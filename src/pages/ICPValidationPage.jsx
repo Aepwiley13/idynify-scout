@@ -1,0 +1,661 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { auth, db } from "../firebase/config";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+
+export default function ICPValidationPage() {
+  const navigate = useNavigate();
+  const [scoutData, setScoutData] = useState(null);
+  const [icpBrief, setIcpBrief] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [activeSection, setActiveSection] = useState('overview');
+
+  useEffect(() => {
+    const fetchScoutData = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          navigate("/login");
+          return;
+        }
+
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          console.log("📦 User data loaded:", data);
+          
+          if (!data.scoutData) {
+            console.log("❌ No scout data, redirecting to questionnaire");
+            navigate("/scout-questionnaire");
+            return;
+          }
+
+          setScoutData(data.scoutData);
+
+          // Check if ICP Brief already exists
+          if (data.icpBrief) {
+            console.log("✅ ICP Brief already exists");
+            setIcpBrief(data.icpBrief);
+          } else {
+            console.log("⚡ No ICP Brief yet, will generate");
+            // Auto-generate on mount if not exists
+            generateICPBrief(data.scoutData, user.uid);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching scout data:", err);
+        setError("Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScoutData();
+  }, [navigate]);
+
+  const generateICPBrief = async (dataToUse = null, userId = null) => {
+    setGenerating(true);
+    setError(null);
+
+    try {
+      const user = userId || auth.currentUser?.uid;
+      if (!user) throw new Error("Not authenticated");
+
+      const summaryData = dataToUse || scoutData;
+      if (!summaryData) throw new Error("No scout data available");
+
+      console.log("🚀 Calling generate-icp-brief with:", summaryData);
+
+      const response = await fetch("/.netlify/functions/generate-icp-brief", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scoutData: summaryData,
+        }),
+      });
+
+      console.log("📡 Response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Response error:", errorText);
+        throw new Error(`Failed to generate ICP Brief: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("✅ Received response:", data);
+
+      if (!data.icpBrief) {
+        console.error("❌ No icpBrief in response:", data);
+        throw new Error("Invalid response format - no icpBrief field");
+      }
+
+      const brief = data.icpBrief;
+      console.log("✅ ICP Brief parsed:", brief);
+
+      setIcpBrief(brief);
+
+      // Save to Firebase
+      console.log("💾 Saving to Firebase for user:", user);
+      const userRef = doc(db, "users", user);
+      await updateDoc(userRef, {
+        icpBrief: brief,
+        icpBriefGeneratedAt: new Date().toISOString()
+      });
+
+      console.log("✅ Successfully saved to Firebase!");
+
+    } catch (err) {
+      console.error("💥 Error generating ICP Brief:", err);
+      setError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to log out?")) {
+      try {
+        await signOut(auth);
+        navigate("/login");
+      } catch (error) {
+        console.error("Error logging out:", error);
+      }
+    }
+  };
+
+  const handleContinue = async () => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        await updateDoc(doc(db, "users", user.uid), {
+          icpApproved: true,
+          icpApprovedAt: new Date().toISOString()
+        });
+      }
+      navigate("/mission-control");
+    } catch (err) {
+      console.error("Error approving ICP:", err);
+      alert("Error saving approval. Please try again.");
+    }
+  };
+
+  const showSection = (sectionId) => {
+    setActiveSection(sectionId);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
+        {/* Starfield */}
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(200)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute bg-white rounded-full"
+              style={{
+                width: Math.random() * 2 + 1 + 'px',
+                height: Math.random() * 2 + 1 + 'px',
+                top: Math.random() * 100 + '%',
+                left: Math.random() * 100 + '%',
+                opacity: Math.random() * 0.7 + 0.3,
+                animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
+                animationDelay: `${Math.random() * 3}s`
+              }}
+            />
+          ))}
+        </div>
+        <div className="relative z-10 text-cyan-400 text-2xl font-mono animate-pulse">
+          [LOADING MISSION DATA...]
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !scoutData) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-red-400 text-xl font-mono">[ERROR: {error}]</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black relative overflow-hidden">
+      {/* Starfield Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(200)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute bg-white rounded-full"
+            style={{
+              width: Math.random() * 2 + 1 + 'px',
+              height: Math.random() * 2 + 1 + 'px',
+              top: Math.random() * 100 + '%',
+              left: Math.random() * 100 + '%',
+              opacity: Math.random() * 0.7 + 0.3,
+              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 3}s`
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Floating Code Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {['[ICP:ANALYSIS]', '[BARRY:PROCESSING]', '[PROFILE:LOCKED]', '[LEADS:READY]', '[TARGET:ACQUIRED]', '[MISSION:GO]'].map((code, i) => (
+          <div
+            key={i}
+            className="absolute text-cyan-400/30 font-mono text-xs"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animation: `floatCode ${15 + i * 3}s linear infinite`,
+              animationDelay: `${i * 2}s`
+            }}
+          >
+            {code}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid Pattern at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-cyan-900/20 to-transparent">
+        <svg className="w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="cyan" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100" height="100" fill="url(#grid)" />
+        </svg>
+      </div>
+
+      {/* Top Right - Logout */}
+      <div className="absolute top-6 right-6 z-50">
+        <button
+          onClick={handleLogout}
+          className="bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 text-red-300 px-4 py-2 rounded-lg font-mono text-xs transition-all"
+        >
+          🚪 LOGOUT
+        </button>
+      </div>
+
+      {/* Header */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-black/80 border-b border-cyan-500/30">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-4xl" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
+                  YOUR ICP BRIEF
+                </h1>
+                <p className="text-xs text-gray-400 font-mono">Generated by Barry AI • Scout Tier</p>
+              </div>
+            </div>
+            {!generating && icpBrief && (
+              <div className="hidden md:flex items-center gap-2 bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/30">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                <span className="text-xs font-semibold text-emerald-300 font-mono">READY TO LAUNCH</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Generating State */}
+      {generating && (
+        <div className="relative z-10 max-w-4xl mx-auto px-6 py-24">
+          <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-12 border border-cyan-500/30 text-center">
+            <div className="text-7xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
+            <h2 className="text-3xl font-bold text-cyan-300 mb-4 font-mono">
+              [GENERATING YOUR ICP BRIEF...]
+            </h2>
+            <p className="text-gray-400 mb-2 font-mono">Barry AI is analyzing your responses</p>
+            <p className="text-gray-500 text-sm font-mono">This takes about 10-15 seconds</p>
+            <div className="mt-8 flex justify-center">
+              <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ICP Brief Content */}
+      {!generating && icpBrief && (
+        <>
+          {/* Hero Section */}
+          <section className="relative z-10 bg-gradient-to-br from-black via-purple-900/20 to-black text-white py-12 border-b border-cyan-500/20">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 bg-cyan-500/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6 border border-cyan-500/30">
+                  <span className="text-cyan-400">✨</span>
+                  <span className="text-sm font-medium text-cyan-300 font-mono">Powered by Barry AI</span>
+                </div>
+                <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                  {icpBrief.companyName}
+                </h1>
+                <p className="text-xl text-gray-300 mb-6 font-mono">Ideal Customer Profile Brief</p>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="flex items-center gap-2 font-mono">
+                    <span className="text-green-400">✓</span>
+                    <span className="text-gray-300">Scout Analysis Complete</span>
+                  </div>
+                  <div className="flex items-center gap-2 font-mono">
+                    <span className="text-green-400">✓</span>
+                    <span className="text-gray-300">Ready for Lead Search</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Navigation Tabs */}
+          <section className="relative z-10 bg-black/50 backdrop-blur-sm border-b border-cyan-500/20 sticky top-[73px]">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="flex overflow-x-auto gap-2 py-3">
+                {[
+                  { id: 'overview', name: 'Executive Summary', icon: '📋' },
+                  { id: 'firmographic', name: 'Firmographics', icon: '🏢' },
+                  { id: 'psychographic', name: 'Psychographics', icon: '🧠' },
+                  { id: 'behavioral', name: 'Behavioral Signals', icon: '⚡' }
+                ].map((section) => (
+                  <button
+                    key={section.id}
+                    onClick={() => showSection(section.id)}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-all font-mono ${
+                      activeSection === section.id
+                        ? 'bg-gradient-to-r from-pink-500 to-cyan-500 text-white'
+                        : 'text-gray-400 hover:bg-cyan-500/10 border border-cyan-500/20'
+                    }`}
+                  >
+                    {section.icon} {section.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Content */}
+          <main className="relative z-10 max-w-7xl mx-auto px-6 py-12">
+            
+            {/* Executive Summary */}
+            {activeSection === 'overview' && (
+              <div className="animate-fadeIn space-y-6">
+                <div className="mb-8">
+                  <h2 className="text-4xl font-bold text-white mb-2 font-mono">Executive Summary</h2>
+                  <p className="text-gray-400 font-mono">Your ideal customer at a glance</p>
+                </div>
+
+                <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-l-4 border-emerald-500 p-8 rounded-r-xl backdrop-blur-sm">
+                  <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono">
+                    <span>🎯</span> Your Ideal Customer At a Glance
+                  </h3>
+                  <p className="text-gray-200 leading-relaxed text-lg">
+                    {icpBrief.idealCustomerGlance}
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="bg-black/60 backdrop-blur-xl border-2 border-green-500/30 rounded-2xl p-8">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                        <span className="text-2xl">✓</span>
+                      </div>
+                      <h4 className="text-xl font-bold text-green-400 font-mono">Perfect Fit Indicators</h4>
+                    </div>
+                    <ul className="space-y-4">
+                      {icpBrief.perfectFitIndicators?.map((indicator, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="text-green-400 text-xl mt-0.5">▸</span>
+                          <span className="text-gray-300">{indicator}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="bg-black/60 backdrop-blur-xl border-2 border-red-500/30 rounded-2xl p-8">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center border border-red-500/30">
+                        <span className="text-2xl">✗</span>
+                      </div>
+                      <h4 className="text-xl font-bold text-red-400 font-mono">Anti-Profile (Avoid)</h4>
+                    </div>
+                    <ul className="space-y-4">
+                      {icpBrief.antiProfile?.map((item, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="text-red-400 text-xl mt-0.5">▸</span>
+                          <span className="text-gray-300">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 backdrop-blur-xl rounded-2xl p-8 border-2 border-yellow-500/30">
+                  <h4 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono">
+                    <span className="text-3xl">💡</span>
+                    Key Insight
+                  </h4>
+                  <p className="text-gray-200 leading-relaxed italic text-lg">
+                    "{icpBrief.keyInsight}"
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Firmographic Profile */}
+            {activeSection === 'firmographic' && icpBrief.firmographics && (
+              <div className="animate-fadeIn space-y-6">
+                <div className="mb-8">
+                  <h2 className="text-4xl font-bold text-white mb-2 font-mono">Firmographic Profile</h2>
+                  <p className="text-gray-400 font-mono">Company characteristics and decision-maker intelligence</p>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-6 rounded-2xl shadow-lg border border-emerald-400/30">
+                    <span className="text-3xl mb-3 block">👥</span>
+                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Company Size</p>
+                    <p className="text-3xl font-bold">{icpBrief.firmographics.companySize?.split(' ')[0]}</p>
+                    <p className="text-xs opacity-90 mt-1">employees</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-6 rounded-2xl shadow-lg border border-blue-400/30">
+                    <span className="text-3xl mb-3 block">📈</span>
+                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Stage</p>
+                    <p className="text-2xl font-bold">{icpBrief.firmographics.stage}</p>
+                    <p className="text-xs opacity-90 mt-1">funding stage</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-500 to-pink-600 text-white p-6 rounded-2xl shadow-lg border border-purple-400/30">
+                    <span className="text-3xl mb-3 block">💰</span>
+                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Budget</p>
+                    <p className="text-2xl font-bold">{icpBrief.firmographics.budget}</p>
+                    <p className="text-xs opacity-90 mt-1">monthly</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-orange-500 to-red-600 text-white p-6 rounded-2xl shadow-lg border border-orange-400/30">
+                    <span className="text-3xl mb-3 block">⚡</span>
+                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Decision Speed</p>
+                    <p className="text-3xl font-bold">{icpBrief.firmographics.decisionSpeed?.split(' ')[0]}</p>
+                    <p className="text-xs opacity-90 mt-1">to close</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-cyan-500/30 p-8">
+                    <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 font-mono">
+                      <span className="text-3xl">🏢</span>
+                      Primary Industries
+                    </h3>
+                    <div className="space-y-3">
+                      {icpBrief.firmographics.industries?.map((industry, i) => (
+                        <div key={i} className="flex items-center justify-between py-3 border-b border-cyan-500/20">
+                          <span className="text-gray-300">{industry.name}</span>
+                          <span className={`text-sm font-semibold font-mono ${
+                            industry.fit === 'High' ? 'text-cyan-400' :
+                            industry.fit === 'Medium' ? 'text-green-400' :
+                            'text-yellow-400'
+                          }`}>{industry.fit} Fit</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-purple-500/30 p-8">
+                    <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 font-mono">
+                      <span className="text-3xl">👤</span>
+                      Decision Makers
+                    </h3>
+                    <div className="space-y-4">
+                      {icpBrief.firmographics.decisionMakers?.map((dm, i) => (
+                        <div key={i} className={`p-4 rounded-lg border ${
+                          dm.level === 'Primary' ? 'bg-purple-500/20 border-purple-500/30' : 'bg-blue-500/20 border-blue-500/30'
+                        }`}>
+                          <p className="font-bold text-white mb-1 font-mono">{dm.level}: {dm.title}</p>
+                          <p className="text-sm text-gray-300">{dm.role}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Psychographic Profile */}
+            {activeSection === 'psychographic' && icpBrief.psychographics && (
+              <div className="animate-fadeIn space-y-6">
+                <div className="mb-8">
+                  <h2 className="text-4xl font-bold text-white mb-2 font-mono">Psychographic Profile</h2>
+                  <p className="text-gray-400 font-mono">Mindset, values, and pain points</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-2 border-purple-500/30 rounded-2xl p-8 backdrop-blur-xl">
+                  <h3 className="text-3xl font-bold text-white mb-6 flex items-center gap-3 font-mono">
+                    <span className="text-4xl">🧠</span>
+                    Top Pain Points
+                  </h3>
+                  <div className="space-y-4">
+                    {icpBrief.psychographics.painPoints?.map((item, i) => (
+                      <div key={i} className="bg-black/40 rounded-xl p-6 border border-purple-500/20">
+                        <div className="flex items-start gap-4">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-2xl flex-shrink-0 ${
+                            item.impact === 'Critical' ? 'bg-red-500/20 text-red-400 border-2 border-red-500/30' :
+                            'bg-orange-500/20 text-orange-400 border-2 border-orange-500/30'
+                          }`}>
+                            {i + 1}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-lg font-bold text-white">{item.pain}</h4>
+                              <span className={`text-xs font-semibold px-3 py-1 rounded-full font-mono ${
+                                item.impact === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                              }`}>
+                                {item.impact}
+                              </span>
+                            </div>
+                            <p className="text-gray-300">{item.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-pink-500/30 p-8">
+                  <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 font-mono">
+                    <span className="text-3xl">💬</span>
+                    Core Values & Beliefs
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {icpBrief.psychographics.values?.map((value, i) => (
+                      <div key={i} className="flex items-start gap-3 p-4 bg-pink-500/10 rounded-lg border border-pink-500/20">
+                        <span className="text-pink-400 text-xl">✓</span>
+                        <span className="text-gray-300">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Behavioral Indicators */}
+            {activeSection === 'behavioral' && icpBrief.behavioralTriggers && (
+              <div className="animate-fadeIn space-y-6">
+                <div className="mb-8">
+                  <h2 className="text-4xl font-bold text-white mb-2 font-mono">Behavioral Indicators</h2>
+                  <p className="text-gray-400 font-mono">Hot buying triggers and timing signals</p>
+                </div>
+
+                <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border-2 border-red-500/30 rounded-2xl p-8 backdrop-blur-xl">
+                  <h3 className="text-3xl font-bold text-white mb-6 flex items-center gap-3 font-mono">
+                    <span className="text-4xl">🔥</span>
+                    Hot Buying Triggers
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {icpBrief.behavioralTriggers?.map((item, i) => (
+                      <div key={i} className="bg-black/40 rounded-xl p-6 border border-red-500/30">
+                        <div className="flex items-start gap-3 mb-4">
+                          <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0 border border-red-500/30">
+                            <span className="text-2xl">⚡</span>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-lg">{item.trigger}</h4>
+                            <p className="text-sm text-red-400 font-semibold font-mono">{item.timing}</p>
+                          </div>
+                        </div>
+                        <div className="bg-red-500/10 p-4 rounded border border-red-500/20">
+                          <p className="text-sm text-gray-300">
+                            <strong className="text-white">Action:</strong> {item.action}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CTA Section */}
+            <div className="mt-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-2xl p-10 text-center border-2 border-emerald-500/30 backdrop-blur-xl">
+              <div className="text-6xl mb-6">🚀</div>
+              <h3 className="text-4xl font-bold text-white mb-4 font-mono">Ready to Find Your Leads?</h3>
+              <p className="text-gray-300 mb-8 text-lg max-w-2xl mx-auto">
+                Your ICP is ready. Now let Barry search for companies that match this profile and deliver qualified leads to your inbox.
+              </p>
+              
+              <div className="space-y-4 max-w-xl mx-auto">
+                <button 
+                  onClick={handleContinue}
+                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-lg font-mono">
+                  🚀 LAUNCH LEAD SEARCH →
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-400 mt-6 font-mono">
+                First batch of leads delivered within 48 hours
+              </p>
+            </div>
+
+          </main>
+        </>
+      )}
+
+      {/* Error State */}
+      {error && !generating && (
+        <div className="relative z-10 max-w-4xl mx-auto px-6 py-24">
+          <div className="bg-red-500/20 border-2 border-red-500 rounded-2xl p-8 text-center backdrop-blur-xl">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-white mb-3 font-mono">ERROR DETECTED</h2>
+            <p className="text-red-300 mb-6 font-mono">{error}</p>
+            <button
+              onClick={() => generateICPBrief()}
+              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition-all font-mono"
+            >
+              → RETRY GENERATION
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Panel */}
+      {scoutData && (
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pb-8">
+          <details className="text-xs">
+            <summary className="cursor-pointer text-cyan-500/50 hover:text-cyan-400 font-mono">
+              [DEBUG: VIEW SCOUT DATA]
+            </summary>
+            <pre className="mt-4 bg-black/80 p-4 rounded-lg overflow-auto text-cyan-400/70 border border-cyan-500/20 font-mono">
+              {JSON.stringify(scoutData, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 1; }
+        }
+        @keyframes floatBear {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        @keyframes floatCode {
+          0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-in; }
+      `}</style>
+    </div>
+  );
+}

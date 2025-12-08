@@ -1,6 +1,12 @@
 exports.handler = async (event, context) => {
   console.log('🎯 Barry Enhanced Lead Generation V2 - Starting Mission');
   
+  // CRITICAL: Set function timeout to 8 seconds (leave 2 sec buffer before Netlify kills it)
+  const FUNCTION_TIMEOUT = 8000;
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Function timeout - processing is taking too long. Try using standard version or reducing search scope.')), FUNCTION_TIMEOUT);
+  });
+  
   // Handle CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -15,175 +21,18 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { userId, scoutData, icpBrief } = JSON.parse(event.body);
+    // Race the main logic against timeout
+    const result = await Promise.race([
+      mainLeadGenerationLogic(event),
+      timeoutPromise
+    ]);
     
-    const apolloKey = process.env.APOLLO_API_KEY;
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    return result;
     
-    if (!apolloKey || !anthropicKey) {
-      throw new Error('API keys not configured');
-    }
-
-    console.log('📊 Scout Data:', {
-      industries: scoutData.industries?.length,
-      jobTitles: scoutData.jobTitles?.length,
-      companySizes: scoutData.companySizes?.length,
-      perfectFit: scoutData.perfectFitCompanies
-    });
-
-    // STEP 1: Barry analyzes ICP and creates search strategy
-    console.log('🧠 Step 1: Barry is analyzing your ICP...');
-    const searchStrategy = await createIntelligentSearchStrategy(scoutData, icpBrief, anthropicKey);
-    console.log('✅ Strategy created:', searchStrategy.summary);
-
-    // STEP 2: Discover companies (not people yet)
-    console.log('🔍 Step 2: Discovering companies in your TAM...');
-    const companiesData = await discoverCompanies(searchStrategy, scoutData, apolloKey);
-    console.log(`✅ Found ${companiesData.organizations?.length || 0} companies`);
-
-    if (!companiesData.organizations || companiesData.organizations.length === 0) {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          leads: [],
-          count: 0,
-          message: 'No companies found matching your criteria. Try broadening your search parameters.',
-          analytics: {
-            totalCompaniesFound: 0,
-            phase: 'company_discovery'
-          }
-        })
-      };
-    }
-
-    // STEP 3: Barry scores companies with AI
-    console.log('⚖️ Step 3: Scoring companies against your ICP...');
-    const scoredCompanies = await scoreCompaniesWithAI(
-      companiesData.organizations.slice(0, 50), // Score first 50
-      scoutData,
-      icpBrief,
-      anthropicKey
-    );
-    console.log(`✅ ${scoredCompanies.length} companies qualified (score >= 60)`);
-
-    if (scoredCompanies.length === 0) {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          leads: [],
-          count: 0,
-          message: 'Found companies but none met the quality threshold. Barry is being selective!',
-          analytics: {
-            totalCompaniesFound: companiesData.organizations.length,
-            companiesScored: 50,
-            qualifiedCompanies: 0,
-            phase: 'company_scoring'
-          }
-        })
-      };
-    }
-
-    // STEP 4: Find decision-makers in top companies
-    console.log('👥 Step 4: Finding decision-makers in top companies...');
-    const topCompanies = scoredCompanies.slice(0, 15); // Top 15 companies
-    const leads = await findDecisionMakers(topCompanies, scoutData, apolloKey);
-    console.log(`✅ Found ${leads.length} decision-makers`);
-
-    if (leads.length === 0) {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          leads: [],
-          count: 0,
-          message: 'Found great companies but no decision-makers with your target titles.',
-          analytics: {
-            totalCompaniesFound: companiesData.organizations.length,
-            qualifiedCompanies: topCompanies.length,
-            leadsFound: 0,
-            phase: 'decision_maker_discovery'
-          }
-        })
-      };
-    }
-
-    // STEP 5: Enrich leads with additional data
-    console.log('🔬 Step 5: Enriching lead profiles...');
-    const enrichedLeads = await enrichLeadsWithData(leads, apolloKey);
-    console.log(`✅ Enriched ${enrichedLeads.length} leads`);
-
-    // STEP 6: Final scoring with your existing scoring function
-    console.log('🎯 Step 6: Final lead scoring...');
-    const finalLeads = enrichedLeads.map(lead => {
-      const { score, breakdown, matchDetails } = calculateLeadScore(lead, scoutData, icpBrief);
-      return {
-        id: lead.id || Math.random().toString(36),
-        name: lead.name || 'Unknown',
-        title: lead.title || 'Unknown',
-        company: lead.organization?.name || 'Unknown',
-        industry: lead.organization?.industry || 'Unknown',
-        employees: lead.organization?.estimated_num_employees || 0,
-        location: `${lead.city || ''}${lead.city && lead.state ? ', ' : ''}${lead.state || ''}`.trim() || 'Unknown',
-        email: lead.email || null,
-        linkedin: lead.linkedin_url || null,
-        phone: lead.phone_numbers?.[0]?.sanitized_number || null,
-        photoUrl: lead.photo_url || null,
-        website: lead.organization?.website_url || null,
-        score: score,
-        scoreBreakdown: breakdown,
-        matchDetails: matchDetails,
-        companyScore: lead.companyScore || 0,
-        companyReason: lead.companyReason || '',
-        companyGrowth: lead.companyGrowth || calculateGrowthSignal(lead.organization),
-        createdAt: new Date().toISOString()
-      };
-    });
-
-    // Filter and sort
-    const qualifiedLeads = finalLeads.filter(lead => lead.score >= 60);
-    qualifiedLeads.sort((a, b) => b.score - a.score);
-    const top10Leads = qualifiedLeads.slice(0, 10);
-
-    console.log(`🎉 Mission complete! Returning ${top10Leads.length} top-quality leads`);
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        leads: top10Leads,
-        count: top10Leads.length,
-        analytics: {
-          totalCompaniesFound: companiesData.organizations.length,
-          companiesScored: scoredCompanies.length,
-          qualifiedCompanies: topCompanies.length,
-          leadsFound: leads.length,
-          finalLeads: top10Leads.length,
-          searchStrategy: searchStrategy.summary,
-          avgScore: Math.round(top10Leads.reduce((acc, l) => acc + l.score, 0) / top10Leads.length)
-        },
-        message: `Barry analyzed ${companiesData.organizations.length} companies and found ${top10Leads.length} perfect-fit leads for you!`,
-        generatedAt: new Date().toISOString()
-      })
-    };
-
   } catch (error) {
     console.error('💥 Barry encountered an error:', error);
     return {
-      statusCode: 500,
+      statusCode: error.message.includes('timeout') ? 504 : 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
@@ -193,11 +42,181 @@ exports.handler = async (event, context) => {
         errorType: error.name || 'Error',
         leads: [],
         count: 0,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        suggestion: error.message.includes('timeout') 
+          ? 'Try using the standard lead generation version, or narrow your search criteria.'
+          : undefined
       })
     };
   }
 };
+
+async function mainLeadGenerationLogic(event) {
+  const { userId, scoutData, icpBrief } = JSON.parse(event.body);
+  
+  const apolloKey = process.env.APOLLO_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  
+  if (!apolloKey || !anthropicKey) {
+    throw new Error('API keys not configured');
+  }
+
+  console.log('📊 Scout Data:', {
+    industries: scoutData.industries?.length,
+    jobTitles: scoutData.jobTitles?.length,
+    companySizes: scoutData.companySizes?.length,
+    perfectFit: scoutData.perfectFitCompanies
+  });
+
+  // STEP 1: Barry analyzes ICP and creates search strategy
+  console.log('🧠 Step 1: Barry is analyzing your ICP...');
+  const searchStrategy = await createIntelligentSearchStrategy(scoutData, icpBrief, anthropicKey);
+  console.log('✅ Strategy created:', searchStrategy.summary);
+
+  // STEP 2: Discover companies (not people yet)
+  console.log('🔍 Step 2: Discovering companies in your TAM...');
+  const companiesData = await discoverCompanies(searchStrategy, scoutData, apolloKey);
+  console.log(`✅ Found ${companiesData.organizations?.length || 0} companies`);
+
+  if (!companiesData.organizations || companiesData.organizations.length === 0) {
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({
+        leads: [],
+        count: 0,
+        message: 'No companies found matching your criteria. Try broadening your search parameters.',
+        analytics: {
+          totalCompaniesFound: 0,
+          phase: 'company_discovery'
+        }
+      })
+    };
+  }
+
+  // STEP 3: Barry scores companies with AI (OPTIMIZED - Only top 20 companies)
+  console.log('⚖️ Step 3: Scoring top companies against your ICP...');
+  const topCompaniesToScore = companiesData.organizations.slice(0, 20); // Reduced from 50
+  const scoredCompanies = await scoreCompaniesWithAI(
+    topCompaniesToScore,
+    scoutData,
+    icpBrief,
+    anthropicKey
+  );
+  console.log(`✅ ${scoredCompanies.length} companies qualified (score >= 60)`);
+
+  if (scoredCompanies.length === 0) {
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({
+        leads: [],
+        count: 0,
+        message: 'Found companies but none met the quality threshold. Barry is being selective!',
+        analytics: {
+          totalCompaniesFound: companiesData.organizations.length,
+          companiesScored: topCompaniesToScore.length,
+          qualifiedCompanies: 0,
+          phase: 'company_scoring'
+        }
+      })
+    };
+  }
+
+  // STEP 4: Find decision-makers in top companies (OPTIMIZED - Parallel requests)
+  console.log('👥 Step 4: Finding decision-makers in top companies...');
+  const topCompanies = scoredCompanies.slice(0, 10); // Reduced from 15
+  const leads = await findDecisionMakersParallel(topCompanies, scoutData, apolloKey); // NEW
+  console.log(`✅ Found ${leads.length} decision-makers`);
+
+  if (leads.length === 0) {
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({
+        leads: [],
+        count: 0,
+        message: 'Found great companies but no decision-makers with your target titles.',
+        analytics: {
+          totalCompaniesFound: companiesData.organizations.length,
+          qualifiedCompanies: topCompanies.length,
+          leadsFound: 0,
+          phase: 'decision_maker_discovery'
+        }
+      })
+    };
+  }
+
+  // STEP 5: Enrich leads with additional data
+  console.log('🔬 Step 5: Enriching lead profiles...');
+  const enrichedLeads = await enrichLeadsWithData(leads, apolloKey);
+  console.log(`✅ Enriched ${enrichedLeads.length} leads`);
+
+  // STEP 6: Final scoring
+  console.log('🎯 Step 6: Final lead scoring...');
+  const finalLeads = enrichedLeads.map(lead => {
+    const { score, breakdown, matchDetails } = calculateLeadScore(lead, scoutData, icpBrief);
+    return {
+      id: lead.id || Math.random().toString(36),
+      name: lead.name || 'Unknown',
+      title: lead.title || 'Unknown',
+      company: lead.organization?.name || 'Unknown',
+      industry: lead.organization?.industry || 'Unknown',
+      employees: lead.organization?.estimated_num_employees || 0,
+      location: `${lead.city || ''}${lead.city && lead.state ? ', ' : ''}${lead.state || ''}`.trim() || 'Unknown',
+      email: lead.email || null,
+      linkedin: lead.linkedin_url || null,
+      phone: lead.phone_numbers?.[0]?.sanitized_number || null,
+      photoUrl: lead.photo_url || null,
+      website: lead.organization?.website_url || null,
+      score: score,
+      scoreBreakdown: breakdown,
+      matchDetails: matchDetails,
+      companyScore: lead.companyScore || 0,
+      companyReason: lead.companyReason || '',
+      companyGrowth: lead.companyGrowth || calculateGrowthSignal(lead.organization),
+      createdAt: new Date().toISOString()
+    };
+  });
+
+  // Filter and sort
+  const qualifiedLeads = finalLeads.filter(lead => lead.score >= 60);
+  qualifiedLeads.sort((a, b) => b.score - a.score);
+  const top10Leads = qualifiedLeads.slice(0, 10);
+
+  console.log(`🎉 Mission complete! Returning ${top10Leads.length} top-quality leads`);
+
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    },
+    body: JSON.stringify({
+      leads: top10Leads,
+      count: top10Leads.length,
+      analytics: {
+        totalCompaniesFound: companiesData.organizations.length,
+        companiesScored: scoredCompanies.length,
+        qualifiedCompanies: topCompanies.length,
+        leadsFound: leads.length,
+        finalLeads: top10Leads.length,
+        searchStrategy: searchStrategy.summary,
+        avgScore: top10Leads.length > 0 ? Math.round(top10Leads.reduce((acc, l) => acc + l.score, 0) / top10Leads.length) : 0
+      },
+      message: `Barry analyzed ${companiesData.organizations.length} companies and found ${top10Leads.length} perfect-fit leads for you!`,
+      generatedAt: new Date().toISOString()
+    })
+  };
+}
 
 // Helper Functions
 
@@ -241,7 +260,6 @@ Create a search strategy. Return ONLY valid JSON (no markdown):
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   
   if (!jsonMatch) {
-    // Fallback strategy
     return {
       primaryIndustryKeywords: scoutData.industries || [],
       companySignals: [],
@@ -260,12 +278,10 @@ async function discoverCompanies(strategy, scoutData, apolloKey) {
     organization_locations: buildLocationArray(scoutData)
   };
 
-  // Add industry keywords
   if (strategy.primaryIndustryKeywords?.length > 0) {
     searchPayload.q_organization_keyword_tags = strategy.primaryIndustryKeywords.slice(0, 3);
   }
 
-  // Add company sizes
   if (scoutData.companySizes?.length > 0) {
     const sizes = [];
     scoutData.companySizes.forEach(range => {
@@ -294,14 +310,8 @@ async function discoverCompanies(strategy, scoutData, apolloKey) {
 }
 
 async function scoreCompaniesWithAI(companies, scoutData, icpBrief, anthropicKey) {
-  // Process in smaller batches to avoid token limits
-  const batchSize = 25;
-  const allScoredCompanies = [];
-
-  for (let i = 0; i < companies.length; i += batchSize) {
-    const batch = companies.slice(i, i + batchSize);
-    
-    const prompt = `You are Barry, scoring companies against this ICP.
+  // OPTIMIZED: Do ONE batch instead of multiple sequential calls
+  const prompt = `You are Barry, scoring companies against this ICP.
 
 PERFECT FIT EXAMPLES: ${scoutData.perfectFitCompanies || 'Not provided'}
 AVOID: ${scoutData.avoidList || 'None'}
@@ -309,7 +319,7 @@ TARGET INDUSTRIES: ${scoutData.industries?.join(', ')}
 
 Score these companies (0-100). Only include companies scoring 60+:
 
-${batch.map((c, idx) => `${idx + 1}. ${c.name} - ${c.industry || 'Unknown'} - ${c.estimated_num_employees || 0} employees`).join('\n')}
+${companies.map((c, idx) => `${idx + 1}. ${c.name} - ${c.industry || 'Unknown'} - ${c.estimated_num_employees || 0} employees`).join('\n')}
 
 Return ONLY valid JSON array (no markdown):
 [
@@ -319,57 +329,61 @@ Return ONLY valid JSON array (no markdown):
 
 Skip companies below 60 score.`;
 
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
 
-      const data = await response.json();
-      const text = data.content[0].text;
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      
-      if (jsonMatch) {
-        const scores = JSON.parse(jsonMatch[0]);
-        
-        scores.forEach(scoreData => {
-          const company = batch[scoreData.index - 1];
-          if (company && scoreData.score >= 60) {
-            allScoredCompanies.push({
-              ...company,
-              barryScore: scoreData.score,
-              barryReason: scoreData.reason
-            });
-          }
+    const data = await response.json();
+    const text = data.content[0].text;
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    
+    if (!jsonMatch) {
+      console.warn('Could not parse AI scoring response, using fallback');
+      return companies.slice(0, 10).map(c => ({ ...c, barryScore: 70, barryReason: 'Fallback scoring' }));
+    }
+    
+    const scores = JSON.parse(jsonMatch[0]);
+    const scoredCompanies = [];
+    
+    scores.forEach(scoreData => {
+      const company = companies[scoreData.index - 1];
+      if (company && scoreData.score >= 60) {
+        scoredCompanies.push({
+          ...company,
+          barryScore: scoreData.score,
+          barryReason: scoreData.reason
         });
       }
-    } catch (err) {
-      console.error('Error scoring batch:', err);
-      // Continue with next batch
-    }
+    });
+    
+    return scoredCompanies.sort((a, b) => b.barryScore - a.barryScore);
+    
+  } catch (err) {
+    console.error('Error in AI scoring:', err);
+    // Fallback: return top companies without AI scoring
+    return companies.slice(0, 10).map(c => ({ ...c, barryScore: 70, barryReason: 'Fallback scoring due to error' }));
   }
-
-  return allScoredCompanies.sort((a, b) => b.barryScore - a.barryScore);
 }
 
-async function findDecisionMakers(companies, scoutData, apolloKey) {
-  const leads = [];
-  
-  // Process up to 15 companies
-  for (const company of companies.slice(0, 15)) {
+// NEW: Parallel version of findDecisionMakers
+async function findDecisionMakersParallel(companies, scoutData, apolloKey) {
+  // Make all API calls in parallel instead of sequential
+  const promises = companies.map(async (company) => {
     try {
       const searchPayload = {
         page: 1,
-        per_page: 3,
+        per_page: 2, // Only get top 2 per company
         organization_ids: [company.id],
         person_titles: scoutData.jobTitles?.slice(0, 5) || []
       };
@@ -386,25 +400,25 @@ async function findDecisionMakers(companies, scoutData, apolloKey) {
       const data = await response.json();
       
       if (data.people && data.people.length > 0) {
-        // Take best match from this company
         const person = data.people[0];
-        leads.push({
+        return {
           ...person,
           companyScore: company.barryScore,
           companyReason: company.barryReason
-        });
+        };
       }
+      return null;
     } catch (err) {
       console.error(`Error finding decision makers for ${company.name}:`, err);
+      return null;
     }
-  }
-  
-  return leads;
+  });
+
+  const results = await Promise.all(promises);
+  return results.filter(lead => lead !== null);
 }
 
 async function enrichLeadsWithData(leads, apolloKey) {
-  // For now, return leads as-is
-  // Apollo match API can be added here for additional enrichment
   return leads.map(lead => ({
     ...lead,
     companyGrowth: calculateGrowthSignal(lead.organization)
@@ -454,7 +468,6 @@ function buildLocationArray(scoutData) {
   return locations.length > 0 ? locations : ['United States'];
 }
 
-// Keep your existing calculateLeadScore function
 function calculateLeadScore(lead, scoutData, icpBrief) {
   let score = 0;
   const breakdown = {

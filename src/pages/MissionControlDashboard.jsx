@@ -23,6 +23,7 @@ export default function MissionControlDashboard() {
   const [icpSection, setIcpSection] = useState('overview');
   const [generatingLeads, setGeneratingLeads] = useState(false);
   const [useEnhancedVersion, setUseEnhancedVersion] = useState(false);
+  const [leadGenError, setLeadGenError] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {

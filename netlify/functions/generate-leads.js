@@ -1,20 +1,19 @@
-const fetch = require('node-fetch');
+// Netlify Functions use native fetch (Node 18+) - NO IMPORTS NEEDED
 
-// ENHANCED Lead scoring function (0-100 points)
-// Includes location targeting from new questionnaire
-function calculateLeadScore(lead, scoutData) {
+// Lead scoring function (0-100 points)
+function calculateLeadScore(lead, scoutData, icpBrief) {
   let score = 0;
   const breakdown = {
     title: 0,
     industry: 0,
     size: 0,
-    location: 0,  // NEW!
+    location: 0,
     notAvoid: 0,
     dataQuality: 0
   };
   const matchDetails = [];
 
-  // 1. TITLE MATCH (25 points max) - Enhanced keyword matching
+  // 1. TITLE MATCH (25 points max)
   const targetTitles = scoutData.jobTitles || [];
   const leadTitle = (lead.title || '').toLowerCase();
   
@@ -35,7 +34,6 @@ function calculateLeadScore(lead, scoutData) {
   }
   
   if (!titleMatch && leadTitle.length > 0) {
-    // Check for related keywords
     const keywords = ['vp', 'vice president', 'director', 'head', 'chief', 'manager', 'ceo', 'cfo', 'cto', 'president', 'owner', 'founder'];
     if (keywords.some(kw => leadTitle.includes(kw))) {
       breakdown.title = 12;
@@ -92,21 +90,19 @@ function calculateLeadScore(lead, scoutData) {
     matchDetails.push(`⚠ Size outside target range (${leadEmployees} employees)`);
   }
 
-  // 4. LOCATION MATCH (15 points max) - NEW!
+  // 4. LOCATION MATCH (15 points max)
   const personLocation = {
     city: (lead.city || '').toLowerCase(),
     state: (lead.state || '').toLowerCase(),
     country: (lead.country || '').toLowerCase()
   };
   
-  // Check location scope from questionnaire
   if (scoutData.locationScope?.includes('All US') || scoutData.locationScope?.includes('Remote')) {
     breakdown.location = 15;
     matchDetails.push(`✓ Location: ${scoutData.locationScope.join(', ')}`);
   } else {
     let locationMatched = false;
     
-    // Check specific states
     if (scoutData.targetStates && scoutData.targetStates.length > 0) {
       for (const targetState of scoutData.targetStates) {
         if (personLocation.state.includes(targetState.toLowerCase()) || 
@@ -119,7 +115,6 @@ function calculateLeadScore(lead, scoutData) {
       }
     }
     
-    // Check specific cities/metros
     if (!locationMatched && scoutData.targetCities && scoutData.targetCities.length > 0) {
       for (const targetCity of scoutData.targetCities) {
         const cityName = targetCity.toLowerCase().replace(' metro', '').replace(' area', '');
@@ -132,7 +127,6 @@ function calculateLeadScore(lead, scoutData) {
       }
     }
     
-    // Partial credit if in US but not target location
     if (!locationMatched && personLocation.country.includes('united states')) {
       breakdown.location = 5;
       matchDetails.push(`⚠ US location but not target area (${lead.state || lead.city})`);
@@ -147,19 +141,16 @@ function calculateLeadScore(lead, scoutData) {
   
   let isAvoided = false;
   
-  // Check if company name is in avoid list
   if (avoidList && avoidList.split(',').some(avoid => companyName.includes(avoid.trim()))) {
     isAvoided = true;
     matchDetails.push('✗ Company in avoid list');
   }
   
-  // Check for enterprise if avoiding large companies
   if (avoidList.includes('enterprise') && leadEmployees > 1000) {
     isAvoided = true;
     matchDetails.push('⚠ Large enterprise (in avoid criteria)');
   }
   
-  // Check for B2C if avoiding consumer-facing
   if (avoidList.includes('b2c') && leadIndustry.includes('consumer')) {
     isAvoided = true;
     matchDetails.push('⚠ B2C company (in avoid criteria)');
@@ -186,45 +177,35 @@ function calculateLeadScore(lead, scoutData) {
   }
   breakdown.dataQuality = Math.min(dataScore, 10);
 
-  // Calculate total score
   score = breakdown.title + breakdown.industry + breakdown.size + breakdown.location + breakdown.notAvoid + breakdown.dataQuality;
 
-  return {
-    score,
-    breakdown,
-    matchDetails
-  };
+  return { score, breakdown, matchDetails };
 }
 
-// Helper: Build location array for Apollo API query
+// Build location array for Apollo API
 function buildLocationArray(scoutData) {
   const locations = [];
   
-  // If "All US" selected
   if (scoutData.locationScope?.includes('All US')) {
     return ['United States'];
   }
   
-  // Add specific states
   if (scoutData.targetStates && scoutData.targetStates.length > 0) {
     locations.push(...scoutData.targetStates.map(state => `${state}, United States`));
   }
   
-  // Add specific cities/metros
   if (scoutData.targetCities && scoutData.targetCities.length > 0) {
     locations.push(...scoutData.targetCities.map(city => {
-      // Extract city name from metro area strings like "San Francisco Bay Area"
       const cityName = city.replace(' Metro', '').replace(' Area', '').replace(' Bay', '');
       return cityName;
     }));
   }
   
-  // Default to US if no specific locations
   return locations.length > 0 ? locations : ['United States'];
 }
 
 exports.handler = async (event, context) => {
-  console.log('🎯 Generate Leads with Enhanced Scoring (Location Targeting Enabled)');
+  console.log('🎯 Generate Leads - Enhanced Scoring with ICP Brief');
   
   // Handle CORS
   if (event.httpMethod === 'OPTIONS') {
@@ -240,11 +221,60 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { userId, scoutData } = JSON.parse(event.body);
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = JSON.parse(event.body);
+    } catch (parseError) {
+      console.error('❌ Failed to parse request body:', parseError);
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          error: 'Invalid request body - must be valid JSON',
+          leads: [],
+          count: 0
+        })
+      };
+    }
+
+    const { userId, scoutData, icpBrief } = requestBody;
+    
+    if (!scoutData) {
+      console.error('❌ No scoutData in request');
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          error: 'scoutData is required in request body',
+          leads: [],
+          count: 0
+        })
+      };
+    }
+    
     const apolloKey = process.env.APOLLO_API_KEY;
     
     if (!apolloKey) {
-      throw new Error('APOLLO_API_KEY not configured in Netlify environment');
+      console.error('❌ APOLLO_API_KEY not set');
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          error: 'APOLLO_API_KEY not configured in Netlify environment variables',
+          leads: [],
+          count: 0
+        })
+      };
     }
 
     console.log('📊 Scout Data:', {
@@ -256,19 +286,19 @@ exports.handler = async (event, context) => {
       targetCities: scoutData.targetCities?.length
     });
 
+    console.log('🎯 ICP Brief:', icpBrief ? 'Present' : 'Not provided');
+
     // Build Apollo search query
     const searchPayload = {
       page: 1,
-      per_page: 25, // Scout tier: get 25 to score and filter down to best 10
-      person_locations: buildLocationArray(scoutData) // NEW: Location targeting!
+      per_page: 25,
+      person_locations: buildLocationArray(scoutData)
     };
 
-    // Add job titles (take first 5 to avoid over-constraining)
     if (scoutData.jobTitles && scoutData.jobTitles.length > 0) {
       searchPayload.person_titles = scoutData.jobTitles.slice(0, 5);
     }
 
-    // Add organization size ranges
     if (scoutData.companySizes && scoutData.companySizes.length > 0) {
       const sizes = [];
       scoutData.companySizes.forEach(range => {
@@ -286,7 +316,7 @@ exports.handler = async (event, context) => {
 
     console.log('🔍 Apollo Search Payload:', JSON.stringify(searchPayload, null, 2));
 
-    // Call Apollo API
+    // Call Apollo API (using native fetch - no import needed!)
     const response = await fetch('https://api.apollo.io/v1/mixed_people/search', {
       method: 'POST',
       headers: {
@@ -299,7 +329,19 @@ exports.handler = async (event, context) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Apollo API Error:', errorText);
-      throw new Error(`Apollo API error: ${response.status} - ${errorText}`);
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          error: `Apollo API error: ${response.status}`,
+          details: errorText,
+          leads: [],
+          count: 0
+        })
+      };
     }
 
     const apolloData = await response.json();
@@ -321,9 +363,9 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Transform and score leads
+    // Transform and score leads (pass icpBrief if available)
     const scoredLeads = (apolloData.people || []).map(person => {
-      const { score, breakdown, matchDetails } = calculateLeadScore(person, scoutData);
+      const { score, breakdown, matchDetails } = calculateLeadScore(person, scoutData, icpBrief);
       
       return {
         id: person.id || Math.random().toString(36),
@@ -344,26 +386,11 @@ exports.handler = async (event, context) => {
       };
     });
 
-    // Sort by score (highest first) and take top 10 for Scout tier
+    // Sort by score and take top 10
     scoredLeads.sort((a, b) => b.score - a.score);
     const topLeads = scoredLeads.slice(0, 10);
 
     console.log('🎉 Returning top', topLeads.length, 'scored leads');
-    console.log('📊 Score distribution:', {
-      excellent: topLeads.filter(l => l.score >= 85).length,
-      good: topLeads.filter(l => l.score >= 70 && l.score < 85).length,
-      moderate: topLeads.filter(l => l.score >= 50 && l.score < 70).length,
-      low: topLeads.filter(l => l.score < 50).length
-    });
-
-    // Log top 3 scores for debugging
-    console.log('🏆 Top 3 leads:', topLeads.slice(0, 3).map(l => ({
-      name: l.name,
-      title: l.title,
-      company: l.company,
-      score: l.score,
-      breakdown: l.scoreBreakdown
-    })));
 
     return {
       statusCode: 200,
@@ -384,7 +411,8 @@ exports.handler = async (event, context) => {
     };
 
   } catch (error) {
-    console.error('💥 ERROR:', error);
+    console.error('💥 CRITICAL ERROR:', error);
+    
     return {
       statusCode: 500,
       headers: {
@@ -392,7 +420,8 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
-        error: error.message,
+        error: error.message || 'Unknown error occurred',
+        errorType: error.name || 'Error',
         leads: [],
         count: 0
       })

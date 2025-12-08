@@ -22,7 +22,7 @@ export default function MissionControlDashboard() {
   const [sortBy, setSortBy] = useState("score");
   const [icpSection, setIcpSection] = useState('overview');
   const [generatingLeads, setGeneratingLeads] = useState(false);
-  const [useEnhancedVersion, setUseEnhancedVersion] = useState(false);
+  const [leadGenError, setLeadGenError] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -115,26 +115,21 @@ export default function MissionControlDashboard() {
     }
   };
 
- const handleGenerateLeads = async () => {
+  const handleGenerateLeads = async () => {
     setGeneratingLeads(true);
     setLeadGenError(null);
-    
+
     try {
-      console.log(`🚀 Generating leads using ${useEnhancedVersion ? 'ENHANCED V2' : 'ORIGINAL'} version...`);
+      console.log('🚀 Initiating lead generation...');
       
-      const endpoint = useEnhancedVersion 
-        ? '/.netlify/functions/generate-leads-v2'
-        : '/.netlify/functions/generate-leads';
-      
-      const response = await fetch(endpoint, {
+      const response = await fetch('/.netlify/functions/generate-leads', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: auth.currentUser?.uid,
-          scoutData: scoutData,
-          icpBrief: icpBrief
+          scoutData,
+          icpBrief
         })
       });
 
@@ -144,49 +139,24 @@ export default function MissionControlDashboard() {
       }
 
       const data = await response.json();
-      console.log(`✅ Generated ${data.leads?.length || 0} leads`);
-      
-      if (useEnhancedVersion && data.analytics) {
-        console.log('📊 Barry Analytics:', data.analytics);
-        
-        const analyticsMessage = `🎯 Barry's Intelligence Report:
+      console.log(`✅ Generated ${data.leads.length} leads`);
 
-📊 Discovery Phase:
-   • Analyzed ${data.analytics.totalCompaniesFound} companies
-   • ${data.analytics.companiesScored} companies scored by AI
-   • ${data.analytics.qualifiedCompanies} met quality threshold (60+ score)
-
-👥 Decision-Maker Phase:
-   • Found ${data.analytics.leadsFound} decision-makers
-   • Delivered ${data.analytics.finalLeads} perfect-fit leads
-   • Average Score: ${data.analytics.avgScore}/100
-
-🧠 Strategy: ${data.analytics.searchStrategy}
-
-${data.message}`;
-
-        alert(analyticsMessage);
-      }
-
+      // Save leads to Firebase
       const user = auth.currentUser;
       if (user) {
         await updateDoc(doc(db, "users", user.uid), {
           leads: data.leads,
-          leadsGeneratedAt: new Date().toISOString(),
-          lastAnalytics: data.analytics || null
+          leadsGeneratedAt: new Date().toISOString()
         });
-        
+
         setLeads(data.leads);
-        
-        if (!useEnhancedVersion) {
-          alert(`🎯 Mission successful! ${data.leads.length} targets acquired.`);
-        }
+        alert(`🎯 Mission successful! ${data.leads.length} targets acquired.`);
       }
 
     } catch (err) {
       console.error('💥 Error generating leads:', err);
       setLeadGenError(err.message);
-      alert(`Error generating leads: ${err.message}`);
+      alert(`Error generating leads: ${err.message}\n\nMake sure your Apollo API key is set in Netlify environment variables.`);
     } finally {
       setGeneratingLeads(false);
     }
@@ -511,49 +481,7 @@ ${data.message}`;
                 <p className="text-gray-300 mb-6 font-mono max-w-2xl mx-auto">
                   Your ICP intelligence is locked and loaded. Time to scan the universe for perfect-fit targets!
                 </p>
-<div className="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl backdrop-blur-sm max-w-3xl mx-auto">
-  <div className="flex items-center justify-between">
-    <div className="flex-1 text-left">
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-white font-bold text-lg">
-          {useEnhancedVersion ? '🚀 Barry Enhanced AI' : '📊 Standard Search'}
-        </h3>
-        {useEnhancedVersion && (
-          <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full border border-green-500/30">
-            BETA
-          </span>
-        )}
-      </div>
-      <p className="text-sm text-purple-300">
-        {useEnhancedVersion 
-? '✨ Barry analyzes companies with AI, scores against your perfect-fit examples, and finds the best decision-makers'
-          : '🔍 Direct Apollo search with keyword matching and basic filtering'}
-</p>
-    </div>
-    <button
-      onClick={() => setUseEnhancedVersion(!useEnhancedVersion)}
-      className={`ml-4 px-6 py-3 rounded-lg font-bold transition-all transform hover:scale-105 ${
-        useEnhancedVersion
-          ? 'bg-gradient-to-r from-green-600 to-green-500 text-white shadow-lg shadow-green-500/50'
-          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-      }`}
-    >
-{useEnhancedVersion ? '✓ Enhanced V2' : 'Try Enhanced V2'}
-    </button>
-  </div>
-  
-  {useEnhancedVersion && (
-    <div className="mt-3 pt-3 border-t border-blue-500/20">
-      <div className="text-xs text-blue-300 space-y-1 text-left">
-        <div>✓ AI-powered company scoring against your ICP</div>
-        <div>✓ Intelligent decision-maker discovery</div>
-        <div>✓ Enhanced data: photos, websites, growth signals</div>
-        <div>✓ Detailed analytics and reasoning</div>
-      </div>
-    </div>
-  )}
-</div>
-<div className="flex gap-4 justify-center">
+                <div className="flex gap-4 justify-center">
                   <button
                     onClick={handleGenerateLeads}
                     disabled={generatingLeads}

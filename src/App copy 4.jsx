@@ -14,9 +14,6 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ICPValidationPage from './pages/ICPValidationPage';
 import MissionPhase1Page from './pages/MissionPhase1Page';
 import MissionPhase2Page from './pages/MissionPhase2Page';
-import MissionPhase3Page from './pages/MissionPhase3Page';
-import MissionPhase4Page from './pages/MissionPhase4Page';
-import MissionPhase5Page from './pages/MissionPhase5Page';
 
 // Components
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
@@ -178,30 +175,6 @@ function App() {
           element={
             <ProtectedRoute>
               <MissionPhase2Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase3"
-          element={
-            <ProtectedRoute>
-              <MissionPhase3Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase4"
-          element={
-            <ProtectedRoute>
-              <MissionPhase4Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase5"
-          element={
-            <ProtectedRoute>
-              <MissionPhase5Page />
             </ProtectedRoute>
           }
         />

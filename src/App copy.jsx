@@ -12,16 +12,10 @@ import Prospects from './pages/Prospects';
 import Questionnaire from './pages/Questionnaire';
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import ICPValidationPage from './pages/ICPValidationPage';
-import MissionPhase1Page from './pages/MissionPhase1Page';
-import MissionPhase2Page from './pages/MissionPhase2Page';
-import MissionPhase3Page from './pages/MissionPhase3Page';
-import MissionPhase4Page from './pages/MissionPhase4Page';
-import MissionPhase5Page from './pages/MissionPhase5Page';
 
 // Components
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
-import Phase1Discovery from './components/Phase1Discovery';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -161,47 +155,7 @@ function App() {
           path="/launch-sequence"
           element={
             <ProtectedRoute>
-              <MissionPhase1Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase1"
-          element={
-            <ProtectedRoute>
-              <MissionPhase1Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase2"
-          element={
-            <ProtectedRoute>
-              <MissionPhase2Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase3"
-          element={
-            <ProtectedRoute>
-              <MissionPhase3Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase4"
-          element={
-            <ProtectedRoute>
-              <MissionPhase4Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase5"
-          element={
-            <ProtectedRoute>
-              <MissionPhase5Page />
+              <LaunchSequence />
             </ProtectedRoute>
           }
         />

@@ -496,20 +496,12 @@ ${data.message}`;
                 <p className="text-gray-300 mb-6 font-mono">
                   Barry found {leads.length} targets. {excellentLeads.length} are excellent matches!
                 </p>
-                <div className="flex gap-4 justify-center">
-                  <button
-                    onClick={() => setActiveTab('leads')}
-                    className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-2xl shadow-cyan-500/50 font-mono text-lg"
-                  >
-                    🚀 VIEW TARGETS →
-                  </button>
-                  <button
-                    onClick={() => navigate('/mission-phase1')}
-                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition-all shadow-2xl shadow-green-500/50 font-mono text-lg"
-                  >
-                    ✨ START NEW MISSION
-                  </button>
-                </div>
+                <button
+                  onClick={() => setActiveTab('leads')}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-2xl shadow-cyan-500/50 font-mono text-lg"
+                >
+                  🚀 VIEW TARGETS →
+                </button>
               </div>
             )}
 
@@ -564,12 +556,6 @@ ${data.message}`;
 </div>
 <div className="flex gap-4 justify-center">
                   <button
-                    onClick={() => navigate('/mission-phase1')}
-                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-10 py-5 rounded-xl font-bold text-xl hover:from-green-600 hover:to-green-700 transition-all shadow-2xl shadow-green-500/50 font-mono"
-                  >
-                    🚀 START MISSION (NEW)
-                  </button>
-                  <button
                     onClick={handleGenerateLeads}
                     disabled={generatingLeads}
                     className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:from-pink-600 hover:to-purple-700 transition-all shadow-2xl shadow-pink-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
@@ -581,7 +567,7 @@ ${data.message}`;
                       </>
                     ) : (
                       <>
-                        🎯 GENERATE TARGETS (OLD)
+                        🎯 GENERATE TARGETS
                       </>
                     )}
                   </button>

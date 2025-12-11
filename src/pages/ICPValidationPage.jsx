@@ -141,17 +141,17 @@ export default function ICPValidationPage() {
       await updateDoc(doc(db, "users", user.uid), {
         icpApproved: true,
         icpApprovedAt: new Date().toISOString(),
-        barryGeneratingLeads: true // Flag that Barry is working
+        barryGeneratingCompanies: true // Flag that Barry is working
       });
 
       // Navigate to mission control
       navigate("/mission-control");
 
-      // Auto-generate leads in the background
-      console.log("🐻 Barry is now searching for your ideal clients...");
+      // Auto-generate companies in the background
+      console.log("🐻 Barry is now searching for companies that match your ICP...");
 
       try {
-        const response = await fetch("/.netlify/functions/generate-leads", {
+        const response = await fetch("/.netlify/functions/generate-companies", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -165,26 +165,26 @@ export default function ICPValidationPage() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to generate leads: ${response.status}`);
+          throw new Error(`Failed to generate companies: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log("✅ Barry found leads:", data);
+        console.log("✅ Barry found companies:", data);
 
-        // Update Firebase with leads and clear the generating flag
+        // Update Firebase with companies and clear the generating flag
         await updateDoc(doc(db, "users", user.uid), {
-          leads: data.leads || [],
-          leadsGeneratedAt: new Date().toISOString(),
-          barryGeneratingLeads: false,
+          companies: data.companies || [],
+          companiesGeneratedAt: new Date().toISOString(),
+          barryGeneratingCompanies: false,
           barryStats: data.analytics || {}
         });
 
-      } catch (leadError) {
-        console.error("❌ Error generating leads:", leadError);
+      } catch (companyError) {
+        console.error("❌ Error generating companies:", companyError);
         // Clear the generating flag even on error
         await updateDoc(doc(db, "users", user.uid), {
-          barryGeneratingLeads: false,
-          leadGenerationError: leadError.message
+          barryGeneratingCompanies: false,
+          companyGenerationError: companyError.message
         });
       }
 
@@ -357,7 +357,7 @@ export default function ICPValidationPage() {
                   </div>
                   <div className="flex items-center gap-2 font-mono">
                     <span className="text-green-400">✓</span>
-                    <span className="text-gray-300">Ready for Lead Search</span>
+                    <span className="text-gray-300">Ready for Company Search</span>
                   </div>
                 </div>
               </div>
@@ -631,21 +631,21 @@ export default function ICPValidationPage() {
             {/* CTA Section */}
             <div className="mt-12 bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-2xl p-10 text-center border-2 border-emerald-500/30 backdrop-blur-xl">
               <div className="text-6xl mb-6">🚀</div>
-              <h3 className="text-4xl font-bold text-white mb-4 font-mono">Ready to Find Your Leads?</h3>
+              <h3 className="text-4xl font-bold text-white mb-4 font-mono">Ready to Find Your Companies?</h3>
               <p className="text-gray-300 mb-8 text-lg max-w-2xl mx-auto">
-                Your ICP is ready. Now let Barry search for companies that match this profile and deliver qualified leads to your inbox.
+                Your ICP is ready. Now let Barry search for companies that match this profile and you can select which ones to engage.
               </p>
-              
+
               <div className="space-y-4 max-w-xl mx-auto">
-                <button 
+                <button
                   onClick={handleContinue}
                   className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-lg font-mono">
-                  🚀 LAUNCH LEAD SEARCH →
+                  🚀 LAUNCH COMPANY SEARCH →
                 </button>
               </div>
 
               <p className="text-sm text-gray-400 mt-6 font-mono">
-                First batch of leads delivered within 48 hours
+                First batch of companies delivered within 48 hours
               </p>
             </div>
 

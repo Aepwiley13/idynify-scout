@@ -12,7 +12,7 @@ export default function MissionControlDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [scoutData, setScoutData] = useState(null);
   const [icpBrief, setIcpBrief] = useState(null);
-  const [leads, setLeads] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCelebration, setShowCelebration] = useState(isFirstLaunch);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -21,9 +21,9 @@ export default function MissionControlDashboard() {
   const [minScore, setMinScore] = useState(70);
   const [sortBy, setSortBy] = useState("score");
   const [icpSection, setIcpSection] = useState('overview');
-  const [generatingLeads, setGeneratingLeads] = useState(false);
+  const [generatingCompanies, setGeneratingCompanies] = useState(false);
   const [useEnhancedVersion, setUseEnhancedVersion] = useState(false);
-  const [leadGenError, setLeadGenError] = useState(null);
+  const [companyGenError, setCompanyGenError] = useState(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -45,12 +45,12 @@ export default function MissionControlDashboard() {
 
         setScoutData(data.scoutData || null);
         setIcpBrief(data.icpBrief || null);
-        setLeads(data.leads || []);
+        setCompanies(data.companies || []);
 
-        // Auto-switch to leads tab when leads arrive
-        if (data.leads && data.leads.length > 0 && leads.length === 0) {
-          console.log("🎉 Barry found leads! Switching to leads tab...");
-          setActiveTab('leads');
+        // Auto-switch to companies tab when companies arrive
+        if (data.companies && data.companies.length > 0 && companies.length === 0) {
+          console.log("🎉 Barry found companies! Switching to companies tab...");
+          setActiveTab('companies');
         }
 
         setLoading(false);
@@ -124,17 +124,17 @@ export default function MissionControlDashboard() {
     }
   };
 
- const handleGenerateLeads = async () => {
-    setGeneratingLeads(true);
-    setLeadGenError(null);
-    
+ const handleGenerateCompanies = async () => {
+    setGeneratingCompanies(true);
+    setCompanyGenError(null);
+
     try {
-      console.log(`🚀 Generating leads using ${useEnhancedVersion ? 'ENHANCED V2' : 'ORIGINAL'} version...`);
-      
-      const endpoint = useEnhancedVersion 
-        ? '/.netlify/functions/generate-leads-v2'
-        : '/.netlify/functions/generate-leads';
-      
+      console.log(`🚀 Generating companies using ${useEnhancedVersion ? 'ENHANCED V2' : 'ORIGINAL'} version...`);
+
+      const endpoint = useEnhancedVersion
+        ? '/.netlify/functions/generate-companies-v2'
+        : '/.netlify/functions/generate-companies';
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -153,11 +153,11 @@ export default function MissionControlDashboard() {
       }
 
       const data = await response.json();
-      console.log(`✅ Generated ${data.leads?.length || 0} leads`);
-      
+      console.log(`✅ Generated ${data.companies?.length || 0} companies`);
+
       if (useEnhancedVersion && data.analytics) {
         console.log('📊 Barry Analytics:', data.analytics);
-        
+
         const analyticsMessage = `🎯 Barry's Intelligence Report:
 
 📊 Discovery Phase:
@@ -166,8 +166,8 @@ export default function MissionControlDashboard() {
    • ${data.analytics.qualifiedCompanies} met quality threshold (60+ score)
 
 👥 Decision-Maker Phase:
-   • Found ${data.analytics.leadsFound} decision-makers
-   • Delivered ${data.analytics.finalLeads} perfect-fit leads
+   • Found ${data.analytics.contactsFound} decision-makers
+   • Delivered ${data.analytics.finalCompanies} perfect-fit companies
    • Average Score: ${data.analytics.avgScore}/100
 
 🧠 Strategy: ${data.analytics.searchStrategy}
@@ -180,29 +180,29 @@ ${data.message}`;
       const user = auth.currentUser;
       if (user) {
         await updateDoc(doc(db, "users", user.uid), {
-          leads: data.leads,
-          leadsGeneratedAt: new Date().toISOString(),
+          companies: data.companies,
+          companiesGeneratedAt: new Date().toISOString(),
           lastAnalytics: data.analytics || null
         });
-        
-        setLeads(data.leads);
-        
+
+        setCompanies(data.companies);
+
         if (!useEnhancedVersion) {
-          alert(`🎯 Mission successful! ${data.leads.length} targets acquired.`);
+          alert(`🎯 Mission successful! ${data.companies.length} companies acquired.`);
         }
       }
 
     } catch (err) {
-      console.error('💥 Error generating leads:', err);
-      setLeadGenError(err.message);
-      alert(`Error generating leads: ${err.message}`);
+      console.error('💥 Error generating companies:', err);
+      setCompanyGenError(err.message);
+      alert(`Error generating companies: ${err.message}`);
     } finally {
-      setGeneratingLeads(false);
+      setGeneratingCompanies(false);
     }
   };
 
-  const filteredLeads = leads
-    .filter(lead => lead.score >= minScore)
+  const filteredCompanies = companies
+    .filter(company => company.score >= minScore)
     .sort((a, b) => {
       if (sortBy === "score") return b.score - a.score;
       if (sortBy === "size") return b.employees - a.employees;
@@ -210,8 +210,8 @@ ${data.message}`;
       return 0;
     });
 
-  const excellentLeads = filteredLeads.filter(l => l.score >= 85);
-  const goodLeads = filteredLeads.filter(l => l.score >= 70 && l.score < 85);
+  const excellentCompanies = filteredCompanies.filter(c => c.score >= 85);
+  const goodCompanies = filteredCompanies.filter(c => c.score >= 70 && c.score < 85);
 
   const getScoreColor = (score) => {
     if (score >= 85) return "text-green-400";
@@ -276,7 +276,7 @@ ${data.message}`;
 
       {/* Floating Code Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {['[MISSION:ACTIVE]', '[BARRY:ONLINE]', '[LEADS:TRACKING]', '[ICP:LOCKED]', '[TARGETS:ACQUIRED]', '[STATUS:GO]'].map((code, i) => (
+        {['[MISSION:ACTIVE]', '[BARRY:ONLINE]', '[COMPANIES:TRACKING]', '[ICP:LOCKED]', '[TARGETS:ACQUIRED]', '[STATUS:GO]'].map((code, i) => (
           <div
             key={i}
             className="absolute text-cyan-400/30 font-mono text-xs"
@@ -330,26 +330,26 @@ ${data.message}`;
               <div className="text-8xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
               <h2 className="text-5xl font-bold text-white mb-4 font-mono">MISSION SUCCESS!</h2>
               <p className="text-2xl text-emerald-300 mb-6 font-mono">
-                Barry found {leads.length} qualified targets!
+                Barry found {companies.length} qualified companies!
               </p>
               <div className="flex justify-center gap-8 mb-8 text-white">
                 <div className="bg-black/40 backdrop-blur-sm rounded-xl p-4 border border-emerald-500/30">
-                  <div className="text-4xl font-bold text-emerald-400">{excellentLeads.length}</div>
+                  <div className="text-4xl font-bold text-emerald-400">{excellentCompanies.length}</div>
                   <div className="text-sm font-mono">🟢 EXCELLENT</div>
                 </div>
                 <div className="bg-black/40 backdrop-blur-sm rounded-xl p-4 border border-yellow-500/30">
-                  <div className="text-4xl font-bold text-yellow-400">{goodLeads.length}</div>
+                  <div className="text-4xl font-bold text-yellow-400">{goodCompanies.length}</div>
                   <div className="text-sm font-mono">🟡 GOOD</div>
                 </div>
               </div>
               <button
                 onClick={() => {
                   setShowCelebration(false);
-                  setActiveTab('leads');
+                  setActiveTab('companies');
                 }}
                 className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-10 py-4 rounded-xl font-bold text-xl transition-all shadow-2xl shadow-cyan-500/50 font-mono"
               >
-                🚀 VIEW TARGETS →
+                🚀 VIEW COMPANIES →
               </button>
             </div>
           </div>
@@ -407,11 +407,11 @@ ${data.message}`;
               </div>
             </div>
             <div className="flex items-center gap-4">
-              {leads.length > 0 && (
+              {companies.length > 0 && (
                 <div className="hidden md:flex items-center gap-2 bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/30">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                   <span className="text-xs font-semibold text-emerald-300 font-mono">
-                    {leads.length} TARGETS
+                    {companies.length} COMPANIES
                   </span>
                 </div>
               )}
@@ -432,7 +432,7 @@ ${data.message}`;
           <div className="flex overflow-x-auto gap-2 py-3">
             {[
               { id: 'overview', name: '🎯 YOUR ICP', icon: '🎯' },
-              { id: 'companies', name: `🏢 YOUR COMPANIES (${leads.length})`, icon: '🏢' }
+              { id: 'companies', name: `🏢 YOUR COMPANIES (${companies.length})`, icon: '🏢' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -459,9 +459,9 @@ ${data.message}`;
             <div className="text-center mb-8">
               <h2 className="text-5xl font-bold text-white mb-4 font-mono">YOUR IDEAL CLIENT PROFILE 🎯</h2>
               <p className="text-xl text-gray-300 font-mono">
-                {leads.length === 0
+                {companies.length === 0
                   ? "🐻 Barry is finding companies that match this profile"
-                  : `🐻 Barry found ${leads.length} companies matching this profile!`}
+                  : `🐻 Barry found ${companies.length} companies matching this profile!`}
               </p>
             </div>
 
@@ -513,23 +513,23 @@ ${data.message}`;
             </div>
 
             {/* Main CTAs */}
-            {leads.length > 0 && (
+            {companies.length > 0 && (
               <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500/30 rounded-2xl p-8 text-center backdrop-blur-xl">
                 <div className="text-6xl mb-4">✅</div>
-                <h3 className="text-3xl font-bold text-white mb-3 font-mono">SAMPLE LEADS READY!</h3>
+                <h3 className="text-3xl font-bold text-white mb-3 font-mono">COMPANIES READY!</h3>
                 <p className="text-gray-300 mb-6 font-mono">
-                  🐻 Barry found {leads.length} ideal clients matching your ICP. {excellentLeads.length} are excellent matches!
+                  🐻 Barry found {companies.length} companies matching your ICP. {excellentCompanies.length} are excellent matches!
                 </p>
                 <button
-                  onClick={() => setActiveTab('leads')}
+                  onClick={() => setActiveTab('companies')}
                   className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-2xl shadow-cyan-500/50 font-mono text-lg"
                 >
-                  🚀 VIEW YOUR SAMPLE LEADS →
+                  🚀 VIEW YOUR COMPANIES →
                 </button>
               </div>
             )}
 
-            {leads.length === 0 && (
+            {companies.length === 0 && (
               <div className="bg-gradient-to-r from-pink-500/20 to-purple-500/20 border-2 border-pink-500/30 rounded-2xl p-8 text-center backdrop-blur-xl">
                 <div className="text-7xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
                 <h3 className="text-3xl font-bold text-white mb-3 font-mono">BARRY IS SEARCHING...</h3>
@@ -550,7 +550,7 @@ ${data.message}`;
         {/* COMPANIES TAB */}
         {activeTab === 'companies' && (
           <div className="animate-fadeIn">
-            {leads.length === 0 ? (
+            {companies.length === 0 ? (
               <div className="text-center py-20">
                 <div className="text-7xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
                 <h2 className="text-4xl font-bold text-white mb-4 font-mono">BARRY IS FINDING COMPANIES...</h2>
@@ -573,14 +573,14 @@ ${data.message}`;
                     <div>
                       <h2 className="text-4xl font-bold text-white mb-2 font-mono">🏢 YOUR COMPANIES</h2>
                       <p className="text-gray-400 font-mono">
-                        🐻 Barry found {filteredLeads.length} companies matching your ICP - Select one to launch a mission
+                        🐻 Barry found {filteredCompanies.length} companies matching your ICP - Select one to launch a mission
                       </p>
                     </div>
                     <div className="text-right">
                       <div className="text-sm text-gray-400 font-mono">MATCH QUALITY</div>
                       <div className="flex gap-4 mt-1">
-                        <span className="text-green-400 font-bold font-mono">🟢 {excellentLeads.length}</span>
-                        <span className="text-yellow-400 font-bold font-mono">🟡 {goodLeads.length}</span>
+                        <span className="text-green-400 font-bold font-mono">🟢 {excellentCompanies.length}</span>
+                        <span className="text-yellow-400 font-bold font-mono">🟡 {goodCompanies.length}</span>
                       </div>
                     </div>
                   </div>
@@ -663,40 +663,40 @@ ${data.message}`;
                 </div>
 
                 {/* Excellent Matches */}
-                {excellentLeads.filter(l => l.score >= minScore).length > 0 && (
+                {excellentCompanies.filter(c => c.score >= minScore).length > 0 && (
                   <div className="mb-8">
                     <h3 className="text-3xl font-bold text-green-400 mb-4 flex items-center gap-2 font-mono">
                       🟢 EXCELLENT MATCHES (85-100)
                       <span className="text-gray-400 text-base">
-                        - {excellentLeads.filter(l => l.score >= minScore).length} targets
+                        - {excellentCompanies.filter(c => c.score >= minScore).length} companies
                       </span>
                     </h3>
                     <div className="space-y-4">
-                      {excellentLeads.filter(l => l.score >= minScore).map((lead) => (
-                        <LeadCard key={lead.id} lead={lead} getScoreColor={getScoreColor} getScoreBadge={getScoreBadge} />
+                      {excellentCompanies.filter(c => c.score >= minScore).map((company) => (
+                        <CompanyCard key={company.id} company={company} getScoreColor={getScoreColor} getScoreBadge={getScoreBadge} />
                       ))}
                     </div>
                   </div>
                 )}
 
                 {/* Good Matches */}
-                {goodLeads.filter(l => l.score >= minScore).length > 0 && (
+                {goodCompanies.filter(c => c.score >= minScore).length > 0 && (
                   <div className="mb-8">
                     <h3 className="text-3xl font-bold text-yellow-400 mb-4 flex items-center gap-2 font-mono">
                       🟡 GOOD MATCHES (70-84)
                       <span className="text-gray-400 text-base">
-                        - {goodLeads.filter(l => l.score >= minScore).length} targets
+                        - {goodCompanies.filter(c => c.score >= minScore).length} companies
                       </span>
                     </h3>
                     <div className="space-y-4">
-                      {goodLeads.filter(l => l.score >= minScore).map((lead) => (
-                        <LeadCard key={lead.id} lead={lead} getScoreColor={getScoreColor} getScoreBadge={getScoreBadge} />
+                      {goodCompanies.filter(c => c.score >= minScore).map((company) => (
+                        <CompanyCard key={company.id} company={company} getScoreColor={getScoreColor} getScoreBadge={getScoreBadge} />
                       ))}
                     </div>
                   </div>
                 )}
 
-                {filteredLeads.length === 0 && (
+                {filteredCompanies.length === 0 && (
                   <div className="text-center py-12 bg-black/60 backdrop-blur-xl rounded-2xl border border-cyan-500/30">
                     <p className="text-gray-400 text-lg font-mono">No targets match current filters.</p>
                     <button
@@ -738,59 +738,59 @@ ${data.message}`;
   );
 }
 
-function LeadCard({ lead, getScoreColor, getScoreBadge }) {
+function CompanyCard({ company, getScoreColor, getScoreBadge }) {
   return (
     <div className="bg-black/60 backdrop-blur-xl rounded-xl p-6 border border-cyan-500/30 hover:border-cyan-500/50 transition-all">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-2xl font-bold text-white border-2 border-purple-400/50">
-            {lead.name.split(' ').map(n => n[0]).join('')}
+            {company.name.split(' ').map(n => n[0]).join('')}
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white mb-1">{lead.name}</h3>
-            <p className="text-purple-300 font-medium">{lead.title}</p>
+            <h3 className="text-xl font-bold text-white mb-1">{company.name}</h3>
+            <p className="text-purple-300 font-medium">{company.title}</p>
             <p className="text-gray-400 text-sm font-mono">
-              🏢 {lead.company} • {lead.industry} • {lead.employees} employees
+              🏢 {company.company} • {company.industry} • {company.employees} employees
             </p>
           </div>
         </div>
         <div className="text-right">
-          <div className={`text-3xl font-bold ${getScoreColor(lead.score)}`}>
-            {getScoreBadge(lead.score)} {lead.score}
+          <div className={`text-3xl font-bold ${getScoreColor(company.score)}`}>
+            {getScoreBadge(company.score)} {company.score}
           </div>
           <p className="text-xs text-gray-400 font-mono">MATCH</p>
         </div>
       </div>
 
       <div className="mb-4 space-y-1">
-        {lead.matchDetails?.map((detail, i) => (
+        {company.matchDetails?.map((detail, i) => (
           <p key={i} className="text-sm text-gray-300">{detail}</p>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4 text-sm">
-        {lead.email ? (
-          <a href={`mailto:${lead.email}`} className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full hover:bg-green-500/30 font-mono">
-            📧 {lead.email}
+        {company.email ? (
+          <a href={`mailto:${company.email}`} className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full hover:bg-green-500/30 font-mono">
+            📧 {company.email}
           </a>
         ) : (
           <span className="bg-gray-700/50 text-gray-400 px-3 py-1 rounded-full font-mono">
             📧 Email locked
           </span>
         )}
-        {lead.linkedin && (
-          <a 
-            href={lead.linkedin} 
-            target="_blank" 
+        {company.linkedin && (
+          <a
+            href={company.linkedin}
+            target="_blank"
             rel="noopener noreferrer"
             className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full hover:bg-blue-500/30 font-mono"
           >
             🔗 LinkedIn
           </a>
         )}
-        {lead.phone && (
+        {company.phone && (
           <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full font-mono">
-            📞 {lead.phone}
+            📞 {company.phone}
           </span>
         )}
       </div>
@@ -798,12 +798,12 @@ function LeadCard({ lead, getScoreColor, getScoreBadge }) {
       <details className="text-xs text-gray-500 mb-4">
         <summary className="cursor-pointer hover:text-gray-400 font-mono">Score Breakdown</summary>
         <div className="mt-2 space-y-1 bg-black/50 p-3 rounded border border-cyan-500/20">
-          <p>Title Match: {lead.scoreBreakdown?.title || 0}/25</p>
-          <p>Industry Match: {lead.scoreBreakdown?.industry || 0}/20</p>
-          <p>Company Size: {lead.scoreBreakdown?.size || 0}/20</p>
-          <p>Location Match: {lead.scoreBreakdown?.location || 0}/15</p>
-          <p>Not in Avoid List: {lead.scoreBreakdown?.notAvoid || 0}/10</p>
-          <p>Data Quality: {lead.scoreBreakdown?.dataQuality || 0}/10</p>
+          <p>Title Match: {company.scoreBreakdown?.title || 0}/25</p>
+          <p>Industry Match: {company.scoreBreakdown?.industry || 0}/20</p>
+          <p>Company Size: {company.scoreBreakdown?.size || 0}/20</p>
+          <p>Location Match: {company.scoreBreakdown?.location || 0}/15</p>
+          <p>Not in Avoid List: {company.scoreBreakdown?.notAvoid || 0}/10</p>
+          <p>Data Quality: {company.scoreBreakdown?.dataQuality || 0}/10</p>
         </div>
       </details>
 
@@ -812,7 +812,7 @@ function LeadCard({ lead, getScoreColor, getScoreBadge }) {
           VIEW PROFILE
         </button>
         <button className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:from-pink-600 hover:to-purple-700 transition-all font-mono">
-          ADD TO CAMPAIGN
+          LAUNCH MISSION
         </button>
       </div>
     </div>

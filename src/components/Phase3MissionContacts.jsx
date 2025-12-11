@@ -41,7 +41,7 @@ export default function Phase3MissionContacts({ phase2Data, scoutData, onComplet
         body: JSON.stringify({
           userId: auth.currentUser.uid,
           selectedCompanies: [currentCompany], // Send ONE company at a time
-          targetTitles: scoutData.targetTitles || []
+          targetTitles: scoutData.jobTitles || scoutData.targetTitles || []
         })
       });
 

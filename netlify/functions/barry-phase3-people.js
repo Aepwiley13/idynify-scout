@@ -102,14 +102,17 @@ exports.handler = async (event, context) => {
 
 async function findPeopleInCompany(company, targetTitles, apolloKey) {
   console.log(`\n🔍 Searching for people in: ${company.name}`);
-  console.log(`   Org ID: ${company.organization_id || 'N/A'}`);
+  
+  // ✅ FIX: Apollo returns 'id' not 'organization_id'
+  const orgId = company.id || company.organization_id;
+  console.log(`   Org ID: ${orgId || 'N/A'}`);
   console.log(`   Domain: ${company.website_url || 'N/A'}`);
   
   // Strategy 1: Try organization_id first (most reliable)
-  if (company.organization_id) {
+  if (orgId) {
     console.log('   📍 Using organization_id');
     
-    const organizationIds = [company.organization_id];
+    const organizationIds = [orgId];
     const titleKeywords = buildTitleKeywords(targetTitles);
     
     const searchParams = {

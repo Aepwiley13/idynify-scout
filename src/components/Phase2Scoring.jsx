@@ -126,13 +126,14 @@ export default function Phase2Scoring({ phase1Data, onComplete }) {
     console.log('↩️ Undid last selection');
   };
 
-  // Save progress incrementally
+  // ✅ FIXED: Save progress incrementally WITH selectedCompanies for Phase 3
   const saveProgressToFirebase = async (results, cardIndex) => {
     try {
       const user = auth.currentUser;
       await setDoc(doc(db, 'missions', user.uid, 'current', 'phase2'), {
         scoredCompanies: scoredCompanies,
         selectionResults: results,
+        selectedCompanies: results.accepted, // ✅ CRITICAL FIX: Phase 3 needs this!
         analytics: analytics,
         progress: {
           currentCard: cardIndex,
@@ -142,7 +143,7 @@ export default function Phase2Scoring({ phase1Data, onComplete }) {
         lastUpdated: serverTimestamp()
       }, { merge: true });
       
-      console.log(`💾 Progress saved: ${cardIndex}/${scoredCompanies.length}`);
+      console.log(`💾 Progress saved: ${cardIndex}/${scoredCompanies.length} (${results.accepted.length} selected)`);
     } catch (err) {
       console.error('Error saving progress:', err);
     }

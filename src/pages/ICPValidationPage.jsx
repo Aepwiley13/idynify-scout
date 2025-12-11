@@ -151,7 +151,7 @@ export default function ICPValidationPage() {
       console.log("🐻 Barry is now searching for your ideal clients...");
 
       try {
-        const response = await fetch("/.netlify/functions/generate-leads-simple", {
+        const response = await fetch("/.netlify/functions/generate-leads", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

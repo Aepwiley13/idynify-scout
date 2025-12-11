@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth, db } from "../firebase/config";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 
 export default function MissionControlDashboard() {
@@ -26,35 +26,43 @@ export default function MissionControlDashboard() {
   const [leadGenError, setLeadGenError] = useState(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) {
-          navigate("/login");
-          return;
-        }
+    const user = auth.currentUser;
+    if (!user) {
+      navigate("/login");
+      return;
+    }
 
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        
-        if (!userDoc.exists()) {
+    // Set up real-time listener for user data
+    const unsubscribe = onSnapshot(
+      doc(db, "users", user.uid),
+      (docSnapshot) => {
+        if (!docSnapshot.exists()) {
           navigate("/scout-questionnaire");
           return;
         }
 
-        const data = userDoc.data();
-        
+        const data = docSnapshot.data();
+
         setScoutData(data.scoutData || null);
         setIcpBrief(data.icpBrief || null);
         setLeads(data.leads || []);
-        
+
+        // Auto-switch to leads tab when leads arrive
+        if (data.leads && data.leads.length > 0 && leads.length === 0) {
+          console.log("🎉 Barry found leads! Switching to leads tab...");
+          setActiveTab('leads');
+        }
+
         setLoading(false);
-      } catch (err) {
+      },
+      (err) => {
         console.error("Error loading data:", err);
         setLoading(false);
       }
-    };
+    );
 
-    loadData();
+    // Cleanup listener on unmount
+    return () => unsubscribe();
   }, [navigate]);
 
   const handleLogout = async () => {

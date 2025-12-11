@@ -1,5 +1,5 @@
 // SIMPLE Barry Lead Generation - No AI scoring, just Apollo search
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 exports.handler = async (event, context) => {
   console.log('🐻 Barry Simple Lead Generation - Starting');

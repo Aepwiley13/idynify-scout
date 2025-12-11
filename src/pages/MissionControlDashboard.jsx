@@ -432,7 +432,7 @@ ${data.message}`;
           <div className="flex overflow-x-auto gap-2 py-3">
             {[
               { id: 'overview', name: '🎯 YOUR ICP', icon: '🎯' },
-              { id: 'leads', name: `🚀 YOUR SAMPLE LEADS (${leads.length})`, icon: '🚀' }
+              { id: 'companies', name: `🏢 YOUR COMPANIES (${leads.length})`, icon: '🏢' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -547,15 +547,15 @@ ${data.message}`;
           </div>
         )}
 
-        {/* LEADS TAB */}
-        {activeTab === 'leads' && (
+        {/* COMPANIES TAB */}
+        {activeTab === 'companies' && (
           <div className="animate-fadeIn">
             {leads.length === 0 ? (
               <div className="text-center py-20">
                 <div className="text-7xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
-                <h2 className="text-4xl font-bold text-white mb-4 font-mono">BARRY IS SEARCHING...</h2>
+                <h2 className="text-4xl font-bold text-white mb-4 font-mono">BARRY IS FINDING COMPANIES...</h2>
                 <p className="text-gray-400 mb-8 font-mono max-w-2xl mx-auto">
-                  Barry is analyzing companies and finding your ideal clients based on your ICP.
+                  Barry is searching for companies that match your ICP. You'll be able to browse and select companies to launch missions.
                 </p>
 
                 <div className="flex justify-center mb-6">
@@ -563,7 +563,7 @@ ${data.message}`;
                 </div>
 
                 <p className="text-sm text-gray-400 font-mono">
-                  💡 Sample leads will appear here automatically
+                  💡 Companies will appear here automatically - then you can select which ones to engage with
                 </p>
               </div>
             ) : (
@@ -571,9 +571,9 @@ ${data.message}`;
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-4xl font-bold text-white mb-2 font-mono">YOUR SAMPLE LEADS</h2>
+                      <h2 className="text-4xl font-bold text-white mb-2 font-mono">🏢 YOUR COMPANIES</h2>
                       <p className="text-gray-400 font-mono">
-                        🐻 Barry found {filteredLeads.length} ideal clients matching your ICP
+                        🐻 Barry found {filteredLeads.length} companies matching your ICP - Select one to launch a mission
                       </p>
                     </div>
                     <div className="text-right">

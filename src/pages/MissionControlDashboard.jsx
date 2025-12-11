@@ -418,15 +418,13 @@ ${data.message}`;
         </div>
       </header>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs - Simplified */}
       <section className="relative z-10 bg-black/50 backdrop-blur-sm border-b border-cyan-500/20 sticky top-[73px]">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex overflow-x-auto gap-2 py-3">
             {[
-              { id: 'overview', name: '📊 OVERVIEW', icon: '📊' },
-              { id: 'mission-params', name: '📝 MISSION PARAMS', icon: '📝' },
-              { id: 'icp-intel', name: '🎯 ICP INTEL', icon: '🎯' },
-              { id: 'leads', name: `🚀 TARGETS (${leads.length})`, icon: '🚀' }
+              { id: 'overview', name: '🎯 YOUR ICP', icon: '🎯' },
+              { id: 'leads', name: `🚀 YOUR SAMPLE LEADS (${leads.length})`, icon: '🚀' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -447,44 +445,62 @@ ${data.message}`;
       {/* Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-12">
         
-        {/* OVERVIEW TAB */}
-        {activeTab === 'overview' && (
+        {/* OVERVIEW TAB - Show ICP Summary */}
+        {activeTab === 'overview' && icpBrief && (
           <div className="space-y-8 animate-fadeIn">
             <div className="text-center mb-8">
-              <h2 className="text-5xl font-bold text-white mb-4 font-mono">WELCOME, AGENT! 🎯</h2>
+              <h2 className="text-5xl font-bold text-white mb-4 font-mono">YOUR IDEAL CLIENT PROFILE 🎯</h2>
               <p className="text-xl text-gray-300 font-mono">
                 {leads.length === 0
-                  ? "ICP intelligence ready. Launch sequence to acquire targets!"
-                  : `${leads.length} targets acquired and ready for engagement!`}
+                  ? "🐻 Barry is finding companies that match this profile"
+                  : `🐻 Barry found ${leads.length} companies matching this profile!`}
               </p>
             </div>
 
-            {/* Mission Status Cards */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-green-500/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-4xl">✓</span>
-                  <h3 className="text-lg font-bold text-white font-mono">SCOUT COMPLETE</h3>
+            {/* ICP Summary */}
+            <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-l-4 border-emerald-500 p-8 rounded-r-xl backdrop-blur-sm mb-8">
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono">
+                <span>🎯</span> Your Ideal Customer At a Glance
+              </h3>
+              <p className="text-gray-200 leading-relaxed text-lg">
+                {icpBrief.idealCustomerGlance}
+              </p>
+            </div>
+
+            {/* Perfect Fit & Anti-Profile */}
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-black/60 backdrop-blur-xl border-2 border-green-500/30 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/30">
+                    <span className="text-2xl">✓</span>
+                  </div>
+                  <h4 className="text-xl font-bold text-green-400 font-mono">Perfect Fit Indicators</h4>
                 </div>
-                <p className="text-green-400 text-sm font-mono">Mission parameters defined</p>
+                <ul className="space-y-4">
+                  {icpBrief.perfectFitIndicators?.map((indicator, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="text-green-400 text-xl mt-0.5">▸</span>
+                      <span className="text-gray-300">{indicator}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
-              <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-cyan-500/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-4xl">🎯</span>
-                  <h3 className="text-lg font-bold text-white font-mono">ICP BRIEF</h3>
+              <div className="bg-black/60 backdrop-blur-xl border-2 border-red-500/30 rounded-2xl p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center border border-red-500/30">
+                    <span className="text-2xl">✗</span>
+                  </div>
+                  <h4 className="text-xl font-bold text-red-400 font-mono">Anti-Profile (Avoid)</h4>
                 </div>
-                <p className="text-cyan-400 text-sm font-mono">
-                  {icpBrief ? "Intelligence analyzed" : "Generating..."}
-                </p>
-              </div>
-
-              <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-purple-500/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-4xl">🚀</span>
-                  <h3 className="text-lg font-bold text-white font-mono">TARGETS</h3>
-                </div>
-                <p className="text-3xl font-bold text-purple-400">{leads.length}</p>
+                <ul className="space-y-4">
+                  {icpBrief.antiProfile?.map((item, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="text-red-400 text-xl mt-0.5">▸</span>
+                      <span className="text-gray-300">{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
 
@@ -492,412 +508,32 @@ ${data.message}`;
             {leads.length > 0 && (
               <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500/30 rounded-2xl p-8 text-center backdrop-blur-xl">
                 <div className="text-6xl mb-4">✅</div>
-                <h3 className="text-3xl font-bold text-white mb-3 font-mono">TARGETS LOCKED!</h3>
+                <h3 className="text-3xl font-bold text-white mb-3 font-mono">SAMPLE LEADS READY!</h3>
                 <p className="text-gray-300 mb-6 font-mono">
-                  Barry found {leads.length} targets. {excellentLeads.length} are excellent matches!
+                  🐻 Barry found {leads.length} ideal clients matching your ICP. {excellentLeads.length} are excellent matches!
                 </p>
-                <div className="flex gap-4 justify-center">
-                  <button
-                    onClick={() => setActiveTab('leads')}
-                    className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-2xl shadow-cyan-500/50 font-mono text-lg"
-                  >
-                    🚀 VIEW TARGETS →
-                  </button>
-                  <button
-                    onClick={() => navigate('/mission-phase1')}
-                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition-all shadow-2xl shadow-green-500/50 font-mono text-lg"
-                  >
-                    ✨ START NEW MISSION
-                  </button>
-                </div>
+                <button
+                  onClick={() => setActiveTab('leads')}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-2xl shadow-cyan-500/50 font-mono text-lg"
+                >
+                  🚀 VIEW YOUR SAMPLE LEADS →
+                </button>
               </div>
             )}
 
             {leads.length === 0 && (
               <div className="bg-gradient-to-r from-pink-500/20 to-purple-500/20 border-2 border-pink-500/30 rounded-2xl p-8 text-center backdrop-blur-xl">
-                <div className="text-6xl mb-4">🚀</div>
-                <h3 className="text-3xl font-bold text-white mb-3 font-mono">READY FOR LAUNCH</h3>
+                <div className="text-7xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
+                <h3 className="text-3xl font-bold text-white mb-3 font-mono">BARRY IS SEARCHING...</h3>
                 <p className="text-gray-300 mb-6 font-mono max-w-2xl mx-auto">
-                  Your ICP intelligence is locked and loaded. Time to scan the universe for perfect-fit targets!
+                  Barry is analyzing companies and finding your ideal clients based on your ICP. This usually takes a few minutes.
                 </p>
-<div className="mb-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl backdrop-blur-sm max-w-3xl mx-auto">
-  <div className="flex items-center justify-between">
-    <div className="flex-1 text-left">
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-white font-bold text-lg">
-          {useEnhancedVersion ? '🚀 Barry Enhanced AI' : '📊 Standard Search'}
-        </h3>
-        {useEnhancedVersion && (
-          <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full border border-green-500/30">
-            BETA
-          </span>
-        )}
-      </div>
-      <p className="text-sm text-purple-300">
-        {useEnhancedVersion 
-? '✨ Barry analyzes companies with AI, scores against your perfect-fit examples, and finds the best decision-makers'
-          : '🔍 Direct Apollo search with keyword matching and basic filtering'}
-</p>
-    </div>
-    <button
-      onClick={() => setUseEnhancedVersion(!useEnhancedVersion)}
-      className={`ml-4 px-6 py-3 rounded-lg font-bold transition-all transform hover:scale-105 ${
-        useEnhancedVersion
-          ? 'bg-gradient-to-r from-green-600 to-green-500 text-white shadow-lg shadow-green-500/50'
-          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-      }`}
-    >
-{useEnhancedVersion ? '✓ Enhanced V2' : 'Try Enhanced V2'}
-    </button>
-  </div>
-  
-  {useEnhancedVersion && (
-    <div className="mt-3 pt-3 border-t border-blue-500/20">
-      <div className="text-xs text-blue-300 space-y-1 text-left">
-        <div>✓ AI-powered company scoring against your ICP</div>
-        <div>✓ Intelligent decision-maker discovery</div>
-        <div>✓ Enhanced data: photos, websites, growth signals</div>
-        <div>✓ Detailed analytics and reasoning</div>
-      </div>
-    </div>
-  )}
-</div>
-<div className="flex gap-4 justify-center">
-                  <button
-                    onClick={() => navigate('/mission-phase1')}
-                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-10 py-5 rounded-xl font-bold text-xl hover:from-green-600 hover:to-green-700 transition-all shadow-2xl shadow-green-500/50 font-mono"
-                  >
-                    🚀 START MISSION (NEW)
-                  </button>
-                  <button
-                    onClick={handleGenerateLeads}
-                    disabled={generatingLeads}
-                    className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:from-pink-600 hover:to-purple-700 transition-all shadow-2xl shadow-pink-500/50 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {generatingLeads ? (
-                      <>
-                        <span className="inline-block animate-spin mr-2">⚡</span>
-                        SCANNING...
-                      </>
-                    ) : (
-                      <>
-                        🎯 GENERATE TARGETS (OLD)
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('icp-intel')}
-                    className="bg-gradient-to-r from-cyan-500/30 to-blue-600/30 border-2 border-cyan-500/50 hover:bg-cyan-500/40 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all font-mono"
-                  >
-                    📋 REVIEW ICP
-                  </button>
+                <div className="flex justify-center mb-6">
+                  <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
                 </div>
-                {leadGenError && (
-                  <div className="mt-6 p-4 bg-red-500/20 border border-red-500 rounded-lg max-w-2xl mx-auto">
-                    <p className="text-red-400 font-mono text-sm">{leadGenError}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* MISSION PARAMS TAB (Scout Answers) */}
-        {activeTab === 'mission-params' && scoutData && (
-          <div className="animate-fadeIn">
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h2 className="text-4xl font-bold text-white mb-2 font-mono">[MISSION PARAMETERS]</h2>
-                <p className="text-gray-400 font-mono">Review and update your targeting criteria</p>
-              </div>
-              <button
-                onClick={handleRegenerateICP}
-                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg font-mono"
-              >
-                🔄 REGENERATE ICP
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {Object.entries({
-                goal: { label: "90-Day Mission Goal", value: scoutData.goal },
-                companyWebsite: { label: "Company Website", value: scoutData.companyWebsite },
-                linkedinCompanyPage: { label: "LinkedIn Page", value: scoutData.linkedinCompanyPage },
-                industries: { label: "Target Industries", value: Array.isArray(scoutData.industries) ? scoutData.industries.join(", ") : scoutData.industries },
-                jobTitles: { label: "Decision Maker Titles", value: Array.isArray(scoutData.jobTitles) ? scoutData.jobTitles.join(", ") : scoutData.jobTitles },
-                companySizes: { label: "Company Sizes", value: Array.isArray(scoutData.companySizes) ? scoutData.companySizes.join(", ") : scoutData.companySizes },
-                locationScope: { label: "Location Scope", value: Array.isArray(scoutData.locationScope) ? scoutData.locationScope.join(", ") : scoutData.locationScope },
-                targetStates: { label: "Target States", value: Array.isArray(scoutData.targetStates) ? scoutData.targetStates.join(", ") : scoutData.targetStates },
-                targetCities: { label: "Target Metro Areas", value: Array.isArray(scoutData.targetCities) ? scoutData.targetCities.join(", ") : scoutData.targetCities },
-                competitors: { label: "Competitors", value: scoutData.competitors },
-                perfectFitCompanies: { label: "Perfect Fit Companies", value: scoutData.perfectFitCompanies },
-                avoidList: { label: "Avoid List", value: scoutData.avoidList },
-                painPoints: { label: "Target Pain Points", value: scoutData.painPoints },
-                valueProposition: { label: "Your Solution", value: scoutData.valueProposition }
-              }).map(([key, data]) => (
-                data.value && (
-                  <div key={key} className="bg-black/60 backdrop-blur-xl rounded-xl p-6 border border-cyan-500/30 hover:border-cyan-500/50 transition-all group">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-cyan-400 mb-2 font-mono flex items-center gap-2">
-                          <span>▸</span> {data.label}
-                        </h3>
-                        <p className="text-gray-300 whitespace-pre-wrap">{data.value}</p>
-                      </div>
-                      <button
-                        onClick={() => handleEditField(key, data.value)}
-                        className="opacity-0 group-hover:opacity-100 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-300 px-4 py-2 rounded-lg font-mono text-sm transition-all"
-                      >
-                        ✏️ EDIT
-                      </button>
-                    </div>
-                  </div>
-                )
-              ))}
-            </div>
-
-            <div className="mt-8 bg-yellow-500/10 border-2 border-yellow-500/30 rounded-xl p-6">
-              <p className="text-yellow-300 font-mono text-sm">
-                ⚠️ After editing parameters, click "REGENERATE ICP" to update your targeting intelligence.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ICP INTEL TAB */}
-        {activeTab === 'icp-intel' && icpBrief && (
-          <div className="animate-fadeIn">
-            <div className="mb-8">
-              <h2 className="text-4xl font-bold text-white mb-2 font-mono">[ICP INTELLIGENCE BRIEF]</h2>
-              <p className="text-gray-400 font-mono">Target profile analysis and engagement strategy</p>
-            </div>
-
-            {/* ICP Section Navigation */}
-            <div className="mb-8 flex gap-2 overflow-x-auto">
-              {[
-                { id: 'overview', name: '📋 SUMMARY', icon: '📋' },
-                { id: 'firmographic', name: '🏢 FIRMOGRAPHICS', icon: '🏢' },
-                { id: 'psychographic', name: '🧠 PSYCHOGRAPHICS', icon: '🧠' },
-                { id: 'behavioral', name: '⚡ TRIGGERS', icon: '⚡' }
-              ].map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => setIcpSection(section.id)}
-                  className={`px-4 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-all font-mono ${
-                    icpSection === section.id
-                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-                      : 'text-gray-400 hover:bg-purple-500/10 border border-purple-500/20'
-                  }`}
-                >
-                  {section.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Executive Summary */}
-            {icpSection === 'overview' && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-l-4 border-emerald-500 p-8 rounded-r-xl backdrop-blur-xl">
-                  <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono">
-                    <span>🎯</span> TARGET PROFILE
-                  </h3>
-                  <p className="text-gray-200 leading-relaxed text-lg">{icpBrief.idealCustomerGlance}</p>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-black/60 backdrop-blur-xl border-2 border-green-500/30 rounded-2xl p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center border border-green-500/30">
-                        <span className="text-2xl">✓</span>
-                      </div>
-                      <h4 className="text-xl font-bold text-green-400 font-mono">PERFECT FIT</h4>
-                    </div>
-                    <ul className="space-y-4">
-                      {icpBrief.perfectFitIndicators?.map((indicator, i) => (
-                        <li key={i} className="flex items-start gap-3">
-                          <span className="text-green-400 text-xl mt-0.5">▸</span>
-                          <span className="text-gray-300">{indicator}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="bg-black/60 backdrop-blur-xl border-2 border-red-500/30 rounded-2xl p-8">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center border border-red-500/30">
-                        <span className="text-2xl">✗</span>
-                      </div>
-                      <h4 className="text-xl font-bold text-red-400 font-mono">AVOID ZONE</h4>
-                    </div>
-                    <ul className="space-y-4">
-                      {icpBrief.antiProfile?.map((item, i) => (
-                        <li key={i} className="flex items-start gap-3">
-                          <span className="text-red-400 text-xl mt-0.5">▸</span>
-                          <span className="text-gray-300">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/20 backdrop-blur-xl rounded-2xl p-8 border-2 border-yellow-500/30">
-                  <h4 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 font-mono">
-                    <span className="text-3xl">💡</span>
-                    KEY INSIGHT
-                  </h4>
-                  <p className="text-gray-200 leading-relaxed italic text-lg">"{icpBrief.keyInsight}"</p>
-                </div>
-              </div>
-            )}
-
-            {/* Firmographics */}
-            {icpSection === 'firmographic' && icpBrief.firmographics && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-6 rounded-2xl shadow-lg border border-emerald-400/30">
-                    <span className="text-3xl mb-3 block">👥</span>
-                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Company Size</p>
-                    <p className="text-3xl font-bold">{icpBrief.firmographics.companySize?.split(' ')[0]}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-6 rounded-2xl shadow-lg border border-blue-400/30">
-                    <span className="text-3xl mb-3 block">📈</span>
-                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Stage</p>
-                    <p className="text-2xl font-bold">{icpBrief.firmographics.stage}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-500 to-pink-600 text-white p-6 rounded-2xl shadow-lg border border-purple-400/30">
-                    <span className="text-3xl mb-3 block">💰</span>
-                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Budget</p>
-                    <p className="text-2xl font-bold">{icpBrief.firmographics.budget}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-orange-500 to-red-600 text-white p-6 rounded-2xl shadow-lg border border-orange-400/30">
-                    <span className="text-3xl mb-3 block">⚡</span>
-                    <p className="text-xs uppercase tracking-wide opacity-90 mb-1 font-mono">Decision Speed</p>
-                    <p className="text-3xl font-bold">{icpBrief.firmographics.decisionSpeed?.split(' ')[0]}</p>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-cyan-500/30 p-8">
-                    <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 font-mono">
-                      <span className="text-3xl">🏢</span>
-                      Industries
-                    </h3>
-                    <div className="space-y-3">
-                      {icpBrief.firmographics.industries?.map((industry, i) => (
-                        <div key={i} className="flex items-center justify-between py-3 border-b border-cyan-500/20">
-                          <span className="text-gray-300">{industry.name}</span>
-                          <span className={`text-sm font-semibold font-mono ${
-                            industry.fit === 'High' ? 'text-cyan-400' :
-                            industry.fit === 'Medium' ? 'text-green-400' :
-                            'text-yellow-400'
-                          }`}>{industry.fit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-purple-500/30 p-8">
-                    <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 font-mono">
-                      <span className="text-3xl">👤</span>
-                      Decision Makers
-                    </h3>
-                    <div className="space-y-4">
-                      {icpBrief.firmographics.decisionMakers?.map((dm, i) => (
-                        <div key={i} className={`p-4 rounded-lg border ${
-                          dm.level === 'Primary' ? 'bg-purple-500/20 border-purple-500/30' : 'bg-blue-500/20 border-blue-500/30'
-                        }`}>
-                          <p className="font-bold text-white mb-1 font-mono">{dm.level}: {dm.title}</p>
-                          <p className="text-sm text-gray-300">{dm.role}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Psychographics */}
-            {icpSection === 'psychographic' && icpBrief.psychographics && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-2 border-purple-500/30 rounded-2xl p-8 backdrop-blur-xl">
-                  <h3 className="text-3xl font-bold text-white mb-6 flex items-center gap-3 font-mono">
-                    <span className="text-4xl">🧠</span>
-                    PAIN POINTS
-                  </h3>
-                  <div className="space-y-4">
-                    {icpBrief.psychographics.painPoints?.map((item, i) => (
-                      <div key={i} className="bg-black/40 rounded-xl p-6 border border-purple-500/20">
-                        <div className="flex items-start gap-4">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-2xl flex-shrink-0 ${
-                            item.impact === 'Critical' ? 'bg-red-500/20 text-red-400 border-2 border-red-500/30' :
-                            'bg-orange-500/20 text-orange-400 border-2 border-orange-500/30'
-                          }`}>
-                            {i + 1}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="text-lg font-bold text-white">{item.pain}</h4>
-                              <span className={`text-xs font-semibold px-3 py-1 rounded-full font-mono ${
-                                item.impact === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                              }`}>
-                                {item.impact}
-                              </span>
-                            </div>
-                            <p className="text-gray-300">{item.description}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-pink-500/30 p-8">
-                  <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 font-mono">
-                    <span className="text-3xl">💬</span>
-                    VALUES
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {icpBrief.psychographics.values?.map((value, i) => (
-                      <div key={i} className="flex items-start gap-3 p-4 bg-pink-500/10 rounded-lg border border-pink-500/20">
-                        <span className="text-pink-400 text-xl">✓</span>
-                        <span className="text-gray-300">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Behavioral Triggers */}
-            {icpSection === 'behavioral' && icpBrief.behavioralTriggers && (
-              <div className="animate-fadeIn">
-                <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border-2 border-red-500/30 rounded-2xl p-8 backdrop-blur-xl">
-                  <h3 className="text-3xl font-bold text-white mb-6 flex items-center gap-3 font-mono">
-                    <span className="text-4xl">🔥</span>
-                    HOT TRIGGERS
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {icpBrief.behavioralTriggers?.map((item, i) => (
-                      <div key={i} className="bg-black/40 rounded-xl p-6 border border-red-500/30">
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0 border border-red-500/30">
-                            <span className="text-2xl">⚡</span>
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-white text-lg">{item.trigger}</h4>
-                            <p className="text-sm text-red-400 font-semibold font-mono">{item.timing}</p>
-                          </div>
-                        </div>
-                        <div className="bg-red-500/10 p-4 rounded border border-red-500/20">
-                          <p className="text-sm text-gray-300">
-                            <strong className="text-white">Action:</strong> {item.action}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-sm text-gray-400 font-mono">
+                  💡 Barry will automatically pull a sample of 15-20 ideal clients for you to review
+                </p>
               </div>
             )}
           </div>
@@ -908,48 +544,28 @@ ${data.message}`;
           <div className="animate-fadeIn">
             {leads.length === 0 ? (
               <div className="text-center py-20">
-                <div className="text-6xl mb-6">🎯</div>
-                <h2 className="text-4xl font-bold text-white mb-4 font-mono">NO TARGETS YET</h2>
-                <p className="text-gray-400 mb-8 font-mono">
-                  Ready to launch target acquisition sequence!
+                <div className="text-7xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
+                <h2 className="text-4xl font-bold text-white mb-4 font-mono">BARRY IS SEARCHING...</h2>
+                <p className="text-gray-400 mb-8 font-mono max-w-2xl mx-auto">
+                  Barry is analyzing companies and finding your ideal clients based on your ICP.
                 </p>
-                
-                {/* GENERATE LEADS BUTTON */}
-                <button
-                  onClick={handleGenerateLeads}
-                  disabled={generatingLeads}
-                  className="px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold font-mono rounded-lg hover:from-pink-600 hover:to-purple-600 transition-all shadow-lg shadow-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-xl"
-                >
-                  {generatingLeads ? (
-                    <>
-                      <span className="inline-block animate-spin mr-2">⚡</span>
-                      SCANNING UNIVERSE...
-                    </>
-                  ) : (
-                    <>
-                      🚀 LAUNCH TARGET ACQUISITION
-                    </>
-                  )}
-                </button>
 
-                {leadGenError && (
-                  <div className="mt-6 p-4 bg-red-500/20 border border-red-500 rounded-lg max-w-2xl mx-auto">
-                    <p className="text-red-400 font-mono text-sm">{leadGenError}</p>
-                  </div>
-                )}
-
-                <div className="mt-8 text-sm text-gray-500 font-mono">
-                  Scout tier: 5-10 qualified targets
+                <div className="flex justify-center mb-6">
+                  <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin"></div>
                 </div>
+
+                <p className="text-sm text-gray-400 font-mono">
+                  💡 Sample leads will appear here automatically
+                </p>
               </div>
             ) : (
               <>
                 <div className="mb-8">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-4xl font-bold text-white mb-2 font-mono">[TARGET ROSTER]</h2>
+                      <h2 className="text-4xl font-bold text-white mb-2 font-mono">YOUR SAMPLE LEADS</h2>
                       <p className="text-gray-400 font-mono">
-                        {filteredLeads.length} of {leads.length} targets match filters
+                        🐻 Barry found {filteredLeads.length} ideal clients matching your ICP
                       </p>
                     </div>
                     <div className="text-right">

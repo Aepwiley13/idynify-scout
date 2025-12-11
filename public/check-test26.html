@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Check test26@test.com Status</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #000;
+      color: #0f0;
+      padding: 20px;
+    }
+    pre { background: #111; padding: 15px; border: 1px solid #0f0; }
+    .error { color: #f00; }
+    .success { color: #0f0; }
+    .warning { color: #ff0; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Checking test26@test.com...</h1>
+  <div id="status">Loading...</div>
+  <pre id="output"></pre>
+
+  <button id="triggerLeads" style="display:none; padding: 10px; margin-top: 20px;">🚀 TRIGGER LEADS NOW</button>
+  <pre id="result" style="display:none;"></pre>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getFirestore, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyClxz_M3Fmn2X03Dq55JUKwNklm5rGKTjI",
+      authDomain: "idynify-scout.firebaseapp.com",
+      projectId: "idynify-scout",
+      storageBucket: "idynify-scout.firebasestorage.app",
+      messagingSenderId: "1040882825158",
+      appId: "1:1040882825158:web:b3b3c8ca33d60a78ea1c03"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let userData = null;
+    let userId = null;
+
+    async function checkUser() {
+      const statusDiv = document.getElementById('status');
+      const outputDiv = document.getElementById('output');
+
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', 'test26@test.com'));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          statusDiv.innerHTML = '<span class="error">❌ No user found with email test26@test.com</span>';
+          outputDiv.textContent = 'User does not exist in Firebase';
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          userData = doc.data();
+          userId = doc.id;
+
+          const hasScout = !!userData.scoutData;
+          const hasICP = !!userData.icpBrief;
+          const hasLeads = (userData.leads?.length || 0) > 0;
+          const isGenerating = userData.barryGeneratingLeads;
+          const hasError = !!userData.leadGenerationError;
+
+          let status = '';
+          if (hasLeads) {
+            status = '<span class="success">✅ HAS LEADS!</span>';
+          } else if (isGenerating) {
+            status = '<span class="warning">⏳ GENERATING (may be stuck)</span>';
+          } else if (hasError) {
+            status = '<span class="error">❌ ERROR OCCURRED</span>';
+          } else if (hasICP) {
+            status = '<span class="warning">⚠️ ICP READY BUT NO LEADS</span>';
+          } else if (hasScout) {
+            status = '<span class="warning">⚠️ SCOUT DONE BUT NO ICP</span>';
+          } else {
+            status = '<span class="error">❌ NO SCOUT DATA</span>';
+          }
+
+          statusDiv.innerHTML = status;
+
+          const report = {
+            userId: userId,
+            email: userData.email,
+            '---PROGRESS---': '---',
+            scoutCompleted: userData.scoutCompleted || false,
+            icpApproved: userData.icpApproved || false,
+            icpBriefExists: hasICP,
+            leadsCount: userData.leads?.length || 0,
+            '---STATUS---': '---',
+            barryGenerating: isGenerating || false,
+            leadGenerationError: userData.leadGenerationError || null,
+            leadsGeneratedAt: userData.leadsGeneratedAt || null,
+            '---SCOUT DATA---': '---',
+            industries: userData.scoutData?.industries || [],
+            companySizes: userData.scoutData?.companySizes || [],
+            jobTitles: userData.scoutData?.jobTitles || [],
+            targetStates: userData.scoutData?.targetStates || [],
+            '---LEADS SAMPLE---': '---',
+            firstLead: userData.leads?.[0] || null
+          };
+
+          outputDiv.textContent = JSON.stringify(report, null, 2);
+
+          // Show trigger button if ready
+          if (hasICP && !hasLeads && !isGenerating) {
+            document.getElementById('triggerLeads').style.display = 'block';
+          }
+        });
+      } catch (err) {
+        statusDiv.innerHTML = '<span class="error">❌ Error: ' + err.message + '</span>';
+        outputDiv.textContent = err.stack;
+      }
+    }
+
+    document.getElementById('triggerLeads').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result');
+      const button = document.getElementById('triggerLeads');
+
+      button.disabled = true;
+      button.textContent = '⏳ TRIGGERING...';
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = 'Calling generate-leads function...\n';
+
+      try {
+        const response = await fetch('/.netlify/functions/generate-leads', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: userId,
+            scoutData: userData.scoutData,
+            icpBrief: userData.icpBrief
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.textContent += '\n✅ SUCCESS!\n\n' + JSON.stringify(data, null, 2);
+
+          // Refresh to show new leads
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        } else {
+          resultDiv.textContent += '\n❌ ERROR!\n\n' + JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        resultDiv.textContent += '\n💥 EXCEPTION!\n\n' + err.message;
+      }
+    });
+
+    checkUser();
+  </script>
+</body>
+</html>

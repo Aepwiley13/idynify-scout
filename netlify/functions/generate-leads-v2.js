@@ -1,8 +1,8 @@
 exports.handler = async (event, context) => {
   console.log('🎯 Barry Enhanced Lead Generation V2 - Starting Mission');
-  
-  // CRITICAL: Set function timeout to 8 seconds (leave 2 sec buffer before Netlify kills it)
-  const FUNCTION_TIMEOUT = 8000;
+
+  // CRITICAL: Set function timeout to 10 minutes (Netlify allows 15min max, leave buffer)
+  const FUNCTION_TIMEOUT = 600000; // 10 minutes in milliseconds
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('Function timeout - processing is taking too long. Try using standard version or reducing search scope.')), FUNCTION_TIMEOUT);
   });

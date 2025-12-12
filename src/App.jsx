@@ -22,6 +22,12 @@ import MissionPhase5Page from './pages/MissionPhase5Page';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
 import Phase1Discovery from './components/Phase1Discovery';
+import ICPBuilder from './components/ICPBuilder';
+import ICPBriefView from './components/ICPBriefView';
+import CompanyList from './components/CompanyList';
+import AddCompanyForm from './components/AddCompanyForm';
+import ContactSuggestions from './components/ContactSuggestions';
+import LeadList from './components/LeadList';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -220,6 +226,56 @@ function App() {
           element={
             <ProtectedRoute>
               <MissionControlDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected Routes - MVP Routes (Module 1) */}
+        <Route
+          path="/icp"
+          element={
+            <ProtectedRoute>
+              <ICPBuilder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/icp-brief"
+          element={
+            <ProtectedRoute>
+              <ICPBriefView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/companies"
+          element={
+            <ProtectedRoute>
+              <CompanyList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/scout"
+          element={
+            <ProtectedRoute>
+              <ContactSuggestions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/add-company"
+          element={
+            <ProtectedRoute>
+              <AddCompanyForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/lead-review"
+          element={
+            <ProtectedRoute>
+              <LeadList />
             </ProtectedRoute>
           }
         />

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth, db } from "../firebase/config";
-import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
+import QuotaDisplay from "../components/QuotaDisplay";
 
 export default function MissionControlDashboard() {
   const navigate = useNavigate();
@@ -24,6 +25,11 @@ export default function MissionControlDashboard() {
   const [generatingLeads, setGeneratingLeads] = useState(false);
   const [useEnhancedVersion, setUseEnhancedVersion] = useState(false);
   const [leadGenError, setLeadGenError] = useState(null);
+
+  // Module 15: Phase status and quick stats
+  const [enrichedLeadsCount, setEnrichedLeadsCount] = useState(0);
+  const [companiesCount, setCompaniesCount] = useState(0);
+  const [currentWeights, setCurrentWeights] = useState(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -64,6 +70,37 @@ export default function MissionControlDashboard() {
     // Cleanup listener on unmount
     return () => unsubscribe();
   }, [navigate]);
+
+  // Module 15: Load quick stats
+  useEffect(() => {
+    const loadQuickStats = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        // Count enriched leads
+        const leadsCollection = collection(db, `users/${user.uid}/leads`);
+        const leadsSnapshot = await getDocs(leadsCollection);
+        setEnrichedLeadsCount(leadsSnapshot.size);
+
+        // Count companies
+        const companiesCollection = collection(db, `users/${user.uid}/companies`);
+        const companiesSnapshot = await getDocs(companiesCollection);
+        setCompaniesCount(companiesSnapshot.size);
+
+        // Fetch current weights
+        const weightsRef = doc(db, `users/${user.uid}/weights/current`);
+        const weightsDoc = await getDoc(weightsRef);
+        if (weightsDoc.exists()) {
+          setCurrentWeights(weightsDoc.data());
+        }
+      } catch (error) {
+        console.error('Error loading quick stats:', error);
+      }
+    };
+
+    loadQuickStats();
+  }, []);
 
   const handleLogout = async () => {
     if (window.confirm("Abort mission and log out?")) {
@@ -456,6 +493,86 @@ ${data.message}`;
         {/* OVERVIEW TAB - Show ICP Summary */}
         {activeTab === 'overview' && icpBrief && (
           <div className="space-y-8 animate-fadeIn">
+            {/* Module 15: Phase Status */}
+            <div className="bg-black/60 backdrop-blur-xl border-2 border-cyan-500/30 rounded-2xl p-8 mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6 font-mono">MISSION STATUS</h2>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl">✅</div>
+                  <div>
+                    <div className="text-green-400 font-bold font-mono">RECON COMPLETE</div>
+                    <div className="text-gray-400 text-sm font-mono">ICP defined and approved</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl">✅</div>
+                  <div>
+                    <div className="text-green-400 font-bold font-mono">SUBSCRIBED TO SCOUT</div>
+                    <div className="text-gray-400 text-sm font-mono">Active subscription tier</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl">🔄</div>
+                  <div>
+                    <div className="text-cyan-400 font-bold font-mono">SCOUT IN PROGRESS</div>
+                    <div className="text-gray-400 text-sm font-mono">{enrichedLeadsCount} leads enriched, {companiesCount} companies matched</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="mt-8 pt-6 border-t border-cyan-500/30">
+                <h3 className="text-lg font-bold text-white mb-4 font-mono">QUICK STATS</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-cyan-400">{enrichedLeadsCount}</div>
+                    <div className="text-xs text-gray-400 font-mono">Total Leads Enriched</div>
+                  </div>
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-purple-400">{companiesCount}</div>
+                    <div className="text-xs text-gray-400 font-mono">Companies Matched</div>
+                  </div>
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
+                    <div className="text-3xl font-bold text-green-400">
+                      {currentWeights ? Math.round((currentWeights.title_match_weight + currentWeights.industry_match_weight + currentWeights.company_size_weight) / 3) : '-'}
+                    </div>
+                    <div className="text-xs text-gray-400 font-mono">Avg Weight Score</div>
+                  </div>
+                </div>
+
+                {/* Debug view for weights */}
+                {currentWeights && (
+                  <details className="mt-4">
+                    <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400 font-mono">
+                      Show current weights (debug)
+                    </summary>
+                    <div className="mt-2 bg-black/50 p-3 rounded border border-cyan-500/20 text-xs font-mono text-gray-400">
+                      <div>Title Match Weight: {currentWeights.title_match_weight}</div>
+                      <div>Industry Match Weight: {currentWeights.industry_match_weight}</div>
+                      <div>Company Size Weight: {currentWeights.company_size_weight}</div>
+                      <div className="text-gray-500 mt-1">Updated: {new Date(currentWeights.updated_at).toLocaleString()}</div>
+                    </div>
+                  </details>
+                )}
+              </div>
+
+              {/* CTAs */}
+              <div className="mt-6 grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => navigate('/lead-review')}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:from-cyan-600 hover:to-blue-700 transition-all font-mono"
+                >
+                  📋 View My Leads
+                </button>
+                <button
+                  onClick={() => navigate('/scout')}
+                  className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-3 rounded-lg font-bold hover:from-purple-600 hover:to-pink-700 transition-all font-mono"
+                >
+                  🔍 Find More Contacts
+                </button>
+              </div>
+            </div>
+
             <div className="text-center mb-8">
               <h2 className="text-5xl font-bold text-white mb-4 font-mono">YOUR IDEAL CLIENT PROFILE 🎯</h2>
               <p className="text-xl text-gray-300 font-mono">

@@ -1,3 +1,4 @@
+// Test deployment - 2025-12-17
 import Anthropic from '@anthropic-ai/sdk';
 
 export const handler = async (event) => {

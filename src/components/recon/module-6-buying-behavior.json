@@ -1,0 +1,469 @@
+{
+  "questionnaire": {
+    "sectionId": 6,
+    "sectionTitle": "Buying Behavior & Triggers",
+    "sectionDescription": "Understand when, why, and how your ideal customers make purchasing decisions",
+    "questions": [
+      {
+        "id": "startTriggers",
+        "question": "What events trigger them to start looking?",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 6,
+        "helpText": "Select all events that typically trigger them to start evaluating solutions",
+        "options": [
+          "Raised funding (Series A/B/C)",
+          "New hire (VP Sales, CRO, etc.)",
+          "Poor quarterly results",
+          "Regulatory/compliance requirements",
+          "Crisis/urgent problem",
+          "Competitor threat",
+          "Leadership change",
+          "Budget cycle (new fiscal year)",
+          "Product launch",
+          "Scaling/growth phase",
+          "Team churn/attrition"
+        ]
+      },
+      {
+        "id": "researchMethods",
+        "question": "How do they research solutions?",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 6,
+        "helpText": "Select all the ways they typically research and evaluate solutions",
+        "options": [
+          "Google search",
+          "Ask peers/network",
+          "Read analyst reports (Gartner, Forrester)",
+          "Watch product demos",
+          "Read reviews (G2, Capterra)",
+          "LinkedIn recommendations",
+          "Industry conferences/events",
+          "Vendor website",
+          "Free trial/POC",
+          "Case studies",
+          "Sales outreach"
+        ]
+      },
+      {
+        "id": "salesCycleLength",
+        "question": "Typical sales cycle length",
+        "type": "radio",
+        "required": true,
+        "helpText": "How long from first contact to closed deal?",
+        "options": [
+          "< 1 week (instant decision)",
+          "1-4 weeks (fast)",
+          "1-3 months (moderate)",
+          "3-6 months (slow)",
+          "6+ months (very slow)"
+        ]
+      },
+      {
+        "id": "bestBuyingTimes",
+        "question": "Best time of year to buy",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 1,
+        "maxSelections": 5,
+        "helpText": "When are they most likely to make purchasing decisions?",
+        "options": [
+          "Q1 (January-March)",
+          "Q2 (April-June)",
+          "Q3 (July-September)",
+          "Q4 (October-December)",
+          "Start of fiscal year",
+          "End of fiscal year",
+          "Budget refresh periods",
+          "Any time (no seasonality)"
+        ]
+      },
+      {
+        "id": "avoidTimes",
+        "question": "Times to avoid",
+        "type": "multi-select",
+        "required": false,
+        "helpText": "When do deals typically stall or get delayed? (Optional)",
+        "options": [
+          "Budget freeze periods",
+          "Year-end holidays (Nov-Dec)",
+          "Summer (June-August)",
+          "End of quarter rush",
+          "Tax season",
+          "Conference season",
+          "None - can close year-round"
+        ]
+      },
+      {
+        "id": "linkedinSignals",
+        "question": "LinkedIn signals of readiness",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 6,
+        "helpText": "What LinkedIn activity indicates they're ready to buy?",
+        "options": [
+          "Job changes (new VP/CRO hired)",
+          "Hiring posts (recruiting for sales/ops)",
+          "Funding announcements",
+          "Company growth posts",
+          "Problem/pain posts",
+          "Thought leadership content",
+          "Attending industry events",
+          "Profile updates",
+          "Following relevant vendors",
+          "Engaging with solution content"
+        ]
+      },
+      {
+        "id": "competitiveAlternatives",
+        "question": "What competitive alternatives do they consider?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What else are they evaluating when they're considering you?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Direct competitors (Outreach, Salesloft), indirect (Apollo, ZoomInfo), DIY (build internal tool), do nothing (manual process)..."
+      },
+      {
+        "id": "lastStepBeforeBuy",
+        "question": "What's the last step before they buy?",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 1,
+        "maxSelections": 4,
+        "helpText": "What do they need to see/do right before signing?",
+        "options": [
+          "Free trial (hands-on testing)",
+          "Live demo with their data",
+          "Customer references/calls",
+          "ROI analysis/business case",
+          "Security/compliance review",
+          "Legal review of contract",
+          "Executive approval",
+          "Proof of concept (POC)"
+        ]
+      },
+      {
+        "id": "stallReasons",
+        "question": "What causes deals to stall?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What typically slows down or blocks deals?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Budget approval delays, champion leaves, too many stakeholders, seasonal slowdown, competing priorities..."
+      },
+      {
+        "id": "accelerators",
+        "question": "What accelerates decisions?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What makes deals close faster than usual?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Quarterly deadline pressure, executive sponsor, urgent pain, competitor using it, strong ROI, time-limited discount..."
+      }
+    ]
+  },
+  "jsonSchema": {
+    "section": 6,
+    "title": "Buying Behavior & Triggers",
+    "status": "completed",
+    "completedAt": "ISO 8601 timestamp",
+    "version": 1,
+    "buyingBehaviorProfile": {
+      "hotTriggers": {
+        "eventBased": ["array of selected event triggers"],
+        "performanceBased": "string (infer from triggers - poor results, missing targets)",
+        "timeBased": "string (infer from triggers - fiscal year, quarters)",
+        "triggerStrength": "string (strong/moderate/weak based on selections)"
+      },
+      "researchPatterns": {
+        "primaryChannels": ["array of top 3 research methods selected"],
+        "influenceSources": "string (who influences their decisions - peers, analysts, etc.)",
+        "contentPreferences": "string (what content they consume - demos, case studies, etc.)",
+        "researchDepth": "string (light/moderate/deep based on methods selected)",
+        "peerInfluence": "string (high/medium/low based on network/peer selections)"
+      },
+      "salesCycleTimeline": {
+        "averageDuration": "string (from salesCycleLength selection)",
+        "durationRange": "string (expand on typical range)",
+        "variance": "string (what causes cycles to be shorter or longer)",
+        "stages": [
+          {
+            "stage": "Awareness",
+            "duration": "string",
+            "activities": "string"
+          },
+          {
+            "stage": "Evaluation",
+            "duration": "string",
+            "activities": "string"
+          },
+          {
+            "stage": "Decision",
+            "duration": "string",
+            "activities": "string"
+          }
+        ],
+        "industryBenchmark": "string (how this compares to industry average)"
+      },
+      "seasonalPatterns": {
+        "bestTimes": ["array from bestBuyingTimes selections"],
+        "avoidTimes": ["array from avoidTimes selections or empty if none"],
+        "seasonalityStrength": "string (strong/moderate/weak/none)",
+        "planningImplications": "string (how to plan outreach based on seasonality)"
+      },
+      "readinessSignals": {
+        "linkedinSignals": ["array from linkedinSignals selections"],
+        "digitalFootprint": "string (what online behavior indicates readiness)",
+        "hiringSignals": "string (job posts, growth indicators)",
+        "fundingSignals": "string (if funding selected, elaborate)",
+        "competitiveSignals": "string (if competitor threat selected, elaborate)",
+        "signalReliability": "string (how reliable these signals are - high/medium/low)"
+      },
+      "competitiveSet": {
+        "directCompetitors": ["array extracted from competitiveAlternatives"],
+        "alternatives": ["array of indirect alternatives"],
+        "doNothing": "string (status quo/manual process if mentioned)",
+        "evaluationProcess": "string (how they evaluate you vs competitors)"
+      },
+      "decisionMilestones": {
+        "finalSteps": ["array from lastStepBeforeBuy selections"],
+        "approvalLevels": "string (what approvals needed - infer from lastStepBeforeBuy)",
+        "criticalPath": "string (what MUST happen to close deal)",
+        "pointOfNoReturn": "string (when deal becomes inevitable)"
+      },
+      "velocityFactors": {
+        "stalls": {
+          "commonBottlenecks": ["array extracted from stallReasons"],
+          "stallDuration": "string (how long stalls typically last)",
+          "recoveryStrategies": "string (how to get stalled deals moving)"
+        },
+        "accelerators": {
+          "speedDrivers": ["array extracted from accelerators"],
+          "compressionTactics": "string (how to compress sales cycle)",
+          "urgencyCreation": "string (how to create urgency)"
+        }
+      },
+      "closeTriggers": {
+        "finalPushFactors": ["array from accelerators - what closes deals"],
+        "commitmentMoment": "string (what tips them over the edge)",
+        "lastObjection": "string (final hurdle before signing)"
+      }
+    },
+    "rawAnswers": {
+      "startTriggers": ["array"],
+      "researchMethods": ["array"],
+      "salesCycleLength": "string",
+      "bestBuyingTimes": ["array"],
+      "avoidTimes": ["array or empty"],
+      "linkedinSignals": ["array"],
+      "competitiveAlternatives": "string",
+      "lastStepBeforeBuy": ["array"],
+      "stallReasons": "string",
+      "accelerators": "string"
+    },
+    "metadata": {
+      "generationTime": "number",
+      "model": "string",
+      "tokensUsed": "number",
+      "editHistory": []
+    }
+  },
+  "exampleOutput": {
+    "section": 6,
+    "title": "Buying Behavior & Triggers",
+    "status": "completed",
+    "completedAt": "2025-12-18T18:00:00Z",
+    "version": 1,
+    "buyingBehaviorProfile": {
+      "hotTriggers": {
+        "eventBased": [
+          "Raised funding (Series A/B/C)",
+          "New hire (VP Sales, CRO, etc.)",
+          "Poor quarterly results",
+          "Scaling/growth phase",
+          "Team churn/attrition"
+        ],
+        "performanceBased": "Poor quarterly results trigger immediate evaluation. Missing revenue targets (trailing 10-20% behind plan) forces VP Sales to find solutions fast. SDR churn (>30% annually) creates urgency to fix broken processes. These performance issues create board pressure and job risk.",
+        "timeBased": "Recent funding (Series A/B) opens budget window and creates growth expectations. New fiscal year brings fresh budgets and new priorities. Q4 is critical - if they're behind on targets, they'll buy anything that can help them catch up before year-end.",
+        "triggerStrength": "Very strong - multiple converging triggers (funding + poor results + churn) create perfect storm. When all three align, buying urgency is extreme and sales cycle compresses to weeks instead of months."
+      },
+      "researchPatterns": {
+        "primaryChannels": [
+          "Ask peers/network",
+          "Watch product demos",
+          "Free trial/POC"
+        ],
+        "influenceSources": "Peers are the #1 influence source - they trust recommendations from other VP Sales/CROs in their network more than any analyst or review site. They're in Slack communities, LinkedIn groups, and revenue leader networks asking 'what tools are you using?'. Analysts (Gartner/Forrester) are referenced but not decision drivers.",
+        "contentPreferences": "Prefer hands-on experience (demos, trials) over reading (whitepapers, case studies). Want to see the tool working with their data. Don't have patience for long analyst reports. Quick YouTube demos and peer testimonials are most effective.",
+        "researchDepth": "Moderate - they do enough research to avoid bad decisions but aren't exhaustive. Typically evaluate 2-3 vendors seriously, not 10+. Focus on pragmatic 'will this work?' questions rather than feature comparisons. Time-constrained so research is efficient, not comprehensive.",
+        "peerInfluence": "Very high - peer recommendation can compress entire sales cycle. If trusted peer says 'this tool saved my team', they'll fast-track evaluation. Negative peer feedback can kill deals instantly. Peer references are often the final decision factor."
+      },
+      "salesCycleTimeline": {
+        "averageDuration": "1-3 months (moderate)",
+        "durationRange": "Typical range is 6-12 weeks. Fast track (high urgency): 3-4 weeks. Slow track (no urgency): 3-4 months. Rarely closes <3 weeks (need time for trial) or >4 months (if that slow, deal is dead).",
+        "variance": "Faster cycles when: urgent pain (Q4 pressure), executive sponsor (CEO involved), clear ROI (obvious savings), funding just closed (budget available). Slower cycles when: no urgency, many stakeholders, procurement involved, competing priorities.",
+        "stages": [
+          {
+            "stage": "Awareness (Discovery)",
+            "duration": "Week 1-2",
+            "activities": "Initial outreach, qualification call, pain discovery, demo request. They're evaluating if problem is worth solving and if you're credible."
+          },
+          {
+            "stage": "Evaluation (Consideration)",
+            "duration": "Week 3-8",
+            "activities": "Product demo, trial setup, hands-on testing, reference calls, competitive evaluation. This is longest phase - they're kicking tires and building consensus."
+          },
+          {
+            "stage": "Decision (Purchase)",
+            "duration": "Week 9-12",
+            "activities": "ROI analysis, security review, contract negotiation, final approvals. If they get here, close rate is 70%+. Last-minute stalls happen when budget or champion issues emerge."
+          }
+        ],
+        "industryBenchmark": "1-3 months is typical for $10K-$50K software deals in growth-stage B2B. Faster than enterprise (6-12 months) but slower than SMB (<1 month). Matches industry average for mid-market SaaS."
+      },
+      "seasonalPatterns": {
+        "bestTimes": [
+          "Q1 (January-March)",
+          "Q4 (October-December)",
+          "Start of fiscal year",
+          "Budget refresh periods"
+        ],
+        "avoidTimes": [
+          "Year-end holidays (Nov-Dec)",
+          "Summer (June-August)"
+        ],
+        "seasonalityStrength": "Moderate - definite seasonal patterns but not extreme. Q1 (new budgets) and Q4 (year-end push) are peak buying seasons. Summer slowdown (July-August) is real but not complete dead zone. Holiday weeks (Thanksgiving, Christmas) are write-offs.",
+        "planningImplications": "Accelerate deals in Q4 if behind on quota - use urgency. Launch new campaigns in January when budgets refresh. Expect slower responses July-August, use for nurturing not closing. Avoid major pushes week of Thanksgiving and December 20-31. Plan pipeline building for Q3 to close in Q4/Q1."
+      },
+      "readinessSignals": {
+        "linkedinSignals": [
+          "Job changes (new VP/CRO hired)",
+          "Hiring posts (recruiting for sales/ops)",
+          "Funding announcements",
+          "Problem/pain posts",
+          "Following relevant vendors"
+        ],
+        "digitalFootprint": "When they start following competitors and engaging with sales content on LinkedIn, they're in buying mode. Active on LinkedIn = actively researching. Silent on LinkedIn = not in market. Profile updates (new title, new company) = new priorities and fresh budget.",
+        "hiringSignals": "Hiring for SDR/BDR roles = they're scaling outbound = perfect time to pitch sales automation. Job posts for VP Sales/CRO = new leader will want new tools = 90-day window to sell. Multiple sales hires in short period = growth mode = high intent.",
+        "fundingSignals": "Funding announcement = 30-90 day window of high buying intent. Fresh capital means budget available and pressure to deploy it wisely. Series A/B are sweet spots - need to professionalize sales but aren't enterprise yet. Seed is too early, Series C+ needs enterprise solutions.",
+        "competitiveSignals": "If competitor just raised $20M and they're trailing, creates urgency to catch up. Competitive pressure forces action - can't let rivals outpace them. Monitor competitor funding/hiring announcements to identify triggered accounts.",
+        "signalReliability": "High for hiring (75% conversion if actively hiring SDRs). High for funding (60% conversion within 90 days). Medium for job changes (40% - new leaders take time to assess). Low for thought leadership (10% - mostly brand building not buying)."
+      },
+      "competitiveSet": {
+        "directCompetitors": [
+          "Outreach",
+          "Salesloft",
+          "Apollo.io"
+        ],
+        "alternatives": [
+          "ZoomInfo (data only, no automation)",
+          "Instantly.ai (budget option)",
+          "Build internal tool (engineering team)",
+          "Do nothing (manual process)"
+        ],
+        "doNothing": "Status quo is biggest competitor - manual prospecting is familiar even if painful. Inertia is strong. Need to show cost of manual approach ($860K/year wasted) to overcome 'if it ain't broke' mentality.",
+        "evaluationProcess": "They evaluate 2-3 vendors seriously. Start with demos from top 2 competitors (Outreach, Salesloft) as enterprise benchmarks. Then look for alternatives - we're positioned as 'easier than enterprise, smarter than budget tools'. Final decision comes down to: ease of use, quality of AI, integration with CRM, and price. Rarely choose based on features alone - it's total package."
+      },
+      "decisionMilestones": {
+        "finalSteps": [
+          "Free trial (hands-on testing)",
+          "Customer references/calls",
+          "ROI analysis/business case",
+          "Executive approval"
+        ],
+        "approvalLevels": "VP Sales can approve <$25K annually without executive sign-off. $25K-$100K needs CFO approval. $100K+ needs CEO/board approval. Most deals are $10K-$30K so VP Sales is economic buyer.",
+        "criticalPath": "Must complete successful trial (2 weeks) → must speak to 2+ happy customers → must build ROI business case ($860K pain ÷ $30K solution = 28x ROI) → must get CFO approval if >$25K → signature. Any of these fail = deal dies.",
+        "pointOfNoReturn": "Once they've run successful trial with their team and seen results (response rates improving, time saved), deal is 80% done. Point of no return is when they've invested time/energy into trial and would look silly to not proceed. Trial success = inevitable close."
+      },
+      "velocityFactors": {
+        "stalls": {
+          "commonBottlenecks": [
+            "Budget approval delays (CFO or CEO slow to approve)",
+            "Champion leaves company mid-deal (lose internal advocate)",
+            "Too many stakeholders (consensus paralysis)",
+            "Competing priorities (other initiatives take precedence)",
+            "Seasonal slowdown (summer/holidays)"
+          ],
+          "stallDuration": "Average stall is 2-4 weeks. Budget delays: 1-2 weeks. Champion change: 4-6 weeks (need new champion). Seasonal: 2-8 weeks (summer/holidays). Competing priorities: indefinite (may never recover).",
+          "recoveryStrategies": "Budget delays: Offer pilot/trial at lower price. Champion leaves: Multi-thread to other stakeholders early. Too many stakeholders: Executive sponsor to force decision. Competing priorities: Create urgency with time-limited offer or Q4 deadline. Seasonal: Stay warm with nurture, re-engage January/September."
+        },
+        "accelerators": {
+          "speedDrivers": [
+            "Quarterly deadline pressure (need results before board meeting)",
+            "Executive sponsor (CEO/CRO pushing for solution)",
+            "Urgent pain (crisis mode - SDR churn, missed targets)",
+            "Strong ROI (>10x return obvious)",
+            "Peer success story (trusted colleague using it successfully)"
+          ],
+          "compressionTactics": "Compress awareness-to-trial from 4 weeks to 1 week with immediate trial access. Compress trial from 2 weeks to 1 week with white-glove setup. Compress decision from 4 weeks to 1 week with pre-built ROI calculator and same-day references. Total cycle compression: 12 weeks → 4 weeks.",
+          "urgencyCreation": "Tie to quarterly deadline ('close before Q4 ends'). Create FOMO ('competitor X just signed'). Leverage pain ('every week costs $16K in wasted time'). Time-limited pricing ('this price ends Friday'). Executive pressure ('CEO asked me to prioritize this'). Peer proof ('3 companies in your network already using this')."
+        }
+      },
+      "closeTriggers": {
+        "finalPushFactors": [
+          "Successful trial with measurable results (2x response rates)",
+          "Glowing customer reference from peer in similar role",
+          "ROI business case approved by CFO (28x return)",
+          "Quarterly deadline creating time pressure",
+          "Executive buy-in from CEO/CRO"
+        ],
+        "commitmentMoment": "The moment they see trial results (response rates doubled, SDRs excited, time saved obvious) combined with peer reference saying 'this worked for us', they mentally commit. Signature is just paperwork at that point. Commitment happens in mind before contract.",
+        "lastObjection": "Final objection is usually price ('Can we get a discount?') or risk ('What if it doesn't work for our team?'). Price objection: Overcome with ROI ($860K pain vs $30K solution). Risk objection: Overcome with success guarantee or extended trial. If these are only objections, deal is 90% done."
+      }
+    },
+    "rawAnswers": {
+      "startTriggers": [
+        "Raised funding (Series A/B/C)",
+        "New hire (VP Sales, CRO, etc.)",
+        "Poor quarterly results",
+        "Scaling/growth phase",
+        "Team churn/attrition"
+      ],
+      "researchMethods": [
+        "Ask peers/network",
+        "Watch product demos",
+        "Read reviews (G2, Capterra)",
+        "Free trial/POC",
+        "Case studies",
+        "LinkedIn recommendations"
+      ],
+      "salesCycleLength": "1-3 months (moderate)",
+      "bestBuyingTimes": [
+        "Q1 (January-March)",
+        "Q4 (October-December)",
+        "Start of fiscal year",
+        "Budget refresh periods"
+      ],
+      "avoidTimes": [
+        "Year-end holidays (Nov-Dec)",
+        "Summer (June-August)"
+      ],
+      "linkedinSignals": [
+        "Job changes (new VP/CRO hired)",
+        "Hiring posts (recruiting for sales/ops)",
+        "Funding announcements",
+        "Problem/pain posts",
+        "Following relevant vendors"
+      ],
+      "competitiveAlternatives": "Direct competitors: Outreach, Salesloft, Apollo. Indirect: ZoomInfo (data only), Instantly (budget tool), building internal tool. Biggest competitor is do nothing - keep doing manual prospecting even though it's broken.",
+      "lastStepBeforeBuy": [
+        "Free trial (hands-on testing)",
+        "Customer references/calls",
+        "ROI analysis/business case",
+        "Executive approval"
+      ],
+      "stallReasons": "Budget approval delays when CFO is slow. Champion leaving company mid-deal. Too many stakeholders can't agree. Seasonal slowdown in summer/holidays. Competing priorities like product launch taking focus.",
+      "accelerators": "Quarterly deadline pressure to hit targets. Executive sponsor (CEO) pushing for solution. Urgent pain like SDR churn or missed quota. Strong ROI calculation showing >10x return. Peer success story from trusted colleague."
+    },
+    "metadata": {
+      "generationTime": 8.7,
+      "model": "claude-sonnet-4-20250514",
+      "tokensUsed": 2891,
+      "editHistory": []
+    }
+  }
+}

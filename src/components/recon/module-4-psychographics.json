@@ -1,0 +1,359 @@
+{
+  "questionnaire": {
+    "sectionId": 4,
+    "sectionTitle": "Ideal Customer Psychographics",
+    "sectionDescription": "Deep psychological profiling of your ideal customer's mindset, motivations, and behaviors",
+    "questions": [
+      {
+        "id": "nightFears",
+        "question": "What keeps them up at night?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What worries, stresses, or anxieties do they have?",
+        "validation": { "minLength": 100, "maxLength": 400 },
+        "placeholder": "Describe the main concerns, worries, or stresses your ideal customers deal with..."
+      },
+      {
+        "id": "goals",
+        "question": "What goals are they trying to achieve?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What are they working toward professionally?",
+        "validation": { "minLength": 100, "maxLength": 400 },
+        "placeholder": "Describe their professional objectives, targets, and aspirations..."
+      },
+      {
+        "id": "values",
+        "question": "What do they value most?",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 5,
+        "helpText": "Select 2-5 values that matter most to them",
+        "options": [
+          "Speed / Quick results",
+          "Quality / Excellence",
+          "Cost savings / Efficiency",
+          "Innovation / Being first",
+          "Reliability / Consistency",
+          "Simplicity / Ease of use",
+          "Scalability / Growth",
+          "Security / Risk mitigation",
+          "Flexibility / Customization",
+          "Support / Partnership"
+        ]
+      },
+      {
+        "id": "commonPhrases",
+        "question": "Common phrases they use when describing problems",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What exact words or phrases do they say repeatedly?",
+        "validation": { "minLength": 50, "maxLength": 300 },
+        "placeholder": "e.g., 'We're drowning in manual work', 'We can't scale fast enough', 'We're losing deals to faster competitors'..."
+      },
+      {
+        "id": "emotionalState",
+        "question": "Emotional state when seeking solutions",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 4,
+        "helpText": "How do they feel when they start looking for solutions?",
+        "options": [
+          "Frustrated / Fed up",
+          "Anxious / Stressed",
+          "Hopeful / Optimistic",
+          "Skeptical / Cautious",
+          "Desperate / Urgent",
+          "Curious / Exploratory",
+          "Overwhelmed / Lost",
+          "Determined / Focused",
+          "Tired / Burned out",
+          "Excited / Eager"
+        ]
+      },
+      {
+        "id": "decisionFears",
+        "question": "What do they fear about making the wrong decision?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What concerns or risks worry them about choosing the wrong solution?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Wasting budget, looking bad to their boss, implementation taking too long, team not adopting it..."
+      },
+      {
+        "id": "changeAttitude",
+        "question": "Attitude toward change",
+        "type": "radio",
+        "required": true,
+        "helpText": "Where do they fall on the innovation adoption curve?",
+        "options": [
+          "Early Adopter (loves trying new things)",
+          "Early Majority (adopts after some validation)",
+          "Late Majority (waits for proven solutions)",
+          "Laggard (very resistant to change)",
+          "Depends on the situation"
+        ]
+      },
+      {
+        "id": "successMeasurement",
+        "question": "How do they measure success?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What metrics, outcomes, or results define success for them?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Revenue growth, time saved, conversion rates, team productivity, customer satisfaction..."
+      },
+      {
+        "id": "personalMotivators",
+        "question": "What motivates them personally?",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 5,
+        "helpText": "What drives them as individuals?",
+        "options": [
+          "Career advancement",
+          "Recognition / Status",
+          "Job security",
+          "Making an impact",
+          "Financial reward",
+          "Learning / Growth",
+          "Work-life balance",
+          "Helping their team",
+          "Solving hard problems",
+          "Building something new"
+        ]
+      },
+      {
+        "id": "riskTolerance",
+        "question": "Risk tolerance",
+        "type": "radio",
+        "required": true,
+        "helpText": "How comfortable are they with risk?",
+        "options": [
+          "Risk taker (bets big, moves fast)",
+          "Calculated risk (data-driven decisions)",
+          "Risk averse (plays it safe)",
+          "Very conservative (avoids risk at all costs)"
+        ]
+      }
+    ]
+  },
+  "jsonSchema": {
+    "section": 4,
+    "title": "Ideal Customer Psychographics",
+    "status": "completed",
+    "completedAt": "ISO 8601 timestamp",
+    "version": 1,
+    "psychographicProfile": {
+      "painLandscape": {
+        "nightFears": "string",
+        "generalAnxiety": "string",
+        "dailyFrustrations": "string",
+        "strategicChallenges": "string"
+      },
+      "goalArchitecture": {
+        "objectives": "string",
+        "aspirations": "string",
+        "measurableTargets": "string",
+        "timeline": "string"
+      },
+      "valueSystem": {
+        "topValues": [
+          {
+            "value": "string",
+            "priority": "number (1-5)",
+            "implication": "string"
+          }
+        ],
+        "tradeoffs": "string"
+      },
+      "languagePatterns": {
+        "exactPhrases": ["array of strings"],
+        "painLanguage": "string",
+        "outcomeLanguage": "string",
+        "industryJargon": "string",
+        "emotionalWords": "string"
+      },
+      "emotionalDrivers": {
+        "currentState": "string",
+        "desiredState": "string",
+        "emotionalJourney": "string",
+        "triggers": "string"
+      },
+      "riskPerception": {
+        "decisionFears": "string",
+        "concernsHesitations": "string",
+        "worstCaseScenario": "string",
+        "riskMitigationNeeds": "string"
+      },
+      "changeReadiness": {
+        "adoptionCurve": "string",
+        "changeAttitude": "string",
+        "innovationTolerance": "string",
+        "statusQuoBias": "string"
+      },
+      "successDefinition": {
+        "successMetrics": "string",
+        "proofPoints": "string",
+        "timeframe": "string",
+        "acceptableROI": "string"
+      },
+      "personalMotivators": {
+        "careerDrivers": ["array"],
+        "professionalGoals": "string",
+        "personalRewards": "string"
+      },
+      "riskProfile": {
+        "tolerance": "string",
+        "pastBehavior": "string",
+        "riskRewardBalance": "string"
+      }
+    },
+    "rawAnswers": {
+      "nightFears": "string",
+      "goals": "string",
+      "values": ["array"],
+      "commonPhrases": "string",
+      "emotionalState": ["array"],
+      "decisionFears": "string",
+      "changeAttitude": "string",
+      "successMeasurement": "string",
+      "personalMotivators": ["array"],
+      "riskTolerance": "string"
+    },
+    "metadata": {
+      "generationTime": "number",
+      "model": "string",
+      "tokensUsed": "number",
+      "editHistory": []
+    }
+  },
+  "exampleOutput": {
+    "section": 4,
+    "title": "Ideal Customer Psychographics",
+    "status": "completed",
+    "completedAt": "2025-12-18T16:30:00Z",
+    "version": 1,
+    "psychographicProfile": {
+      "painLandscape": {
+        "nightFears": "They worry about missing revenue targets and being blamed for slow sales growth. They fear their manual prospecting approach can't scale fast enough to hit aggressive growth goals. They stress about their SDRs burning out from repetitive manual work and churning before becoming productive.",
+        "generalAnxiety": "Constant pressure to do more with less - hit bigger numbers without adding more headcount. Anxiety about competitors moving faster and stealing market share. Worried about being seen as the bottleneck preventing company growth.",
+        "dailyFrustrations": "Spending 3-4 hours per day on manual tasks (researching leads, writing emails, data entry). SDRs only reaching 20-30 prospects per day when they need 100+. Low response rates (<2%) making all that work feel pointless. CRM data is always outdated.",
+        "strategicChallenges": "Can't prove sales productivity improvements to justify more headcount. Don't have data to show what messaging works. Can't scale outbound without throwing bodies at the problem. Need to 3x pipeline but resources are flat."
+      },
+      "goalArchitecture": {
+        "objectives": "Hit 150% of quota this year and get promoted to VP Sales. Build a scalable sales engine that doesn't require constant firefighting. Prove to executives that their team can compete with larger, better-funded competitors.",
+        "aspirations": "Want to be known as the leader who modernized sales at the company. Build a reputation as someone who can scale teams efficiently. Eventually run revenue for a unicorn. Get recruited away for a VP Sales role at a hot startup.",
+        "measurableTargets": "Increase outbound response rates from 2% to 5%. Double meetings booked per SDR from 4/week to 8/week. Reduce time-to-productivity for new hires from 90 days to 45 days. Hit $500K in closed-won pipeline from outbound this quarter.",
+        "timeline": "Need to show results within 90 days (one quarter) to prove the investment is working. Full team adoption within 6 months. VP promotion within 12-18 months if numbers hit."
+      },
+      "valueSystem": {
+        "topValues": [
+          {
+            "value": "Speed / Quick results",
+            "priority": 1,
+            "implication": "They need wins fast to prove themselves. Long implementations are deal-breakers. Time-to-value is more important than feature completeness."
+          },
+          {
+            "value": "Scalability / Growth",
+            "priority": 2,
+            "implication": "Solution must work at 5 SDRs and 50 SDRs. They're building for where they're going, not where they are. Need proof it won't break as they scale."
+          },
+          {
+            "value": "Reliability / Consistency",
+            "priority": 3,
+            "implication": "Can't afford downtime or buggy software. Their credibility is on the line. Would rather have fewer features that work perfectly than many features that are flaky."
+          },
+          {
+            "value": "Quality / Excellence",
+            "priority": 4,
+            "implication": "Want to look good in front of executives. Need polished solution they can show off. Presentation matters for internal credibility."
+          },
+          {
+            "value": "Support / Partnership",
+            "priority": 5,
+            "implication": "First time implementing AI sales tools. Need hand-holding during setup and optimization. Value responsive support more than self-service docs."
+          }
+        ],
+        "tradeoffs": "Will sacrifice cost savings for speed and reliability. Will pay premium for something that works vs discount for something that requires heavy lifting. Would rather have focused feature set that works than Swiss Army knife approach."
+      },
+      "languagePatterns": {
+        "exactPhrases": [
+          "We're drowning in manual work",
+          "We can't scale fast enough",
+          "Our SDRs are burning out",
+          "We're losing deals to faster competitors",
+          "We need to do more with less",
+          "I can't prove ROI to my CEO",
+          "Our outreach feels like spray and pray",
+          "We're leaving money on the table"
+        ],
+        "painLanguage": "Uses military/sports metaphors ('we're getting crushed', 'losing ground', 'need to fight back'). Talks in terms of time wasted ('burning hours', 'wasting days'). Expresses urgency through scarcity ('running out of time', 'window is closing').",
+        "outcomeLanguage": "Talks about 'winning' and 'dominating'. Uses multipliers ('2x pipeline', '3x meetings'). Describes ideal state as 'machine' or 'engine' ('sales machine', 'pipeline engine'). Wants to 'level up' and 'scale up'.",
+        "industryJargon": "SDR, BDR, ACV, pipeline, qualified lead, MQL, SQL, conversion rate, response rate, time-to-productivity, ramp time, quota attainment.",
+        "emotionalWords": "Frustrated, overwhelmed, stuck, behind, stressed, anxious, desperate (for solution), excited (about possibilities), hopeful (if tool works)."
+      },
+      "emotionalDrivers": {
+        "currentState": "Frustrated and stressed. Feel like they're working harder than ever but results aren't scaling. Anxious about hitting targets with current approach. Slightly desperate for a solution that actually works.",
+        "desiredState": "Want to feel confident and in control. Dream of having a scalable system they can trust. Want to walk into exec meetings with impressive metrics. Want to stop firefighting and start strategizing.",
+        "emotionalJourney": "START: Frustrated by current manual approach → Research phase: Hopeful but skeptical → Demo: Excited if it looks easy → Trial: Cautiously optimistic → Implementation: Anxious about adoption → Success: Relieved and validated → Expansion: Confident evangelist.",
+        "triggers": "Emotional triggers include: Missing quota (desperation), losing deals to competitors (urgency), SDR churn (frustration), CEO pressure (anxiety), seeing competitor win (FOMO), getting promoted (motivation)."
+      },
+      "riskPerception": {
+        "decisionFears": "Fears wasting budget on something that doesn't work and looking incompetent. Worries about implementation taking too long and missing the quarter. Fears team won't adopt it and money is wasted. Concerns about data quality issues making output useless.",
+        "concernsHesitations": "Hesitant about AI quality (will messages sound robotic?). Concerned about learning curve for team. Worried about switching costs from current tools. Nervous about vendor going out of business. Unsure if it will integrate with their CRM.",
+        "worstCaseScenario": "Spend $20K+ on tool, spend 2 months implementing, team hates it, no one uses it, get blamed for failed project, lose credibility with CEO, miss quota, don't get promoted (or worse, get fired).",
+        "riskMitigationNeeds": "Need social proof (other similar companies using it successfully). Want trial period to test before committing. Need implementation support (not DIY). Want clear onboarding plan. Need to see it working in first 30 days."
+      },
+      "changeReadiness": {
+        "adoptionCurve": "Early Majority (adopts after some validation)",
+        "changeAttitude": "Open to new tools if they solve real problems, but wants proof first. Not bleeding edge but not lagging either. Will move fast once convinced it works. Looks to peers and industry leaders for validation.",
+        "innovationTolerance": "Comfortable with 'proven' innovation. Wants to see case studies and testimonials before buying. Will adopt new category if early adopters have validated it. Not interested in being a guinea pig but doesn't want to be left behind.",
+        "statusQuoBias": "Current approach is painful but familiar. Change is scary because it's their reputation on the line. Will stick with broken process if alternative feels risky. Needs strong push (pain or opportunity) to overcome inertia."
+      },
+      "successDefinition": {
+        "successMetrics": "Primary: Outbound pipeline generated ($), meetings booked per SDR per week, response rates to outreach. Secondary: Time saved per SDR (hours/week), cost per meeting, SDR ramp time. Tertiary: Team satisfaction, CRM data quality, executive perception.",
+        "proofPoints": "Within 30 days: Response rates improve 2x. Within 60 days: Meetings per SDR double. Within 90 days: Pipeline from outbound up 3x. Within 6 months: Promoted to VP or recruited away for better role.",
+        "timeframe": "Need to see early wins within first 30 days (response rate improvement). Must show clear ROI within 90 days (one quarter). Full team productivity improvement within 6 months. Career advancement within 12-18 months.",
+        "acceptableROI": "Minimum: Break even on cost (tool pays for itself through time saved). Good: 3x return (every $1 spent generates $3 in pipeline). Great: 5x+ return (every $1 spent generates $5+ in pipeline). Will pay premium if ROI is clearly >3x."
+      },
+      "personalMotivators": {
+        "careerDrivers": [
+          "Career advancement (get promoted to VP Sales)",
+          "Recognition / Status (be known as the one who scaled sales)",
+          "Making an impact (build something that lasts)",
+          "Financial reward (VP comp is 2x current salary)",
+          "Solving hard problems (love the challenge of scaling)"
+        ],
+        "professionalGoals": "Become VP Sales at current company or get recruited to VP role at hot startup. Build reputation as a sales leader who can scale efficiently. Eventually join a unicorn exec team. Maybe start own company one day.",
+        "personalRewards": "Career advancement is #1 driver. Love recognition from peers and executives. Competitive - wants to win and be the best. Gets energy from solving hard problems. Motivated by helping team succeed (not just personal wins)."
+      },
+      "riskProfile": {
+        "tolerance": "Calculated risk (data-driven decisions)",
+        "pastBehavior": "Has tried 2-3 sales tools in past year (some worked, some didn't). Generally cautious but will move fast with right evidence. Prefers to see demos and trials before committing. Looks for social proof and case studies. Once convinced, acts quickly.",
+        "riskRewardBalance": "Will take moderate risks if upside is clear and downside is limited. Risk tolerance increases with desperation (quarterly pressure). More conservative with budget decisions (career on the line). More aggressive with process changes (less visible risk)."
+      }
+    },
+    "rawAnswers": {
+      "nightFears": "They worry about missing revenue targets and being blamed for slow sales growth. They fear their manual prospecting approach can't scale fast enough to hit aggressive growth goals. They stress about their SDRs burning out from repetitive manual work and churning before becoming productive.",
+      "goals": "Hit 150% of quota this year and get promoted to VP Sales. Build a scalable sales engine that doesn't require constant firefighting. Prove to executives that their team can compete with larger, better-funded competitors.",
+      "values": ["Speed / Quick results", "Scalability / Growth", "Reliability / Consistency", "Quality / Excellence", "Support / Partnership"],
+      "commonPhrases": "We're drowning in manual work. We can't scale fast enough. Our SDRs are burning out. We're losing deals to faster competitors. We need to do more with less. I can't prove ROI to my CEO.",
+      "emotionalState": ["Frustrated / Fed up", "Anxious / Stressed", "Determined / Focused", "Hopeful / Optimistic"],
+      "decisionFears": "Wasting budget on something that doesn't work and looking incompetent. Implementation taking too long and missing the quarter. Team won't adopt it and money is wasted. Data quality issues making output useless.",
+      "changeAttitude": "Early Majority (adopts after some validation)",
+      "successMeasurement": "Outbound response rates improving from 2% to 5%. Meetings booked per SDR doubling from 4/week to 8/week. Time-to-productivity for new hires cut from 90 days to 45 days. $500K in closed-won pipeline from outbound this quarter.",
+      "personalMotivators": ["Career advancement", "Recognition / Status", "Making an impact", "Financial reward", "Solving hard problems"],
+      "riskTolerance": "Calculated risk (data-driven decisions)"
+    },
+    "metadata": {
+      "generationTime": 8.2,
+      "model": "claude-sonnet-4-20250514",
+      "tokensUsed": 2834,
+      "editHistory": []
+    }
+  }
+}

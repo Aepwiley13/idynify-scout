@@ -1,0 +1,574 @@
+{
+  "questionnaire": {
+    "sectionId": 7,
+    "sectionTitle": "Decision Process & Stakeholders",
+    "sectionDescription": "Map out who makes the buying decision, their roles, influence levels, and the approval workflow",
+    "questions": [
+      {
+        "id": "economicBuyer",
+        "question": "Who is the Economic Buyer? (signs the contract, owns budget)",
+        "type": "radio",
+        "required": true,
+        "helpText": "Who has the authority to approve the purchase and allocate budget?",
+        "options": [
+          "CEO / Founder",
+          "CFO / Finance Leader",
+          "CRO / Chief Revenue Officer",
+          "VP Sales",
+          "VP Marketing",
+          "Head of Operations",
+          "Department Head",
+          "Other Executive"
+        ]
+      },
+      {
+        "id": "champion",
+        "question": "Who is the Champion? (internal advocate, drives process)",
+        "type": "radio",
+        "required": true,
+        "helpText": "Who internally champions the solution and drives the buying process?",
+        "options": [
+          "Same as Economic Buyer",
+          "VP Sales",
+          "Sales Operations Manager",
+          "Marketing Operations Manager",
+          "Sales Development Manager",
+          "RevOps Leader",
+          "Individual Contributor",
+          "Other"
+        ]
+      },
+      {
+        "id": "otherStakeholders",
+        "question": "Other stakeholders involved in decision",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 1,
+        "maxSelections": 6,
+        "helpText": "Who else needs to be involved or give approval?",
+        "options": [
+          "IT / Security",
+          "Legal / Compliance",
+          "Procurement",
+          "Finance Team",
+          "End Users (SDRs/AEs)",
+          "Marketing Team",
+          "Sales Leadership",
+          "Customer Success",
+          "Data/Analytics Team",
+          "No other stakeholders"
+        ]
+      },
+      {
+        "id": "committeeDecision",
+        "question": "Is this a committee decision?",
+        "type": "radio",
+        "required": true,
+        "helpText": "Does this require consensus from multiple people or is it one person's call?",
+        "options": [
+          "Single decision maker (one person decides)",
+          "Small committee (2-3 people)",
+          "Large committee (4-6 people)",
+          "Very large committee (7+ people)"
+        ]
+      },
+      {
+        "id": "approvalLevels",
+        "question": "How many approval levels?",
+        "type": "radio",
+        "required": true,
+        "helpText": "How many levels of approval are typically needed?",
+        "options": [
+          "1 level (champion approves)",
+          "2 levels (champion → manager)",
+          "3 levels (champion → manager → executive)",
+          "4+ levels (multiple layers)"
+        ]
+      },
+      {
+        "id": "technicalEvaluation",
+        "question": "Who does technical/security evaluation?",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 1,
+        "maxSelections": 4,
+        "helpText": "Who evaluates technical fit, security, integration?",
+        "options": [
+          "IT/Security team",
+          "Sales Operations",
+          "RevOps",
+          "Engineering team",
+          "No technical evaluation",
+          "Champion handles it themselves"
+        ]
+      },
+      {
+        "id": "userInput",
+        "question": "How much do end users influence the decision?",
+        "type": "radio",
+        "required": true,
+        "helpText": "How much weight do actual users (SDRs, AEs) have in the decision?",
+        "options": [
+          "Very high (users can veto)",
+          "High (users heavily influence)",
+          "Moderate (users consulted)",
+          "Low (users informed after)",
+          "None (top-down decision)"
+        ]
+      },
+      {
+        "id": "consensusOrTopDown",
+        "question": "Decision-making style",
+        "type": "radio",
+        "required": true,
+        "helpText": "How are decisions typically made in this organization?",
+        "options": [
+          "Consensus-driven (everyone must agree)",
+          "Collaborative (input sought, leader decides)",
+          "Top-down (executive decides, team executes)",
+          "Democratic (majority vote)",
+          "Varies by situation"
+        ]
+      },
+      {
+        "id": "procurementInvolved",
+        "question": "Is procurement/legal involved?",
+        "type": "radio",
+        "required": true,
+        "helpText": "Does this go through formal procurement or legal review?",
+        "options": [
+          "Always (formal process)",
+          "Usually (depends on deal size)",
+          "Sometimes (for large deals only)",
+          "Rarely (fast-track approvals)",
+          "Never (direct to signature)"
+        ]
+      },
+      {
+        "id": "decisionCriteria",
+        "question": "Key decision criteria (in priority order)",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What factors matter most in the decision? List in priority order.",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., 1) ROI/cost savings, 2) Ease of use for team, 3) Integration with Salesforce, 4) Implementation time, 5) Vendor reputation..."
+      }
+    ]
+  },
+  "jsonSchema": {
+    "section": 7,
+    "title": "Decision Process & Stakeholders",
+    "status": "completed",
+    "completedAt": "ISO 8601 timestamp",
+    "version": 1,
+    "decisionProcessMap": {
+      "stakeholderMap": {
+        "economicBuyer": {
+          "role": "string (from economicBuyer selection)",
+          "authority": "string (what they control - budget, final decision)",
+          "motivations": "string (what drives them - ROI, risk mitigation, growth)",
+          "concerns": "string (what worries them - cost, risk, implementation)",
+          "engagementStrategy": "string (how to engage - business case, executive meetings)"
+        },
+        "champion": {
+          "role": "string (from champion selection)",
+          "relationship": "string (relationship to economic buyer - reports to, peer, same person)",
+          "motivations": "string (what drives champion - career advancement, solving pain)",
+          "influence": "string (high/medium/low influence on economic buyer)",
+          "support": "string (how to support champion - arm with content, references)"
+        },
+        "technicalBuyers": [
+          {
+            "role": "string (from technicalEvaluation selections)",
+            "concerns": "string (security, integration, data privacy, etc.)",
+            "vetoPower": "boolean (can they block deal?)",
+            "engagementNeeds": "string (technical docs, security reviews, etc.)"
+          }
+        ],
+        "influencers": [
+          {
+            "role": "string (from otherStakeholders)",
+            "influence": "string (high/medium/low)",
+            "concerns": "string (what matters to them)",
+            "engagementStrategy": "string (how to engage)"
+          }
+        ],
+        "endUsers": {
+          "role": "string (SDRs, AEs, etc.)",
+          "influence": "string (from userInput selection)",
+          "vetoPower": "boolean (can they block deal?)",
+          "adoptionCritical": "boolean (is adoption critical to success?)"
+        }
+      },
+      "decisionComplexity": {
+        "committeeSize": "string (from committeeDecision selection)",
+        "approvalLayers": "string (from approvalLevels selection)",
+        "complexity": "string (low/moderate/high/very high based on committee + approvals)",
+        "averageDecisionTime": "string (estimate based on complexity)",
+        "consensusRequirement": "string (from consensusOrTopDown)"
+      },
+      "approvalWorkflow": {
+        "stages": [
+          {
+            "stage": 1,
+            "name": "string (e.g., 'Champion Evaluation')",
+            "stakeholders": ["array of roles involved"],
+            "duration": "string",
+            "activities": "string",
+            "successCriteria": "string"
+          },
+          {
+            "stage": 2,
+            "name": "string",
+            "stakeholders": ["array"],
+            "duration": "string",
+            "activities": "string",
+            "successCriteria": "string"
+          },
+          {
+            "stage": 3,
+            "name": "string",
+            "stakeholders": ["array"],
+            "duration": "string",
+            "activities": "string",
+            "successCriteria": "string"
+          }
+        ],
+        "totalDuration": "string (sum of all stages)",
+        "bottlenecks": ["array of common bottlenecks"]
+      },
+      "procurementProcess": {
+        "involvement": "string (from procurementInvolved selection)",
+        "whenInvolved": "string (at what stage do they get involved)",
+        "typicalDuration": "string (how long procurement adds)",
+        "requirements": ["array of what procurement needs - MSA, security review, etc."],
+        "negotiationStyle": "string (aggressive, collaborative, by-the-book)"
+      },
+      "decisionCriteria": {
+        "rankedCriteria": [
+          {
+            "rank": 1,
+            "criterion": "string (extracted from decisionCriteria)",
+            "weight": "string (critical/high/moderate)",
+            "stakeholderOwner": "string (who cares most about this)"
+          },
+          {
+            "rank": 2,
+            "criterion": "string",
+            "weight": "string",
+            "stakeholderOwner": "string"
+          },
+          {
+            "rank": 3,
+            "criterion": "string",
+            "weight": "string",
+            "stakeholderOwner": "string"
+          }
+        ],
+        "mustHaves": ["array of non-negotiable criteria"],
+        "niceToHaves": ["array of nice-to-have criteria"],
+        "dealBreakers": ["array of things that would kill deal"]
+      },
+      "sellingStrategy": {
+        "multiThreading": {
+          "required": "boolean (true if committee decision)",
+          "keyRelationships": ["array of roles to multi-thread to"],
+          "priority": "string (who to engage first, second, third)"
+        },
+        "championEnablement": {
+          "contentNeeds": ["array of what champion needs - ROI calc, slides, etc."],
+          "internalSelling": "string (how to help champion sell internally)",
+          "politicalNavigation": "string (how to navigate org politics)"
+        },
+        "consensusBuilding": {
+          "strategy": "string (how to build consensus across stakeholders)",
+          "alignmentMeetings": "string (what meetings are needed)",
+          "objectionHandling": "string (how to handle differing opinions)"
+        },
+        "executiveEngagement": {
+          "when": "string (when to engage economic buyer)",
+          "how": "string (executive briefing, business review, etc.)",
+          "topics": ["array of topics to discuss with executive"]
+        }
+      },
+      "riskFactors": {
+        "singleThreadedRisk": "string (risk if only talking to champion)",
+        "championDepartureRisk": "string (what happens if champion leaves)",
+        "consensusFailureRisk": "string (risk if stakeholders don't align)",
+        "procurementRisk": "string (risk from procurement delays/demands)",
+        "mitigationStrategies": ["array of how to mitigate these risks"]
+      }
+    },
+    "rawAnswers": {
+      "economicBuyer": "string",
+      "champion": "string",
+      "otherStakeholders": ["array"],
+      "committeeDecision": "string",
+      "approvalLevels": "string",
+      "technicalEvaluation": ["array"],
+      "userInput": "string",
+      "consensusOrTopDown": "string",
+      "procurementInvolved": "string",
+      "decisionCriteria": "string"
+    },
+    "metadata": {
+      "generationTime": "number",
+      "model": "string",
+      "tokensUsed": "number",
+      "editHistory": []
+    }
+  },
+  "exampleOutput": {
+    "section": 7,
+    "title": "Decision Process & Stakeholders",
+    "status": "completed",
+    "completedAt": "2025-12-18T19:00:00Z",
+    "version": 1,
+    "decisionProcessMap": {
+      "stakeholderMap": {
+        "economicBuyer": {
+          "role": "VP Sales",
+          "authority": "Controls sales budget ($50K-$100K discretionary), can approve tools without CFO sign-off up to $50K annually. Final decision maker for sales stack.",
+          "motivations": "Hitting revenue targets, scaling team efficiently, proving ROI to CEO/board, career advancement (wants promotion to CRO). Motivated by tools that make team more productive and help hit quota.",
+          "concerns": "Worried about wasting budget on tools that don't get adopted. Concerned about implementation time (can't afford 3-month rollout). Nervous about team pushback. Reputation at stake if tool fails.",
+          "engagementStrategy": "Lead with ROI and business case. Show how tool directly impacts quota attainment. Provide executive-level content (one-pagers, board-ready slides). Schedule executive briefings focused on strategic impact, not features. Connect to their personal goals (promotion path)."
+        },
+        "champion": {
+          "role": "Sales Operations Manager",
+          "relationship": "Reports directly to VP Sales (Economic Buyer). Champion manages day-to-day sales operations, owns CRM admin, tool evaluation. Close working relationship with VP Sales.",
+          "motivations": "Reducing manual work for SDR team, improving data quality, modernizing sales stack, being seen as strategic (not just admin). Wants to bring innovation to team and get recognition. Career goal: Director of Sales Ops.",
+          "influence": "High influence - VP Sales trusts their technical judgment and relies on them for tool recommendations. Champion's endorsement is critical. If champion says 'this won't work', deal is dead.",
+          "support": "Arm champion with: ROI calculator, competitive comparison, implementation timeline, customer references from similar companies. Help them build internal business case. Provide demo environment they can show to VP Sales. Make them look like hero who found the solution."
+        },
+        "technicalBuyers": [
+          {
+            "role": "IT/Security team",
+            "concerns": "Data security (where is data stored?), compliance (SOC2, GDPR), integration security (API access to Salesforce), vendor risk assessment, data privacy. Want to ensure no security vulnerabilities.",
+            "vetoPower": true,
+            "engagementNeeds": "Security documentation (SOC2 report, penetration test results, data processing agreement), technical architecture overview, integration security details, customer references from similar security-conscious companies. Need to complete security questionnaire."
+          }
+        ],
+        "influencers": [
+          {
+            "role": "End Users (SDRs)",
+            "influence": "High - VP Sales will ask SDRs for feedback during trial. If SDRs hate it, deal is at risk. User adoption is critical for ROI.",
+            "concerns": "Ease of use (can't be complex), doesn't add work, helps them hit quota, doesn't feel like micromanagement. Want tools that make their job easier, not harder.",
+            "engagementStrategy": "Include SDRs in trial. Get them excited early. Show quick wins (time saved, more meetings booked). Make champions out of 1-2 SDRs who can advocate to VP Sales. User training and support is critical."
+          },
+          {
+            "role": "Finance Team",
+            "influence": "Medium - consulted on ROI but don't have veto power under $50K. Would be involved if deal exceeds VP Sales's authority.",
+            "concerns": "ROI justification, cost vs alternatives, budget impact, payment terms, contract length. Want to ensure financial prudence.",
+            "engagementStrategy": "Provide detailed ROI analysis. Show cost of inaction ($860K wasted annually). Compare to alternatives (more expensive or less effective). Offer flexible payment terms if needed."
+          },
+          {
+            "role": "Legal/Compliance",
+            "influence": "Medium - review contract but typically don't block deals unless major red flags. Can slow process with contract negotiations.",
+            "concerns": "Contract terms, liability, data privacy, termination clauses, indemnification. Want to protect company legally.",
+            "engagementStrategy": "Start with standard contract. Be flexible on reasonable edits. Provide data processing agreement proactively. Use existing customer MSAs as templates to speed review."
+          }
+        ],
+        "endUsers": {
+          "role": "SDRs (Sales Development Reps)",
+          "influence": "High (users heavily influence) - VP Sales will trial with SDRs and listen to their feedback",
+          "vetoPower": false,
+          "adoptionCritical": true
+        }
+      },
+      "decisionComplexity": {
+        "committeeSize": "Small committee (2-3 people)",
+        "approvalLayers": "2 levels (champion → manager)",
+        "complexity": "Moderate - small committee but requires consensus between Sales Ops Manager (champion), VP Sales (economic buyer), and input from IT Security (technical buyer). Not overly complex but requires alignment.",
+        "averageDecisionTime": "6-8 weeks from first contact to signature. Can compress to 3-4 weeks if urgent.",
+        "consensusRequirement": "Collaborative (input sought, leader decides) - VP Sales makes final call but wants consensus from Sales Ops and IT before proceeding"
+      },
+      "approvalWorkflow": {
+        "stages": [
+          {
+            "stage": 1,
+            "name": "Champion Evaluation & Internal Buy-In",
+            "stakeholders": ["Sales Operations Manager (Champion)", "SDR Team (Users)"],
+            "duration": "Week 1-3",
+            "activities": "Sales Ops Manager evaluates tool, runs trial with 2-3 SDRs, builds internal business case, gathers feedback. Creates presentation for VP Sales.",
+            "successCriteria": "Champion is convinced tool works, has positive SDR feedback, has built ROI business case. Ready to present to VP Sales."
+          },
+          {
+            "stage": 2,
+            "name": "Executive Approval & Technical Review",
+            "stakeholders": ["VP Sales (Economic Buyer)", "IT/Security (Technical Buyer)"],
+            "duration": "Week 4-6",
+            "activities": "VP Sales reviews business case, attends demo, sees trial results. IT/Security does security review in parallel. Customer reference calls. ROI validation with Finance (informal).",
+            "successCriteria": "VP Sales approves budget allocation. IT/Security completes security review with no major blockers. ROI is clear and justified."
+          },
+          {
+            "stage": 3,
+            "name": "Contract & Procurement",
+            "stakeholders": ["Legal (Contract Review)", "Finance (if >$50K)"],
+            "duration": "Week 7-8",
+            "activities": "Legal reviews contract, negotiates terms. Finance approves if needed. Signatures collected. Implementation planning begins.",
+            "successCriteria": "Contract signed, PO issued, kickoff scheduled. Implementation plan approved."
+          }
+        ],
+        "totalDuration": "7-8 weeks typical, 3-4 weeks if fast-tracked with urgency",
+        "bottlenecks": [
+          "IT Security review can take 2-3 weeks if backlogged",
+          "Legal contract review adds 1-2 weeks",
+          "Champion building internal case can take 2-3 weeks if not guided",
+          "VP Sales schedule (hard to get on calendar)"
+        ]
+      },
+      "procurementProcess": {
+        "involvement": "Usually (depends on deal size)",
+        "whenInvolved": "Stage 3 (after executive approval, during contracting). Procurement only involved if deal exceeds $50K annually or if Legal flags it.",
+        "typicalDuration": "Adds 1-2 weeks for contract review and vendor approval process",
+        "requirements": [
+          "Standard contract review",
+          "Vendor risk assessment (basic)",
+          "Insurance verification (COI)",
+          "W-9 form",
+          "Payment terms negotiation"
+        ],
+        "negotiationStyle": "Collaborative but process-driven. They want to follow procedure but aren't aggressive negotiators. Will push back on non-standard terms but reasonable on most requests."
+      },
+      "decisionCriteria": {
+        "rankedCriteria": [
+          {
+            "rank": 1,
+            "criterion": "ROI / Cost savings - must show clear return",
+            "weight": "Critical",
+            "stakeholderOwner": "VP Sales (Economic Buyer) + Finance"
+          },
+          {
+            "rank": 2,
+            "criterion": "Ease of use for SDR team - can't be complex",
+            "weight": "Critical",
+            "stakeholderOwner": "Champion (Sales Ops) + End Users (SDRs)"
+          },
+          {
+            "rank": 3,
+            "criterion": "Integration with Salesforce - must sync seamlessly",
+            "weight": "High",
+            "stakeholderOwner": "Champion (Sales Ops) + IT/Security"
+          },
+          {
+            "rank": 4,
+            "criterion": "Implementation time - need fast rollout (<30 days)",
+            "weight": "High",
+            "stakeholderOwner": "VP Sales (Economic Buyer)"
+          },
+          {
+            "rank": 5,
+            "criterion": "Vendor reputation - need established player",
+            "weight": "Moderate",
+            "stakeholderOwner": "VP Sales + IT/Security"
+          }
+        ],
+        "mustHaves": [
+          "Positive ROI (>10x preferred)",
+          "Easy to use (SDRs can learn in <1 hour)",
+          "Salesforce integration (real-time sync)",
+          "Fast implementation (<30 days)",
+          "SOC2 compliance",
+          "Good customer support"
+        ],
+        "niceToHaves": [
+          "AI/automation features",
+          "Custom reporting",
+          "Mobile app",
+          "Slack integration",
+          "Multi-language support"
+        ],
+        "dealBreakers": [
+          "Poor security (no SOC2, data breaches)",
+          "Complex implementation (>90 days)",
+          "No Salesforce integration",
+          "Bad user experience (SDRs hate it)",
+          "No customer support",
+          "Negative ROI or unclear value"
+        ]
+      },
+      "sellingStrategy": {
+        "multiThreading": {
+          "required": true,
+          "keyRelationships": [
+            "Sales Operations Manager (Champion) - PRIMARY",
+            "VP Sales (Economic Buyer) - CRITICAL",
+            "IT/Security Lead - TECHNICAL GATEKEEPER",
+            "2-3 SDRs (Trial Users) - ADOPTION DRIVERS"
+          ],
+          "priority": "1st: Build champion relationship (Sales Ops). 2nd: Get SDRs excited during trial. 3rd: Engage IT Security early. 4th: Executive briefing with VP Sales (after champion advocacy)."
+        },
+        "championEnablement": {
+          "contentNeeds": [
+            "ROI calculator (pre-filled with their numbers)",
+            "Executive presentation (board-ready slides)",
+            "Competitive comparison (vs Outreach, Salesloft)",
+            "Implementation timeline",
+            "Customer case studies (similar companies)",
+            "Security documentation"
+          ],
+          "internalSelling": "Help champion position as strategic initiative ('modernizing sales stack', 'scaling efficiently') not just tool purchase. Frame as solving VP Sales's #1 problem (can't scale team). Make champion look like innovator who found solution.",
+          "politicalNavigation": "Champion reports to economic buyer (clean reporting line). Main risk is IT Security blocking. Help champion engage IT early with proper documentation. Ensure SDRs are positive influencers."
+        },
+        "consensusBuilding": {
+          "strategy": "Sequential consensus: Champion → Users → IT Security → VP Sales. Build support bottom-up so VP Sales sees unanimous support when they make decision.",
+          "alignmentMeetings": "Week 2: Champion + SDR trial review. Week 3: Champion + IT Security review. Week 4: Champion presents to VP Sales with SDR testimonials. Week 5: VP Sales + IT + Champion alignment meeting.",
+          "objectionHandling": "If IT Security objects: Address security concerns with documentation, customer references, compliance proof. If SDRs object: More training, better onboarding, show quick wins. If VP Sales hesitates: Reinforce ROI, create urgency, peer proof."
+        },
+        "executiveEngagement": {
+          "when": "Week 4-5, after champion is convinced and trial is successful. Don't engage too early (before champion advocacy) or too late (after champion loses momentum).",
+          "how": "Executive briefing (30 min), focused on business impact not features. Show ROI, reference customers, trial results. Let champion present (they've done the work). Vendor provides executive perspective and answers strategic questions.",
+          "topics": [
+            "Strategic impact on revenue growth",
+            "ROI and cost justification",
+            "Risk mitigation (vs status quo)",
+            "Competitive positioning (vs doing nothing)",
+            "Implementation and time to value",
+            "Customer success stories"
+          ]
+        }
+      },
+      "riskFactors": {
+        "singleThreadedRisk": "High risk - if only talking to Sales Ops Manager and they leave or lose influence, deal dies. Must multi-thread to VP Sales, IT Security, and SDRs to reduce dependency on single champion.",
+        "championDepartureRisk": "Very high risk - Sales Ops Manager job hopping is common in tech. If champion leaves mid-deal, typically adds 4-6 weeks to reset with new champion. Mitigation: Build relationships with VP Sales and SDRs so deal survives champion change.",
+        "consensusFailureRisk": "Moderate risk - if SDRs hate tool or IT Security blocks, VP Sales won't override. Need unanimous support for deal to close. Mitigation: Include all stakeholders early, address concerns proactively.",
+        "procurementRisk": "Low risk - procurement usually rubber-stamps under $50K. Adds 1-2 weeks but rarely blocks. Mitigation: Use standard contract, be flexible on reasonable terms.",
+        "mitigationStrategies": [
+          "Multi-thread early (don't rely on single champion)",
+          "Build champion relationship with VP Sales directly (not just through Sales Ops)",
+          "Get IT Security involved in week 2-3 (don't wait until end)",
+          "Make SDRs champions during trial (get 2-3 evangelists)",
+          "Document all stakeholder concerns and address proactively",
+          "Create urgency with quarterly deadlines",
+          "Provide champion with all enablement materials"
+        ]
+      }
+    },
+    "rawAnswers": {
+      "economicBuyer": "VP Sales",
+      "champion": "Sales Operations Manager",
+      "otherStakeholders": [
+        "IT / Security",
+        "End Users (SDRs/AEs)",
+        "Finance Team",
+        "Legal / Compliance"
+      ],
+      "committeeDecision": "Small committee (2-3 people)",
+      "approvalLevels": "2 levels (champion → manager)",
+      "technicalEvaluation": [
+        "IT/Security team",
+        "Sales Operations"
+      ],
+      "userInput": "High (users heavily influence)",
+      "consensusOrTopDown": "Collaborative (input sought, leader decides)",
+      "procurementInvolved": "Usually (depends on deal size)",
+      "decisionCriteria": "1) ROI/cost savings - must show clear return on investment. 2) Ease of use for SDR team - cant be complex or require heavy training. 3) Integration with Salesforce - must sync seamlessly. 4) Implementation time - need fast rollout, under 30 days. 5) Vendor reputation - prefer established players with good support."
+    },
+    "metadata": {
+      "generationTime": 9.4,
+      "model": "claude-sonnet-4-20250514",
+      "tokensUsed": 3421,
+      "editHistory": []
+    }
+  }
+}

@@ -1,0 +1,576 @@
+{
+  "questionnaire": {
+    "sectionId": 8,
+    "sectionTitle": "Competitive Landscape",
+    "sectionDescription": "Map your competitive landscape, understand win/loss patterns, and develop differentiation strategies",
+    "questions": [
+      {
+        "id": "directCompetitors",
+        "question": "Top 3-5 direct competitors",
+        "type": "textarea",
+        "required": true,
+        "helpText": "List your main direct competitors (same category, solving same problem)",
+        "validation": { "minLength": 50, "maxLength": 200 },
+        "placeholder": "e.g., Outreach, Salesloft, Apollo.io, Groove, Reply.io..."
+      },
+      {
+        "id": "indirectCompetitors",
+        "question": "Indirect alternatives",
+        "type": "textarea",
+        "required": true,
+        "helpText": "Different approaches to solving the same problem (other categories, DIY, do nothing)",
+        "validation": { "minLength": 50, "maxLength": 200 },
+        "placeholder": "e.g., ZoomInfo (data only), hiring more SDRs, building internal tool, manual prospecting..."
+      },
+      {
+        "id": "whyYouWin",
+        "question": "Why do you win deals?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What are your biggest competitive advantages? Why do customers choose you?",
+        "validation": { "minLength": 100, "maxLength": 400 },
+        "placeholder": "e.g., Easier to use, better AI, faster implementation, better support, lower price, better integration..."
+      },
+      {
+        "id": "whyYouLose",
+        "question": "Why do you lose deals?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "Be honest - what causes you to lose to competitors or status quo?",
+        "validation": { "minLength": 100, "maxLength": 400 },
+        "placeholder": "e.g., Higher price, fewer features, less brand recognition, integration gaps, longer implementation..."
+      },
+      {
+        "id": "uniqueDifferentiators",
+        "question": "Your unique differentiators (top 3)",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What do you do that NO ONE else does? What makes you truly unique?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Only tool with AI personalization at scale, only 15-min setup, only one built for mid-market..."
+      },
+      {
+        "id": "competitorStrengths",
+        "question": "What do competitors do better?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "Be honest - where are competitors stronger? What do they do well?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Enterprise features, brand recognition, more integrations, bigger team, better reporting..."
+      },
+      {
+        "id": "yourWeaknesses",
+        "question": "Your biggest weaknesses to address",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What gaps or weaknesses do you need to overcome or work around?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Limited integrations, small team, new to market, fewer case studies, single product..."
+      },
+      {
+        "id": "pricePosition",
+        "question": "Price positioning",
+        "type": "radio",
+        "required": true,
+        "helpText": "Where do you sit on the pricing spectrum relative to competitors?",
+        "options": [
+          "Premium (20%+ more expensive)",
+          "Slightly premium (10-20% more)",
+          "Market rate (competitive pricing)",
+          "Slightly discount (10-20% less)",
+          "Budget option (20%+ cheaper)"
+        ]
+      },
+      {
+        "id": "idealCompetitor",
+        "question": "Who do you WANT to compete against?",
+        "type": "radio",
+        "required": true,
+        "helpText": "Which competitor gives you the best win rate when you go head-to-head?",
+        "options": [
+          "Enterprise incumbents (Outreach, Salesloft, etc.)",
+          "Mid-market alternatives",
+          "Budget tools",
+          "Do nothing / Status quo",
+          "DIY / Build internal"
+        ]
+      },
+      {
+        "id": "avoidCompetitor",
+        "question": "Who do you want to AVOID competing against?",
+        "type": "radio",
+        "required": true,
+        "helpText": "Which competitor do you struggle most against? Lowest win rate?",
+        "options": [
+          "Enterprise incumbents (Outreach, Salesloft, etc.)",
+          "Mid-market alternatives",
+          "Budget tools",
+          "Do nothing / Status quo",
+          "DIY / Build internal"
+        ]
+      }
+    ]
+  },
+  "jsonSchema": {
+    "section": 8,
+    "title": "Competitive Landscape",
+    "status": "completed",
+    "completedAt": "ISO 8601 timestamp",
+    "version": 1,
+    "competitiveLandscape": {
+      "competitorMap": {
+        "directCompetitors": [
+          {
+            "name": "string (competitor 1)",
+            "category": "string (enterprise/mid-market/budget)",
+            "strengths": ["array of their strengths"],
+            "weaknesses": ["array of their weaknesses"],
+            "whenTheyWin": "string (what scenarios they win)",
+            "whenYouWin": "string (what scenarios you win against them)",
+            "positioning": "string (how to position against them)"
+          }
+        ],
+        "indirectAlternatives": [
+          {
+            "alternative": "string (alternative approach)",
+            "appeal": "string (why customers consider this)",
+            "weakness": "string (why it's not ideal)",
+            "counterStrategy": "string (how to position against it)"
+          }
+        ],
+        "statusQuo": {
+          "description": "string (what 'do nothing' looks like from indirectCompetitors)",
+          "appeal": "string (why customers stick with status quo)",
+          "cost": "string (cost of doing nothing - from Section 5 if available)",
+          "counterStrategy": "string (how to overcome inertia)"
+        }
+      },
+      "winLossAnalysis": {
+        "winReasons": [
+          {
+            "reason": "string (extracted from whyYouWin)",
+            "frequency": "string (primary/secondary/occasional)",
+            "customerQuote": "string (how customers describe this)"
+          }
+        ],
+        "lossReasons": [
+          {
+            "reason": "string (extracted from whyYouLose)",
+            "frequency": "string (primary/secondary/occasional)",
+            "mitigation": "string (how to address this weakness)"
+          }
+        ],
+        "winRate": {
+          "estimatedOverall": "string (estimate based on win/loss reasons)",
+          "vsEnterprise": "string (win rate against enterprise tools)",
+          "vsBudget": "string (win rate against budget tools)",
+          "vsStatusQuo": "string (win rate against do nothing)"
+        }
+      },
+      "differentiation": {
+        "uniqueValueProps": [
+          {
+            "differentiator": "string (extracted from uniqueDifferentiators)",
+            "defendability": "string (easy/moderate/hard for competitors to copy)",
+            "marketRelevance": "string (how much customers care - high/medium/low)",
+            "leverage": "string (how to leverage in messaging)"
+          }
+        ],
+        "competitiveAdvantages": [
+          "array of 3-5 advantages extracted from whyYouWin"
+        ],
+        "vulnerabilities": [
+          "array of 3-5 vulnerabilities from yourWeaknesses + whyYouLose"
+        ]
+      },
+      "positioningStrategy": {
+        "primaryPosition": "string (how you position in market - synthesize from differentiators + price)",
+        "againstEnterprise": "string (positioning vs enterprise incumbents)",
+        "againstBudget": "string (positioning vs budget alternatives)",
+        "againstDIY": "string (positioning vs build-it-yourself)",
+        "againstStatusQuo": "string (positioning vs do nothing)",
+        "targetSegment": "string (which segment to focus on based on idealCompetitor)"
+      },
+      "priceStrategy": {
+        "positioning": "string (from pricePosition selection)",
+        "implication": "string (what this means for sales strategy)",
+        "justification": "string (how to justify price vs alternatives)",
+        "objectionHandling": "string (how to handle price objections)"
+      },
+      "battleCards": {
+        "vsEnterprise": {
+          "theirStrengths": ["array from competitorStrengths if applicable"],
+          "theirWeaknesses": ["array"],
+          "ourAdvantages": ["array from whyYouWin"],
+          "positioning": "string (how to win against enterprise)",
+          "trapQuestions": ["array of 3-5 questions to make enterprise look bad"]
+        },
+        "vsStatusQuo": {
+          "theirAppeal": "string (why status quo is comfortable)",
+          "costOfInaction": "string (quantified from Section 5 if available)",
+          "changeDrivers": ["array of what forces change"],
+          "positioning": "string (how to overcome inertia)",
+          "urgencyCreation": "string (how to create urgency)"
+        },
+        "vsBudget": {
+          "theirStrengths": ["array (typically: low price, simple)"],
+          "theirWeaknesses": ["array (typically: limited features, poor support)"],
+          "ourAdvantages": ["array from whyYouWin"],
+          "positioning": "string (value vs price positioning)",
+          "roiJustification": "string (how to justify higher price)"
+        }
+      },
+      "marketOpportunity": {
+        "sweetSpot": {
+          "description": "string (who you're best suited for based on idealCompetitor)",
+          "why": "string (why you win in this segment)",
+          "penetration": "string (how much of this segment you can capture)"
+        },
+        "avoidSegment": {
+          "description": "string (who you struggle with based on avoidCompetitor)",
+          "why": "string (why you lose in this segment)",
+          "strategy": "string (avoid or find angle to compete)"
+        }
+      }
+    },
+    "rawAnswers": {
+      "directCompetitors": "string",
+      "indirectCompetitors": "string",
+      "whyYouWin": "string",
+      "whyYouLose": "string",
+      "uniqueDifferentiators": "string",
+      "competitorStrengths": "string",
+      "yourWeaknesses": "string",
+      "pricePosition": "string",
+      "idealCompetitor": "string",
+      "avoidCompetitor": "string"
+    },
+    "metadata": {
+      "generationTime": "number",
+      "model": "string",
+      "tokensUsed": "number",
+      "editHistory": []
+    }
+  },
+  "exampleOutput": {
+    "section": 8,
+    "title": "Competitive Landscape",
+    "status": "completed",
+    "completedAt": "2025-12-18T20:00:00Z",
+    "version": 1,
+    "competitiveLandscape": {
+      "competitorMap": {
+        "directCompetitors": [
+          {
+            "name": "Outreach",
+            "category": "Enterprise incumbent",
+            "strengths": [
+              "Strong brand recognition and market presence",
+              "Extensive features and customization options",
+              "Large customer base with many case studies",
+              "Deep Salesforce integration",
+              "Dedicated CSM team"
+            ],
+            "weaknesses": [
+              "Expensive ($150K+/year for mid-market)",
+              "Complex implementation (3-6 months typical)",
+              "Requires dedicated admin to manage",
+              "Overkill for smaller teams (<50 reps)",
+              "Steep learning curve"
+            ],
+            "whenTheyWin": "They win when: (1) Enterprise buyer wants 'safe choice' with brand name, (2) Complex needs requiring extensive customization, (3) Large sales team (100+ reps) needs enterprise features, (4) Already using Salesforce heavily and need deep integration.",
+            "whenYouWin": "You win when: (1) Mid-market buyer wants fast ROI without 6-month implementation, (2) Smaller team (5-50 reps) doesn't need enterprise complexity, (3) Budget-conscious and can't justify $150K/year, (4) Need to get value in 30 days not 6 months, (5) Don't have dedicated admin to manage tool.",
+            "positioning": "Position as 'Outreach power without Outreach complexity - built for mid-market teams who need results in weeks not months. Get 80% of the value at 20% of the cost and implementation time.'"
+          },
+          {
+            "name": "Apollo.io",
+            "category": "Mid-market data + automation",
+            "strengths": [
+              "Great database with 275M+ contacts",
+              "All-in-one (data + engagement)",
+              "Reasonable pricing (~$100/user/mo)",
+              "Modern UI",
+              "Good for early-stage/SMB"
+            ],
+            "weaknesses": [
+              "Data quality can be hit-or-miss",
+              "Automation is basic (not AI-powered)",
+              "Limited personalization (mostly mail merge)",
+              "Support is slow",
+              "Feature gaps vs enterprise tools"
+            ],
+            "whenTheyWin": "They win when: (1) Buyer values database access over automation quality, (2) SMB/early-stage needs all-in-one simplicity, (3) Data sourcing is bigger pain than engagement, (4) Price-sensitive and wants good-enough solution.",
+            "whenYouWin": "You win when: (1) Buyer already has data source (ZoomInfo, etc.) and needs better automation, (2) Mid-market buyer needs enterprise-quality automation without enterprise price, (3) Personalization quality matters (not just volume), (4) AI-powered approach resonates, (5) Implementation speed is priority.",
+            "positioning": "Position as 'Automation specialist vs generalist - we focus on making your outreach amazing, not just providing data. If you have data, we make it work harder.'"
+          },
+          {
+            "name": "Instantly.ai",
+            "category": "Budget option",
+            "strengths": [
+              "Very cheap ($30-50/mo)",
+              "Simple and fast to set up",
+              "Unlimited sending",
+              "Good for agencies/high-volume",
+              "No long-term contracts"
+            ],
+            "weaknesses": [
+              "No AI personalization (basic mail merge)",
+              "Poor deliverability reputation",
+              "No CRM integration",
+              "Minimal support",
+              "Can get accounts flagged for spam",
+              "No sophistication for quality outreach"
+            ],
+            "whenTheyWin": "They win when: (1) Buyer is extremely price-sensitive, (2) Volume over quality approach, (3) Agency model (managing many clients), (4) No budget for proper tool, (5) Testing market before investing.",
+            "whenYouWin": "You win when: (1) Buyer realizes cheap tools damage sender reputation, (2) Quality matters more than volume, (3) Need CRM integration, (4) Mid-market willing to invest in proper solution, (5) Deliverability and compliance matter, (6) Burned by spam issues from cheap tools.",
+            "positioning": "Position as 'Professional-grade vs hobby tool - cheap tools cost more in the long run (damaged reputation, wasted time, poor results). We're built for companies serious about outbound.'"
+          }
+        ],
+        "indirectAlternatives": [
+          {
+            "alternative": "ZoomInfo + Manual Outreach",
+            "appeal": "Already paying for ZoomInfo for data, figure they can just email manually. Seems like cheapest option.",
+            "weakness": "Doesn't scale - manual emailing takes 3-4 hours/day per rep. Can't personalize at scale. No tracking or optimization. Time cost far exceeds tool cost.",
+            "counterStrategy": "Show time cost calculation: 3 hours/day × $75K salary = $28K/year wasted per rep in manual work. Our tool at $10K/year saves $18K per rep in time + improves results."
+          },
+          {
+            "alternative": "Hire More SDRs",
+            "appeal": "Feels like controlling growth directly. 'Throw bodies at the problem' mentality. Avoids tool complexity.",
+            "weakness": "SDRs cost $90K loaded (salary + benefits + overhead). Still face manual work problems. Churn is 30-40% annually. Takes 3 months to ramp new rep. Doesn't solve efficiency problem, just spreads it.",
+            "counterStrategy": "Show hiring cost: $90K per SDR vs $10K tool that makes existing SDRs 2-3x more productive. Would need 2-3 more SDRs to match 1 SDR with our tool. Plus hiring takes 3 months, tool takes 3 days."
+          },
+          {
+            "alternative": "Build Internal Tool",
+            "appeal": "Engineering team thinks 'we can build this ourselves.' Seems like one-time cost. Full control.",
+            "weakness": "Engineering distraction from core product. Never gets prioritized. Takes 6-12 months to build basic features. No ongoing maintenance or support. Hidden costs add up. Never as good as dedicated product.",
+            "counterStrategy": "Show opportunity cost: 2 engineers × 6 months × $150K salary = $150K build cost + ongoing maintenance. Plus 6 months delay vs 30 days with our tool. Core product development should be priority, not building internal tools."
+          },
+          {
+            "alternative": "Do Nothing / Manual Process",
+            "appeal": "No new investment. Familiar process. 'If it ain't broke don't fix it.' Avoid change management.",
+            "weakness": "Bleeding $860K/year in wasted time + opportunity cost. Can't scale. SDRs burning out. Missing revenue targets. Status quo is breaking.",
+            "counterStrategy": "Quantify status quo cost from Section 5: $860K/year in time waste + missed pipeline + SDR churn. Our tool costs $30K/year. ROI is 28x in first year. Status quo isn't free - it's the most expensive option."
+          }
+        ],
+        "statusQuo": {
+          "description": "Manual prospecting process: SDRs spend 3-4 hours/day researching prospects, writing individual emails, and updating CRM. Using basic templates, some personalization, but mostly manual work.",
+          "appeal": "Familiar and predictable. No learning curve. No budget required. Feels safe. Avoid change management with team. 'We know how to do this.'",
+          "cost": "$860K/year in wasted time (from Section 5) + $500K missed pipeline + SDR churn costs = $1.3M+ total annual cost of status quo",
+          "counterStrategy": "Frame status quo as 'slow death by a thousand cuts' not stability. Show quantified cost ($1.3M/year). Create urgency with Q4 deadline and competitive pressure. Use peer proof ('3 companies in your network already switched'). Position as 'evolve or get left behind.'"
+        }
+      },
+      "winLossAnalysis": {
+        "winReasons": [
+          {
+            "reason": "Ease of use and fast implementation (15-min setup, not 3 months)",
+            "frequency": "Primary (60% of wins)",
+            "customerQuote": "We needed something that worked out of the box. We don't have a dedicated admin and we needed results this quarter, not next year."
+          },
+          {
+            "reason": "AI-powered personalization at scale (not just mail merge)",
+            "frequency": "Primary (55% of wins)",
+            "customerQuote": "The AI actually writes good emails. Our response rates doubled because messages feel human, not templated."
+          },
+          {
+            "reason": "Price-to-value ratio (20% of Outreach cost, 80% of value)",
+            "frequency": "Secondary (40% of wins)",
+            "customerQuote": "We couldn't justify $150K for Outreach but we could do $30K for you. The ROI was obvious."
+          },
+          {
+            "reason": "Better support and partnership feel (not just vendor)",
+            "frequency": "Secondary (35% of wins)",
+            "customerQuote": "Your team actually cares about our success. With [enterprise tool], we were just another seat license. With you, we have a partner."
+          },
+          {
+            "reason": "Built for mid-market (not enterprise or SMB)",
+            "frequency": "Occasional (25% of wins)",
+            "customerQuote": "Finally a tool built for companies our size. Enterprise tools are overkill, budget tools are too basic. You're the Goldilocks option."
+          }
+        ],
+        "lossReasons": [
+          {
+            "reason": "Enterprise buyer wants 'safe choice' brand name (Outreach, Salesloft)",
+            "frequency": "Primary (40% of losses)",
+            "mitigation": "Build more enterprise customer stories. Get 'no one ever got fired for buying IBM' objection. Lead with ROI and peer proof. Offer pilot to prove value before commitment."
+          },
+          {
+            "reason": "Feature gaps vs enterprise tools (advanced reporting, workflow automation)",
+            "frequency": "Secondary (30% of losses)",
+            "mitigation": "Position as feature focus not feature bloat. 80/20 rule - we have 80% of features that drive 100% of results. Acknowledge gaps upfront and show roadmap."
+          },
+          {
+            "reason": "Price too high vs budget tools (Instantly, Mailshake)",
+            "frequency": "Secondary (25% of losses)",
+            "mitigation": "Reframe from price to value. Show cost of cheap tools (reputation damage, poor results, wasted time). Position as investment not expense. Offer ROI guarantee."
+          },
+          {
+            "reason": "Integration gaps (missing specific CRM or tool)",
+            "frequency": "Occasional (20% of losses)",
+            "mitigation": "Prioritize most-requested integrations on roadmap. Offer workarounds (Zapier, API). Show what integrations we DO have. Make custom integration part of enterprise deal."
+          },
+          {
+            "reason": "Fewer case studies and customer proof points",
+            "frequency": "Occasional (15% of losses)",
+            "mitigation": "Invest in customer marketing. Create video testimonials. Get logo permissions. Build case study library. Offer reference calls proactively. Use peer networks."
+          }
+        ],
+        "winRate": {
+          "estimatedOverall": "60-65% overall win rate when we get to demo stage",
+          "vsEnterprise": "70-75% vs enterprise incumbents (Outreach, Salesloft) - our sweet spot",
+          "vsBudget": "80-85% vs budget tools (Instantly, Mailshake) - once they see quality difference",
+          "vsStatusQuo": "50-55% vs do nothing - hardest to overcome inertia, need urgency"
+        }
+      },
+      "differentiation": {
+        "uniqueValueProps": [
+          {
+            "differentiator": "AI-powered personalization that actually works (not just {{FirstName}})",
+            "defendability": "Moderate - others can build AI, but quality and training data are moats",
+            "marketRelevance": "High - everyone is tired of generic outreach, personalization is table stakes now",
+            "leverage": "Lead with live demo showing AI writing quality. Compare side-by-side vs competitor templates. Show response rate improvements (2-5x typical)."
+          },
+          {
+            "differentiator": "15-minute setup with zero admin required (not 3-month implementation)",
+            "defendability": "Hard - competitors stuck in complex enterprise architecture can't match easily",
+            "marketRelevance": "Very High - mid-market doesn't have dedicated admins and needs speed",
+            "leverage": "Offer to set up live in sales call. 'Let's configure it right now and you can start using it this afternoon.' Speed to value is competitive moat."
+          },
+          {
+            "differentiator": "Built specifically for mid-market (5-50 reps), not enterprise downsize or SMB upsize",
+            "defendability": "Easy to say, hard to execute - requires product and pricing alignment",
+            "marketRelevance": "Medium - resonates with mid-market who feel underserved",
+            "leverage": "Position as 'finally a tool for companies at your stage.' Not trying to be everything to everyone. Focused on your specific needs."
+          }
+        ],
+        "competitiveAdvantages": [
+          "Faster implementation (15 minutes vs 3 months)",
+          "Better AI personalization (response rates 2-5x higher)",
+          "Easier to use (no training required)",
+          "Better support (partnership not vendor)",
+          "Lower price (20% of enterprise cost)"
+        ],
+        "vulnerabilities": [
+          "Smaller brand vs Outreach/Salesloft (less 'safe choice')",
+          "Fewer enterprise features (advanced reporting, workflows)",
+          "Limited integrations (working on roadmap)",
+          "Fewer case studies (newer to market)",
+          "Higher price than budget tools (but worth it)"
+        ]
+      },
+      "positioningStrategy": {
+        "primaryPosition": "The intelligent sales engagement platform for mid-market teams who need enterprise-quality results without enterprise complexity or cost. Get Outreach power with Apollo simplicity at 20% of the price.",
+        "againstEnterprise": "Position as 'Modern alternative to legacy enterprise tools - get 80% of value at 20% of cost and implementation time. Built for teams who need results in weeks not months. No dedicated admin required.'",
+        "againstBudget": "Position as 'Professional-grade vs hobby tools - cheap tools cost more in long run through reputation damage and poor results. We're priced for mid-market but built for quality.'",
+        "againstDIY": "Position as 'Buy vs build economics - we're cheaper than 2 engineers for 6 months, with ongoing innovation you'd never get from internal tools. Focus engineering on your core product.'",
+        "againstStatusQuo": "Position as 'Evolution not revolution - we don't replace your process, we supercharge it. Manual prospecting costs $860K/year in wasted time. We cost $30K and save you $830K. The math is simple.'",
+        "targetSegment": "Sweet spot: Mid-market B2B companies ($10M-$100M revenue) with sales teams of 5-50 reps who are scaling outbound and need better efficiency without enterprise complexity. Specifically target VP Sales who report to CEO/CRO and have $50K-$100K discretionary budget."
+      },
+      "priceStrategy": {
+        "positioning": "Slightly premium (10-20% more)",
+        "implication": "Positioned above budget tools but below enterprise. Signals quality without being 'expensive.' Allows room for discounting while maintaining value perception. Must justify premium with ROI.",
+        "justification": "We're 10-20% more than budget tools but deliver 3-5x better results (response rates, time saved, deliverability). We're 70-80% cheaper than enterprise tools while delivering 80% of the value. Sweet spot pricing for mid-market: premium enough for quality, affordable enough for budget.",
+        "objectionHandling": "When price objection: (1) Reframe to ROI not cost ('This saves $830K/year, costs $30K - that's 27x return'), (2) Compare to alternatives ('Cheaper than 1 SDR hire at $90K'), (3) Show cost of cheap tools ('Instantly damaged sender reputation costs $100K+ in lost pipeline'), (4) Offer ROI guarantee ('If you don't hit 5x ROI in 90 days, we'll refund')."
+      },
+      "battleCards": {
+        "vsEnterprise": {
+          "theirStrengths": [
+            "Strong brand and market presence",
+            "Extensive enterprise features",
+            "Large customer base",
+            "Deep integrations"
+          ],
+          "theirWeaknesses": [
+            "Expensive ($150K+ per year)",
+            "Complex implementation (3-6 months)",
+            "Requires dedicated admin",
+            "Overkill for mid-market",
+            "Slow to innovate"
+          ],
+          "ourAdvantages": [
+            "Fast implementation (15 minutes)",
+            "No admin required",
+            "80% of value at 20% of cost",
+            "Modern AI technology",
+            "Better support and partnership"
+          ],
+          "positioning": "Outreach is built for enterprises with 500+ reps and unlimited budgets. You're not an enterprise. You need something that works out of the box and delivers ROI this quarter, not next year. We're built for companies at your stage.",
+          "trapQuestions": [
+            "How long is the typical implementation? (3-6 months vs our 15 minutes)",
+            "Do you need a dedicated admin to manage the platform? (yes vs our no)",
+            "What's the true all-in cost including implementation and admin? ($200K+ vs our $30K)",
+            "How long until you see ROI? (6-12 months vs our 30 days)",
+            "Can you actually use it without weeks of training? (no vs our yes)"
+          ]
+        },
+        "vsStatusQuo": {
+          "theirAppeal": "Manual process is familiar, predictable, and requires no new investment or change management. Team knows how to do it.",
+          "costOfInaction": "$1.3M+ annually: $860K in wasted time + $500K missed pipeline + SDR churn costs. Status quo is the most expensive option.",
+          "changeDrivers": [
+            "Q4 deadline pressure",
+            "SDR burnout and churn",
+            "Can't scale without automation",
+            "Competitors using automation winning",
+            "CEO/board pressure for efficiency"
+          ],
+          "positioning": "Status quo isn't stability, it's slow decline. Your competitors are automating while you're doing manual work. You're bleeding $1.3M/year staying comfortable. The market has moved on - will you?",
+          "urgencyCreation": "Create urgency by: (1) Quantifying cost of delay ($110K per month wasted), (2) Competitive pressure ('3 competitors already using automation'), (3) Q4 deadline ('Start now to hit targets'), (4) SDR churn crisis ('Lost 2 reps this quarter'), (5) Peer proof ('Everyone in your network is switching')."
+        },
+        "vsBudget": {
+          "theirStrengths": [
+            "Very low price ($30-50/mo)",
+            "Simple to start",
+            "No commitment"
+          ],
+          "theirWeaknesses": [
+            "No real personalization (basic mail merge)",
+            "Poor deliverability (reputation damage)",
+            "No CRM integration",
+            "Minimal support",
+            "Damages sender reputation",
+            "Spam risk"
+          ],
+          "ourAdvantages": [
+            "AI-powered personalization (2-5x response rates)",
+            "Professional deliverability",
+            "Full CRM integration",
+            "White-glove support",
+            "Built for quality not volume",
+            "Protects sender reputation"
+          ],
+          "positioning": "Cheap tools aren't cheap when they damage your reputation and waste your team's time. Sender reputation takes 12 months to recover if flagged. One damaged domain costs $50K+ in lost pipeline. We're priced for mid-market but built for quality. Professional-grade tools for professional sales teams.",
+          "roiJustification": "We're $30K/year vs their $600/year. But we deliver: (1) 3x higher response rates = $300K more pipeline, (2) No reputation damage = $50K saved, (3) 2 hours/day saved = $56K per rep. $400K value vs $30K cost = 13x ROI. Budget tools cost more in the long run."
+        }
+      },
+      "marketOpportunity": {
+        "sweetSpot": {
+          "description": "Mid-market B2B SaaS companies ($10M-$100M revenue) with 5-50 sales reps scaling outbound. VP Sales buyers who need results fast without enterprise complexity.",
+          "why": "This is where we win 70%+ of deals. They need enterprise-quality automation but can't afford enterprise tools or implementation time. They value speed to value and ROI over brand names. Our pricing and simplicity are perfect fit.",
+          "penetration": "Market segment: ~50K companies in US. Addressable: ~25K with active outbound sales. Realistically capturable: 5-10% market share in 3 years = 1,250-2,500 customers. At $30K ACV = $37.5M-$75M potential revenue."
+        },
+        "avoidSegment": {
+          "description": "Large enterprises (500+ reps) with complex requirements and procurement processes. They need enterprise features we don't have.",
+          "why": "Win rate <30% against true enterprise incumbents in this segment. Our feature set isn't deep enough for complex enterprise needs. Procurement process adds 6+ months. Not worth the effort relative to mid-market wins.",
+          "strategy": "Avoid competing here for now. If enterprise inbound comes, qualify hard on: (1) Actual needs (do they need enterprise features?), (2) Timeline (can they do 6-8 week cycle?), (3) Budget authority (VP Sales with autonomy?). If not great fit, politely decline and focus on sweet spot."
+        }
+      }
+    },
+    "rawAnswers": {
+      "directCompetitors": "Outreach, Salesloft (enterprise), Apollo.io (mid-market data + automation), Instantly.ai, Mailshake (budget tools)",
+      "indirectCompetitors": "ZoomInfo + manual outreach, hiring more SDRs, building internal tool, do nothing / manual prospecting",
+      "whyYouWin": "Easier to use (no training needed), faster implementation (15 min vs 3 months), better AI personalization (response rates 2-5x higher), better support (partnership not vendor), lower price than enterprise (20% of Outreach cost)",
+      "whyYouLose": "Enterprise buyers want brand name for 'safe choice', feature gaps vs enterprise tools (advanced reporting), price too high vs budget tools, integration gaps, fewer case studies (newer to market)",
+      "uniqueDifferentiators": "1) AI-powered personalization that actually works (not just {{FirstName}}), 2) 15-minute setup with zero admin required (not 3-month implementation), 3) Built specifically for mid-market (5-50 reps), not enterprise downsize",
+      "competitorStrengths": "Enterprise tools: strong brand, extensive features, large customer base, deep integrations, dedicated CSMs. Budget tools: very cheap, simple, fast to start. Manual/DIY: no new investment, full control",
+      "yourWeaknesses": "Smaller brand vs Outreach/Salesloft, fewer enterprise features (advanced reporting, workflows), limited integrations (working on roadmap), fewer case studies (newer to market), higher price than budget tools",
+      "pricePosition": "Slightly premium (10-20% more)",
+      "idealCompetitor": "Enterprise incumbents (Outreach, Salesloft, etc.)",
+      "avoidCompetitor": "Do nothing / Status quo"
+    },
+    "metadata": {
+      "generationTime": 10.2,
+      "model": "claude-sonnet-4-20250514",
+      "tokensUsed": 3892,
+      "editHistory": []
+    }
+  }
+}

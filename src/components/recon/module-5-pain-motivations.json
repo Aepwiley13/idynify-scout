@@ -1,0 +1,417 @@
+{
+  "questionnaire": {
+    "sectionId": 5,
+    "sectionTitle": "Pain Points & Motivations",
+    "sectionDescription": "Quantify the pain, urgency, and motivation driving your ideal customers to seek solutions",
+    "questions": [
+      {
+        "id": "primaryPain",
+        "question": "Their #1 pain point (in their exact words)",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What is the single biggest problem they're trying to solve? Use their language, not yours.",
+        "validation": { "minLength": 100, "maxLength": 400 },
+        "placeholder": "Describe their #1 pain in their exact words. What do they say when complaining about this problem?"
+      },
+      {
+        "id": "painCost",
+        "question": "How much does this pain cost them? (time, money, opportunity)",
+        "type": "textarea",
+        "required": true,
+        "helpText": "Quantify the cost - be specific with numbers if possible",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Wasting 15 hours/week on manual work ($60K/year in lost productivity), missing $500K in pipeline, losing 2 reps/year to burnout..."
+      },
+      {
+        "id": "triedBefore",
+        "question": "What have they tried before to solve it?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "List previous solutions, tools, or approaches they've attempted",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Tried Salesforce, hired more reps, outsourced to agency, built internal tool, trained team on new process..."
+      },
+      {
+        "id": "whyFailed",
+        "question": "Why didn't those solutions work?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What went wrong with previous attempts?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Too complex, team didn't adopt it, data quality was poor, too expensive, took too long to implement..."
+      },
+      {
+        "id": "doNothing",
+        "question": "What happens if they do nothing?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What are the consequences of not solving this problem?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Miss revenue targets, lose to competitors, team burns out, can't scale, get blamed by CEO..."
+      },
+      {
+        "id": "urgentTrigger",
+        "question": "What triggers URGENT need to solve now?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What events or situations force immediate action?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Quarterly deadline approaching, CEO pressure, recent funding requires growth, competitor threat, team churn..."
+      },
+      {
+        "id": "successLooksLike",
+        "question": "What would success look like? (specific outcome)",
+        "type": "textarea",
+        "required": true,
+        "helpText": "Describe the specific, measurable outcome they want",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Double meetings booked, cut manual work by 75%, hit $1M pipeline from outbound, reduce SDR churn to <10%..."
+      },
+      {
+        "id": "workarounds",
+        "question": "How do they work around this today?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "What are they currently doing to cope with the problem?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., Working nights/weekends, hiring temps, ignoring non-urgent leads, using spreadsheets, manual copy-paste..."
+      },
+      {
+        "id": "whoElseFeels",
+        "question": "Who else in the company feels this pain?",
+        "type": "textarea",
+        "required": true,
+        "helpText": "Which other roles or departments are affected?",
+        "validation": { "minLength": 100, "maxLength": 300 },
+        "placeholder": "e.g., CEO (worried about growth), CFO (ROI pressure), Sales reps (burnout), Marketing (lead waste), Ops (data cleanup)..."
+      },
+      {
+        "id": "churnReasons",
+        "question": "Why do customers churn or fail with your solution?",
+        "type": "textarea",
+        "required": false,
+        "helpText": "If you have existing customers, why do some leave or not get value? (Optional)",
+        "validation": { "maxLength": 400 },
+        "placeholder": "e.g., Didn't integrate with CRM, team didn't adopt, data quality issues, too complex, needed more support..."
+      }
+    ]
+  },
+  "jsonSchema": {
+    "section": 5,
+    "title": "Pain Points & Motivations",
+    "status": "completed",
+    "completedAt": "ISO 8601 timestamp",
+    "version": 1,
+    "painMotivationMap": {
+      "primaryPainPoint": {
+        "customerLanguage": "string (exact words from primaryPain)",
+        "painDescription": "string (elaborated pain)",
+        "severity": "number (1-10 scale)",
+        "frequency": "string (daily, weekly, monthly)"
+      },
+      "costOfInaction": {
+        "timeWasted": "string (hours/days per week/month)",
+        "moneyLost": "string ($amount per year)",
+        "opportunityMissed": "string (pipeline, deals, revenue lost)",
+        "totalCost": "string (aggregated annual impact)",
+        "painROI": "string (potential return if solved)"
+      },
+      "failedSolutionHistory": {
+        "attemptedSolutions": [
+          {
+            "solution": "string",
+            "failureReason": "string",
+            "lessonLearned": "string"
+          }
+        ],
+        "patterns": "string (common failure patterns across attempts)",
+        "skepticismLevel": "string (high/medium/low based on past failures)"
+      },
+      "urgencyTriggers": {
+        "hotTriggers": [
+          "string (trigger 1)",
+          "string (trigger 2)",
+          "string (trigger 3)"
+        ],
+        "triggerEvents": "string (elaborate on what creates urgency)",
+        "urgencyLevel": "string (high/medium/low based on triggers)",
+        "windowOfOpportunity": "string (how long urgency window lasts)"
+      },
+      "successVision": {
+        "specificOutcome": "string (from successLooksLike)",
+        "timeframe": "string (when they expect results)",
+        "successMetrics": [
+          "string (metric 1)",
+          "string (metric 2)",
+          "string (metric 3)"
+        ],
+        "idealEndState": "string (vivid description of success)"
+      },
+      "currentWorkarounds": {
+        "copingMechanisms": [
+          {
+            "workaround": "string",
+            "cost": "string (time, money, or quality impact)",
+            "sustainability": "string (how long can this last)"
+          }
+        ],
+        "workaroundCost": "string (total cost of all workarounds)",
+        "unsustainable": "string (why current approach is failing)"
+      },
+      "stakeholderPainMap": {
+        "primaryStakeholder": {
+          "role": "string",
+          "painExperienced": "string",
+          "impact": "string"
+        },
+        "secondaryStakeholders": [
+          {
+            "role": "string",
+            "painExperienced": "string",
+            "impact": "string"
+          }
+        ],
+        "organizationalImpact": "string (company-wide effects)",
+        "rippleEffects": "string (downstream consequences)"
+      },
+      "churnPatterns": {
+        "whyTheyLeave": [
+          "string (reason 1)",
+          "string (reason 2)",
+          "string (reason 3)"
+        ],
+        "failureIndicators": [
+          "string (early warning sign 1)",
+          "string (early warning sign 2)"
+        ],
+        "retentionDrivers": "string (what keeps customers successful)",
+        "churnRisk": "string (high/medium/low based on patterns)",
+        "applicableNote": "string (if no churn data, explain why)"
+      },
+      "painSeverityScale": {
+        "rating": "number (1-10)",
+        "rationale": "string (why this rating)",
+        "comparisonToOtherPains": "string (how this ranks vs other problems they have)"
+      },
+      "motivationHierarchy": {
+        "rankedDrivers": [
+          {
+            "rank": 1,
+            "driver": "string (primary motivation)",
+            "urgency": "string (critical/high/moderate)"
+          },
+          {
+            "rank": 2,
+            "driver": "string",
+            "urgency": "string"
+          },
+          {
+            "rank": 3,
+            "driver": "string",
+            "urgency": "string"
+          }
+        ],
+        "motivationStrength": "string (strong/moderate/weak overall)"
+      }
+    },
+    "rawAnswers": {
+      "primaryPain": "string",
+      "painCost": "string",
+      "triedBefore": "string",
+      "whyFailed": "string",
+      "doNothing": "string",
+      "urgentTrigger": "string",
+      "successLooksLike": "string",
+      "workarounds": "string",
+      "whoElseFeels": "string",
+      "churnReasons": "string or null"
+    },
+    "metadata": {
+      "generationTime": "number",
+      "model": "string",
+      "tokensUsed": "number",
+      "editHistory": []
+    }
+  },
+  "exampleOutput": {
+    "section": 5,
+    "title": "Pain Points & Motivations",
+    "status": "completed",
+    "completedAt": "2025-12-18T17:15:00Z",
+    "version": 1,
+    "painMotivationMap": {
+      "primaryPainPoint": {
+        "customerLanguage": "Our sales team is drowning in manual prospecting work - spending 3-4 hours per day on research, writing emails, and data entry instead of actually selling. We can't scale our outbound motion without throwing more bodies at the problem, and our response rates are terrible (<2%) so all that manual work feels pointless.",
+        "painDescription": "The VP of Sales is frustrated that their team spends the majority of their day on low-value manual tasks (researching prospects, crafting individual emails, updating CRM) rather than high-value selling activities (calls, demos, closing). This manual approach doesn't scale - adding more reps just means more manual work. Low response rates (<2%) make the effort feel wasted.",
+        "severity": 9,
+        "frequency": "Daily - every single day the team loses 3-4 productive hours to manual work"
+      },
+      "costOfInaction": {
+        "timeWasted": "Each SDR wastes 15-20 hours per week on manual tasks. With 5 SDRs, that's 75-100 hours/week = 4,000 hours/year of lost productivity.",
+        "moneyLost": "At $75K salary per SDR + benefits ($90K loaded cost), that's $360K/year in SDR time wasted on manual work. Plus opportunity cost of deals not pursued.",
+        "opportunityMissed": "With current manual approach, each SDR can only reach ~25 prospects/day = ~500/month. If they could reach 100/day with automation, that's 75 more prospects/day × 5 SDRs = 375 additional prospects/day = 7,500/month. At 2% response rate and 25% close rate, that's 37 extra deals/month missed.",
+        "totalCost": "$360K in wasted SDR time + ~$500K in missed pipeline annually = $860K total annual cost of inaction",
+        "painROI": "If automation costs $30K/year but recovers even 50% of wasted time and adds 25% more pipeline, ROI is 14x+ in first year"
+      },
+      "failedSolutionHistory": {
+        "attemptedSolutions": [
+          {
+            "solution": "Tried Salesforce with Sales Engagement (Outreach/Salesloft)",
+            "failureReason": "Too complex - took 3 months to implement, team never fully adopted it. Required dedicated admin. Expensive ($150K/year) and still required manual personalization.",
+            "lessonLearned": "Need something simpler that doesn't require months of setup or dedicated admin. Team wants plug-and-play."
+          },
+          {
+            "solution": "Hired offshore agency to do prospecting",
+            "failureReason": "Quality was terrible - generic messages, wrong targets, low response rates (<1%). Lost control of brand voice. Agency didn't understand ICP.",
+            "lessonLearned": "Can't outsource this - need to maintain quality and control. But still need to reduce manual work internally."
+          },
+          {
+            "solution": "Tried basic email automation tools (Mailshake, Lemlist)",
+            "failureReason": "No personalization at scale - just mail merge. Messages looked automated and response rates stayed low. No intelligence or lead enrichment.",
+            "lessonLearned": "Need real personalization, not just {{FirstName}}. Need smarter tool that understands context."
+          }
+        ],
+        "patterns": "Common pattern: tools are either too complex (enterprise platforms) or too simple (basic automation). Nothing in the middle that's powerful but easy. Past solutions either required heavy lifting OR produced low-quality output.",
+        "skepticismLevel": "High - they've been burned 3 times. Will need strong proof (demo, trial, references) before committing again. Very cautious about promises."
+      },
+      "urgencyTriggers": {
+        "hotTriggers": [
+          "Q4 approaching - need to hit annual targets (90 days left)",
+          "CEO just asked why sales isn't scaling with recent Series A funding",
+          "Lost 2 SDRs to burnout in last 3 months - can't keep hiring/churning",
+          "Competitor just announced $20M raise and is hiring 10 sales reps",
+          "Board meeting in 60 days where VP Sales needs to show pipeline growth"
+        ],
+        "triggerEvents": "Combination of quarterly pressure (Q4 deadline), executive scrutiny (CEO/board), competitive threat (competitor raise), and team issues (SDR churn) creating perfect storm of urgency. Recent funding means they have budget but also pressure to deploy it wisely and show results fast.",
+        "urgencyLevel": "High - multiple converging pressures creating compelling event",
+        "windowOfOpportunity": "Next 60-90 days (before board meeting and end of Q4). After that, if they don't solve it, they'll likely miss targets and VP Sales is at risk. Urgency is real and time-bound."
+      },
+      "successVision": {
+        "specificOutcome": "Double the number of meetings booked per SDR from 4/week to 8/week within 90 days. Cut manual prospecting time from 4 hours/day to 1 hour/day. Hit $500K in new pipeline from outbound this quarter. Reduce SDR churn from 40% to <15% annually.",
+        "timeframe": "Need to see results within 30 days (proof of concept), full results within 90 days (one quarter). Can't wait 6 months - urgency is now.",
+        "successMetrics": [
+          "Meetings booked per SDR per week (currently 4, target 8)",
+          "Hours spent on manual work per day (currently 4, target <1)",
+          "Outbound-sourced pipeline (currently $200K/quarter, target $500K)",
+          "SDR retention rate (currently 60% annual, target 85%+)",
+          "Response rate to outreach (currently <2%, target 5%+)"
+        ],
+        "idealEndState": "Sales team becomes a high-velocity pipeline machine where SDRs spend 80% of their time on high-value activities (calls, demos) and only 20% on necessary admin. Team is energized instead of burned out. Outbound becomes predictable, scalable engine for growth. VP Sales walks into board meeting with confidence showing 3x pipeline growth."
+      },
+      "currentWorkarounds": {
+        "copingMechanisms": [
+          {
+            "workaround": "SDRs work early mornings (6-8am) and late nights (6-8pm) to get prospecting done outside of 'core hours'",
+            "cost": "Unsustainable - leads to burnout and churn. Team morale is low. Work-life balance destroyed.",
+            "sustainability": "Can't last - already lost 2 reps in 3 months. Hiring new reps every quarter is expensive ($30K+ per hire including recruiting, training, ramp time)."
+          },
+          {
+            "workaround": "VP Sales personally writes email templates that reps copy-paste and slightly customize",
+            "cost": "VP Sales spends 5-10 hours/week on template writing instead of strategy. Messages still generic. Response rates still low.",
+            "sustainability": "Not scalable - VP Sales can't keep doing IC work. Bottleneck for the team."
+          },
+          {
+            "workaround": "Ignoring lower-priority leads and only prospecting to 'perfect fit' accounts",
+            "cost": "Leaving 60-70% of addressable market untapped. Missing opportunities. Competitors get them.",
+            "sustainability": "Can't hit aggressive growth targets by ignoring most of market. TAM is being wasted."
+          }
+        ],
+        "workaroundCost": "Estimated $200K+ annually in SDR churn/rehiring costs + $100K in VP Sales time on IC work + $500K+ in missed pipeline from ignored leads = $800K+ total cost of current workarounds",
+        "unsustainable": "Current approach is breaking - can't scale, team is burning out, opportunities are missed. Working harder is not the answer. Need to work smarter with better tools. Status quo leads to missed targets and team attrition."
+      },
+      "stakeholderPainMap": {
+        "primaryStakeholder": {
+          "role": "VP Sales (primary buyer persona)",
+          "painExperienced": "Can't scale team, missing targets, team burning out, CEO pressure, job at risk if doesn't fix this",
+          "impact": "Career impact - needs promotion to VP Revenue but current results won't get them there. Reputation as blocker to growth."
+        },
+        "secondaryStakeholders": [
+          {
+            "role": "CEO / Founder",
+            "painExperienced": "Just raised Series A but sales isn't scaling. Investors asking tough questions about go-to-market efficiency.",
+            "impact": "Can't show growth trajectory needed for Series B. Concerned about sales leadership capability."
+          },
+          {
+            "role": "SDRs / BDRs (end users)",
+            "painExperienced": "Burning out from manual work. Feel like data entry clerks instead of salespeople. Low job satisfaction.",
+            "impact": "High churn (40% annually). Takes 90 days to ramp new rep. Constant cycle of hiring/training."
+          },
+          {
+            "role": "CFO",
+            "painExperienced": "High CAC, poor sales efficiency metrics, can't model pipeline predictably with current approach",
+            "impact": "Budget pressure - needs to see ROI on sales investments. Can't justify more headcount without better efficiency."
+          },
+          {
+            "role": "Marketing",
+            "painExperienced": "Sales ignoring 70% of marketing-generated leads due to capacity constraints",
+            "impact": "Marketing spend being wasted. Can't prove marketing ROI if sales doesn't work leads."
+          }
+        ],
+        "organizationalImpact": "Company-wide growth is bottlenecked by inefficient sales process. Can't achieve growth targets needed for next funding round. Team morale suffering. Competitive position weakening as rivals scale faster.",
+        "rippleEffects": "If sales doesn't fix this: (1) Miss revenue targets → (2) Can't raise Series B → (3) Layoffs likely → (4) Best people leave → (5) Death spiral. Solving this unlocks entire company's growth trajectory."
+      },
+      "churnPatterns": {
+        "whyTheyLeave": [
+          "Didn't integrate properly with CRM (Salesforce) - data got messy, team stopped using it",
+          "Onboarding was too complex - required 2 weeks of training, team gave up",
+          "AI-generated messages sounded robotic - customers complained, team lost trust in tool",
+          "Support was slow (2-3 day response times) - blockers couldn't be resolved quickly",
+          "Pricing increased unexpectedly after first year - felt bait-and-switched"
+        ],
+        "failureIndicators": [
+          "Low adoption in first 30 days (less than 50% of team actively using)",
+          "Complaints about data quality or message quality in first 60 days",
+          "Support tickets going unresolved for 48+ hours",
+          "CRM sync issues causing duplicate data or missing records",
+          "Team bypassing the tool and going back to manual processes"
+        ],
+        "retentionDrivers": "Customers who succeed have: (1) Strong onboarding with dedicated support in first 30 days, (2) Quick integration wins (CRM syncing correctly in week 1), (3) Visible results in first 30 days (response rates improving), (4) Ongoing optimization help from CSM, (5) Regular feature updates that show we're investing in product.",
+        "churnRisk": "Medium-High - given past failed attempts and high skepticism, if we don't nail implementation and show quick wins, they'll churn within 90 days. Must be white-glove in first quarter.",
+        "applicableNote": "Churn data is based on past tool experiments. Currently evaluating new solution so no customer churn data yet, but high awareness of what caused past tool failures."
+      },
+      "painSeverityScale": {
+        "rating": 9,
+        "rationale": "This is a 9/10 severity because: (1) It's costing $860K+ annually in hard costs and opportunity costs, (2) It's causing team churn which compounds the problem, (3) It's preventing company from hitting growth targets which affects funding, (4) VP Sales's job is on the line, (5) Status quo is unsustainable. Only not a 10 because company isn't at risk of going out of business (yet) - but another year of this and they might be.",
+        "comparisonToOtherPains": "This is their #1 pain right now. Other pains exist (product gaps, marketing channel issues) but this is the blocker preventing them from scaling revenue. If they don't fix sales, nothing else matters. CEO agrees this is top priority."
+      },
+      "motivationHierarchy": {
+        "rankedDrivers": [
+          {
+            "rank": 1,
+            "driver": "Hit revenue targets and prove sales can scale (save VP Sales's job/reputation)",
+            "urgency": "Critical - Q4 deadline in 90 days, board meeting in 60 days"
+          },
+          {
+            "rank": 2,
+            "driver": "Stop SDR churn and build sustainable, happy team (reduce hiring/training costs)",
+            "urgency": "High - already lost 2 reps in 3 months, can't keep bleeding talent"
+          },
+          {
+            "rank": 3,
+            "driver": "Free up VP Sales time for strategic work instead of IC tasks (template writing, firefighting)",
+            "urgency": "Moderate - important for long-term but not the burning platform right now"
+          }
+        ],
+        "motivationStrength": "Very strong - combination of career risk (VP Sales job), financial impact ($860K cost), and time pressure (90 days) creates extremely high motivation to solve this NOW. They will pay premium for solution that works quickly."
+      }
+    },
+    "rawAnswers": {
+      "primaryPain": "Our sales team is drowning in manual prospecting work - spending 3-4 hours per day on research, writing emails, and data entry instead of actually selling. We can't scale our outbound motion without throwing more bodies at the problem, and our response rates are terrible (<2%) so all that manual work feels pointless.",
+      "painCost": "Each SDR wastes 15-20 hours/week on manual work. At $75K salary per SDR, that's $360K/year in wasted time across 5 reps. Plus we're missing $500K+ in pipeline because we can only prospect to 25% of our addressable market. Lost 2 SDRs to burnout in last 3 months ($30K each to replace).",
+      "triedBefore": "Tried Salesforce with Outreach but too complex and expensive ($150K/year). Hired offshore agency but quality was terrible. Tried basic email tools like Mailshake but no real personalization so response rates stayed low.",
+      "whyFailed": "Salesforce/Outreach took 3 months to implement, team never adopted it. Agency didn't understand our ICP and sent generic garbage. Basic tools just do mail merge - no intelligence.",
+      "doNothing": "We'll miss Q4 targets and annual goals. CEO will lose confidence. Board will ask why sales can't scale with the funding we just raised. More SDRs will burn out and quit. Competitors will steal market share while we're stuck in manual mode.",
+      "urgentTrigger": "Q4 is coming up (90 days to hit annual target). CEO is already asking questions. Just lost 2 SDRs to burnout. Competitor announced $20M raise and is hiring aggressively. Board meeting in 60 days where I need to show pipeline growth.",
+      "successLooksLike": "Double meetings booked from 4/week to 8/week per SDR. Cut manual work from 4 hours/day to <1 hour. Generate $500K in outbound pipeline this quarter. Stop SDR churn - get retention above 85%. Prove sales can scale without just adding headcount.",
+      "workarounds": "SDRs work early mornings and late nights to get prospecting done. I personally write all email templates and they copy-paste. We ignore 70% of our addressable market and only prospect to perfect-fit accounts. It's not working.",
+      "whoElseFeels": "CEO feels it (can't show growth to investors), CFO feels it (poor sales efficiency metrics), SDRs feel it (burning out), Marketing feels it (their leads aren't being worked), and honestly the whole company because sales is the bottleneck to everything.",
+      "churnReasons": "With past tools: didn't integrate with Salesforce properly, onboarding was too complex, AI messages sounded robotic, support was slow to respond, pricing increased unexpectedly after first year."
+    },
+    "metadata": {
+      "generationTime": 9.2,
+      "model": "claude-sonnet-4-20250514",
+      "tokensUsed": 3156,
+      "editHistory": []
+    }
+  }
+}

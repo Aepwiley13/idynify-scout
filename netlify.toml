@@ -9,6 +9,9 @@
 [functions."generate-icp-brief"]
   timeout = 900
 
+[functions."generate-section-1"]
+  timeout = 900
+
 [functions."generate-leads"]
   timeout = 900
 

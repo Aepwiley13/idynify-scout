@@ -9,6 +9,9 @@
 //   ├── subscription (document)
 //   ├── icp (document)
 //   ├── icpBrief (document)
+//   ├── section1Answers (object) - Section 1: Company Identity & Foundation answers
+//   ├── section1Output (object) - Section 1 Executive Summary output
+//   ├── reconProgress (object) - RECON questionnaire progress tracking
 //   ├── weights/ (subcollection)
 //   │   ├── current (document)
 //   │   └── history/{versionId} (documents)
@@ -25,6 +28,9 @@ export const COLLECTION_PATHS = {
   subscription: 'subscription',
   icp: 'icp',
   icpBrief: 'icpBrief',
+  section1Answers: 'section1Answers',
+  section1Output: 'section1Output',
+  reconProgress: 'reconProgress',
   weights: 'weights',
   weightsCurrent: 'weights/current',
   weightsHistory: 'weights/history',
@@ -54,3 +60,86 @@ export const getPath = {
   userDailyEnrichments: (userId) => `users/${userId}/quotas/daily_enrichments`,
   userWeeklyEnrichments: (userId) => `users/${userId}/quotas/weekly_enrichments`
 };
+
+// ============================================================================
+// SECTION 1: COMPANY IDENTITY & FOUNDATION - Schema Documentation
+// ============================================================================
+
+/**
+ * section1Answers
+ * Stores user's raw answers to Section 1 questionnaire
+ *
+ * Schema:
+ * {
+ *   companyName: string,
+ *   whatYouDo: string,
+ *   industry: string,
+ *   stage: string,
+ *   role: string,
+ *   mainProduct: string,
+ *   problemSolved: string,
+ *   currentCustomers: string,
+ *   ninetyDayGoal: string,
+ *   biggestChallenge: string,
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section1Output
+ * Stores the generated Executive Summary for Section 1
+ *
+ * Schema:
+ * {
+ *   section: 1,
+ *   title: "Company Identity & Foundation",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   executiveSummary: {
+ *     companyOverview: {
+ *       name: string,
+ *       industry: string,
+ *       stage: string,
+ *       elevatorPitch: string
+ *     },
+ *     coreOffering: {
+ *       product: string,
+ *       problemSolved: string,
+ *       targetCustomer: string
+ *     },
+ *     currentState: {
+ *       ninetyDayGoal: string,
+ *       biggestChallenge: string,
+ *       implication: string
+ *     },
+ *     idealCustomerGlance: string,
+ *     perfectFitIndicators: string[],
+ *     antiProfile: string[],
+ *     keyInsight: string
+ *   },
+ *   rawAnswers: {
+ *     // Copy of section1Answers
+ *   },
+ *   metadata: {
+ *     generationTime: number,
+ *     model: string,
+ *     tokensUsed: number,
+ *     editHistory: any[]
+ *   },
+ *   generatedAt: Timestamp
+ * }
+ */
+
+/**
+ * reconProgress
+ * Tracks overall RECON questionnaire progress
+ *
+ * Schema:
+ * {
+ *   currentSection: number,
+ *   completedSections: number[],
+ *   section1Completed: boolean,
+ *   lastUpdated: Timestamp
+ * }
+ */

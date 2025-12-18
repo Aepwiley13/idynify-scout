@@ -1,0 +1,685 @@
+{
+  "questionnaire": {
+    "sectionId": 9,
+    "sectionTitle": "Messaging & Communication",
+    "sectionDescription": "Generate email sequences, value propositions, and objection handling scripts using insights from previous sections",
+    "questions": [
+      {
+        "id": "emailTone",
+        "question": "Preferred email tone",
+        "type": "radio",
+        "required": true,
+        "helpText": "What tone resonates best with your audience?",
+        "options": [
+          "Professional & formal",
+          "Professional but friendly",
+          "Conversational & casual",
+          "Direct & to-the-point",
+          "Consultative & educational"
+        ]
+      },
+      {
+        "id": "emailLength",
+        "question": "Ideal email length",
+        "type": "radio",
+        "required": true,
+        "helpText": "What length gets best response from your audience?",
+        "options": [
+          "Very short (2-3 sentences)",
+          "Short (4-5 sentences)",
+          "Medium (6-8 sentences)",
+          "Long (9-12 sentences)",
+          "Varies by sequence stage"
+        ]
+      },
+      {
+        "id": "keyMessages",
+        "question": "Key messages to emphasize",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 5,
+        "helpText": "What do you most want prospects to understand?",
+        "options": [
+          "Time savings / efficiency",
+          "Revenue impact / growth",
+          "Cost reduction / ROI",
+          "Risk mitigation / security",
+          "Ease of use / simplicity",
+          "Speed to value / quick wins",
+          "Innovation / competitive edge",
+          "Team productivity / morale",
+          "Scalability / future-proofing",
+          "Data quality / insights"
+        ]
+      },
+      {
+        "id": "callsToAction",
+        "question": "Primary calls to action",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 2,
+        "maxSelections": 4,
+        "helpText": "What do you want prospects to do?",
+        "options": [
+          "Book a demo",
+          "Quick 15-min call",
+          "Watch a video",
+          "Try free trial",
+          "Download resource",
+          "Reply with interest",
+          "Schedule discovery call",
+          "Review case study"
+        ]
+      },
+      {
+        "id": "meetingTypes",
+        "question": "Meeting types to offer",
+        "type": "multi-select",
+        "required": true,
+        "minSelections": 1,
+        "maxSelections": 3,
+        "helpText": "What meeting formats work best?",
+        "options": [
+          "15-min intro call",
+          "30-min discovery call",
+          "45-min demo",
+          "60-min deep dive",
+          "Executive briefing",
+          "Technical review"
+        ]
+      },
+      {
+        "id": "socialProofEmphasis",
+        "question": "Social proof emphasis",
+        "type": "radio",
+        "required": true,
+        "helpText": "How much to emphasize customer stories and proof?",
+        "options": [
+          "Very high (mention in every email)",
+          "High (mention frequently)",
+          "Moderate (mention occasionally)",
+          "Low (minimal mentions)",
+          "None (data-driven only)"
+        ]
+      },
+      {
+        "id": "personalizationLevel",
+        "question": "Personalization approach",
+        "type": "radio",
+        "required": true,
+        "helpText": "How personalized should outreach be?",
+        "options": [
+          "Highly personalized (research each prospect)",
+          "Moderately personalized (company + role)",
+          "Template-based with variables",
+          "Mass outreach (minimal personalization)"
+        ]
+      },
+      {
+        "id": "urgencyTactics",
+        "question": "Urgency creation approach",
+        "type": "radio",
+        "required": true,
+        "helpText": "How to create urgency without being pushy?",
+        "options": [
+          "Strong (deadlines, scarcity)",
+          "Moderate (timely relevance)",
+          "Soft (natural urgency only)",
+          "None (no urgency tactics)"
+        ]
+      }
+    ]
+  },
+  "jsonSchema": {
+    "section": 9,
+    "title": "Messaging & Communication",
+    "status": "completed",
+    "completedAt": "ISO 8601 timestamp",
+    "version": 1,
+    "messagingFramework": {
+      "coreValueProps": [
+        {
+          "audience": "string (stakeholder from Section 7)",
+          "valueProp": "string (what matters to them from Section 7 criteria)",
+          "painPoint": "string (from Section 5)",
+          "outcome": "string (transformation)",
+          "proof": "string (from Section 8 win reasons)"
+        }
+      ],
+      "emailSequences": {
+        "coldOutreach": {
+          "sequence": [
+            {
+              "touchNumber": 1,
+              "timing": "Day 0",
+              "channel": "Email",
+              "subjectLine": "string (using Section 4 language)",
+              "body": "string (2-8 sentences based on emailLength)",
+              "cta": "string (from callsToAction)",
+              "personalizationNotes": "string (what to customize)"
+            },
+            {
+              "touchNumber": 2,
+              "timing": "Day 2-3",
+              "channel": "Email",
+              "subjectLine": "string",
+              "body": "string",
+              "cta": "string",
+              "personalizationNotes": "string"
+            },
+            {
+              "touchNumber": 3,
+              "timing": "Day 5-7",
+              "channel": "Email or LinkedIn",
+              "subjectLine": "string",
+              "body": "string",
+              "cta": "string",
+              "personalizationNotes": "string"
+            },
+            {
+              "touchNumber": 4,
+              "timing": "Day 10-12",
+              "channel": "Email",
+              "subjectLine": "string",
+              "body": "string",
+              "cta": "string",
+              "personalizationNotes": "string"
+            },
+            {
+              "touchNumber": 5,
+              "timing": "Day 15-17",
+              "channel": "Email (breakup)",
+              "subjectLine": "string",
+              "body": "string",
+              "cta": "string",
+              "personalizationNotes": "string"
+            }
+          ],
+          "notes": "string (best practices for this sequence)"
+        },
+        "triggerBased": {
+          "triggers": [
+            {
+              "trigger": "string (from Section 6 triggers)",
+              "timing": "string (when to reach out)",
+              "subjectLine": "string",
+              "body": "string",
+              "cta": "string",
+              "urgency": "string (why now matters)"
+            }
+          ]
+        },
+        "stakeholderSpecific": [
+          {
+            "stakeholder": "string (from Section 7 - e.g., Economic Buyer)",
+            "focusArea": "string (what they care about from Section 7)",
+            "subjectLine": "string",
+            "body": "string",
+            "cta": "string",
+            "meetingType": "string (from meetingTypes)"
+          }
+        ]
+      },
+      "subjectLines": {
+        "painFocused": ["array of 5-7 subject lines using Section 5 pain"],
+        "valueFocused": ["array of 5-7 subject lines emphasizing outcomes"],
+        "triggerFocused": ["array of 5-7 subject lines for trigger events"],
+        "curiosityBased": ["array of 5-7 curiosity-generating subjects"],
+        "personalizedTemplates": ["array of 5-7 templates with {{variables}}"]
+      },
+      "objectionHandling": {
+        "priceObjection": {
+          "objection": "\"This is too expensive\"",
+          "response": "string (using Section 5 cost of inaction + Section 8 ROI)",
+          "reframe": "string (shift from price to value)",
+          "proof": "string (customer example)"
+        },
+        "timingObjection": {
+          "objection": "\"Not the right time\"",
+          "response": "string (using Section 6 triggers + urgency)",
+          "reframe": "string",
+          "proof": "string"
+        },
+        "competitorObjection": {
+          "objection": "\"We're looking at [Competitor]\"",
+          "response": "string (using Section 8 trap questions)",
+          "reframe": "string",
+          "proof": "string"
+        },
+        "statusQuoObjection": {
+          "objection": "\"We're fine with current process\"",
+          "response": "string (using Section 5 cost + Section 8 status quo battle card)",
+          "reframe": "string",
+          "proof": "string"
+        },
+        "featureObjection": {
+          "objection": "\"You're missing [Feature]\"",
+          "response": "string (using Section 8 positioning)",
+          "reframe": "string",
+          "proof": "string"
+        }
+      },
+      "discoveryQuestions": {
+        "painDiscovery": ["array of 5-7 questions to uncover Section 5 pain"],
+        "processDiscovery": ["array of 5-7 questions about current state"],
+        "stakeholderMapping": ["array of 5-7 questions to identify Section 7 players"],
+        "competitiveIntel": ["array of 5-7 questions including Section 8 trap questions"],
+        "urgencyCreation": ["array of 5-7 questions to create urgency"]
+      },
+      "valuePropOnePages": [
+        {
+          "audience": "string (stakeholder type)",
+          "headline": "string (outcome-focused)",
+          "subheadline": "string (problem statement from Section 5)",
+          "keyBenefits": ["array of 3-5 benefits mapped to their criteria"],
+          "socialProof": "string (customer story or stat)",
+          "differentiator": "string (from Section 8)",
+          "cta": "string"
+        }
+      ],
+      "linkedInMessaging": {
+        "connectionRequest": "string (150 chars max, personalized)",
+        "followUpMessage": "string (after connection accepted)",
+        "contentCommentTemplates": ["array of 3-5 templates for engaging with posts"]
+      }
+    },
+    "rawAnswers": {
+      "emailTone": "string",
+      "emailLength": "string",
+      "keyMessages": ["array"],
+      "callsToAction": ["array"],
+      "meetingTypes": ["array"],
+      "socialProofEmphasis": "string",
+      "personalizationLevel": "string",
+      "urgencyTactics": "string"
+    },
+    "contextFromPreviousSections": {
+      "section4Language": "object (if available)",
+      "section5Pain": "object (if available)",
+      "section6Triggers": "object (if available)",
+      "section7Stakeholders": "object (if available)",
+      "section8Competitive": "object (if available)"
+    },
+    "metadata": {
+      "generationTime": "number",
+      "model": "string",
+      "tokensUsed": "number",
+      "editHistory": []
+    }
+  },
+  "exampleOutput": {
+    "section": 9,
+    "title": "Messaging & Communication",
+    "status": "completed",
+    "completedAt": "2025-12-18T21:00:00Z",
+    "version": 1,
+    "messagingFramework": {
+      "coreValueProps": [
+        {
+          "audience": "VP Sales (Economic Buyer)",
+          "valueProp": "Scale your sales team 3x without hiring 15 more SDRs - get $860K back in wasted time while hitting quota faster",
+          "painPoint": "SDRs spend 3-4 hours/day on manual prospecting instead of selling. You're bleeding $860K/year in wasted time + missing $500K pipeline.",
+          "outcome": "Increase meetings booked by 40%, reduce SDR time waste by 70%, hit quota 2 quarters earlier",
+          "proof": "Mid-market companies using our AI see 2-5x response rates and save 15 hours/week per rep"
+        },
+        {
+          "audience": "Sales Operations Manager (Champion)",
+          "valueProp": "Stop managing templates and be the strategic ops leader you want to be - 15-minute setup, zero admin required",
+          "painPoint": "You're stuck managing email templates, troubleshooting Salesforce sync, and training reps instead of driving strategy",
+          "outcome": "Reclaim 10 hours/week, modernize sales stack, get recognized as innovator",
+          "proof": "Sales Ops teams report 80% reduction in tool admin time and 'finally feel strategic'"
+        },
+        {
+          "audience": "SDRs (End Users)",
+          "valueProp": "Book more meetings while working less - AI writes your emails so you can focus on conversations",
+          "painPoint": "Spending 3 hours/day researching and writing emails leaves only 2 hours for actual selling",
+          "outcome": "Double meeting bookings, work 2 hours less per day, hit quota consistently",
+          "proof": "SDRs using AI personalization book 40% more meetings and leave work on time"
+        }
+      ],
+      "emailSequences": {
+        "coldOutreach": {
+          "sequence": [
+            {
+              "touchNumber": 1,
+              "timing": "Day 0",
+              "channel": "Email",
+              "subjectLine": "Quick question about your SDR team",
+              "body": "Hi {{FirstName}},\n\nNoticed {{CompanyName}} has been growing fast (congrats on the Series B!). Quick question: how are your SDRs handling the increased volume?\n\nMost VP Sales we work with hit a wall around 10-15 reps where manual prospecting becomes unsustainable. They're losing $860K/year in wasted time - curious if you're seeing similar challenges?\n\nWorth a 15-min chat to compare notes?",
+              "cta": "15-minute call this week?",
+              "personalizationNotes": "Reference funding round, hiring signals, or recent growth milestone from LinkedIn"
+            },
+            {
+              "touchNumber": 2,
+              "timing": "Day 2-3",
+              "channel": "Email",
+              "subjectLine": "Re: Quick question about your SDR team",
+              "body": "{{FirstName}}, following up on my note below.\n\nThought you'd find this relevant: we helped a company similar to {{CompanyName}} (also mid-market SaaS, ~30 reps) reduce SDR prospecting time from 4 hours/day to 45 minutes. Their response rates went from 2% to 8%.\n\nThe kicker? They set it up in 15 minutes. No 3-month implementation like Outreach.\n\nWorth 15 minutes to see if we can do the same for you?",
+              "cta": "Here's my calendar: {{CalendarLink}}",
+              "personalizationNotes": "Mention similar company in their industry or size"
+            },
+            {
+              "touchNumber": 3,
+              "timing": "Day 5-7",
+              "channel": "Email or LinkedIn",
+              "subjectLine": "Idea for your Q1 planning",
+              "body": "{{FirstName}}, quick idea for your Q1 planning:\n\nIf your SDRs could book 40% more meetings without working longer hours, would that move the needle on your targets?\n\nThat's what AI-powered personalization is doing for mid-market teams. Instead of spending 3 hours writing emails, reps spend 30 minutes reviewing AI suggestions.\n\nWe could have you set up and seeing results before your next QBR.\n\nInterested in seeing how?",
+              "cta": "Quick demo this week?",
+              "personalizationNotes": "Reference Q1/Q4 timing, quota pressure, or QBR cycles"
+            },
+            {
+              "touchNumber": 4,
+              "timing": "Day 10-12",
+              "channel": "Email",
+              "subjectLine": "The $860K question",
+              "body": "{{FirstName}}, one last thought:\n\nIf your 15 SDRs each waste 3 hours/day on manual prospecting at $75K/year loaded cost, that's $860K annually. Not to mention the $500K in missed pipeline from low response rates.\n\nThat's $1.3M/year to maintain the status quo.\n\nOur tool costs $30K/year and typically pays for itself in the first month.\n\nNot trying to be pushy - just thought the math was worth sharing. If the timing's not right, totally understand.\n\nBut if it is worth exploring, I'm here.",
+              "cta": "{{CalendarLink}}",
+              "personalizationNotes": "Adjust SDR count and math to their team size"
+            },
+            {
+              "touchNumber": 5,
+              "timing": "Day 15-17",
+              "channel": "Email (breakup)",
+              "subjectLine": "Closing the loop",
+              "body": "{{FirstName}},\n\nHaven't heard back, so I'll assume the timing's not right. Totally understand - you're busy scaling a company.\n\nBefore I close my loop:\n\n**If you decide to explore sales automation in the next 6 months, here are 3 questions to ask any vendor:**\n1. How long is implementation? (3+ months is a red flag)\n2. Do I need a dedicated admin? (Most enterprise tools do)\n3. What's your typical ROI timeline? (6+ months is too long)\n\nWe answer: 15 minutes, no admin needed, 30-day ROI.\n\nIf/when you're ready, you know where to find me.\n\nBest of luck with your Q4 push!",
+              "cta": "No CTA (breakup email)",
+              "personalizationNotes": "Reference their current quarter or timing"
+            }
+          ],
+          "notes": "Best practices: Send emails Tuesday-Thursday 8-10am or 2-4pm their timezone. Personalize touch 1 heavily, touches 2-3 moderately, touch 4-5 can be template. Breakup emails get 20-30% response rate."
+        },
+        "triggerBased": {
+          "triggers": [
+            {
+              "trigger": "Funding announcement (Series A/B/C)",
+              "timing": "Within 7-14 days of announcement",
+              "subjectLine": "Congrats on the {{FundingRound}}",
+              "body": "{{FirstName}}, congrats on the {{FundingRound}}! Saw the news on TechCrunch.\n\nFunding usually means scaling the sales team fast. One challenge that always comes up: how do you scale outbound efficiently without quality dropping?\n\nWe help mid-market companies like {{CompanyName}} scale from 5 to 50 reps without proportionally scaling prospecting time. AI handles the grunt work so reps focus on selling.\n\nWorth exploring as you're planning team expansion?",
+              "cta": "15 minutes next week?",
+              "urgency": "Funding creates 90-day window to invest in tools before budget scrutiny returns. Strike while momentum is high."
+            },
+            {
+              "trigger": "New VP Sales / CRO hired",
+              "timing": "30-60 days after start date (in 'listening mode')",
+              "subjectLine": "Welcome to {{CompanyName}}, {{FirstName}}",
+              "body": "{{FirstName}}, welcome to {{CompanyName}} as their new {{Title}}!\n\nFirst 90 days are always about quick wins. One thing new sales leaders often tackle early: sales efficiency.\n\nYou're probably inheriting a team that's spending 3-4 hours/day on manual prospecting. AI automation can get that down to 30 minutes while doubling response rates.\n\nMost new leaders implement this in first 60 days for a visible quick win. Want to explore?",
+              "cta": "Quick call to discuss your early priorities?",
+              "urgency": "New leaders have 90-day honeymoon to make changes. After that, harder to get approval."
+            },
+            {
+              "trigger": "Hiring SDRs (job posting active)",
+              "timing": "While job posting is live",
+              "subjectLine": "Re: Your SDR openings",
+              "body": "{{FirstName}}, noticed you're hiring {{NumberOfSDRs}} SDRs.\n\nQuick math: hiring 5 SDRs costs ~$450K/year loaded. What if you could get the same output with 3 SDRs + our AI automation for $30K/year?\n\nYou'd save $210K and avoid 3 months of ramp time per hire.\n\nWe're not anti-hiring - you'll still need those SDRs. But with AI handling prospecting, they can focus on what humans do best: conversations.\n\nWorth discussing before you finalize headcount?",
+              "cta": "15 minutes before your next hire?",
+              "urgency": "Hiring decisions lock in budget for 12+ months. Better to optimize before hiring than after."
+            }
+          ]
+        },
+        "stakeholderSpecific": [
+          {
+            "stakeholder": "VP Sales (Economic Buyer)",
+            "focusArea": "ROI, revenue impact, quota attainment",
+            "subjectLine": "How to hit Q4 targets without hiring 10 more reps",
+            "body": "{{FirstName}},\n\nIf you're like most VP Sales we talk to, you're staring at a Q4 gap and the headcount budget is frozen.\n\nHere's what we're seeing: teams using AI-powered prospecting are booking 40% more meetings with the same number of reps. The average mid-market team (15 reps) saves $860K/year in wasted prospecting time.\n\nThree companies in {{Industry}} have already implemented this quarter and are seeing results in weeks, not months.\n\n**The ROI is simple:** \n- Cost: $30K/year\n- Time saved: $860K/year\n- Pipeline increase: $500K/year\n- Payback: 18 days\n\nWorth a 30-minute conversation about your Q4 goals?",
+            "cta": "30-min discovery call",
+            "meetingType": "30-min discovery call"
+          },
+          {
+            "stakeholder": "Sales Operations Manager (Champion)",
+            "focusArea": "Ease of use, implementation speed, reducing admin burden",
+            "subjectLine": "Finally, a tool that doesn't need a dedicated admin",
+            "body": "{{FirstName}},\n\nAs a Sales Ops Manager, you're probably tired of being the admin for every sales tool. Outreach needs a full-time admin. Salesloft requires constant template management. Apollo needs data cleanup.\n\n**What if there was a tool that actually lived up to 'easy to use'?**\n\n- Setup: 15 minutes (not 3 months)\n- Training required: None (intuitive UI)\n- Ongoing admin: Zero (AI handles optimization)\n- Integration: Real-time Salesforce sync (no manual work)\n\nYou could finally focus on strategy instead of troubleshooting.\n\nOne Sales Ops Manager told us: 'I got 10 hours/week back and finally feel like a strategic partner, not just an admin.'\n\nInterested in seeing how it works?",
+            "cta": "Quick 15-min walkthrough?",
+            "meetingType": "15-min intro call"
+          }
+        ]
+      },
+      "subjectLines": {
+        "painFocused": [
+          "Are your SDRs spending 3+ hours/day on prospecting?",
+          "Quick question about your team's efficiency",
+          "How much time do your reps waste on email research?",
+          "The $860K problem most VP Sales miss",
+          "Is manual prospecting holding back your growth?",
+          "Your SDRs are working too hard for poor results",
+          "How much pipeline are you leaving on the table?"
+        ],
+        "valueFocused": [
+          "Double your meetings without hiring more reps",
+          "What if your SDRs only needed 30 minutes for prospecting?",
+          "40% more pipeline with the team you have",
+          "Get 15 hours/week back per rep",
+          "Scale outbound without scaling headcount",
+          "How mid-market teams are beating enterprise competitors",
+          "Hit quota 2 quarters earlier"
+        ],
+        "triggerFocused": [
+          "Congrats on the {{FundingRound}} raise!",
+          "Welcome to {{CompanyName}}, {{FirstName}}",
+          "Saw you're hiring {{NumberOfSDRs}} SDRs",
+          "Re: Your Q4 planning",
+          "Idea for your new role as {{Title}}",
+          "Quick thought on your recent LinkedIn post",
+          "How other Series B companies are scaling sales"
+        ],
+        "curiosityBased": [
+          "Quick question...",
+          "Thought you'd find this interesting",
+          "This reminded me of {{CompanyName}}",
+          "Most VP Sales miss this",
+          "Not what you'd expect",
+          "The counterintuitive approach to scaling sales",
+          "What your competitors are doing differently"
+        ],
+        "personalizedTemplates": [
+          "Quick question about {{CompanyName}}'s growth",
+          "Congrats on {{RecentMilestone}}!",
+          "Saw your post about {{Topic}}",
+          "How {{CompetitorName}} users are switching",
+          "Re: {{CompanyName}}'s {{Initiative}}",
+          "{{MutualConnection}} suggested I reach out",
+          "Fellow {{Industry}} leader dealing with same challenge"
+        ]
+      },
+      "objectionHandling": {
+        "priceObjection": {
+          "objection": "\"This is too expensive / We don't have budget\"",
+          "response": "I totally understand budget constraints. Let me reframe the investment: Your current manual process costs $860K/year in wasted time. Our tool costs $30K/year and saves $830K. So you're not spending money - you're getting $830K back. The question isn't 'can we afford this?' but 'can we afford NOT to do this?' It pays for itself in 18 days.",
+          "reframe": "Shift from expense to investment with ROI. Position status quo as more expensive than solution.",
+          "proof": "Similar-sized companies see 27x ROI in first year. One customer said: 'We spent $30K to save $800K. That's the easiest decision I made all year.'"
+        },
+        "timingObjection": {
+          "objection": "\"Not the right time / We'll revisit next quarter\"",
+          "response": "I appreciate you being upfront about timing. Just to help with future planning: every quarter you wait costs $215K ($860K annual waste ÷ 4). Plus, implementation takes 15 minutes, not 3 months, so there's no heavy lift. Most teams who say 'next quarter' later regret waiting because competitors beat them to market with better efficiency. Is timing truly the issue, or is there something else we should address?",
+          "reframe": "Quantify cost of delay. Make 'next quarter' visible as expensive decision.",
+          "proof": "Companies who implement in Q3 vs Q4 have 1 extra quarter of benefit = $215K difference. Time is not on your side."
+        },
+        "competitorObjection": {
+          "objection": "\"We're already looking at Outreach/Salesloft\"",
+          "response": "Great! Outreach is solid if you have 100+ reps and can afford 3-6 month implementation. I'm curious: (1) How long did they say implementation would take? (2) What's the all-in cost including admin salary? (3) How long until ROI? Most mid-market teams find Outreach is built for enterprise and ends up being overkill. We're 20% of the cost with 80% of the value and you're live in 15 minutes. Worth comparing?",
+          "reframe": "Use trap questions to expose competitor weaknesses. Position as modern alternative, not cheap substitute.",
+          "proof": "We win 70% of deals when we compete against Outreach because mid-market teams realize they don't need enterprise complexity."
+        },
+        "statusQuoObjection": {
+          "objection": "\"We're fine with our current process\"",
+          "response": "That's what I hear from a lot of sales leaders initially. Then we calculate the actual cost: 15 SDRs × 3 hours/day wasted × $75K salary = $860K/year. Plus $500K in missed pipeline from low response rates. Plus SDR churn from burnout. Total: $1.3M/year to maintain 'fine.' For $30K/year, you could get that $1.3M back. Are you truly 'fine' or just comfortable with what you know?",
+          "reframe": "Make invisible status quo cost visible with math. Challenge 'fine' with data.",
+          "proof": "Every company that told us they were 'fine' later found $800K+ in hidden waste once they measured it properly."
+        },
+        "featureObjection": {
+          "objection": "\"You're missing [Advanced Reporting / Workflow Automation / X Feature]\"",
+          "response": "You're right - we don't have every feature that enterprise tools have. We intentionally focused on the 20% of features that drive 80% of results: AI personalization, fast setup, and ease of use. The question is: do you need feature parity or do you need results? Most mid-market teams tell us they were paying for 50 features they never used. We give you the 10 that actually matter. Is [Feature] truly critical to your success, or is it nice-to-have?",
+          "reframe": "Reframe from feature checklist to outcomes focus. Position fewer features as advantage (simplicity), not weakness.",
+          "proof": "Teams switching from Outreach tell us they used less than 20% of features but paid 100% of the cost. They prefer our focused approach."
+        }
+      },
+      "discoveryQuestions": {
+        "painDiscovery": [
+          "How much time do your SDRs spend on prospecting vs actual conversations? (uncover time waste)",
+          "What's your current response rate on cold outreach? (benchmark performance)",
+          "How many meetings is each SDR booking per week? (quantify output)",
+          "What's your biggest bottleneck in the sales process right now? (identify priority pain)",
+          "If you could wave a magic wand and fix one thing about your outbound process, what would it be? (dream state)",
+          "What percentage of your SDRs hit quota consistently? (performance gap)",
+          "How much churn are you seeing on the SDR team? (retention signal)"
+        ],
+        "processDiscovery": [
+          "Walk me through your current prospecting process from start to finish. (understand workflow)",
+          "What tools are you using today for outbound? (tech stack audit)",
+          "How do you currently personalize outreach at scale? (current solution)",
+          "Who manages your email templates and sequences? (admin burden)",
+          "How long does it take to onboard a new SDR? (ramp time)",
+          "How are you measuring SDR productivity today? (metrics)",
+          "What's working well that we shouldn't mess with? (preserve wins)"
+        ],
+        "stakeholderMapping": [
+          "Who else would need to be involved in evaluating a tool like this? (identify committee)",
+          "Who typically makes the final decision on sales tools? (economic buyer)",
+          "Does IT/Security need to review new tools? (technical buyer)",
+          "How do your SDRs feel about the current process? (user influence)",
+          "What's your typical approval process for new software? (buying process)",
+          "Have you bought similar tools before? How did that go? (past behavior)",
+          "Is there a budget owner I should connect with? (budget authority)"
+        ],
+        "competitiveIntel": [
+          "Have you looked at other solutions? Which ones? (competitive set)",
+          "What did you like/dislike about [Competitor]? (competitor positioning)",
+          "How long did [Competitor] say implementation would take? (trap question)",
+          "What's their pricing including all the hidden costs? (trap question)",
+          "Do they require a dedicated admin to manage the platform? (trap question)",
+          "If you could change one thing about [Competitor], what would it be? (weakness identification)",
+          "Why did you decide to keep exploring options? (objection surfacing)"
+        ],
+        "urgencyCreation": [
+          "What happens if you don't solve this in the next 90 days? (quantify cost of delay)",
+          "What's driving your timeline for making a decision? (urgency triggers)",
+          "Are there any upcoming deadlines or targets you're trying to hit? (external pressure)",
+          "How much is this problem costing you per month? (quantify pain monthly)",
+          "What would success look like 6 months from now? (vision)",
+          "If you had this solved by [Date], what would that enable? (opportunity cost)",
+          "What's at risk if you don't fix this? (downside)"
+        ]
+      },
+      "valuePropOnePages": [
+        {
+          "audience": "VP Sales (Economic Buyer)",
+          "headline": "Scale Sales 3x Without Tripling Headcount",
+          "subheadline": "Your SDRs waste $860K/year on manual prospecting. Get it back in 30 days.",
+          "keyBenefits": [
+            "**40% more meetings** with same team size - no hiring required",
+            "**$860K recovered** in wasted time annually per 15-rep team",
+            "**2-5x response rates** with AI-powered personalization",
+            "**30-day ROI** - see results this quarter, not next year",
+            "**15-minute setup** - live same day, not 3-6 months"
+          ],
+          "socialProof": "Mid-market SaaS companies report 27x first-year ROI on average. One VP Sales: 'We hit quota 2 quarters early for first time in 3 years.'",
+          "differentiator": "Unlike Outreach (3-6 month implementation), you're live in 15 minutes. Unlike Instantly (poor quality), you get enterprise-grade AI. Built for mid-market teams who need results now.",
+          "cta": "See it in action: Book 30-min demo"
+        },
+        {
+          "audience": "Sales Operations Manager (Champion)",
+          "headline": "Zero Admin Required. Actually.",
+          "subheadline": "Stop being the template admin and be the strategic ops leader you signed up for.",
+          "keyBenefits": [
+            "**15-minute setup** - No implementation project, no consultants",
+            "**Zero training** - Intuitive UI that reps actually use",
+            "**No ongoing admin** - AI optimizes automatically",
+            "**10 hours/week back** - Spend time on strategy, not troubleshooting",
+            "**Real-time Salesforce sync** - No manual data entry"
+          ],
+          "socialProof": "Sales Ops Managers report 80% reduction in tool admin time. One said: 'I finally feel like a strategic partner instead of a helpdesk.'",
+          "differentiator": "Enterprise tools need dedicated admins. We don't. You set it up once and it runs itself. Modern AI that actually delivers on 'easy to use.'",
+          "cta": "See the 15-min setup: Quick walkthrough"
+        },
+        {
+          "audience": "SDRs (End Users)",
+          "headline": "Book More Meetings, Work Less",
+          "subheadline": "AI writes your emails. You focus on conversations.",
+          "keyBenefits": [
+            "**2 hours back per day** - Spend 30 min on prospecting, not 3 hours",
+            "**Double your meeting bookings** - 2-5x response rates",
+            "**No more writer's block** - AI generates personalized emails instantly",
+            "**Leave work on time** - Hit quota without burning out",
+            "**Feel like a pro** - Send emails that sound smart, not templated"
+          ],
+          "socialProof": "SDRs using AI personalization book 40% more meetings and consistently hit quota. One SDR: 'I finally have time to actually talk to prospects instead of writing emails all day.'",
+          "differentiator": "This isn't mail merge with {{FirstName}}. It's AI that actually understands context and writes like a human. Your prospects won't know it's automated.",
+          "cta": "See it write an email: Quick demo"
+        }
+      ],
+      "linkedInMessaging": {
+        "connectionRequest": "Hi {{FirstName}}, saw your post about {{Topic}} - resonated with challenges we're seeing across {{Industry}}. Would love to connect and compare notes!",
+        "followUpMessage": "Thanks for connecting, {{FirstName}}! I work with mid-market {{Industry}} companies on sales efficiency. If you're ever exploring ways to scale outbound without scaling headcount proportionally, happy to share what's working for similar companies. No pressure - just offering to be a resource.",
+        "contentCommentTemplates": [
+          "Great post, {{FirstName}}! The point about {{KeyIdea}} really resonates. We're seeing similar patterns across {{Industry}} - would love to hear how you're approaching it.",
+          "This is spot on. {{KeyIdea}} is exactly the challenge most {{Title}}s are facing right now. Have you considered {{AlternativeApproach}}?",
+          "Couldn't agree more. We just helped a company tackle {{Problem}} by {{Solution}}. Happy to share what worked if you're interested."
+        ]
+      }
+    },
+    "rawAnswers": {
+      "emailTone": "Professional but friendly",
+      "emailLength": "Short (4-5 sentences)",
+      "keyMessages": [
+        "Time savings / efficiency",
+        "ROI / cost reduction",
+        "Speed to value / quick wins",
+        "Ease of use / simplicity"
+      ],
+      "callsToAction": [
+        "Book a demo",
+        "Quick 15-min call",
+        "Schedule discovery call"
+      ],
+      "meetingTypes": [
+        "15-min intro call",
+        "30-min discovery call",
+        "45-min demo"
+      ],
+      "socialProofEmphasis": "High (mention frequently)",
+      "personalizationLevel": "Moderately personalized (company + role)",
+      "urgencyTactics": "Moderate (timely relevance)"
+    },
+    "contextFromPreviousSections": {
+      "section4Language": {
+        "communicationPreferences": {
+          "preferredChannels": ["Email", "LinkedIn", "Phone"],
+          "tonePreferences": "Direct but friendly, values data over fluff",
+          "commonPhrases": ["scale efficiently", "hit quota", "waste time", "quick wins"]
+        }
+      },
+      "section5Pain": {
+        "costOfInaction": {
+          "totalCost": "$1.3M+ annually",
+          "breakdown": {
+            "timeWaste": "$860K/year",
+            "missedPipeline": "$500K/year"
+          }
+        }
+      },
+      "section6Triggers": {
+        "hotTriggers": {
+          "eventBased": ["Raised funding", "New hire (VP Sales)", "Scaling phase"],
+          "performanceBased": "Poor quarterly results, team churn"
+        }
+      },
+      "section7Stakeholders": {
+        "economicBuyer": "VP Sales",
+        "champion": "Sales Operations Manager",
+        "decisionCriteria": ["ROI", "Ease of use", "Implementation time"]
+      },
+      "section8Competitive": {
+        "winReasons": ["Ease of use", "Fast implementation", "Better AI"],
+        "positioning": "Modern alternative to legacy enterprise tools"
+      }
+    },
+    "metadata": {
+      "generationTime": 11.8,
+      "model": "claude-sonnet-4-20250514",
+      "tokensUsed": 4289,
+      "editHistory": []
+    }
+  }
+}

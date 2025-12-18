@@ -8,6 +8,9 @@ import { doc, getDoc } from 'firebase/firestore';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import MissionControlDashboard from './pages/MissionControlDashboard';
+import MissionControlDashboardV2 from './pages/MissionControlDashboardV2';
+import RECONModulePage from './pages/RECONModulePage';
+import RECONSectionPage from './pages/RECONSectionPage';
 import Prospects from './pages/Prospects';
 import Questionnaire from './pages/Questionnaire';
 import UnifiedDashboard from './pages/UnifiedDashboard';
@@ -212,7 +215,33 @@ function App() {
           }
         />
 
-        {/* Protected Routes - Mission Control Dashboard (NEW!) */}
+        {/* Protected Routes - Mission Control Dashboard V2 (MODULAR SYSTEM) */}
+        <Route
+          path="/mission-control-v2"
+          element={
+            <ProtectedRoute>
+              <MissionControlDashboardV2 />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mission-control-v2/recon"
+          element={
+            <ProtectedRoute>
+              <RECONModulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mission-control-v2/recon/section/:sectionId"
+          element={
+            <ProtectedRoute>
+              <RECONSectionPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected Routes - Mission Control Dashboard (OLD SYSTEM) */}
         <Route
           path="/mission-control"
           element={

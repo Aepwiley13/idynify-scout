@@ -1,0 +1,610 @@
+{
+  "dashboard": {
+    "version": "1.0.0",
+    "userId": "string",
+    "createdAt": "ISO 8601 timestamp",
+    "lastUpdatedAt": "ISO 8601 timestamp",
+    "currentModule": "recon",
+    "currentSection": null,
+    "navigation": {
+      "primaryView": "mission-control",
+      "availableViews": [
+        "mission-control",
+        "module-view",
+        "section-view",
+        "summary-view"
+      ],
+      "breadcrumbs": {
+        "enabled": true,
+        "format": "Home > Module > Section"
+      }
+    },
+    "layout": {
+      "header": {
+        "logo": true,
+        "userProfile": true,
+        "notifications": true,
+        "logout": true
+      },
+      "sidebar": {
+        "enabled": true,
+        "collapsed": false,
+        "items": [
+          {
+            "id": "overview",
+            "label": "Overview",
+            "icon": "dashboard",
+            "route": "/mission-control"
+          },
+          {
+            "id": "recon",
+            "label": "RECON",
+            "icon": "search",
+            "route": "/mission-control/recon",
+            "badge": "in-progress"
+          },
+          {
+            "id": "scout",
+            "label": "SCOUT",
+            "icon": "target",
+            "route": "/mission-control/scout",
+            "disabled": true,
+            "locked": true
+          },
+          {
+            "id": "sniper",
+            "label": "SNIPER",
+            "icon": "crosshair",
+            "route": "/mission-control/sniper",
+            "disabled": true,
+            "locked": true
+          }
+        ]
+      },
+      "mainContent": {
+        "maxWidth": "1400px",
+        "padding": "2rem"
+      },
+      "footer": {
+        "enabled": true,
+        "links": ["Help", "Documentation", "Support"]
+      }
+    },
+    "modules": [
+      {
+        "id": "recon",
+        "name": "RECON",
+        "description": "Reconnaissance intelligence gathering for ICP definition",
+        "order": 1,
+        "status": "in-progress",
+        "unlocked": true,
+        "startedAt": null,
+        "completedAt": null,
+        "totalSections": 10,
+        "completedSections": 0,
+        "progressPercentage": 0,
+        "controls": {
+          "canStart": true,
+          "canContinue": false,
+          "canViewSummary": false,
+          "canEdit": false,
+          "canExport": false
+        },
+        "sections": [
+          {
+            "sectionId": 1,
+            "title": "Business Foundation",
+            "description": "Core business information and objectives",
+            "order": 1,
+            "status": "not_started",
+            "unlocked": true,
+            "required": true,
+            "estimatedTime": "5-7 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": true,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 2,
+            "title": "Target Market Definition",
+            "description": "Industries, company sizes, and market segments",
+            "order": 2,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "6-8 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 3,
+            "title": "Decision Maker Profiles",
+            "description": "Job titles, roles, and buying authority",
+            "order": 3,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "5-6 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 4,
+            "title": "Geographic Targeting",
+            "description": "Location scope, states, cities, and regions",
+            "order": 4,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "3-4 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 5,
+            "title": "Competitive Landscape",
+            "description": "Competitors, alternatives, and market positioning",
+            "order": 5,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "4-5 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 6,
+            "title": "Perfect Fit & Anti-Profile",
+            "description": "Ideal customers and companies to avoid",
+            "order": 6,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "5-6 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 7,
+            "title": "Pain Points & Challenges",
+            "description": "Customer problems, frustrations, and needs",
+            "order": 7,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "6-8 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 8,
+            "title": "Budget & Pricing Intelligence",
+            "description": "Pricing tiers, budget ranges, and affordability",
+            "order": 8,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "4-5 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 9,
+            "title": "Messaging & Value Proposition",
+            "description": "Core messaging, positioning, and differentiation",
+            "order": 9,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "7-9 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": {
+              "messagingFramework": {
+                "coreMessage": {
+                  "headline": null,
+                  "subheadline": null,
+                  "elevatorPitch": null
+                },
+                "valueProposition": {
+                  "primary": null,
+                  "secondary": [],
+                  "differentiators": []
+                },
+                "targetedMessaging": {
+                  "byPersona": [],
+                  "byIndustry": [],
+                  "byPainPoint": []
+                },
+                "proofPoints": {
+                  "statistics": [],
+                  "caseStudies": [],
+                  "testimonials": []
+                },
+                "objectionHandling": {
+                  "commonObjections": [],
+                  "responses": []
+                }
+              },
+              "rawAnswers": {
+                "q1_primary_value": null,
+                "q2_unique_differentiator": null,
+                "q3_customer_outcome": null,
+                "q4_proof_points": null,
+                "q5_objection_handling": null
+              }
+            },
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          },
+          {
+            "sectionId": 10,
+            "title": "Behavioral & Timing Signals",
+            "description": "Buying triggers, timing, and engagement patterns",
+            "order": 10,
+            "status": "not_started",
+            "unlocked": false,
+            "required": true,
+            "estimatedTime": "5-7 minutes",
+            "startedAt": null,
+            "completedAt": null,
+            "lastEditedAt": null,
+            "version": 0,
+            "schemaVersion": "1.0.0",
+            "data": null,
+            "metadata": {
+              "generationTime": null,
+              "model": null,
+              "tokensUsed": null,
+              "editHistory": []
+            },
+            "controls": {
+              "canStart": false,
+              "canContinue": false,
+              "canEdit": false,
+              "canReset": false,
+              "canSkip": false
+            }
+          }
+        ],
+        "outputs": {
+          "icpBrief": {
+            "generated": false,
+            "generatedAt": null,
+            "version": 0,
+            "data": null
+          },
+          "strategyPlan": {
+            "generated": false,
+            "generatedAt": null,
+            "version": 0,
+            "data": null
+          },
+          "tamReport": {
+            "generated": false,
+            "generatedAt": null,
+            "version": 0,
+            "data": null
+          },
+          "actionPlan": {
+            "generated": false,
+            "generatedAt": null,
+            "version": 0,
+            "data": null
+          }
+        },
+        "navigation": {
+          "nextSection": 1,
+          "previousSection": null,
+          "canProceed": false,
+          "requiresAllSections": true
+        }
+      },
+      {
+        "id": "scout",
+        "name": "SCOUT",
+        "description": "Lead generation and contact discovery",
+        "order": 2,
+        "status": "locked",
+        "unlocked": false,
+        "startedAt": null,
+        "completedAt": null,
+        "totalSections": 0,
+        "completedSections": 0,
+        "progressPercentage": 0,
+        "controls": {
+          "canStart": false,
+          "canContinue": false,
+          "canViewSummary": false,
+          "canEdit": false,
+          "canExport": false
+        },
+        "sections": [],
+        "outputs": {},
+        "navigation": {
+          "nextSection": null,
+          "previousSection": null,
+          "canProceed": false,
+          "requiresAllSections": false
+        }
+      },
+      {
+        "id": "sniper",
+        "name": "SNIPER",
+        "description": "Precision outreach and campaign execution",
+        "order": 3,
+        "status": "locked",
+        "unlocked": false,
+        "startedAt": null,
+        "completedAt": null,
+        "totalSections": 0,
+        "completedSections": 0,
+        "progressPercentage": 0,
+        "controls": {
+          "canStart": false,
+          "canContinue": false,
+          "canViewSummary": false,
+          "canEdit": false,
+          "canExport": false
+        },
+        "sections": [],
+        "outputs": {},
+        "navigation": {
+          "nextSection": null,
+          "previousSection": null,
+          "canProceed": false,
+          "requiresAllSections": false
+        }
+      }
+    ],
+    "globalControls": {
+      "buttons": [
+        {
+          "id": "start-section",
+          "label": "Start Section",
+          "action": "navigate-to-section",
+          "variant": "primary",
+          "enabled": true,
+          "visibleWhen": "section.status === 'not_started' && section.unlocked"
+        },
+        {
+          "id": "continue-section",
+          "label": "Continue Section",
+          "action": "navigate-to-section",
+          "variant": "secondary",
+          "enabled": true,
+          "visibleWhen": "section.status === 'in_progress'"
+        },
+        {
+          "id": "edit-section",
+          "label": "Edit Section",
+          "action": "navigate-to-section",
+          "variant": "outline",
+          "enabled": true,
+          "visibleWhen": "section.status === 'completed'"
+        },
+        {
+          "id": "view-summary",
+          "label": "View Summary",
+          "action": "navigate-to-summary",
+          "variant": "ghost",
+          "enabled": true,
+          "visibleWhen": "module.completedSections > 0"
+        },
+        {
+          "id": "generate-outputs",
+          "label": "Generate Intelligence",
+          "action": "trigger-generation",
+          "variant": "primary",
+          "enabled": true,
+          "visibleWhen": "module.status === 'completed'"
+        },
+        {
+          "id": "export-data",
+          "label": "Export Data",
+          "action": "export-json",
+          "variant": "outline",
+          "enabled": true,
+          "visibleWhen": "module.completedSections > 0"
+        }
+      ]
+    },
+    "progressTracking": {
+      "overallProgress": 0,
+      "moduleProgress": {
+        "recon": 0,
+        "scout": 0,
+        "sniper": 0
+      },
+      "milestones": [
+        {
+          "id": "recon-started",
+          "label": "RECON Started",
+          "achieved": false,
+          "achievedAt": null
+        },
+        {
+          "id": "recon-50-percent",
+          "label": "RECON 50% Complete",
+          "achieved": false,
+          "achievedAt": null
+        },
+        {
+          "id": "recon-completed",
+          "label": "RECON Completed",
+          "achieved": false,
+          "achievedAt": null
+        },
+        {
+          "id": "icp-generated",
+          "label": "ICP Brief Generated",
+          "achieved": false,
+          "achievedAt": null
+        },
+        {
+          "id": "scout-unlocked",
+          "label": "SCOUT Module Unlocked",
+          "achieved": false,
+          "achievedAt": null
+        }
+      ]
+    },
+    "userState": {
+      "hasCompletedPayment": true,
+      "subscriptionTier": "pro",
+      "subscriptionStatus": "active",
+      "accountCreatedAt": "ISO 8601 timestamp",
+      "lastLoginAt": "ISO 8601 timestamp",
+      "totalSessions": 0
+    }
+  }
+}

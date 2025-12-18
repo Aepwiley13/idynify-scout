@@ -1,0 +1,271 @@
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
+
+/**
+ * Update a section's status and data
+ */
+export async function updateSectionStatus(userId, moduleId, sectionId, updates) {
+  try {
+    const dashboardRef = doc(db, 'dashboards', userId);
+    const dashboardDoc = await getDoc(dashboardRef);
+
+    if (!dashboardDoc.exists()) {
+      throw new Error('Dashboard not found');
+    }
+
+    const dashboardData = dashboardDoc.data();
+    const modules = [...dashboardData.modules];
+    const moduleIndex = modules.findIndex(m => m.id === moduleId);
+
+    if (moduleIndex === -1) {
+      throw new Error(`Module ${moduleId} not found`);
+    }
+
+    const sections = [...modules[moduleIndex].sections];
+    const sectionIndex = sections.findIndex(s => s.sectionId === sectionId);
+
+    if (sectionIndex === -1) {
+      throw new Error(`Section ${sectionId} not found`);
+    }
+
+    // Update section
+    sections[sectionIndex] = {
+      ...sections[sectionIndex],
+      ...updates,
+      lastEditedAt: new Date().toISOString()
+    };
+
+    // If section is being completed, unlock next section
+    if (updates.status === 'completed' && !sections[sectionIndex].completedAt) {
+      sections[sectionIndex].completedAt = new Date().toISOString();
+
+      // Unlock next section
+      if (sectionIndex + 1 < sections.length) {
+        sections[sectionIndex + 1].unlocked = true;
+      }
+    }
+
+    // Recalculate module progress
+    const completedSections = sections.filter(s => s.status === 'completed').length;
+    const progressPercentage = Math.round((completedSections / sections.length) * 100);
+
+    modules[moduleIndex].sections = sections;
+    modules[moduleIndex].completedSections = completedSections;
+    modules[moduleIndex].progressPercentage = progressPercentage;
+
+    // Update module status
+    if (completedSections === 0) {
+      modules[moduleIndex].status = 'not_started';
+    } else if (completedSections === sections.length) {
+      modules[moduleIndex].status = 'completed';
+      modules[moduleIndex].completedAt = new Date().toISOString();
+    } else {
+      modules[moduleIndex].status = 'in-progress';
+      if (!modules[moduleIndex].startedAt) {
+        modules[moduleIndex].startedAt = new Date().toISOString();
+      }
+    }
+
+    // Update overall progress
+    const totalSections = modules.reduce((sum, m) => sum + m.totalSections, 0);
+    const totalCompleted = modules.reduce((sum, m) => sum + m.completedSections, 0);
+    const overallProgress = totalSections > 0 ? Math.round((totalCompleted / totalSections) * 100) : 0;
+
+    // Update milestones
+    const progressTracking = updateMilestones(dashboardData.progressTracking, modules, overallProgress);
+
+    // Save to Firestore
+    await updateDoc(dashboardRef, {
+      modules,
+      'progressTracking.overallProgress': overallProgress,
+      'progressTracking.moduleProgress': {
+        recon: modules.find(m => m.id === 'recon')?.progressPercentage || 0,
+        scout: modules.find(m => m.id === 'scout')?.progressPercentage || 0,
+        sniper: modules.find(m => m.id === 'sniper')?.progressPercentage || 0
+      },
+      'progressTracking.milestones': progressTracking.milestones,
+      lastUpdatedAt: new Date().toISOString()
+    });
+
+    console.log('✅ Section updated successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Error updating section:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update milestones based on progress
+ */
+function updateMilestones(progressTracking, modules, overallProgress) {
+  const milestones = [...progressTracking.milestones];
+  const reconModule = modules.find(m => m.id === 'recon');
+
+  // RECON Started
+  const reconStartedIndex = milestones.findIndex(m => m.id === 'recon-started');
+  if (reconStartedIndex !== -1 && !milestones[reconStartedIndex].achieved && reconModule?.startedAt) {
+    milestones[reconStartedIndex].achieved = true;
+    milestones[reconStartedIndex].achievedAt = reconModule.startedAt;
+  }
+
+  // RECON 50% Complete
+  const recon50Index = milestones.findIndex(m => m.id === 'recon-50-percent');
+  if (recon50Index !== -1 && !milestones[recon50Index].achieved && reconModule?.progressPercentage >= 50) {
+    milestones[recon50Index].achieved = true;
+    milestones[recon50Index].achievedAt = new Date().toISOString();
+  }
+
+  // RECON Completed
+  const reconCompletedIndex = milestones.findIndex(m => m.id === 'recon-completed');
+  if (reconCompletedIndex !== -1 && !milestones[reconCompletedIndex].achieved && reconModule?.status === 'completed') {
+    milestones[reconCompletedIndex].achieved = true;
+    milestones[reconCompletedIndex].achievedAt = reconModule.completedAt;
+  }
+
+  return { ...progressTracking, milestones };
+}
+
+/**
+ * Save section data
+ */
+export async function saveSectionData(userId, moduleId, sectionId, data) {
+  try {
+    const dashboardRef = doc(db, 'dashboards', userId);
+    const dashboardDoc = await getDoc(dashboardRef);
+
+    if (!dashboardDoc.exists()) {
+      throw new Error('Dashboard not found');
+    }
+
+    const dashboardData = dashboardDoc.data();
+    const modules = [...dashboardData.modules];
+    const moduleIndex = modules.findIndex(m => m.id === moduleId);
+    const sectionIndex = modules[moduleIndex].sections.findIndex(s => s.sectionId === sectionId);
+
+    // Update section data
+    modules[moduleIndex].sections[sectionIndex].data = data;
+    modules[moduleIndex].sections[sectionIndex].lastEditedAt = new Date().toISOString();
+    modules[moduleIndex].sections[sectionIndex].version += 1;
+
+    // Save to Firestore
+    await updateDoc(dashboardRef, {
+      modules,
+      lastUpdatedAt: new Date().toISOString()
+    });
+
+    console.log('✅ Section data saved');
+    return true;
+  } catch (error) {
+    console.error('❌ Error saving section data:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get current dashboard state
+ */
+export async function getDashboardState(userId) {
+  try {
+    const dashboardRef = doc(db, 'dashboards', userId);
+    const dashboardDoc = await getDoc(dashboardRef);
+
+    if (!dashboardDoc.exists()) {
+      return null;
+    }
+
+    return dashboardDoc.data();
+  } catch (error) {
+    console.error('❌ Error getting dashboard state:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get specific section data
+ */
+export async function getSectionData(userId, moduleId, sectionId) {
+  try {
+    const dashboardState = await getDashboardState(userId);
+    if (!dashboardState) return null;
+
+    const module = dashboardState.modules.find(m => m.id === moduleId);
+    if (!module) return null;
+
+    const section = module.sections.find(s => s.sectionId === sectionId);
+    return section;
+  } catch (error) {
+    console.error('❌ Error getting section data:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark section as in-progress
+ */
+export async function startSection(userId, moduleId, sectionId) {
+  return updateSectionStatus(userId, moduleId, sectionId, {
+    status: 'in_progress',
+    startedAt: new Date().toISOString()
+  });
+}
+
+/**
+ * Mark section as completed
+ */
+export async function completeSection(userId, moduleId, sectionId, data = null) {
+  const updates = {
+    status: 'completed',
+    completedAt: new Date().toISOString()
+  };
+
+  if (data) {
+    updates.data = data;
+  }
+
+  return updateSectionStatus(userId, moduleId, sectionId, updates);
+}
+
+/**
+ * Add edit to section history
+ */
+export async function addEditHistory(userId, moduleId, sectionId, field, previousValue, newValue) {
+  try {
+    const dashboardRef = doc(db, 'dashboards', userId);
+    const dashboardDoc = await getDoc(dashboardRef);
+
+    if (!dashboardDoc.exists()) {
+      throw new Error('Dashboard not found');
+    }
+
+    const dashboardData = dashboardDoc.data();
+    const modules = [...dashboardData.modules];
+    const moduleIndex = modules.findIndex(m => m.id === moduleId);
+    const sectionIndex = modules[moduleIndex].sections.findIndex(s => s.sectionId === sectionId);
+
+    const editEntry = {
+      editedAt: new Date().toISOString(),
+      field,
+      previousValue,
+      newValue,
+      editedBy: 'user'
+    };
+
+    if (!modules[moduleIndex].sections[sectionIndex].metadata.editHistory) {
+      modules[moduleIndex].sections[sectionIndex].metadata.editHistory = [];
+    }
+
+    modules[moduleIndex].sections[sectionIndex].metadata.editHistory.push(editEntry);
+
+    await updateDoc(dashboardRef, {
+      modules,
+      lastUpdatedAt: new Date().toISOString()
+    });
+
+    console.log('✅ Edit history updated');
+    return true;
+  } catch (error) {
+    console.error('❌ Error adding edit history:', error);
+    throw error;
+  }
+}

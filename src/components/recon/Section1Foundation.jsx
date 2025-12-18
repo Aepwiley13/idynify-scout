@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 
@@ -8,7 +9,7 @@ const SECTION_1_QUESTIONS = [
     question: "Company name",
     type: "text",
     required: true,
-    validation: { minLength: 2, maxLength: 100 }
+    validation: { minLength: 2, maxLength: 500 }
   },
   {
     id: "whatYouDo",
@@ -16,7 +17,7 @@ const SECTION_1_QUESTIONS = [
     helpText: "In plain English, what does your company do? (Imagine explaining to a friend)",
     type: "textarea",
     required: true,
-    validation: { minLength: 50, maxLength: 300 }
+    validation: { minLength: 50, maxLength: 500 }
   },
   {
     id: "industry",
@@ -52,16 +53,9 @@ const SECTION_1_QUESTIONS = [
   {
     id: "role",
     question: "Your role/title",
-    type: "dropdown",
+    type: "text",
     required: true,
-    options: [
-      "Founder / CEO",
-      "VP of Sales / Revenue",
-      "Sales Director / Manager",
-      "Head of Marketing",
-      "Business Development",
-      "Other"
-    ]
+    validation: { minLength: 2, maxLength: 500 }
   },
   {
     id: "mainProduct",
@@ -69,7 +63,7 @@ const SECTION_1_QUESTIONS = [
     helpText: "What is the ONE thing you sell that generates the most revenue?",
     type: "textarea",
     required: true,
-    validation: { minLength: 50, maxLength: 200 }
+    validation: { minLength: 50, maxLength: 500 }
   },
   {
     id: "problemSolved",
@@ -77,7 +71,7 @@ const SECTION_1_QUESTIONS = [
     helpText: "In your customers' words, what problem were they trying to solve when they found you?",
     type: "textarea",
     required: true,
-    validation: { minLength: 50, maxLength: 300 }
+    validation: { minLength: 50, maxLength: 500 }
   },
   {
     id: "currentCustomers",
@@ -85,33 +79,33 @@ const SECTION_1_QUESTIONS = [
     helpText: "Describe your current customers. What do they have in common?",
     type: "textarea",
     required: true,
-    validation: { minLength: 100, maxLength: 400 }
+    validation: { minLength: 100, maxLength: 500 }
   },
   {
     id: "ninetyDayGoal",
     question: "What's your 90-day goal?",
     type: "textarea",
     required: false,
-    validation: { maxLength: 300 }
+    validation: { maxLength: 500 }
   },
   {
     id: "biggestChallenge",
     question: "What's your biggest sales challenge right now?",
     type: "textarea",
     required: false,
-    validation: { maxLength: 300 }
+    validation: { maxLength: 500 }
   }
 ];
 
 export default function Section1Foundation({ initialData = {}, onSave, onComplete }) {
+  const navigate = useNavigate();
   const [answers, setAnswers] = useState({});
   const [output, setOutput] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [showOutput, setShowOutput] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
-  const autoSaveTimerRef = useRef(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Initialize answers from initialData or section1Answers from Firestore
   useEffect(() => {
@@ -145,25 +139,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     loadSavedData();
   }, [initialData]);
 
-  // Auto-save every 30 seconds
-  useEffect(() => {
-    autoSaveTimerRef.current = setInterval(() => {
-      if (Object.keys(answers).length > 0) {
-        handleAutoSave();
-      }
-    }, 30000); // 30 seconds
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearInterval(autoSaveTimerRef.current);
-      }
-    };
-  }, [answers]);
-
-  const handleAutoSave = async () => {
+  const handleManualSave = async () => {
     try {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) {
+        alert('❌ You must be logged in to save');
+        return;
+      }
 
       setSaving(true);
 
@@ -172,14 +154,18 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         'section1Answers.lastSaved': new Date()
       });
 
-      setLastSaved(new Date());
+      setHasUnsavedChanges(false);
 
       // Call parent onSave if provided
       if (onSave) {
         await onSave(answers);
       }
+
+      // Silent save - no popup
+      console.log('✅ Progress saved');
     } catch (error) {
-      console.error('Auto-save error:', error);
+      console.error('Save error:', error);
+      alert('❌ Failed to save progress. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -229,6 +215,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
       [questionId]: value
     }));
 
+    setHasUnsavedChanges(true);
+
     // Clear error for this field
     if (errors[questionId]) {
       setErrors(prev => {
@@ -258,6 +246,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         throw new Error('User not authenticated');
       }
 
+      console.log('🚀 Calling generate-section-1 function...');
+
       // Call Netlify function
       const response = await fetch('/.netlify/functions/generate-section-1', {
         method: 'POST',
@@ -270,31 +260,49 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         })
       });
 
+      console.log('📡 Response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Generation failed');
+        // Try to parse error response
+        let errorMessage = 'Generation failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error('❌ Error response:', errorData);
+        } catch (parseError) {
+          console.error('❌ Could not parse error response');
+        }
+
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('✅ Response data:', data);
 
       if (data.success) {
         setOutput(data.output);
         setShowOutput(true);
 
-        // Save output to Firestore
-        await updateDoc(doc(db, 'users', user.uid), {
-          section1Output: data.output,
-          'reconProgress.currentSection': 1,
-          'reconProgress.lastUpdated': new Date()
-        });
+        // Save output to Firestore (client-side backup)
+        try {
+          await updateDoc(doc(db, 'users', user.uid), {
+            section1Output: data.output,
+            'reconProgress.currentSection': 1,
+            'reconProgress.section1Completed': true,
+            'reconProgress.lastUpdated': new Date()
+          });
+          console.log('💾 Saved to Firestore (client-side)');
+        } catch (firestoreError) {
+          console.warn('⚠️  Firestore save failed:', firestoreError);
+        }
 
         alert('✅ Executive Summary generated successfully!');
       } else {
         throw new Error(data.error || 'Unknown error');
       }
     } catch (error) {
-      console.error('Generation error:', error);
-      alert(`❌ Generation failed: ${error.message}`);
+      console.error('💥 Generation error:', error);
+      alert(`❌ Generation failed: ${error.message}\n\nPlease check:\n1. Are you connected to the internet?\n2. Try refreshing the page\n3. Contact support if issue persists`);
     } finally {
       setGenerating(false);
     }
@@ -302,6 +310,14 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
   const handleEditAnswers = () => {
     setShowOutput(false);
+  };
+
+  const handleNextSection = () => {
+    navigate('/mission-control-v2/recon/section/2');
+  };
+
+  const handleMissionControl = () => {
+    navigate('/mission-control-v2');
   };
 
   const renderQuestion = (question, index) => {
@@ -517,12 +533,28 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
           </div>
         )}
 
-        {/* Edit Button */}
+        {/* Navigation Buttons */}
+        <div className="flex gap-4">
+          <button
+            onClick={handleEditAnswers}
+            className="flex-1 bg-gray-700/50 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono border border-gray-500/30"
+          >
+            ✏️ EDIT ANSWERS
+          </button>
+          <button
+            onClick={handleNextSection}
+            className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono shadow-lg shadow-cyan-500/50"
+          >
+            NEXT SECTION →
+          </button>
+        </div>
+
+        {/* Mission Control Button */}
         <button
-          onClick={handleEditAnswers}
-          className="w-full bg-gray-700/50 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono border border-gray-500/30"
+          onClick={handleMissionControl}
+          className="w-full bg-purple-700/50 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl transition-all font-mono border border-purple-500/30"
         >
-          ✏️ EDIT ANSWERS & RE-GENERATE
+          🏠 RETURN TO MISSION CONTROL
         </button>
       </div>
     );
@@ -554,27 +586,30 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
   return (
     <div className="space-y-6">
-      {/* Progress Indicator */}
-      <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold text-white font-mono">📋 PROGRESS</h3>
-          <span className="text-cyan-400 font-mono font-bold">{completedCount}/{totalQuestions}</span>
+      {/* Progress & Mission Control Button */}
+      <div className="flex gap-4">
+        <div className="flex-1 bg-gradient-to-br from-cyan-900/20 to-blue-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-white font-mono">📋 PROGRESS</h3>
+            <span className="text-cyan-400 font-mono font-bold">{completedCount}/{totalQuestions}</span>
+          </div>
+          <div className="w-full bg-black/40 rounded-full h-3 overflow-hidden border border-cyan-500/30">
+            <div
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500"
+              style={{ width: `${(completedCount / totalQuestions) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 font-mono mt-2">
+            Required fields: {requiredCompleted}/{requiredQuestions.length}
+          </p>
         </div>
-        <div className="w-full bg-black/40 rounded-full h-3 overflow-hidden border border-cyan-500/30">
-          <div
-            className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500"
-            style={{ width: `${(completedCount / totalQuestions) * 100}%` }}
-          />
-        </div>
-        <p className="text-xs text-gray-500 font-mono mt-2">
-          Required fields: {requiredCompleted}/{requiredQuestions.length}
-          {saving && <span className="ml-2 text-cyan-400">💾 Saving...</span>}
-          {lastSaved && !saving && (
-            <span className="ml-2 text-green-400">
-              ✅ Last saved: {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
-        </p>
+
+        <button
+          onClick={handleMissionControl}
+          className="bg-purple-700/50 hover:bg-purple-700 text-white font-bold px-8 rounded-2xl transition-all font-mono border border-purple-500/30 whitespace-nowrap"
+        >
+          🏠 MISSION CONTROL
+        </button>
       </div>
 
       {/* Questions */}
@@ -586,8 +621,31 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         {SECTION_1_QUESTIONS.map((question, index) => renderQuestion(question, index))}
       </div>
 
-      {/* Generate Button */}
-      <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
+      {/* Action Buttons */}
+      <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30 space-y-4">
+        {/* Save Button */}
+        <button
+          onClick={handleManualSave}
+          disabled={saving || !hasUnsavedChanges}
+          className={`w-full font-bold py-4 px-6 rounded-xl transition-all font-mono ${
+            hasUnsavedChanges && !saving
+              ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-500'
+              : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border border-gray-700/30'
+          }`}
+        >
+          {saving ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin">⚙️</span>
+              SAVING...
+            </span>
+          ) : hasUnsavedChanges ? (
+            '💾 SAVE PROGRESS'
+          ) : (
+            '✅ ALL CHANGES SAVED'
+          )}
+        </button>
+
+        {/* Generate Button */}
         <button
           onClick={handleGenerate}
           disabled={!canGenerate || generating}
@@ -610,13 +668,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </button>
 
         {!canGenerate && (
-          <p className="text-xs text-gray-500 font-mono mt-4 text-center">
+          <p className="text-xs text-gray-500 font-mono text-center">
             Please complete all required fields (*) before generating
           </p>
         )}
 
         {canGenerate && !generating && (
-          <p className="text-xs text-gray-400 font-mono mt-4 text-center">
+          <p className="text-xs text-gray-400 font-mono text-center">
             This will analyze your answers and generate your ICP foundation insights
           </p>
         )}

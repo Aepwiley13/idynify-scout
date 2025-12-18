@@ -39,10 +39,11 @@ export default function Signup() {
         email: email,
         createdAt: new Date(),
         tier: 'scout',
-        status: 'active'
+        status: 'active',
+        hasCompletedPayment: false // Will be set to true after checkout
       });
 
-      navigate('/scout-questionnaire');
+      navigate('/checkout'); // ✅ NEW FLOW: Go to payment after signup
     } catch (error) {
       setError(error.message);
     }

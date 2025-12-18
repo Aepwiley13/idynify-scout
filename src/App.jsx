@@ -5,8 +5,12 @@ import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 
 // Pages
+import Homepage from './pages/Homepage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import CheckoutPage from './pages/CheckoutPage';
+import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
+import CheckoutCancelPage from './pages/CheckoutCancelPage';
 import MissionControlDashboard from './pages/MissionControlDashboard';
 import MissionControlDashboardV2 from './pages/MissionControlDashboardV2';
 import RECONModulePage from './pages/RECONModulePage';
@@ -91,7 +95,7 @@ function App() {
     return children;
   };
 
-  // Smart redirect after login
+  // Smart redirect after login - NEW FLOW
   const SmartRedirect = () => {
     if (loading) {
       return (
@@ -105,33 +109,14 @@ function App() {
       return <Navigate to="/login" />;
     }
 
-    // If user has leads, go to mission control dashboard
-    if (userData?.leads && userData.leads.length > 0) {
-      return <Navigate to="/mission-control" />;
+    // ✅ NEW FLOW: Check payment status first
+    if (!userData?.hasCompletedPayment) {
+      // User hasn't paid yet - send to checkout
+      return <Navigate to="/checkout" />;
     }
 
-    // If user has completed Scout questionnaire and has ICP brief, go to mission control
-    if (userData?.scoutCompleted && userData?.icpBrief) {
-      return <Navigate to="/mission-control" />;
-    }
-
-    // If user has ICP brief but hasn't approved it, go to ICP validation
-    if (userData?.icpBrief && !userData?.icpApproved) {
-      return <Navigate to="/icp-validation" />;
-    }
-
-    // If user has scoutData but no ICP brief, go to ICP validation
-    if (userData?.scoutData && !userData?.icpBrief) {
-      return <Navigate to="/icp-validation" />;
-    }
-
-    // If user has partial scoutData, go back to scout questionnaire
-    if (userData?.scoutData) {
-      return <Navigate to="/scout-questionnaire" />;
-    }
-
-    // New users go to Scout questionnaire
-    return <Navigate to="/scout-questionnaire" />;
+    // ✅ If user has paid, always go to Mission Control V2
+    return <Navigate to="/mission-control-v2" />;
   };
 
   if (loading) {
@@ -146,26 +131,18 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
-        <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/" />} />
+        <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
+        <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
 
-        {/* Protected Routes - New Scout Flow */}
-        <Route
-          path="/scout-questionnaire"
-          element={
-            <ProtectedRoute>
-              <ImprovedScoutQuestionnaire />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/icp-validation"
-          element={
-            <ProtectedRoute>
-              <ICPValidationPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Payment Routes */}
+        <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancelPage /></ProtectedRoute>} />
+
+        {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
+        <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />
+        <Route path="/icp-validation" element={<Navigate to="/mission-control-v2" />} />
         <Route
           path="/launch-sequence"
           element={
@@ -241,23 +218,9 @@ function App() {
           }
         />
 
-        {/* Protected Routes - Mission Control Dashboard (OLD SYSTEM) */}
-        <Route
-          path="/mission-control"
-          element={
-            <ProtectedRoute>
-              <MissionControlDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <MissionControlDashboard />
-            </ProtectedRoute>
-          }
-        />
+        {/* Protected Routes - OLD DASHBOARD REDIRECTS (Use V2 by default) */}
+        <Route path="/mission-control" element={<Navigate to="/mission-control-v2" />} />
+        <Route path="/dashboard" element={<Navigate to="/mission-control-v2" />} />
 
         {/* Protected Routes - MVP Routes (Module 1) */}
         <Route
@@ -334,9 +297,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* Default Route - Smart Redirect */}
-        <Route path="/" element={<SmartRedirect />} />
 
         {/* 404 */}
         <Route path="*" element={<Navigate to="/" />} />

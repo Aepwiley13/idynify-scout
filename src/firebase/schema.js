@@ -143,3 +143,80 @@ export const getPath = {
  *   lastUpdated: Timestamp
  * }
  */
+
+// ============================================================================
+// SECTION 2: PRODUCT/SERVICE DEEP DIVE - Schema Documentation
+// ============================================================================
+
+/**
+ * section2Answers
+ * Stores user's raw answers to Section 2 questionnaire
+ *
+ * Schema:
+ * {
+ *   productName: string,
+ *   category: string,
+ *   coreFeatures: string[],
+ *   differentiation: string,
+ *   useCases: string[],
+ *   implementationTime: string,
+ *   supportLevel: string,
+ *   pricingModel: string,
+ *   startingPrice: string,
+ *   techStack: string,
+ *   integrations: string[],
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section2Output
+ * Stores the generated output for Section 2
+ *
+ * Schema:
+ * {
+ *   section: 2,
+ *   title: "Product/Service Deep Dive",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: {
+ *     productOverview: {
+ *       name: string,
+ *       category: string,
+ *       description: string
+ *     },
+ *     valueAnalysis: {
+ *       coreCapabilities: string[],
+ *       uniqueDifferentiators: string[],
+ *       competitiveAdvantages: string[]
+ *     },
+ *     targetUseCases: {
+ *       primary: string[],
+ *       secondary: string[]
+ *     },
+ *     technicalProfile: {
+ *       stack: string,
+ *       integrations: string[],
+ *       implementationTime: string,
+ *       supportModel: string
+ *     },
+ *     pricingIntelligence: {
+ *       model: string,
+ *       startingPrice: string,
+ *       valueMetric: string,
+ *       pricePositioning: string
+ *     },
+ *     icpAlignment: string,
+ *     strategicRecommendations: string[]
+ *   },
+ *   rawAnswers: object,
+ *   metadata: {
+ *     generationTime: number,
+ *     model: string,
+ *     tokensUsed: number,
+ *     editHistory: any[]
+ *   },
+ *   generatedAt: Timestamp
+ * }
+ */

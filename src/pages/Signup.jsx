@@ -232,9 +232,12 @@ export default function Signup() {
   </p>
   <p className="text-gray-400 text-sm mt-4">
     Already have an account?{' '}
-    <a href="/login" className="text-cyan-400 hover:text-cyan-300 font-bold underline">
+    <button
+      onClick={() => navigate('/login')}
+      className="text-cyan-400 hover:text-cyan-300 font-bold underline bg-transparent border-0 cursor-pointer"
+    >
       Login here →
-    </a>
+    </button>
   </p>
 </div>
           </div>

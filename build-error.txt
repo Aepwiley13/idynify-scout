@@ -1,0 +1,26 @@
+
+> idynify-scout@0.0.0 build
+> vite build
+
+vite v7.2.4 building client environment for production...
+transforming...
+✓ 54 modules transformed.
+✗ Build failed in 1.80s
+error during build:
+[vite:json] [plugin vite:json] src/schemas/dashboardSchema.json (610:0): Failed to parse JSON file, invalid JSON syntax found at position 17718
+file: /Users/mac/Desktop/idynify-scout-deploy/src/schemas/dashboardSchema.json:610:0
+
+608:     }
+609:   }
+610: }{
+     ^
+611:   "dashboard": {
+612:     "version": "1.0.0",
+
+    at getRollupError (file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at error (file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+    at Object.error (file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/rollup/dist/es/shared/node-entry.js:22129:20)
+    at Object.error (file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/rollup/dist/es/shared/node-entry.js:21186:42)
+    at Object.handler (file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/vite/dist/node/chunks/config.js:9125:11)
+    at Object.handler (file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/vite/dist/node/chunks/config.js:34378:13)
+    at file:///Users/mac/Desktop/idynify-scout-deploy/node_modules/rollup/dist/es/shared/node-entry.js:22451:40

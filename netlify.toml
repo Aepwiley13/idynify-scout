@@ -12,6 +12,9 @@
 [functions."generate-section-1"]
   timeout = 900
 
+[functions."generate-section-2"]
+  timeout = 900
+
 [functions."generate-leads"]
   timeout = 900
 

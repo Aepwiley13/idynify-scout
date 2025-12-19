@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { auth } from '../firebase/config';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../utils/dashboardUtils';
 import Section1Foundation from '../components/recon/Section1Foundation';
+import Section2ProductDeepDive from '../components/recon/Section2ProductDeepDive';
 
 export default function RECONSectionPage() {
   const navigate = useNavigate();
@@ -210,6 +211,12 @@ export default function RECONSectionPage() {
               onSave={handleSave}
               onComplete={handleComplete}
             />
+          ) : parseInt(sectionId) === 2 ? (
+            <Section2ProductDeepDive
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
           ) : (
             <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-8 border border-cyan-500/30">
               <h3 className="text-2xl font-bold text-white mb-6 font-mono">Section Content</h3>
@@ -267,8 +274,8 @@ export default function RECONSectionPage() {
           )}
         </section>
 
-        {/* Actions - Only show for non-Section1 */}
-        {parseInt(sectionId) !== 1 && (
+        {/* Actions - Only show for sections without custom UI (not Section 1 or 2) */}
+        {parseInt(sectionId) !== 1 && parseInt(sectionId) !== 2 && (
           <section>
             <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
               <div className="flex gap-4">

@@ -220,3 +220,282 @@ export const getPath = {
  *   generatedAt: Timestamp
  * }
  */
+
+// ============================================================================
+// SECTION 3: TARGET MARKET FIRMOGRAPHICS - Schema Documentation
+// ============================================================================
+
+/**
+ * section3Answers
+ * Stores user's raw answers to Section 3 questionnaire
+ *
+ * Schema:
+ * {
+ *   companySize: string[],
+ *   revenueRange: string[],
+ *   growthStage: string[],
+ *   geography: string[],
+ *   targetIndustries: string[],
+ *   avoidIndustries: string,
+ *   companyType: string,
+ *   budgetRange: string,
+ *   decisionSpeed: string,
+ *   technicalMaturity: string,
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section3Output
+ * Stores the generated firmographic profile for Section 3
+ *
+ * Schema:
+ * {
+ *   section: 3,
+ *   title: "Target Market Firmographics",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// SECTION 4: IDEAL CUSTOMER PSYCHOGRAPHICS - Schema Documentation
+// ============================================================================
+
+/**
+ * section4Answers
+ * Stores user's raw answers to Section 4 questionnaire
+ *
+ * Schema:
+ * {
+ *   nightFears: string,
+ *   goals: string,
+ *   values: string[],
+ *   commonPhrases: string,
+ *   emotionalState: string[],
+ *   decisionFears: string,
+ *   changeAttitude: string,
+ *   successMeasurement: string,
+ *   informationSources: string[],
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section4Output
+ * Stores the generated psychographic profile for Section 4
+ *
+ * Schema:
+ * {
+ *   section: 4,
+ *   title: "Ideal Customer Psychographics",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// SECTION 5: PAIN POINTS & MOTIVATIONS - Schema Documentation
+// ============================================================================
+
+/**
+ * section5Answers
+ * Stores user's raw answers to Section 5 questionnaire
+ *
+ * Schema:
+ * {
+ *   primaryPainPoint: string,
+ *   painImpact: string,
+ *   currentSolution: string,
+ *   solutionShortcomings: string,
+ *   desiredOutcome: string,
+ *   urgencyLevel: string,
+ *   consequenceInaction: string,
+ *   motivatingFactors: string[],
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section5Output
+ * Stores the generated pain points analysis for Section 5
+ *
+ * Schema:
+ * {
+ *   section: 5,
+ *   title: "Pain Points & Motivations",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// SECTION 6: BUYING BEHAVIOR & TRIGGERS - Schema Documentation
+// ============================================================================
+
+/**
+ * section6Answers
+ * Stores user's raw answers to Section 6 questionnaire
+ *
+ * Schema:
+ * {
+ *   buyingTriggers: string[],
+ *   researchProcess: string,
+ *   evaluationCriteria: string[],
+ *   contentPreferences: string[],
+ *   objections: string,
+ *   competitorConsideration: string,
+ *   winningFactors: string,
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section6Output
+ * Stores the generated buying behavior analysis for Section 6
+ *
+ * Schema:
+ * {
+ *   section: 6,
+ *   title: "Buying Behavior & Triggers",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// SECTION 7: DECISION PROCESS - Schema Documentation
+// ============================================================================
+
+/**
+ * section7Answers
+ * Stores user's raw answers to Section 7 questionnaire
+ *
+ * Schema:
+ * {
+ *   decisionMaker: string,
+ *   influencers: string[],
+ *   decisionCriteria: string[],
+ *   approvalProcess: string,
+ *   typicalTimeline: string,
+ *   budgetCycle: string,
+ *   stakeholderConcerns: string,
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section7Output
+ * Stores the generated decision process analysis for Section 7
+ *
+ * Schema:
+ * {
+ *   section: 7,
+ *   title: "Decision Process",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// SECTION 8: COMPETITIVE LANDSCAPE - Schema Documentation
+// ============================================================================
+
+/**
+ * section8Answers
+ * Stores user's raw answers to Section 8 questionnaire
+ *
+ * Schema:
+ * {
+ *   mainCompetitors: string[],
+ *   competitorStrengths: string,
+ *   yourAdvantages: string,
+ *   alternativeSolutions: string,
+ *   marketPosition: string,
+ *   switchingBarriers: string,
+ *   competitiveThreats: string,
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section8Output
+ * Stores the generated competitive analysis for Section 8
+ *
+ * Schema:
+ * {
+ *   section: 8,
+ *   title: "Competitive Landscape",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// SECTION 9: MESSAGING & POSITIONING - Schema Documentation
+// ============================================================================
+
+/**
+ * section9Answers
+ * Stores user's raw answers to Section 9 questionnaire
+ *
+ * Schema:
+ * {
+ *   valueProposition: string,
+ *   keyMessages: string[],
+ *   differentiators: string,
+ *   brandVoice: string,
+ *   messagingPillars: string[],
+ *   customerTestimonials: string,
+ *   proofPoints: string[],
+ *   lastSaved: Timestamp
+ * }
+ */
+
+/**
+ * section9Output
+ * Stores the generated messaging framework for Section 9
+ *
+ * Schema:
+ * {
+ *   section: 9,
+ *   title: "Messaging & Positioning",
+ *   status: "completed",
+ *   completedAt: string (ISO timestamp),
+ *   version: 1,
+ *   analysis: object,
+ *   rawAnswers: object,
+ *   metadata: object,
+ *   generatedAt: Timestamp
+ * }
+ */

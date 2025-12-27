@@ -1,18 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,7 +12,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { answers, userId } = JSON.parse(event.body);
+    const { answers, userId, authToken } = JSON.parse(event.body);
 
     if (!answers) {
       throw new Error('Answers are required');
@@ -36,33 +22,64 @@ export const handler = async (event) => {
       throw new Error('User ID is required');
     }
 
-    console.log('🎯 Generating Section 2 Product Intelligence Brief for user:', userId);
+    if (!authToken) {
+      throw new Error('Authentication token is required');
+    }
 
-    // Validate required fields
-    const requiredFields = [
-      'productName', 
-      'category', 
-      'coreFeatures', 
-      'differentiation', 
-      'useCases', 
-      'implementationTime', 
-      'supportLevel', 
-      'pricingModel', 
-      'startingPrice', 
-      'techStack'
-    ];
-    
+    console.log('🎯 Generating Section 2 Product Deep Dive for user:', userId);
+
+    // Verify Firebase Auth token using REST API
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new Error('Firebase project ID not configured');
+    }
+
+    console.log('🔐 Verifying auth token...');
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
+      }
+    );
+
+    if (!verifyResponse.ok) {
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('❌ Firebase auth verification failed:', {
+        status: verifyResponse.status,
+        statusText: verifyResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Invalid authentication token: ${errorData.error?.message || verifyResponse.statusText}`);
+    }
+
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyData.users || verifyData.users.length === 0) {
+      console.error('❌ No user found in token verification response');
+      throw new Error('Authentication token verification failed: no user found');
+    }
+
+    const tokenUserId = verifyData.users[0].localId;
+
+    // Verify the token belongs to the claimed user
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified for user:', userId);
+
+    // Validate required fields for Section 2
+    const requiredFields = ['productName', 'category', 'coreFeatures', 'differentiation', 'pricingModel', 'startingPrice'];
     for (const field of requiredFields) {
-      if (!answers[field] || (typeof answers[field] === 'string' && answers[field].trim() === '')) {
+      if (!answers[field] || answers[field].trim() === '') {
         throw new Error(`Required field missing: ${field}`);
-      }
-      
-      // Special validation for arrays
-      if (field === 'coreFeatures' && (!Array.isArray(answers[field]) || answers[field].filter(f => f && f.trim()).length === 0)) {
-        throw new Error('At least one core feature is required');
-      }
-      if (field === 'useCases' && (!Array.isArray(answers[field]) || answers[field].length < 2)) {
-        throw new Error('At least 2 use cases are required');
       }
     }
 
@@ -70,78 +87,54 @@ export const handler = async (event) => {
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const prompt = `You are generating the Product Intelligence Brief for Section 2 of a RECON ICP intelligence system.
+    const prompt = `You are generating the Product Analysis for Section 2 of a RECON ICP intelligence system.
 
-SECTION 2: PRODUCT/SERVICE DEEP DIVE
+SECTION 2: PRODUCT DEEP DIVE
 
-User's answers:
+User's product/service details:
 ${JSON.stringify(answers, null, 2)}
 
-Generate the Product Intelligence Brief output following this EXACT JSON schema:
+Generate the Product Analysis output following this EXACT JSON schema:
 {
   "section": 2,
-  "title": "Product/Service Deep Dive",
+  "title": "Product Deep Dive",
   "status": "completed",
   "completedAt": "${new Date().toISOString()}",
   "version": 1,
-  "productIntelligence": {
-    "productProfile": {
-      "name": "string (from productName)",
-      "category": "string (from category)",
-      "coreFeatures": [
-        "string (feature 1 from coreFeatures array)",
-        "string (feature 2)",
-        "string (feature 3)",
-        "string (feature 4)",
-        "string (feature 5)"
-      ],
-      "featurePriority": "string (analyze which features matter most to customers and why)"
+  "executiveSummary": {
+    "productSnapshot": {
+      "name": "string (productName)",
+      "category": "string (category)",
+      "positioning": "string (1-2 sentences describing what it does and who it's for)"
     },
-    "differentiation": {
-      "uniqueValue": "string (what makes it different - extract key point from differentiation)",
-      "competitiveAdvantage": "string (why it's defensible - analyze their differentiation)",
-      "positioning": "string (premium/value/niche based on pricing and features)"
-    },
-    "useCaseMap": {
-      "primaryUseCases": [
-        "string (use case 1 from useCases array)",
-        "string (use case 2)",
-        "string (use case 3 - if provided)",
-        "string (use case 4 - if provided)"
-      ],
-      "customerApplications": "string (describe HOW customers actually use it in practice based on use cases)"
+    "coreValue": {
+      "topFeatures": ["array of 3-5 most compelling features from coreFeatures"],
+      "differentiation": "string (what makes it unique - from differentiation field)",
+      "primaryUseCases": ["array from useCases field"]
     },
     "implementationProfile": {
       "timeToValue": "string (from implementationTime)",
-      "supportLevel": "string (from supportLevel)",
-      "complexity": "string (derive: instant/< 1 week = simple, 1-4 weeks = moderate, 1-3 months = complex, 3+ months = very complex)",
-      "onboardingRequirements": "string (based on implementationTime + supportLevel, describe what customer needs)"
+      "supportNeeded": "string (from supportLevel)",
+      "buyerImplication": "string (what this means for who buys it - quick = self-serve, long = executive buy-in needed)"
     },
-    "pricingStructure": {
+    "pricingStrategy": {
       "model": "string (from pricingModel)",
-      "entryPoint": "string (from startingPrice)",
-      "positioning": "string (derive: <$200/mo = budget, $200-$1000 = value, >$1000 = premium)",
-      "implication": "string (what this pricing means for ICP - who can afford it, who it filters out)"
+      "startingPrice": "string (from startingPrice)",
+      "marketPosition": "string (analyze if this is enterprise, mid-market, or SMB pricing)"
     },
-    "technicalFit": {
-      "typicalTechStack": "string (from techStack)",
-      "requiredIntegrations": [
-        "string (integration 1 from integrations array if provided)",
-        "string (integration 2 - if provided)",
-        "string (integration 3 - if provided)",
-        "string (integration 4 - if provided)",
-        "string (integration 5 - if provided)"
-      ],
-      "technicalBarriers": "string (infer potential friction points based on techStack + integrations)"
+    "techStackFit": {
+      "idealEnvironment": "string (from techStack - what tools do ideal customers use)",
+      "criticalIntegrations": ["array from integrations if provided"],
+      "buyerSignal": "string (What does their tech stack tell you about ICP? e.g., 'Salesforce users = enterprise focus')"
     },
-    "sweetSpotCustomer": {
-      "description": "string (synthesize: who gets maximum value based on all answers)",
-      "characteristics": [
-        "string (characteristic 1 - be specific)",
-        "string (characteristic 2 - be specific)",
-        "string (characteristic 3 - be specific)"
-      ]
-    }
+    "icpImplications": [
+      "string (3-5 insights about WHO will buy based on product attributes)",
+      "string (e.g., 'High implementation time + enterprise pricing = targets IT/RevOps leaders, not individual contributors')",
+      "string (e.g., 'Self-serve model + low price = targets doers/practitioners, not C-suite')",
+      "string (e.g., 'Salesforce integration required = only companies with $1M+ revenue')",
+      "string (Connect product features to buyer persona and company profile)"
+    ],
+    "keyInsight": "string (ONE actionable insight: What does this product reveal about your ICP's needs, budget, and buying process?)"
   },
   "rawAnswers": ${JSON.stringify(answers, null, 2)},
   "metadata": {
@@ -153,42 +146,11 @@ Generate the Product Intelligence Brief output following this EXACT JSON schema:
 }
 
 CRITICAL INSTRUCTIONS:
-1. Use the customer's EXACT feature descriptions from coreFeatures - don't rewrite them
-2. Be SPECIFIC in featurePriority - explain which features drive purchase decisions
-3. For differentiation.uniqueValue, extract the CORE differentiator from their answer
-4. For differentiation.competitiveAdvantage, analyze WHY it's defensible (moat, IP, data, network effects)
-5. Derive positioning based on pricing: <$200 = budget, $200-$1000 = value, >$1000 = premium
-6. For pricingStructure.implication, be specific about WHO this price attracts/repels
-7. In technicalBarriers, identify REAL friction points (API access, admin permissions, domain setup, etc.)
-8. sweetSpotCustomer.description should synthesize ALL answers into a clear profile
-9. sweetSpotCustomer.characteristics must be SPECIFIC and OBSERVABLE (company size, revenue, tech maturity)
-10. If integrations array is empty or all blank, set requiredIntegrations to empty array []
-
-EXAMPLE GOOD OUTPUT:
-{
-  "productProfile": {
-    "featurePriority": "Customers prioritize the AI personalization engine and multi-channel orchestration above all else. Lead sourcing is table stakes, but the quality of AI-generated messages is what drives their results. Analytics are important for optimization but not a primary decision factor."
-  },
-  "differentiation": {
-    "uniqueValue": "Only platform combining lead sourcing, AI personalization, and multi-channel execution in one place",
-    "competitiveAdvantage": "AI trained on 10M+ successful B2B sales emails (proprietary dataset), not generic GPT prompts. This creates a data moat that improves with scale.",
-    "positioning": "Value premium - between budget tools and enterprise platforms"
-  },
-  "pricingStructure": {
-    "implication": "Pricing attracts Series A-B SaaS and bootstrapped profitable companies ($1M+ revenue). Too expensive for pre-revenue startups, too cheap for enterprises. Naturally filters ICP to growth-stage companies with 10-100 employees."
-  },
-  "technicalBarriers": "Email deliverability requires SPF/DKIM/DMARC setup. CRM API access needs admin permissions which can delay setup. LinkedIn rate limits if using other automation tools. Domain reputation issues require new sending domain.",
-  "sweetSpotCustomer": {
-    "description": "B2B SaaS companies with 10-100 employees, $1M-$10M revenue, selling products priced $5K-$50K annually. Small sales team (1-5 reps) doing high-volume outbound. Tried basic tools but need better personalization.",
-    "characteristics": [
-      "Series A or bootstrapped profitable with sales team growing rapidly",
-      "Using Salesforce or HubSpot and comfortable with CRM integrations",
-      "Sending 500-2000 outbound emails per week with low response rates (<2%)",
-      "Budget for tools ($500-$1K/mo) but not enterprise pricing ($3K+/mo)",
-      "Technical enough for email authentication but want setup help"
-    ]
-  }
-}
+1. Analyze what the PRODUCT reveals about the IDEAL CUSTOMER
+2. Implementation time + pricing + support level = buyer persona clues
+3. Tech stack = company size/sophistication signals
+4. Be SPECIFIC about implications (not "various companies" but "Series A SaaS companies with 20-100 employees")
+5. Key Insight should connect product attributes to WHO can actually buy and use it successfully
 
 Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.`;
 
@@ -222,7 +184,7 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     }
 
     // Validate schema
-    if (!output.productIntelligence || !output.rawAnswers) {
+    if (!output.executiveSummary || !output.rawAnswers) {
       throw new Error('Invalid output schema - missing required fields');
     }
 
@@ -239,18 +201,8 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
 
-    // Save to Firestore
-    try {
-      await db.collection('users').doc(userId).update({
-        section2Output: output,
-        'reconProgress.section2Completed': true,
-        'reconProgress.lastUpdated': admin.firestore.FieldValue.serverTimestamp()
-      });
-      console.log('💾 Saved to Firestore');
-    } catch (firestoreError) {
-      console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
-      // Don't fail the entire request if Firestore save fails
-    }
+    // Note: Client will save to Firestore using its authenticated session
+    console.log('💡 Returning output to client for Firestore save');
 
     return {
       statusCode: 200,

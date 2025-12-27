@@ -61,30 +61,43 @@ export default function RECONSectionPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (data) => {
     try {
       const user = auth.currentUser;
       if (!user) return;
 
-      await saveSectionData(user.uid, 'recon', parseInt(sectionId), formData);
-      alert('✅ Progress saved!');
+      // Use data parameter if provided, otherwise use formData state
+      const dataToSave = data || formData;
+
+      await saveSectionData(user.uid, 'recon', parseInt(sectionId), dataToSave);
+
+      // Update local state if data was passed in
+      if (data) {
+        setFormData(data);
+      }
+
+      console.log('✅ Progress saved!');
     } catch (error) {
       console.error('❌ Error saving:', error);
-      alert('❌ Error saving progress');
+      throw error; // Re-throw so child components can handle
     }
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (data) => {
     try {
       const user = auth.currentUser;
       if (!user) return;
 
-      await completeSection(user.uid, 'recon', parseInt(sectionId), formData);
-      alert('✅ Section completed!');
+      // Use data parameter if provided, otherwise use formData state
+      const dataToSave = data || formData;
+
+      await completeSection(user.uid, 'recon', parseInt(sectionId), dataToSave);
+
+      alert('✅ Section completed! Moving to RECON overview...');
       navigate('/mission-control-v2/recon');
     } catch (error) {
       console.error('❌ Error completing section:', error);
-      alert('❌ Error completing section');
+      throw error; // Re-throw so child components can handle
     }
   };
 

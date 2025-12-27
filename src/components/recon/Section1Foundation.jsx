@@ -306,17 +306,29 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         setOutput(data.output);
         setShowOutput(true);
 
-        // Save output to Firestore (client-side backup)
-        try {
+        // Complete the section using unified state management
+        if (onComplete) {
+          try {
+            await onComplete(data.output);
+            console.log('✅ Section marked as completed, Section 2 unlocked');
+          } catch (completeError) {
+            console.error('❌ Error completing section:', completeError);
+            // Still save to legacy location as fallback
+            await updateDoc(doc(db, 'users', user.uid), {
+              section1Output: data.output,
+              'reconProgress.currentSection': 1,
+              'reconProgress.section1Completed': true,
+              'reconProgress.lastUpdated': new Date()
+            });
+          }
+        } else {
+          // Fallback: Save to legacy location if no onComplete handler
           await updateDoc(doc(db, 'users', user.uid), {
             section1Output: data.output,
             'reconProgress.currentSection': 1,
             'reconProgress.section1Completed': true,
             'reconProgress.lastUpdated': new Date()
           });
-          console.log('💾 Saved to Firestore (client-side)');
-        } catch (firestoreError) {
-          console.warn('⚠️  Firestore save failed:', firestoreError);
         }
 
         alert('✅ Executive Summary generated successfully!');

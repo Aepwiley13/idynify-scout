@@ -303,6 +303,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
       console.log('✅ Response data:', data);
 
       if (data.success) {
+        console.log('💾 Setting output and showing results...');
         setOutput(data.output);
         setShowOutput(true);
 
@@ -310,12 +311,16 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         if (onComplete) {
           try {
             console.log('📤 Calling onComplete to mark section as completed...');
+            console.log('🔍 onComplete type:', typeof onComplete);
             await onComplete(data.output);
-            console.log('✅ Section marked as completed, Section 2 unlocked');
+            console.log('✅ onComplete returned successfully!');
+            console.log('🎉 Section marked as completed, Section 2 should be unlocked');
+            console.log('⏳ Parent component should now show alert and navigate...');
             // Success handled by parent component (shows alert and navigates)
           } catch (completeError) {
-            console.error('❌ Error completing section:', completeError);
-            alert(`⚠️ Executive Summary generated but failed to mark section as complete: ${completeError.message}\n\nPlease try refreshing the page.`);
+            console.error('❌ Error in onComplete:', completeError);
+            console.error('❌ Error stack:', completeError.stack);
+            alert(`⚠️ Executive Summary generated but failed to mark section as complete:\n\n${completeError.message}\n\nPlease refresh the page and check the console for details.`);
             // Still save to legacy location as fallback
             await updateDoc(doc(db, 'users', user.uid), {
               section1Output: data.output,
@@ -333,7 +338,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
             'reconProgress.section1Completed': true,
             'reconProgress.lastUpdated': new Date()
           });
-          alert('✅ Executive Summary generated successfully!');
+          alert('✅ Executive Summary generated successfully!\n\nNote: Using legacy save mode. Progress may not sync properly.');
         }
       } else {
         throw new Error(data.error || 'Unknown error');
@@ -351,7 +356,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   };
 
   const handleNextSection = () => {
-    navigate('/mission-control-v2/recon/section/2');
+    // Navigate back to RECON overview where Section 2 should now be unlocked
+    navigate('/mission-control-v2/recon');
   };
 
   const handleMissionControl = () => {

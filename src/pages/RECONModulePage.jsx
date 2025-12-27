@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function RECONModulePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [dashboardState, setDashboardState] = useState(null);
   const [reconModule, setReconModule] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Reload dashboard state whenever we navigate to this page
   useEffect(() => {
+    console.log('🔄 RECONModulePage mounted/updated, reloading dashboard state...');
     loadDashboardState();
-  }, []);
+  }, [location.pathname]); // Reload when pathname changes
 
   const loadDashboardState = async () => {
     try {

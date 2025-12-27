@@ -19,7 +19,10 @@ export default function RECONSectionPage() {
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({});
 
+  // Reload section data whenever sectionId changes
   useEffect(() => {
+    console.log(`🔄 Loading section ${sectionId}...`);
+    setLoading(true); // Show loading state when switching sections
     loadSection();
   }, [sectionId]);
 

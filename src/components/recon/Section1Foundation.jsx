@@ -267,6 +267,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
       console.log('🚀 Calling generate-section-1 function...');
 
+      // Get fresh auth token
+      const authToken = await user.getIdToken();
+
       // Call Netlify function
       const response = await fetch('/.netlify/functions/generate-section-1', {
         method: 'POST',
@@ -275,7 +278,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         },
         body: JSON.stringify({
           answers,
-          userId: user.uid
+          userId: user.uid,
+          authToken
         })
       });
 

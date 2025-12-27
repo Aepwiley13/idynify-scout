@@ -1,18 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,7 +12,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { answers, userId } = JSON.parse(event.body);
+    const { answers, userId, authToken } = JSON.parse(event.body);
 
     if (!answers) {
       throw new Error('Answers are required');
@@ -36,7 +22,41 @@ export const handler = async (event) => {
       throw new Error('User ID is required');
     }
 
+    if (!authToken) {
+      throw new Error('Authentication token is required');
+    }
+
     console.log('🎯 Generating Section 1 Executive Summary for user:', userId);
+
+    // Verify Firebase Auth token using REST API
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new Error('Firebase project ID not configured');
+    }
+
+    console.log('🔐 Verifying auth token...');
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.VITE_FIREBASE_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
+      }
+    );
+
+    if (!verifyResponse.ok) {
+      throw new Error('Invalid authentication token');
+    }
+
+    const verifyData = await verifyResponse.json();
+    const tokenUserId = verifyData.users[0].localId;
+
+    // Verify the token belongs to the claimed user
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified for user:', userId);
 
     // Validate required fields
     const requiredFields = ['companyName', 'whatYouDo', 'industry', 'stage', 'role', 'mainProduct', 'problemSolved', 'currentCustomers'];
@@ -192,14 +212,42 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
 
-    // Save to Firestore
+    // Save to Firestore using REST API
     try {
-      await db.collection('users').doc(userId).update({
-        section1Output: output,
-        'reconProgress.section1Completed': true,
-        'reconProgress.lastUpdated': admin.firestore.FieldValue.serverTimestamp()
+      console.log('💾 Saving to Firestore via REST API...');
+
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}?updateMask.fieldPaths=section1Output&updateMask.fieldPaths=reconProgress.section1Completed&updateMask.fieldPaths=reconProgress.lastUpdated`;
+
+      const firestoreResponse = await fetch(firestoreUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          fields: {
+            section1Output: {
+              mapValue: {
+                fields: convertToFirestoreFields(output)
+              }
+            },
+            reconProgress: {
+              mapValue: {
+                fields: {
+                  section1Completed: { booleanValue: true },
+                  lastUpdated: { timestampValue: new Date().toISOString() }
+                }
+              }
+            }
+          }
+        })
       });
-      console.log('💾 Saved to Firestore');
+
+      if (firestoreResponse.ok) {
+        console.log('✅ Saved to Firestore successfully');
+      } else {
+        console.warn('⚠️  Warning: Failed to save to Firestore:', await firestoreResponse.text());
+      }
     } catch (firestoreError) {
       console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
       // Don't fail the entire request if Firestore save fails
@@ -243,3 +291,41 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     };
   }
 };
+
+// Helper function to convert JS objects to Firestore field format
+function convertToFirestoreFields(obj) {
+  const fields = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === null || value === undefined) {
+      fields[key] = { nullValue: null };
+    } else if (typeof value === 'string') {
+      fields[key] = { stringValue: value };
+    } else if (typeof value === 'number') {
+      fields[key] = { doubleValue: value };
+    } else if (typeof value === 'boolean') {
+      fields[key] = { booleanValue: value };
+    } else if (Array.isArray(value)) {
+      fields[key] = {
+        arrayValue: {
+          values: value.map(item => {
+            if (typeof item === 'string') return { stringValue: item };
+            if (typeof item === 'number') return { doubleValue: item };
+            if (typeof item === 'object') return { mapValue: { fields: convertToFirestoreFields(item) } };
+            return { stringValue: String(item) };
+          })
+        }
+      };
+    } else if (typeof value === 'object') {
+      fields[key] = {
+        mapValue: {
+          fields: convertToFirestoreFields(value)
+        }
+      };
+    } else {
+      fields[key] = { stringValue: String(value) };
+    }
+  }
+
+  return fields;
+}

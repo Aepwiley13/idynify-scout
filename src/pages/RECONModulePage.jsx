@@ -9,6 +9,8 @@ export default function RECONModulePage() {
   const [dashboardState, setDashboardState] = useState(null);
   const [reconModule, setReconModule] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generatingAll, setGeneratingAll] = useState(false);
 
   // Reload dashboard state when component mounts or location key changes (navigation)
   // location.key changes on every navigation, even to the same path
@@ -42,6 +44,106 @@ export default function RECONModulePage() {
       console.error('❌ Error loading dashboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateICPBrief = async () => {
+    setGenerating(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
+      // Get fresh auth token
+      const authToken = await user.getIdToken();
+
+      // Compile all section data
+      const allSectionData = reconModule.sections.reduce((acc, section) => {
+        acc[`section${section.sectionId}`] = section.data;
+        return acc;
+      }, {});
+
+      console.log('🚀 Generating ICP Brief...');
+
+      const response = await fetch('/.netlify/functions/generate-icp-brief', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          sectionData: allSectionData
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate ICP Brief');
+      }
+
+      alert('✅ ICP Brief generated successfully!');
+      // Refresh to show the generated brief
+      loadDashboardState();
+
+    } catch (error) {
+      console.error('❌ Error generating ICP Brief:', error);
+      alert(`❌ Failed to generate ICP Brief: ${error.message}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleGenerateAllReports = async () => {
+    setGeneratingAll(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
+      // Get fresh auth token
+      const authToken = await user.getIdToken();
+
+      // Compile all section data
+      const allSectionData = reconModule.sections.reduce((acc, section) => {
+        acc[`section${section.sectionId}`] = section.data;
+        return acc;
+      }, {});
+
+      console.log('📊 Generating all reports...');
+
+      const response = await fetch('/.netlify/functions/generate-all-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          sectionData: allSectionData
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate reports');
+      }
+
+      alert('✅ All reports generated successfully!');
+      // Refresh to show the generated reports
+      loadDashboardState();
+
+    } catch (error) {
+      console.error('❌ Error generating reports:', error);
+      alert(`❌ Failed to generate reports: ${error.message}`);
+    } finally {
+      setGeneratingAll(false);
     }
   };
 
@@ -318,11 +420,27 @@ export default function RECONModulePage() {
               </p>
 
               <div className="flex gap-4 justify-center">
-                <button className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl transition-all font-mono">
-                  🚀 GENERATE ICP BRIEF
+                <button
+                  onClick={handleGenerateICPBrief}
+                  disabled={generating}
+                  className={`font-bold py-4 px-8 rounded-xl transition-all font-mono ${
+                    generating
+                      ? 'bg-gray-600 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700'
+                  } text-white`}
+                >
+                  {generating ? '⏳ GENERATING ICP BRIEF...' : '🚀 GENERATE ICP BRIEF'}
                 </button>
-                <button className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-4 px-8 rounded-xl transition-all font-mono">
-                  📊 GENERATE ALL REPORTS
+                <button
+                  onClick={handleGenerateAllReports}
+                  disabled={generatingAll}
+                  className={`font-bold py-4 px-8 rounded-xl transition-all font-mono ${
+                    generatingAll
+                      ? 'bg-gray-600 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
+                  } text-white`}
+                >
+                  {generatingAll ? '⏳ GENERATING REPORTS...' : '📊 GENERATE ALL REPORTS'}
                 </button>
               </div>
             </div>

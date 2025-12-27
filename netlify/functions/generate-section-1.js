@@ -35,8 +35,13 @@ export const handler = async (event) => {
     }
 
     console.log('🔐 Verifying auth token...');
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
     const verifyResponse = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.VITE_FIREBASE_API_KEY}`,
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,10 +50,22 @@ export const handler = async (event) => {
     );
 
     if (!verifyResponse.ok) {
-      throw new Error('Invalid authentication token');
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('❌ Firebase auth verification failed:', {
+        status: verifyResponse.status,
+        statusText: verifyResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Invalid authentication token: ${errorData.error?.message || verifyResponse.statusText}`);
     }
 
     const verifyData = await verifyResponse.json();
+
+    if (!verifyData.users || verifyData.users.length === 0) {
+      console.error('❌ No user found in token verification response');
+      throw new Error('Authentication token verification failed: no user found');
+    }
+
     const tokenUserId = verifyData.users[0].localId;
 
     // Verify the token belongs to the claimed user

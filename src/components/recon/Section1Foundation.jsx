@@ -107,29 +107,34 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   const [showOutput, setShowOutput] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Initialize answers from initialData or section1Answers from Firestore
+  // Initialize answers from initialData (preferred) or fallback to legacy storage
   useEffect(() => {
     const loadSavedData = async () => {
       try {
         const user = auth.currentUser;
         if (!user) return;
 
+        // Prefer initialData from dashboard state (unified state management)
+        if (initialData && Object.keys(initialData).length > 0) {
+          setAnswers(initialData);
+          setHasUnsavedChanges(false);
+        } else {
+          // Fallback: Check legacy storage for migration
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+
+            if (userData.section1Answers) {
+              setAnswers(userData.section1Answers);
+            }
+          }
+        }
+
+        // Check for saved output in legacy storage
         const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-
-          // Load saved answers
-          if (userData.section1Answers) {
-            setAnswers(userData.section1Answers);
-          } else if (initialData) {
-            setAnswers(initialData);
-          }
-
-          // Load saved output if exists
-          if (userData.section1Output) {
-            setOutput(userData.section1Output);
-            setShowOutput(true);
-          }
+        if (userDoc.exists() && userDoc.data().section1Output) {
+          setOutput(userDoc.data().section1Output);
+          setShowOutput(true);
         }
       } catch (error) {
         console.error('Error loading saved data:', error);
@@ -138,6 +143,21 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
     loadSavedData();
   }, [initialData]);
+
+  // Auto-save functionality - saves every 30 seconds when there are unsaved changes
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    console.log('🔄 Auto-save scheduled in 30 seconds...');
+    const autoSaveTimer = setTimeout(() => {
+      console.log('💾 Auto-saving progress...');
+      handleManualSave();
+    }, 30000); // 30 seconds
+
+    return () => {
+      clearTimeout(autoSaveTimer);
+    };
+  }, [answers, hasUnsavedChanges]);
 
   const handleManualSave = async () => {
     try {
@@ -149,19 +169,18 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
       setSaving(true);
 
-      await updateDoc(doc(db, 'users', user.uid), {
-        section1Answers: answers,
-        'section1Answers.lastSaved': new Date()
-      });
-
-      setHasUnsavedChanges(false);
-
-      // Call parent onSave if provided
+      // Use unified state management through parent's onSave
       if (onSave) {
         await onSave(answers);
+      } else {
+        // Fallback: Save directly to legacy location if no parent handler
+        await updateDoc(doc(db, 'users', user.uid), {
+          section1Answers: answers,
+          'section1Answers.lastSaved': new Date()
+        });
       }
 
-      // Silent save - no popup
+      setHasUnsavedChanges(false);
       console.log('✅ Progress saved');
     } catch (error) {
       console.error('Save error:', error);

@@ -11,30 +11,59 @@ export default function CheckoutPage() {
     setProcessing(true);
 
     try {
-      // TODO: Replace with actual Stripe integration
-      // For now, simulate payment and mark as completed
       const user = auth.currentUser;
       if (!user) {
         navigate('/login');
         return;
       }
 
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check if Stripe is configured (production mode)
+      const isStripeConfigured = import.meta.env.VITE_STRIPE_ENABLED === 'true';
 
-      // Mark payment as completed in Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
-        hasCompletedPayment: true,
-        paymentCompletedAt: new Date().toISOString(),
-        subscriptionTier: 'pro',
-        subscriptionStatus: 'active'
-      });
+      if (isStripeConfigured) {
+        // PRODUCTION MODE: Use real Stripe integration
+        console.log('🔐 Redirecting to Stripe Checkout...');
 
-      // Redirect to success page
-      navigate('/checkout/success');
+        // Call Netlify function to create Stripe Checkout Session
+        const response = await fetch('/.netlify/functions/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create checkout session');
+        }
+
+        const { url } = await response.json();
+
+        // Redirect to Stripe Checkout
+        window.location.href = url;
+      } else {
+        // DEVELOPMENT MODE: Simulate payment (for testing without Stripe)
+        console.log('⚠️ DEV MODE: Simulating payment (Stripe not configured)');
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Mark payment as completed in Firestore
+        await updateDoc(doc(db, 'users', user.uid), {
+          hasCompletedPayment: true,
+          paymentCompletedAt: new Date().toISOString(),
+          subscriptionTier: 'pro',
+          subscriptionStatus: 'active'
+        });
+
+        // Redirect to success page
+        navigate('/checkout/success');
+      }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
+      alert(`Payment failed: ${error.message}\n\nPlease try again or contact support.`);
       setProcessing(false);
     }
   };
@@ -134,7 +163,9 @@ export default function CheckoutPage() {
             </button>
 
             <p className="text-center text-xs text-gray-500 mt-4 font-mono">
-              ⚠️ PLACEHOLDER: Replace with actual Stripe integration
+              {import.meta.env.VITE_STRIPE_ENABLED === 'true'
+                ? '🔐 Secure payment powered by Stripe'
+                : '⚠️ DEV MODE: Payment simulation (Stripe not configured)'}
             </p>
           </div>
 

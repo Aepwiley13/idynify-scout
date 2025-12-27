@@ -4,6 +4,13 @@ import { auth } from '../firebase/config';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../utils/dashboardUtils';
 import Section1Foundation from '../components/recon/Section1Foundation';
 import Section2ProductDeepDive from '../components/recon/Section2ProductDeepDive';
+import Section3TargetMarketFirmographics from '../components/recon/Section3TargetMarketFirmographics';
+import Section4IdealCustomerPsychographics from '../components/recon/Section4IdealCustomerPsychographics';
+import Section5PainPointsMotivations from '../components/recon/Section5PainPointsMotivations';
+import Section6BuyingBehaviorTriggers from '../components/recon/Section6BuyingBehaviorTriggers';
+import Section7DecisionProcess from '../components/recon/Section7DecisionProcess';
+import Section8CompetitiveLandscape from '../components/recon/Section8CompetitiveLandscape';
+import Section9Messaging from '../components/recon/Section9Messaging';
 
 export default function RECONSectionPage() {
   const navigate = useNavigate();
@@ -217,88 +224,55 @@ export default function RECONSectionPage() {
               onSave={handleSave}
               onComplete={handleComplete}
             />
+          ) : parseInt(sectionId) === 3 ? (
+            <Section3TargetMarketFirmographics
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 4 ? (
+            <Section4IdealCustomerPsychographics
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 5 ? (
+            <Section5PainPointsMotivations
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 6 ? (
+            <Section6BuyingBehaviorTriggers
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 7 ? (
+            <Section7DecisionProcess
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 8 ? (
+            <Section8CompetitiveLandscape
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 9 ? (
+            <Section9Messaging
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
           ) : (
-            <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-8 border border-cyan-500/30">
-              <h3 className="text-2xl font-bold text-white mb-6 font-mono">Section Content</h3>
-
-              {/* Placeholder Message */}
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 mb-6">
-                <div className="flex items-start gap-3">
-                  <div className="text-3xl">⚠️</div>
-                  <div>
-                    <h4 className="text-yellow-400 font-bold font-mono mb-2">Section Content Not Yet Implemented</h4>
-                    <p className="text-gray-300 text-sm">
-                      This is a placeholder view for Section {section.order}: {section.title}.
-                      The actual questionnaire content will be added in the next implementation phase.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Temporary Form */}
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-gray-300 font-mono mb-2">Sample Question 1</label>
-                  <textarea
-                    value={formData.question1 || ''}
-                    onChange={(e) => setFormData({ ...formData, question1: e.target.value })}
-                    className="w-full bg-black/40 border border-cyan-500/30 rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none"
-                    rows="4"
-                    placeholder="Enter your answer here..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 font-mono mb-2">Sample Question 2</label>
-                  <textarea
-                    value={formData.question2 || ''}
-                    onChange={(e) => setFormData({ ...formData, question2: e.target.value })}
-                    className="w-full bg-black/40 border border-cyan-500/30 rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none"
-                    rows="4"
-                    placeholder="Enter your answer here..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 font-mono mb-2">Sample Question 3</label>
-                  <textarea
-                    value={formData.question3 || ''}
-                    onChange={(e) => setFormData({ ...formData, question3: e.target.value })}
-                    className="w-full bg-black/40 border border-cyan-500/30 rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none"
-                    rows="4"
-                    placeholder="Enter your answer here..."
-                  />
-                </div>
-              </div>
+            <div className="bg-red-500/10 border border-red-500 rounded-xl p-8">
+              <h3 className="text-red-400 font-bold font-mono text-xl">❌ Section {sectionId} not found</h3>
+              <p className="text-gray-300 mt-2">This section does not exist. Please return to the RECON module.</p>
             </div>
           )}
         </section>
-
-        {/* Actions - Only show for sections without custom UI (not Section 1 or 2) */}
-        {parseInt(sectionId) !== 1 && parseInt(sectionId) !== 2 && (
-          <section>
-            <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-              <div className="flex gap-4">
-                <button
-                  onClick={handleSave}
-                  className="flex-1 bg-gray-700/50 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono border border-gray-500/30"
-                >
-                  💾 SAVE PROGRESS
-                </button>
-                <button
-                  onClick={handleComplete}
-                  className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono shadow-lg shadow-cyan-500/50"
-                >
-                  ✅ COMPLETE SECTION →
-                </button>
-              </div>
-
-              <p className="text-xs text-gray-500 font-mono mt-4 text-center">
-                Completing this section will unlock the next section and save your progress.
-              </p>
-            </div>
-          </section>
-        )}
 
         {/* Debug Info */}
         <details className="mt-8">

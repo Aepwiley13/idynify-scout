@@ -11,6 +11,7 @@ import Section6BuyingBehaviorTriggers from '../components/recon/Section6BuyingBe
 import Section7DecisionProcess from '../components/recon/Section7DecisionProcess';
 import Section8CompetitiveLandscape from '../components/recon/Section8CompetitiveLandscape';
 import Section9Messaging from '../components/recon/Section9Messaging';
+import Section10BehavioralSignals from '../components/recon/Section10BehavioralSignals';
 
 export default function RECONSectionPage() {
   const navigate = useNavigate();
@@ -285,6 +286,12 @@ export default function RECONSectionPage() {
             />
           ) : parseInt(sectionId) === 9 ? (
             <Section9Messaging
+              initialData={formData}
+              onSave={handleSave}
+              onComplete={handleComplete}
+            />
+          ) : parseInt(sectionId) === 10 ? (
+            <Section10BehavioralSignals
               initialData={formData}
               onSave={handleSave}
               onComplete={handleComplete}

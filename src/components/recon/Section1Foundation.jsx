@@ -309,10 +309,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         // Complete the section using unified state management
         if (onComplete) {
           try {
+            console.log('📤 Calling onComplete to mark section as completed...');
             await onComplete(data.output);
             console.log('✅ Section marked as completed, Section 2 unlocked');
+            // Success handled by parent component (shows alert and navigates)
           } catch (completeError) {
             console.error('❌ Error completing section:', completeError);
+            alert(`⚠️ Executive Summary generated but failed to mark section as complete: ${completeError.message}\n\nPlease try refreshing the page.`);
             // Still save to legacy location as fallback
             await updateDoc(doc(db, 'users', user.uid), {
               section1Output: data.output,
@@ -323,15 +326,15 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
           }
         } else {
           // Fallback: Save to legacy location if no onComplete handler
+          console.warn('⚠️ No onComplete handler provided, using legacy save');
           await updateDoc(doc(db, 'users', user.uid), {
             section1Output: data.output,
             'reconProgress.currentSection': 1,
             'reconProgress.section1Completed': true,
             'reconProgress.lastUpdated': new Date()
           });
+          alert('✅ Executive Summary generated successfully!');
         }
-
-        alert('✅ Executive Summary generated successfully!');
       } else {
         throw new Error(data.error || 'Unknown error');
       }

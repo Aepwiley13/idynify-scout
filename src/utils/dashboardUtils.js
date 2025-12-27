@@ -28,6 +28,10 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
       throw new Error(`Section ${sectionId} not found`);
     }
 
+    // Check if this is a new completion (before updating)
+    const wasAlreadyCompleted = sections[sectionIndex].status === 'completed';
+    const isBeingCompleted = updates.status === 'completed';
+
     // Update section
     sections[sectionIndex] = {
       ...sections[sectionIndex],
@@ -35,13 +39,14 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
       lastEditedAt: new Date().toISOString()
     };
 
-    // If section is being completed, unlock next section
-    if (updates.status === 'completed' && !sections[sectionIndex].completedAt) {
-      sections[sectionIndex].completedAt = new Date().toISOString();
+    // If section is being completed for the first time, unlock next section
+    if (isBeingCompleted && !wasAlreadyCompleted) {
+      console.log(`🔓 Section ${sectionId} completed! Unlocking next section...`);
 
       // Unlock next section
       if (sectionIndex + 1 < sections.length) {
         sections[sectionIndex + 1].unlocked = true;
+        console.log(`✅ Section ${sections[sectionIndex + 1].sectionId} unlocked!`);
       }
     }
 
@@ -88,7 +93,15 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
     });
 
     console.log('✅ Section updated successfully');
-    return true;
+    console.log(`📊 Module progress: ${completedSections}/${sections.length} sections (${progressPercentage}%)`);
+
+    // Return updated section data for verification
+    return {
+      success: true,
+      section: sections[sectionIndex],
+      nextSection: sectionIndex + 1 < sections.length ? sections[sectionIndex + 1] : null,
+      moduleProgress: progressPercentage
+    };
   } catch (error) {
     console.error('❌ Error updating section:', error);
     throw error;
@@ -154,8 +167,11 @@ export async function saveSectionData(userId, moduleId, sectionId, data) {
       lastUpdatedAt: new Date().toISOString()
     });
 
-    console.log('✅ Section data saved');
-    return true;
+    console.log(`✅ Section ${sectionId} data saved (version ${modules[moduleIndex].sections[sectionIndex].version})`);
+    return {
+      success: true,
+      section: modules[moduleIndex].sections[sectionIndex]
+    };
   } catch (error) {
     console.error('❌ Error saving section data:', error);
     throw error;

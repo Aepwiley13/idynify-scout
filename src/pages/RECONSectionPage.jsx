@@ -91,12 +91,19 @@ export default function RECONSectionPage() {
       // Use data parameter if provided, otherwise use formData state
       const dataToSave = data || formData;
 
-      await completeSection(user.uid, 'recon', parseInt(sectionId), dataToSave);
+      console.log(`🎯 Completing section ${sectionId}...`);
+      const result = await completeSection(user.uid, 'recon', parseInt(sectionId), dataToSave);
+
+      console.log('✅ Section completion result:', result);
+      if (result.nextSection) {
+        console.log(`🔓 Next section unlocked: Section ${result.nextSection.sectionId}`);
+      }
 
       alert('✅ Section completed! Moving to RECON overview...');
       navigate('/mission-control-v2/recon');
     } catch (error) {
       console.error('❌ Error completing section:', error);
+      alert(`❌ Failed to complete section: ${error.message}`);
       throw error; // Re-throw so child components can handle
     }
   };

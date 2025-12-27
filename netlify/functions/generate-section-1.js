@@ -212,46 +212,8 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
 
-    // Save to Firestore using REST API
-    try {
-      console.log('💾 Saving to Firestore via REST API...');
-
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}?updateMask.fieldPaths=section1Output&updateMask.fieldPaths=reconProgress.section1Completed&updateMask.fieldPaths=reconProgress.lastUpdated`;
-
-      const firestoreResponse = await fetch(firestoreUrl, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          fields: {
-            section1Output: {
-              mapValue: {
-                fields: convertToFirestoreFields(output)
-              }
-            },
-            reconProgress: {
-              mapValue: {
-                fields: {
-                  section1Completed: { booleanValue: true },
-                  lastUpdated: { timestampValue: new Date().toISOString() }
-                }
-              }
-            }
-          }
-        })
-      });
-
-      if (firestoreResponse.ok) {
-        console.log('✅ Saved to Firestore successfully');
-      } else {
-        console.warn('⚠️  Warning: Failed to save to Firestore:', await firestoreResponse.text());
-      }
-    } catch (firestoreError) {
-      console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
-      // Don't fail the entire request if Firestore save fails
-    }
+    // Note: Client will save to Firestore using its authenticated session
+    console.log('💡 Returning output to client for Firestore save');
 
     return {
       statusCode: 200,
@@ -291,41 +253,3 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     };
   }
 };
-
-// Helper function to convert JS objects to Firestore field format
-function convertToFirestoreFields(obj) {
-  const fields = {};
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === null || value === undefined) {
-      fields[key] = { nullValue: null };
-    } else if (typeof value === 'string') {
-      fields[key] = { stringValue: value };
-    } else if (typeof value === 'number') {
-      fields[key] = { doubleValue: value };
-    } else if (typeof value === 'boolean') {
-      fields[key] = { booleanValue: value };
-    } else if (Array.isArray(value)) {
-      fields[key] = {
-        arrayValue: {
-          values: value.map(item => {
-            if (typeof item === 'string') return { stringValue: item };
-            if (typeof item === 'number') return { doubleValue: item };
-            if (typeof item === 'object') return { mapValue: { fields: convertToFirestoreFields(item) } };
-            return { stringValue: String(item) };
-          })
-        }
-      };
-    } else if (typeof value === 'object') {
-      fields[key] = {
-        mapValue: {
-          fields: convertToFirestoreFields(value)
-        }
-      };
-    } else {
-      fields[key] = { stringValue: String(value) };
-    }
-  }
-
-  return fields;
-}

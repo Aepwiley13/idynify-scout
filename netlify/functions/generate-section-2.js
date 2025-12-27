@@ -75,12 +75,9 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified for user:', userId);
 
-    // Validate required fields for Section 2
-    const requiredFields = ['productName', 'category', 'coreFeatures', 'differentiation', 'pricingModel', 'startingPrice'];
-    for (const field of requiredFields) {
-      if (!answers[field] || answers[field].trim() === '') {
-        throw new Error(`Required field missing: ${field}`);
-      }
+    // Validate that we have answers (generic validation)
+    if (!answers || Object.keys(answers).length === 0) {
+      throw new Error('No answers provided');
     }
 
     const anthropic = new Anthropic({

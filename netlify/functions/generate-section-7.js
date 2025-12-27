@@ -1,18 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,7 +12,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { answers, userId } = JSON.parse(event.body);
+    const { answers, userId, authToken } = JSON.parse(event.body);
 
     if (!answers) {
       throw new Error('Answers are required');
@@ -36,210 +22,103 @@ export const handler = async (event) => {
       throw new Error('User ID is required');
     }
 
-    console.log('🎯 Generating Section 7 Decision Process Map for user:', userId);
+    if (!authToken) {
+      throw new Error('Authentication token is required');
+    }
 
-    // Validate required fields
-    const requiredFields = [
-      'economicBuyer',
-      'champion',
-      'otherStakeholders',
-      'committeeDecision',
-      'approvalLevels',
-      'technicalEvaluation',
-      'userInput',
-      'consensusOrTopDown',
-      'procurementInvolved',
-      'decisionCriteria'
-    ];
-    
-    for (const field of requiredFields) {
-      const value = answers[field];
-      if (!value) {
-        throw new Error(`Required field missing: ${field}`);
+    console.log('🎯 Generating Section 7 Decision Process for user:', userId);
+
+    // Verify Firebase Auth token using REST API
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new Error('Firebase project ID not configured');
+    }
+
+    console.log('🔐 Verifying auth token...');
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
       }
-      
-      // Validate arrays
-      if (['otherStakeholders', 'technicalEvaluation'].includes(field)) {
-        if (!Array.isArray(value) || value.length === 0) {
-          throw new Error(`At least one selection required for: ${field}`);
-        }
-      }
-      
-      // Validate text fields
-      if (field === 'decisionCriteria') {
-        if (typeof value === 'string' && value.length < 100) {
-          throw new Error(`${field} must be at least 100 characters`);
-        }
-      }
+    );
+
+    if (!verifyResponse.ok) {
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('❌ Firebase auth verification failed:', {
+        status: verifyResponse.status,
+        statusText: verifyResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Invalid authentication token: ${errorData.error?.message || verifyResponse.statusText}`);
+    }
+
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyData.users || verifyData.users.length === 0) {
+      console.error('❌ No user found in token verification response');
+      throw new Error('Authentication token verification failed: no user found');
+    }
+
+    const tokenUserId = verifyData.users[0].localId;
+
+    // Verify the token belongs to the claimed user
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified for user:', userId);
+
+        // Validate that we have answers (generic validation)
+    if (!answers || Object.keys(answers).length === 0) {
+      throw new Error('No answers provided');
     }
 
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const prompt = `You are generating the Decision Process Map for Section 7 of a RECON ICP intelligence system.
+    const sectionNumber = 7;
+    const sectionTitle = "Decision Process";
 
-SECTION 7: DECISION PROCESS & STAKEHOLDERS
+    const prompt = `You are generating analysis for Section ${sectionNumber} (${sectionTitle}) of a RECON ICP intelligence system.
 
 User's answers:
 ${JSON.stringify(answers, null, 2)}
 
-Generate the Decision Process Map output following this EXACT JSON schema:
+Generate comprehensive ICP analysis output following this EXACT JSON schema:
 {
-  "section": 7,
-  "title": "Decision Process & Stakeholders",
+  "section": ${sectionNumber},
+  "title": "${sectionTitle}",
   "status": "completed",
   "completedAt": "${new Date().toISOString()}",
   "version": 1,
-  "decisionProcessMap": {
-    "stakeholderMap": {
-      "economicBuyer": {
-        "role": "string (from economicBuyer selection)",
-        "authority": "string (what they control - budget amount, final decision)",
-        "motivations": "string (what drives them - ROI, risk, growth, career)",
-        "concerns": "string (what worries them - cost, risk, implementation)",
-        "engagementStrategy": "string (how to engage - exec meetings, business case)"
-      },
-      "champion": {
-        "role": "string (from champion selection)",
-        "relationship": "string (relationship to economic buyer - reports to, peer, same person)",
-        "motivations": "string (what drives champion - career, solving pain, recognition)",
-        "influence": "string (very high/high/medium/low influence on economic buyer)",
-        "support": "string (how to support champion - content, references, tools)"
-      },
-      "technicalBuyers": [
-        {
-          "role": "string (from technicalEvaluation selections)",
-          "concerns": "string (security, integration, data privacy, etc.)",
-          "vetoPower": boolean,
-          "engagementNeeds": "string (technical docs, security reviews, etc.)"
-        }
-      ],
-      "influencers": [
-        {
-          "role": "string (from otherStakeholders - extract each)",
-          "influence": "string (high/medium/low)",
-          "concerns": "string (what matters to them)",
-          "engagementStrategy": "string (how to engage)"
-        }
-      ],
-      "endUsers": {
-        "role": "string (SDRs, AEs, etc. - infer from context)",
-        "influence": "string (from userInput selection)",
-        "vetoPower": boolean (true if userInput is 'Very high', false otherwise),
-        "adoptionCritical": boolean (true if users selected in otherStakeholders)
-      }
-    },
-    "decisionComplexity": {
-      "committeeSize": "string (from committeeDecision selection)",
-      "approvalLayers": "string (from approvalLevels selection)",
-      "complexity": "string (calculate based on committee + approvals: single+1level=low, small+2levels=moderate, large+3levels=high, very large+4levels=very high)",
-      "averageDecisionTime": "string (estimate based on complexity: low=2-4 weeks, moderate=6-8 weeks, high=12-16 weeks, very high=20+ weeks)",
-      "consensusRequirement": "string (from consensusOrTopDown)"
-    },
-    "approvalWorkflow": {
-      "stages": [
-        {
-          "stage": 1,
-          "name": "string (e.g., 'Champion Evaluation')",
-          "stakeholders": ["array of roles involved in this stage"],
-          "duration": "string",
-          "activities": "string (what happens in this stage)",
-          "successCriteria": "string (how to know stage is complete)"
-        },
-        {
-          "stage": 2,
-          "name": "string",
-          "stakeholders": ["array"],
-          "duration": "string",
-          "activities": "string",
-          "successCriteria": "string"
-        },
-        {
-          "stage": 3,
-          "name": "string",
-          "stakeholders": ["array"],
-          "duration": "string",
-          "activities": "string",
-          "successCriteria": "string"
-        }
-      ],
-      "totalDuration": "string (sum of all stages - should match averageDecisionTime)",
-      "bottlenecks": ["array of 3-5 common bottlenecks based on answers"]
-    },
-    "procurementProcess": {
-      "involvement": "string (from procurementInvolved selection)",
-      "whenInvolved": "string (at what stage - usually stage 3 after executive approval)",
-      "typicalDuration": "string (how long procurement adds: always=2-4 weeks, usually=1-2 weeks, sometimes=1 week, rarely/never=0 weeks)",
-      "requirements": ["array of what procurement needs - MSA, security, insurance, etc."],
-      "negotiationStyle": "string (aggressive, collaborative, by-the-book - infer from involvement level)"
-    },
-    "decisionCriteria": {
-      "rankedCriteria": [
-        {
-          "rank": 1,
-          "criterion": "string (extract criterion 1 from decisionCriteria text)",
-          "weight": "string (critical/high/moderate - rank 1-2 are critical, 3-4 are high, 5+ are moderate)",
-          "stakeholderOwner": "string (who cares most about this - map to stakeholder roles)"
-        },
-        {
-          "rank": 2,
-          "criterion": "string",
-          "weight": "string",
-          "stakeholderOwner": "string"
-        },
-        {
-          "rank": 3,
-          "criterion": "string",
-          "weight": "string",
-          "stakeholderOwner": "string"
-        },
-        {
-          "rank": 4,
-          "criterion": "string (if exists)",
-          "weight": "string",
-          "stakeholderOwner": "string"
-        },
-        {
-          "rank": 5,
-          "criterion": "string (if exists)",
-          "weight": "string",
-          "stakeholderOwner": "string"
-        }
-      ],
-      "mustHaves": ["array of non-negotiable criteria - typically rank 1-2"],
-      "niceToHaves": ["array of nice-to-have criteria - typically rank 4-5"],
-      "dealBreakers": ["array of things that would kill deal - infer from criteria"]
-    },
-    "sellingStrategy": {
-      "multiThreading": {
-        "required": boolean (true if committeeDecision is not 'Single decision maker'),
-        "keyRelationships": ["array of roles to multi-thread to - prioritize economic buyer, champion, technical buyers"],
-        "priority": "string (describe sequence: 1st: champion, 2nd: users, 3rd: technical, 4th: economic buyer)"
-      },
-      "championEnablement": {
-        "contentNeeds": ["array of what champion needs - ROI calc, slides, competitive comparison, etc."],
-        "internalSelling": "string (how to help champion sell internally)",
-        "politicalNavigation": "string (how to navigate org politics based on decision style)"
-      },
-      "consensusBuilding": {
-        "strategy": "string (how to build consensus - sequential, parallel, etc.)",
-        "alignmentMeetings": "string (what meetings are needed)",
-        "objectionHandling": "string (how to handle differing opinions)"
-      },
-      "executiveEngagement": {
-        "when": "string (timing - after champion advocacy, before final decision)",
-        "how": "string (executive briefing, business review, etc.)",
-        "topics": ["array of topics to discuss with executive"]
-      }
-    },
-    "riskFactors": {
-      "singleThreadedRisk": "string (risk if only talking to champion - high/medium/low)",
-      "championDepartureRisk": "string (what happens if champion leaves)",
-      "consensusFailureRisk": "string (risk if stakeholders don't align)",
-      "procurementRisk": "string (risk from procurement delays/demands based on procurementInvolved)",
-      "mitigationStrategies": ["array of 5-7 specific mitigation strategies"]
-    }
+  "executiveSummary": {
+    "overview": "string (2-3 sentence summary of key insights from this section)",
+    "keyFindings": [
+      "string (3-7 specific, actionable insights derived from the user's answers)",
+      "string (Focus on WHO the ideal customer is and HOW to identify them)",
+      "string (Be specific with numbers, roles, company attributes)",
+      "string (Include observable signals when relevant)",
+      "string (Connect findings to ICP targeting strategy)"
+    ],
+    "icpImplications": [
+      "string (3-5 insights about how this data narrows the ICP definition)",
+      "string (What does this tell us about company size, industry, roles, etc.)",
+      "string (Observable signals for targeting and qualification)"
+    ],
+    "actionableInsights": [
+      "string (2-4 specific next steps or targeting strategies)",
+      "string (How to use this information in prospecting/outreach)",
+      "string (Warning signs or anti-patterns to avoid)"
+    ],
+    "keyInsight": "string (ONE critical takeaway that synthesizes this section's contribution to ICP definition)"
   },
   "rawAnswers": ${JSON.stringify(answers, null, 2)},
   "metadata": {
@@ -251,97 +130,13 @@ Generate the Decision Process Map output following this EXACT JSON schema:
 }
 
 CRITICAL INSTRUCTIONS:
-1. Map stakeholder roles accurately:
-   - Economic Buyer = budget authority, final decision
-   - Champion = internal advocate, drives process
-   - Technical Buyers = evaluate security, integration (veto power)
-   - Influencers = other stakeholders without veto power
-   - End Users = people who will actually use the tool
-
-2. Assess champion influence:
-   - Very high: Champion IS economic buyer OR economic buyer fully trusts them
-   - High: Champion reports directly to economic buyer + good relationship
-   - Medium: Champion is peer to economic buyer OR indirect report
-   - Low: Champion is IC with limited access to economic buyer
-
-3. Calculate decision complexity:
-   - Low: Single decision maker + 1 approval level
-   - Moderate: Small committee (2-3) + 2 approval levels
-   - High: Large committee (4-6) + 3 approval levels
-   - Very high: Very large committee (7+) + 4+ approval levels
-
-4. Estimate decision time:
-   - Low complexity: 2-4 weeks
-   - Moderate complexity: 6-8 weeks
-   - High complexity: 12-16 weeks
-   - Very high complexity: 20+ weeks
-
-5. Create 3-stage approval workflow:
-   - Stage 1: Champion Evaluation (champion + users if applicable)
-   - Stage 2: Executive & Technical Review (economic buyer + IT/Security)
-   - Stage 3: Contract & Procurement (Legal + Procurement if applicable)
-   
-   Duration splits based on total time:
-   - 2-4 weeks total: 1w, 1w, 1w
-   - 6-8 weeks total: 2w, 3w, 2w
-   - 12-16 weeks total: 4w, 6w, 4w
-   - 20+ weeks total: 6w, 10w, 6w
-
-6. Parse decisionCriteria text into ranked list:
-   - Look for numbered lists (1), 2), 3)) or priority markers
-   - Extract criterion name
-   - Assign weight: rank 1-2 = critical, 3-4 = high, 5+ = moderate
-   - Map stakeholder owner (ROI → economic buyer, ease of use → users, integration → IT)
-
-7. Determine veto power:
-   - Technical buyers (IT/Security): YES (can block on security)
-   - End users: YES if userInput is "Very high", NO otherwise
-   - Procurement: NO (can delay but not block)
-   - Legal: NO (can delay but not block)
-   - Other influencers: NO
-
-8. Multi-threading is REQUIRED unless single decision maker
-
-9. Engagement priority sequence:
-   - 1st: Build champion relationship (PRIMARY)
-   - 2nd: Get users excited (if high influence)
-   - 3rd: Engage technical buyers early (prevent late veto)
-   - 4th: Executive briefing (after champion advocacy built)
-
-10. Common bottlenecks to include:
-    - IT Security review delays
-    - Legal contract negotiation
-    - Champion building internal case
-    - Economic buyer calendar/availability
-    - Procurement process
-    - Budget approval delays
-    - Consensus paralysis (if large committee)
-
-EXAMPLE STAKEHOLDER MAPPING:
-economicBuyer: "VP Sales"
-champion: "Sales Operations Manager"
-otherStakeholders: ["IT / Security", "End Users (SDRs/AEs)", "Finance Team"]
-
-Output:
-economicBuyer: {
-  role: "VP Sales",
-  authority: "Controls sales budget up to $100K",
-  motivations: "Hitting revenue targets, scaling team, career advancement"
-}
-champion: {
-  role: "Sales Operations Manager",
-  relationship: "Reports directly to VP Sales",
-  influence: "High - VP Sales trusts their technical judgment"
-}
-technicalBuyers: [{
-  role: "IT/Security team",
-  vetoPower: true,
-  concerns: "Data security, compliance, integration security"
-}]
-influencers: [
-  {role: "End Users (SDRs)", influence: "High", concerns: "Ease of use, doesn't add work"},
-  {role: "Finance Team", influence: "Medium", concerns: "ROI justification"}
-]
+1. Use the user's EXACT language from their answers - don't sanitize or rewrite
+2. Be SPECIFIC - include numbers, percentages, company sizes, roles, technologies
+3. Focus on OBSERVABLE signals that can be used for targeting
+4. Connect findings to HOW to identify and qualify prospects
+5. Key Insight must be ACTIONABLE and section-specific
+6. Synthesize across all answers to find patterns and implications
+7. Think about: WHO buys, WHAT they look like, WHERE to find them, WHY they buy
 
 Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.`;
 
@@ -375,16 +170,8 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     }
 
     // Validate schema
-    if (!output.decisionProcessMap || !output.rawAnswers) {
+    if (!output.executiveSummary || !output.rawAnswers) {
       throw new Error('Invalid output schema - missing required fields');
-    }
-
-    // Validate required sections
-    const requiredSections = ['stakeholderMap', 'decisionComplexity', 'approvalWorkflow', 'decisionCriteria', 'sellingStrategy'];
-    for (const section of requiredSections) {
-      if (!output.decisionProcessMap[section]) {
-        throw new Error(`Missing required section in output: ${section}`);
-      }
     }
 
     // Add metadata
@@ -399,20 +186,9 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log('✅ Successfully generated Section 7 output');
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
-    console.log(`👥 Complexity: ${output.decisionProcessMap.decisionComplexity.complexity}`);
 
-    // Save to Firestore
-    try {
-      await db.collection('users').doc(userId).update({
-        section7Output: output,
-        'reconProgress.section7Completed': true,
-        'reconProgress.lastUpdated': admin.firestore.FieldValue.serverTimestamp()
-      });
-      console.log('💾 Saved to Firestore');
-    } catch (firestoreError) {
-      console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
-      // Don't fail the entire request if Firestore save fails
-    }
+    // Note: Client will save to Firestore using its authenticated session
+    console.log('💡 Returning output to client for Firestore save');
 
     return {
       statusCode: 200,

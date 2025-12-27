@@ -10,11 +10,13 @@ export default function RECONModulePage() {
   const [reconModule, setReconModule] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Reload dashboard state whenever we navigate to this page
+  // Reload dashboard state when component mounts or location key changes (navigation)
+  // location.key changes on every navigation, even to the same path
   useEffect(() => {
-    console.log('🔄 RECONModulePage mounted/updated, reloading dashboard state...');
+    console.log('🔄 RECONModulePage: Loading dashboard state (location.key changed)...');
     loadDashboardState();
-  }, [location.pathname]); // Reload when pathname changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]); // Reload on navigation, but location.key only changes on actual navigation events
 
   const loadDashboardState = async () => {
     try {
@@ -138,9 +140,21 @@ export default function RECONModulePage() {
                 <p className="text-xs text-gray-400 font-mono">{reconModule.description}</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 font-mono">Progress</p>
-              <p className="text-2xl font-bold text-cyan-400 font-mono">{reconModule.progressPercentage}%</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => {
+                  console.log('🔄 Manual refresh triggered...');
+                  setLoading(true);
+                  loadDashboardState();
+                }}
+                className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 px-4 py-2 rounded-lg border border-cyan-500/30 font-mono text-sm transition-all"
+              >
+                🔄 REFRESH
+              </button>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 font-mono">Progress</p>
+                <p className="text-2xl font-bold text-cyan-400 font-mono">{reconModule.progressPercentage}%</p>
+              </div>
             </div>
           </div>
         </div>

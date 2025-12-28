@@ -75,18 +75,26 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified for user:', userId);
 
+    // Extract only the essential data (rawAnswers) to reduce prompt size
+    const essentialData = {};
+    for (const [key, value] of Object.entries(sectionData)) {
+      if (value && typeof value === 'object') {
+        essentialData[key] = value.rawAnswers || value.data || value;
+      }
+    }
+
+    console.log('📊 Essential data extracted, size:', JSON.stringify(essentialData).length, 'chars');
+
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const prompt = `You are generating the COMPREHENSIVE ICP BRIEF from all 10 completed RECON sections.
+    const prompt = `Generate a concise ICP Brief from the RECON data below. Be specific and actionable.
 
-ALL SECTION DATA:
-${JSON.stringify(sectionData, null, 2)}
+DATA:
+${JSON.stringify(essentialData, null, 2)}
 
-Generate a comprehensive ICP Brief that synthesizes ALL sections into ONE actionable intelligence document.
-
-Return this EXACT JSON schema:
+Return EXACT JSON schema:
 {
   "title": "Comprehensive ICP Brief",
   "generatedAt": "${new Date().toISOString()}",
@@ -166,28 +174,18 @@ Return this EXACT JSON schema:
   }
 }
 
-CRITICAL INSTRUCTIONS:
-1. SYNTHESIZE across all sections - find patterns, connections, contradictions
-2. Use the customer's EXACT language from their answers throughout
-3. Be HYPER-SPECIFIC - no vague generalizations
-4. Perfect Fit Criteria must be OBSERVABLE and actionable for prospecting
-5. Buyer Personas must be based on Section 4 psychographics + Section 7 decision process
-6. Targeting Playbook must be TACTICAL - tell them exactly what to do
-7. If sections contradict each other, note it and recommend clarification
-8. Confidence Score should reflect data quality and specificity (not just completion)
-9. Critical Insight should be something NON-OBVIOUS that emerged from synthesis
-10. Action items should be prioritized and specific
-
-Think like a B2B sales strategist who's analyzing this company's entire ICP research and distilling it into a battle plan.
-
-Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.`;
+RULES:
+- Use customer's exact language
+- Be specific with numbers and observable signals
+- Make it actionable
+- Return ONLY valid JSON, no markdown fences`;
 
     console.log('🤖 Calling Claude API for ICP Brief synthesis...');
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      temperature: 0.7,
+      max_tokens: 4096,
+      temperature: 0.5,
       messages: [{
         role: 'user',
         content: prompt

@@ -75,18 +75,26 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified for user:', userId);
 
+    // Extract only the essential data (rawAnswers) to reduce prompt size
+    const essentialData = {};
+    for (const [key, value] of Object.entries(sectionData)) {
+      if (value && typeof value === 'object') {
+        essentialData[key] = value.rawAnswers || value.data || value;
+      }
+    }
+
+    console.log('📊 Essential data extracted, size:', JSON.stringify(essentialData).length, 'chars');
+
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const prompt = `You are generating COMPREHENSIVE INTELLIGENCE REPORTS from all 10 completed RECON sections.
+    const prompt = `Generate actionable intelligence reports from the RECON data. Be concise and tactical.
 
-ALL SECTION DATA:
-${JSON.stringify(sectionData, null, 2)}
+DATA:
+${JSON.stringify(essentialData, null, 2)}
 
-Generate multiple actionable reports that operators can use immediately.
-
-Return this EXACT JSON schema:
+Return EXACT JSON schema:
 {
   "title": "RECON Intelligence Reports",
   "generatedAt": "${new Date().toISOString()}",
@@ -289,28 +297,18 @@ Return this EXACT JSON schema:
   }
 }
 
-CRITICAL INSTRUCTIONS:
-1. Make every report IMMEDIATELY ACTIONABLE - operators should be able to use these today
-2. Use the customer's EXACT language from their answers - don't sanitize
-3. Be HYPER-SPECIFIC with numbers, examples, tools, platforms
-4. Personas should feel REAL - give them personality based on psychographics
-5. Battle Cards must be TACTICAL - tell them exactly what to say/do vs. each competitor
-6. Messaging templates should be READY TO USE - just fill in company name
-7. LinkedIn filters should be EXACT - down to the specific filter syntax
-8. Cold outreach templates should match the buyer persona and pain points
-9. Roadmap should connect to the user's 90-day goal from Section 1
-10. Every recommendation must tie back to the section data
-
-Think like a revenue operations leader creating a complete GTM playbook for the sales and marketing teams.
-
-Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.`;
+RULES:
+- Make reports immediately actionable
+- Use customer's exact language
+- Be specific with examples and tools
+- Return ONLY valid JSON, no markdown fences`;
 
     console.log('🤖 Calling Claude API for comprehensive reports...');
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 16384,
-      temperature: 0.7,
+      max_tokens: 6144,
+      temperature: 0.5,
       messages: [{
         role: 'user',
         content: prompt

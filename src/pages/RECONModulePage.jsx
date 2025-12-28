@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
+import SectionOutputModal from '../components/recon/SectionOutputModal';
 
 export default function RECONModulePage() {
   const navigate = useNavigate();
@@ -9,8 +10,7 @@ export default function RECONModulePage() {
   const [dashboardState, setDashboardState] = useState(null);
   const [reconModule, setReconModule] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [generatingAll, setGeneratingAll] = useState(false);
+  const [viewingSection, setViewingSection] = useState(null);
 
   // Reload dashboard state when component mounts or location key changes (navigation)
   // location.key changes on every navigation, even to the same path
@@ -44,106 +44,6 @@ export default function RECONModulePage() {
       console.error('❌ Error loading dashboard:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGenerateICPBrief = async () => {
-    setGenerating(true);
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      // Get fresh auth token
-      const authToken = await user.getIdToken();
-
-      // Compile all section data
-      const allSectionData = reconModule.sections.reduce((acc, section) => {
-        acc[`section${section.sectionId}`] = section.data;
-        return acc;
-      }, {});
-
-      console.log('🚀 Generating ICP Brief...');
-
-      const response = await fetch('/.netlify/functions/generate-icp-brief', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          sectionData: allSectionData
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to generate ICP Brief');
-      }
-
-      alert('✅ ICP Brief generated successfully!');
-      // Refresh to show the generated brief
-      loadDashboardState();
-
-    } catch (error) {
-      console.error('❌ Error generating ICP Brief:', error);
-      alert(`❌ Failed to generate ICP Brief: ${error.message}`);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleGenerateAllReports = async () => {
-    setGeneratingAll(true);
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      // Get fresh auth token
-      const authToken = await user.getIdToken();
-
-      // Compile all section data
-      const allSectionData = reconModule.sections.reduce((acc, section) => {
-        acc[`section${section.sectionId}`] = section.data;
-        return acc;
-      }, {});
-
-      console.log('📊 Generating all reports...');
-
-      const response = await fetch('/.netlify/functions/generate-all-reports', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          sectionData: allSectionData
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to generate reports');
-      }
-
-      alert('✅ All reports generated successfully!');
-      // Refresh to show the generated reports
-      loadDashboardState();
-
-    } catch (error) {
-      console.error('❌ Error generating reports:', error);
-      alert(`❌ Failed to generate reports: ${error.message}`);
-    } finally {
-      setGeneratingAll(false);
     }
   };
 
@@ -384,9 +284,13 @@ export default function RECONModulePage() {
 
                             {section.status === 'completed' && (
                               <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingSection(section);
+                                }}
                                 className="px-4 py-3 rounded-lg font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
                               >
-                                📊 VIEW DATA
+                                📊 VIEW OUTPUT
                               </button>
                             )}
                           </div>
@@ -409,45 +313,34 @@ export default function RECONModulePage() {
           </div>
         </section>
 
-        {/* Generate Intelligence CTA (show when all complete) */}
+        {/* Completion Message (show when all complete) */}
         {reconModule.status === 'completed' && (
           <section className="mt-12">
             <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-2xl p-10 text-center border-2 border-emerald-500/30 backdrop-blur-xl">
               <div className="text-6xl mb-6">🎯</div>
               <h3 className="text-4xl font-bold text-white mb-4 font-mono">RECON Complete!</h3>
-              <p className="text-gray-300 mb-8 text-lg max-w-2xl mx-auto">
-                All sections completed. Generate your comprehensive intelligence reports.
+              <p className="text-gray-300 mb-6 text-lg max-w-2xl mx-auto">
+                All 10 sections completed! Each section has generated AI intelligence based on your inputs.
               </p>
-
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={handleGenerateICPBrief}
-                  disabled={generating}
-                  className={`font-bold py-4 px-8 rounded-xl transition-all font-mono ${
-                    generating
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700'
-                  } text-white`}
-                >
-                  {generating ? '⏳ GENERATING ICP BRIEF...' : '🚀 GENERATE ICP BRIEF'}
-                </button>
-                <button
-                  onClick={handleGenerateAllReports}
-                  disabled={generatingAll}
-                  className={`font-bold py-4 px-8 rounded-xl transition-all font-mono ${
-                    generatingAll
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
-                  } text-white`}
-                >
-                  {generatingAll ? '⏳ GENERATING REPORTS...' : '📊 GENERATE ALL REPORTS'}
-                </button>
+              <div className="bg-black/40 rounded-xl p-6 max-w-2xl mx-auto border border-cyan-500/20">
+                <p className="text-cyan-400 font-mono mb-3">📊 VIEW YOUR INTELLIGENCE REPORTS</p>
+                <p className="text-gray-300 text-sm">
+                  Click the <span className="text-purple-400 font-bold">"📊 VIEW OUTPUT"</span> button on any completed section above to see the AI-generated intelligence for that section.
+                </p>
               </div>
             </div>
           </section>
         )}
 
       </main>
+
+      {/* Section Output Modal */}
+      {viewingSection && (
+        <SectionOutputModal
+          section={viewingSection}
+          onClose={() => setViewingSection(null)}
+        />
+      )}
 
       <style>{`
         @keyframes twinkle {

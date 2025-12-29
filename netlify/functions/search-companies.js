@@ -265,7 +265,7 @@ export const handler = async (event) => {
     }
 
     const apolloData = await apolloResponse.json();
-    const companies = apolloData.organizations || [];
+    let companies = apolloData.organizations || [];
 
     console.log(`✅ Found ${companies.length} companies from Apollo`);
 
@@ -280,6 +280,35 @@ export const handler = async (event) => {
         console.log(`    - Location: ${JSON.stringify(company.headquarters_location || company.primary_location || 'N/A')}`);
       });
       console.log('\n');
+    }
+
+    // VALIDATION: Filter companies to ensure they match requested industries
+    // Apollo sometimes returns companies that don't match the filter
+    const requestedIndustries = companyProfile.industries || [];
+    if (requestedIndustries.length > 0) {
+      console.log(`🔍 Validating companies match requested industries: ${requestedIndustries.join(', ')}`);
+
+      const beforeCount = companies.length;
+      const filteredCompanies = companies.filter(company => {
+        const companyIndustry = company.industry || company.primary_industry || '';
+        const matches = requestedIndustries.includes(companyIndustry);
+
+        if (!matches) {
+          console.log(`  ❌ Filtering out ${company.name} - Industry: "${companyIndustry}" (not in requested list)`);
+        }
+
+        return matches;
+      });
+
+      console.log(`✅ Validation complete: ${filteredCompanies.length}/${beforeCount} companies match requested industries`);
+
+      if (filteredCompanies.length === 0) {
+        console.error('❌ CRITICAL: No companies match requested industries after filtering!');
+        console.error('This likely means Apollo is ignoring the industry filter.');
+        console.error('Check the Apollo query and industry IDs above.');
+      }
+
+      companies = filteredCompanies;
     }
 
     // Clear old pending companies before adding new ones (for updated searches)

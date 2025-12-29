@@ -247,7 +247,7 @@ export const handler = async (event) => {
     console.log('📊 Apollo query:', JSON.stringify(apolloQuery, null, 2));
     console.log('🔍 Industry filter check:');
     console.log(`   - Requested industries: ${JSON.stringify(companyProfile.industries)}`);
-    console.log(`   - Apollo industry_tag_ids: ${JSON.stringify(apolloQuery.organization_industry_tag_ids || 'NONE - THIS IS THE PROBLEM!')}`);
+    console.log(`   - Apollo keyword search: ${JSON.stringify(apolloQuery.q_organization_keyword_tags || 'NONE')}`);
 
     // Call Apollo API
     const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
@@ -396,11 +396,14 @@ function buildApolloQuery(companyProfile) {
     per_page: 50
   };
 
-  // Map industries to Apollo industry tag IDs
+  // FIXED: Use keyword search instead of industry tag IDs
+  // Industry tag IDs don't work - Apollo ignores them
+  // Keyword search is more reliable
   if (companyProfile.industries && companyProfile.industries.length > 0) {
-    query.organization_industry_tag_ids = getIndustryIds(companyProfile.industries);
+    // Convert industry names to lowercase keywords for search
+    query.q_organization_keyword_tags = companyProfile.industries.map(i => i.toLowerCase());
     console.log(`🏭 Industries selected: ${companyProfile.industries.join(', ')}`);
-    console.log(`🏭 Mapped to Apollo IDs: ${query.organization_industry_tag_ids.join(', ')}`);
+    console.log(`🏭 Using keyword search: ${query.q_organization_keyword_tags.join(', ')}`);
   } else {
     console.log('⚠️  No industries selected!');
   }

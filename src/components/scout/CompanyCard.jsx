@@ -93,18 +93,6 @@ export default function CompanyCard({ company, onSwipe }) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Fit Score Badge */}
-        <div className="absolute top-6 right-6 z-10">
-          <div className={`px-6 py-3 rounded-2xl font-bold text-2xl font-mono border-2 ${
-            company.fit_score >= 80 ? 'bg-green-500/20 text-green-400 border-green-500/50' :
-            company.fit_score >= 60 ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' :
-            company.fit_score >= 40 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' :
-            'bg-red-500/20 text-red-400 border-red-500/50'
-          }`}>
-            {company.fit_score}% FIT
-          </div>
-        </div>
-
         <div className="p-10">
           {/* Company Name */}
           <div className="mb-8">
@@ -124,8 +112,8 @@ export default function CompanyCard({ company, onSwipe }) {
             )}
           </div>
 
-          {/* Company Details Grid */}
-          <div className="grid grid-cols-2 gap-6 mb-8">
+          {/* Company Details Grid - Simplified */}
+          <div className="grid grid-cols-3 gap-6 mb-8">
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
               <p className="text-gray-400 text-sm mb-2 font-mono">INDUSTRY</p>
               <p className="text-white text-lg font-semibold">{company.industry || 'Unknown'}</p>
@@ -134,61 +122,15 @@ export default function CompanyCard({ company, onSwipe }) {
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
               <p className="text-gray-400 text-sm mb-2 font-mono">SIZE</p>
               <p className="text-white text-lg font-semibold">
-                {company.employee_range || (company.employee_count ? `${company.employee_count.toLocaleString()} employees` : 'Unknown')}
+                {company.employee_range || (company.employee_count ? `${company.employee_count.toLocaleString()} employees` : 'Size not available')}
               </p>
             </div>
 
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-              <p className="text-gray-400 text-sm mb-2 font-mono">REVENUE</p>
-              <p className="text-white text-lg font-semibold">{company.revenue_range || 'Unknown'}</p>
-            </div>
-
-            <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
               <p className="text-gray-400 text-sm mb-2 font-mono">LOCATION</p>
-              <p className="text-white text-lg font-semibold">{company.headquarters_location || 'Unknown'}</p>
+              <p className="text-white text-lg font-semibold">{company.headquarters_location || 'Location not available'}</p>
             </div>
           </div>
-
-          {/* Company Insights */}
-          {(company.founded_year || company.company_age_years) && (
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-5 border border-purple-500/20">
-                <p className="text-gray-400 text-sm mb-3 font-mono">COMPANY INSIGHTS</p>
-                <div className="flex gap-6 flex-wrap">
-                  {company.founded_year && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-purple-400 text-xl">📅</span>
-                      <span className="text-white font-semibold">Founded {company.founded_year}</span>
-                    </div>
-                  )}
-                  {company.company_age_years > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-pink-400 text-xl">⏳</span>
-                      <span className="text-white font-semibold">{company.company_age_years} years old</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Fit Reasons */}
-          {company.fit_reasons && company.fit_reasons.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-gray-400 text-sm mb-3 font-mono">WHY THIS IS A GOOD FIT:</h3>
-              <div className="space-y-2">
-                {company.fit_reasons.map((reason, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-3 bg-cyan-500/10 rounded-lg p-3 border border-cyan-500/20"
-                  >
-                    <span className="text-cyan-400 text-lg">✓</span>
-                    <span className="text-gray-300">{reason}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Links */}
           <div className="flex gap-4 mb-8">

@@ -571,42 +571,59 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
     console.log(`📦 Processing ${companies.length} companies from Apollo...`);
 
-    // Enrich and filter companies
-    const enrichedCompanies = companies
-      .map(company => enrichCompanyData(company, companyProfile))
-      .filter(company => validateCompanyData(company));
+    // SIMPLIFIED: Accept ALL companies - no filtering or complex scoring
+    // Scout's job is discovery, not scoring. User decides fit via swipes.
+    const simplifiedCompanies = companies.map(company => {
+      // Extract basic info only - what Scout displays
+      const employeeCount = company.estimated_num_employees || 0;
+      const location = extractSimpleLocation(company);
 
-    console.log(`✅ ${enrichedCompanies.length} companies passed validation (filtered ${companies.length - enrichedCompanies.length})`);
+      return {
+        // IDs
+        apollo_organization_id: company.id,
 
-    // Sort by fit score (highest first)
-    enrichedCompanies.sort((a, b) => b.fit_score - a.fit_score);
+        // Basic Info (what Scout displays)
+        name: company.name || 'Unknown Company',
+        industry: company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown',
+        employee_count: employeeCount,
+        employee_range: formatEmployeeRange(employeeCount),
 
-    // Save to Firestore
-    for (const company of enrichedCompanies) {
+        // Links (critical for user research)
+        website_url: company.website_url || company.primary_domain || null,
+        linkedin_url: company.linkedin_url || null,
+
+        // Location (for display)
+        headquarters_location: location,
+
+        // Metadata
+        found_at: new Date().toISOString(),
+        source: 'apollo_api',
+
+        // User Actions
+        status: 'pending' // pending | accepted | rejected
+      };
+    });
+
+    console.log(`✅ Accepting ALL ${simplifiedCompanies.length} companies (no filtering)`);
+    console.log(`📊 Scout shows total market size, user decides fit via swipes`);
+
+    // Save to Firestore - ALL companies, no sorting needed
+    for (const company of simplifiedCompanies) {
       const companyId = company.apollo_organization_id || `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       const companyData = {
         fields: {
           apollo_organization_id: { stringValue: String(company.apollo_organization_id) },
           name: { stringValue: String(company.name) },
-          domain: { stringValue: String(company.domain || '') },
           industry: { stringValue: String(company.industry) },
           employee_count: { integerValue: String(company.employee_count) },
           employee_range: { stringValue: String(company.employee_range) },
-          revenue_range: { stringValue: String(company.revenue_range) },
           headquarters_location: { stringValue: String(company.headquarters_location) },
           linkedin_url: { stringValue: String(company.linkedin_url || '') },
           website_url: { stringValue: String(company.website_url || '') },
-          phone: { stringValue: String(company.phone || '') },
-          founded_year: { integerValue: String(company.founded_year || 0) },
-          company_age_years: { integerValue: String(company.company_age_years || 0) },
           status: { stringValue: 'pending' },
-          fit_score: { integerValue: String(company.fit_score) },
-          fit_reasons: { arrayValue: { values: company.fit_reasons.map(r => ({ stringValue: String(r) })) } },
-          foundAt: { timestampValue: new Date().toISOString() },
-          source: { stringValue: 'apollo_api' },
-          swipedAt: { nullValue: null },
-          swipeDirection: { nullValue: null }
+          found_at: { timestampValue: company.found_at },
+          source: { stringValue: 'apollo_api' }
         }
       };
 
@@ -638,7 +655,37 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 }
 
 /**
- * Enrich company data from Apollo response with fallbacks and formatting
+ * Extract simple location string from Apollo company object
+ */
+function extractSimpleLocation(company) {
+  // Try headquarters_location first
+  if (company.headquarters_location) {
+    if (typeof company.headquarters_location === 'object') {
+      const { city, state } = company.headquarters_location;
+      if (city && state) return `${city}, ${state}`;
+      if (state) return `${state}, USA`;
+    }
+    if (typeof company.headquarters_location === 'string') {
+      return company.headquarters_location;
+    }
+  }
+
+  // Try primary_location
+  if (company.primary_location?.state) {
+    return `${company.primary_location.state}, USA`;
+  }
+
+  // Try organization_locations array
+  if (company.organization_locations && company.organization_locations.length > 0) {
+    return company.organization_locations[0];
+  }
+
+  return 'Location not available';
+}
+
+/**
+ * DEPRECATED - OLD COMPLEX ENRICHMENT (NOT USED ANYMORE)
+ * Kept for reference only - Scout now uses simplified approach
  */
 function enrichCompanyData(company, companyProfile) {
   // Extract and format employee count

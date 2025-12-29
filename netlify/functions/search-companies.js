@@ -301,6 +301,13 @@ export const handler = async (event) => {
       }))
     };
 
+    // TEMPORARILY DISABLED - Apollo API is not returning industry field
+    // Need to investigate raw response structure first
+    console.log('⚠️  INDUSTRY VALIDATION TEMPORARILY DISABLED');
+    console.log('⚠️  All companies from Apollo will be saved regardless of industry');
+    console.log('⚠️  This is to debug why Apollo returns industry: N/A for all companies');
+
+    /* DISABLED - RE-ENABLE AFTER FIXING APOLLO INDUSTRY FIELD
     if (requestedIndustries.length > 0) {
       console.log(`🔍 Validating companies match requested industries: ${requestedIndustries.join(', ')}`);
 
@@ -329,6 +336,7 @@ export const handler = async (event) => {
 
       companies = filteredCompanies;
     }
+    */
 
     // Clear old pending companies before adding new ones (for updated searches)
     await clearPendingCompanies(userId, authToken);

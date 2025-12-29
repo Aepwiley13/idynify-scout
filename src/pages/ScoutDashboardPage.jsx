@@ -274,9 +274,17 @@ export default function ScoutDashboardPage() {
                 <p className="text-xs text-gray-400 font-mono">Swipe to find your ideal customers</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 font-mono">Daily Swipes Remaining</p>
-              <p className="text-2xl font-bold text-cyan-400 font-mono">{remainingToday}/{DAILY_SWIPE_LIMIT}</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/onboarding/company-profile')}
+                className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg font-mono font-bold text-sm transition-all"
+              >
+                🔄 UPDATE SEARCH
+              </button>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 font-mono">Daily Swipes Remaining</p>
+                <p className="text-2xl font-bold text-cyan-400 font-mono">{remainingToday}/{DAILY_SWIPE_LIMIT}</p>
+              </div>
             </div>
           </div>
         </div>

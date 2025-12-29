@@ -257,6 +257,9 @@ export const handler = async (event) => {
 
     console.log(`✅ Found ${companies.length} companies from Apollo`);
 
+    // Clear old pending companies before adding new ones (for updated searches)
+    await clearPendingCompanies(userId, authToken);
+
     // Save companies to Firestore
     await saveCompaniesToFirestore(userId, authToken, companies, companyProfile);
 
@@ -361,6 +364,92 @@ function convertRevenueToNumeric(revenueRange) {
   };
 
   return mapping[revenueRange] || [0, 999999999999];
+}
+
+/**
+ * Clear all pending companies from previous searches
+ * This allows users to update their search criteria and get fresh results
+ */
+async function clearPendingCompanies(userId, authToken) {
+  try {
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+
+    if (!projectId) {
+      console.error('❌ Firebase Project ID not configured');
+      throw new Error('Firebase Project ID not configured');
+    }
+
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+    console.log('🗑️  Clearing old pending companies...');
+
+    // Query to get all pending companies
+    const queryUrl = `${firestoreUrl}:runQuery`;
+
+    const queryBody = {
+      structuredQuery: {
+        from: [{
+          collectionId: 'companies'
+        }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'status' },
+            op: 'EQUAL',
+            value: { stringValue: 'pending' }
+          }
+        }
+      }
+    };
+
+    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}/companies:runQuery`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(queryBody)
+    });
+
+    if (!queryResponse.ok) {
+      const errorText = await queryResponse.text();
+      console.error(`❌ Failed to query pending companies:`, errorText);
+      // Don't throw - continue even if query fails
+      return;
+    }
+
+    const queryResults = await queryResponse.json();
+
+    // Extract document names from query results
+    const pendingCompanyDocs = queryResults
+      .filter(result => result.document)
+      .map(result => result.document.name);
+
+    console.log(`📦 Found ${pendingCompanyDocs.length} pending companies to clear`);
+
+    // Delete each pending company
+    for (const docName of pendingCompanyDocs) {
+      try {
+        const deleteResponse = await fetch(`https://firestore.googleapis.com/v1/${docName}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        if (!deleteResponse.ok) {
+          console.error(`⚠️  Failed to delete ${docName}`);
+        }
+      } catch (deleteError) {
+        console.error(`⚠️  Error deleting ${docName}:`, deleteError);
+      }
+    }
+
+    console.log(`✅ Cleared ${pendingCompanyDocs.length} pending companies`);
+
+  } catch (error) {
+    console.error('❌ Error clearing pending companies:', error);
+    // Don't throw - allow search to continue even if clearing fails
+  }
 }
 
 async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile) {

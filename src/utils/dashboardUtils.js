@@ -64,6 +64,20 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
     } else if (completedSections === sections.length) {
       modules[moduleIndex].status = 'completed';
       modules[moduleIndex].completedAt = new Date().toISOString();
+
+      // Unlock next module when current module is completed
+      if (moduleIndex + 1 < modules.length) {
+        const nextModule = modules[moduleIndex + 1];
+        if (!nextModule.unlocked) {
+          console.log(`🔓 Module ${moduleId} completed! Unlocking next module: ${nextModule.id}`);
+          modules[moduleIndex + 1].unlocked = true;
+          modules[moduleIndex + 1].status = 'not_started';
+          // Unlock first section of next module
+          if (modules[moduleIndex + 1].sections && modules[moduleIndex + 1].sections.length > 0) {
+            modules[moduleIndex + 1].sections[0].unlocked = true;
+          }
+        }
+      }
     } else {
       modules[moduleIndex].status = 'in-progress';
       if (!modules[moduleIndex].startedAt) {
@@ -190,7 +204,39 @@ export async function getDashboardState(userId) {
       return null;
     }
 
-    return dashboardDoc.data();
+    const data = dashboardDoc.data();
+
+    // Migration: Auto-unlock next modules if previous module is completed
+    const modules = data.modules || [];
+    let needsUpdate = false;
+
+    for (let i = 0; i < modules.length - 1; i++) {
+      const currentModule = modules[i];
+      const nextModule = modules[i + 1];
+
+      // If current module is completed and next module is locked, unlock it
+      if (currentModule.status === 'completed' && !nextModule.unlocked) {
+        console.log(`🔧 Migration: Unlocking ${nextModule.id} because ${currentModule.id} is completed`);
+        nextModule.unlocked = true;
+        nextModule.status = 'not_started';
+        if (nextModule.sections && nextModule.sections.length > 0) {
+          nextModule.sections[0].unlocked = true;
+        }
+        needsUpdate = true;
+      }
+    }
+
+    // Save migration changes
+    if (needsUpdate) {
+      await updateDoc(dashboardRef, {
+        modules,
+        lastUpdatedAt: new Date().toISOString()
+      });
+      console.log('✅ Dashboard state migrated and updated');
+      return { ...data, modules };
+    }
+
+    return data;
   } catch (error) {
     console.error('❌ Error getting dashboard state:', error);
     throw error;

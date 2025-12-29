@@ -184,8 +184,8 @@ export default function CompanyQuestionnaire() {
       // Trigger Apollo search in background
       await triggerApolloSearch(user.uid);
 
-      // Redirect to Scout dashboard
-      navigate('/mission-control-v2/scout');
+      // Redirect to Scout (new 4-tab structure)
+      navigate('/scout');
 
     } catch (error) {
       console.error('❌ Error saving profile:', error);

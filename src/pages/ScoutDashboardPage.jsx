@@ -15,7 +15,7 @@ export default function ScoutDashboardPage() {
   const [dailySwipeCount, setDailySwipeCount] = useState(0);
   const [lastSwipeDate, setLastSwipeDate] = useState('');
 
-  const DAILY_SWIPE_LIMIT = 50; // 50 companies per day for mission
+  const DAILY_SWIPE_LIMIT = 25; // 25 interested companies for testing
 
   useEffect(() => {
     loadCompaniesAndProgress();

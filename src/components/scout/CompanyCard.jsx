@@ -116,21 +116,31 @@ export default function CompanyCard({ company, onSwipe }) {
           <div className="grid grid-cols-3 gap-6 mb-8">
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
               <p className="text-gray-400 text-sm mb-2 font-mono">INDUSTRY</p>
-              <p className="text-white text-lg font-semibold">{company.industry || 'Unknown'}</p>
+              <p className="text-white text-lg font-semibold">{company.industry || 'Accounting'}</p>
             </div>
 
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-              <p className="text-gray-400 text-sm mb-2 font-mono">SIZE</p>
+              <p className="text-gray-400 text-sm mb-2 font-mono">REVENUE</p>
               <p className="text-white text-lg font-semibold">
-                {company.employee_range || (company.employee_count ? `${company.employee_count.toLocaleString()} employees` : 'Size not available')}
+                {company.revenue || 'Not available'}
               </p>
             </div>
 
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-              <p className="text-gray-400 text-sm mb-2 font-mono">LOCATION</p>
-              <p className="text-white text-lg font-semibold">{company.headquarters_location || 'Location not available'}</p>
+              <p className="text-gray-400 text-sm mb-2 font-mono">FOUNDED</p>
+              <p className="text-white text-lg font-semibold">{company.founded_year || 'Not available'}</p>
             </div>
           </div>
+
+          {/* Phone if available */}
+          {company.phone && (
+            <div className="mb-8">
+              <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
+                <p className="text-gray-400 text-sm mb-2 font-mono">PHONE</p>
+                <p className="text-white text-lg font-semibold">{company.phone}</p>
+              </div>
+            </div>
+          )}
 
           {/* Links */}
           <div className="flex gap-4 mb-8">

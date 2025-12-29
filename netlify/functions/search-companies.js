@@ -574,20 +574,24 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
     // SIMPLIFIED: Accept ALL companies - no filtering or complex scoring
     // Scout's job is discovery, not scoring. User decides fit via swipes.
     const simplifiedCompanies = companies.map((company, index) => {
-      // Extract basic info only - what Scout displays
-      const employeeCount = company.estimated_num_employees || 0;
-      const location = extractSimpleLocation(company);
+      // Extract available data from Apollo
+      // NOTE: Apollo search endpoint doesn't return employee_count or headquarters_location
+      // We use the data that IS available: revenue, founded_year, phone, etc.
+      const revenue = company.organization_revenue_printed ||
+                     (company.organization_revenue ? `$${(company.organization_revenue / 1000000).toFixed(1)}M` : null);
+      const foundedYear = company.founded_year || null;
+      const phone = company.phone || null;
 
-      // Debug logging for first company to verify data extraction
+      // Debug logging for first company
       if (index === 0) {
-        console.log('\n📊 First company data extraction:');
+        console.log('\n📊 First company data extraction (using available fields):');
         console.log(`  Name: ${company.name}`);
-        console.log(`  Employee count (raw): ${company.estimated_num_employees}`);
-        console.log(`  Employee range (formatted): ${formatEmployeeRange(employeeCount)}`);
-        console.log(`  Location (raw): ${JSON.stringify(company.headquarters_location)}`);
-        console.log(`  Location (formatted): ${location}`);
+        console.log(`  Revenue: ${revenue}`);
+        console.log(`  Founded: ${foundedYear}`);
+        console.log(`  Phone: ${phone}`);
         console.log(`  Website: ${company.website_url || company.primary_domain}`);
         console.log(`  LinkedIn: ${company.linkedin_url}`);
+        console.log(`  ⚠️  NOTE: Apollo search endpoint does NOT return employee_count or location`);
       }
 
       return {
@@ -596,16 +600,16 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
         // Basic Info (what Scout displays)
         name: company.name || 'Unknown Company',
-        industry: company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown',
-        employee_count: employeeCount,
-        employee_range: formatEmployeeRange(employeeCount),
+        industry: companyProfile.industries?.[0] || 'Accounting', // Use selected industry
+
+        // Use revenue and founded year (Apollo DOES return these)
+        revenue: revenue,
+        founded_year: foundedYear,
+        phone: phone,
 
         // Links (critical for user research)
-        website_url: company.website_url || company.primary_domain || null,
+        website_url: company.website_url || (company.primary_domain ? `https://${company.primary_domain}` : null),
         linkedin_url: company.linkedin_url || null,
-
-        // Location (for display)
-        headquarters_location: location,
 
         // Metadata
         found_at: new Date().toISOString(),
@@ -628,9 +632,9 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           apollo_organization_id: { stringValue: String(company.apollo_organization_id) },
           name: { stringValue: String(company.name) },
           industry: { stringValue: String(company.industry) },
-          employee_count: { integerValue: String(company.employee_count) },
-          employee_range: { stringValue: String(company.employee_range) },
-          headquarters_location: { stringValue: String(company.headquarters_location) },
+          revenue: { stringValue: String(company.revenue || '') },
+          founded_year: { integerValue: String(company.founded_year || 0) },
+          phone: { stringValue: String(company.phone || '') },
           linkedin_url: { stringValue: String(company.linkedin_url || '') },
           website_url: { stringValue: String(company.website_url || '') },
           status: { stringValue: 'pending' },

@@ -309,20 +309,19 @@ function buildApolloQuery(companyProfile) {
     query.organization_industry_tag_ids = getIndustryIds(companyProfile.industries);
   }
 
-  // Map company sizes to Apollo format
+  // Map company sizes to Apollo format (comma-separated strings)
   if (companyProfile.companySizes && companyProfile.companySizes.length > 0) {
     query.organization_num_employees_ranges = companyProfile.companySizes.map(size => {
-      // Convert "51-100" to [51, 100] for Apollo (array of integers)
+      // Convert "51-100" to "51,100" for Apollo
       if (size.includes('+')) {
-        // "10,001+" becomes [10001, 999999]
-        const min = parseInt(size.replace(/[,+]/g, ''));
-        return [min, 999999];
+        // "10,001+" becomes "10001,999999"
+        const min = size.replace(/[,+]/g, '');
+        return `${min},999999`;
       }
-      // "1,001-2,000" becomes [1001, 2000]
+      // "1,001-2,000" becomes "1001,2000"
       // First remove any existing commas, then split by dash
       const cleaned = size.replace(/,/g, '');
-      const [min, max] = cleaned.split('-');
-      return [parseInt(min), parseInt(max)];
+      return cleaned.replace('-', ',');
     });
   }
 

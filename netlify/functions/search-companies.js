@@ -645,7 +645,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       }
     }
 
-    console.log(`✅ Saved ${enrichedCompanies.length} companies to Firestore`);
+    console.log(`✅ Saved ${simplifiedCompanies.length} companies to Firestore`);
 
   } catch (error) {
     console.error('❌ Error saving companies to Firestore:', error);

@@ -573,10 +573,22 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
     // SIMPLIFIED: Accept ALL companies - no filtering or complex scoring
     // Scout's job is discovery, not scoring. User decides fit via swipes.
-    const simplifiedCompanies = companies.map(company => {
+    const simplifiedCompanies = companies.map((company, index) => {
       // Extract basic info only - what Scout displays
       const employeeCount = company.estimated_num_employees || 0;
       const location = extractSimpleLocation(company);
+
+      // Debug logging for first company to verify data extraction
+      if (index === 0) {
+        console.log('\n📊 First company data extraction:');
+        console.log(`  Name: ${company.name}`);
+        console.log(`  Employee count (raw): ${company.estimated_num_employees}`);
+        console.log(`  Employee range (formatted): ${formatEmployeeRange(employeeCount)}`);
+        console.log(`  Location (raw): ${JSON.stringify(company.headquarters_location)}`);
+        console.log(`  Location (formatted): ${location}`);
+        console.log(`  Website: ${company.website_url || company.primary_domain}`);
+        console.log(`  LinkedIn: ${company.linkedin_url}`);
+      }
 
       return {
         // IDs

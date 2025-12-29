@@ -134,7 +134,7 @@ export default function CompanyCard({ company, onSwipe }) {
             <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
               <p className="text-gray-400 text-sm mb-2 font-mono">SIZE</p>
               <p className="text-white text-lg font-semibold">
-                {company.employee_count ? `${company.employee_count.toLocaleString()} employees` : 'Unknown'}
+                {company.employee_range || (company.employee_count ? `${company.employee_count.toLocaleString()} employees` : 'Unknown')}
               </p>
             </div>
 
@@ -148,6 +148,29 @@ export default function CompanyCard({ company, onSwipe }) {
               <p className="text-white text-lg font-semibold">{company.headquarters_location || 'Unknown'}</p>
             </div>
           </div>
+
+          {/* Company Insights */}
+          {(company.founded_year || company.company_age_years) && (
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-5 border border-purple-500/20">
+                <p className="text-gray-400 text-sm mb-3 font-mono">COMPANY INSIGHTS</p>
+                <div className="flex gap-6 flex-wrap">
+                  {company.founded_year && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-purple-400 text-xl">📅</span>
+                      <span className="text-white font-semibold">Founded {company.founded_year}</span>
+                    </div>
+                  )}
+                  {company.company_age_years > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-pink-400 text-xl">⏳</span>
+                      <span className="text-white font-semibold">{company.company_age_years} years old</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Fit Reasons */}
           {company.fit_reasons && company.fit_reasons.length > 0 && (

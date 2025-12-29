@@ -178,9 +178,31 @@ export const handler = async (event) => {
     }
 
     console.log('🔍 Starting Apollo company search for user:', userId);
+    console.log('📋 Company profile:', JSON.stringify(companyProfile, null, 2));
+
+    // Validate required environment variables
+    const apolloApiKey = process.env.APOLLO_API_KEY;
+    if (!apolloApiKey) {
+      console.error('❌ APOLLO_API_KEY not configured in environment');
+      throw new Error('Apollo API key not configured. Please contact support.');
+    }
+
+    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!firebaseApiKey) {
+      console.error('❌ FIREBASE_API_KEY not configured in environment');
+      throw new Error('Firebase API key not configured. Please contact support.');
+    }
+
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      console.error('❌ FIREBASE_PROJECT_ID not configured in environment');
+      throw new Error('Firebase Project ID not configured. Please contact support.');
+    }
+
+    console.log('✅ All environment variables validated');
 
     // Verify Firebase Auth token
-    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const apiKey = firebaseApiKey;
     if (!apiKey) {
       throw new Error('Firebase API key not configured');
     }
@@ -213,11 +235,6 @@ export const handler = async (event) => {
     console.log('📊 Apollo query:', JSON.stringify(apolloQuery, null, 2));
 
     // Call Apollo API
-    const apolloApiKey = process.env.APOLLO_API_KEY;
-    if (!apolloApiKey) {
-      throw new Error('Apollo API key not configured');
-    }
-
     const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
       method: 'POST',
       headers: {

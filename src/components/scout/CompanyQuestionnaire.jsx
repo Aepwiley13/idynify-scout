@@ -206,16 +206,20 @@ export default function CompanyQuestionnaire() {
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Apollo search failed');
+        console.error('❌ Backend error response:', data);
+        throw new Error(data.error || 'Apollo search failed');
       }
 
-      const data = await response.json();
       console.log(`✅ Found ${data.companiesFound} companies!`);
 
     } catch (error) {
       console.error('❌ Apollo search error:', error);
-      // Don't block user flow on search error
+      console.error('❌ Error details:', error.message);
+      // Don't block user flow on search error - user can still proceed to Scout
+      alert(`Warning: Company search encountered an error: ${error.message}\n\nYou can still access Scout, but you may not have any companies yet. Please check your settings or contact support.`);
     }
   };
 

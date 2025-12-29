@@ -151,9 +151,21 @@ const APOLLO_INDUSTRIES = {
 };
 
 function getIndustryIds(industryNames) {
-  return industryNames
-    .map(name => APOLLO_INDUSTRIES[name])
-    .filter(id => id !== undefined);
+  console.log('\n🔍 Industry ID Mapping:');
+  const ids = industryNames.map(name => {
+    const id = APOLLO_INDUSTRIES[name];
+    console.log(`  "${name}" -> ${id || 'NOT FOUND'}`);
+    if (!id) {
+      console.error(`  ❌ WARNING: Industry "${name}" not found in APOLLO_INDUSTRIES mapping!`);
+    }
+    return id;
+  }).filter(id => id !== undefined);
+
+  if (ids.length === 0 && industryNames.length > 0) {
+    console.error('❌ CRITICAL: No valid industry IDs mapped! This will return companies from ALL industries!');
+  }
+
+  return ids;
 }
 
 function formatStatesForApollo(states) {
@@ -257,14 +269,17 @@ export const handler = async (event) => {
 
     console.log(`✅ Found ${companies.length} companies from Apollo`);
 
-    // Log first company details for debugging
+    // Log first 3 companies details for debugging
     if (companies.length > 0) {
-      const firstCompany = companies[0];
-      console.log('📊 First company sample:');
-      console.log(`  - Name: ${firstCompany.name}`);
-      console.log(`  - Industry: ${firstCompany.industry || firstCompany.primary_industry || 'N/A'}`);
-      console.log(`  - Employees: ${firstCompany.estimated_num_employees || 'N/A'}`);
-      console.log(`  - Location: ${JSON.stringify(firstCompany.headquarters_location || firstCompany.primary_location || 'N/A')}`);
+      console.log('\n📊 Sample companies returned by Apollo:');
+      companies.slice(0, 3).forEach((company, index) => {
+        console.log(`\n  Company ${index + 1}:`);
+        console.log(`    - Name: ${company.name}`);
+        console.log(`    - Industry: ${company.industry || company.primary_industry || 'N/A'}`);
+        console.log(`    - Employees: ${company.estimated_num_employees || 'N/A'}`);
+        console.log(`    - Location: ${JSON.stringify(company.headquarters_location || company.primary_location || 'N/A')}`);
+      });
+      console.log('\n');
     }
 
     // Clear old pending companies before adding new ones (for updated searches)

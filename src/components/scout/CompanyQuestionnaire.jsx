@@ -166,6 +166,11 @@ export default function CompanyQuestionnaire() {
         return;
       }
 
+      console.log('📋 Form data being saved:', JSON.stringify(formData, null, 2));
+      console.log('🏭 Industries selected:', formData.industries);
+      console.log('👥 Company sizes selected:', formData.companySizes);
+      console.log('📍 Locations selected:', formData.locations);
+
       // Save company profile
       const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
       await setDoc(profileRef, {
@@ -174,7 +179,7 @@ export default function CompanyQuestionnaire() {
         updatedAt: new Date().toISOString()
       });
 
-      console.log('✅ Company profile saved!');
+      console.log('✅ Company profile saved to Firestore!');
 
       // Trigger Apollo search in background
       await triggerApolloSearch(user.uid);
@@ -193,17 +198,22 @@ export default function CompanyQuestionnaire() {
   const triggerApolloSearch = async (userId) => {
     try {
       console.log('🔍 Triggering Apollo company search...');
+      console.log('📤 Sending to backend:', JSON.stringify(formData, null, 2));
 
       const authToken = await auth.currentUser.getIdToken();
+
+      const payload = {
+        userId,
+        authToken,
+        companyProfile: formData
+      };
+
+      console.log('📦 Full payload to backend:', JSON.stringify(payload, null, 2));
 
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          authToken,
-          companyProfile: formData
-        })
+        body: JSON.stringify(payload)
       });
 
       let data;

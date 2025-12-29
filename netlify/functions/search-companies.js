@@ -275,12 +275,16 @@ export const handler = async (event) => {
     // Log first 3 companies details for debugging
     if (companies.length > 0) {
       console.log('\n📊 Sample companies returned by Apollo:');
+      console.log('\n🔍 First company RAW DATA:');
+      console.log(JSON.stringify(companies[0], null, 2));
+
       companies.slice(0, 3).forEach((company, index) => {
         console.log(`\n  Company ${index + 1}:`);
         console.log(`    - Name: ${company.name}`);
         console.log(`    - Industry: ${company.industry || company.primary_industry || 'N/A'}`);
         console.log(`    - Employees: ${company.estimated_num_employees || 'N/A'}`);
         console.log(`    - Location: ${JSON.stringify(company.headquarters_location || company.primary_location || 'N/A')}`);
+        console.log(`    - Available keys: ${Object.keys(company).slice(0, 20).join(', ')}`);
       });
       console.log('\n');
     }

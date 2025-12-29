@@ -374,30 +374,42 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
-    console.log(`📦 Saving ${companies.length} companies to Firestore...`);
+    console.log(`📦 Processing ${companies.length} companies from Apollo...`);
 
-    for (const company of companies) {
-      const companyId = company.id || `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Enrich and filter companies
+    const enrichedCompanies = companies
+      .map(company => enrichCompanyData(company, companyProfile))
+      .filter(company => validateCompanyData(company));
 
-      // Calculate fit score
-      const fitScore = calculateFitScore(company, companyProfile);
+    console.log(`✅ ${enrichedCompanies.length} companies passed validation (filtered ${companies.length - enrichedCompanies.length})`);
+
+    // Sort by fit score (highest first)
+    enrichedCompanies.sort((a, b) => b.fit_score - a.fit_score);
+
+    // Save to Firestore
+    for (const company of enrichedCompanies) {
+      const companyId = company.apollo_organization_id || `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       const companyData = {
         fields: {
-          apollo_organization_id: { stringValue: String(company.id || '') },
-          name: { stringValue: String(company.name || '') },
-          domain: { stringValue: String(company.website_url || company.primary_domain || '') },
-          industry: { stringValue: String(company.industry || '') },
-          employee_count: { integerValue: String(company.estimated_num_employees || 0) },
-          revenue_range: { stringValue: String(formatRevenueRange(company.revenue_range)) },
-          headquarters_location: { stringValue: String(formatLocation(company.primary_location)) },
+          apollo_organization_id: { stringValue: String(company.apollo_organization_id) },
+          name: { stringValue: String(company.name) },
+          domain: { stringValue: String(company.domain || '') },
+          industry: { stringValue: String(company.industry) },
+          employee_count: { integerValue: String(company.employee_count) },
+          employee_range: { stringValue: String(company.employee_range) },
+          revenue_range: { stringValue: String(company.revenue_range) },
+          headquarters_location: { stringValue: String(company.headquarters_location) },
           linkedin_url: { stringValue: String(company.linkedin_url || '') },
           website_url: { stringValue: String(company.website_url || '') },
+          phone: { stringValue: String(company.phone || '') },
+          founded_year: { integerValue: String(company.founded_year || 0) },
+          company_age_years: { integerValue: String(company.company_age_years || 0) },
           status: { stringValue: 'pending' },
-          fit_score: { integerValue: String(fitScore) },
-          fit_reasons: { arrayValue: { values: getFitReasons(company, companyProfile).map(r => ({ stringValue: String(r) })) } },
+          fit_score: { integerValue: String(company.fit_score) },
+          fit_reasons: { arrayValue: { values: company.fit_reasons.map(r => ({ stringValue: String(r) })) } },
           foundAt: { timestampValue: new Date().toISOString() },
-          source: { stringValue: 'initial_search' },
+          source: { stringValue: 'apollo_api' },
           swipedAt: { nullValue: null },
           swipeDirection: { nullValue: null }
         }
@@ -421,7 +433,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       }
     }
 
-    console.log(`✅ Saved ${companies.length} companies to Firestore`);
+    console.log(`✅ Saved ${enrichedCompanies.length} companies to Firestore`);
 
   } catch (error) {
     console.error('❌ Error saving companies to Firestore:', error);
@@ -430,94 +442,302 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
   }
 }
 
-function calculateFitScore(company, companyProfile) {
-  let score = 0;
-  let maxScore = 0;
+/**
+ * Enrich company data from Apollo response with fallbacks and formatting
+ */
+function enrichCompanyData(company, companyProfile) {
+  // Extract and format employee count
+  const employeeCount = company.estimated_num_employees ||
+                       extractMidpoint(company.organization_num_employees_ranges) ||
+                       0;
 
-  // Industry match (30 points)
-  maxScore += 30;
-  if (companyProfile.industries.includes(company.industry)) {
-    score += 30;
+  // Extract industry with fallbacks
+  const industry = company.industry ||
+                  company.primary_industry ||
+                  'Unknown Industry';
+
+  // Extract location with multiple fallbacks
+  const location = extractLocation(company);
+
+  // Format revenue range
+  const revenueRange = formatRevenueRange(company.revenue_range);
+
+  // Calculate company age
+  const foundedYear = company.founded_year || null;
+  const companyAge = foundedYear ? new Date().getFullYear() - foundedYear : 0;
+
+  // Calculate fit score
+  const fitScore = calculateFitScore(company, companyProfile);
+
+  // Generate fit reasons
+  const fitReasons = generateFitReasons(company, companyProfile, fitScore);
+
+  return {
+    apollo_organization_id: company.id,
+    name: company.name || 'Unknown Company',
+    domain: company.website_url || company.primary_domain || null,
+    industry: industry,
+    employee_count: employeeCount,
+    employee_range: formatEmployeeRange(employeeCount),
+    revenue_range: revenueRange,
+    headquarters_location: location,
+    linkedin_url: company.linkedin_url || null,
+    website_url: company.website_url || null,
+    phone: company.phone || null,
+    founded_year: foundedYear,
+    company_age_years: companyAge,
+    fit_score: fitScore,
+    fit_reasons: fitReasons,
+    status: 'pending'
+  };
+}
+
+/**
+ * Validate company data before saving
+ */
+function validateCompanyData(company) {
+  // Require minimum fit score of 50%
+  if (company.fit_score < 50) {
+    console.log(`⚠️  Filtering out ${company.name}: Low fit score (${company.fit_score}%)`);
+    return false;
   }
 
-  // Company size match (20 points)
-  maxScore += 20;
-  const companySize = company.estimated_num_employees;
-  for (const sizeRange of companyProfile.companySizes) {
-    if (isInSizeRange(companySize, sizeRange)) {
-      score += 20;
-      break;
+  // Require at least name and one other key field
+  const hasName = company.name && company.name !== 'Unknown Company';
+  const hasIndustry = company.industry && company.industry !== 'Unknown Industry';
+  const hasLocation = company.headquarters_location && company.headquarters_location !== 'Unknown';
+
+  if (!hasName) {
+    console.log(`⚠️  Filtering out company: No name`);
+    return false;
+  }
+
+  // Reject if both industry and location are unknown
+  if (!hasIndustry && !hasLocation) {
+    console.log(`⚠️  Filtering out ${company.name}: Missing industry AND location`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Extract location from Apollo response with fallbacks
+ */
+function extractLocation(company) {
+  // Try headquarters_location first
+  if (company.headquarters_location) {
+    if (typeof company.headquarters_location === 'object') {
+      const { city, state, country } = company.headquarters_location;
+      if (city && state) return `${city}, ${state}`;
+      if (state) return `${state}, USA`;
+      if (country) return country;
+    }
+    if (typeof company.headquarters_location === 'string') {
+      return company.headquarters_location;
     }
   }
 
-  // Revenue match (20 points)
-  if (!companyProfile.skipRevenue && companyProfile.revenueRanges.length > 0) {
-    maxScore += 20;
-    const companyRevenue = company.revenue_range;
-    if (companyRevenue && isInRevenueRange(companyRevenue, companyProfile.revenueRanges)) {
-      score += 20;
+  // Try primary_location
+  if (company.primary_location) {
+    if (typeof company.primary_location === 'object') {
+      const { city, state, country } = company.primary_location;
+      if (city && state) return `${city}, ${state}`;
+      if (state) return `${state}, USA`;
+      if (country) return country;
     }
   }
 
-  // Location match (30 points)
-  maxScore += 30;
-  const companyLocation = company.primary_location?.state;
-  if (companyLocation && (companyProfile.isNationwide || companyProfile.locations.includes(companyLocation))) {
-    score += 30;
+  // Try organization_locations array
+  if (company.organization_locations && company.organization_locations.length > 0) {
+    return company.organization_locations[0];
   }
 
-  return Math.round((score / maxScore) * 100);
+  return 'Unknown';
 }
 
-function isInSizeRange(employeeCount, sizeRange) {
-  if (sizeRange.includes('+')) {
-    const min = parseInt(sizeRange.replace(/[,+]/g, ''));
-    return employeeCount >= min;
+/**
+ * Extract midpoint from employee range string
+ */
+function extractMidpoint(rangeString) {
+  if (!rangeString) return null;
+
+  // Handle "51,100" format
+  if (typeof rangeString === 'string' && rangeString.includes(',')) {
+    const [min, max] = rangeString.split(',').map(n => parseInt(n));
+    return Math.floor((min + max) / 2);
   }
 
-  const [min, max] = sizeRange.split('-').map(s => parseInt(s.replace(/,/g, '')));
-  return employeeCount >= min && employeeCount <= max;
+  return null;
 }
 
-function isInRevenueRange(companyRevenue, revenueRanges) {
-  // This is a simplified check - you may want to make it more sophisticated
-  return true; // For now, accept any revenue if revenue filter is set
+/**
+ * Format employee count to range string
+ */
+function formatEmployeeRange(count) {
+  if (!count || count === 0) return 'Unknown Size';
+  if (count <= 10) return '1-10 employees';
+  if (count <= 20) return '11-20 employees';
+  if (count <= 50) return '21-50 employees';
+  if (count <= 100) return '51-100 employees';
+  if (count <= 200) return '101-200 employees';
+  if (count <= 500) return '201-500 employees';
+  if (count <= 1000) return '501-1,000 employees';
+  if (count <= 2000) return '1,001-2,000 employees';
+  if (count <= 5000) return '2,001-5,000 employees';
+  if (count <= 10000) return '5,001-10,000 employees';
+  return '10,001+ employees';
 }
 
-function getFitReasons(company, companyProfile) {
+/**
+ * Generate human-readable fit reasons
+ */
+function generateFitReasons(company, companyProfile, fitScore) {
   const reasons = [];
 
+  // Industry match
   if (companyProfile.industries.includes(company.industry)) {
-    reasons.push(`Industry match: ${company.industry}`);
+    reasons.push(`✓ Industry match: ${company.industry}`);
   }
 
-  if (company.estimated_num_employees) {
-    reasons.push(`Company size: ${company.estimated_num_employees} employees`);
+  // Size match
+  const employeeCount = company.estimated_num_employees || extractMidpoint(company.organization_num_employees_ranges);
+  if (employeeCount && isWithinSizeRange(employeeCount, companyProfile.companySizes)) {
+    reasons.push(`✓ Size match: ${formatEmployeeRange(employeeCount)}`);
   }
 
-  if (company.revenue_range) {
-    reasons.push(`Revenue: ${formatRevenueRange(company.revenue_range)}`);
+  // Location match
+  const location = extractLocation(company);
+  const state = extractStateFromLocation(location);
+  if (state && (companyProfile.isNationwide || companyProfile.locations.includes(state))) {
+    reasons.push(`✓ Location: ${state} (your target)`);
   }
 
-  if (company.primary_location) {
-    reasons.push(`Location: ${formatLocation(company.primary_location)}`);
+  // Add at least one reason if fit score is decent
+  if (reasons.length === 0 && fitScore >= 50) {
+    reasons.push(`✓ Good match for your criteria (${fitScore}% fit)`);
   }
 
   return reasons;
 }
 
+/**
+ * Check if employee count is within ICP size ranges
+ */
+function isWithinSizeRange(employeeCount, icpSizes) {
+  if (!employeeCount || !icpSizes || icpSizes.length === 0) return false;
+
+  return icpSizes.some(range => {
+    // Handle "10,001+" format
+    if (range.includes('+')) {
+      const min = parseInt(range.replace(/[,+]/g, ''));
+      return employeeCount >= min;
+    }
+
+    // Handle "51-100" format
+    const cleaned = range.replace(/,/g, '');
+    const [min, max] = cleaned.split('-').map(n => parseInt(n));
+    return employeeCount >= min && employeeCount <= max;
+  });
+}
+
+/**
+ * Extract state from location string
+ */
+function extractStateFromLocation(location) {
+  if (!location || location === 'Unknown') return null;
+
+  // Handle "City, State" or "State, Country" format
+  const parts = location.split(',').map(s => s.trim());
+
+  // If we have "City, State" or "State, USA"
+  if (parts.length >= 2) {
+    // Check if second part is USA/United States, return first part
+    if (parts[1].includes('USA') || parts[1].includes('United States')) {
+      return parts[0];
+    }
+    // Otherwise return second part (likely the state)
+    return parts[1];
+  }
+
+  // Single part, return as-is
+  return parts[0];
+}
+
+function calculateFitScore(company, companyProfile) {
+  let score = 0;
+  let maxScore = 0;
+
+  // Extract industry (with fallback)
+  const industry = company.industry || company.primary_industry || '';
+
+  // Industry match (30 points)
+  maxScore += 30;
+  if (industry && companyProfile.industries.includes(industry)) {
+    score += 30;
+  }
+
+  // Company size match (25 points)
+  maxScore += 25;
+  const employeeCount = company.estimated_num_employees || extractMidpoint(company.organization_num_employees_ranges);
+  if (employeeCount && companyProfile.companySizes) {
+    if (isWithinSizeRange(employeeCount, companyProfile.companySizes)) {
+      score += 25;
+    }
+  }
+
+  // Revenue match (20 points) - only if user specified revenue preference
+  if (!companyProfile.skipRevenue && companyProfile.revenueRanges && companyProfile.revenueRanges.length > 0) {
+    maxScore += 20;
+    // For now, give points if company has revenue data
+    if (company.revenue_range) {
+      score += 20;
+    }
+  } else if (companyProfile.skipRevenue) {
+    // If user skipped revenue, don't penalize - add to max score and give points
+    maxScore += 20;
+    score += 20;
+  }
+
+  // Location match (25 points)
+  maxScore += 25;
+  const location = extractLocation(company);
+  const state = extractStateFromLocation(location);
+
+  if (state) {
+    if (companyProfile.isNationwide || (companyProfile.locations && companyProfile.locations.includes(state))) {
+      score += 25;
+    }
+  }
+
+  // Calculate percentage
+  const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+
+  return percentage;
+}
+
+/**
+ * Format revenue range from Apollo API response
+ */
 function formatRevenueRange(revenueRange) {
   if (!revenueRange) return 'Unknown';
-  if (typeof revenueRange === 'object' && revenueRange.min && revenueRange.max) {
-    return `$${(revenueRange.min / 1000000).toFixed(0)}M-$${(revenueRange.max / 1000000).toFixed(0)}M`;
+
+  if (typeof revenueRange === 'object' && revenueRange.min !== undefined && revenueRange.max !== undefined) {
+    const minFormatted = formatRevenueNumber(revenueRange.min);
+    const maxFormatted = formatRevenueNumber(revenueRange.max);
+    return `$${minFormatted} - $${maxFormatted}`;
   }
+
   return 'Unknown';
 }
 
-function formatLocation(location) {
-  if (!location) return 'Unknown';
-  if (typeof location === 'object') {
-    return `${location.city || ''}, ${location.state || ''}, ${location.country || ''}`.replace(/,\s*,/g, ',').trim();
-  }
-  return location;
+/**
+ * Format revenue number to readable string (e.g., 1000000 -> "1M")
+ */
+function formatRevenueNumber(amount) {
+  if (!amount || amount === 0) return '0';
+  if (amount >= 1000000000) return `${(amount / 1000000000).toFixed(1)}B`;
+  if (amount >= 1000000) return `${(amount / 1000000).toFixed(0)}M`;
+  if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+  return amount.toString();
 }

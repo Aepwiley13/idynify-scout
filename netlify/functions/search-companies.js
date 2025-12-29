@@ -232,8 +232,9 @@ export const handler = async (event) => {
 
     if (!apolloResponse.ok) {
       const errorText = await apolloResponse.text();
-      console.error('Apollo API error:', errorText);
-      throw new Error(`Apollo API request failed: ${apolloResponse.status}`);
+      console.error('❌ Apollo API error:', apolloResponse.status, errorText);
+      console.error('📊 Apollo query that failed:', JSON.stringify(apolloQuery, null, 2));
+      throw new Error(`Apollo API request failed: ${apolloResponse.status} - ${errorText}`);
     }
 
     const apolloData = await apolloResponse.json();
@@ -302,7 +303,11 @@ function buildApolloQuery(companyProfile) {
         const min = size.replace(/[,+]/g, '');
         return `${min},999999`;
       }
-      return size.replace('-', ',').replace(/,/g, '');
+      // "1,001-2,000" becomes "1001,2000"
+      // First remove any existing commas, then split by dash
+      const cleaned = size.replace(/,/g, '');
+      const [min, max] = cleaned.split('-');
+      return `${min},${max}`;
     });
   }
 
@@ -342,7 +347,15 @@ function convertRevenueToNumeric(revenueRange) {
 async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+
+    if (!projectId) {
+      console.error('❌ Firebase Project ID not configured');
+      throw new Error('Firebase Project ID not configured');
+    }
+
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+    console.log(`📦 Saving ${companies.length} companies to Firestore...`);
 
     for (const company of companies) {
       const companyId = company.id || `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -352,18 +365,18 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
       const companyData = {
         fields: {
-          apollo_organization_id: { stringValue: company.id || '' },
-          name: { stringValue: company.name || '' },
-          domain: { stringValue: company.website_url || company.primary_domain || '' },
-          industry: { stringValue: company.industry || '' },
-          employee_count: { integerValue: company.estimated_num_employees || 0 },
-          revenue_range: { stringValue: formatRevenueRange(company.revenue_range) },
-          headquarters_location: { stringValue: formatLocation(company.primary_location) },
-          linkedin_url: { stringValue: company.linkedin_url || '' },
-          website_url: { stringValue: company.website_url || '' },
+          apollo_organization_id: { stringValue: String(company.id || '') },
+          name: { stringValue: String(company.name || '') },
+          domain: { stringValue: String(company.website_url || company.primary_domain || '') },
+          industry: { stringValue: String(company.industry || '') },
+          employee_count: { integerValue: String(company.estimated_num_employees || 0) },
+          revenue_range: { stringValue: String(formatRevenueRange(company.revenue_range)) },
+          headquarters_location: { stringValue: String(formatLocation(company.primary_location)) },
+          linkedin_url: { stringValue: String(company.linkedin_url || '') },
+          website_url: { stringValue: String(company.website_url || '') },
           status: { stringValue: 'pending' },
-          fit_score: { integerValue: fitScore },
-          fit_reasons: { arrayValue: { values: getFitReasons(company, companyProfile).map(r => ({ stringValue: r })) } },
+          fit_score: { integerValue: String(fitScore) },
+          fit_reasons: { arrayValue: { values: getFitReasons(company, companyProfile).map(r => ({ stringValue: String(r) })) } },
           foundAt: { timestampValue: new Date().toISOString() },
           source: { stringValue: 'initial_search' },
           swipedAt: { nullValue: null },
@@ -384,7 +397,8 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       });
 
       if (!saveResponse.ok) {
-        console.error(`Failed to save company ${company.name}:`, await saveResponse.text());
+        const errorText = await saveResponse.text();
+        console.error(`❌ Failed to save company ${company.name}:`, errorText);
       }
     }
 
@@ -392,7 +406,8 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
   } catch (error) {
     console.error('❌ Error saving companies to Firestore:', error);
-    // Don't throw - allow function to complete even if some saves fail
+    // Throw error so user knows companies weren't saved
+    throw error;
   }
 }
 

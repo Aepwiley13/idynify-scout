@@ -245,6 +245,9 @@ export const handler = async (event) => {
     const apolloQuery = buildApolloQuery(companyProfile);
 
     console.log('📊 Apollo query:', JSON.stringify(apolloQuery, null, 2));
+    console.log('🔍 Industry filter check:');
+    console.log(`   - Requested industries: ${JSON.stringify(companyProfile.industries)}`);
+    console.log(`   - Apollo industry_tag_ids: ${JSON.stringify(apolloQuery.organization_industry_tag_ids || 'NONE - THIS IS THE PROBLEM!')}`);
 
     // Call Apollo API
     const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
@@ -285,6 +288,15 @@ export const handler = async (event) => {
     // VALIDATION: Filter companies to ensure they match requested industries
     // Apollo sometimes returns companies that don't match the filter
     const requestedIndustries = companyProfile.industries || [];
+    const debugInfo = {
+      apolloReturned: companies.length,
+      requestedIndustries: requestedIndustries,
+      sampleIndustriesReturned: companies.slice(0, 10).map(c => ({
+        name: c.name,
+        industry: c.industry || c.primary_industry || 'N/A'
+      }))
+    };
+
     if (requestedIndustries.length > 0) {
       console.log(`🔍 Validating companies match requested industries: ${requestedIndustries.join(', ')}`);
 
@@ -302,10 +314,13 @@ export const handler = async (event) => {
 
       console.log(`✅ Validation complete: ${filteredCompanies.length}/${beforeCount} companies match requested industries`);
 
+      debugInfo.afterValidation = filteredCompanies.length;
+
       if (filteredCompanies.length === 0) {
         console.error('❌ CRITICAL: No companies match requested industries after filtering!');
         console.error('This likely means Apollo is ignoring the industry filter.');
         console.error('Check the Apollo query and industry IDs above.');
+        console.error('Debug info:', JSON.stringify(debugInfo, null, 2));
       }
 
       companies = filteredCompanies;
@@ -330,7 +345,13 @@ export const handler = async (event) => {
         success: true,
         companiesFound: companies.length,
         generationTime,
-        message: `Found ${companies.length} companies matching your criteria`
+        message: `Found ${companies.length} companies matching your criteria`,
+        debug: companies.length === 0 ? {
+          apolloQuery: apolloQuery,
+          apolloReturnedCount: debugInfo?.apolloReturned || 0,
+          requestedIndustries: debugInfo?.requestedIndustries || [],
+          sampleIndustriesFromApollo: debugInfo?.sampleIndustriesReturned || []
+        } : undefined
       })
     };
 

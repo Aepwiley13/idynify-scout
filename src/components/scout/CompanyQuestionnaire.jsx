@@ -236,6 +236,19 @@ export default function CompanyQuestionnaire() {
 
       console.log(`✅ Found ${data.companiesFound} companies!`);
 
+      // Show debug info if 0 companies found
+      if (data.companiesFound === 0 && data.debug) {
+        console.error('\n❌ ZERO COMPANIES FOUND - DEBUG INFO:');
+        console.error('   Apollo returned:', data.debug.apolloReturnedCount, 'companies');
+        console.error('   Requested industries:', data.debug.requestedIndustries);
+        console.error('   Apollo query sent:', data.debug.apolloQuery);
+        console.error('   Sample industries from Apollo:');
+        data.debug.sampleIndustriesFromApollo.forEach(c => {
+          console.error(`      - ${c.name}: ${c.industry}`);
+        });
+        console.error('\n   ⚠️  This means Apollo API is ignoring the industry filter!');
+      }
+
     } catch (error) {
       console.error('❌ Apollo search error:', error);
       console.error('❌ Error details:', error.message);

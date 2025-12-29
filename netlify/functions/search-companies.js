@@ -326,17 +326,16 @@ function buildApolloQuery(companyProfile) {
   }
 
   // Map revenue ranges to Apollo format (single min/max object)
-  if (companyProfile.revenueRanges && companyProfile.revenueRanges.length > 0 && !companyProfile.skipRevenue) {
-    // Apollo only accepts a single revenue range, so we need to find the min and max across all selections
-    const allRanges = companyProfile.revenueRanges.map(range => convertRevenueToNumeric(range));
-    const minRevenue = Math.min(...allRanges.map(r => r[0]));
-    const maxRevenue = Math.max(...allRanges.map(r => r[1]));
-
-    query.revenue_range = {
-      min: minRevenue,
-      max: maxRevenue
-    };
-  }
+  // TEMPORARILY DISABLED TO DEBUG - Apollo keeps rejecting with "Invalid parameters"
+  // if (companyProfile.revenueRanges && companyProfile.revenueRanges.length > 0 && !companyProfile.skipRevenue) {
+  //   const allRanges = companyProfile.revenueRanges.map(range => convertRevenueToNumeric(range));
+  //   const minRevenue = Math.min(...allRanges.map(r => r[0]));
+  //   const maxRevenue = Math.max(...allRanges.map(r => r[1]));
+  //   query.revenue_range = {
+  //     min: minRevenue,
+  //     max: maxRevenue
+  //   };
+  // }
 
   // Map locations to Apollo format
   if (companyProfile.locations && companyProfile.locations.length > 0) {

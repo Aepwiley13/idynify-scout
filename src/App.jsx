@@ -35,6 +35,7 @@ import CompanyList from './components/CompanyList';
 import AddCompanyForm from './components/AddCompanyForm';
 import ContactSuggestions from './components/ContactSuggestions';
 import LeadList from './components/LeadList';
+import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -221,6 +222,16 @@ function App() {
         {/* Protected Routes - OLD DASHBOARD REDIRECTS (Use V2 by default) */}
         <Route path="/mission-control" element={<Navigate to="/mission-control-v2" />} />
         <Route path="/dashboard" element={<Navigate to="/mission-control-v2" />} />
+
+        {/* NEW: Company Profile Questionnaire (4 Questions) */}
+        <Route
+          path="/onboarding/company-profile"
+          element={
+            <ProtectedRoute>
+              <CompanyQuestionnaire />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protected Routes - MVP Routes (Module 1) */}
         <Route

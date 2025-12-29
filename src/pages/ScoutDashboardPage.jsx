@@ -85,9 +85,9 @@ export default function ScoutDashboardPage() {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // Check daily swipe limit
-    if (dailySwipeCount >= DAILY_SWIPE_LIMIT && lastSwipeDate === today) {
-      alert(`Daily swipe limit reached! You can swipe ${DAILY_SWIPE_LIMIT} companies per day. Come back tomorrow for more! 🚀`);
+    // Check daily swipe limit (only for interested/right swipes)
+    if (direction === 'right' && dailySwipeCount >= DAILY_SWIPE_LIMIT && lastSwipeDate === today) {
+      alert(`Daily limit reached! You can mark ${DAILY_SWIPE_LIMIT} companies as interested per day. Come back tomorrow for more! 🚀`);
       return;
     }
 
@@ -102,8 +102,12 @@ export default function ScoutDashboardPage() {
         swipeDirection: direction
       });
 
-      // Update swipe progress
-      const newSwipeCount = lastSwipeDate === today ? dailySwipeCount + 1 : 1;
+      // Update swipe progress - only count right swipes (interested companies)
+      const isInterested = direction === 'right';
+      const newSwipeCount = isInterested
+        ? (lastSwipeDate === today ? dailySwipeCount + 1 : 1)
+        : dailySwipeCount;
+
       const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
       await setDoc(swipeProgressRef, {
         dailySwipeCount: newSwipeCount,
@@ -282,8 +286,8 @@ export default function ScoutDashboardPage() {
                 🔄 UPDATE SEARCH
               </button>
               <div className="text-right">
-                <p className="text-xs text-gray-500 font-mono">Daily Swipes Remaining</p>
-                <p className="text-2xl font-bold text-cyan-400 font-mono">{remainingToday}/{DAILY_SWIPE_LIMIT}</p>
+                <p className="text-xs text-gray-500 font-mono">Interested Companies Today</p>
+                <p className="text-2xl font-bold text-cyan-400 font-mono">{dailySwipeCount}/{DAILY_SWIPE_LIMIT}</p>
               </div>
             </div>
           </div>

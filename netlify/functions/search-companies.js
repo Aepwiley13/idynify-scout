@@ -507,7 +507,8 @@ async function clearPendingCompanies(userId, authToken) {
       }
     };
 
-    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}/companies:runQuery`, {
+    // runQuery should be called on the parent document, not the collection
+    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -206,11 +206,22 @@ export default function CompanyQuestionnaire() {
         })
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Failed to parse JSON response:', jsonError);
+        const text = await response.text();
+        console.error('❌ Raw response:', text);
+        throw new Error(`Backend returned invalid JSON (Status ${response.status}). Check Netlify function logs for details.`);
+      }
+
+      console.log('📥 Backend response:', data);
 
       if (!response.ok) {
         console.error('❌ Backend error response:', data);
-        throw new Error(data.error || 'Apollo search failed');
+        console.error('❌ Response status:', response.status);
+        throw new Error(data.error || `Backend error: ${response.status} ${response.statusText}`);
       }
 
       console.log(`✅ Found ${data.companiesFound} companies!`);
@@ -218,8 +229,9 @@ export default function CompanyQuestionnaire() {
     } catch (error) {
       console.error('❌ Apollo search error:', error);
       console.error('❌ Error details:', error.message);
+      console.error('❌ Full error:', error);
       // Don't block user flow on search error - user can still proceed to Scout
-      alert(`Warning: Company search encountered an error: ${error.message}\n\nYou can still access Scout, but you may not have any companies yet. Please check your settings or contact support.`);
+      alert(`Warning: Company search encountered an error:\n\n${error.message}\n\nYou can still access Scout, but you may not have any companies yet.\n\nPlease check the browser console for details or contact support.`);
     }
   };
 

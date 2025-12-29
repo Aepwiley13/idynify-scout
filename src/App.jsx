@@ -24,6 +24,7 @@ import MissionPhase2Page from './pages/MissionPhase2Page';
 import MissionPhase3Page from './pages/MissionPhase3Page';
 import MissionPhase4Page from './pages/MissionPhase4Page';
 import MissionPhase5Page from './pages/MissionPhase5Page';
+import ScoutDashboardPage from './pages/ScoutDashboardPage';
 
 // Components
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
@@ -215,6 +216,14 @@ function App() {
           element={
             <ProtectedRoute>
               <RECONSectionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mission-control-v2/scout"
+          element={
+            <ProtectedRoute>
+              <ScoutDashboardPage />
             </ProtectedRoute>
           }
         />

@@ -257,6 +257,16 @@ export const handler = async (event) => {
 
     console.log(`✅ Found ${companies.length} companies from Apollo`);
 
+    // Log first company details for debugging
+    if (companies.length > 0) {
+      const firstCompany = companies[0];
+      console.log('📊 First company sample:');
+      console.log(`  - Name: ${firstCompany.name}`);
+      console.log(`  - Industry: ${firstCompany.industry || firstCompany.primary_industry || 'N/A'}`);
+      console.log(`  - Employees: ${firstCompany.estimated_num_employees || 'N/A'}`);
+      console.log(`  - Location: ${JSON.stringify(firstCompany.headquarters_location || firstCompany.primary_location || 'N/A')}`);
+    }
+
     // Clear old pending companies before adding new ones (for updated searches)
     await clearPendingCompanies(userId, authToken);
 
@@ -302,6 +312,8 @@ export const handler = async (event) => {
 };
 
 function buildApolloQuery(companyProfile) {
+  console.log('📋 Building Apollo query from profile:', JSON.stringify(companyProfile, null, 2));
+
   const query = {
     page: 1,
     per_page: 50
@@ -310,6 +322,10 @@ function buildApolloQuery(companyProfile) {
   // Map industries to Apollo industry tag IDs
   if (companyProfile.industries && companyProfile.industries.length > 0) {
     query.organization_industry_tag_ids = getIndustryIds(companyProfile.industries);
+    console.log(`🏭 Industries selected: ${companyProfile.industries.join(', ')}`);
+    console.log(`🏭 Mapped to Apollo IDs: ${query.organization_industry_tag_ids.join(', ')}`);
+  } else {
+    console.log('⚠️  No industries selected!');
   }
 
   // Map company sizes to Apollo format (comma-separated strings)
@@ -326,6 +342,10 @@ function buildApolloQuery(companyProfile) {
       const cleaned = size.replace(/,/g, '');
       return cleaned.replace('-', ',');
     });
+    console.log(`👥 Company sizes selected: ${companyProfile.companySizes.join(', ')}`);
+    console.log(`👥 Mapped to Apollo format: ${query.organization_num_employees_ranges.join(', ')}`);
+  } else {
+    console.log('⚠️  No company sizes selected!');
   }
 
   // Map revenue ranges to Apollo format (single min/max object)
@@ -343,6 +363,12 @@ function buildApolloQuery(companyProfile) {
   // Map locations to Apollo format
   if (companyProfile.locations && companyProfile.locations.length > 0) {
     query.organization_locations = formatStatesForApollo(companyProfile.locations);
+    console.log(`📍 Locations selected: ${companyProfile.locations.join(', ')}`);
+    console.log(`📍 Mapped to Apollo format: ${query.organization_locations.join(', ')}`);
+  } else if (companyProfile.isNationwide) {
+    console.log('🌎 Nationwide search enabled');
+  } else {
+    console.log('⚠️  No locations selected and not nationwide!');
   }
 
   return query;

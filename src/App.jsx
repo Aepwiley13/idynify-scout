@@ -25,6 +25,7 @@ import MissionPhase3Page from './pages/MissionPhase3Page';
 import MissionPhase4Page from './pages/MissionPhase4Page';
 import MissionPhase5Page from './pages/MissionPhase5Page';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
+import ScoutMain from './pages/Scout/ScoutMain';
 
 // Components
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
@@ -219,13 +220,20 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Scout Module - NEW 4-Tab Structure */}
         <Route
-          path="/mission-control-v2/scout"
+          path="/scout"
           element={
             <ProtectedRoute>
-              <ScoutDashboardPage />
+              <ScoutMain />
             </ProtectedRoute>
           }
+        />
+
+        {/* Redirect old Scout route to new Scout */}
+        <Route
+          path="/mission-control-v2/scout"
+          element={<Navigate to="/scout" />}
         />
 
         {/* Protected Routes - OLD DASHBOARD REDIRECTS (Use V2 by default) */}
@@ -267,8 +275,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* OLD Scout route - now replaced by new Scout at /scout */}
         <Route
-          path="/scout"
+          path="/old-scout"
           element={
             <ProtectedRoute>
               <ContactSuggestions />

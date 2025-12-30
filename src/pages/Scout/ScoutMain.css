@@ -19,12 +19,35 @@
   z-index: 50;
   backdrop-filter: blur(10px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 1.25rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.scout-branding {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.scout-branding svg {
+  color: #3b82f6;
+  stroke-width: 2.5;
 }
 
 .back-btn {
@@ -37,6 +60,9 @@
   transition: all 0.2s ease;
   font-weight: 600;
   font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .back-btn:hover {
@@ -45,29 +71,26 @@
   color: #3b82f6;
 }
 
-.scout-header h1 {
-  font-size: 1.5rem;
-  margin: 0;
-  color: #111827;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-}
-
 /* ========================================
    TAB NAVIGATION
    ======================================== */
 .scout-tabs {
-  display: flex;
-  gap: 0.5rem;
-  padding: 1rem 2rem;
   background: #ffffff;
   border-bottom: 1.5px solid #e5e7eb;
-  overflow-x: auto;
+  padding: 1rem 2rem;
   position: sticky;
   top: 69px;
   z-index: 40;
   backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.tabs-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .tab {
@@ -82,6 +105,10 @@
   transition: all 0.2s ease;
   font-weight: 600;
   border: 1.5px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
 }
 
 .tab:hover {
@@ -96,6 +123,21 @@
   font-weight: 700;
   border-color: #3b82f6;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.tab-badge {
+  background: #ffffff;
+  color: #3b82f6;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  margin-left: 0.25rem;
+}
+
+.tab.active .tab-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 /* ========================================
@@ -129,18 +171,25 @@
 /* ========================================
    MOBILE RESPONSIVE
    ======================================== */
+@media (max-width: 1024px) {
+  .scout-tabs {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 768px) {
   .scout-header {
     padding: 1rem 1.5rem;
   }
 
-  .scout-header h1 {
-    font-size: 1.25rem;
+  .scout-branding {
+    font-size: 1rem;
   }
 
   .scout-tabs {
     padding: 0.75rem 1rem;
     top: 61px;
+    justify-content: flex-start;
   }
 
   .tab {
@@ -151,5 +200,15 @@
   .back-btn {
     padding: 0.5rem 1rem;
     font-size: 0.8125rem;
+  }
+
+  .back-btn span {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .scout-branding span {
+    display: none;
   }
 }

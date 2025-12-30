@@ -60,9 +60,9 @@ export default function CompanyCard({ company, onSwipe }) {
   // Calculate lead score badge
   const leadScore = company.fit_score || 0;
   const getScoreBadge = (score) => {
-    if (score >= 80) return { label: 'High Priority', color: 'green', bgColor: 'bg-green-50', textColor: 'text-green-700', borderColor: 'border-green-200' };
-    if (score >= 50) return { label: 'Good Match', color: 'blue', bgColor: 'bg-blue-50', textColor: 'text-blue-700', borderColor: 'border-blue-200' };
-    return { label: 'Needs Review', color: 'gray', bgColor: 'bg-gray-50', textColor: 'text-gray-700', borderColor: 'border-gray-200' };
+    if (score >= 80) return { label: 'High Priority', color: 'green' };
+    if (score >= 50) return { label: 'Good Match', color: 'blue' };
+    return { label: 'Needs Review', color: 'gray' };
   };
 
   const scoreBadge = getScoreBadge(leadScore);
@@ -98,7 +98,10 @@ export default function CompanyCard({ company, onSwipe }) {
         style={{
           transform: `translateX(${dragOffset.x}px) translateY(${dragOffset.y * 0.1}px) rotate(${rotation}deg)`,
           opacity: opacity,
-          transition: isDragging ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out'
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out',
+          border: '1px solid #000000',
+          borderRadius: '16px',
+          overflow: 'hidden'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -108,20 +111,8 @@ export default function CompanyCard({ company, onSwipe }) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Lead Score Badge - Top Right */}
-        <div className="absolute top-6 right-6 z-20">
-          <div className={`score-badge ${scoreBadge.bgColor} ${scoreBadge.textColor} ${scoreBadge.borderColor}`}>
-            <Award className="w-4 h-4" />
-            <span className="font-bold">{leadScore}</span>
-            <span className="text-xs opacity-75">/ 100</span>
-          </div>
-          <div className={`score-label ${scoreBadge.bgColor} ${scoreBadge.textColor}`}>
-            {scoreBadge.label}
-          </div>
-        </div>
-
         {/* Card Content */}
-        <div className="card-content">
+        <div className="card-content" style={{ padding: '2rem' }}>
           {/* Company Header */}
           <div className="company-header">
             {/* Logo Placeholder */}
@@ -131,7 +122,9 @@ export default function CompanyCard({ company, onSwipe }) {
 
             {/* Company Name & Domain */}
             <div className="company-info">
-              <h2 className="company-name">{company.name}</h2>
+              <h2 className="company-name" style={{ color: '#000000', fontWeight: 700, fontSize: '1.75rem', marginBottom: '0.5rem' }}>
+                {company.name}
+              </h2>
               {company.domain && (
                 <a
                   href={`https://${company.domain}`}
@@ -139,6 +132,7 @@ export default function CompanyCard({ company, onSwipe }) {
                   rel="noopener noreferrer"
                   className="company-domain"
                   onClick={(e) => e.stopPropagation()}
+                  style={{ color: '#3b82f6', fontWeight: 400 }}
                 >
                   <Globe className="w-4 h-4" />
                   {company.domain}
@@ -154,8 +148,8 @@ export default function CompanyCard({ company, onSwipe }) {
                 <Building2 className="w-5 h-5 text-gray-500" />
               </div>
               <div className="stat-content">
-                <p className="stat-label">Industry</p>
-                <p className="stat-value">{company.industry || 'Not specified'}</p>
+                <p className="stat-label" style={{ fontWeight: 600, color: '#6b7280' }}>Industry</p>
+                <p className="stat-value" style={{ fontWeight: 400, color: '#000000' }}>{company.industry || 'Not specified'}</p>
               </div>
             </div>
 
@@ -164,8 +158,8 @@ export default function CompanyCard({ company, onSwipe }) {
                 <DollarSign className="w-5 h-5 text-gray-500" />
               </div>
               <div className="stat-content">
-                <p className="stat-label">Revenue</p>
-                <p className="stat-value">{company.revenue || 'Not available'}</p>
+                <p className="stat-label" style={{ fontWeight: 600, color: '#6b7280' }}>Revenue</p>
+                <p className="stat-value" style={{ fontWeight: 400, color: '#000000' }}>{company.revenue || 'Not available'}</p>
               </div>
             </div>
 
@@ -174,8 +168,8 @@ export default function CompanyCard({ company, onSwipe }) {
                 <Calendar className="w-5 h-5 text-gray-500" />
               </div>
               <div className="stat-content">
-                <p className="stat-label">Founded</p>
-                <p className="stat-value">{company.founded_year || 'Not available'}</p>
+                <p className="stat-label" style={{ fontWeight: 600, color: '#6b7280' }}>Founded</p>
+                <p className="stat-value" style={{ fontWeight: 400, color: '#000000' }}>{company.founded_year || 'Not available'}</p>
               </div>
             </div>
 
@@ -185,8 +179,8 @@ export default function CompanyCard({ company, onSwipe }) {
                   <Phone className="w-5 h-5 text-gray-500" />
                 </div>
                 <div className="stat-content">
-                  <p className="stat-label">Phone</p>
-                  <p className="stat-value">{company.phone}</p>
+                  <p className="stat-label" style={{ fontWeight: 600, color: '#6b7280' }}>Phone</p>
+                  <p className="stat-value" style={{ fontWeight: 400, color: '#000000' }}>{company.phone}</p>
                 </div>
               </div>
             )}
@@ -245,10 +239,55 @@ export default function CompanyCard({ company, onSwipe }) {
           </div>
         </div>
 
+        {/* Status Section - Bottom */}
+        <div className="card-status-section" style={{
+          borderTop: '1px solid #e5e7eb',
+          padding: '1.25rem 2rem',
+          background: '#f9fafb',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Award className="w-5 h-5" style={{ color: scoreBadge.color === 'green' ? '#10b981' : scoreBadge.color === 'blue' ? '#3b82f6' : '#6b7280' }} />
+            <div>
+              <p style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#6b7280',
+                margin: 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>Lead Score</p>
+              <p style={{
+                fontSize: '1.5rem',
+                fontWeight: 700,
+                color: '#000000',
+                margin: 0,
+                lineHeight: 1
+              }}>
+                {leadScore} <span style={{ fontSize: '1rem', color: '#6b7280', fontWeight: 400 }}>/ 100</span>
+              </p>
+            </div>
+          </div>
+
+          <div style={{
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+            color: scoreBadge.color === 'green' ? '#065f46' : scoreBadge.color === 'blue' ? '#1e40af' : '#374151',
+            background: scoreBadge.color === 'green' ? '#d1fae5' : scoreBadge.color === 'blue' ? '#dbeafe' : '#f3f4f6',
+            border: `1px solid ${scoreBadge.color === 'green' ? '#86efac' : scoreBadge.color === 'blue' ? '#93c5fd' : '#d1d5db'}`
+          }}>
+            {scoreBadge.label}
+          </div>
+        </div>
+
         {/* Swipe Hint */}
         <div className="swipe-hint">
           <div className="hint-text">
-            <span className="hint-desktop">Drag card left or right, or use the buttons below</span>
+            <span className="hint-desktop">Drag card left or right, or use the buttons above</span>
             <span className="hint-mobile">Swipe left or right to review</span>
           </div>
         </div>

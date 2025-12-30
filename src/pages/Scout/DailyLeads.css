@@ -517,7 +517,7 @@
   margin: 0 auto;
 }
 
-.view-matches-btn {
+.view-saved-companies-btn {
   width: 100%;
   display: flex;
   align-items: center;
@@ -535,7 +535,7 @@
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-.view-matches-btn:hover {
+.view-saved-companies-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
 }

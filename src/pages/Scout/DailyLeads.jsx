@@ -4,7 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import CompanyCard from '../../components/scout/CompanyCard';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
-import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown, CheckCircle } from 'lucide-react';
 import './DailyLeads.css';
 
 export default function DailyLeads() {
@@ -219,20 +219,20 @@ export default function DailyLeads() {
 
         <div className="kpi-card">
           <div className="kpi-header">
-            <Target className="kpi-icon" />
-            <span className="kpi-label">Match Rate</span>
+            <CheckCircle className="kpi-icon" />
+            <span className="kpi-label">Matches</span>
           </div>
-          <div className="kpi-value">{matchRate}%</div>
+          <div className="kpi-value">{dailySwipeCount} Matches</div>
           <div className="kpi-trend">
-            {matchRate >= 50 ? (
+            {dailySwipeCount > 0 ? (
               <>
                 <TrendingUp className="trend-icon positive" />
-                <span className="trend-text positive">Strong match quality</span>
+                <span className="trend-text positive">Companies accepted</span>
               </>
             ) : (
               <>
                 <TrendingDown className="trend-icon neutral" />
-                <span className="trend-text neutral">Adjust ICP for better results</span>
+                <span className="trend-text neutral">Start reviewing leads</span>
               </>
             )}
           </div>
@@ -329,18 +329,16 @@ export default function DailyLeads() {
         </div>
       )}
 
-      {/* View Matched Companies Button */}
-      {dailySwipeCount > 0 && (
-        <div className="action-footer">
-          <button
-            className="view-matches-btn"
-            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-          >
-            <Users className="w-5 h-5" />
-            <span>View {dailySwipeCount} Matched {dailySwipeCount === 1 ? 'Company' : 'Companies'}</span>
-          </button>
-        </div>
-      )}
+      {/* View Saved Companies Button */}
+      <div className="action-footer">
+        <button
+          className="view-saved-companies-btn"
+          onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+        >
+          <CheckCircle className="w-5 h-5" />
+          <span>View Saved Companies {dailySwipeCount > 0 && `(${dailySwipeCount})`}</span>
+        </button>
+      </div>
 
       {/* Contact Title Setup Modal */}
       {showTitleSetup && (

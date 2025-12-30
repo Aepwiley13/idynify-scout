@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { ArrowLeft, Target, Building2, Users, TrendingUp, Settings } from 'lucide-react';
 import SavedCompanies from './SavedCompanies';
 import TotalMarket from './TotalMarket';
 import ICPSettings from './ICPSettings';
@@ -46,48 +47,63 @@ export default function ScoutMain() {
             className="back-btn"
             onClick={() => navigate('/mission-control-v2')}
           >
-            ← Mission Control
+            <ArrowLeft className="w-4 h-4" />
+            <span>Mission Control</span>
           </button>
-          <h1>🎯 SCOUT</h1>
+        </div>
+
+        <div className="header-right">
+          <div className="scout-branding">
+            <Target className="w-5 h-5" />
+            <span>Scout</span>
+          </div>
         </div>
       </header>
 
       {/* Tab Navigation */}
       <nav className="scout-tabs">
-        <button
-          className={`tab ${activeTab === 'daily-leads' ? 'active' : ''}`}
-          onClick={() => setActiveTab('daily-leads')}
-        >
-          📱 Daily Leads
-        </button>
+        <div className="tabs-container">
+          <button
+            className={`tab ${activeTab === 'daily-leads' ? 'active' : ''}`}
+            onClick={() => setActiveTab('daily-leads')}
+          >
+            <Target className="w-4 h-4" />
+            <span>Daily Leads</span>
+          </button>
 
-        <button
-          className={`tab ${activeTab === 'saved-companies' ? 'active' : ''}`}
-          onClick={() => setActiveTab('saved-companies')}
-        >
-          🏢 Saved Companies
-        </button>
+          <button
+            className={`tab ${activeTab === 'saved-companies' ? 'active' : ''}`}
+            onClick={() => setActiveTab('saved-companies')}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Saved Companies</span>
+          </button>
 
-        <button
-          className={`tab ${activeTab === 'all-leads' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all-leads')}
-        >
-          👥 All Leads {contactCount > 0 && `(${contactCount})`}
-        </button>
+          <button
+            className={`tab ${activeTab === 'all-leads' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all-leads')}
+          >
+            <Users className="w-4 h-4" />
+            <span>All Leads</span>
+            {contactCount > 0 && <span className="tab-badge">{contactCount}</span>}
+          </button>
 
-        <button
-          className={`tab ${activeTab === 'total-market' ? 'active' : ''}`}
-          onClick={() => setActiveTab('total-market')}
-        >
-          📊 Total Market
-        </button>
+          <button
+            className={`tab ${activeTab === 'total-market' ? 'active' : ''}`}
+            onClick={() => setActiveTab('total-market')}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Total Market</span>
+          </button>
 
-        <button
-          className={`tab ${activeTab === 'icp-settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('icp-settings')}
-        >
-          ⚙️ ICP Settings
-        </button>
+          <button
+            className={`tab ${activeTab === 'icp-settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('icp-settings')}
+          >
+            <Settings className="w-4 h-4" />
+            <span>ICP Settings</span>
+          </button>
+        </div>
       </nav>
 
       {/* Tab Content */}

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { calculateICPScore } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter } from 'lucide-react';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp } from 'lucide-react';
+import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
 
 export default function ICPSettings() {
@@ -46,7 +48,12 @@ export default function ICPSettings() {
       );
 
       if (profileDoc.exists()) {
-        setProfile(profileDoc.data());
+        const data = profileDoc.data();
+        // Ensure scoring weights exist (for existing profiles)
+        if (!data.scoringWeights) {
+          data.scoringWeights = DEFAULT_WEIGHTS;
+        }
+        setProfile(data);
       } else {
         // No profile yet - set defaults
         setProfile({
@@ -55,7 +62,8 @@ export default function ICPSettings() {
           revenueRanges: [],
           skipRevenue: false,
           locations: [],
-          isNationwide: false
+          isNationwide: false,
+          scoringWeights: DEFAULT_WEIGHTS
         });
       }
       setLoading(false);
@@ -70,6 +78,14 @@ export default function ICPSettings() {
       setSaving(true);
       const user = auth.currentUser;
 
+      // Validate weights if they exist
+      if (profile.scoringWeights && totalWeight !== 100) {
+        alert(`Scoring weights must total 100%. Currently at ${totalWeight}%.`);
+        setSaving(false);
+        return;
+      }
+
+      // Save profile
       await setDoc(
         doc(db, 'users', user.uid, 'companyProfile', 'current'),
         {
@@ -78,6 +94,11 @@ export default function ICPSettings() {
         }
       );
 
+      // Recalculate all company scores with new weights
+      if (profile.scoringWeights) {
+        await recalculateAllScores(user.uid, profile, profile.scoringWeights);
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
       setSaving(false);
@@ -85,6 +106,38 @@ export default function ICPSettings() {
       console.error('Failed to save ICP:', error);
       alert('Failed to save changes. Please try again.');
       setSaving(false);
+    }
+  }
+
+  async function recalculateAllScores(userId, icpProfile, weights) {
+    try {
+      console.log('🔄 Recalculating scores for all companies...');
+
+      // Get all companies
+      const companiesSnapshot = await getDocs(
+        collection(db, 'users', userId, 'companies')
+      );
+
+      const updates = [];
+
+      for (const companyDoc of companiesSnapshot.docs) {
+        const company = companyDoc.data();
+        const newScore = calculateICPScore(company, icpProfile, weights);
+
+        // Update company with new fit_score
+        updates.push(
+          updateDoc(doc(db, 'users', userId, 'companies', companyDoc.id), {
+            fit_score: newScore,
+            lastScoreUpdate: new Date().toISOString()
+          })
+        );
+      }
+
+      await Promise.all(updates);
+      console.log(`✅ Updated ${updates.length} company scores`);
+    } catch (error) {
+      console.error('❌ Failed to recalculate scores:', error);
+      // Don't throw - just log the error
     }
   }
 
@@ -156,6 +209,23 @@ export default function ICPSettings() {
       locations: !prev.isNationwide ? [...US_STATES] : []
     }));
   };
+
+  const handleWeightChange = (key, value) => {
+    const newValue = parseInt(value) || 0;
+    setProfile(prev => ({
+      ...prev,
+      scoringWeights: {
+        ...prev.scoringWeights,
+        [key]: newValue
+      }
+    }));
+  };
+
+  // Calculate total weight for validation
+  const totalWeight = profile?.scoringWeights
+    ? profile.scoringWeights.industry + profile.scoringWeights.location +
+      profile.scoringWeights.employeeSize + profile.scoringWeights.revenue
+    : 100;
 
   if (loading) {
     return (
@@ -397,6 +467,148 @@ export default function ICPSettings() {
                 <p className="showing-more">Showing first 20 of {filteredStates.length} results. Use search to narrow down.</p>
               )}
             </>
+          )}
+        </div>
+
+        {/* ICP Scoring Weights Section */}
+        <div className="setting-section scoring-weights-section">
+          <div className="section-header">
+            <div className="section-title-group">
+              <Sliders className="section-icon" />
+              <h3>ICP Scoring Weights</h3>
+            </div>
+            <span className={`selection-count ${totalWeight !== 100 ? 'error' : ''}`}>
+              {totalWeight}%
+            </span>
+          </div>
+          <p className="section-description">
+            Adjust how much each criterion contributes to the lead score. Total must equal 100%.
+          </p>
+
+          {profile.scoringWeights && (
+            <div className="weights-grid">
+              {/* Industry Weight */}
+              <div className="weight-control">
+                <div className="weight-header">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <label className="weight-label">Industry Match</label>
+                  <span className="weight-value">{profile.scoringWeights.industry}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={profile.scoringWeights.industry}
+                  onChange={(e) => handleWeightChange('industry', e.target.value)}
+                  className="weight-slider"
+                />
+                <div className="weight-input-group">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={profile.scoringWeights.industry}
+                    onChange={(e) => handleWeightChange('industry', e.target.value)}
+                    className="weight-input"
+                  />
+                  <span className="weight-unit">%</span>
+                </div>
+              </div>
+
+              {/* Location Weight */}
+              <div className="weight-control">
+                <div className="weight-header">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <label className="weight-label">Location Match</label>
+                  <span className="weight-value">{profile.scoringWeights.location}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={profile.scoringWeights.location}
+                  onChange={(e) => handleWeightChange('location', e.target.value)}
+                  className="weight-slider"
+                />
+                <div className="weight-input-group">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={profile.scoringWeights.location}
+                    onChange={(e) => handleWeightChange('location', e.target.value)}
+                    className="weight-input"
+                  />
+                  <span className="weight-unit">%</span>
+                </div>
+              </div>
+
+              {/* Employee Size Weight */}
+              <div className="weight-control">
+                <div className="weight-header">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <label className="weight-label">Employee Size Match</label>
+                  <span className="weight-value">{profile.scoringWeights.employeeSize}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={profile.scoringWeights.employeeSize}
+                  onChange={(e) => handleWeightChange('employeeSize', e.target.value)}
+                  className="weight-slider"
+                />
+                <div className="weight-input-group">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={profile.scoringWeights.employeeSize}
+                    onChange={(e) => handleWeightChange('employeeSize', e.target.value)}
+                    className="weight-input"
+                  />
+                  <span className="weight-unit">%</span>
+                </div>
+              </div>
+
+              {/* Revenue Weight */}
+              <div className="weight-control">
+                <div className="weight-header">
+                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                  <label className="weight-label">Revenue Match</label>
+                  <span className="weight-value">{profile.scoringWeights.revenue}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={profile.scoringWeights.revenue}
+                  onChange={(e) => handleWeightChange('revenue', e.target.value)}
+                  className="weight-slider"
+                />
+                <div className="weight-input-group">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={profile.scoringWeights.revenue}
+                    onChange={(e) => handleWeightChange('revenue', e.target.value)}
+                    className="weight-input"
+                  />
+                  <span className="weight-unit">%</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {totalWeight !== 100 && (
+            <div className="weight-warning">
+              <X className="w-5 h-5" />
+              <span>
+                Total must equal 100%. Currently at {totalWeight}%.
+                {totalWeight > 100 ? ` Reduce by ${totalWeight - 100}%.` : ` Add ${100 - totalWeight}%.`}
+              </span>
+            </div>
           )}
         </div>
 

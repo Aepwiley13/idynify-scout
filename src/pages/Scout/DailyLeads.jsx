@@ -241,9 +241,9 @@ export default function DailyLeads() {
         <div className="kpi-card">
           <div className="kpi-header">
             <TrendingUp className="kpi-icon" />
-            <span className="kpi-label">Avg Lead Score</span>
+            <span className="kpi-label">Lead Quality</span>
           </div>
-          <div className="kpi-value">{avgLeadScore}</div>
+          <div className="kpi-value">Avg Score: {avgLeadScore}</div>
           <div className="kpi-trend">
             <span className="trend-text neutral">Out of 100</span>
           </div>

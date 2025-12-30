@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X } from 'lucide-react';
 import './AllLeads.css';
 
 export default function AllLeads() {
@@ -10,6 +11,8 @@ export default function AllLeads() {
   const [companies, setCompanies] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   useEffect(() => {
     loadAllContacts();
@@ -60,7 +63,7 @@ export default function AllLeads() {
   }
 
   function exportToCSV() {
-    if (filteredContacts.length === 0) {
+    if (sortedAndFilteredContacts.length === 0) {
       alert('No contacts to export!');
       return;
     }
@@ -69,7 +72,7 @@ export default function AllLeads() {
     const headers = ['Name', 'Title', 'Company', 'Email', 'Phone', 'LinkedIn', 'Added Date'];
 
     // CSV rows
-    const rows = filteredContacts.map(contact => {
+    const rows = sortedAndFilteredContacts.map(contact => {
       const company = companies[contact.company_id];
       return [
         contact.name || '',
@@ -95,7 +98,7 @@ export default function AllLeads() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 
-    console.log('📥 Exported', filteredContacts.length, 'contacts to CSV');
+    console.log('📥 Exported', sortedAndFilteredContacts.length, 'contacts to CSV');
   }
 
   // Filter contacts based on search term
@@ -113,11 +116,37 @@ export default function AllLeads() {
     );
   });
 
+  // Sort contacts
+  const sortedAndFilteredContacts = [...filteredContacts].sort((a, b) => {
+    let comparison = 0;
+
+    if (sortBy === 'name') {
+      comparison = (a.name || '').localeCompare(b.name || '');
+    } else if (sortBy === 'company') {
+      const companyA = companies[a.company_id]?.name || '';
+      const companyB = companies[b.company_id]?.name || '';
+      comparison = companyA.localeCompare(companyB);
+    } else if (sortBy === 'date') {
+      const dateA = a.addedAt || 0;
+      const dateB = b.addedAt || 0;
+      comparison = dateA - dateB;
+    }
+
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  // Calculate KPIs
+  const totalContacts = contacts.length;
+  const uniqueCompanies = new Set(contacts.map(c => c.company_id)).size;
+  const contactsWithEmail = contacts.filter(c => c.email).length;
+  const contactsWithLinkedIn = contacts.filter(c => c.linkedin_url).length;
+  const emailRate = totalContacts > 0 ? Math.round((contactsWithEmail / totalContacts) * 100) : 0;
+
   if (loading) {
     return (
       <div className="all-leads-loading">
         <div className="loading-spinner"></div>
-        <p className="loading-text">[LOADING ALL CONTACTS...]</p>
+        <p className="loading-text">Loading all contacts...</p>
       </div>
     );
   }
@@ -125,48 +154,134 @@ export default function AllLeads() {
   if (contacts.length === 0) {
     return (
       <div className="empty-state">
-        <div className="empty-icon">👥</div>
+        <div className="empty-icon">
+          <Users className="w-16 h-16 text-gray-400" />
+        </div>
         <h2>No Contacts Yet</h2>
         <p>Contacts you select from companies will appear here</p>
-        <p className="empty-hint">Go to Saved Companies and select contacts from your interested companies!</p>
+        <p className="empty-hint">Go to Matched Companies and select contacts from your interested companies!</p>
+        <button
+          onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+          className="empty-action-btn"
+        >
+          <Building2 className="w-5 h-5" />
+          <span>View Matched Companies</span>
+        </button>
       </div>
     );
   }
 
   return (
     <div className="all-leads">
-      {/* Header with Stats */}
-      <div className="section-header">
-        <div>
-          <h2>All Leads</h2>
-          <p className="section-subtitle">
-            {filteredContacts.length} {filteredContacts.length === 1 ? 'contact' : 'contacts'}
-            {searchTerm && ` matching "${searchTerm}"`}
-          </p>
+      {/* Enterprise Header */}
+      <div className="enterprise-header">
+        <div className="header-content">
+          <h1 className="page-title">All Leads</h1>
+          <p className="page-subtitle">Complete database of your contact pipeline</p>
         </div>
-
-        <button className="export-btn" onClick={exportToCSV}>
-          📥 Export to CSV
-        </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="search-container">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="🔍 Search by name, title, company, or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        {searchTerm && (
-          <button
-            className="clear-search-btn"
-            onClick={() => setSearchTerm('')}
+      {/* KPI Summary */}
+      <div className="kpi-summary">
+        <div className="kpi-card">
+          <div className="kpi-icon-wrapper">
+            <Users className="kpi-icon" />
+          </div>
+          <div className="kpi-content">
+            <p className="kpi-label">Total Contacts</p>
+            <p className="kpi-value">{totalContacts}</p>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon-wrapper">
+            <Building2 className="kpi-icon" />
+          </div>
+          <div className="kpi-content">
+            <p className="kpi-label">Companies</p>
+            <p className="kpi-value">{uniqueCompanies}</p>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon-wrapper">
+            <Mail className="kpi-icon" />
+          </div>
+          <div className="kpi-content">
+            <p className="kpi-label">With Email</p>
+            <p className="kpi-value">{contactsWithEmail}</p>
+          </div>
+        </div>
+
+        <div className="kpi-card highlight">
+          <div className="kpi-icon-wrapper">
+            <Linkedin className="kpi-icon" />
+          </div>
+          <div className="kpi-content">
+            <p className="kpi-label">Email Coverage</p>
+            <p className="kpi-value">{emailRate}%</p>
+            <div className="kpi-progress-bar">
+              <div
+                className="kpi-progress-fill"
+                style={{ width: `${emailRate}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls Section */}
+      <div className="controls-section">
+        {/* Search Bar */}
+        <div className="search-input-wrapper">
+          <Search className="search-icon" />
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search by name, title, company, or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              className="clear-search-btn"
+              onClick={() => setSearchTerm('')}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Sort Controls */}
+        <div className="sort-controls">
+          <select
+            className="sort-select"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
           >
-            ✕ Clear
+            <option value="date">Sort by Date Added</option>
+            <option value="name">Sort by Name</option>
+            <option value="company">Sort by Company</option>
+          </select>
+
+          <button
+            className="sort-order-btn"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
           </button>
-        )}
+
+          <button className="export-btn" onClick={exportToCSV}>
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Results Count */}
+      <div className="results-count">
+        Showing {sortedAndFilteredContacts.length} of {totalContacts} contacts
+        {searchTerm && ` matching "${searchTerm}"`}
       </div>
 
       {/* Contacts Table */}
@@ -174,56 +289,101 @@ export default function AllLeads() {
         <table className="contacts-table">
           <thead>
             <tr>
-              <th>Contact</th>
-              <th>Title</th>
-              <th>Company</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Added</th>
-              <th>Links</th>
+              <th>
+                <div className="th-content">
+                  <UserCircle className="w-4 h-4" />
+                  <span>Contact</span>
+                </div>
+              </th>
+              <th>
+                <div className="th-content">
+                  <Building2 className="w-4 h-4" />
+                  <span>Title</span>
+                </div>
+              </th>
+              <th>
+                <div className="th-content">
+                  <Building2 className="w-4 h-4" />
+                  <span>Company</span>
+                </div>
+              </th>
+              <th>
+                <div className="th-content">
+                  <Mail className="w-4 h-4" />
+                  <span>Email</span>
+                </div>
+              </th>
+              <th>
+                <div className="th-content">
+                  <Phone className="w-4 h-4" />
+                  <span>Phone</span>
+                </div>
+              </th>
+              <th>
+                <div className="th-content">
+                  <Calendar className="w-4 h-4" />
+                  <span>Added</span>
+                </div>
+              </th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredContacts.map(contact => {
+            {sortedAndFilteredContacts.map(contact => {
               const company = companies[contact.company_id];
               return (
                 <tr key={contact.id}>
-                  <td className="contact-name">
-                    <div className="avatar">
-                      {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
+                  <td className="contact-cell">
+                    <div className="contact-info">
+                      <div className="avatar">
+                        {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
+                      </div>
+                      <span className="contact-name">
+                        {contact.name || 'Unknown'}
+                      </span>
                     </div>
-                    <span
-                      className="contact-name-link"
-                      onClick={() => navigate(`/scout/contact/${contact.id}`)}
-                    >
-                      {contact.name || 'Unknown'}
-                    </span>
                   </td>
-                  <td className="contact-title">{contact.title || '—'}</td>
-                  <td className="company-name">{company?.name || 'Unknown Company'}</td>
-                  <td className="contact-email">
+                  <td className="title-cell">{contact.title || '—'}</td>
+                  <td className="company-cell">{company?.name || 'Unknown Company'}</td>
+                  <td className="email-cell">
                     {contact.email ? (
-                      <a href={`mailto:${contact.email}`} onClick={(e) => e.stopPropagation()}>
-                        {contact.email}
-                      </a>
-                    ) : '—'}
-                  </td>
-                  <td className="contact-phone">{contact.phone || '—'}</td>
-                  <td className="added-date">
-                    {contact.addedAt ? new Date(contact.addedAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="contact-links">
-                    {contact.linkedin_url && (
                       <a
-                        href={contact.linkedin_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="link-btn"
+                        href={`mailto:${contact.email}`}
+                        className="email-link"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        💼
+                        {contact.email}
                       </a>
+                    ) : (
+                      <span className="empty-value">—</span>
                     )}
+                  </td>
+                  <td className="phone-cell">{contact.phone || '—'}</td>
+                  <td className="date-cell">
+                    {contact.addedAt ? new Date(contact.addedAt).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="actions-cell">
+                    <div className="action-links">
+                      {contact.linkedin_url && (
+                        <a
+                          href={contact.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="action-link"
+                          onClick={(e) => e.stopPropagation()}
+                          title="View LinkedIn Profile"
+                        >
+                          <Linkedin className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button
+                        className="action-link"
+                        onClick={() => navigate(`/scout/contact/${contact.id}`)}
+                        title="View Contact Details"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -232,9 +392,12 @@ export default function AllLeads() {
         </table>
       </div>
 
-      {filteredContacts.length === 0 && searchTerm && (
+      {/* No Search Results */}
+      {sortedAndFilteredContacts.length === 0 && searchTerm && (
         <div className="no-results">
-          <p>No contacts found matching "{searchTerm}"</p>
+          <Search className="w-12 h-12 text-gray-400 mb-4" />
+          <h3>No contacts found</h3>
+          <p>No contacts match your search for "{searchTerm}"</p>
           <button className="clear-btn" onClick={() => setSearchTerm('')}>
             Clear Search
           </button>

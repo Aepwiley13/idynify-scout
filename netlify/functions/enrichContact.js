@@ -56,10 +56,10 @@ export const handler = async (event) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apolloApiKey
       },
       body: JSON.stringify({
-        api_key: apolloApiKey,
         id: contactId
       })
     });

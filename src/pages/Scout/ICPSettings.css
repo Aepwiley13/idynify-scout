@@ -325,7 +325,7 @@
 .icp-empty {
   display: flex;
   align-items: center;
-  justify-center;
+  justify-content: center;
   min-height: 400px;
   text-align: center;
   padding: 2rem;

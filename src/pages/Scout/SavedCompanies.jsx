@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import TitleSelectionModal from '../../components/TitleSelectionModal';
 import './SavedCompanies.css';
 
 export default function SavedCompanies() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showTitleModal, setShowTitleModal] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState(null);
 
   useEffect(() => {
     loadSavedCompanies();
@@ -77,6 +80,28 @@ export default function SavedCompanies() {
     }
   }
 
+  // Handle company click - show title modal or navigate to detail
+  function handleCompanyClick(company) {
+    // Check if titles already selected for this company
+    const hasTitles = company.selected_titles && company.selected_titles.length > 0;
+
+    if (hasTitles) {
+      // Already has titles, go straight to company detail
+      navigate(`/scout/company/${company.id}`);
+    } else {
+      // First time, show title selection modal
+      setSelectedCompany(company);
+      setShowTitleModal(true);
+    }
+  }
+
+  // Handle titles selected from modal
+  function handleTitlesSelected(titles) {
+    setShowTitleModal(false);
+    // Navigate to company detail page
+    navigate(`/scout/company/${selectedCompany.id}`);
+  }
+
   if (loading) {
     return (
       <div className="saved-companies-loading">
@@ -109,10 +134,7 @@ export default function SavedCompanies() {
           <div
             key={company.id}
             className="company-tile"
-            onClick={() => {
-              // TODO: Navigate to company detail page when implemented
-              console.log('Navigate to company detail:', company.id);
-            }}
+            onClick={() => handleCompanyClick(company)}
           >
             <div className="company-logo">
               {company.name ? company.name.charAt(0).toUpperCase() : '?'}
@@ -165,6 +187,15 @@ export default function SavedCompanies() {
           </div>
         ))}
       </div>
+
+      {/* Title Selection Modal */}
+      {showTitleModal && selectedCompany && (
+        <TitleSelectionModal
+          company={selectedCompany}
+          onClose={() => setShowTitleModal(false)}
+          onConfirm={handleTitlesSelected}
+        />
+      )}
     </div>
   );
 }

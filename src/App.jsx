@@ -26,6 +26,9 @@ import MissionPhase4Page from './pages/MissionPhase4Page';
 import MissionPhase5Page from './pages/MissionPhase5Page';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
 import ScoutMain from './pages/Scout/ScoutMain';
+import CompanyDetail from './pages/Scout/CompanyDetail';
+import CompanyLeads from './pages/Scout/CompanyLeads';
+import ContactProfile from './pages/Scout/ContactProfile';
 
 // Components
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
@@ -226,6 +229,34 @@ function App() {
           element={
             <ProtectedRoute>
               <ScoutMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Scout Sub-Routes */}
+        <Route
+          path="/scout/company/:companyId"
+          element={
+            <ProtectedRoute>
+              <CompanyDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/scout/company/:companyId/leads"
+          element={
+            <ProtectedRoute>
+              <CompanyLeads />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/scout/contact/:contactId"
+          element={
+            <ProtectedRoute>
+              <ContactProfile />
             </ProtectedRoute>
           }
         />

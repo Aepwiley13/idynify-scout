@@ -173,6 +173,17 @@
   flex-shrink: 0;
 }
 
+.contact-name-link {
+  cursor: pointer;
+  color: #06b6d4;
+  transition: color 0.2s;
+}
+
+.contact-name-link:hover {
+  color: #22d3ee;
+  text-decoration: underline;
+}
+
 /* Email Column */
 .contact-email a {
   color: #06b6d4;

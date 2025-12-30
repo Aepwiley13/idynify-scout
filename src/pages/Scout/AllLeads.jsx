@@ -192,7 +192,12 @@ export default function AllLeads() {
                     <div className="avatar">
                       {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
                     </div>
-                    <span>{contact.name || 'Unknown'}</span>
+                    <span
+                      className="contact-name-link"
+                      onClick={() => navigate(`/scout/contact/${contact.id}`)}
+                    >
+                      {contact.name || 'Unknown'}
+                    </span>
                   </td>
                   <td className="contact-title">{contact.title || '—'}</td>
                   <td className="company-name">{company?.name || 'Unknown Company'}</td>

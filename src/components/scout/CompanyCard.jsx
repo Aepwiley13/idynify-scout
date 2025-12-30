@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle } from 'lucide-react';
 
 export default function CompanyCard({ company, onSwipe }) {
   const [dragStart, setDragStart] = useState(null);
@@ -53,35 +54,49 @@ export default function CompanyCard({ company, onSwipe }) {
     handleMouseUp();
   };
 
-  const rotation = dragOffset.x * 0.1; // Tilt effect
-  const opacity = 1 - Math.abs(dragOffset.x) / 300;
+  const rotation = dragOffset.x * 0.05; // Subtle tilt effect
+  const opacity = 1 - Math.abs(dragOffset.x) / 400;
+
+  // Calculate lead score badge
+  const leadScore = company.fit_score || 0;
+  const getScoreBadge = (score) => {
+    if (score >= 80) return { label: 'High Priority', color: 'green', bgColor: 'bg-green-50', textColor: 'text-green-700', borderColor: 'border-green-200' };
+    if (score >= 50) return { label: 'Good Match', color: 'blue', bgColor: 'bg-blue-50', textColor: 'text-blue-700', borderColor: 'border-blue-200' };
+    return { label: 'Needs Review', color: 'gray', bgColor: 'bg-gray-50', textColor: 'text-gray-700', borderColor: 'border-gray-200' };
+  };
+
+  const scoreBadge = getScoreBadge(leadScore);
 
   return (
     <div className="relative">
       {/* Swipe Indicators (Behind Card) */}
-      <div className="absolute inset-0 flex items-center justify-between pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-between px-8 pointer-events-none z-0">
         <div
-          className={`text-8xl transition-opacity ${
-            dragOffset.x < -50 ? 'opacity-100' : 'opacity-0'
+          className={`transition-all duration-200 ${
+            dragOffset.x < -50 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
           }`}
         >
-          ❌
+          <div className="bg-red-500 text-white rounded-full p-6 shadow-2xl">
+            <XCircle className="w-16 h-16" strokeWidth={2.5} />
+          </div>
         </div>
         <div
-          className={`text-8xl transition-opacity ${
-            dragOffset.x > 50 ? 'opacity-100' : 'opacity-0'
+          className={`transition-all duration-200 ${
+            dragOffset.x > 50 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
           }`}
         >
-          ✅
+          <div className="bg-green-500 text-white rounded-full p-6 shadow-2xl">
+            <CheckCircle className="w-16 h-16" strokeWidth={2.5} />
+          </div>
         </div>
       </div>
 
       {/* Company Card */}
       <div
         ref={cardRef}
-        className="bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-xl rounded-3xl border-2 border-cyan-500/30 overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing"
+        className="enterprise-company-card relative z-10"
         style={{
-          transform: `translateX(${dragOffset.x}px) translateY(${dragOffset.y * 0.2}px) rotate(${rotation}deg)`,
+          transform: `translateX(${dragOffset.x}px) translateY(${dragOffset.y * 0.1}px) rotate(${rotation}deg)`,
           opacity: opacity,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out'
         }}
@@ -93,66 +108,102 @@ export default function CompanyCard({ company, onSwipe }) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="p-10">
-          {/* Company Name */}
-          <div className="mb-8">
-            <h2 className="text-5xl font-bold text-white mb-3 font-mono">
-              {company.name}
-            </h2>
-            {company.domain && (
-              <a
-                href={`https://${company.domain}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-cyan-400 hover:text-cyan-300 text-lg"
-                onClick={(e) => e.stopPropagation()}
-              >
-                🔗 {company.domain}
-              </a>
+        {/* Lead Score Badge - Top Right */}
+        <div className="absolute top-6 right-6 z-20">
+          <div className={`score-badge ${scoreBadge.bgColor} ${scoreBadge.textColor} ${scoreBadge.borderColor}`}>
+            <Award className="w-4 h-4" />
+            <span className="font-bold">{leadScore}</span>
+            <span className="text-xs opacity-75">/ 100</span>
+          </div>
+          <div className={`score-label ${scoreBadge.bgColor} ${scoreBadge.textColor}`}>
+            {scoreBadge.label}
+          </div>
+        </div>
+
+        {/* Card Content */}
+        <div className="card-content">
+          {/* Company Header */}
+          <div className="company-header">
+            {/* Logo Placeholder */}
+            <div className="company-logo-placeholder">
+              <Building2 className="w-8 h-8 text-gray-400" />
+            </div>
+
+            {/* Company Name & Domain */}
+            <div className="company-info">
+              <h2 className="company-name">{company.name}</h2>
+              {company.domain && (
+                <a
+                  href={`https://${company.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="company-domain"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Globe className="w-4 h-4" />
+                  {company.domain}
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Company Stats Grid */}
+          <div className="stats-grid">
+            <div className="stat-item">
+              <div className="stat-icon">
+                <Building2 className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Industry</p>
+                <p className="stat-value">{company.industry || 'Not specified'}</p>
+              </div>
+            </div>
+
+            <div className="stat-item">
+              <div className="stat-icon">
+                <DollarSign className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Revenue</p>
+                <p className="stat-value">{company.revenue || 'Not available'}</p>
+              </div>
+            </div>
+
+            <div className="stat-item">
+              <div className="stat-icon">
+                <Calendar className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Founded</p>
+                <p className="stat-value">{company.founded_year || 'Not available'}</p>
+              </div>
+            </div>
+
+            {company.phone && (
+              <div className="stat-item">
+                <div className="stat-icon">
+                  <Phone className="w-5 h-5 text-gray-500" />
+                </div>
+                <div className="stat-content">
+                  <p className="stat-label">Phone</p>
+                  <p className="stat-value">{company.phone}</p>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Company Details Grid - Simplified */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
-            <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-              <p className="text-gray-400 text-sm mb-2 font-mono">INDUSTRY</p>
-              <p className="text-white text-lg font-semibold">{company.industry || 'Accounting'}</p>
-            </div>
-
-            <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-              <p className="text-gray-400 text-sm mb-2 font-mono">REVENUE</p>
-              <p className="text-white text-lg font-semibold">
-                {company.revenue || 'Not available'}
-              </p>
-            </div>
-
-            <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-              <p className="text-gray-400 text-sm mb-2 font-mono">FOUNDED</p>
-              <p className="text-white text-lg font-semibold">{company.founded_year || 'Not available'}</p>
-            </div>
-          </div>
-
-          {/* Phone if available */}
-          {company.phone && (
-            <div className="mb-8">
-              <div className="bg-black/40 rounded-xl p-5 border border-cyan-500/20">
-                <p className="text-gray-400 text-sm mb-2 font-mono">PHONE</p>
-                <p className="text-white text-lg font-semibold">{company.phone}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Links */}
-          <div className="flex gap-4 mb-8">
+          {/* Quick Links */}
+          <div className="quick-links">
             {company.website_url && (
               <a
                 href={company.website_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-6 py-4 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-xl font-mono font-bold transition-all text-center"
+                className="quick-link website"
                 onClick={(e) => e.stopPropagation()}
               >
-                🌐 WEBSITE
+                <Globe className="w-4 h-4" />
+                <span>Visit Website</span>
               </a>
             )}
             {company.linkedin_url && (
@@ -160,43 +211,47 @@ export default function CompanyCard({ company, onSwipe }) {
                 href={company.linkedin_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-6 py-4 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded-xl font-mono font-bold transition-all text-center"
+                className="quick-link linkedin"
                 onClick={(e) => e.stopPropagation()}
               >
-                💼 LINKEDIN
+                <Linkedin className="w-4 h-4" />
+                <span>LinkedIn</span>
               </a>
             )}
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="action-buttons">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onSwipe('left');
               }}
-              className="px-8 py-6 bg-red-500/20 hover:bg-red-500/30 text-red-400 border-2 border-red-500/50 rounded-2xl font-mono font-bold text-xl transition-all hover:scale-105"
+              className="action-btn reject"
             >
-              ❌ NOT INTERESTED
+              <XCircle className="w-5 h-5" />
+              <span>Not a Match</span>
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onSwipe('right');
               }}
-              className="px-8 py-6 bg-gradient-to-r from-green-500/20 to-emerald-500/20 hover:from-green-500/30 hover:to-emerald-500/30 text-green-400 border-2 border-green-500/50 rounded-2xl font-mono font-bold text-xl transition-all hover:scale-105"
+              className="action-btn accept"
             >
-              ✅ INTERESTED
+              <CheckCircle className="w-5 h-5" />
+              <span>This is a Match</span>
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Hint Text */}
-      <div className="text-center mt-6">
-        <p className="text-gray-500 text-sm font-mono">
-          💡 Drag the card left or right, or use the buttons
-        </p>
+        {/* Swipe Hint */}
+        <div className="swipe-hint">
+          <div className="hint-text">
+            <span className="hint-desktop">Drag card left or right, or use the buttons below</span>
+            <span className="hint-mobile">Swipe left or right to review</span>
+          </div>
+        </div>
       </div>
     </div>
   );

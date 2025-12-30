@@ -4,6 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import CompanyCard from '../../components/scout/CompanyCard';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
+import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown } from 'lucide-react';
 import './DailyLeads.css';
 
 export default function DailyLeads() {
@@ -15,6 +16,11 @@ export default function DailyLeads() {
   const [hasSeenTitleSetup, setHasSeenTitleSetup] = useState(false);
   const [dailySwipeCount, setDailySwipeCount] = useState(0);
   const [lastSwipeDate, setLastSwipeDate] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    quality: 'all',
+    sortBy: 'score'
+  });
 
   const DAILY_SWIPE_LIMIT = 25; // 25 interested companies per day
 
@@ -150,11 +156,18 @@ export default function DailyLeads() {
     setShowTitleSetup(false);
   };
 
+  // Calculate KPIs
+  const matchRate = companies.length > 0 ? Math.round((dailySwipeCount / (currentIndex + 1)) * 100) || 0 : 0;
+  const avgLeadScore = companies.length > 0
+    ? Math.round(companies.reduce((sum, c) => sum + (c.fit_score || 0), 0) / companies.length)
+    : 0;
+  const remainingLeads = companies.length - currentIndex;
+
   if (loading) {
     return (
       <div className="daily-leads-loading">
         <div className="loading-spinner"></div>
-        <p className="loading-text">[LOADING TODAY'S LEADS...]</p>
+        <p className="loading-text">Loading lead insights...</p>
       </div>
     );
   }
@@ -162,15 +175,17 @@ export default function DailyLeads() {
   if (companies.length === 0) {
     return (
       <div className="empty-daily-leads">
-        <div className="empty-icon">🎉</div>
-        <h2>All Done for Today!</h2>
-        <p>You've reviewed all available companies. Great work!</p>
-        <p className="empty-hint">Come back tomorrow for fresh leads (Mon-Fri), or update your ICP Settings to get more companies.</p>
+        <div className="empty-icon">
+          <Target className="w-16 h-16 text-gray-400" />
+        </div>
+        <h2>All Leads Reviewed</h2>
+        <p>You've reviewed all available companies for today. Excellent work!</p>
+        <p className="empty-hint">Fresh leads arrive Monday-Friday, or update your ICP Settings for more matches.</p>
         <button
-          onClick={() => navigate('/scout')}
+          onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
           className="refresh-btn"
         >
-          🔄 Go to ICP Settings
+          Update ICP Settings
         </button>
       </div>
     );
@@ -180,28 +195,128 @@ export default function DailyLeads() {
 
   return (
     <div className="daily-leads">
-      {/* Daily Stats Header */}
-      <div className="daily-header">
-        <div className="daily-stats">
-          <div className="stat-item">
-            <span className="stat-label">Progress</span>
-            <span className="stat-value">{currentIndex + 1} / {companies.length}</span>
+      {/* Enterprise Header */}
+      <div className="enterprise-header">
+        <div className="header-content">
+          <h1 className="page-title">Daily Lead Insights</h1>
+          <p className="page-subtitle">AI-matched companies for your ICP criteria</p>
+        </div>
+      </div>
+
+      {/* KPI Dashboard */}
+      <div className="kpi-dashboard">
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <Users className="kpi-icon" />
+            <span className="kpi-label">Leads Available</span>
           </div>
-          <div className="stat-item">
-            <span className="stat-label">Interested Today</span>
-            <span className="stat-value">{dailySwipeCount} / {DAILY_SWIPE_LIMIT}</span>
+          <div className="kpi-value">{remainingLeads}</div>
+          <div className="kpi-trend">
+            <TrendingUp className="trend-icon positive" />
+            <span className="trend-text positive">Updated daily</span>
           </div>
         </div>
 
-        {/* "View My Companies" button - shows when user has accepted companies */}
-        {dailySwipeCount > 0 && (
-          <button
-            className="view-companies-btn"
-            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-          >
-            📁 View My {dailySwipeCount} Companies →
-          </button>
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <Target className="kpi-icon" />
+            <span className="kpi-label">Match Rate</span>
+          </div>
+          <div className="kpi-value">{matchRate}%</div>
+          <div className="kpi-trend">
+            {matchRate >= 50 ? (
+              <>
+                <TrendingUp className="trend-icon positive" />
+                <span className="trend-text positive">Strong match quality</span>
+              </>
+            ) : (
+              <>
+                <TrendingDown className="trend-icon neutral" />
+                <span className="trend-text neutral">Adjust ICP for better results</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <TrendingUp className="kpi-icon" />
+            <span className="kpi-label">Avg Lead Score</span>
+          </div>
+          <div className="kpi-value">{avgLeadScore}</div>
+          <div className="kpi-trend">
+            <span className="trend-text neutral">Out of 100</span>
+          </div>
+        </div>
+
+        <div className="kpi-card highlight">
+          <div className="kpi-header">
+            <span className="kpi-label">Matched Today</span>
+          </div>
+          <div className="kpi-value">{dailySwipeCount} / {DAILY_SWIPE_LIMIT}</div>
+          <div className="kpi-progress">
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${(dailySwipeCount / DAILY_SWIPE_LIMIT) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Section */}
+      <div className="filters-section">
+        <button
+          className="filter-toggle"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter className="w-4 h-4" />
+          <span>Filters & Sort</span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showFilters && (
+          <div className="filter-controls">
+            <div className="filter-group">
+              <label>Lead Quality</label>
+              <select
+                value={filters.quality}
+                onChange={(e) => setFilters({...filters, quality: e.target.value})}
+              >
+                <option value="all">All Leads</option>
+                <option value="high">High Quality (80+)</option>
+                <option value="medium">Medium Quality (50-79)</option>
+                <option value="low">Needs Review (&lt;50)</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Sort By</label>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => setFilters({...filters, sortBy: e.target.value})}
+              >
+                <option value="score">Lead Score (High to Low)</option>
+                <option value="recent">Recently Added</option>
+                <option value="revenue">Revenue (High to Low)</option>
+              </select>
+            </div>
+          </div>
         )}
+      </div>
+
+      {/* Progress Indicator */}
+      <div className="progress-indicator">
+        <div className="progress-text">
+          Reviewing lead {currentIndex + 1} of {companies.length}
+        </div>
+        <div className="progress-bar-container">
+          <div
+            className="progress-bar-fill"
+            style={{ width: `${((currentIndex + 1) / companies.length) * 100}%` }}
+          />
+        </div>
       </div>
 
       {/* Company Card */}
@@ -214,18 +329,18 @@ export default function DailyLeads() {
         </div>
       )}
 
-      {/* Instructions */}
-      <div className="swipe-instructions">
-        <div className="instruction-item">
-          <span className="instruction-icon">👈</span>
-          <span className="instruction-text red">SWIPE LEFT = Not Interested</span>
+      {/* View Matched Companies Button */}
+      {dailySwipeCount > 0 && (
+        <div className="action-footer">
+          <button
+            className="view-matches-btn"
+            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+          >
+            <Users className="w-5 h-5" />
+            <span>View {dailySwipeCount} Matched {dailySwipeCount === 1 ? 'Company' : 'Companies'}</span>
+          </button>
         </div>
-        <div className="instruction-divider"></div>
-        <div className="instruction-item">
-          <span className="instruction-text green">SWIPE RIGHT = Interested</span>
-          <span className="instruction-icon">👉</span>
-        </div>
-      </div>
+      )}
 
       {/* Contact Title Setup Modal */}
       {showTitleSetup && (

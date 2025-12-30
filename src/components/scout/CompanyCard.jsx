@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
-import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle, Users } from 'lucide-react';
 
 export default function CompanyCard({ company, onSwipe }) {
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const cardRef = useRef(null);
 
   const handleMouseDown = (e) => {
@@ -112,9 +113,24 @@ export default function CompanyCard({ company, onSwipe }) {
         <div className="card-content">
           {/* Company Header */}
           <div className="company-header">
-            {/* Logo Placeholder */}
+            {/* Company Logo */}
             <div className="company-logo-placeholder">
-              <Building2 className="w-8 h-8 text-gray-400" />
+              {company.domain && !logoError ? (
+                <img
+                  src={`https://logo.clearbit.com/${company.domain}`}
+                  alt={`${company.name} logo`}
+                  className="company-logo"
+                  onError={() => setLogoError(true)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    padding: '8px'
+                  }}
+                />
+              ) : (
+                <Building2 className="w-8 h-8 text-gray-400" />
+              )}
             </div>
 
             {/* Company Name & Domain */}
@@ -151,6 +167,16 @@ export default function CompanyCard({ company, onSwipe }) {
 
             <div className="stat-item">
               <div className="stat-icon">
+                <Users className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Employees</p>
+                <p className="stat-value">{company.employee_count || company.company_size || 'Not available'}</p>
+              </div>
+            </div>
+
+            <div className="stat-item">
+              <div className="stat-icon">
                 <DollarSign className="w-5 h-5 text-gray-500" />
               </div>
               <div className="stat-content">
@@ -168,18 +194,6 @@ export default function CompanyCard({ company, onSwipe }) {
                 <p className="stat-value">{company.founded_year || 'Not available'}</p>
               </div>
             </div>
-
-            {company.phone && (
-              <div className="stat-item">
-                <div className="stat-icon">
-                  <Phone className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Phone</p>
-                  <p className="stat-value">{company.phone}</p>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Quick Links */}

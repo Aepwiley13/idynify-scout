@@ -4,7 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import CompanyCard from '../../components/scout/CompanyCard';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
-import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown, CheckCircle, RotateCcw } from 'lucide-react';
 import './DailyLeads.css';
 
 export default function DailyLeads() {
@@ -21,6 +21,8 @@ export default function DailyLeads() {
     quality: 'all',
     sortBy: 'score'
   });
+  const [lastSwipe, setLastSwipe] = useState(null); // Track last swipe for undo
+  const [showUndo, setShowUndo] = useState(false);
 
   const DAILY_SWIPE_LIMIT = 25; // 25 interested companies per day
 
@@ -127,6 +129,15 @@ export default function DailyLeads() {
       setDailySwipeCount(newSwipeCount);
       setLastSwipeDate(today);
 
+      // Track swipe for undo
+      setLastSwipe({
+        company: company,
+        direction: direction,
+        index: currentIndex,
+        previousSwipeCount: dailySwipeCount
+      });
+      setShowUndo(true);
+
       // If accepted and haven't seen title setup modal yet, show it
       if (direction === 'right' && !hasSeenTitleSetup) {
         setShowTitleSetup(true);
@@ -149,6 +160,47 @@ export default function DailyLeads() {
     } catch (error) {
       console.error('Error handling swipe:', error);
       alert('Failed to save swipe. Please try again.');
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!lastSwipe) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      // Restore company status to pending
+      const companyRef = doc(db, 'users', user.uid, 'companies', lastSwipe.company.id);
+      await updateDoc(companyRef, {
+        status: 'pending',
+        swipedAt: null,
+        swipeDirection: null
+      });
+
+      // Restore swipe count if it was a right swipe
+      if (lastSwipe.direction === 'right') {
+        const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
+        await setDoc(swipeProgressRef, {
+          dailySwipeCount: lastSwipe.previousSwipeCount,
+          lastSwipeDate: today,
+          hasSeenTitleSetup: hasSeenTitleSetup
+        });
+        setDailySwipeCount(lastSwipe.previousSwipeCount);
+      }
+
+      // Go back to the previous company
+      setCurrentIndex(lastSwipe.index);
+
+      // Clear undo state
+      setLastSwipe(null);
+      setShowUndo(false);
+
+    } catch (error) {
+      console.error('Error undoing swipe:', error);
+      alert('Failed to undo swipe. Please try again.');
     }
   };
 
@@ -326,6 +378,19 @@ export default function DailyLeads() {
             company={currentCompany}
             onSwipe={handleSwipe}
           />
+        </div>
+      )}
+
+      {/* Undo Button */}
+      {showUndo && lastSwipe && (
+        <div className="undo-container">
+          <button
+            className="undo-btn"
+            onClick={handleUndo}
+          >
+            <RotateCcw className="w-5 h-5" />
+            <span>Undo Last Swipe</span>
+          </button>
         </div>
       )}
 

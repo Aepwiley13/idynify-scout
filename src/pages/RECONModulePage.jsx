@@ -171,7 +171,7 @@ export default function RECONModulePage() {
             <h2 className="text-3xl font-bold text-white mb-4 font-mono">Reconnaissance Intelligence</h2>
             <p className="text-gray-300 text-lg mb-6">
               Complete all 10 sections to build your comprehensive Ideal Customer Profile (ICP).
-              Each section must be completed in order to unlock the next.
+              All sections are available - complete them in any order you prefer.
             </p>
 
             {/* Progress Stats */}
@@ -203,22 +203,9 @@ export default function RECONModulePage() {
               return (
                 <div key={section.sectionId}>
                   <div
-                    className={`relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 transition-all ${
-                      section.unlocked
-                        ? 'border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer'
-                        : 'border-gray-500/20 opacity-60'
-                    }`}
-                    onClick={() => section.unlocked && navigateToSection(section.sectionId)}
+                    className="relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer transition-all"
+                    onClick={() => navigateToSection(section.sectionId)}
                   >
-                    {/* Lock Overlay */}
-                    {!section.unlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl backdrop-blur-sm">
-                        <div className="text-center">
-                          <div className="text-5xl mb-2">🔒</div>
-                          <p className="text-gray-400 font-mono text-sm">Complete previous section to unlock</p>
-                        </div>
-                      </div>
-                    )}
 
                     <div className="flex items-start gap-6">
                       {/* Section Number */}
@@ -262,39 +249,37 @@ export default function RECONModulePage() {
                         </div>
 
                         {/* Action Buttons */}
-                        {section.unlocked && (
-                          <div className="flex gap-3">
+                        <div className="flex gap-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToSection(section.sectionId);
+                            }}
+                            className={`px-6 py-3 rounded-lg font-mono font-bold transition-all ${
+                              section.status === 'completed'
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                                : section.status === 'in_progress'
+                                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30'
+                                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700'
+                            }`}
+                          >
+                            {section.status === 'completed' ? '✏️ EDIT SECTION' :
+                             section.status === 'in_progress' ? '▶️ CONTINUE SECTION' :
+                             '🚀 START SECTION'} →
+                          </button>
+
+                          {section.status === 'completed' && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigateToSection(section.sectionId);
+                                setViewingSection(section);
                               }}
-                              className={`px-6 py-3 rounded-lg font-mono font-bold transition-all ${
-                                section.status === 'completed'
-                                  ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
-                                  : section.status === 'in_progress'
-                                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30'
-                                  : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700'
-                              }`}
+                              className="px-4 py-3 rounded-lg font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
                             >
-                              {section.status === 'completed' ? '✏️ EDIT SECTION' :
-                               section.status === 'in_progress' ? '▶️ CONTINUE SECTION' :
-                               '🚀 START SECTION'} →
+                              📊 VIEW OUTPUT
                             </button>
-
-                            {section.status === 'completed' && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setViewingSection(section);
-                                }}
-                                className="px-4 py-3 rounded-lg font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
-                              >
-                                📊 VIEW OUTPUT
-                              </button>
-                            )}
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -302,9 +287,7 @@ export default function RECONModulePage() {
                   {/* Connector Line */}
                   {!isLast && (
                     <div className="flex justify-center py-2">
-                      <div className={`w-0.5 h-8 ${
-                        reconModule.sections[index + 1].unlocked ? 'bg-cyan-500/50' : 'bg-gray-500/30'
-                      }`} />
+                      <div className="w-0.5 h-8 bg-cyan-500/50" />
                     </div>
                   )}
                 </div>

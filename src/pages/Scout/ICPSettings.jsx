@@ -4,6 +4,7 @@ import { db, auth } from '../../firebase/config';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter } from 'lucide-react';
 import './ICPSettings.css';
 
 export default function ICPSettings() {
@@ -12,6 +13,7 @@ export default function ICPSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Search states for dropdowns
   const [industrySearch, setIndustrySearch] = useState('');
@@ -76,11 +78,12 @@ export default function ICPSettings() {
         }
       );
 
-      alert('✅ ICP settings updated! Click "Refresh Results" to get new companies based on your updated criteria.');
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
       setSaving(false);
     } catch (error) {
       console.error('Failed to save ICP:', error);
-      alert('❌ Failed to save changes. Please try again.');
+      alert('Failed to save changes. Please try again.');
       setSaving(false);
     }
   }
@@ -105,7 +108,7 @@ export default function ICPSettings() {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`✅ Success! Found ${data.companiesFound} new companies. Check Daily Leads tab!`);
+        alert(`Success! Found ${data.companiesFound} new companies. Check the Daily Leads tab!`);
       } else {
         throw new Error(data.error || 'Failed to refresh results');
       }
@@ -113,7 +116,7 @@ export default function ICPSettings() {
       setRefreshing(false);
     } catch (error) {
       console.error('Failed to refresh:', error);
-      alert(`❌ Failed to refresh results: ${error.message}`);
+      alert(`Failed to refresh results: ${error.message}`);
       setRefreshing(false);
     }
   }
@@ -158,7 +161,7 @@ export default function ICPSettings() {
     return (
       <div className="icp-settings-loading">
         <div className="loading-spinner"></div>
-        <p className="loading-text">[LOADING ICP SETTINGS...]</p>
+        <p className="loading-text">Loading ICP settings...</p>
       </div>
     );
   }
@@ -166,7 +169,9 @@ export default function ICPSettings() {
   if (!profile) {
     return (
       <div className="icp-empty">
-        <p>No ICP profile found. Please complete the questionnaire first.</p>
+        <Filter className="w-16 h-16 text-gray-400 mb-4" />
+        <h2>No ICP Profile Found</h2>
+        <p>Please complete the questionnaire first to set up your Ideal Customer Profile.</p>
       </div>
     );
   }
@@ -181,15 +186,59 @@ export default function ICPSettings() {
 
   return (
     <div className="icp-settings">
-      <div className="settings-header">
-        <h2>ICP Settings</h2>
-        <p className="settings-subtitle">Define and update your Ideal Customer Profile</p>
+      {/* Enterprise Header */}
+      <div className="enterprise-header">
+        <div className="header-content">
+          <h1 className="page-title">ICP Settings</h1>
+          <p className="page-subtitle">Define and refine your Ideal Customer Profile criteria</p>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="summary-cards">
+        <div className="summary-card">
+          <div className="summary-icon">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div className="summary-content">
+            <p className="summary-label">Industries Selected</p>
+            <p className="summary-value">{profile.industries.length}</p>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <div className="summary-icon">
+            <Users className="w-5 h-5" />
+          </div>
+          <div className="summary-content">
+            <p className="summary-label">Company Sizes</p>
+            <p className="summary-value">{profile.companySizes.length}</p>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <div className="summary-icon">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div className="summary-content">
+            <p className="summary-label">Target Locations</p>
+            <p className="summary-value">
+              {profile.isNationwide ? 'Nationwide' : `${profile.locations.length} states`}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="settings-content">
-        {/* Industries */}
+        {/* Industries Section */}
         <div className="setting-section">
-          <h3>🏭 Industries</h3>
+          <div className="section-header">
+            <div className="section-title-group">
+              <Building2 className="section-icon" />
+              <h3>Industries</h3>
+            </div>
+            <span className="selection-count">{profile.industries.length} selected</span>
+          </div>
           <p className="section-description">Select all industries that match your ideal customers</p>
 
           {profile.industries.length > 0 && (
@@ -197,19 +246,32 @@ export default function ICPSettings() {
               {profile.industries.map(industry => (
                 <span key={industry} className="selected-item">
                   {industry}
-                  <button onClick={() => handleIndustryToggle(industry)} className="remove-btn">✕</button>
+                  <button onClick={() => handleIndustryToggle(industry)} className="remove-btn">
+                    <X className="w-3 h-3" />
+                  </button>
                 </span>
               ))}
             </div>
           )}
 
-          <input
-            type="text"
-            placeholder="🔍 Search industries..."
-            value={industrySearch}
-            onChange={(e) => setIndustrySearch(e.target.value)}
-            className="search-input"
-          />
+          <div className="search-wrapper">
+            <Search className="search-icon-input" />
+            <input
+              type="text"
+              placeholder="Search industries..."
+              value={industrySearch}
+              onChange={(e) => setIndustrySearch(e.target.value)}
+              className="search-input"
+            />
+            {industrySearch && (
+              <button
+                className="clear-search-btn"
+                onClick={() => setIndustrySearch('')}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
           <div className="checkbox-grid">
             {filteredIndustries.slice(0, 20).map(industry => (
@@ -223,12 +285,21 @@ export default function ICPSettings() {
               </label>
             ))}
           </div>
+          {filteredIndustries.length > 20 && (
+            <p className="showing-more">Showing first 20 of {filteredIndustries.length} results. Use search to narrow down.</p>
+          )}
         </div>
 
-        {/* Company Sizes */}
+        {/* Company Sizes Section */}
         <div className="setting-section">
-          <h3>👥 Company Sizes</h3>
-          <p className="section-description">Select all employee ranges that fit your target</p>
+          <div className="section-header">
+            <div className="section-title-group">
+              <Users className="section-icon" />
+              <h3>Company Sizes</h3>
+            </div>
+            <span className="selection-count">{profile.companySizes.length} selected</span>
+          </div>
+          <p className="section-description">Select all employee ranges that fit your target companies</p>
 
           <div className="size-grid">
             {companySizeOptions.map(size => (
@@ -247,10 +318,18 @@ export default function ICPSettings() {
           </div>
         </div>
 
-        {/* Locations */}
+        {/* Locations Section */}
         <div className="setting-section">
-          <h3>📍 Locations</h3>
-          <p className="section-description">Select target US states or choose Nationwide</p>
+          <div className="section-header">
+            <div className="section-title-group">
+              <MapPin className="section-icon" />
+              <h3>Target Locations</h3>
+            </div>
+            <span className="selection-count">
+              {profile.isNationwide ? 'All US' : `${profile.locations.length} states`}
+            </span>
+          </div>
+          <p className="section-description">Select specific US states or choose Nationwide coverage</p>
 
           <label className="nationwide-option">
             <input
@@ -258,7 +337,11 @@ export default function ICPSettings() {
               checked={profile.isNationwide}
               onChange={handleNationwideToggle}
             />
-            <span className="nationwide-label">🌎 Nationwide (All US States)</span>
+            <Globe className="w-5 h-5" />
+            <span className="nationwide-label">Nationwide (All US States)</span>
+            {profile.isNationwide && (
+              <CheckCircle className="w-5 h-5 check-icon" />
+            )}
           </label>
 
           {!profile.isNationwide && (
@@ -268,7 +351,9 @@ export default function ICPSettings() {
                   {profile.locations.slice(0, 10).map(location => (
                     <span key={location} className="selected-item">
                       {location}
-                      <button onClick={() => handleLocationToggle(location)} className="remove-btn">✕</button>
+                      <button onClick={() => handleLocationToggle(location)} className="remove-btn">
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
                   ))}
                   {profile.locations.length > 10 && (
@@ -277,13 +362,24 @@ export default function ICPSettings() {
                 </div>
               )}
 
-              <input
-                type="text"
-                placeholder="🔍 Search states..."
-                value={locationSearch}
-                onChange={(e) => setLocationSearch(e.target.value)}
-                className="search-input"
-              />
+              <div className="search-wrapper">
+                <Search className="search-icon-input" />
+                <input
+                  type="text"
+                  placeholder="Search states..."
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  className="search-input"
+                />
+                {locationSearch && (
+                  <button
+                    className="clear-search-btn"
+                    onClick={() => setLocationSearch('')}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
               <div className="checkbox-grid">
                 {filteredStates.slice(0, 20).map(state => (
@@ -297,32 +393,47 @@ export default function ICPSettings() {
                   </label>
                 ))}
               </div>
+              {filteredStates.length > 20 && (
+                <p className="showing-more">Showing first 20 of {filteredStates.length} results. Use search to narrow down.</p>
+              )}
             </>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="action-buttons">
-          <button
-            onClick={handleSaveChanges}
-            disabled={saving}
-            className="save-btn"
-          >
-            {saving ? '⏳ Saving...' : '💾 Save Changes'}
-          </button>
+        <div className="action-section">
+          {saveSuccess && (
+            <div className="success-message">
+              <CheckCircle className="w-5 h-5" />
+              <span>Settings saved successfully! Click "Refresh Results" to fetch new companies.</span>
+            </div>
+          )}
 
-          <button
-            onClick={handleRefreshResults}
-            disabled={refreshing || saving}
-            className="refresh-btn"
-          >
-            {refreshing ? '⏳ Searching...' : '🔄 Refresh Results'}
-          </button>
+          <div className="action-buttons">
+            <button
+              onClick={handleSaveChanges}
+              disabled={saving}
+              className="save-btn"
+            >
+              <Save className="w-5 h-5" />
+              <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+            </button>
+
+            <button
+              onClick={handleRefreshResults}
+              disabled={refreshing || saving}
+              className="refresh-btn"
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'spinning' : ''}`} />
+              <span>{refreshing ? 'Searching...' : 'Refresh Results'}</span>
+            </button>
+          </div>
+
+          <p className="action-hint">
+            <Filter className="w-4 h-4" />
+            <span>Save your changes first, then click "Refresh Results" to fetch new companies from Apollo API</span>
+          </p>
         </div>
-
-        <p className="action-hint">
-          💡 Save your changes first, then click "Refresh Results" to fetch new companies from Apollo
-        </p>
       </div>
     </div>
   );

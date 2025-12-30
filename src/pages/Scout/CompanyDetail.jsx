@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import TitleSelectionModal from '../../components/TitleSelectionModal';
 import './CompanyDetail.css';
 
 export default function CompanyDetail() {
@@ -15,6 +16,7 @@ export default function CompanyDetail() {
   const [loading, setLoading] = useState(true);
   const [searchingContacts, setSearchingContacts] = useState(false);
   const [approvingContactIds, setApprovingContactIds] = useState(new Set());
+  const [showTitleModal, setShowTitleModal] = useState(false);
 
   useEffect(() => {
     loadCompanyData();
@@ -84,6 +86,14 @@ export default function CompanyDetail() {
     } catch (error) {
       console.error('❌ Failed to load approved contacts:', error);
     }
+  }
+
+  // Handle new titles selected from modal
+  function handleTitlesSelected(newTitles) {
+    setShowTitleModal(false);
+    setSelectedTitles(newTitles);
+    // Re-search for contacts with new titles
+    searchContacts(company, newTitles);
   }
 
   // Search for contacts from Apollo
@@ -319,7 +329,12 @@ export default function CompanyDetail() {
       {/* Selected Titles */}
       {selectedTitles.length > 0 && (
         <div className="selected-titles-section">
-          <h3>Searching for contacts with these titles:</h3>
+          <div className="titles-header">
+            <h3>Searching for contacts with these titles:</h3>
+            <button className="change-titles-btn" onClick={() => setShowTitleModal(true)}>
+              ✏️ Change Titles
+            </button>
+          </div>
           <div className="titles-badges">
             {selectedTitles.slice(0, 3).map(titleObj => (
               <span key={titleObj.title} className="title-badge">
@@ -352,7 +367,7 @@ export default function CompanyDetail() {
         ) : contacts.length === 0 ? (
           <div className="empty-contacts">
             <p>No contacts found for the selected titles</p>
-            <button onClick={() => navigate(`/scout/company/${companyId}`)}>
+            <button onClick={() => setShowTitleModal(true)}>
               Try Different Titles
             </button>
           </div>
@@ -460,6 +475,15 @@ export default function CompanyDetail() {
             </p>
           )}
         </div>
+      )}
+
+      {/* Title Selection Modal */}
+      {showTitleModal && company && (
+        <TitleSelectionModal
+          company={company}
+          onClose={() => setShowTitleModal(false)}
+          onConfirm={handleTitlesSelected}
+        />
       )}
     </div>
   );

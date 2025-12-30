@@ -21,22 +21,33 @@ export default function SavedCompanies() {
         return;
       }
 
-      // Get all accepted companies
+      const userId = user.uid;
+      console.log('🔍 Loading saved companies for user:', userId);
+
+      // Get all ACCEPTED companies
       const companiesQuery = query(
-        collection(db, 'users', user.uid, 'companies'),
+        collection(db, 'users', userId, 'companies'),
         where('status', '==', 'accepted')
       );
       const companiesSnapshot = await getDocs(companiesQuery);
 
-      // For each company, count contacts (if contacts exist)
+      console.log('📦 Found accepted companies:', companiesSnapshot.size);
+
+      if (companiesSnapshot.empty) {
+        console.log('⚠️ No accepted companies found. User needs to swipe right on companies first.');
+        setCompanies([]);
+        setLoading(false);
+        return;
+      }
+
+      // For each company, count contacts
       const companiesList = await Promise.all(
         companiesSnapshot.docs.map(async (companyDoc) => {
           const company = { id: companyDoc.id, ...companyDoc.data() };
 
-          // Try to count contacts for this company
           try {
             const contactsQuery = query(
-              collection(db, 'users', user.uid, 'contacts'),
+              collection(db, 'users', userId, 'contacts'),
               where('company_id', '==', company.id)
             );
             const contactsSnapshot = await getDocs(contactsQuery);
@@ -55,14 +66,13 @@ export default function SavedCompanies() {
         })
       );
 
-      // Filter to only show companies WITH contacts (for now, show all accepted)
-      // TODO: Change this filter when contact selection is implemented
-      // const companiesWithContacts = companiesList.filter(c => c.contact_count > 0);
+      console.log('✅ Loaded companies:', companiesList.length);
+      console.log('📊 Companies with contacts:', companiesList.filter(c => c.contact_count > 0).length);
 
       setCompanies(companiesList);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load saved companies:', error);
+      console.error('❌ Failed to load saved companies:', error);
       setLoading(false);
     }
   }

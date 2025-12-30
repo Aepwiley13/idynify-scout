@@ -88,7 +88,9 @@ export default function DailyLeads() {
 
     // Check daily swipe limit (only for interested/right swipes)
     if (direction === 'right' && dailySwipeCount >= DAILY_SWIPE_LIMIT && lastSwipeDate === today) {
-      alert(`Daily limit reached! You can mark ${DAILY_SWIPE_LIMIT} companies as interested per day. Come back tomorrow for more! 🚀`);
+      alert('✅ Daily limit reached! Moving you to Saved Companies to select contacts from your interested companies.');
+      // Redirect to Scout with Saved Companies tab active
+      navigate('/scout', { replace: true, state: { activeTab: 'saved-companies' } });
       return;
     }
 
@@ -190,6 +192,16 @@ export default function DailyLeads() {
             <span className="stat-value">{dailySwipeCount} / {DAILY_SWIPE_LIMIT}</span>
           </div>
         </div>
+
+        {/* "View My Companies" button - shows when user has accepted companies */}
+        {dailySwipeCount > 0 && (
+          <button
+            className="view-companies-btn"
+            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+          >
+            📁 View My {dailySwipeCount} Companies →
+          </button>
+        )}
       </div>
 
       {/* Company Card */}

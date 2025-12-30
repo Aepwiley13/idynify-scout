@@ -1,21 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import dashboardSchema from '../schemas/dashboardSchema.json';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
-  const [dashboardState, setDashboardState] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('overview');
+  const [stats, setStats] = useState({
+    scoutCompanies: 0,
+    scoutContacts: 0,
+    reconCompletion: 0
+  });
 
   useEffect(() => {
-    initializeDashboard();
+    loadDashboardStats();
   }, []);
 
-  const initializeDashboard = async () => {
+  const loadDashboardStats = async () => {
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -23,35 +25,33 @@ export default function MissionControlDashboardV2() {
         return;
       }
 
-      // Try to load existing dashboard state
-      const dashboardRef = doc(db, 'dashboards', user.uid);
-      const dashboardDoc = await getDoc(dashboardRef);
+      const userId = user.uid;
 
-      if (dashboardDoc.exists()) {
-        console.log('✅ Dashboard state loaded from Firestore');
-        setDashboardState(dashboardDoc.data());
-      } else {
-        // Initialize new dashboard from schema
-        console.log('🆕 Creating new dashboard state from schema');
-        const initialState = {
-          ...dashboardSchema.dashboard,
-          userId: user.uid,
-          createdAt: new Date().toISOString(),
-          lastUpdatedAt: new Date().toISOString(),
-          userState: {
-            ...dashboardSchema.dashboard.userState,
-            accountCreatedAt: user.metadata.creationTime,
-            lastLoginAt: new Date().toISOString(),
-            totalSessions: 1
-          }
-        };
+      // Count accepted companies
+      const companiesQuery = query(
+        collection(db, 'users', userId, 'companies'),
+        where('status', '==', 'accepted')
+      );
+      const companiesSnapshot = await getDocs(companiesQuery);
 
-        await setDoc(dashboardRef, initialState);
-        setDashboardState(initialState);
-      }
+      // Count contacts
+      const contactsSnapshot = await getDocs(
+        collection(db, 'users', userId, 'contacts')
+      );
+
+      // Get RECON completion
+      const reconDoc = await getDoc(doc(db, 'users', userId, 'recon', 'current'));
+      const reconCompletion = reconDoc.exists() ? reconDoc.data().completionPercentage || 0 : 0;
+
+      setStats({
+        scoutCompanies: companiesSnapshot.size,
+        scoutContacts: contactsSnapshot.size,
+        reconCompletion
+      });
+
+      setLoading(false);
     } catch (error) {
-      console.error('❌ Error initializing dashboard:', error);
-    } finally {
+      console.error('❌ Error loading dashboard stats:', error);
       setLoading(false);
     }
   };
@@ -65,14 +65,6 @@ export default function MissionControlDashboardV2() {
         console.error('Error logging out:', error);
       }
     }
-  };
-
-  const navigateToModule = (moduleId) => {
-    navigate(`/mission-control-v2/${moduleId}`);
-  };
-
-  const navigateToSection = (moduleId, sectionId) => {
-    navigate(`/mission-control-v2/${moduleId}/section/${sectionId}`);
   };
 
   if (loading) {
@@ -99,19 +91,15 @@ export default function MissionControlDashboardV2() {
         <div className="relative z-10 text-cyan-400 text-2xl font-mono animate-pulse">
           [INITIALIZING MISSION CONTROL...]
         </div>
+        <style>{`
+          @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+          }
+        `}</style>
       </div>
     );
   }
-
-  if (!dashboardState) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-red-400 text-xl font-mono">[ERROR: Dashboard state not loaded]</div>
-      </div>
-    );
-  }
-
-  const reconModule = dashboardState.modules.find(m => m.id === 'recon');
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -166,13 +154,7 @@ export default function MissionControlDashboardV2() {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
                   MISSION CONTROL
                 </h1>
-                <p className="text-xs text-gray-400 font-mono">Modular Intelligence System v{dashboardState.version}</p>
-              </div>
-            </div>
-            <div className="hidden md:flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-xs text-gray-500 font-mono">Overall Progress</p>
-                <p className="text-2xl font-bold text-cyan-400 font-mono">{dashboardState.progressTracking.overallProgress}%</p>
+                <p className="text-xs text-gray-400 font-mono">Command Center v2.0</p>
               </div>
             </div>
           </div>
@@ -181,173 +163,106 @@ export default function MissionControlDashboardV2() {
 
       {/* Main Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-12">
-
         {/* Welcome Section */}
         <section className="mb-12">
           <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-8 border border-cyan-500/30">
             <h2 className="text-3xl font-bold text-white mb-4 font-mono">Welcome to Mission Control</h2>
-            <p className="text-gray-300 text-lg mb-6">
-              Your modular intelligence platform. Complete each module to unlock advanced capabilities.
+            <p className="text-gray-300 text-lg">
+              Your modular intelligence platform for B2B lead generation.
             </p>
-
-            {/* Milestones */}
-            <div className="flex flex-wrap gap-3">
-              {dashboardState.progressTracking.milestones.map((milestone) => (
-                <div
-                  key={milestone.id}
-                  className={`px-4 py-2 rounded-lg font-mono text-sm border ${
-                    milestone.achieved
-                      ? 'bg-green-500/20 border-green-500/30 text-green-300'
-                      : 'bg-gray-500/10 border-gray-500/20 text-gray-500'
-                  }`}
-                >
-                  {milestone.achieved ? '✓' : '○'} {milestone.label}
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
         {/* Modules Grid */}
         <section className="mb-12">
-          <h3 className="text-2xl font-bold text-white mb-6 font-mono">Available Modules</h3>
+          <h3 className="text-2xl font-bold text-white mb-6 font-mono">Modules</h3>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {dashboardState.modules.map((module) => (
-              <div
-                key={module.id}
-                className={`relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 transition-all ${
-                  module.unlocked
-                    ? 'border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer'
-                    : 'border-gray-500/20 opacity-60'
-                }`}
-                onClick={() => module.unlocked && navigateToModule(module.id)}
-              >
-                {/* Lock Icon if locked */}
-                {!module.unlocked && (
-                  <div className="absolute top-4 right-4 text-3xl">🔒</div>
-                )}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* SCOUT MODULE - UNLOCKED */}
+            <div
+              className="module-card unlocked relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer transition-all"
+              onClick={() => navigate('/scout')}
+            >
+              <div className="module-icon text-4xl mb-4">🎯</div>
+              <h4 className="text-2xl font-bold text-white mb-2 font-mono">SCOUT</h4>
+              <div className="status-badge unlocked mb-2">ACTIVE</div>
+              <p className="text-gray-400 text-sm mb-4">Discover and track your ideal customers</p>
 
-                {/* Module Header */}
-                <div className="mb-4">
-                  <h4 className="text-2xl font-bold text-white mb-2 font-mono">{module.name}</h4>
-                  <p className="text-gray-400 text-sm">{module.description}</p>
+              <div className="module-stats mb-4 grid grid-cols-2 gap-2">
+                <div className="stat-box bg-black/40 rounded-lg p-3 border border-cyan-500/20">
+                  <p className="text-xs text-gray-500 font-mono">Companies</p>
+                  <p className="text-xl font-bold text-cyan-400 font-mono">{stats.scoutCompanies}</p>
                 </div>
-
-                {/* Progress Bar */}
-                {module.unlocked && (
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs text-gray-400 font-mono">Progress</span>
-                      <span className="text-xs text-cyan-400 font-mono font-bold">{module.progressPercentage}%</span>
-                    </div>
-                    <div className="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 transition-all duration-500"
-                        style={{ width: `${module.progressPercentage}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Stats */}
-                {module.unlocked && module.totalSections > 0 && (
-                  <div className="flex gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-gray-500 font-mono">Sections</p>
-                      <p className="text-lg font-bold text-white font-mono">
-                        {module.completedSections}/{module.totalSections}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 font-mono">Status</p>
-                      <p className={`text-sm font-bold font-mono ${
-                        module.status === 'completed' ? 'text-green-400' :
-                        module.status === 'in-progress' ? 'text-cyan-400' :
-                        'text-gray-400'
-                      }`}>
-                        {module.status.toUpperCase()}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Button */}
-                {module.unlocked && (
-                  <button
-                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all font-mono"
-                  >
-                    {module.status === 'completed' ? 'REVIEW MODULE' :
-                     module.status === 'in-progress' ? 'CONTINUE MODULE' :
-                     'START MODULE'} →
-                  </button>
-                )}
+                <div className="stat-box bg-black/40 rounded-lg p-3 border border-cyan-500/20">
+                  <p className="text-xs text-gray-500 font-mono">Contacts</p>
+                  <p className="text-xl font-bold text-cyan-400 font-mono">{stats.scoutContacts}</p>
+                </div>
               </div>
-            ))}
+
+              <button className="module-btn w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all font-mono">
+                Enter Scout →
+              </button>
+            </div>
+
+            {/* RECON MODULE - UNLOCKED (OPTIONAL) */}
+            <div
+              className="module-card unlocked relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer transition-all"
+              onClick={() => navigate('/mission-control-v2/recon')}
+            >
+              <div className="module-icon text-4xl mb-4">🧠</div>
+              <h4 className="text-2xl font-bold text-white mb-2 font-mono">RECON</h4>
+              <div className="flex gap-2 mb-2">
+                <div className="status-badge unlocked">ACTIVE</div>
+                <div className="optional-badge">Optional</div>
+              </div>
+              <p className="text-gray-400 text-sm mb-4">Train your AI to find better leads</p>
+
+              <div className="module-stats mb-4">
+                <div className="stat-box bg-black/40 rounded-lg p-3 border border-cyan-500/20">
+                  <p className="text-xs text-gray-500 font-mono">Completion</p>
+                  <p className="text-xl font-bold text-cyan-400 font-mono">{stats.reconCompletion}%</p>
+                </div>
+                <div className="progress-bar mt-2 w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 transition-all duration-500"
+                    style={{ width: `${stats.reconCompletion}%` }}
+                  />
+                </div>
+              </div>
+
+              <button className="module-btn w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all font-mono">
+                Train AI →
+              </button>
+            </div>
+
+            {/* HUNTER MODULE - LOCKED */}
+            <div className="module-card locked relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-gray-500/20 opacity-60">
+              <div className="absolute top-4 right-4 text-3xl">🔒</div>
+              <div className="module-icon text-4xl mb-4 grayscale">🎯</div>
+              <h4 className="text-2xl font-bold text-white mb-2 font-mono">HUNTER</h4>
+              <div className="status-badge locked mb-2">COMING SOON</div>
+              <p className="text-gray-400 text-sm mb-4">Automated outreach campaigns</p>
+
+              <div className="unlock-requirements mt-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                <p className="text-xs text-gray-500 mb-1">✓ Select 50+ contacts</p>
+                <p className="text-xs text-gray-500">○ Complete 1 RECON section</p>
+              </div>
+            </div>
+
+            {/* SNIPER MODULE - LOCKED */}
+            <div className="module-card locked relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-gray-500/20 opacity-60">
+              <div className="absolute top-4 right-4 text-3xl">🔒</div>
+              <div className="module-icon text-4xl mb-4 grayscale">🎯</div>
+              <h4 className="text-2xl font-bold text-white mb-2 font-mono">SNIPER</h4>
+              <div className="status-badge locked mb-2">COMING SOON</div>
+              <p className="text-gray-400 text-sm mb-4">Advanced targeting & personalization</p>
+
+              <div className="unlock-requirements mt-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                <p className="text-xs text-gray-500">○ Complete Hunter</p>
+              </div>
+            </div>
           </div>
         </section>
-
-        {/* RECON Quick View (if in progress) */}
-        {reconModule && reconModule.unlocked && (
-          <section className="mb-12">
-            <h3 className="text-2xl font-bold text-white mb-6 font-mono flex items-center gap-2">
-              <span>🔍</span> RECON Sections
-            </h3>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {reconModule.sections.map((section) => (
-                <div
-                  key={section.sectionId}
-                  className={`bg-black/60 backdrop-blur-xl rounded-xl p-4 border transition-all ${
-                    section.unlocked
-                      ? 'border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer'
-                      : 'border-gray-500/20 opacity-50'
-                  }`}
-                  onClick={() => section.unlocked && navigateToSection('recon', section.sectionId)}
-                >
-                  {/* Section Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold font-mono ${
-                        section.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                        section.status === 'in_progress' ? 'bg-cyan-500/20 text-cyan-400' :
-                        'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {section.status === 'completed' ? '✓' : section.order}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white font-mono">{section.title}</h4>
-                        <p className="text-xs text-gray-500 font-mono">{section.estimatedTime}</p>
-                      </div>
-                    </div>
-                    {!section.unlocked && <span className="text-lg">🔒</span>}
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-xs text-gray-400 mb-3">{section.description}</p>
-
-                  {/* Action Button */}
-                  {section.unlocked && (
-                    <button
-                      className={`w-full py-2 px-4 rounded-lg font-mono text-xs font-bold transition-all ${
-                        section.status === 'completed'
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
-                          : section.status === 'in_progress'
-                          ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30'
-                          : 'bg-cyan-500 text-white hover:bg-cyan-600'
-                      }`}
-                    >
-                      {section.status === 'completed' ? 'EDIT' :
-                       section.status === 'in_progress' ? 'CONTINUE' :
-                       'START'}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
       </main>
 
       <style>{`
@@ -358,6 +273,62 @@ export default function MissionControlDashboardV2() {
         @keyframes floatBear {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-20px); }
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 0.25rem 0.75rem;
+          border-radius: 20px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          font-family: 'Courier New', monospace;
+        }
+
+        .status-badge.unlocked {
+          background: #10b981;
+          color: white;
+        }
+
+        .status-badge.locked {
+          background: #9ca3af;
+          color: white;
+        }
+
+        .optional-badge {
+          display: inline-block;
+          background: #fbbf24;
+          color: white;
+          padding: 0.25rem 0.5rem;
+          border-radius: 12px;
+          font-size: 0.75rem;
+          font-family: 'Courier New', monospace;
+          font-weight: 600;
+        }
+
+        .unlock-requirements {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #1f2937;
+          border-radius: 8px;
+          font-size: 0.875rem;
+          color: #9ca3af;
+        }
+
+        .unlock-requirements p {
+          margin: 0.25rem 0;
+          font-family: 'Courier New', monospace;
+        }
+
+        .module-card.locked {
+          cursor: not-allowed;
+        }
+
+        .module-card.locked .module-btn {
+          display: none;
+        }
+
+        .grayscale {
+          filter: grayscale(100%);
         }
       `}</style>
     </div>

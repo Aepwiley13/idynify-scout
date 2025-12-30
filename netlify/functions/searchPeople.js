@@ -70,8 +70,14 @@ export const handler = async (event) => {
 
     if (!apolloResponse.ok) {
       const errorText = await apolloResponse.text();
-      console.error('❌ Apollo API error:', errorText);
-      throw new Error('Apollo API request failed');
+      console.error('❌ Apollo API error:', apolloResponse.status, errorText);
+      console.error('📊 Request that failed:', JSON.stringify({
+        organization_ids: [organizationId],
+        person_titles: titles,
+        page: 1,
+        per_page: 10
+      }, null, 2));
+      throw new Error(`Apollo API request failed: ${apolloResponse.status} - ${errorText}`);
     }
 
     const apolloData = await apolloResponse.json();

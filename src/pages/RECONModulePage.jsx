@@ -225,11 +225,6 @@ export default function RECONModulePage() {
                             <p className="text-gray-400 text-sm mb-2">{section.description}</p>
                             <div className="flex items-center gap-4 text-xs font-mono">
                               <span className="text-gray-500">⏱️ {section.estimatedTime}</span>
-                              {section.required && (
-                                <span className="bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30">
-                                  REQUIRED
-                                </span>
-                              )}
                               {section.status === 'completed' && section.completedAt && (
                                 <span className="text-green-400">
                                   ✓ Completed {new Date(section.completedAt).toLocaleDateString()}

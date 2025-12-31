@@ -739,32 +739,48 @@
 .title-search-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 1.5rem;
+  gap: 1.5rem;
 }
 
-.title-search-header h3 {
-  font-size: 1.25rem;
+.title-search-header .header-text {
+  flex: 1;
+}
+
+.section-title-search {
+  font-size: 1.5rem;
   font-weight: 700;
   color: #111827;
+  margin: 0 0 0.5rem 0;
+}
+
+.section-subtitle-search {
+  font-size: 0.9375rem;
+  color: #6b7280;
   margin: 0;
 }
 
 .browse-titles-btn {
-  padding: 0.625rem 1.25rem;
-  background: #ffffff;
-  border: 1.5px solid #d1d5db;
-  color: #3b82f6;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+  white-space: nowrap;
 }
 
 .browse-titles-btn:hover {
-  background: #f9fafb;
-  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
 }
 
 /* Custom Title Form */
@@ -837,16 +853,58 @@
   cursor: not-allowed;
 }
 
-/* Selected Titles Display */
-.selected-titles-display {
+/* Active Titles Section */
+.active-titles-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1.5px solid #3b82f6;
+  border-radius: 12px;
+  padding: 1.5rem;
   margin-top: 1.5rem;
+}
+
+.active-titles-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.active-titles-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.active-titles-label svg {
+  color: #3b82f6;
+  stroke-width: 2.5;
+}
+
+.clear-all-titles-btn {
+  padding: 0.5rem 1rem;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  color: #6b7280;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-all-titles-btn:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
 .titles-badges-wrapper {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 1rem;
 }
 
 .title-badge-chip {
@@ -919,6 +977,40 @@
 .titles-count strong {
   color: #111827;
   font-weight: 700;
+}
+
+/* Title Search Empty State */
+.title-search-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border: 1.5px dashed #d1d5db;
+  border-radius: 12px;
+  margin-top: 1.5rem;
+}
+
+.title-search-empty-state svg {
+  color: #9ca3af;
+  stroke-width: 1.5;
+  margin-bottom: 1rem;
+}
+
+.title-search-empty-state h4 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 0.5rem 0;
+}
+
+.title-search-empty-state p {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  margin: 0;
+  max-width: 400px;
 }
 
 /* ========================================
@@ -1034,47 +1126,136 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4rem 2rem;
-  gap: 1.5rem;
+  padding: 5rem 2rem;
+  gap: 1rem;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 12px;
+}
+
+.searching-state h4 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e40af;
+  margin: 0;
 }
 
 .searching-state p {
-  color: #6b7280;
-  font-size: 1rem;
+  color: #3b82f6;
+  font-size: 0.9375rem;
   font-weight: 500;
+  margin: 0;
+  max-width: 500px;
+  text-align: center;
 }
 
-/* Empty Contacts */
+/* No Search State */
+.no-search-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 2rem;
+  text-align: center;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border: 1.5px dashed #d1d5db;
+  border-radius: 12px;
+}
+
+.no-search-state svg {
+  color: #9ca3af;
+  stroke-width: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.no-search-state h4 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+}
+
+.no-search-state p {
+  color: #6b7280;
+  font-size: 0.9375rem;
+  margin: 0;
+  max-width: 450px;
+}
+
+/* Empty Contacts (No Results) */
 .empty-contacts {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4rem 2rem;
+  padding: 5rem 2rem;
   text-align: center;
-  gap: 1.5rem;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1.5px solid #fca5a5;
+  border-radius: 12px;
+}
+
+.empty-contacts svg {
+  color: #f87171;
+  stroke-width: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.empty-contacts h4 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin: 0 0 0.75rem 0;
 }
 
 .empty-contacts p {
-  color: #6b7280;
-  font-size: 1rem;
-  margin: 0;
+  color: #7f1d1d;
+  font-size: 0.9375rem;
+  margin: 0 0 1.5rem 0;
+  max-width: 450px;
 }
 
-.empty-contacts button {
+.empty-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.try-different-btn,
+.clear-titles-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.875rem 1.5rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: #ffffff;
   border: none;
   border-radius: 10px;
-  font-weight: 600;
+  font-size: 0.9375rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.empty-contacts button:hover {
+.try-different-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.try-different-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.clear-titles-btn {
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  color: #6b7280;
+}
+
+.clear-titles-btn:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 
 /* ========================================

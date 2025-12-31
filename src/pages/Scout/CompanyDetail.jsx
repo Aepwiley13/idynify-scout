@@ -915,34 +915,61 @@ export default function CompanyDetail() {
           </div>
         )}
 
-      {/* Custom Title Search */}
+      {/* Title Search Section */}
       <div className="title-search-section">
         <div className="title-search-header">
-          <h3>Search for Contacts by Title</h3>
+          <div className="header-text">
+            <h3 className="section-title-search">Search for Contacts by Title</h3>
+            <p className="section-subtitle-search">
+              {selectedTitles.length === 0
+                ? 'Add titles to search for contacts at this company'
+                : `Searching for ${selectedTitles.length} title${selectedTitles.length !== 1 ? 's' : ''}`
+              }
+            </p>
+          </div>
           <button className="browse-titles-btn" onClick={() => setShowTitleModal(true)}>
-            Browse Common Titles
+            <Target className="w-4 h-4" />
+            <span>Browse Common Titles</span>
           </button>
         </div>
 
+        {/* Custom Title Input */}
         <form onSubmit={handleAddCustomTitle} className="custom-title-form">
           <div className="search-input-wrapper">
             <Search className="search-icon" />
             <input
               type="text"
-              placeholder="Add custom title (e.g., 'Head of Revenue Operations')..."
+              placeholder="Or add a custom title (e.g., 'Head of Revenue Operations')..."
               value={customTitleInput}
               onChange={(e) => setCustomTitleInput(e.target.value)}
               className="custom-title-input"
             />
             <button type="submit" className="add-title-btn" disabled={!customTitleInput.trim()}>
-              Add
+              <span>Add</span>
             </button>
           </div>
         </form>
 
-        {/* Selected Titles Badges */}
+        {/* Active Titles Display */}
         {selectedTitles.length > 0 && (
-          <div className="selected-titles-display">
+          <div className="active-titles-section">
+            <div className="active-titles-header">
+              <div className="active-titles-label">
+                <Target className="w-4 h-4" />
+                <span>Active Titles ({selectedTitles.length})</span>
+              </div>
+              {selectedTitles.length > 1 && (
+                <button
+                  className="clear-all-titles-btn"
+                  onClick={() => {
+                    setSelectedTitles([]);
+                    setContacts([]);
+                  }}
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
             <div className="titles-badges-wrapper">
               {selectedTitles.map((titleObj) => (
                 <div key={titleObj.title} className={`title-badge-chip ${titleObj.custom ? 'custom' : ''}`}>
@@ -958,9 +985,15 @@ export default function CompanyDetail() {
                 </div>
               ))}
             </div>
-            <p className="titles-count">
-              Searching with <strong>{selectedTitles.length}</strong> title{selectedTitles.length !== 1 ? 's' : ''}
-            </p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {selectedTitles.length === 0 && (
+          <div className="title-search-empty-state">
+            <Target className="w-12 h-12" />
+            <h4>No Titles Selected</h4>
+            <p>Choose common titles or add custom ones to start finding contacts</p>
           </div>
         )}
       </div>
@@ -971,7 +1004,14 @@ export default function CompanyDetail() {
           <div>
             <h2>Available Contacts</h2>
             <p className="section-subtitle">
-              {searchingContacts ? 'Searching...' : `${contacts.length} contacts found`}
+              {searchingContacts
+                ? `Searching Apollo for ${selectedTitles.length} title${selectedTitles.length !== 1 ? 's' : ''}...`
+                : contacts.length > 0
+                  ? `Found ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`
+                  : selectedTitles.length > 0
+                    ? 'No contacts found for these titles'
+                    : 'Add titles above to start searching'
+              }
             </p>
           </div>
 
@@ -1017,14 +1057,30 @@ export default function CompanyDetail() {
         {searchingContacts ? (
           <div className="searching-state">
             <div className="loading-spinner"></div>
-            <p>Searching for contacts from Apollo...</p>
+            <h4>Searching Apollo</h4>
+            <p>Looking for {selectedTitles.map(t => t.title).join(', ')} at {company.name}</p>
+          </div>
+        ) : contacts.length === 0 && selectedTitles.length > 0 ? (
+          <div className="empty-contacts">
+            <Users className="w-16 h-16" />
+            <h4>No Contacts Found</h4>
+            <p>We couldn't find any contacts with these titles at {company.name}</p>
+            <div className="empty-actions">
+              <button className="try-different-btn" onClick={() => setShowTitleModal(true)}>
+                <Target className="w-4 h-4" />
+                <span>Browse Common Titles</span>
+              </button>
+              <button className="clear-titles-btn" onClick={() => setSelectedTitles([])}>
+                <X className="w-4 h-4" />
+                <span>Clear Titles & Try Again</span>
+              </button>
+            </div>
           </div>
         ) : contacts.length === 0 ? (
-          <div className="empty-contacts">
-            <p>No contacts found for the selected titles</p>
-            <button onClick={() => setShowTitleModal(true)}>
-              Try Different Titles
-            </button>
+          <div className="no-search-state">
+            <Search className="w-16 h-16" />
+            <h4>Ready to Find Contacts</h4>
+            <p>Add job titles above to start searching for contacts at {company.name}</p>
           </div>
         ) : (
           <div className="contacts-grid">

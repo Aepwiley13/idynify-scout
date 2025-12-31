@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
+import NavigationBar from '../../components/NavigationBar';
 import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield } from 'lucide-react';
 import './CompanyDetail.css';
 
@@ -441,18 +442,23 @@ export default function CompanyDetail() {
   }
 
   return (
-    <div className="company-detail">
-      {/* Header with Back Button */}
-      <div className="page-header">
-        <button
-          className="back-btn"
-          onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-        >
-          ← Back to Saved Companies
-        </button>
-      </div>
+    <>
+      <NavigationBar />
+      <div className="company-detail">
+        {/* Breadcrumb Navigation */}
+        <div className="breadcrumb-nav">
+          <button onClick={() => navigate('/scout')} className="breadcrumb-link">
+            Scout
+          </button>
+          <span className="breadcrumb-separator">›</span>
+          <button onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })} className="breadcrumb-link">
+            Saved Companies
+          </button>
+          <span className="breadcrumb-separator">›</span>
+          <span className="breadcrumb-current">{company?.name || 'Company'}</span>
+        </div>
 
-      {/* Company Info Section */}
+        {/* Company Info Section */}
       <div className="company-header-section">
         <div className="company-logo-large">
           {company.name.charAt(0).toUpperCase()}
@@ -830,14 +836,15 @@ export default function CompanyDetail() {
         </div>
       )}
 
-      {/* Title Selection Modal */}
-      {showTitleModal && company && (
-        <TitleSelectionModal
-          company={company}
-          onClose={() => setShowTitleModal(false)}
-          onConfirm={handleTitlesSelected}
-        />
-      )}
-    </div>
+        {/* Title Selection Modal */}
+        {showTitleModal && company && (
+          <TitleSelectionModal
+            company={company}
+            onClose={() => setShowTitleModal(false)}
+            onConfirm={handleTitlesSelected}
+          />
+        )}
+      </div>
+    </>
   );
 }

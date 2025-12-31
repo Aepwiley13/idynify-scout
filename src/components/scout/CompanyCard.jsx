@@ -60,6 +60,15 @@ export default function CompanyCard({ company, onSwipe }) {
   };
 
   const handleOpenPreview = (url, title) => {
+    // Check if mobile device
+    const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+
+    // On mobile, always open in new tab for better UX
+    if (isMobile) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     // If URL is HTTP (not HTTPS), open directly in new tab
     // because browsers block HTTP iframes in HTTPS pages
     if (url.toLowerCase().startsWith('http://')) {
@@ -67,7 +76,7 @@ export default function CompanyCard({ company, onSwipe }) {
       return;
     }
 
-    // For HTTPS URLs, show preview modal
+    // For HTTPS URLs on desktop, show preview modal
     setPreviewUrl(url);
     setPreviewTitle(title);
     setShowPreview(true);

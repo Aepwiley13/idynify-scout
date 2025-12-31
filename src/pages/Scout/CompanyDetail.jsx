@@ -24,6 +24,8 @@ export default function CompanyDetail() {
   const [showTitleModal, setShowTitleModal] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showKeywords, setShowKeywords] = useState(false);
+  const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
+  const [savingDecisionMakers, setSavingDecisionMakers] = useState(false);
 
   useEffect(() => {
     loadCompanyData();
@@ -425,6 +427,82 @@ export default function CompanyDetail() {
     return { label: 'Available', class: 'available', icon: '~' };
   }
 
+  // Toggle decision maker selection
+  function handleToggleDecisionMaker(person) {
+    setSelectedDecisionMakers(prev => {
+      const isSelected = prev.some(p => p.id === person.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== person.id);
+      } else {
+        return [...prev, person];
+      }
+    });
+  }
+
+  // Add selected decision makers as leads
+  async function handleAddDecisionMakersToLeads() {
+    if (selectedDecisionMakers.length === 0) return;
+
+    try {
+      setSavingDecisionMakers(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      // Save each selected decision maker as a contact
+      for (const person of selectedDecisionMakers) {
+        const contactId = `${companyId}_${person.id}`;
+
+        await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
+          // Apollo IDs
+          apollo_person_id: person.id,
+
+          // Basic Info
+          name: person.name || 'Unknown',
+          title: person.title || '',
+          email: person.email || null,
+          phone: person.phone || null,
+          linkedin_url: person.linkedin_url || null,
+          photo_url: person.photo_url || null,
+
+          // Company Association
+          company_id: companyId,
+          company_name: company.name,
+          company_industry: company.industry || null,
+
+          // Additional Info
+          department: person.department || null,
+          seniority: person.seniority || null,
+
+          // Metadata
+          status: 'active',
+          saved_at: new Date().toISOString(),
+          source: 'decision_makers'
+        });
+      }
+
+      // Update company contact count
+      const companyRef = doc(db, 'users', user.uid, 'companies', companyId);
+      const companyDoc = await getDoc(companyRef);
+      const currentContactCount = companyDoc.data()?.contact_count || 0;
+
+      await updateDoc(companyRef, {
+        contact_count: currentContactCount + selectedDecisionMakers.length
+      });
+
+      console.log(`✅ Added ${selectedDecisionMakers.length} decision makers as leads`);
+
+      // Reload approved contacts and clear selection
+      await loadApprovedContacts();
+      setSelectedDecisionMakers([]);
+      setSavingDecisionMakers(false);
+
+    } catch (err) {
+      console.error('Error saving decision makers:', err);
+      setSavingDecisionMakers(false);
+      alert('Failed to save contacts. Please try again.');
+    }
+  }
+
   if (loading) {
     return (
       <div className="company-detail-loading">
@@ -752,39 +830,88 @@ export default function CompanyDetail() {
             </div>
 
             <div className="decision-makers-grid">
-              {company.apolloEnrichment.decisionMakers.map((person, idx) => (
-                <div key={idx} className="decision-maker-card">
-                  <div className="decision-maker-header">
-                    <div className="decision-maker-avatar">
-                      {person.photo_url ? (
-                        <img src={person.photo_url} alt={person.name} />
-                      ) : (
-                        <div className="avatar-placeholder">
-                          <Users className="w-6 h-6" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="decision-maker-info">
-                      <p className="decision-maker-name">{person.name}</p>
-                      <p className="decision-maker-title">{person.title}</p>
-                      {person.department && (
-                        <span className="decision-maker-dept">{person.department}</span>
-                      )}
-                    </div>
-                  </div>
+              {company.apolloEnrichment.decisionMakers.map((person, idx) => {
+                const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
+                const isAlreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
 
-                  {person.linkedin_url && (
-                    <button
-                      className="decision-maker-linkedin"
-                      onClick={() => window.open(person.linkedin_url, '_blank', 'noopener,noreferrer')}
-                    >
-                      <Linkedin className="w-4 h-4" />
-                      <span>LinkedIn</span>
-                    </button>
-                  )}
-                </div>
-              ))}
+                return (
+                  <div
+                    key={idx}
+                    className={`decision-maker-card ${isSelected ? 'selected' : ''} ${isAlreadySaved ? 'already-saved' : ''}`}
+                    onClick={() => !isAlreadySaved && handleToggleDecisionMaker(person)}
+                  >
+                    {/* Selection Checkbox or Saved Badge */}
+                    {isAlreadySaved ? (
+                      <div className="decision-maker-saved-badge">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Saved</span>
+                      </div>
+                    ) : (
+                      <div className="decision-maker-select-indicator">
+                        <div className={`checkbox ${isSelected ? 'checked' : ''}`}>
+                          {isSelected && <CheckCircle className="w-5 h-5" />}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="decision-maker-header">
+                      <div className="decision-maker-avatar">
+                        {person.photo_url ? (
+                          <img src={person.photo_url} alt={person.name} />
+                        ) : (
+                          <div className="avatar-placeholder">
+                            <Users className="w-6 h-6" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="decision-maker-info">
+                        <p className="decision-maker-name">{person.name}</p>
+                        <p className="decision-maker-title">{person.title}</p>
+                        {person.department && (
+                          <span className="decision-maker-dept">{person.department}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {person.linkedin_url && (
+                      <button
+                        className="decision-maker-linkedin"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(person.linkedin_url, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        <Linkedin className="w-4 h-4" />
+                        <span>LinkedIn</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+
+            {/* Action Button */}
+            {selectedDecisionMakers.length > 0 && (
+              <div className="decision-makers-actions">
+                <button
+                  className="btn-add-selected-dm"
+                  onClick={handleAddDecisionMakersToLeads}
+                  disabled={savingDecisionMakers}
+                >
+                  {savingDecisionMakers ? (
+                    <>
+                      <div className="loading-spinner-small"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-5 h-5" />
+                      <span>Add {selectedDecisionMakers.length} to Leads</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

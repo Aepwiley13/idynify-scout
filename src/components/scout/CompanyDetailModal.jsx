@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle } from 'lucide-react';
+import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award } from 'lucide-react';
 import './CompanyDetailModal.css';
 
 export default function CompanyDetailModal({ company, onClose }) {
@@ -34,123 +34,83 @@ export default function CompanyDetailModal({ company, onClose }) {
 
       const currentData = companyDoc.data();
 
-      // Check if we already have enriched data
-      if (currentData.enrichedAt &&
-          Date.now() - currentData.enrichedAt < 7 * 24 * 60 * 60 * 1000) { // 7 days cache
-        setEnrichedData(currentData);
+      // Check if we already have fresh Apollo data (14 days cache)
+      if (currentData.apolloEnrichment &&
+          currentData.apolloEnrichedAt &&
+          Date.now() - currentData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
+        console.log('✅ Using cached Apollo data');
+        setEnrichedData(currentData.apolloEnrichment);
         setLoading(false);
         return;
       }
 
-      // Enrich the data
-      // For now, we'll use the existing data but mark it as enriched
-      // In the future, this could call external APIs like Clearbit, Apollo, etc.
-      const enriched = {
-        ...currentData,
-        enrichedAt: Date.now(),
-        enrichmentSource: 'manual', // Could be 'clearbit', 'apollo', etc.
+      // Call Netlify Function to enrich with Apollo
+      console.log('🔄 Calling Apollo enrichment API...');
 
-        // Additional fields that could be enriched:
-        description: currentData.description || generateCompanyDescription(currentData),
-        tags: currentData.tags || generateTags(currentData),
-        icpScore: currentData.icpScore || 0,
+      const authToken = await user.getIdToken();
 
-        // Social media presence
-        socialPresence: {
-          hasWebsite: !!currentData.website_url,
-          hasLinkedIn: !!currentData.linkedin_url,
-          hasFacebook: !!currentData.facebook_url,
-          hasTwitter: !!currentData.twitter_url,
+      const response = await fetch('/.netlify/functions/enrichCompany', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         },
-
-        // Company metrics
-        metrics: {
-          employeeCount: currentData.employee_count || currentData.company_size || 'Unknown',
-          revenue: currentData.revenue || 'Unknown',
-          foundedYear: currentData.founded_year || 'Unknown',
-          location: currentData.location || 'Unknown',
-        }
-      };
-
-      // Update Firestore with enriched data
-      await updateDoc(companyRef, {
-        enrichedAt: enriched.enrichedAt,
-        enrichmentSource: enriched.enrichmentSource,
-        description: enriched.description,
-        tags: enriched.tags,
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: authToken,
+          domain: company.domain || extractDomain(company.website_url),
+          organizationId: currentData.apollo_id || null
+        })
       });
 
-      setEnrichedData(enriched);
+      if (!response.ok) {
+        throw new Error('Apollo enrichment failed');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Enrichment failed');
+      }
+
+      console.log('✅ Apollo enrichment successful');
+
+      // Store enriched data in Firestore
+      await updateDoc(companyRef, {
+        apolloEnrichment: result.data,
+        apolloEnrichedAt: Date.now(),
+        apollo_id: result.data._raw?.apolloOrgId || null
+      });
+
+      setEnrichedData(result.data);
       setLoading(false);
+
     } catch (err) {
       console.error('Error enriching company data:', err);
       setError(err.message);
       setLoading(false);
 
-      // Still show basic company data even if enrichment fails
-      setEnrichedData(company);
+      // Show basic company data even if enrichment fails
+      setEnrichedData({
+        snapshot: {
+          name: company.name,
+          industry: company.industry,
+          location: { full: company.location || 'Unknown' }
+        }
+      });
     }
   }
 
-  // Helper function to generate a basic company description
-  function generateCompanyDescription(data) {
-    const parts = [];
-
-    if (data.name) {
-      parts.push(`${data.name} is`);
+  function extractDomain(url) {
+    if (!url) return null;
+    try {
+      const domain = url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      return domain;
+    } catch {
+      return null;
     }
-
-    if (data.industry) {
-      parts.push(`a company in the ${data.industry} industry`);
-    }
-
-    if (data.location) {
-      parts.push(`based in ${data.location}`);
-    }
-
-    if (data.founded_year) {
-      parts.push(`Founded in ${data.founded_year}`);
-    }
-
-    if (data.employee_count || data.company_size) {
-      const size = data.employee_count || data.company_size;
-      parts.push(`with ${size} employees`);
-    }
-
-    if (data.revenue) {
-      parts.push(`generating ${data.revenue} in revenue`);
-    }
-
-    return parts.length > 0
-      ? parts.join(', ') + '.'
-      : 'No description available.';
-  }
-
-  // Helper function to generate tags
-  function generateTags(data) {
-    const tags = [];
-
-    if (data.industry) tags.push(data.industry);
-    if (data.location) tags.push(data.location);
-
-    // Size tags
-    const empCount = data.employee_count || data.company_size;
-    if (empCount) {
-      const size = parseInt(empCount.toString().replace(/[^0-9]/g, ''));
-      if (size < 50) tags.push('Small Business');
-      else if (size < 500) tags.push('Mid-Market');
-      else tags.push('Enterprise');
-    }
-
-    // Social presence
-    if (data.website_url) tags.push('Has Website');
-    if (data.linkedin_url) tags.push('On LinkedIn');
-
-    return tags.slice(0, 6); // Limit to 6 tags
   }
 
   function handleOpenLink(url) {
-    // Check if mobile device
     const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
 
     if (isMobile || url.toLowerCase().startsWith('http://')) {
@@ -164,6 +124,13 @@ export default function CompanyDetailModal({ company, onClose }) {
     } else {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
+  }
+
+  function formatGrowthPercentage(value) {
+    if (!value) return null;
+    const num = parseFloat(value);
+    if (isNaN(num)) return null;
+    return num > 0 ? `+${num}%` : `${num}%`;
   }
 
   return (
@@ -186,7 +153,7 @@ export default function CompanyDetailModal({ company, onClose }) {
             </div>
             <div className="header-text">
               <h2 className="company-detail-name">{company.name || 'Unknown Company'}</h2>
-              <p className="company-detail-industry">{company.industry || 'Industry not specified'}</p>
+              <p className="company-detail-industry">{enrichedData?.snapshot?.industry || company.industry || 'Industry not specified'}</p>
             </div>
           </div>
           <button className="close-button" onClick={onClose}>
@@ -199,121 +166,256 @@ export default function CompanyDetailModal({ company, onClose }) {
           {loading ? (
             <div className="loading-state">
               <Loader className="spinner" />
-              <p>Enriching company data...</p>
+              <p>Enriching company data with Apollo...</p>
             </div>
           ) : error ? (
             <div className="error-state">
               <AlertCircle className="error-icon" />
-              <p>Failed to load company details</p>
+              <p>Enrichment encountered an issue</p>
               <p className="error-message">{error}</p>
+              <p className="error-hint">Showing basic company information</p>
             </div>
-          ) : enrichedData ? (
+          ) : null}
+
+          {enrichedData && (
             <>
-              {/* Description */}
-              <div className="detail-section">
-                <h3 className="section-title">About</h3>
-                <p className="company-description">{enrichedData.description}</p>
+              {/* Section 1: Company Snapshot (Top Fold) */}
+              <div className="detail-section snapshot-section">
+                <h3 className="section-title">Company Snapshot</h3>
+                <div className="snapshot-grid">
+                  <div className="snapshot-item">
+                    <Briefcase className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Industry</p>
+                      <p className="snapshot-value">{enrichedData.snapshot?.industry || 'Not available'}</p>
+                    </div>
+                  </div>
+
+                  <div className="snapshot-item">
+                    <Users className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Employees</p>
+                      <p className="snapshot-value">
+                        {enrichedData.snapshot?.employee_count_range ||
+                         enrichedData.snapshot?.estimated_num_employees ||
+                         'Not available'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="snapshot-item">
+                    <DollarSign className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Revenue</p>
+                      <p className="snapshot-value">
+                        {enrichedData.snapshot?.revenue_range ||
+                         enrichedData.snapshot?.annual_revenue ||
+                         'Not available'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="snapshot-item">
+                    <Calendar className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Founded</p>
+                      <p className="snapshot-value">{enrichedData.snapshot?.founded_year || 'Not available'}</p>
+                    </div>
+                  </div>
+
+                  <div className="snapshot-item">
+                    <MapPin className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Location</p>
+                      <p className="snapshot-value">{enrichedData.snapshot?.location?.full || 'Not available'}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Tags */}
-              {enrichedData.tags && enrichedData.tags.length > 0 && (
-                <div className="detail-section">
-                  <h3 className="section-title">Tags</h3>
-                  <div className="tags-container">
-                    {enrichedData.tags.map((tag, index) => (
-                      <span key={index} className="tag-pill">{tag}</span>
+              {/* Section 2: Growth & Hiring Signals */}
+              {enrichedData.growth && (enrichedData.growth.employee_growth_12mo || enrichedData.growth.job_postings_count > 0) && (
+                <div className="detail-section growth-section">
+                  <h3 className="section-title">Growth & Hiring Signals</h3>
+
+                  <div className="growth-indicators">
+                    {enrichedData.growth.employee_growth_12mo && (
+                      <div className="growth-card positive">
+                        <TrendingUp className="w-5 h-5" />
+                        <div>
+                          <p className="growth-label">12-Month Growth</p>
+                          <p className="growth-value">{formatGrowthPercentage(enrichedData.growth.employee_growth_12mo)}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {enrichedData.growth.hiring_velocity && (
+                      <div className={`growth-card ${enrichedData.growth.hiring_velocity.toLowerCase()}`}>
+                        <Award className="w-5 h-5" />
+                        <div>
+                          <p className="growth-label">Hiring Velocity</p>
+                          <p className="growth-value">{enrichedData.growth.hiring_velocity}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {enrichedData.growth.job_postings_count > 0 && (
+                      <div className="growth-card">
+                        <Users className="w-5 h-5" />
+                        <div>
+                          <p className="growth-label">Active Job Postings</p>
+                          <p className="growth-value">{enrichedData.growth.job_postings_count}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {enrichedData.growth.job_postings && enrichedData.growth.job_postings.length > 0 && (
+                    <div className="job-postings">
+                      <p className="job-postings-header">Relevant Openings:</p>
+                      <div className="job-postings-list">
+                        {enrichedData.growth.job_postings.map((job, idx) => (
+                          <span key={idx} className="job-tag">{job.title}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Section 3: Decision Makers */}
+              {enrichedData.decisionMakers && enrichedData.decisionMakers.length > 0 && (
+                <div className="detail-section decision-makers-section">
+                  <h3 className="section-title">Key Decision Makers</h3>
+                  <div className="decision-makers-grid">
+                    {enrichedData.decisionMakers.map((person, idx) => (
+                      <div key={idx} className="decision-maker-card">
+                        <div className="decision-maker-header">
+                          <div className="decision-maker-avatar">
+                            {person.photo_url ? (
+                              <img src={person.photo_url} alt={person.name} />
+                            ) : (
+                              <Users className="w-6 h-6" />
+                            )}
+                          </div>
+                          <div className="decision-maker-info">
+                            <p className="decision-maker-name">{person.name}</p>
+                            <p className="decision-maker-title">{person.title}</p>
+                            {person.department && (
+                              <p className="decision-maker-dept">{person.department}</p>
+                            )}
+                          </div>
+                        </div>
+                        {person.linkedin_url && (
+                          <button
+                            className="decision-maker-linkedin"
+                            onClick={() => handleOpenLink(person.linkedin_url)}
+                          >
+                            <Linkedin className="w-4 h-4" />
+                            <span>LinkedIn</span>
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Company Metrics */}
-              <div className="detail-section">
-                <h3 className="section-title">Company Details</h3>
-                <div className="metrics-grid">
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <Briefcase className="w-5 h-5" />
-                    </div>
-                    <div className="metric-content">
-                      <p className="metric-label">Industry</p>
-                      <p className="metric-value">{enrichedData.metrics.employeeCount !== 'Unknown' ? enrichedData.industry : 'Not available'}</p>
-                    </div>
-                  </div>
-
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div className="metric-content">
-                      <p className="metric-label">Employees</p>
-                      <p className="metric-value">{enrichedData.metrics.employeeCount}</p>
-                    </div>
-                  </div>
-
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <DollarSign className="w-5 h-5" />
-                    </div>
-                    <div className="metric-content">
-                      <p className="metric-label">Revenue</p>
-                      <p className="metric-value">{enrichedData.metrics.revenue}</p>
-                    </div>
-                  </div>
-
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div className="metric-content">
-                      <p className="metric-label">Founded</p>
-                      <p className="metric-value">{enrichedData.metrics.foundedYear}</p>
-                    </div>
-                  </div>
-
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <MapPin className="w-5 h-5" />
-                    </div>
-                    <div className="metric-content">
-                      <p className="metric-label">Location</p>
-                      <p className="metric-value">{enrichedData.metrics.location}</p>
-                    </div>
-                  </div>
-
-                  {enrichedData.icpScore > 0 && (
-                    <div className="metric-card highlight">
-                      <div className="metric-icon">
-                        <Building2 className="w-5 h-5" />
+              {/* Section 4: Department Breakdown */}
+              {enrichedData.departments && Object.values(enrichedData.departments).some(d => d) && (
+                <div className="detail-section departments-section">
+                  <h3 className="section-title">Department Breakdown</h3>
+                  <div className="departments-grid">
+                    {enrichedData.departments.sales && (
+                      <div className="dept-card">
+                        <p className="dept-label">Sales</p>
+                        <p className="dept-value">{enrichedData.departments.sales}</p>
                       </div>
-                      <div className="metric-content">
-                        <p className="metric-label">ICP Score</p>
-                        <p className="metric-value">{enrichedData.icpScore}/100</p>
+                    )}
+                    {enrichedData.departments.marketing && (
+                      <div className="dept-card">
+                        <p className="dept-label">Marketing</p>
+                        <p className="dept-value">{enrichedData.departments.marketing}</p>
                       </div>
-                    </div>
-                  )}
+                    )}
+                    {enrichedData.departments.engineering && (
+                      <div className="dept-card">
+                        <p className="dept-label">Engineering</p>
+                        <p className="dept-value">{enrichedData.departments.engineering}</p>
+                      </div>
+                    )}
+                    {enrichedData.departments.operations && (
+                      <div className="dept-card">
+                        <p className="dept-label">Operations</p>
+                        <p className="dept-value">{enrichedData.departments.operations}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Section 5: Tech Stack */}
+              {enrichedData.techStack && enrichedData.techStack.length > 0 && (
+                <div className="detail-section tech-stack-section">
+                  <h3 className="section-title">Tech Stack</h3>
+                  <div className="tech-stack-grid">
+                    {enrichedData.techStack.map((tech, idx) => (
+                      <div key={idx} className="tech-card">
+                        <Code className="w-4 h-4 tech-icon" />
+                        <div>
+                          <p className="tech-name">{tech.name}</p>
+                          {tech.category && <p className="tech-category">{tech.category}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section 6: Data Confidence & Freshness */}
+              {enrichedData.dataQuality && (
+                <div className="detail-section data-quality-section">
+                  <h3 className="section-title">Data Confidence</h3>
+                  <div className="data-quality-info">
+                    <div className="data-quality-item">
+                      <span className="data-quality-label">Last Updated:</span>
+                      <span className="data-quality-value">
+                        {new Date(enrichedData._raw?.enrichedAt || Date.now()).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="data-quality-item">
+                      <span className="data-quality-label">Status:</span>
+                      <span className={`data-quality-badge ${enrichedData.dataQuality.organization_status}`}>
+                        {enrichedData.dataQuality.organization_status || 'Active'}
+                      </span>
+                    </div>
+                    <div className="data-quality-item">
+                      <span className="data-quality-label">Source:</span>
+                      <span className="data-quality-value">Apollo</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Social Links */}
-              {(enrichedData.website_url || enrichedData.linkedin_url) && (
+              {(enrichedData.snapshot?.website_url || enrichedData.dataQuality?.linkedin_url || company.website_url || company.linkedin_url) && (
                 <div className="detail-section">
                   <h3 className="section-title">Links</h3>
                   <div className="links-container">
-                    {enrichedData.website_url && (
+                    {(enrichedData.snapshot?.website_url || company.website_url) && (
                       <button
                         className="link-button website"
-                        onClick={() => handleOpenLink(enrichedData.website_url)}
+                        onClick={() => handleOpenLink(enrichedData.snapshot?.website_url || company.website_url)}
                       >
                         <Globe className="w-5 h-5" />
                         <span>Visit Website</span>
                         <ExternalLink className="w-4 h-4 ml-auto" />
                       </button>
                     )}
-                    {enrichedData.linkedin_url && (
+                    {(enrichedData.dataQuality?.linkedin_url || company.linkedin_url) && (
                       <button
                         className="link-button linkedin"
-                        onClick={() => handleOpenLink(enrichedData.linkedin_url)}
+                        onClick={() => handleOpenLink(enrichedData.dataQuality?.linkedin_url || company.linkedin_url)}
                       >
                         <Linkedin className="w-5 h-5" />
                         <span>View on LinkedIn</span>
@@ -324,14 +426,14 @@ export default function CompanyDetailModal({ company, onClose }) {
                 </div>
               )}
 
-              {/* Contact Status */}
+              {/* Contact Status & CTA */}
               <div className="detail-section">
                 <div className="contact-status-card">
                   <div className="status-header">
-                    <h3 className="section-title">Contact Status</h3>
+                    <h3 className="section-title">Ready to Connect?</h3>
                     {company.contact_count > 0 && (
                       <span className="contact-badge-inline">
-                        {company.contact_count} contact{company.contact_count !== 1 ? 's' : ''}
+                        {company.contact_count} contact{company.contact_count !== 1 ? 's' : ''} found
                       </span>
                     )}
                   </div>
@@ -341,7 +443,7 @@ export default function CompanyDetailModal({ company, onClose }) {
                 </div>
               </div>
             </>
-          ) : null}
+          )}
         </div>
       </div>
     </div>

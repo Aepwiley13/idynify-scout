@@ -1,9 +1,19 @@
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
 import './WebsitePreviewModal.css';
 
 export default function WebsitePreviewModal({ url, title, onClose }) {
+  const [iframeError, setIframeError] = useState(false);
+
+  // Upgrade HTTP to HTTPS to avoid Mixed Content errors
+  const secureUrl = url.replace(/^http:\/\//i, 'https://');
+
   const handleOpenInNewTab = () => {
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleIframeError = () => {
+    setIframeError(true);
   };
 
   return (
@@ -34,14 +44,30 @@ export default function WebsitePreviewModal({ url, title, onClose }) {
           </div>
         </div>
 
-        {/* Modal Content - Iframe */}
+        {/* Modal Content - Iframe or Error */}
         <div className="preview-modal-content">
-          <iframe
-            src={url}
-            title={title}
-            className="preview-modal-iframe"
-            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-          />
+          {iframeError ? (
+            <div className="preview-modal-error">
+              <AlertCircle className="error-icon" />
+              <h3>Unable to Display Preview</h3>
+              <p>This website cannot be displayed in a preview due to security restrictions.</p>
+              <button
+                className="error-open-btn"
+                onClick={handleOpenInNewTab}
+              >
+                <ExternalLink className="w-5 h-5" />
+                <span>Open in New Tab Instead</span>
+              </button>
+            </div>
+          ) : (
+            <iframe
+              src={secureUrl}
+              title={title}
+              className="preview-modal-iframe"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              onError={handleIframeError}
+            />
+          )}
         </div>
       </div>
     </div>

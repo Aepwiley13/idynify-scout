@@ -3,8 +3,173 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
-import { Building2, Users, CheckCircle, TrendingUp, Search, Globe, Linkedin, ChevronRight, Target } from 'lucide-react';
+import { Building2, Users, CheckCircle, TrendingUp, Search, Globe, Linkedin, ChevronRight, Target, DollarSign, Calendar, MapPin, Briefcase } from 'lucide-react';
 import './SavedCompanies.css';
+
+// Company Card Component matching Daily Leads design
+function CompanyCard({ company, onClick }) {
+  const [logoError, setLogoError] = useState(false);
+
+  return (
+    <div className="saved-company-card" onClick={onClick}>
+      {/* Contact Badge */}
+      {company.contact_count > 0 && (
+        <div className="contact-badge">
+          <CheckCircle className="w-3 h-3" />
+          <span>{company.contact_count} contact{company.contact_count !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
+      {/* Company Header with Logo */}
+      <div className="saved-card-header">
+        <div className="saved-company-logo-placeholder">
+          {company.domain && !logoError ? (
+            <img
+              src={`https://logo.clearbit.com/${company.domain}`}
+              alt={`${company.name} logo`}
+              className="saved-company-logo"
+              onError={() => setLogoError(true)}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                padding: '8px'
+              }}
+            />
+          ) : (
+            <Building2 className="w-8 h-8 text-gray-400" />
+          )}
+        </div>
+        <div className="saved-company-info">
+          <h3 className="saved-company-name">{company.name || 'Unknown Company'}</h3>
+          <p className="saved-company-industry">{company.industry || 'Industry not specified'}</p>
+        </div>
+      </div>
+
+      {/* Stats Grid - Matching Daily Leads */}
+      <div className="saved-stats-grid">
+        {/* Industry */}
+        <div className="saved-stat-item">
+          <div className="saved-stat-icon">
+            <Briefcase className="w-5 h-5 text-gray-500" />
+          </div>
+          <div className="saved-stat-content">
+            <p className="saved-stat-label">Industry</p>
+            <p className="saved-stat-value">{company.industry || 'Not available'}</p>
+          </div>
+        </div>
+
+        {/* Employees */}
+        <div className="saved-stat-item">
+          <div className="saved-stat-icon">
+            <Users className="w-5 h-5 text-gray-500" />
+          </div>
+          <div className="saved-stat-content">
+            <p className="saved-stat-label">Employees</p>
+            <p className="saved-stat-value">{company.employee_count || company.company_size || 'Not available'}</p>
+          </div>
+        </div>
+
+        {/* Revenue */}
+        {company.revenue && (
+          <div className="saved-stat-item">
+            <div className="saved-stat-icon">
+              <DollarSign className="w-5 h-5 text-gray-500" />
+            </div>
+            <div className="saved-stat-content">
+              <p className="saved-stat-label">Revenue</p>
+              <p className="saved-stat-value">{company.revenue}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Founded */}
+        {company.founded_year && (
+          <div className="saved-stat-item">
+            <div className="saved-stat-icon">
+              <Calendar className="w-5 h-5 text-gray-500" />
+            </div>
+            <div className="saved-stat-content">
+              <p className="saved-stat-label">Founded</p>
+              <p className="saved-stat-value">{company.founded_year}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Location */}
+        {company.location && (
+          <div className="saved-stat-item">
+            <div className="saved-stat-icon">
+              <MapPin className="w-5 h-5 text-gray-500" />
+            </div>
+            <div className="saved-stat-content">
+              <p className="saved-stat-label">Location</p>
+              <p className="saved-stat-value">{company.location}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Links - Matching Daily Leads */}
+      <div className="saved-quick-links">
+        {company.website_url && (
+          <button
+            className="saved-quick-link website"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Check if mobile device
+              const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+              if (isMobile || company.website_url.toLowerCase().startsWith('http://')) {
+                const anchor = document.createElement('a');
+                anchor.href = company.website_url;
+                anchor.target = '_blank';
+                anchor.rel = 'noopener noreferrer';
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+              } else {
+                window.open(company.website_url, '_blank', 'noopener,noreferrer');
+              }
+            }}
+          >
+            <Globe className="w-4 h-4" />
+            <span>Visit Website</span>
+          </button>
+        )}
+        {company.linkedin_url && (
+          <button
+            className="saved-quick-link linkedin"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Check if mobile device
+              const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+              if (isMobile || company.linkedin_url.toLowerCase().startsWith('http://')) {
+                const anchor = document.createElement('a');
+                anchor.href = company.linkedin_url;
+                anchor.target = '_blank';
+                anchor.rel = 'noopener noreferrer';
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+              } else {
+                window.open(company.linkedin_url, '_blank', 'noopener,noreferrer');
+              }
+            }}
+          >
+            <Linkedin className="w-4 h-4" />
+            <span>LinkedIn</span>
+          </button>
+        )}
+      </div>
+
+      {/* CTA Button */}
+      <button className="saved-view-details-btn">
+        <span>{company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}</span>
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
 
 export default function SavedCompanies() {
   const navigate = useNavigate();
@@ -235,80 +400,11 @@ export default function SavedCompanies() {
       {/* Companies Grid */}
       <div className="companies-grid">
         {filteredCompanies.map(company => (
-          <div
+          <CompanyCard
             key={company.id}
-            className="company-card"
+            company={company}
             onClick={() => handleCompanyClick(company)}
-          >
-            {/* Contact Badge */}
-            {company.contact_count > 0 && (
-              <div className="contact-badge">
-                <CheckCircle className="w-3 h-3" />
-                <span>{company.contact_count} contact{company.contact_count !== 1 ? 's' : ''}</span>
-              </div>
-            )}
-
-            {/* Company Header */}
-            <div className="company-header">
-              <div className="company-logo">
-                {company.name ? company.name.charAt(0).toUpperCase() : '?'}
-              </div>
-              <div className="company-title-section">
-                <h3 className="company-name">{company.name || 'Unknown Company'}</h3>
-                <p className="company-industry">{company.industry || 'Industry not specified'}</p>
-              </div>
-            </div>
-
-            {/* Company Details */}
-            <div className="company-stats">
-              {company.revenue && (
-                <div className="stat-pill">
-                  <span className="stat-label">Revenue</span>
-                  <span className="stat-value">{company.revenue}</span>
-                </div>
-              )}
-              {company.founded_year && (
-                <div className="stat-pill">
-                  <span className="stat-label">Founded</span>
-                  <span className="stat-value">{company.founded_year}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Links */}
-            <div className="company-actions">
-              {company.website_url && (
-                <a
-                  href={company.website_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="action-link"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Globe className="w-4 h-4" />
-                  <span>Website</span>
-                </a>
-              )}
-              {company.linkedin_url && (
-                <a
-                  href={company.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="action-link"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Linkedin className="w-4 h-4" />
-                  <span>LinkedIn</span>
-                </a>
-              )}
-            </div>
-
-            {/* CTA Button */}
-            <button className="view-details-btn">
-              <span>{company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          />
         ))}
       </div>
 

@@ -3,6 +3,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
+import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { Building2, Users, CheckCircle, TrendingUp, Search, Globe, Linkedin, ChevronRight, Target, DollarSign, Calendar, MapPin, Briefcase } from 'lucide-react';
 import './SavedCompanies.css';
 
@@ -177,6 +178,7 @@ export default function SavedCompanies() {
   const [filteredCompanies, setFilteredCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTitleModal, setShowTitleModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -263,18 +265,28 @@ export default function SavedCompanies() {
     }
   }
 
-  // Handle company click - show title modal or navigate to detail
+  // Handle company click - show detail modal with enriched data
   function handleCompanyClick(company) {
-    // Check if titles already selected for this company
-    const hasTitles = company.selected_titles && company.selected_titles.length > 0;
+    setSelectedCompany(company);
+    setShowDetailModal(true);
+  }
 
-    if (hasTitles) {
-      // Already has titles, go straight to company detail
-      navigate(`/scout/company/${company.id}`);
-    } else {
-      // First time, show title selection modal
-      setSelectedCompany(company);
-      setShowTitleModal(true);
+  // Handle detail modal close
+  function handleDetailModalClose() {
+    setShowDetailModal(false);
+
+    // After closing detail modal, check if user wants to find contacts
+    // If company doesn't have titles yet, show title modal
+    if (selectedCompany) {
+      const hasTitles = selectedCompany.selected_titles && selectedCompany.selected_titles.length > 0;
+
+      if (hasTitles) {
+        // Already has titles, go straight to company detail
+        navigate(`/scout/company/${selectedCompany.id}`);
+      } else {
+        // First time, show title selection modal
+        setShowTitleModal(true);
+      }
     }
   }
 
@@ -282,7 +294,9 @@ export default function SavedCompanies() {
   function handleTitlesSelected(titles) {
     setShowTitleModal(false);
     // Navigate to company detail page
-    navigate(`/scout/company/${selectedCompany.id}`);
+    if (selectedCompany) {
+      navigate(`/scout/company/${selectedCompany.id}`);
+    }
   }
 
   // Calculate KPIs
@@ -415,6 +429,14 @@ export default function SavedCompanies() {
           <h3>No companies found</h3>
           <p>Try adjusting your search term</p>
         </div>
+      )}
+
+      {/* Company Detail Modal */}
+      {showDetailModal && selectedCompany && (
+        <CompanyDetailModal
+          company={selectedCompany}
+          onClose={handleDetailModalClose}
+        />
       )}
 
       {/* Title Selection Modal */}

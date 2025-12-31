@@ -740,6 +740,54 @@ export default function CompanyDetail() {
           )}
         </div>
 
+        {/* Key Decision Makers Section */}
+        {company.decisionMakers && company.decisionMakers.length > 0 && (
+          <div className="decision-makers-section">
+            <div className="section-header-main">
+              <h3 className="section-title-main">
+                <Users className="w-6 h-6" />
+                <span>Key Decision Makers</span>
+              </h3>
+              <p className="section-subtitle-main">Select contacts to add as leads</p>
+            </div>
+
+            <div className="decision-makers-grid">
+              {company.decisionMakers.map((person, idx) => (
+                <div key={idx} className="decision-maker-card">
+                  <div className="decision-maker-header">
+                    <div className="decision-maker-avatar">
+                      {person.photo_url ? (
+                        <img src={person.photo_url} alt={person.name} />
+                      ) : (
+                        <div className="avatar-placeholder">
+                          <Users className="w-6 h-6" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="decision-maker-info">
+                      <p className="decision-maker-name">{person.name}</p>
+                      <p className="decision-maker-title">{person.title}</p>
+                      {person.department && (
+                        <span className="decision-maker-dept">{person.department}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {person.linkedin_url && (
+                    <button
+                      className="decision-maker-linkedin"
+                      onClick={() => window.open(person.linkedin_url, '_blank', 'noopener,noreferrer')}
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      <span>LinkedIn</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       {/* Custom Title Search */}
       <div className="title-search-section">
         <div className="title-search-header">

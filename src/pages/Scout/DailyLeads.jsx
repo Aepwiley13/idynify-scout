@@ -305,7 +305,10 @@ export default function DailyLeads() {
           <div className="kpi-header">
             <span className="kpi-label">Matched Today</span>
           </div>
-          <div className="kpi-value">{dailySwipeCount} / {DAILY_SWIPE_LIMIT}</div>
+          <div className="kpi-value">{dailySwipeCount}</div>
+          <div className="kpi-trend">
+            <span className="trend-text neutral">Out of {DAILY_SWIPE_LIMIT} daily</span>
+          </div>
           <div className="kpi-progress">
             <div className="progress-bar">
               <div

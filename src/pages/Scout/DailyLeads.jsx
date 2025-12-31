@@ -274,7 +274,7 @@ export default function DailyLeads() {
             <CheckCircle className="kpi-icon" />
             <span className="kpi-label">Matches</span>
           </div>
-          <div className="kpi-value">{dailySwipeCount} Matches</div>
+          <div className="kpi-value">{dailySwipeCount}</div>
           <div className="kpi-trend">
             {dailySwipeCount > 0 ? (
               <>
@@ -295,9 +295,9 @@ export default function DailyLeads() {
             <TrendingUp className="kpi-icon" />
             <span className="kpi-label">Lead Quality</span>
           </div>
-          <div className="kpi-value">Avg Score: {avgLeadScore}</div>
+          <div className="kpi-value">{avgLeadScore}</div>
           <div className="kpi-trend">
-            <span className="trend-text neutral">Out of 100</span>
+            <span className="trend-text neutral">Avg score out of 100</span>
           </div>
         </div>
 

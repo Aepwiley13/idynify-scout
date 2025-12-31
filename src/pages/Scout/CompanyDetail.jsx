@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
-import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin } from 'lucide-react';
+import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
 
@@ -607,7 +607,7 @@ export default function CompanyDetail() {
             )}
           </div>
 
-          {/* Quick Links - Matching SavedCompanies */}
+          {/* Quick Links - Expanded with all social media */}
           <div className="company-quick-links">
             {company.website_url && (
               <button
@@ -618,7 +618,7 @@ export default function CompanyDetail() {
                 }}
               >
                 <Globe className="w-4 h-4" />
-                <span>Visit Website</span>
+                <span>Website</span>
               </button>
             )}
             {company.linkedin_url && (
@@ -633,8 +633,90 @@ export default function CompanyDetail() {
                 <span>LinkedIn</span>
               </button>
             )}
+            {company.facebook_url && (
+              <button
+                className="company-quick-link facebook"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(company.facebook_url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <Facebook className="w-4 h-4" />
+                <span>Facebook</span>
+              </button>
+            )}
+            {company.twitter_url && (
+              <button
+                className="company-quick-link twitter"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(company.twitter_url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <Twitter className="w-4 h-4" />
+                <span>X (Twitter)</span>
+              </button>
+            )}
+            {company.phone && (
+              <button
+                className="company-quick-link phone"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.href = `tel:${company.phone}`;
+                }}
+              >
+                <Phone className="w-4 h-4" />
+                <span>{company.phone}</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Company Snapshot Section */}
+        {company.description && (
+          <div className="company-snapshot-section">
+            <h3 className="section-title">
+              <FileText className="w-5 h-5" />
+              <span>Company Overview</span>
+            </h3>
+            <p className="company-description">{company.description}</p>
+          </div>
+        )}
+
+        {/* Industries & Keywords Section */}
+        {(company.keywords?.length > 0 || company.industry) && (
+          <div className="company-tags-section">
+            <h3 className="section-title">
+              <Tag className="w-5 h-5" />
+              <span>Industries & Keywords</span>
+            </h3>
+            <div className="tags-container">
+              {company.industry && (
+                <span className="tag tag-industry">{company.industry}</span>
+              )}
+              {company.keywords?.map((keyword, index) => (
+                <span key={index} className="tag tag-keyword">{keyword}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SIC Codes Section */}
+        {company.sic_codes?.length > 0 && (
+          <div className="company-sic-section">
+            <h3 className="section-title">
+              <Briefcase className="w-5 h-5" />
+              <span>SIC Codes</span>
+            </h3>
+            <div className="sic-codes-container">
+              {company.sic_codes.map((code, index) => (
+                <div key={index} className="sic-code-item">
+                  <span className="sic-code">{code}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       {/* Custom Title Search */}
       <div className="title-search-section">

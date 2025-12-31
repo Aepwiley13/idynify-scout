@@ -256,6 +256,160 @@
   transform: translateY(-1px);
 }
 
+.company-quick-link.facebook {
+  background: rgba(59, 89, 152, 0.1);
+  border-color: rgba(59, 89, 152, 0.3);
+  color: #4267B2;
+}
+
+.company-quick-link.facebook:hover {
+  background: rgba(59, 89, 152, 0.2);
+  border-color: #4267B2;
+  transform: translateY(-1px);
+}
+
+.company-quick-link.twitter {
+  background: rgba(29, 161, 242, 0.1);
+  border-color: rgba(29, 161, 242, 0.3);
+  color: #1DA1F2;
+}
+
+.company-quick-link.twitter:hover {
+  background: rgba(29, 161, 242, 0.2);
+  border-color: #1DA1F2;
+  transform: translateY(-1px);
+}
+
+.company-quick-link.phone {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.company-quick-link.phone:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  transform: translateY(-1px);
+}
+
+/* ========================================
+   COMPANY SNAPSHOT SECTION
+   ======================================== */
+.company-snapshot-section {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 1.25rem 0;
+}
+
+.section-title svg {
+  color: #3b82f6;
+  stroke-width: 2;
+}
+
+.company-description {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #4b5563;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* ========================================
+   INDUSTRIES & KEYWORDS SECTION
+   ======================================== */
+.company-tags-section {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.tag-industry {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.tag-keyword {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1.5px solid #d1d5db;
+}
+
+.tag-keyword:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
+/* ========================================
+   SIC CODES SECTION
+   ======================================== */
+.company-sic-section {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.sic-codes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sic-code-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1.5px solid #3b82f6;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.sic-code-item:hover {
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+.sic-code {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #1e40af;
+  font-family: 'Courier New', monospace;
+}
+
 /* ========================================
    TITLE SEARCH SECTION
    ======================================== */

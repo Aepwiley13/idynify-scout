@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
-import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter } from 'lucide-react';
+import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
 
@@ -22,6 +22,8 @@ export default function CompanyDetail() {
   const [approvingContactIds, setApprovingContactIds] = useState(new Set());
   const [savingBulkContacts, setSavingBulkContacts] = useState(false);
   const [showTitleModal, setShowTitleModal] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
+  const [showKeywords, setShowKeywords] = useState(false);
 
   useEffect(() => {
     loadCompanyData();
@@ -670,53 +672,73 @@ export default function CompanyDetail() {
               </button>
             )}
           </div>
-        </div>
 
-        {/* Company Snapshot Section */}
-        {company.description && (
-          <div className="company-snapshot-section">
-            <h3 className="section-title">
-              <FileText className="w-5 h-5" />
-              <span>Company Overview</span>
-            </h3>
-            <p className="company-description">{company.description}</p>
-          </div>
-        )}
-
-        {/* Industries & Keywords Section */}
-        {(company.keywords?.length > 0 || company.industry) && (
-          <div className="company-tags-section">
-            <h3 className="section-title">
-              <Tag className="w-5 h-5" />
-              <span>Industries & Keywords</span>
-            </h3>
-            <div className="tags-container">
-              {company.industry && (
-                <span className="tag tag-industry">{company.industry}</span>
-              )}
-              {company.keywords?.map((keyword, index) => (
-                <span key={index} className="tag tag-keyword">{keyword}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* SIC Codes Section */}
-        {company.sic_codes?.length > 0 && (
-          <div className="company-sic-section">
-            <h3 className="section-title">
-              <Briefcase className="w-5 h-5" />
-              <span>SIC Codes</span>
-            </h3>
-            <div className="sic-codes-container">
-              {company.sic_codes.map((code, index) => (
-                <div key={index} className="sic-code-item">
-                  <span className="sic-code">{code}</span>
+          {/* Collapsible Company Overview */}
+          {company.description && (
+            <div className="company-expandable-section">
+              <button
+                className="expandable-header"
+                onClick={() => setShowOverview(!showOverview)}
+              >
+                <div className="expandable-title">
+                  <FileText className="w-5 h-5" />
+                  <span>Company Overview</span>
                 </div>
-              ))}
+                {showOverview ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </button>
+              {showOverview && (
+                <div className="expandable-content">
+                  <p className="company-description">{company.description}</p>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Collapsible Industries & Keywords */}
+          {(company.keywords?.length > 0 || company.industry) && (
+            <div className="company-expandable-section">
+              <button
+                className="expandable-header"
+                onClick={() => setShowKeywords(!showKeywords)}
+              >
+                <div className="expandable-title">
+                  <Tag className="w-5 h-5" />
+                  <span>Industries & Keywords</span>
+                </div>
+                {showKeywords ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </button>
+              {showKeywords && (
+                <div className="expandable-content">
+                  <div className="tags-container">
+                    {company.industry && (
+                      <span className="tag tag-industry">{company.industry}</span>
+                    )}
+                    {company.keywords?.map((keyword, index) => (
+                      <span key={index} className="tag tag-keyword">{keyword}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SIC Codes - Keep as separate section below */}
+          {company.sic_codes?.length > 0 && (
+            <div className="company-expandable-section">
+              <div className="sic-codes-inline">
+                <div className="sic-label">
+                  <Briefcase className="w-4 h-4" />
+                  <span>SIC Codes:</span>
+                </div>
+                <div className="sic-codes-list">
+                  {company.sic_codes.map((code, index) => (
+                    <span key={index} className="sic-code-inline">{code}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
       {/* Custom Title Search */}
       <div className="title-search-section">

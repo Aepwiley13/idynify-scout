@@ -293,29 +293,65 @@
 }
 
 /* ========================================
-   COMPANY SNAPSHOT SECTION
+   EXPANDABLE SECTIONS INSIDE COMPANY CARD
    ======================================== */
-.company-snapshot-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+.company-expandable-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1.5px solid #e5e7eb;
 }
 
-.section-title {
+.expandable-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.expandable-header:hover {
+  background: #f3f4f6;
+  border-color: #3b82f6;
+}
+
+.expandable-title {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 1.25rem 0;
 }
 
-.section-title svg {
+.expandable-title svg {
   color: #3b82f6;
   stroke-width: 2;
+}
+
+.expandable-header svg:last-child {
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+.expandable-content {
+  padding: 1.25rem 1rem;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .company-description {
@@ -326,15 +362,54 @@
   white-space: pre-wrap;
 }
 
-/* ========================================
-   INDUSTRIES & KEYWORDS SECTION
-   ======================================== */
-.company-tags-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+/* SIC Codes Inline Display */
+.sic-codes-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem 0;
+}
+
+.sic-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.sic-label svg {
+  color: #3b82f6;
+}
+
+.sic-codes-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.sic-code-inline {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1.5px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #1e40af;
+  font-family: 'Courier New', monospace;
+  transition: all 0.2s ease;
+}
+
+.sic-code-inline:hover {
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
 }
 
 .tags-container {
@@ -369,45 +444,6 @@
   background: #e5e7eb;
   border-color: #9ca3af;
   transform: translateY(-1px);
-}
-
-/* ========================================
-   SIC CODES SECTION
-   ======================================== */
-.company-sic-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-}
-
-.sic-codes-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.sic-code-item {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1.25rem;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border: 1.5px solid #3b82f6;
-  border-radius: 10px;
-  transition: all 0.2s ease;
-}
-
-.sic-code-item:hover {
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
-  transform: translateY(-1px);
-}
-
-.sic-code {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: #1e40af;
-  font-family: 'Courier New', monospace;
 }
 
 /* ========================================

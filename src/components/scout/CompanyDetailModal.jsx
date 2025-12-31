@@ -63,7 +63,7 @@ export default function CompanyDetailModal({ company, onClose }) {
       });
 
       if (!response.ok) {
-        throw new Error('Apollo enrichment failed');
+        throw new Error('Company enrichment failed');
       }
 
       const result = await response.json();
@@ -391,7 +391,7 @@ export default function CompanyDetailModal({ company, onClose }) {
                     </div>
                     <div className="data-quality-item">
                       <span className="data-quality-label">Source:</span>
-                      <span className="data-quality-value">Apollo</span>
+                      <span className="data-quality-value">Verified Data</span>
                     </div>
                   </div>
                 </div>

@@ -124,6 +124,9 @@ export const handler = async (event) => {
       snapshot: {
         name: organization.name,
         website_url: organization.website_url,
+        linkedin_url: organization.linkedin_url,
+        facebook_url: organization.facebook_url,
+        twitter_url: organization.twitter_url,
         domain: organization.primary_domain,
         industry: organization.industry,
         description: organization.short_description || organization.description || null,

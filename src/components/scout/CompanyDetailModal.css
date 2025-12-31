@@ -476,6 +476,130 @@
   border-color: #3b82f6;
 }
 
+/* Decision Makers Selection Styles */
+.section-header-with-actions {
+  margin-bottom: 1.25rem;
+}
+
+.section-subtitle {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.decision-maker-card {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.decision-maker-card.selected {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.decision-maker-select-indicator {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 10;
+}
+
+.checkbox {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.checkbox.checked {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.checkbox svg {
+  width: 18px;
+  height: 18px;
+}
+
+.decision-makers-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-add-selected,
+.btn-find-more {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.5rem;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.btn-add-selected {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-add-selected:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-add-selected:disabled {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-find-more {
+  background: #ffffff;
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.btn-find-more:hover {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Section 4: Department Breakdown */
 .departments-grid {
   display: grid;
@@ -725,6 +849,15 @@
 
   .decision-makers-grid {
     grid-template-columns: 1fr;
+  }
+
+  .decision-makers-actions {
+    flex-direction: column;
+  }
+
+  .btn-add-selected,
+  .btn-find-more {
+    min-width: 100%;
   }
 
   .departments-grid {

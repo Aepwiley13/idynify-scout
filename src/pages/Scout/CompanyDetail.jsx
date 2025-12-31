@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
-import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings } from 'lucide-react';
+import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
 
@@ -508,34 +508,133 @@ export default function CompanyDetail() {
         </div>
       </nav>
 
-      {/* Company Info Section */}
-      <div className="company-header-section">
-        <div className="company-logo-large">
-          {company.name.charAt(0).toUpperCase()}
-        </div>
+      {/* Company Info Card - Matching SavedCompanies Design */}
+      <div className="company-detail-content">
+        <div className="company-info-card">
+          {/* Contact Badge */}
+          {approvedContacts.length > 0 && (
+            <div className="contact-badge">
+              <CheckCircle className="w-3 h-3" />
+              <span>{approvedContacts.length} contact{approvedContacts.length !== 1 ? 's' : ''} saved</span>
+            </div>
+          )}
 
-        <div className="company-info-main">
-          <h1>{company.name}</h1>
-          <p className="company-meta">
-            {company.industry && <span>{company.industry}</span>}
-            {company.location && <span>• {company.location}</span>}
-            {company.employee_count && <span>• {company.employee_count} employees</span>}
-          </p>
+          {/* Company Header with Logo */}
+          <div className="company-card-header">
+            <div className="company-logo-wrapper">
+              {company.domain ? (
+                <img
+                  src={`https://logo.clearbit.com/${company.domain}`}
+                  alt={`${company.name} logo`}
+                  className="company-logo"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div className="company-logo-fallback" style={{ display: company.domain ? 'none' : 'flex' }}>
+                <Building2 className="w-8 h-8 text-gray-400" />
+              </div>
+            </div>
+            <div className="company-header-info">
+              <h1 className="company-name">{company.name || 'Unknown Company'}</h1>
+              <p className="company-industry">{company.industry || 'Industry not specified'}</p>
+            </div>
+          </div>
 
-          <div className="company-links">
+          {/* Stats Grid - Matching SavedCompanies */}
+          <div className="company-stats-grid">
+            {/* Industry */}
+            <div className="company-stat-item">
+              <div className="stat-icon">
+                <Briefcase className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Industry</p>
+                <p className="stat-value">{company.industry || 'Not available'}</p>
+              </div>
+            </div>
+
+            {/* Employees */}
+            <div className="company-stat-item">
+              <div className="stat-icon">
+                <Users className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="stat-content">
+                <p className="stat-label">Employees</p>
+                <p className="stat-value">{company.employee_count || company.company_size || 'Not available'}</p>
+              </div>
+            </div>
+
+            {/* Revenue */}
+            {company.revenue && (
+              <div className="company-stat-item">
+                <div className="stat-icon">
+                  <DollarSign className="w-5 h-5 text-gray-500" />
+                </div>
+                <div className="stat-content">
+                  <p className="stat-label">Revenue</p>
+                  <p className="stat-value">{company.revenue}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Founded */}
+            {company.founded_year && (
+              <div className="company-stat-item">
+                <div className="stat-icon">
+                  <Calendar className="w-5 h-5 text-gray-500" />
+                </div>
+                <div className="stat-content">
+                  <p className="stat-label">Founded</p>
+                  <p className="stat-value">{company.founded_year}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Location */}
+            {company.location && (
+              <div className="company-stat-item">
+                <div className="stat-icon">
+                  <MapPin className="w-5 h-5 text-gray-500" />
+                </div>
+                <div className="stat-content">
+                  <p className="stat-label">Location</p>
+                  <p className="stat-value">{company.location}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Links - Matching SavedCompanies */}
+          <div className="company-quick-links">
             {company.website_url && (
-              <a href={company.website_url} target="_blank" rel="noopener noreferrer" className="company-link-btn">
-                🌐 Website
-              </a>
+              <button
+                className="company-quick-link website"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(company.website_url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <Globe className="w-4 h-4" />
+                <span>Visit Website</span>
+              </button>
             )}
             {company.linkedin_url && (
-              <a href={company.linkedin_url} target="_blank" rel="noopener noreferrer" className="company-link-btn">
-                💼 LinkedIn
-              </a>
+              <button
+                className="company-quick-link linkedin"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(company.linkedin_url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <Linkedin className="w-4 h-4" />
+                <span>LinkedIn</span>
+              </button>
             )}
           </div>
         </div>
-      </div>
 
       {/* Custom Title Search */}
       <div className="title-search-section">
@@ -885,6 +984,7 @@ export default function CompanyDetail() {
           )}
         </div>
       )}
+      </div>
 
       {/* Title Selection Modal */}
       {showTitleModal && company && (

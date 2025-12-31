@@ -611,70 +611,70 @@ export default function CompanyDetail() {
 
           {/* Quick Links - Expanded with all social media */}
           <div className="company-quick-links">
-            {company.website_url && (
+            {(company.apolloEnrichment?.snapshot?.website_url || company.website_url) && (
               <button
                 className="company-quick-link website"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(company.website_url, '_blank', 'noopener,noreferrer');
+                  window.open(company.apolloEnrichment?.snapshot?.website_url || company.website_url, '_blank', 'noopener,noreferrer');
                 }}
               >
                 <Globe className="w-4 h-4" />
                 <span>Website</span>
               </button>
             )}
-            {company.linkedin_url && (
+            {(company.apolloEnrichment?.snapshot?.linkedin_url || company.linkedin_url) && (
               <button
                 className="company-quick-link linkedin"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(company.linkedin_url, '_blank', 'noopener,noreferrer');
+                  window.open(company.apolloEnrichment?.snapshot?.linkedin_url || company.linkedin_url, '_blank', 'noopener,noreferrer');
                 }}
               >
                 <Linkedin className="w-4 h-4" />
                 <span>LinkedIn</span>
               </button>
             )}
-            {company.facebook_url && (
+            {company.apolloEnrichment?.snapshot?.facebook_url && (
               <button
                 className="company-quick-link facebook"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(company.facebook_url, '_blank', 'noopener,noreferrer');
+                  window.open(company.apolloEnrichment.snapshot.facebook_url, '_blank', 'noopener,noreferrer');
                 }}
               >
                 <Facebook className="w-4 h-4" />
                 <span>Facebook</span>
               </button>
             )}
-            {company.twitter_url && (
+            {company.apolloEnrichment?.snapshot?.twitter_url && (
               <button
                 className="company-quick-link twitter"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(company.twitter_url, '_blank', 'noopener,noreferrer');
+                  window.open(company.apolloEnrichment.snapshot.twitter_url, '_blank', 'noopener,noreferrer');
                 }}
               >
                 <Twitter className="w-4 h-4" />
                 <span>X (Twitter)</span>
               </button>
             )}
-            {company.phone && (
+            {company.apolloEnrichment?.snapshot?.phone && (
               <button
                 className="company-quick-link phone"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.location.href = `tel:${company.phone}`;
+                  window.location.href = `tel:${company.apolloEnrichment.snapshot.phone}`;
                 }}
               >
                 <Phone className="w-4 h-4" />
-                <span>{company.phone}</span>
+                <span>{company.apolloEnrichment.snapshot.phone}</span>
               </button>
             )}
           </div>
 
           {/* Collapsible Company Overview */}
-          {company.description && (
+          {company.apolloEnrichment?.snapshot?.description && (
             <div className="company-expandable-section">
               <button
                 className="expandable-header"
@@ -688,14 +688,14 @@ export default function CompanyDetail() {
               </button>
               {showOverview && (
                 <div className="expandable-content">
-                  <p className="company-description">{company.description}</p>
+                  <p className="company-description">{company.apolloEnrichment.snapshot.description}</p>
                 </div>
               )}
             </div>
           )}
 
           {/* Collapsible Industries & Keywords */}
-          {(company.keywords?.length > 0 || company.industry) && (
+          {(company.apolloEnrichment?.snapshot?.keywords?.length > 0 || company.industry) && (
             <div className="company-expandable-section">
               <button
                 className="expandable-header"
@@ -713,7 +713,7 @@ export default function CompanyDetail() {
                     {company.industry && (
                       <span className="tag tag-industry">{company.industry}</span>
                     )}
-                    {company.keywords?.map((keyword, index) => (
+                    {company.apolloEnrichment?.snapshot?.keywords?.map((keyword, index) => (
                       <span key={index} className="tag tag-keyword">{keyword}</span>
                     ))}
                   </div>
@@ -723,7 +723,7 @@ export default function CompanyDetail() {
           )}
 
           {/* SIC Codes - Keep as separate section below */}
-          {company.sic_codes?.length > 0 && (
+          {company.apolloEnrichment?.snapshot?.sic_codes?.length > 0 && (
             <div className="company-expandable-section">
               <div className="sic-codes-inline">
                 <div className="sic-label">
@@ -731,7 +731,7 @@ export default function CompanyDetail() {
                   <span>SIC Codes:</span>
                 </div>
                 <div className="sic-codes-list">
-                  {company.sic_codes.map((code, index) => (
+                  {company.apolloEnrichment.snapshot.sic_codes.map((code, index) => (
                     <span key={index} className="sic-code-inline">{code}</span>
                   ))}
                 </div>
@@ -741,7 +741,7 @@ export default function CompanyDetail() {
         </div>
 
         {/* Key Decision Makers Section */}
-        {company.decisionMakers && company.decisionMakers.length > 0 && (
+        {company.apolloEnrichment?.decisionMakers && company.apolloEnrichment.decisionMakers.length > 0 && (
           <div className="decision-makers-section">
             <div className="section-header-main">
               <h3 className="section-title-main">
@@ -752,7 +752,7 @@ export default function CompanyDetail() {
             </div>
 
             <div className="decision-makers-grid">
-              {company.decisionMakers.map((person, idx) => (
+              {company.apolloEnrichment.decisionMakers.map((person, idx) => (
                 <div key={idx} className="decision-maker-card">
                   <div className="decision-maker-header">
                     <div className="decision-maker-avatar">

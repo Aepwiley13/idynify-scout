@@ -166,7 +166,7 @@ export default function CompanyDetailModal({ company, onClose }) {
           {loading ? (
             <div className="loading-state">
               <Loader className="spinner" />
-              <p>Enriching company data with Apollo...</p>
+              <p>Enriching company data...</p>
             </div>
           ) : error ? (
             <div className="error-state">

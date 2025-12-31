@@ -6,48 +6,35 @@
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
-/* Breadcrumb Navigation */
-.breadcrumb-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+/* Scout Navigation Header */
+.scout-nav-header {
   margin-bottom: 2rem;
-  padding: 1rem 1.5rem;
-  background: rgba(59, 130, 246, 0.05);
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  flex-wrap: wrap;
 }
 
-.breadcrumb-link {
-  background: none;
-  border: none;
+.back-to-scout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.5rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
   color: #3b82f6;
   font-size: 0.9375rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
 }
 
-.breadcrumb-link:hover {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-  text-decoration: underline;
+.back-to-scout-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  transform: translateX(-4px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
-.breadcrumb-separator {
-  color: #6b7280;
-  font-size: 1rem;
-  user-select: none;
-}
-
-.breadcrumb-current {
-  color: #e5e7eb;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  padding: 0.25rem 0.5rem;
+.back-to-scout-btn svg {
+  flex-shrink: 0;
 }
 
 /* Loading & Error States */
@@ -1284,15 +1271,10 @@
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-  /* Mobile: Breadcrumb */
-  .breadcrumb-nav {
-    padding: 0.75rem 1rem;
+  /* Mobile: Back Button */
+  .back-to-scout-btn {
+    padding: 0.75rem 1.25rem;
     font-size: 0.875rem;
-  }
-
-  .breadcrumb-link,
-  .breadcrumb-current {
-    font-size: 0.8125rem;
   }
 
   .company-header-section {

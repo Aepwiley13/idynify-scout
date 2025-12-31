@@ -64,15 +64,28 @@ export default function CompanyCard({ company, onSwipe }) {
     const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
 
     // On mobile, always open in new tab for better UX
+    // Use anchor element approach which is more reliable on mobile
     if (isMobile) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       return;
     }
 
     // If URL is HTTP (not HTTPS), open directly in new tab
     // because browsers block HTTP iframes in HTTPS pages
     if (url.toLowerCase().startsWith('http://')) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       return;
     }
 

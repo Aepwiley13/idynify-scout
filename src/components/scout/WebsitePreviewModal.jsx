@@ -1,11 +1,15 @@
 import { X, ExternalLink, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './WebsitePreviewModal.css';
 
 export default function WebsitePreviewModal({ url, title, onClose }) {
-  const [iframeError, setIframeError] = useState(false);
+  // Check if URL is insecure (HTTP instead of HTTPS)
+  const isInsecureUrl = url.toLowerCase().startsWith('http://');
 
-  // Upgrade HTTP to HTTPS to avoid Mixed Content errors
+  // Start with error state if URL is HTTP (Mixed Content will block it)
+  const [iframeError, setIframeError] = useState(isInsecureUrl);
+
+  // Try to upgrade HTTP to HTTPS (but likely won't work due to Mixed Content policy)
   const secureUrl = url.replace(/^http:\/\//i, 'https://');
 
   const handleOpenInNewTab = () => {
@@ -50,7 +54,12 @@ export default function WebsitePreviewModal({ url, title, onClose }) {
             <div className="preview-modal-error">
               <AlertCircle className="error-icon" />
               <h3>Unable to Display Preview</h3>
-              <p>This website cannot be displayed in a preview due to security restrictions.</p>
+              <p>
+                {isInsecureUrl
+                  ? "This website uses HTTP (not HTTPS) and cannot be displayed in a secure preview. For your security, browsers block insecure content."
+                  : "This website cannot be displayed in a preview due to security restrictions."
+                }
+              </p>
               <button
                 className="error-open-btn"
                 onClick={handleOpenInNewTab}

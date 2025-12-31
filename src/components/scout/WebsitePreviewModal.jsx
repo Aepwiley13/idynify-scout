@@ -2,8 +2,27 @@ import { X, ExternalLink } from 'lucide-react';
 import './WebsitePreviewModal.css';
 
 export default function WebsitePreviewModal({ url, title, onClose }) {
+  // Convert HTTP to HTTPS to prevent mixed content errors
+  const ensureHttps = (inputUrl) => {
+    if (!inputUrl) return '';
+
+    // If URL starts with http:// (not https://), convert it to https://
+    if (inputUrl.startsWith('http://')) {
+      return inputUrl.replace('http://', 'https://');
+    }
+
+    // If no protocol specified, add https://
+    if (!inputUrl.startsWith('http://') && !inputUrl.startsWith('https://')) {
+      return `https://${inputUrl}`;
+    }
+
+    return inputUrl;
+  };
+
+  const secureUrl = ensureHttps(url);
+
   const handleOpenInNewTab = () => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.open(secureUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -13,7 +32,7 @@ export default function WebsitePreviewModal({ url, title, onClose }) {
         <div className="preview-modal-header">
           <div className="preview-modal-title">
             <h3>{title}</h3>
-            <p className="preview-modal-url">{url}</p>
+            <p className="preview-modal-url">{secureUrl}</p>
           </div>
           <div className="preview-modal-actions">
             <button
@@ -37,7 +56,7 @@ export default function WebsitePreviewModal({ url, title, onClose }) {
         {/* Modal Content - Iframe */}
         <div className="preview-modal-content">
           <iframe
-            src={url}
+            src={secureUrl}
             title={title}
             className="preview-modal-iframe"
             sandbox="allow-same-origin allow-scripts allow-popups allow-forms"

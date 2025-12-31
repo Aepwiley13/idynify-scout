@@ -1,11 +1,15 @@
 import { useState, useRef } from 'react';
 import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle, Users } from 'lucide-react';
+import WebsitePreviewModal from './WebsitePreviewModal';
 
 export default function CompanyCard({ company, onSwipe }) {
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewTitle, setPreviewTitle] = useState('');
   const cardRef = useRef(null);
 
   const handleMouseDown = (e) => {
@@ -53,6 +57,18 @@ export default function CompanyCard({ company, onSwipe }) {
 
   const handleTouchEnd = () => {
     handleMouseUp();
+  };
+
+  const handleOpenPreview = (url, title) => {
+    setPreviewUrl(url);
+    setPreviewTitle(title);
+    setShowPreview(true);
+  };
+
+  const handleClosePreview = () => {
+    setShowPreview(false);
+    setPreviewUrl('');
+    setPreviewTitle('');
   };
 
   const rotation = dragOffset.x * 0.05; // Subtle tilt effect
@@ -133,23 +149,11 @@ export default function CompanyCard({ company, onSwipe }) {
               )}
             </div>
 
-            {/* Company Name & Domain */}
+            {/* Company Name */}
             <div className="company-info">
               <h2 className="company-name">
                 {company.name}
               </h2>
-              {company.domain && (
-                <a
-                  href={`https://${company.domain}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="company-domain"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Globe className="w-4 h-4" />
-                  {company.domain}
-                </a>
-              )}
             </div>
           </div>
 
@@ -199,28 +203,28 @@ export default function CompanyCard({ company, onSwipe }) {
           {/* Quick Links */}
           <div className="quick-links">
             {company.website_url && (
-              <a
-                href={company.website_url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
                 className="quick-link website"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenPreview(company.website_url, `${company.name} - Website`);
+                }}
               >
                 <Globe className="w-4 h-4" />
                 <span>Visit Website</span>
-              </a>
+              </button>
             )}
             {company.linkedin_url && (
-              <a
-                href={company.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
                 className="quick-link linkedin"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenPreview(company.linkedin_url, `${company.name} - LinkedIn`);
+                }}
               >
                 <Linkedin className="w-4 h-4" />
                 <span>LinkedIn</span>
-              </a>
+              </button>
             )}
           </div>
 
@@ -274,6 +278,15 @@ export default function CompanyCard({ company, onSwipe }) {
           </div>
         </div>
       </div>
+
+      {/* Website Preview Modal */}
+      {showPreview && (
+        <WebsitePreviewModal
+          url={previewUrl}
+          title={previewTitle}
+          onClose={handleClosePreview}
+        />
+      )}
     </div>
   );
 }

@@ -40,9 +40,15 @@
    ======================================== */
 .kpi-dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .kpi-dashboard {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .kpi-card {
@@ -417,9 +423,10 @@
   border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 600;
-  text-decoration: none;
   transition: all 0.2s ease;
   border: 1.5px solid;
+  cursor: pointer;
+  background: transparent;
 }
 
 .quick-link.website {

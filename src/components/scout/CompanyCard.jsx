@@ -60,6 +60,14 @@ export default function CompanyCard({ company, onSwipe }) {
   };
 
   const handleOpenPreview = (url, title) => {
+    // If URL is HTTP (not HTTPS), open directly in new tab
+    // because browsers block HTTP iframes in HTTPS pages
+    if (url.toLowerCase().startsWith('http://')) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // For HTTPS URLs, show preview modal
     setPreviewUrl(url);
     setPreviewTitle(title);
     setShowPreview(true);

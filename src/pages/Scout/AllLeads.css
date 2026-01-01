@@ -673,7 +673,7 @@
   }
 
   .contacts-table {
-    min-width: 900px;
+    min-width: unset; /* Fix mobile horizontal scroll - allow table to fit viewport */
   }
 }
 

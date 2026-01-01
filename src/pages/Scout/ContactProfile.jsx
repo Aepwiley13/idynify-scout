@@ -2,6 +2,27 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import {
+  ArrowLeft,
+  User,
+  Mail,
+  Phone,
+  Linkedin,
+  MapPin,
+  Briefcase,
+  Building2,
+  Clock,
+  TrendingUp,
+  Award,
+  Target,
+  MessageSquare,
+  AlertCircle,
+  CheckCircle,
+  Sparkles,
+  Globe,
+  Twitter,
+  Facebook
+} from 'lucide-react';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -43,11 +64,43 @@ export default function ContactProfile() {
     }
   }
 
+  // Helper: Calculate tenure from job start date
+  function calculateTenure(startDate) {
+    if (!startDate) return null;
+
+    try {
+      const start = new Date(startDate);
+      const now = new Date();
+      const months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      const years = Math.floor(months / 12);
+      const remainingMonths = months % 12;
+
+      if (years === 0) {
+        return `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+      } else if (remainingMonths === 0) {
+        return `${years} year${years !== 1 ? 's' : ''}`;
+      } else {
+        return `${years} year${years !== 1 ? 's' : ''}, ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  // Helper: Format location
+  function formatLocation(contact) {
+    const parts = [];
+    if (contact.city) parts.push(contact.city);
+    if (contact.state) parts.push(contact.state);
+    if (contact.country) parts.push(contact.country);
+    return parts.join(', ') || 'Not available';
+  }
+
   if (loading) {
     return (
       <div className="profile-loading">
         <div className="loading-spinner"></div>
-        <p>[LOADING CONTACT PROFILE...]</p>
+        <p>Loading contact profile...</p>
       </div>
     );
   }
@@ -55,283 +108,381 @@ export default function ContactProfile() {
   if (!contact) {
     return (
       <div className="profile-error">
-        <p>Contact not found</p>
-        <button onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}>
-          ← Back to All Leads
+        <AlertCircle className="w-16 h-16" />
+        <h3>Contact Not Found</h3>
+        <p>The contact you're looking for doesn't exist or has been removed.</p>
+        <button
+          className="btn-back"
+          onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to All Leads</span>
         </button>
       </div>
     );
   }
 
-  const hasEnrichmentFailed = contact.status === 'enrichment_failed';
+  const tenure = calculateTenure(contact.job_start_date);
+  const hasEnrichedProfile = contact.enrichedProfile;
 
   return (
-    <div className="contact-profile">
-      {/* Back Navigation */}
+    <div className="contact-profile-page">
+      {/* Header Navigation */}
       <div className="profile-nav">
-        <button onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}>
-          ← Back to All Leads
+        <button
+          className="btn-back-nav"
+          onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Company</span>
         </button>
-        {contact.company_id && (
-          <button onClick={() => navigate(`/scout/company/${contact.company_id}`)}>
-            View Company →
-          </button>
-        )}
+        <button
+          className="btn-export"
+          onClick={() => alert('Export to CSV feature coming soon')}
+        >
+          Export Profile
+        </button>
       </div>
 
-      {/* Contact Header */}
-      <div className="profile-header">
-        <div className="profile-avatar">
-          {contact.name.charAt(0).toUpperCase()}
+      {/* Profile Header Card */}
+      <div className="profile-header-card">
+        <div className="profile-header-content">
+          <div className="profile-avatar">
+            {contact.photo_url ? (
+              <img src={contact.photo_url} alt={contact.name} />
+            ) : (
+              <div className="avatar-fallback">
+                <User className="w-12 h-12" />
+              </div>
+            )}
+          </div>
+
+          <div className="profile-header-info">
+            <h1 className="profile-name">{contact.name || 'Unknown Contact'}</h1>
+            <p className="profile-title">{contact.title || 'No title specified'}</p>
+            {contact.company_name && (
+              <div className="profile-company">
+                <Building2 className="w-4 h-4" />
+                <span>{contact.company_name}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="profile-header-info">
-          <h1>{contact.name}</h1>
-          <p className="profile-title">
-            {contact.title}
-            {contact.company_name && <span> @ {contact.company_name}</span>}
-          </p>
-
-          {hasEnrichmentFailed && (
-            <div className="enrichment-warning">
-              ⚠️ Some data may be incomplete. Contact saved with basic information.
-            </div>
+        {/* Quick Contact Actions */}
+        <div className="quick-actions">
+          {contact.email && (
+            <a href={`mailto:${contact.email}`} className="quick-action-btn email">
+              <Mail className="w-4 h-4" />
+              <span>Email</span>
+            </a>
           )}
-        </div>
-      </div>
-
-      {/* Contact Information Section */}
-      <div className="profile-section">
-        <h2>📧 Contact Information</h2>
-        <div className="info-grid">
-          {contact.email ? (
-            <div className="info-item">
-              <span className="info-label">Email</span>
-              <a href={`mailto:${contact.email}`} className="info-value">
-                {contact.email}
-              </a>
-            </div>
-          ) : (
-            <div className="info-item">
-              <span className="info-label">Email</span>
-              <span className="info-value unavailable">Not available</span>
-            </div>
+          {contact.phone && (
+            <a href={`tel:${contact.phone}`} className="quick-action-btn phone">
+              <Phone className="w-4 h-4" />
+              <span>Call</span>
+            </a>
           )}
-
-          {contact.phone ? (
-            <div className="info-item">
-              <span className="info-label">Phone</span>
-              <a href={`tel:${contact.phone}`} className="info-value">
-                {contact.phone}
-              </a>
-            </div>
-          ) : (
-            <div className="info-item">
-              <span className="info-label">Phone</span>
-              <span className="info-value unavailable">Not available</span>
-            </div>
-          )}
-
           {contact.linkedin_url && (
-            <div className="info-item">
-              <span className="info-label">LinkedIn</span>
-              <a
-                href={contact.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="info-value link"
-              >
-                View Profile →
-              </a>
-            </div>
-          )}
-
-          {contact.twitter_url && (
-            <div className="info-item">
-              <span className="info-label">Twitter</span>
-              <a
-                href={contact.twitter_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="info-value link"
-              >
-                View Profile →
-              </a>
-            </div>
+            <a
+              href={contact.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="quick-action-btn linkedin"
+            >
+              <Linkedin className="w-4 h-4" />
+              <span>LinkedIn</span>
+            </a>
           )}
         </div>
       </div>
 
-      {/* Company Information Section */}
-      {contact.company_name && (
-        <div className="profile-section">
-          <h2>🏢 Company Information</h2>
-          <div className="info-grid">
-            <div className="info-item">
-              <span className="info-label">Company</span>
-              <span className="info-value">{contact.company_name}</span>
+      <div className="profile-content">
+        {/* Left Column: Main Info */}
+        <div className="profile-left-column">
+          {/* Section 1: Professional Snapshot */}
+          <div className="profile-section">
+            <div className="section-header">
+              <div className="section-icon">
+                <Briefcase className="w-5 h-5" />
+              </div>
+              <h2>Professional Snapshot</h2>
             </div>
 
-            {contact.company_industry && (
-              <div className="info-item">
-                <span className="info-label">Industry</span>
-                <span className="info-value">{contact.company_industry}</span>
+            <div className="snapshot-grid">
+              <div className="snapshot-item">
+                <span className="snapshot-label">Current Role</span>
+                <span className="snapshot-value">{contact.title || 'Not specified'}</span>
               </div>
-            )}
 
-            {contact.city && (
-              <div className="info-item">
-                <span className="info-label">Location</span>
-                <span className="info-value">
-                  {contact.city}
-                  {contact.state && `, ${contact.state}`}
-                  {contact.country && `, ${contact.country}`}
-                </span>
+              <div className="snapshot-item">
+                <span className="snapshot-label">Company</span>
+                <span className="snapshot-value">{contact.company_name || 'Not available'}</span>
               </div>
-            )}
 
-            {contact.company_id && (
-              <div className="info-item">
-                <span className="info-label">Actions</span>
-                <button
-                  className="view-company-btn"
-                  onClick={() => navigate(`/scout/company/${contact.company_id}`)}
-                >
-                  View Company Profile →
-                </button>
+              {contact.department && (
+                <div className="snapshot-item">
+                  <span className="snapshot-label">Department</span>
+                  <span className="snapshot-value">{contact.department}</span>
+                </div>
+              )}
+
+              {contact.seniority && (
+                <div className="snapshot-item">
+                  <span className="snapshot-label">Seniority Level</span>
+                  <span className="snapshot-value">{contact.seniority}</span>
+                </div>
+              )}
+
+              {tenure && (
+                <div className="snapshot-item">
+                  <span className="snapshot-label">Tenure in Role</span>
+                  <div className="tenure-value">
+                    <Clock className="w-4 h-4" />
+                    <span>{tenure}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="snapshot-item">
+                <span className="snapshot-label">Location</span>
+                <div className="location-value">
+                  <MapPin className="w-4 h-4" />
+                  <span>{formatLocation(contact)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Decision-Making Context */}
+          <div className="profile-section">
+            <div className="section-header">
+              <div className="section-icon">
+                <Target className="w-5 h-5" />
+              </div>
+              <h2>Decision-Making Context</h2>
+            </div>
+
+            <div className="decision-context">
+              <div className="context-item">
+                <div className="context-header">
+                  <Award className="w-5 h-5" />
+                  <span className="context-label">Decision Maker Likelihood</span>
+                </div>
+                <div className={`likelihood-badge ${contact.is_likely_decision_maker ? 'high' : 'low'}`}>
+                  {contact.is_likely_decision_maker ? (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>High</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Low / Influencer</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="context-reasoning">
+                <p className="reasoning-label">Reasoning</p>
+                <p className="reasoning-text">
+                  {contact.is_likely_decision_maker
+                    ? `Based on ${contact.seniority || 'seniority level'} and title "${contact.title}", this contact likely holds decision-making authority or significant budget influence within their department.`
+                    : `Based on ${contact.seniority || 'role'} and title "${contact.title}", this contact may be an influencer or contributor but likely requires approval from higher authority for major decisions.`
+                  }
+                </p>
+              </div>
+
+              {contact.departments && contact.departments.length > 0 && (
+                <div className="context-item">
+                  <p className="context-label">Relevant Departments</p>
+                  <div className="department-tags">
+                    {contact.departments.map((dept, idx) => (
+                      <span key={idx} className="dept-tag">{dept}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 3: Career Pattern Summary (AI Placeholder) */}
+          <div className="profile-section ai-section">
+            <div className="section-header">
+              <div className="section-icon">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <h2>Career Pattern Summary</h2>
+              <div className="ai-badge">
+                <Sparkles className="w-3 h-3" />
+                <span>AI-Powered</span>
+              </div>
+            </div>
+
+            {hasEnrichedProfile && contact.enrichedProfile.careerPatternSummary ? (
+              <div className="career-pattern-content">
+                <p>{contact.enrichedProfile.careerPatternSummary}</p>
+              </div>
+            ) : (
+              <div className="ai-placeholder">
+                <Sparkles className="w-8 h-8" />
+                <p className="placeholder-title">Analyzing career trajectory...</p>
+                <p className="placeholder-text">
+                  AI analysis of career patterns, stability, and experience will appear here once processed.
+                </p>
               </div>
             )}
           </div>
         </div>
-      )}
 
-      {/* Professional Background Section */}
-      {(contact.seniority || contact.departments?.length > 0 || contact.functions?.length > 0) && (
-        <div className="profile-section">
-          <h2>💼 Professional Background</h2>
-          <div className="info-grid">
-            {contact.seniority && (
-              <div className="info-item">
-                <span className="info-label">Seniority</span>
-                <span className="info-value">{contact.seniority}</span>
+        {/* Right Column: Insights */}
+        <div className="profile-right-column">
+          {/* Contact Information Card */}
+          <div className="info-card">
+            <h3>Contact Information</h3>
+
+            <div className="info-items">
+              {contact.email ? (
+                <div className="info-item">
+                  <div className="info-icon">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="info-content">
+                    <span className="info-label">Email</span>
+                    <a href={`mailto:${contact.email}`} className="info-value">{contact.email}</a>
+                    {contact.email_status && (
+                      <span className={`email-status ${contact.email_status}`}>
+                        {contact.email_status === 'verified' && '✓ Verified'}
+                        {contact.email_status === 'likely' && '~ Likely'}
+                        {contact.email_status === 'unverified' && 'Unverified'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="info-item">
+                  <div className="info-icon">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="info-content">
+                    <span className="info-label">Email</span>
+                    <span className="info-value unavailable">Not available</span>
+                  </div>
+                </div>
+              )}
+
+              {contact.phone ? (
+                <div className="info-item">
+                  <div className="info-icon">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div className="info-content">
+                    <span className="info-label">Phone</span>
+                    <a href={`tel:${contact.phone}`} className="info-value">{contact.phone}</a>
+                  </div>
+                </div>
+              ) : (
+                <div className="info-item">
+                  <div className="info-icon">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div className="info-content">
+                    <span className="info-label">Phone</span>
+                    <span className="info-value unavailable">Not available</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 4: Public Presence Signals (AI Placeholder) */}
+          <div className="info-card ai-card">
+            <div className="card-header">
+              <h3>Public Presence Signals</h3>
+              <div className="ai-badge-small">
+                <Sparkles className="w-3 h-3" />
+                <span>AI</span>
               </div>
-            )}
+            </div>
 
-            {contact.departments && contact.departments.length > 0 && (
-              <div className="info-item">
-                <span className="info-label">Departments</span>
-                <div className="tags">
-                  {contact.departments.map((dept, idx) => (
-                    <span key={idx} className="tag">
-                      {dept}
-                    </span>
-                  ))}
+            {hasEnrichedProfile && contact.enrichedProfile.publicPresenceSignals ? (
+              <div className="presence-content">
+                {/* Show AI-generated presence signals */}
+                <p>{JSON.stringify(contact.enrichedProfile.publicPresenceSignals)}</p>
+              </div>
+            ) : (
+              <div className="ai-placeholder-small">
+                <div className="presence-items">
+                  <div className="presence-item">
+                    <Linkedin className="w-4 h-4" />
+                    <span>LinkedIn: {contact.linkedin_url ? 'Profile Found' : 'Not Found'}</span>
+                  </div>
+                  <div className="presence-item analyzing">
+                    <Twitter className="w-4 h-4" />
+                    <span>Twitter/X: Analyzing...</span>
+                  </div>
+                  <div className="presence-item analyzing">
+                    <Globe className="w-4 h-4" />
+                    <span>Thought Leadership: Analyzing...</span>
+                  </div>
                 </div>
               </div>
             )}
+          </div>
 
-            {contact.functions && contact.functions.length > 0 && (
-              <div className="info-item">
-                <span className="info-label">Functions</span>
-                <div className="tags">
-                  {contact.functions.map((func, idx) => (
-                    <span key={idx} className="tag">
-                      {func}
-                    </span>
-                  ))}
-                </div>
+          {/* Section 5: Outreach Angle (AI Placeholder) */}
+          <div className="info-card ai-card outreach-card">
+            <div className="card-header">
+              <h3>Suggested Outreach Angle</h3>
+              <div className="ai-badge-small">
+                <Sparkles className="w-3 h-3" />
+                <span>AI</span>
+              </div>
+            </div>
+
+            {hasEnrichedProfile && contact.enrichedProfile.outreachAngle ? (
+              <div className="outreach-content">
+                <p>{contact.enrichedProfile.outreachAngle}</p>
+              </div>
+            ) : (
+              <div className="ai-placeholder-small">
+                <MessageSquare className="w-8 h-8" />
+                <p className="placeholder-title-small">Generating personalized approach...</p>
+                <p className="placeholder-text-small">
+                  AI will suggest how to approach this contact based on their role, tenure, and public presence.
+                </p>
               </div>
             )}
           </div>
 
-          {/* Employment History */}
-          {contact.employment_history && contact.employment_history.length > 0 && (
-            <div className="employment-section">
-              <h3>Employment History</h3>
-              <div className="timeline">
-                {contact.employment_history.slice(0, 5).map((job, idx) => (
-                  <div key={idx} className="timeline-item">
-                    <div className="timeline-marker"></div>
-                    <div className="timeline-content">
-                      <h4>{job.title || 'Position'}</h4>
-                      <p className="timeline-company">{job.organization_name || 'Company'}</p>
-                      <p className="timeline-dates">
-                        {job.start_date || 'Start'} - {job.end_date || job.current ? 'Present' : 'End'}
-                      </p>
-                    </div>
+          {/* Company Info Card */}
+          {contact.company_name && (
+            <div className="info-card">
+              <h3>Company Context</h3>
+              <div className="company-info">
+                <div className="company-item">
+                  <Building2 className="w-4 h-4" />
+                  <span>{contact.company_name}</span>
+                </div>
+                {contact.company_industry && (
+                  <div className="company-item">
+                    <Briefcase className="w-4 h-4" />
+                    <span>{contact.company_industry}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Education */}
-          {contact.education && contact.education.length > 0 && (
-            <div className="education-section">
-              <h3>Education</h3>
-              <div className="timeline">
-                {contact.education.slice(0, 3).map((edu, idx) => (
-                  <div key={idx} className="timeline-item">
-                    <div className="timeline-marker education-marker"></div>
-                    <div className="timeline-content">
-                      <h4>{edu.degree || 'Degree'}</h4>
-                      <p className="timeline-company">{edu.school_name || 'School'}</p>
-                      {edu.field_of_study && <p className="timeline-field">{edu.field_of_study}</p>}
-                    </div>
-                  </div>
-                ))}
+                )}
+                {contact.company_id && (
+                  <button
+                    className="view-company-link"
+                    onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+                  >
+                    View Full Company Profile →
+                  </button>
+                )}
               </div>
             </div>
           )}
         </div>
-      )}
-
-      {/* Engagement Section */}
-      <div className="profile-section">
-        <h2>📊 Engagement</h2>
-        <div className="info-grid">
-          <div className="info-item">
-            <span className="info-label">Status</span>
-            <span className={`status-badge ${contact.status}`}>
-              {contact.status === 'active' && '✓ Active'}
-              {contact.status === 'pending_enrichment' && '⏳ Pending'}
-              {contact.status === 'enrichment_failed' && '⚠️ Partial Data'}
-            </span>
-          </div>
-
-          {contact.saved_at && (
-            <div className="info-item">
-              <span className="info-label">Added</span>
-              <span className="info-value">{new Date(contact.saved_at).toLocaleDateString()}</span>
-            </div>
-          )}
-
-          {contact.enriched_at && (
-            <div className="info-item">
-              <span className="info-label">Last Updated</span>
-              <span className="info-value">{new Date(contact.enriched_at).toLocaleDateString()}</span>
-            </div>
-          )}
-
-          {contact.source && (
-            <div className="info-item">
-              <span className="info-label">Source</span>
-              <span className="info-value">{contact.source.replace(/_/g, ' ')}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="profile-actions">
-        <button className="action-btn primary">
-          📥 Export to CSV
-        </button>
-        {contact.email && (
-          <a href={`mailto:${contact.email}`} className="action-btn secondary">
-            ✉️ Send Email
-          </a>
-        )}
       </div>
     </div>
   );

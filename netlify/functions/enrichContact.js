@@ -83,6 +83,8 @@ export const handler = async (event) => {
     const enrichedData = {
       // Contact Info (update with enriched data)
       email: person.email || null,
+      email_status: person.email_status || null,
+      email_confidence: person.email_confidence || null,
       phone: person.phone_numbers?.[0] || null,
       linkedin_url: person.linkedin_url || null,
       twitter_url: person.twitter_url || null,
@@ -93,20 +95,35 @@ export const handler = async (event) => {
       departments: person.departments || [],
       functions: person.functions || [],
 
+      // Current Employment
+      job_start_date: person.employment_history?.[0]?.start_date || null,
+      current_position_title: person.employment_history?.[0]?.title || person.title || null,
+      current_company_name: person.employment_history?.[0]?.organization_name || null,
+
       // Employment History
       employment_history: person.employment_history || [],
 
       // Education
       education: person.education || [],
 
-      // Location
+      // Location & Time Zone
       city: person.city || null,
       state: person.state || null,
       country: person.country || null,
+      time_zone: person.time_zone || null,
 
       // Additional metadata
       headline: person.headline || null,
-      photo_url: person.photo_url || null
+      photo_url: person.photo_url || null,
+
+      // Derived flags for decision-making context
+      is_likely_decision_maker: inferDecisionMaker(person.seniority, person.title),
+
+      // Raw data for future AI processing
+      _raw_apollo_data: {
+        person_id: person.id,
+        enriched_at: new Date().toISOString()
+      }
     };
 
     return {
@@ -136,3 +153,39 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Helper function to infer if contact is likely a decision maker
+function inferDecisionMaker(seniority, title) {
+  if (!seniority && !title) return false;
+
+  const seniorityStr = (seniority || '').toLowerCase();
+  const titleStr = (title || '').toLowerCase();
+
+  // C-level executives
+  if (seniorityStr.includes('c_suite') ||
+      seniorityStr.includes('c-suite') ||
+      titleStr.includes('chief') ||
+      titleStr.match(/\b(ceo|cfo|cto|cmo|coo|cro|ciso)\b/)) {
+    return true;
+  }
+
+  // VP level
+  if (seniorityStr.includes('vp') ||
+      seniorityStr.includes('vice_president') ||
+      titleStr.includes('vice president') ||
+      titleStr.includes(' vp ')) {
+    return true;
+  }
+
+  // Director level
+  if (seniorityStr.includes('director') || titleStr.includes('director')) {
+    return true;
+  }
+
+  // Head of / Owner roles
+  if (titleStr.includes('head of') || titleStr.includes('owner')) {
+    return true;
+  }
+
+  return false;
+}

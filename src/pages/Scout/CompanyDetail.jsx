@@ -317,10 +317,13 @@ export default function CompanyDetail() {
       phone: contact.phone_numbers?.[0] || null,
       linkedin_url: contact.linkedin_url || null,
 
-      // Company Association
+      // Company Association (required for Lead system)
       company_id: companyId,
       company_name: company.name,
       company_industry: company.industry || null,
+
+      // Lead Ownership (required for CRM export and multi-user support)
+      lead_owner: userId,
 
       // Metadata
       status: 'pending_enrichment',
@@ -448,7 +451,7 @@ export default function CompanyDetail() {
       const user = auth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
-      // Save each selected decision maker as a contact
+      // Save each selected decision maker as a contact/lead
       for (const person of selectedDecisionMakers) {
         const contactId = `${companyId}_${person.id}`;
 
@@ -464,20 +467,26 @@ export default function CompanyDetail() {
           linkedin_url: person.linkedin_url || null,
           photo_url: person.photo_url || null,
 
-          // Company Association
+          // Company Association (required for Lead system)
           company_id: companyId,
           company_name: company.name,
           company_industry: company.industry || null,
+
+          // Lead Ownership (required for CRM export and multi-user support)
+          lead_owner: user.uid,
 
           // Additional Info
           department: person.department || null,
           seniority: person.seniority || null,
 
           // Metadata
-          status: 'active',
+          status: 'pending_enrichment',
           saved_at: new Date().toISOString(),
           source: 'decision_makers'
         });
+
+        // Trigger enrichment for decision makers too
+        await enrichContact(user.uid, person.id);
       }
 
       // Update company contact count

@@ -150,6 +150,12 @@ export const handler = async (event) => {
       // Derived flags for decision-making context
       is_likely_decision_maker: inferDecisionMaker(person.seniority, person.title),
 
+      // Lead Export Readiness - CANONICAL LEAD RECORD
+      lead_status: 'saved',           // "saved" | "exported" | "contacted"
+      export_ready: true,              // Always true after enrichment
+      last_enriched_at: new Date().toISOString(),
+      data_sources: ['apollo'],        // Will add "ai_summary" after AI enrichment runs
+
       // Raw data for future AI processing
       _raw_apollo_data: {
         person_id: person.id,

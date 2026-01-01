@@ -5,7 +5,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,7 +30,8 @@
   border-radius: 16px;
   width: 100%;
   max-width: 900px;
-  max-height: 90vh;
+  max-height: 85vh;
+  min-height: 500px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -56,6 +58,11 @@
   padding: 2rem;
   border-bottom: 1px solid #e5e7eb;
   background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  transition: box-shadow 0.3s ease;
+}
+
+.company-detail-header.scrolled {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .header-content {
@@ -138,6 +145,25 @@
   flex: 1;
   overflow-y: auto;
   padding: 2rem;
+  position: relative;
+}
+
+/* Scroll gradient indicator */
+.company-detail-content::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.company-detail-content.has-scroll::after {
+  opacity: 1;
 }
 
 /* Loading State */
@@ -209,8 +235,8 @@
 
 /* Sections */
 .detail-section {
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 2.5rem;
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -224,8 +250,38 @@
   font-size: 1.125rem;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 1.25rem 0;
+  margin: 0 0 1.5rem 0;
   letter-spacing: -0.01em;
+}
+
+/* Collapsible Section Headers */
+.section-header-collapsible {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.section-header-collapsible:hover {
+  opacity: 0.7;
+}
+
+.section-header-collapsible .section-title {
+  margin: 0;
+}
+
+.section-header-collapsible .chevron {
+  width: 20px;
+  height: 20px;
+  color: #6b7280;
+  transition: transform 0.3s ease;
+}
+
+.section-header-collapsible .chevron.expanded {
+  transform: rotate(180deg);
 }
 
 /* Section 1: Company Snapshot */
@@ -379,15 +435,15 @@
 /* Section 3: Decision Makers */
 .decision-makers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
 }
 
 .decision-maker-card {
   background: #f9fafb;
   border: 1.5px solid #e5e7eb;
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1.5rem;
   transition: all 0.2s ease;
 }
 
@@ -640,8 +696,8 @@
 /* Section 5: Tech Stack */
 .tech-stack-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
 }
 
 .tech-card {
@@ -900,5 +956,20 @@
 
   .departments-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Shorter Screens (Laptops under 1080p) */
+@media (max-height: 800px) {
+  .company-detail-container {
+    max-height: 80vh;
+  }
+
+  .company-detail-header {
+    padding: 1.5rem;
+  }
+
+  .company-detail-content {
+    padding: 1.5rem;
   }
 }

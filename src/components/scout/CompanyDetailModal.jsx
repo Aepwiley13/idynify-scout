@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus } from 'lucide-react';
+import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, ChevronDown } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import './CompanyDetailModal.css';
 
@@ -14,9 +14,52 @@ export default function CompanyDetailModal({ company, onClose }) {
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingContacts, setSavingContacts] = useState(false);
 
+  // Scroll detection states
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [hasScroll, setHasScroll] = useState(false);
+  const contentRef = useRef(null);
+  const headerRef = useRef(null);
+
+  // Collapsible section states
+  const [departmentsExpanded, setDepartmentsExpanded] = useState(true);
+  const [techStackExpanded, setTechStackExpanded] = useState(true);
+
   useEffect(() => {
     enrichCompanyData();
   }, [company.id]);
+
+  // Scroll detection effect
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+
+    const handleScroll = () => {
+      const scrollTop = contentElement.scrollTop;
+      const scrollHeight = contentElement.scrollHeight;
+      const clientHeight = contentElement.clientHeight;
+
+      // Add 'scrolled' class to header when scrolled down
+      setIsScrolled(scrollTop > 10);
+
+      // Show scroll gradient if there's more content below
+      setHasScroll(scrollHeight > clientHeight && scrollTop < scrollHeight - clientHeight - 20);
+    };
+
+    // Initial check
+    handleScroll();
+
+    // Add scroll listener
+    contentElement.addEventListener('scroll', handleScroll);
+
+    // Recheck on content changes
+    const observer = new ResizeObserver(handleScroll);
+    observer.observe(contentElement);
+
+    return () => {
+      contentElement.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, [enrichedData]);
 
   async function enrichCompanyData() {
     try {
@@ -221,7 +264,7 @@ export default function CompanyDetailModal({ company, onClose }) {
     <div className="company-detail-overlay" onClick={onClose}>
       <div className="company-detail-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="company-detail-header">
+        <div ref={headerRef} className={`company-detail-header ${isScrolled ? 'scrolled' : ''}`}>
           <div className="header-content">
             {/* Robust multi-source logo */}
             <CompanyLogo company={company} size="large" className="company-detail-logo-wrapper" />
@@ -236,7 +279,7 @@ export default function CompanyDetailModal({ company, onClose }) {
         </div>
 
         {/* Content */}
-        <div className="company-detail-content">
+        <div ref={contentRef} className={`company-detail-content ${hasScroll ? 'has-scroll' : ''}`}>
           {loading ? (
             <div className="loading-state">
               <Loader className="spinner" />
@@ -452,8 +495,15 @@ export default function CompanyDetailModal({ company, onClose }) {
               {/* Section 4: Department Breakdown */}
               {enrichedData.departments && Object.values(enrichedData.departments).some(d => d) && (
                 <div className="detail-section departments-section">
-                  <h3 className="section-title">Department Breakdown</h3>
-                  <div className="departments-grid">
+                  <div
+                    className="section-header-collapsible"
+                    onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
+                  >
+                    <h3 className="section-title">Department Breakdown</h3>
+                    <ChevronDown className={`chevron ${departmentsExpanded ? 'expanded' : ''}`} />
+                  </div>
+                  {departmentsExpanded && (
+                    <div className="departments-grid">
                     {enrichedData.departments.sales && (
                       <div className="dept-card">
                         <p className="dept-label">Sales</p>
@@ -478,15 +528,23 @@ export default function CompanyDetailModal({ company, onClose }) {
                         <p className="dept-value">{enrichedData.departments.operations}</p>
                       </div>
                     )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Section 5: Tech Stack */}
               {enrichedData.techStack && enrichedData.techStack.length > 0 && (
                 <div className="detail-section tech-stack-section">
-                  <h3 className="section-title">Tech Stack</h3>
-                  <div className="tech-stack-grid">
+                  <div
+                    className="section-header-collapsible"
+                    onClick={() => setTechStackExpanded(!techStackExpanded)}
+                  >
+                    <h3 className="section-title">Tech Stack ({enrichedData.techStack.length})</h3>
+                    <ChevronDown className={`chevron ${techStackExpanded ? 'expanded' : ''}`} />
+                  </div>
+                  {techStackExpanded && (
+                    <div className="tech-stack-grid">
                     {enrichedData.techStack.map((tech, idx) => (
                       <div key={idx} className="tech-card">
                         <Code className="w-4 h-4 tech-icon" />
@@ -496,7 +554,8 @@ export default function CompanyDetailModal({ company, onClose }) {
                         </div>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 

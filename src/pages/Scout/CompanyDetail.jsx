@@ -1006,17 +1006,23 @@ export default function CompanyDetail() {
             <p className="section-subtitle">
               {searchingContacts
                 ? `Searching Apollo for ${selectedTitles.length} title${selectedTitles.length !== 1 ? 's' : ''}...`
-                : contacts.length > 0
-                  ? `Found ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`
-                  : selectedTitles.length > 0
-                    ? 'No contacts found for these titles'
-                    : 'Add titles above to start searching'
+                : (() => {
+                    const availableCount = contacts.filter(c => !approvedContacts.some(ac => ac.apollo_person_id === c.id)).length;
+                    return availableCount > 0
+                      ? `Found ${availableCount} contact${availableCount !== 1 ? 's' : ''}`
+                      : selectedTitles.length > 0
+                        ? 'No contacts found for these titles'
+                        : 'Add titles above to start searching';
+                  })()
               }
             </p>
           </div>
 
           {/* Bulk Actions */}
-          {!searchingContacts && contacts.length > 0 && (
+          {!searchingContacts && (() => {
+            const availableCount = contacts.filter(c => !approvedContacts.some(ac => ac.apollo_person_id === c.id)).length;
+            return availableCount > 0;
+          })() && (
             <div className="bulk-actions">
               {selectedContactIds.size > 0 ? (
                 <>
@@ -1060,31 +1066,59 @@ export default function CompanyDetail() {
             <h4>Searching Apollo</h4>
             <p>Looking for {selectedTitles.map(t => t.title).join(', ')} at {company.name}</p>
           </div>
-        ) : contacts.length === 0 && selectedTitles.length > 0 ? (
-          <div className="empty-contacts">
-            <Users className="w-16 h-16" />
-            <h4>No Contacts Found</h4>
-            <p>We couldn't find any contacts with these titles at {company.name}</p>
-            <div className="empty-actions">
-              <button className="try-different-btn" onClick={() => setShowTitleModal(true)}>
-                <Target className="w-4 h-4" />
-                <span>Browse Common Titles</span>
-              </button>
-              <button className="clear-titles-btn" onClick={() => setSelectedTitles([])}>
-                <X className="w-4 h-4" />
-                <span>Clear Titles & Try Again</span>
-              </button>
-            </div>
-          </div>
-        ) : contacts.length === 0 ? (
-          <div className="no-search-state">
-            <Search className="w-16 h-16" />
-            <h4>Ready to Find Contacts</h4>
-            <p>Add job titles above to start searching for contacts at {company.name}</p>
-          </div>
-        ) : (
+        ) : (() => {
+          const availableContacts = contacts.filter(c => !approvedContacts.some(ac => ac.apollo_person_id === c.id));
+
+          if (availableContacts.length === 0 && selectedTitles.length > 0 && contacts.length > 0) {
+            // All contacts have been saved
+            return (
+              <div className="empty-contacts">
+                <CheckCircle className="w-16 h-16" style={{ color: '#10b981' }} />
+                <h4>All Contacts Saved!</h4>
+                <p>You've saved all {contacts.length} contact{contacts.length !== 1 ? 's' : ''} found for these titles at {company.name}</p>
+                <div className="empty-actions">
+                  <button className="try-different-btn" onClick={() => setShowTitleModal(true)}>
+                    <Target className="w-4 h-4" />
+                    <span>Add More Titles</span>
+                  </button>
+                </div>
+              </div>
+            );
+          } else if (contacts.length === 0 && selectedTitles.length > 0) {
+            // No contacts found
+            return (
+              <div className="empty-contacts">
+                <Users className="w-16 h-16" />
+                <h4>No Contacts Found</h4>
+                <p>We couldn't find any contacts with these titles at {company.name}</p>
+                <div className="empty-actions">
+                  <button className="try-different-btn" onClick={() => setShowTitleModal(true)}>
+                    <Target className="w-4 h-4" />
+                    <span>Browse Common Titles</span>
+                  </button>
+                  <button className="clear-titles-btn" onClick={() => setSelectedTitles([])}>
+                    <X className="w-4 h-4" />
+                    <span>Clear Titles & Try Again</span>
+                  </button>
+                </div>
+              </div>
+            );
+          } else if (contacts.length === 0) {
+            // No search performed yet
+            return (
+              <div className="no-search-state">
+                <Search className="w-16 h-16" />
+                <h4>Ready to Find Contacts</h4>
+                <p>Add job titles above to start searching for contacts at {company.name}</p>
+              </div>
+            );
+          } else {
+            // Show available contacts
+            return (
           <div className="contacts-grid">
-            {contacts.map(contact => {
+            {contacts
+              .filter(contact => !approvedContacts.some(c => c.apollo_person_id === contact.id))
+              .map(contact => {
               const isApproved = approvedContacts.some(c => c.apollo_person_id === contact.id);
               const isApproving = approvingContactIds.has(contact.id);
               const isSelected = selectedContactIds.has(contact.id);
@@ -1223,7 +1257,9 @@ export default function CompanyDetail() {
               );
             })}
           </div>
-        )}
+            );
+          }
+        })()}
       </div>
 
       {/* Saved Contacts Section */}

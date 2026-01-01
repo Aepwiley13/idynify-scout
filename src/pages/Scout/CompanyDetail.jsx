@@ -818,6 +818,79 @@ export default function CompanyDetail() {
           )}
         </div>
 
+        {/* Saved Contacts Section */}
+        {approvedContacts.length > 0 && (
+          <div className="saved-contacts-section">
+            <div className="section-header-main">
+              <h3 className="section-title-main">
+                <CheckCircle className="w-6 h-6" />
+                <span>Saved Contacts ({approvedContacts.length})</span>
+              </h3>
+              <button
+                className="view-all-leads-btn"
+                onClick={() => navigate(`/scout/company/${companyId}/leads`)}
+              >
+                View All Leads →
+              </button>
+            </div>
+
+            <div className="decision-makers-grid">
+              {approvedContacts.map(contact => (
+                <div key={contact.id} className="decision-maker-card already-saved">
+                  {/* Saved Badge */}
+                  <div className="decision-maker-saved-badge">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Saved</span>
+                  </div>
+
+                  <div className="decision-maker-header">
+                    <div className="decision-maker-avatar">
+                      {contact.photo_url ? (
+                        <img src={contact.photo_url} alt={contact.name} />
+                      ) : (
+                        <div className="avatar-placeholder">
+                          <Users className="w-6 h-6" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="decision-maker-info">
+                      <p className="decision-maker-name">{contact.name}</p>
+                      <p className="decision-maker-title">{contact.title}</p>
+                      {(contact.departments?.[0] || contact.department) && (
+                        <span className="decision-maker-dept">
+                          {contact.departments?.[0] || contact.department}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* LinkedIn Button */}
+                  {contact.linkedin_url && (
+                    <button
+                      className="decision-maker-linkedin"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
+                      }}
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      <span>LinkedIn</span>
+                    </button>
+                  )}
+
+                  {/* View Profile Button */}
+                  <button
+                    className="decision-maker-view-profile"
+                    onClick={() => navigate(`/scout/contact/${contact.id}`)}
+                  >
+                    View Profile →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Key Decision Makers Section */}
         {company.apolloEnrichment?.decisionMakers && company.apolloEnrichment.decisionMakers.length > 0 && (
           <div className="decision-makers-section">
@@ -1261,79 +1334,6 @@ export default function CompanyDetail() {
           }
         })()}
       </div>
-
-      {/* Saved Contacts Section */}
-      {approvedContacts.length > 0 && (
-        <div className="saved-contacts-section">
-          <div className="section-header-main">
-            <h3 className="section-title-main">
-              <CheckCircle className="w-6 h-6" />
-              <span>Saved Contacts ({approvedContacts.length})</span>
-            </h3>
-            <button
-              className="view-all-leads-btn"
-              onClick={() => navigate(`/scout/company/${companyId}/leads`)}
-            >
-              View All Leads →
-            </button>
-          </div>
-
-          <div className="decision-makers-grid">
-            {approvedContacts.map(contact => (
-              <div key={contact.id} className="decision-maker-card already-saved">
-                {/* Saved Badge */}
-                <div className="decision-maker-saved-badge">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Saved</span>
-                </div>
-
-                <div className="decision-maker-header">
-                  <div className="decision-maker-avatar">
-                    {contact.photo_url ? (
-                      <img src={contact.photo_url} alt={contact.name} />
-                    ) : (
-                      <div className="avatar-placeholder">
-                        <Users className="w-6 h-6" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="decision-maker-info">
-                    <p className="decision-maker-name">{contact.name}</p>
-                    <p className="decision-maker-title">{contact.title}</p>
-                    {(contact.departments?.[0] || contact.department) && (
-                      <span className="decision-maker-dept">
-                        {contact.departments?.[0] || contact.department}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* LinkedIn Button */}
-                {contact.linkedin_url && (
-                  <button
-                    className="decision-maker-linkedin"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
-                    }}
-                  >
-                    <Linkedin className="w-4 h-4" />
-                    <span>LinkedIn</span>
-                  </button>
-                )}
-
-                {/* View Profile Button */}
-                <button
-                  className="decision-maker-view-profile"
-                  onClick={() => navigate(`/scout/contact/${contact.id}`)}
-                >
-                  View Profile →
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       </div>
 
       {/* Title Selection Modal */}

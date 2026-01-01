@@ -79,13 +79,44 @@ export const handler = async (event) => {
 
     console.log('✅ Contact enriched:', person.name);
 
+    // Extract phone numbers by type
+    const phoneNumbers = person.phone_numbers || [];
+    const phoneByType = {
+      mobile: null,
+      direct: null,
+      work: null,
+      home: null,
+      other: null
+    };
+
+    // Organize phone numbers by type
+    phoneNumbers.forEach(phone => {
+      const type = phone.type?.toLowerCase() || 'other';
+      if (!phoneByType[type]) {
+        phoneByType[type] = phone.sanitized_number || phone.raw_number || phone.number;
+      }
+    });
+
+    // Fallback: if no specific types, use first available
+    const primaryPhone = phoneByType.mobile || phoneByType.direct || phoneByType.work ||
+                        phoneByType.other || phoneByType.home || phoneNumbers[0]?.sanitized_number || null;
+
     // Extract and structure enriched data
     const enrichedData = {
-      // Contact Info (update with enriched data)
+      // Contact Info - Email
       email: person.email || null,
       email_status: person.email_status || null,
       email_confidence: person.email_confidence || null,
-      phone: person.phone_numbers?.[0] || null,
+
+      // Contact Info - Phone Numbers (organized by type)
+      phone: primaryPhone, // Primary phone for backward compatibility
+      phone_mobile: phoneByType.mobile,
+      phone_direct: phoneByType.direct,
+      phone_work: phoneByType.work,
+      phone_home: phoneByType.home,
+      phone_numbers: phoneNumbers, // Keep all phone numbers with metadata
+
+      // Contact Info - Social
       linkedin_url: person.linkedin_url || null,
       twitter_url: person.twitter_url || null,
       facebook_url: person.facebook_url || null,
@@ -122,7 +153,8 @@ export const handler = async (event) => {
       // Raw data for future AI processing
       _raw_apollo_data: {
         person_id: person.id,
-        enriched_at: new Date().toISOString()
+        enriched_at: new Date().toISOString(),
+        total_phone_numbers: phoneNumbers.length
       }
     };
 

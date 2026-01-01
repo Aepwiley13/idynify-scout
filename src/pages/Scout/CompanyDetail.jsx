@@ -864,6 +864,45 @@ export default function CompanyDetail() {
                     </div>
                   </div>
 
+                  {/* Enriched Contact Info */}
+                  <div className="contact-enriched-info">
+                    {contact.email && (
+                      <div className="enriched-info-item">
+                        <Mail className="w-4 h-4" />
+                        <a href={`mailto:${contact.email}`} className="enriched-info-value">
+                          {contact.email}
+                        </a>
+                        {contact.email_status === 'verified' && (
+                          <span className="verified-badge">✓</span>
+                        )}
+                      </div>
+                    )}
+                    {contact.phone_mobile && (
+                      <div className="enriched-info-item">
+                        <Phone className="w-4 h-4" />
+                        <a href={`tel:${contact.phone_mobile}`} className="enriched-info-value">
+                          <span className="phone-label">Mobile:</span> {contact.phone_mobile}
+                        </a>
+                      </div>
+                    )}
+                    {contact.phone_direct && (
+                      <div className="enriched-info-item">
+                        <Phone className="w-4 h-4" />
+                        <a href={`tel:${contact.phone_direct}`} className="enriched-info-value">
+                          <span className="phone-label">Direct:</span> {contact.phone_direct}
+                        </a>
+                      </div>
+                    )}
+                    {!contact.phone_mobile && !contact.phone_direct && contact.phone && (
+                      <div className="enriched-info-item">
+                        <Phone className="w-4 h-4" />
+                        <a href={`tel:${contact.phone}`} className="enriched-info-value">
+                          {contact.phone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
                   {/* LinkedIn Button */}
                   {contact.linkedin_url && (
                     <button

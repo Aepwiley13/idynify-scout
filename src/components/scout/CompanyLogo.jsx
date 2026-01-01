@@ -1,19 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Building2 } from 'lucide-react';
+
+// Session-level cache to remember Clearbit failures
+// Prevents repeated network requests for known failures
+const clearbitFailureCache = new Set();
 
 /**
  * CompanyLogo - Robust logo rendering with multi-source fallback
  *
  * Resolution order:
  * 1. Apollo-provided logo URL (if exists)
- * 2. Clearbit Logo API (https://logo.clearbit.com/{domain})
+ * 2. Clearbit Logo API (https://logo.clearbit.com/{domain}) - attempted once per session
  * 3. Company initials (first letter of each word)
  * 4. Fallback building icon
  */
 export default function CompanyLogo({ company, size = 'default', className = '' }) {
   const [logoSrc, setLogoSrc] = useState(null);
+  const [logoType, setLogoType] = useState(null); // 'apollo' | 'clearbit' | 'initials'
   const [logoLoading, setLogoLoading] = useState(true);
-  const [logoError, setLogoError] = useState(false);
+  const clearbitAttemptedRef = useRef(false);
 
   // Size variants
   const sizeClasses = {
@@ -48,31 +53,45 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
   // Resolve logo source
   useEffect(() => {
     setLogoLoading(true);
-    setLogoError(false);
 
     // Priority 1: Apollo enrichment logo (if available)
     const apolloLogo = company.apolloEnrichment?.snapshot?.logo_url;
     if (apolloLogo) {
       setLogoSrc(apolloLogo);
+      setLogoType('apollo');
       setLogoLoading(false);
       return;
     }
 
-    // Priority 2: Clearbit logo via domain
+    // Priority 2: Clearbit logo via domain (only if not previously failed)
     const domain = company.domain || company.website_url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
-    if (domain) {
+
+    if (domain && !clearbitFailureCache.has(domain) && !clearbitAttemptedRef.current) {
+      // Attempt Clearbit once
+      clearbitAttemptedRef.current = true;
       setLogoSrc(`https://logo.clearbit.com/${domain}`);
+      setLogoType('clearbit');
       setLogoLoading(false);
       return;
     }
 
-    // Priority 3: No logo source available - use fallback
+    // Priority 3: Use initials fallback immediately
+    // (Either no domain, or Clearbit known to fail)
     setLogoSrc(null);
+    setLogoType('initials');
     setLogoLoading(false);
   }, [company]);
 
   const handleLogoError = () => {
-    setLogoError(true);
+    // Mark Clearbit as failed for this domain
+    const domain = company.domain || company.website_url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    if (domain && logoType === 'clearbit') {
+      clearbitFailureCache.add(domain);
+    }
+
+    // Switch to initials fallback
+    setLogoSrc(null);
+    setLogoType('initials');
   };
 
   // Loading skeleton
@@ -84,8 +103,8 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     );
   }
 
-  // Show logo image if available and hasn't errored
-  if (logoSrc && !logoError) {
+  // Show logo image if available
+  if (logoSrc && logoType !== 'initials') {
     return (
       <div className={`${sizeClasses[size]} ${className} bg-white rounded-xl border border-gray-200 flex items-center justify-center overflow-hidden`}>
         <img

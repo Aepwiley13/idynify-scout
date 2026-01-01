@@ -1265,8 +1265,11 @@ export default function CompanyDetail() {
       {/* Saved Contacts Section */}
       {approvedContacts.length > 0 && (
         <div className="saved-contacts-section">
-          <div className="section-header">
-            <h3>Saved Contacts ({approvedContacts.length})</h3>
+          <div className="section-header-main">
+            <h3 className="section-title-main">
+              <CheckCircle className="w-6 h-6" />
+              <span>Saved Contacts ({approvedContacts.length})</span>
+            </h3>
             <button
               className="view-all-leads-btn"
               onClick={() => navigate(`/scout/company/${companyId}/leads`)}
@@ -1275,84 +1278,60 @@ export default function CompanyDetail() {
             </button>
           </div>
 
-          <div className="saved-contacts-grid">
-            {approvedContacts.slice(0, 6).map(contact => (
-              <div key={contact.id} className="saved-contact-card">
-                {/* Contact Avatar */}
-                <div className="saved-contact-avatar">
-                  {contact.photo_url ? (
-                    <img src={contact.photo_url} alt={contact.name} />
-                  ) : (
-                    <div className="avatar-fallback-saved">
-                      {contact.name?.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+          <div className="decision-makers-grid">
+            {approvedContacts.map(contact => (
+              <div key={contact.id} className="decision-maker-card already-saved">
+                {/* Saved Badge */}
+                <div className="decision-maker-saved-badge">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Saved</span>
                 </div>
 
-                {/* Contact Info */}
-                <div className="saved-contact-info">
-                  <h4 className="saved-contact-name">{contact.name}</h4>
-                  <p className="saved-contact-title">{contact.title}</p>
-
-                  {/* Quick Contact Info */}
-                  <div className="saved-contact-quick-info">
-                    {contact.email && (
-                      <div className="quick-info-item">
-                        <Mail className="w-3 h-3" />
-                        <span className="quick-info-text">{contact.email}</span>
+                <div className="decision-maker-header">
+                  <div className="decision-maker-avatar">
+                    {contact.photo_url ? (
+                      <img src={contact.photo_url} alt={contact.name} />
+                    ) : (
+                      <div className="avatar-placeholder">
+                        <Users className="w-6 h-6" />
                       </div>
                     )}
-                    {contact.phone && (
-                      <div className="quick-info-item">
-                        <Phone className="w-3 h-3" />
-                        <span className="quick-info-text">{contact.phone}</span>
-                      </div>
-                    )}
-                    {contact.department && (
-                      <div className="quick-info-item">
-                        <Briefcase className="w-3 h-3" />
-                        <span className="quick-info-text">{contact.department}</span>
-                      </div>
+                  </div>
+                  <div className="decision-maker-info">
+                    <p className="decision-maker-name">{contact.name}</p>
+                    <p className="decision-maker-title">{contact.title}</p>
+                    {(contact.departments?.[0] || contact.department) && (
+                      <span className="decision-maker-dept">
+                        {contact.departments?.[0] || contact.department}
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="saved-contact-actions">
-                  {contact.linkedin_url && (
-                    <a
-                      href={contact.linkedin_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="saved-action-btn linkedin"
-                      title="View LinkedIn"
-                    >
-                      <Linkedin className="w-4 h-4" />
-                    </a>
-                  )}
+                {/* LinkedIn Button */}
+                {contact.linkedin_url && (
                   <button
-                    className="saved-action-btn profile"
-                    onClick={() => navigate(`/scout/contact/${contact.id}`)}
-                    title="View Full Profile"
+                    className="decision-maker-linkedin"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
+                    }}
                   >
-                    View Profile →
+                    <Linkedin className="w-4 h-4" />
+                    <span>LinkedIn</span>
                   </button>
-                </div>
+                )}
+
+                {/* View Profile Button */}
+                <button
+                  className="decision-maker-view-profile"
+                  onClick={() => navigate(`/scout/contact/${contact.id}`)}
+                >
+                  View Profile →
+                </button>
               </div>
             ))}
           </div>
-
-          {approvedContacts.length > 6 && (
-            <div className="more-contacts-banner">
-              <p>+{approvedContacts.length - 6} more saved contacts</p>
-              <button
-                className="view-all-inline-btn"
-                onClick={() => navigate(`/scout/company/${companyId}/leads`)}
-              >
-                View All
-              </button>
-            </div>
-          )}
         </div>
       )}
       </div>

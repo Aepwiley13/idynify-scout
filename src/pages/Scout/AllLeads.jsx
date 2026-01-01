@@ -68,10 +68,26 @@ export default function AllLeads() {
       return;
     }
 
-    // CSV headers
-    const headers = ['Name', 'Title', 'Company', 'Email', 'Phone', 'LinkedIn', 'Added Date'];
+    // CSV headers - Export-ready with all enriched fields
+    const headers = [
+      'Name',
+      'Title',
+      'Company',
+      'Email',
+      'Email Status',
+      'Email Confidence',
+      'Mobile Phone',
+      'Direct Line',
+      'Work Phone',
+      'LinkedIn',
+      'Seniority',
+      'Department',
+      'Lead Status',
+      'Added Date',
+      'Last Enriched'
+    ];
 
-    // CSV rows
+    // CSV rows - CRM-ready lead export
     const rows = sortedAndFilteredContacts.map(contact => {
       const company = companies[contact.company_id];
       return [
@@ -79,9 +95,17 @@ export default function AllLeads() {
         contact.title || '',
         company?.name || 'Unknown Company',
         contact.email || '',
-        contact.phone || '',
+        contact.email_status || '',
+        contact.email_confidence || '',
+        contact.phone_mobile || '',
+        contact.phone_direct || '',
+        contact.phone_work || '',
         contact.linkedin_url || '',
-        contact.addedAt ? new Date(contact.addedAt).toLocaleDateString() : ''
+        contact.seniority || '',
+        contact.departments?.[0] || contact.department || '',
+        contact.lead_status || 'saved',
+        contact.saved_at ? new Date(contact.saved_at).toLocaleDateString() : '',
+        contact.last_enriched_at ? new Date(contact.last_enriched_at).toLocaleDateString() : ''
       ].map(field => `"${field}"`).join(',');
     });
 
@@ -92,13 +116,13 @@ export default function AllLeads() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `scout-contacts-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `scout-leads-export-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 
-    console.log('📥 Exported', sortedAndFilteredContacts.length, 'contacts to CSV');
+    console.log('📥 Exported', sortedAndFilteredContacts.length, 'CRM-ready leads to CSV');
   }
 
   // Filter contacts based on search term
@@ -139,8 +163,11 @@ export default function AllLeads() {
   const totalContacts = contacts.length;
   const uniqueCompanies = new Set(contacts.map(c => c.company_id)).size;
   const contactsWithEmail = contacts.filter(c => c.email).length;
+  const verifiedEmails = contacts.filter(c => c.email_status === 'verified').length;
+  const contactsWithPhone = contacts.filter(c => c.phone_mobile || c.phone_direct || c.phone).length;
   const contactsWithLinkedIn = contacts.filter(c => c.linkedin_url).length;
   const emailRate = totalContacts > 0 ? Math.round((contactsWithEmail / totalContacts) * 100) : 0;
+  const phoneRate = totalContacts > 0 ? Math.round((contactsWithPhone / totalContacts) * 100) : 0;
 
   if (loading) {
     return (
@@ -208,22 +235,30 @@ export default function AllLeads() {
             <Mail className="kpi-icon" />
           </div>
           <div className="kpi-content">
-            <p className="kpi-label">With Email</p>
-            <p className="kpi-value">{contactsWithEmail}</p>
+            <p className="kpi-label">Email Coverage</p>
+            <p className="kpi-value">{emailRate}%</p>
+            <p className="kpi-detail">{verifiedEmails} verified</p>
+            <div className="kpi-progress-bar">
+              <div
+                className="kpi-progress-fill"
+                style={{ width: `${emailRate}%` }}
+              />
+            </div>
           </div>
         </div>
 
         <div className="kpi-card highlight">
           <div className="kpi-icon-wrapper">
-            <Linkedin className="kpi-icon" />
+            <Phone className="kpi-icon" />
           </div>
           <div className="kpi-content">
-            <p className="kpi-label">Email Coverage</p>
-            <p className="kpi-value">{emailRate}%</p>
+            <p className="kpi-label">Phone Coverage</p>
+            <p className="kpi-value">{phoneRate}%</p>
+            <p className="kpi-detail">{contactsWithPhone} contacts</p>
             <div className="kpi-progress-bar">
               <div
                 className="kpi-progress-fill"
-                style={{ width: `${emailRate}%` }}
+                style={{ width: `${phoneRate}%` }}
               />
             </div>
           </div>
@@ -347,18 +382,45 @@ export default function AllLeads() {
                   <td className="company-cell">{company?.name || 'Unknown Company'}</td>
                   <td className="email-cell">
                     {contact.email ? (
-                      <a
-                        href={`mailto:${contact.email}`}
-                        className="email-link"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {contact.email}
-                      </a>
+                      <div className="email-with-status">
+                        <a
+                          href={`mailto:${contact.email}`}
+                          className="email-link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {contact.email}
+                        </a>
+                        {contact.email_status === 'verified' && (
+                          <span className="verified-badge-table" title="Verified Email">✓</span>
+                        )}
+                      </div>
                     ) : (
                       <span className="empty-value">—</span>
                     )}
                   </td>
-                  <td className="phone-cell">{contact.phone || '—'}</td>
+                  <td className="phone-cell">
+                    {contact.phone_mobile || contact.phone_direct || contact.phone ? (
+                      <div className="phone-with-type">
+                        {contact.phone_mobile && (
+                          <div className="phone-item">
+                            <span className="phone-type-label">M:</span>
+                            <a href={`tel:${contact.phone_mobile}`}>{contact.phone_mobile}</a>
+                          </div>
+                        )}
+                        {contact.phone_direct && (
+                          <div className="phone-item">
+                            <span className="phone-type-label">D:</span>
+                            <a href={`tel:${contact.phone_direct}`}>{contact.phone_direct}</a>
+                          </div>
+                        )}
+                        {!contact.phone_mobile && !contact.phone_direct && contact.phone && (
+                          <a href={`tel:${contact.phone}`}>{contact.phone}</a>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="empty-value">—</span>
+                    )}
+                  </td>
                   <td className="date-cell">
                     {contact.addedAt ? new Date(contact.addedAt).toLocaleDateString() : '—'}
                   </td>

@@ -4,12 +4,12 @@ import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import TitleSelectionModal from '../../components/TitleSelectionModal';
 import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
+import CompanyLogo from '../../components/scout/CompanyLogo';
 import { Building2, Users, CheckCircle, TrendingUp, Search, Globe, Linkedin, ChevronRight, Target, DollarSign, Calendar, MapPin, Briefcase } from 'lucide-react';
 import './SavedCompanies.css';
 
 // Company Card Component matching Daily Leads design
 function CompanyCard({ company, onClick }) {
-  const [logoError, setLogoError] = useState(false);
 
   return (
     <div className="saved-company-card" onClick={onClick}>
@@ -23,24 +23,8 @@ function CompanyCard({ company, onClick }) {
 
       {/* Company Header with Logo */}
       <div className="saved-card-header">
-        <div className="saved-company-logo-placeholder">
-          {company.domain && !logoError ? (
-            <img
-              src={`https://logo.clearbit.com/${company.domain}`}
-              alt={`${company.name} logo`}
-              className="saved-company-logo"
-              onError={() => setLogoError(true)}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                padding: '8px'
-              }}
-            />
-          ) : (
-            <Building2 className="w-8 h-8 text-gray-400" />
-          )}
-        </div>
+        {/* Robust multi-source logo */}
+        <CompanyLogo company={company} size="default" />
         <div className="saved-company-info">
           <h3 className="saved-company-name">{company.name || 'Unknown Company'}</h3>
           <p className="saved-company-industry">{company.industry || 'Industry not specified'}</p>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus } from 'lucide-react';
+import CompanyLogo from './CompanyLogo';
 import './CompanyDetailModal.css';
 
 export default function CompanyDetailModal({ company, onClose }) {
@@ -10,7 +11,6 @@ export default function CompanyDetailModal({ company, onClose }) {
   const [enrichedData, setEnrichedData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [logoError, setLogoError] = useState(false);
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingContacts, setSavingContacts] = useState(false);
 
@@ -223,18 +223,8 @@ export default function CompanyDetailModal({ company, onClose }) {
         {/* Header */}
         <div className="company-detail-header">
           <div className="header-content">
-            <div className="company-detail-logo-wrapper">
-              {company.domain && !logoError ? (
-                <img
-                  src={`https://logo.clearbit.com/${company.domain}`}
-                  alt={`${company.name} logo`}
-                  className="company-detail-logo"
-                  onError={() => setLogoError(true)}
-                />
-              ) : (
-                <Building2 className="company-detail-logo-fallback" />
-              )}
-            </div>
+            {/* Robust multi-source logo */}
+            <CompanyLogo company={company} size="large" className="company-detail-logo-wrapper" />
             <div className="header-text">
               <h2 className="company-detail-name">{company.name || 'Unknown Company'}</h2>
               <p className="company-detail-industry">{enrichedData?.snapshot?.industry || company.industry || 'Industry not specified'}</p>

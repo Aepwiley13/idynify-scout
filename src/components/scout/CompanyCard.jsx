@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react';
 import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle, Users } from 'lucide-react';
 import WebsitePreviewModal from './WebsitePreviewModal';
+import CompanyLogo from './CompanyLogo';
 
 export default function CompanyCard({ company, onSwipe }) {
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [logoError, setLogoError] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewTitle, setPreviewTitle] = useState('');
@@ -159,25 +159,8 @@ export default function CompanyCard({ company, onSwipe }) {
         <div className="card-content">
           {/* Company Header */}
           <div className="company-header">
-            {/* Company Logo */}
-            <div className="company-logo-placeholder">
-              {company.domain && !logoError ? (
-                <img
-                  src={`https://logo.clearbit.com/${company.domain}`}
-                  alt={`${company.name} logo`}
-                  className="company-logo"
-                  onError={() => setLogoError(true)}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    padding: '8px'
-                  }}
-                />
-              ) : (
-                <Building2 className="w-8 h-8 text-gray-400" />
-              )}
-            </div>
+            {/* Company Logo - Robust multi-source fallback */}
+            <CompanyLogo company={company} size="default" />
 
             {/* Company Name */}
             <div className="company-info">

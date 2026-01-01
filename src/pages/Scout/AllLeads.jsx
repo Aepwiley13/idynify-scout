@@ -373,9 +373,25 @@ export default function AllLeads() {
                       <div className="avatar">
                         {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
                       </div>
-                      <span className="contact-name">
-                        {contact.name || 'Unknown'}
-                      </span>
+                      <div>
+                        <span className="contact-name">
+                          {contact.name || 'Unknown'}
+                        </span>
+                        {/* Source Badge */}
+                        <div style={{
+                          display: 'inline-block',
+                          marginLeft: '0.5rem',
+                          padding: '0.125rem 0.5rem',
+                          borderRadius: '0.5rem',
+                          fontSize: '0.625rem',
+                          fontWeight: '600',
+                          backgroundColor: contact.source === 'manual' ? '#eff6ff' : contact.source === 'networking' ? '#faf5ff' : '#f0fdf4',
+                          color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
+                          border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
+                        }}>
+                          {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Apollo'}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="title-cell" data-label="Title">{contact.title || '—'}</td>

@@ -711,16 +711,110 @@
     font-size: 1.5rem;
   }
 
-  .contacts-table thead th,
+  /* ========================================
+     MOBILE CARD LAYOUT FOR LEADS TABLE
+     ======================================== */
+
+  /* Hide table structure, use card layout */
+  .table-container {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .contacts-table {
+    display: block;
+  }
+
+  /* Hide table headers on mobile */
+  .contacts-table thead {
+    display: none;
+  }
+
+  .contacts-table tbody {
+    display: block;
+  }
+
+  /* Convert each row to a card */
+  .contacts-table tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.25rem;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Convert each cell to a block with label */
   .contacts-table tbody td {
-    padding: 0.75rem 0.625rem;
-    font-size: 0.8125rem;
+    display: block;
+    padding: 0.625rem 0;
+    border: none;
+    text-align: left;
+  }
+
+  /* Add labels before each field using data attributes */
+  .contacts-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #6b7280;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.375rem;
+  }
+
+  /* Remove label before contact cell (it has avatar) */
+  .contact-cell::before {
+    content: none;
+  }
+
+  /* Style contact cell specially */
+  .contact-cell {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .contact-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .avatar {
-    width: 32px;
-    height: 32px;
-    font-size: 0.875rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .contact-name {
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  /* Actions cell - make buttons larger */
+  .actions-cell {
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .actions-cell::before {
+    content: none; /* Remove "Actions" label */
+  }
+
+  .action-links {
+    gap: 0.75rem;
+  }
+
+  .action-link {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 

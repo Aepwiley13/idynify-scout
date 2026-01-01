@@ -368,7 +368,7 @@ export default function AllLeads() {
               const company = companies[contact.company_id];
               return (
                 <tr key={contact.id}>
-                  <td className="contact-cell">
+                  <td className="contact-cell" data-label="Contact">
                     <div className="contact-info">
                       <div className="avatar">
                         {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
@@ -378,9 +378,9 @@ export default function AllLeads() {
                       </span>
                     </div>
                   </td>
-                  <td className="title-cell">{contact.title || '—'}</td>
-                  <td className="company-cell">{company?.name || 'Unknown Company'}</td>
-                  <td className="email-cell">
+                  <td className="title-cell" data-label="Title">{contact.title || '—'}</td>
+                  <td className="company-cell" data-label="Company">{company?.name || 'Unknown Company'}</td>
+                  <td className="email-cell" data-label="Email">
                     {contact.email ? (
                       <div className="email-with-status">
                         <a
@@ -398,7 +398,7 @@ export default function AllLeads() {
                       <span className="empty-value">—</span>
                     )}
                   </td>
-                  <td className="phone-cell">
+                  <td className="phone-cell" data-label="Phone">
                     {contact.phone_mobile || contact.phone_direct || contact.phone ? (
                       <div className="phone-with-type">
                         {contact.phone_mobile && (
@@ -421,10 +421,10 @@ export default function AllLeads() {
                       <span className="empty-value">—</span>
                     )}
                   </td>
-                  <td className="date-cell">
+                  <td className="date-cell" data-label="Added">
                     {contact.addedAt ? new Date(contact.addedAt).toLocaleDateString() : '—'}
                   </td>
-                  <td className="actions-cell">
+                  <td className="actions-cell" data-label="Actions">
                     <div className="action-links">
                       {contact.linkedin_url && (
                         <a

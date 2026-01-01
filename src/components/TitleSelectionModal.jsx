@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
+import { X, Search, Target, CheckCircle, ChevronUp, ChevronDown } from 'lucide-react';
 import './TitleSelectionModal.css';
 
 // Comprehensive B2B job titles list
@@ -142,22 +143,35 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
       <div className="title-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="modal-header">
-          <h2>Select Target Titles</h2>
-          <p className="company-name">for {company.name}</p>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <div className="header-content">
+            <div className="header-icon">
+              <Target className="w-6 h-6" />
+            </div>
+            <div className="header-text">
+              <h2>Browse Common Titles</h2>
+              <p className="company-name">{company.name}</p>
+            </div>
+          </div>
+          <button className="close-btn" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Instructions */}
         <div className="modal-instructions">
-          <p>Select and rank the job titles you want to target at this company.</p>
-          <p className="instruction-note">💡 Top 3 titles will be prioritized in the search</p>
+          <p className="instruction-main">Select and rank the job titles you want to target at this company.</p>
+          <p className="instruction-note">
+            <Target className="w-4 h-4" />
+            <span>Top 3 titles will be prioritized in the search</span>
+          </p>
         </div>
 
         {/* Search Bar */}
         <div className="search-bar">
+          <Search className="search-icon-modal" />
           <input
             type="text"
-            placeholder="🔍 Search titles..."
+            placeholder="Search titles..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -173,12 +187,16 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
                 const isSelected = selectedTitles.find(t => t.title === title);
                 return (
                   <label key={title} className={`title-checkbox ${isSelected ? 'selected' : ''}`}>
+                    <div className="checkbox-custom">
+                      {isSelected && <CheckCircle className="w-5 h-5" />}
+                    </div>
+                    <span className="title-label">{title}</span>
                     <input
                       type="checkbox"
                       checked={!!isSelected}
                       onChange={() => toggleTitle(title)}
+                      style={{ display: 'none' }}
                     />
-                    <span>{title}</span>
                   </label>
                 );
               })}
@@ -191,8 +209,9 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
 
             {selectedTitles.length === 0 ? (
               <div className="empty-selection">
-                <p>No titles selected yet</p>
-                <p className="hint">← Select titles from the left</p>
+                <Target className="w-12 h-12" />
+                <p className="empty-title">No titles selected yet</p>
+                <p className="empty-hint">Select titles from the left to get started</p>
               </div>
             ) : (
               <div className="ranked-list">
@@ -207,7 +226,7 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
                         className="arrow-btn"
                         title="Move up"
                       >
-                        ↑
+                        <ChevronUp className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => moveDown(index)}
@@ -215,7 +234,7 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
                         className="arrow-btn"
                         title="Move down"
                       >
-                        ↓
+                        <ChevronDown className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -225,10 +244,14 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
 
             {selectedTitles.length > 0 && (
               <div className="priority-note">
-                Top 3 ranked titles:
+                <div className="priority-header">
+                  <Target className="w-4 h-4" />
+                  <span>Top 3 Prioritized Titles</span>
+                </div>
                 {selectedTitles.slice(0, 3).map((t, idx) => (
                   <div key={t.title} className="priority-item">
-                    #{idx + 1}: {t.title}
+                    <span className="priority-rank">#{idx + 1}</span>
+                    <span>{t.title}</span>
                   </div>
                 ))}
               </div>
@@ -246,7 +269,17 @@ export default function TitleSelectionModal({ company, onClose, onConfirm }) {
             onClick={handleSearchContacts}
             disabled={selectedTitles.length === 0 || saving}
           >
-            {saving ? '⏳ Saving...' : `Search Contacts →`}
+            {saving ? (
+              <>
+                <div className="loading-spinner-small"></div>
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4" />
+                <span>Search Contacts</span>
+              </>
+            )}
           </button>
         </div>
       </div>

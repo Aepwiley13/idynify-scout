@@ -529,10 +529,10 @@
 }
 
 .decision-maker-select-indicator .checkbox {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   border: 2px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1385,10 +1385,10 @@
 }
 
 .checkbox {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   border: 2px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #ffffff;
   cursor: pointer;
   display: flex;
@@ -1993,5 +1993,34 @@
   .title-badge-chip {
     width: 100%;
     justify-content: space-between;
+  }
+}
+
+/* ========================================
+   MOBILE - iPhone 14/15 Optimization
+   ======================================== */
+@media (max-width: 375px) {
+  .company-detail-content {
+    padding: 1rem 0.75rem;
+  }
+
+  .company-info-card,
+  .decision-makers-section,
+  .title-search-section,
+  .contacts-section,
+  .saved-contacts-section {
+    padding: 1.25rem;
+  }
+
+  .company-name {
+    font-size: 1rem;
+  }
+
+  .section-title-main {
+    font-size: 1.25rem;
+  }
+
+  .section-header h2 {
+    font-size: 1.125rem;
   }
 }

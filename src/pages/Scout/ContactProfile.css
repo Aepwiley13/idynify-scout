@@ -878,3 +878,41 @@
     justify-content: center;
   }
 }
+
+/* ========================================
+   MOBILE - iPhone 14/15 Optimization
+   ======================================== */
+@media (max-width: 375px) {
+  .contact-profile-page {
+    padding: 0.75rem;
+  }
+
+  .profile-header-card {
+    padding: 1.25rem;
+  }
+
+  .profile-section,
+  .info-card {
+    padding: 1rem;
+  }
+
+  /* Smaller avatar on very small screens */
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-name {
+    font-size: 1.375rem;
+  }
+
+  /* Stack quick actions earlier for better one-handed use */
+  .quick-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .quick-action-btn {
+    width: 100%;
+  }
+}

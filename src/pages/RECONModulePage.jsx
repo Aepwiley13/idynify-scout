@@ -57,26 +57,9 @@ export default function RECONModulePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(200)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute bg-white rounded-full"
-              style={{
-                width: Math.random() * 2 + 1 + 'px',
-                height: Math.random() * 2 + 1 + 'px',
-                top: Math.random() * 100 + '%',
-                left: Math.random() * 100 + '%',
-                opacity: Math.random() * 0.7 + 0.3,
-                animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 3}s`
-              }}
-            />
-          ))}
-        </div>
-        <div className="relative z-10 text-cyan-400 text-2xl font-mono animate-pulse">
-          [LOADING RECON MODULE...]
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-blue-600 text-2xl font-semibold animate-pulse">
+          Loading RECON Module...
         </div>
       </div>
     );
@@ -84,47 +67,16 @@ export default function RECONModulePage() {
 
   if (!reconModule) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-red-400 text-xl font-mono">[ERROR: RECON module not found]</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-red-600 text-xl font-semibold">Error: RECON module not found</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Starfield Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(200)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bg-white rounded-full"
-            style={{
-              width: Math.random() * 2 + 1 + 'px',
-              height: Math.random() * 2 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.7 + 0.3,
-              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 3}s`
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Grid Pattern */}
-      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-cyan-900/20 to-transparent">
-        <svg className="w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <defs>
-            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="cyan" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100" height="100" fill="url(#grid)" />
-        </svg>
-      </div>
-
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-black/80 border-b border-cyan-500/30">
+      <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -136,10 +88,10 @@ export default function RECONModulePage() {
               </button>
               <div className="text-4xl">🔍</div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
-                  RECON MODULE
+                <h1 className="text-xl font-bold text-gray-900">
+                  RECON Module
                 </h1>
-                <p className="text-xs text-gray-400 font-mono">{reconModule.description}</p>
+                <p className="text-sm text-gray-600">{reconModule.description}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -149,13 +101,13 @@ export default function RECONModulePage() {
                   setLoading(true);
                   loadDashboardState();
                 }}
-                className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 px-4 py-2 rounded-lg border border-cyan-500/30 font-mono text-sm transition-all"
+                className="bg-white hover:bg-gray-50 text-blue-600 px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold transition-all"
               >
-                🔄 REFRESH
+                🔄 Refresh
               </button>
               <div className="text-right">
-                <p className="text-xs text-gray-500 font-mono">Progress</p>
-                <p className="text-2xl font-bold text-cyan-400 font-mono">{reconModule.progressPercentage}%</p>
+                <p className="text-xs text-gray-600 font-semibold">Progress</p>
+                <p className="text-2xl font-bold text-blue-600">{reconModule.progressPercentage}%</p>
               </div>
             </div>
           </div>
@@ -163,30 +115,30 @@ export default function RECONModulePage() {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-12">
+      <main className="max-w-7xl mx-auto px-6 py-12">
 
         {/* Module Overview */}
         <section className="mb-12">
-          <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-8 border border-cyan-500/30">
-            <h2 className="text-3xl font-bold text-white mb-4 font-mono">Reconnaissance Intelligence</h2>
-            <p className="text-gray-300 text-lg mb-6">
+          <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Reconnaissance Intelligence</h2>
+            <p className="text-gray-700 text-lg mb-6">
               Complete all 10 sections to build your comprehensive Ideal Customer Profile (ICP).
               All sections are available - complete them in any order you prefer.
             </p>
 
             {/* Progress Stats */}
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-black/40 rounded-xl p-4 border border-cyan-500/20">
-                <p className="text-xs text-gray-400 font-mono mb-1">COMPLETED</p>
-                <p className="text-3xl font-bold text-green-400 font-mono">{reconModule.completedSections}</p>
+              <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                <p className="text-xs text-gray-600 font-semibold mb-1 uppercase tracking-wide">Completed</p>
+                <p className="text-3xl font-bold text-green-600">{reconModule.completedSections}</p>
               </div>
-              <div className="bg-black/40 rounded-xl p-4 border border-cyan-500/20">
-                <p className="text-xs text-gray-400 font-mono mb-1">REMAINING</p>
-                <p className="text-3xl font-bold text-cyan-400 font-mono">{reconModule.totalSections - reconModule.completedSections}</p>
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <p className="text-xs text-gray-600 font-semibold mb-1 uppercase tracking-wide">Remaining</p>
+                <p className="text-3xl font-bold text-blue-600">{reconModule.totalSections - reconModule.completedSections}</p>
               </div>
-              <div className="bg-black/40 rounded-xl p-4 border border-cyan-500/20">
-                <p className="text-xs text-gray-400 font-mono mb-1">TOTAL</p>
-                <p className="text-3xl font-bold text-white font-mono">{reconModule.totalSections}</p>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <p className="text-xs text-gray-600 font-semibold mb-1 uppercase tracking-wide">Total</p>
+                <p className="text-3xl font-bold text-gray-900">{reconModule.totalSections}</p>
               </div>
             </div>
           </div>
@@ -194,7 +146,7 @@ export default function RECONModulePage() {
 
         {/* Sections List */}
         <section>
-          <h3 className="text-2xl font-bold text-white mb-6 font-mono">Sections</h3>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">Sections</h3>
 
           <div className="space-y-4">
             {reconModule.sections.map((section, index) => {
@@ -203,16 +155,16 @@ export default function RECONModulePage() {
               return (
                 <div key={section.sectionId}>
                   <div
-                    className="relative bg-black/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-cyan-500/30 hover:border-cyan-500/60 cursor-pointer transition-all"
+                    className="relative bg-white rounded-2xl p-6 border border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all"
                     onClick={() => navigateToSection(section.sectionId)}
                   >
 
                     <div className="flex items-start gap-6">
                       {/* Section Number */}
                       <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl flex-shrink-0 ${
-                        section.status === 'completed' ? 'bg-green-500/20 text-green-400 border-2 border-green-500/30' :
-                        section.status === 'in_progress' ? 'bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500/30' :
-                        'bg-gray-500/20 text-gray-400 border-2 border-gray-500/20'
+                        section.status === 'completed' ? 'bg-green-100 text-green-600 border-2 border-green-300' :
+                        section.status === 'in_progress' ? 'bg-blue-100 text-blue-600 border-2 border-blue-300' :
+                        'bg-gray-100 text-gray-500 border-2 border-gray-300'
                       }`}>
                         {section.status === 'completed' ? '✓' : section.order}
                       </div>
@@ -221,12 +173,12 @@ export default function RECONModulePage() {
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <h4 className="text-xl font-bold text-white mb-1 font-mono">{section.title}</h4>
-                            <p className="text-gray-400 text-sm mb-2">{section.description}</p>
-                            <div className="flex items-center gap-4 text-xs font-mono">
+                            <h4 className="text-xl font-bold text-gray-900 mb-1">{section.title}</h4>
+                            <p className="text-gray-600 text-sm mb-2">{section.description}</p>
+                            <div className="flex items-center gap-4 text-xs">
                               <span className="text-gray-500">⏱️ {section.estimatedTime}</span>
                               {section.status === 'completed' && section.completedAt && (
-                                <span className="text-green-400">
+                                <span className="text-green-600">
                                   ✓ Completed {new Date(section.completedAt).toLocaleDateString()}
                                 </span>
                               )}
@@ -234,10 +186,10 @@ export default function RECONModulePage() {
                           </div>
 
                           {/* Status Badge */}
-                          <div className={`px-4 py-2 rounded-lg font-mono text-xs font-bold ${
-                            section.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                            section.status === 'in_progress' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
-                            'bg-gray-500/20 text-gray-400 border border-gray-500/20'
+                          <div className={`px-4 py-2 rounded-lg text-xs font-semibold ${
+                            section.status === 'completed' ? 'bg-green-100 text-green-700 border border-green-300' :
+                            section.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border border-blue-300' :
+                            'bg-gray-100 text-gray-600 border border-gray-300'
                           }`}>
                             {section.status.replace('_', ' ').toUpperCase()}
                           </div>
@@ -250,17 +202,17 @@ export default function RECONModulePage() {
                               e.stopPropagation();
                               navigateToSection(section.sectionId);
                             }}
-                            className={`px-6 py-3 rounded-lg font-mono font-bold transition-all ${
+                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
                               section.status === 'completed'
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                                ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
                                 : section.status === 'in_progress'
-                                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30'
-                                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700'
+                                ? 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'
+                                : 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700'
                             }`}
                           >
-                            {section.status === 'completed' ? '✏️ EDIT SECTION' :
-                             section.status === 'in_progress' ? '▶️ CONTINUE SECTION' :
-                             '🚀 START SECTION'} →
+                            {section.status === 'completed' ? '✏️ Edit Section' :
+                             section.status === 'in_progress' ? '▶️ Continue Section' :
+                             '🚀 Start Section'} →
                           </button>
 
                           {section.status === 'completed' && (
@@ -269,9 +221,9 @@ export default function RECONModulePage() {
                                 e.stopPropagation();
                                 setViewingSection(section);
                               }}
-                              className="px-4 py-3 rounded-lg font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition-all"
+                              className="px-4 py-3 rounded-lg font-semibold bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200 transition-all"
                             >
-                              📊 VIEW OUTPUT
+                              📊 View Output
                             </button>
                           )}
                         </div>
@@ -282,7 +234,7 @@ export default function RECONModulePage() {
                   {/* Connector Line */}
                   {!isLast && (
                     <div className="flex justify-center py-2">
-                      <div className="w-0.5 h-8 bg-cyan-500/50" />
+                      <div className="w-0.5 h-8 bg-gray-300" />
                     </div>
                   )}
                 </div>
@@ -294,16 +246,16 @@ export default function RECONModulePage() {
         {/* Completion Message (show when all complete) */}
         {reconModule.status === 'completed' && (
           <section className="mt-12">
-            <div className="bg-gradient-to-br from-emerald-500/20 to-teal-600/20 rounded-2xl p-10 text-center border-2 border-emerald-500/30 backdrop-blur-xl">
+            <div className="bg-green-50 rounded-2xl p-10 text-center border border-green-200">
               <div className="text-6xl mb-6">🎯</div>
-              <h3 className="text-4xl font-bold text-white mb-4 font-mono">RECON Complete!</h3>
-              <p className="text-gray-300 mb-6 text-lg max-w-2xl mx-auto">
+              <h3 className="text-4xl font-bold text-gray-900 mb-4">RECON Complete!</h3>
+              <p className="text-gray-700 mb-6 text-lg max-w-2xl mx-auto">
                 All 10 sections completed! Each section has generated AI intelligence based on your inputs.
               </p>
-              <div className="bg-black/40 rounded-xl p-6 max-w-2xl mx-auto border border-cyan-500/20">
-                <p className="text-cyan-400 font-mono mb-3">📊 VIEW YOUR INTELLIGENCE REPORTS</p>
-                <p className="text-gray-300 text-sm">
-                  Click the <span className="text-purple-400 font-bold">"📊 VIEW OUTPUT"</span> button on any completed section above to see the AI-generated intelligence for that section.
+              <div className="bg-white rounded-xl p-6 max-w-2xl mx-auto border border-gray-200 shadow-sm">
+                <p className="text-blue-600 font-semibold mb-3">📊 View Your Intelligence Reports</p>
+                <p className="text-gray-700 text-sm">
+                  Click the <span className="text-purple-700 font-semibold">"📊 View Output"</span> button on any completed section above to see the AI-generated intelligence for that section.
                 </p>
               </div>
             </div>
@@ -319,13 +271,6 @@ export default function RECONModulePage() {
           onClose={() => setViewingSection(null)}
         />
       )}
-
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -118,26 +118,9 @@ export default function RECONSectionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(200)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute bg-white rounded-full"
-              style={{
-                width: Math.random() * 2 + 1 + 'px',
-                height: Math.random() * 2 + 1 + 'px',
-                top: Math.random() * 100 + '%',
-                left: Math.random() * 100 + '%',
-                opacity: Math.random() * 0.7 + 0.3,
-                animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 3}s`
-              }}
-            />
-          ))}
-        </div>
-        <div className="relative z-10 text-cyan-400 text-2xl font-mono animate-pulse">
-          [LOADING SECTION...]
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-blue-600 text-2xl font-semibold animate-pulse">
+          Loading Section...
         </div>
       </div>
     );
@@ -145,47 +128,16 @@ export default function RECONSectionPage() {
 
   if (!section) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-red-400 text-xl font-mono">[ERROR: Section not found]</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-red-600 text-xl font-semibold">Error: Section not found</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Starfield Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(200)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bg-white rounded-full"
-            style={{
-              width: Math.random() * 2 + 1 + 'px',
-              height: Math.random() * 2 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.7 + 0.3,
-              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 3}s`
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Grid Pattern */}
-      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-cyan-900/20 to-transparent">
-        <svg className="w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <defs>
-            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="cyan" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100" height="100" fill="url(#grid)" />
-        </svg>
-      </div>
-
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-black/80 border-b border-cyan-500/30">
+      <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -197,38 +149,38 @@ export default function RECONSectionPage() {
               </button>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs text-gray-500 font-mono">SECTION {section.order}</span>
+                  <span className="text-xs text-gray-600 font-semibold">Section {section.order}</span>
                   {section.required && (
-                    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-mono border border-red-500/30">
-                      REQUIRED
+                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-semibold border border-red-300">
+                      Required
                     </span>
                   )}
                 </div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
+                <h1 className="text-xl font-bold text-gray-900">
                   {section.title}
                 </h1>
-                <p className="text-xs text-gray-400 font-mono">{section.description}</p>
+                <p className="text-sm text-gray-600">{section.description}</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500 font-mono">Estimated Time</p>
-              <p className="text-lg font-bold text-cyan-400 font-mono">{section.estimatedTime}</p>
+              <p className="text-xs text-gray-600 font-semibold">Estimated Time</p>
+              <p className="text-lg font-bold text-blue-600">{section.estimatedTime}</p>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-4xl mx-auto px-6 py-12">
+      <main className="max-w-4xl mx-auto px-6 py-12">
 
         {/* Section Instructions */}
         <section className="mb-8">
-          <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-            <h2 className="text-2xl font-bold text-white mb-3 font-mono">📋 Instructions</h2>
-            <p className="text-gray-300 mb-4">
+          <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">📋 Instructions</h2>
+            <p className="text-gray-700 mb-4">
               Answer the questions below to complete this section. Your responses will be used to build your comprehensive ICP.
             </p>
-            <p className="text-sm text-gray-400 font-mono">
+            <p className="text-sm text-gray-600">
               💡 You can save your progress at any time and return later to finish.
             </p>
           </div>
@@ -297,31 +249,24 @@ export default function RECONSectionPage() {
               onComplete={handleComplete}
             />
           ) : (
-            <div className="bg-red-500/10 border border-red-500 rounded-xl p-8">
-              <h3 className="text-red-400 font-bold font-mono text-xl">❌ Section {sectionId} not found</h3>
-              <p className="text-gray-300 mt-2">This section does not exist. Please return to the RECON module.</p>
+            <div className="bg-red-50 border border-red-300 rounded-xl p-8">
+              <h3 className="text-red-700 font-bold text-xl">❌ Section {sectionId} not found</h3>
+              <p className="text-gray-700 mt-2">This section does not exist. Please return to the RECON module.</p>
             </div>
           )}
         </section>
 
         {/* Debug Info */}
         <details className="mt-8">
-          <summary className="cursor-pointer text-cyan-500/50 hover:text-cyan-400 font-mono text-xs">
-            [DEBUG: VIEW SECTION STATE]
+          <summary className="cursor-pointer text-blue-600 hover:text-blue-700 text-xs">
+            [Debug: View section state]
           </summary>
-          <pre className="mt-4 bg-black/80 p-4 rounded-lg overflow-auto text-cyan-400/70 border border-cyan-500/20 font-mono text-xs">
+          <pre className="mt-4 bg-gray-50 p-4 rounded-lg overflow-auto text-gray-700 border border-gray-200 text-xs">
             {JSON.stringify(section, null, 2)}
           </pre>
         </details>
 
       </main>
-
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle } from 'lucide-react';
+import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter } from 'lucide-react';
 import './ContactDetailModal.css';
 
 export default function ContactDetailModal({ contact, onClose, onUpdate }) {
@@ -350,6 +350,111 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
               </div>
             </div>
           </div>
+
+          {/* Professional Snapshot (Apollo contacts only) */}
+          {contact.source === 'apollo' && contact.department && (
+            <div className="detail-section professional-snapshot-section">
+              <div className="section-header-with-icon">
+                <Building2 className="section-icon" />
+                <h3 className="section-title">Professional Snapshot</h3>
+              </div>
+              <div className="snapshot-grid-contact">
+                <div className="snapshot-item-contact">
+                  <Briefcase className="snapshot-icon" />
+                  <div>
+                    <p className="snapshot-label">Current Role</p>
+                    <p className="snapshot-value">{contact.title || 'Not available'}</p>
+                  </div>
+                </div>
+
+                {contact.department && (
+                  <div className="snapshot-item-contact">
+                    <Building2 className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Department</p>
+                      <p className="snapshot-value">{contact.department}</p>
+                    </div>
+                  </div>
+                )}
+
+                {contact.seniority && (
+                  <div className="snapshot-item-contact">
+                    <Award className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Seniority Level</p>
+                      <p className="snapshot-value">{contact.seniority}</p>
+                    </div>
+                  </div>
+                )}
+
+                {contact.location && (
+                  <div className="snapshot-item-contact">
+                    <MapPin className="snapshot-icon" />
+                    <div>
+                      <p className="snapshot-label">Location</p>
+                      <p className="snapshot-value">{contact.location}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="snapshot-item-contact">
+                  <Building2 className="snapshot-icon" />
+                  <div>
+                    <p className="snapshot-label">Company</p>
+                    <p className="snapshot-value">{contact.company_name || 'Not available'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Decision-Making Context (Apollo contacts only) */}
+          {contact.source === 'apollo' && (
+            <div className="detail-section decision-context-section">
+              <div className="section-header-with-icon">
+                <Target className="section-icon" />
+                <h3 className="section-title">Decision-Making Context</h3>
+              </div>
+              <div className="decision-likelihood-container">
+                <div className="decision-likelihood-label">
+                  <Award className="w-4 h-4" />
+                  <span>Decision Maker Likelihood</span>
+                </div>
+                <div className={`decision-likelihood-badge ${(contact.seniority || 'entry').toLowerCase()}`}>
+                  {contact.seniority === 'c_suite' ? 'High / Decision Maker' :
+                   contact.seniority === 'senior' ? 'Medium / Influencer' :
+                   'Low / Influencer'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Public Presence Signals (Apollo contacts only) */}
+          {contact.source === 'apollo' && (
+            <div className="detail-section public-presence-section">
+              <div className="section-header-with-icon">
+                <Globe className="section-icon" />
+                <h3 className="section-title">Public Presence Signals</h3>
+                <span className="ai-badge">AI</span>
+              </div>
+              <div className="presence-signals-list">
+                {contact.linkedin_url && (
+                  <div className="presence-signal-item">
+                    <Linkedin className="presence-icon linkedin" />
+                    <span className="presence-text">LinkedIn: Profile Found</span>
+                  </div>
+                )}
+                <div className="presence-signal-item">
+                  <Twitter className="presence-icon twitter" />
+                  <span className="presence-text">Twitter/X: Analyzing...</span>
+                </div>
+                <div className="presence-signal-item">
+                  <Globe className="presence-icon globe" />
+                  <span className="presence-text">Thought Leadership: Analyzing...</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Networking Context (if applicable) */}
           {contact.source === 'networking' && (

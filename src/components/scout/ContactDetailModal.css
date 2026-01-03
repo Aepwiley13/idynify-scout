@@ -640,7 +640,8 @@
 /* Shorter Screens (Laptops under 1080p) */
 @media (max-height: 800px) {
   .contact-detail-container {
-    max-height: 80vh;
+    max-height: 85vh;
+    min-height: 0; /* Allow modal to shrink on short screens */
   }
 
   .contact-detail-header {
@@ -649,5 +650,25 @@
 
   .contact-detail-content {
     padding: 1.5rem;
+  }
+}
+
+/* Very Short Screens (Mobile landscape, small laptops) */
+@media (max-height: 600px) {
+  .contact-detail-container {
+    max-height: 90vh;
+    min-height: 0;
+  }
+
+  .contact-detail-header {
+    padding: 1rem;
+  }
+
+  .contact-detail-content {
+    padding: 1rem;
+  }
+
+  .section-title {
+    font-size: 1rem;
   }
 }

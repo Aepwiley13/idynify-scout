@@ -29,8 +29,9 @@
   background: #ffffff;
   border-radius: 16px;
   width: 100%;
-  max-width: 700px;
+  max-width: 800px;
   max-height: 85vh;
+  min-height: 500px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -57,6 +58,11 @@
   padding: 2rem;
   border-bottom: 1px solid #e5e7eb;
   background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  transition: box-shadow 0.3s ease;
+}
+
+.contact-detail-header.scrolled {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .header-content {
@@ -132,6 +138,25 @@
   flex: 1;
   overflow-y: auto;
   padding: 2rem;
+  position: relative;
+}
+
+/* Scroll gradient indicator */
+.contact-detail-content::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.contact-detail-content.has-scroll::after {
+  opacity: 1;
 }
 
 /* Error Banner */
@@ -151,8 +176,8 @@
 
 /* Sections */
 .detail-section {
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 2.5rem;
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -205,8 +230,8 @@
 /* Contact Info Grid */
 .contact-info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.75rem;
 }
 
 .info-field {
@@ -431,5 +456,20 @@
 
   .section-title {
     font-size: 1rem;
+  }
+}
+
+/* Shorter Screens (Laptops under 1080p) */
+@media (max-height: 800px) {
+  .contact-detail-container {
+    max-height: 80vh;
+  }
+
+  .contact-detail-header {
+    padding: 1.5rem;
+  }
+
+  .contact-detail-content {
+    padding: 1.5rem;
   }
 }

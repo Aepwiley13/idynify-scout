@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle } from 'lucide-react';
@@ -19,7 +19,46 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     date_met: contact.networking_context?.date_met || ''
   });
 
+  // Scroll detection states
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [hasScroll, setHasScroll] = useState(false);
+  const contentRef = useRef(null);
+  const headerRef = useRef(null);
+
   const isManualOrNetworking = contact.source === 'manual' || contact.source === 'networking';
+
+  // Scroll detection effect
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+
+    const handleScroll = () => {
+      const scrollTop = contentElement.scrollTop;
+      const scrollHeight = contentElement.scrollHeight;
+      const clientHeight = contentElement.clientHeight;
+
+      // Add 'scrolled' class to header when scrolled down
+      setIsScrolled(scrollTop > 10);
+
+      // Show scroll gradient if there's more content below
+      setHasScroll(scrollHeight > clientHeight && scrollTop < scrollHeight - clientHeight - 20);
+    };
+
+    // Initial check
+    handleScroll();
+
+    // Add scroll listener
+    contentElement.addEventListener('scroll', handleScroll);
+
+    // Recheck on content changes
+    const observer = new ResizeObserver(handleScroll);
+    observer.observe(contentElement);
+
+    return () => {
+      contentElement.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+    };
+  }, [contact, isEditing]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -133,7 +172,7 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     <div className="contact-detail-overlay" onClick={onClose}>
       <div className="contact-detail-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="contact-detail-header">
+        <div ref={headerRef} className={`contact-detail-header ${isScrolled ? 'scrolled' : ''}`}>
           <div className="header-content">
             <div className="contact-avatar">
               {contact.photo_url ? (
@@ -156,7 +195,7 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
         </div>
 
         {/* Content */}
-        <div className="contact-detail-content">
+        <div ref={contentRef} className={`contact-detail-content ${hasScroll ? 'has-scroll' : ''}`}>
           {error && (
             <div className="error-banner">
               <AlertCircle className="w-5 h-5" />

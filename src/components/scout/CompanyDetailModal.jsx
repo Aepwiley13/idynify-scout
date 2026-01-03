@@ -220,13 +220,15 @@ export default function CompanyDetailModal({ company, onClose }) {
           company_name: company.name,
           company_industry: company.industry || null,
 
-          // Additional Info
+          // Apollo Enrichment Fields (for Professional Snapshot & Decision-Making Context)
           department: person.department || null,
+          seniority: person.seniority || null,
+          location: person.location || null,
 
           // Metadata
           status: 'active',
           saved_at: new Date().toISOString(),
-          source: 'company_enrichment'
+          source: 'apollo'
         });
       }
 

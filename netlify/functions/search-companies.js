@@ -338,11 +338,49 @@ export const handler = async (event) => {
     }
     */
 
-    // Clear old pending companies before adding new ones (for updated searches)
-    await clearPendingCompanies(userId, authToken);
+    // Top-off model: Only add companies if queue needs refilling
+    const pendingCount = await countPendingCompanies(userId, authToken);
+    const TARGET_QUEUE_SIZE = 50;
+
+    console.log(`📊 Current pending companies: ${pendingCount}`);
+
+    if (pendingCount >= TARGET_QUEUE_SIZE) {
+      console.log(`✅ Queue is full (${pendingCount}/${TARGET_QUEUE_SIZE}). No new companies needed.`);
+
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type'
+        },
+        body: JSON.stringify({
+          success: true,
+          companiesFound: 0,
+          companiesAdded: 0,
+          currentQueueSize: pendingCount,
+          message: `Queue is full with ${pendingCount} pending companies. No new companies added.`,
+          generationTime: (Date.now() - startTime) / 1000
+        })
+      };
+    }
+
+    // Get existing company IDs to prevent duplicates
+    const existingCompanyIds = await getExistingCompanyIds(userId, authToken);
+
+    // Filter out companies that already exist
+    const newCompanies = companies.filter(c => !existingCompanyIds.has(String(c.id)));
+
+    console.log(`📊 Filtered ${companies.length} companies → ${newCompanies.length} new (removed ${companies.length - newCompanies.length} duplicates)`);
+
+    // Calculate how many we need to add
+    const needed = TARGET_QUEUE_SIZE - pendingCount;
+    const toAdd = newCompanies.slice(0, needed);
+
+    console.log(`📊 Adding ${toAdd.length} companies to reach target of ${TARGET_QUEUE_SIZE}`);
 
     // Save companies to Firestore
-    await saveCompaniesToFirestore(userId, authToken, companies, companyProfile);
+    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile);
 
     const generationTime = (Date.now() - startTime) / 1000;
 
@@ -356,8 +394,10 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         companiesFound: companies.length,
+        companiesAdded: toAdd.length,
+        currentQueueSize: pendingCount + toAdd.length,
         generationTime,
-        message: `Found ${companies.length} companies matching your criteria`,
+        message: `Added ${toAdd.length} companies to queue (now ${pendingCount + toAdd.length}/${TARGET_QUEUE_SIZE})`,
         debug: companies.length === 0 ? {
           apolloQuery: apolloQuery,
           apolloReturnedCount: debugInfo?.apolloReturned || 0,
@@ -473,24 +513,18 @@ function convertRevenueToNumeric(revenueRange) {
 }
 
 /**
- * Clear all pending companies from previous searches
- * This allows users to update their search criteria and get fresh results
+ * Count pending companies in the queue
  */
-async function clearPendingCompanies(userId, authToken) {
+async function countPendingCompanies(userId, authToken) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
     if (!projectId) {
       console.error('❌ Firebase Project ID not configured');
-      throw new Error('Firebase Project ID not configured');
+      return 0;
     }
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-
-    console.log('🗑️  Clearing old pending companies...');
-
-    // Query to get all pending companies
-    const queryUrl = `${firestoreUrl}:runQuery`;
 
     const queryBody = {
       structuredQuery: {
@@ -507,7 +541,6 @@ async function clearPendingCompanies(userId, authToken) {
       }
     };
 
-    // runQuery should be called on the parent document, not the collection
     const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
       method: 'POST',
       headers: {
@@ -518,44 +551,72 @@ async function clearPendingCompanies(userId, authToken) {
     });
 
     if (!queryResponse.ok) {
-      const errorText = await queryResponse.text();
-      console.error(`❌ Failed to query pending companies:`, errorText);
-      // Don't throw - continue even if query fails
-      return;
+      console.error(`❌ Failed to query pending companies`);
+      return 0;
     }
 
     const queryResults = await queryResponse.json();
 
-    // Extract document names from query results
-    const pendingCompanyDocs = queryResults
-      .filter(result => result.document)
-      .map(result => result.document.name);
+    const count = queryResults.filter(result => result.document).length;
 
-    console.log(`📦 Found ${pendingCompanyDocs.length} pending companies to clear`);
-
-    // Delete each pending company
-    for (const docName of pendingCompanyDocs) {
-      try {
-        const deleteResponse = await fetch(`https://firestore.googleapis.com/v1/${docName}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          }
-        });
-
-        if (!deleteResponse.ok) {
-          console.error(`⚠️  Failed to delete ${docName}`);
-        }
-      } catch (deleteError) {
-        console.error(`⚠️  Error deleting ${docName}:`, deleteError);
-      }
-    }
-
-    console.log(`✅ Cleared ${pendingCompanyDocs.length} pending companies`);
+    return count;
 
   } catch (error) {
-    console.error('❌ Error clearing pending companies:', error);
-    // Don't throw - allow search to continue even if clearing fails
+    console.error('❌ Error counting pending companies:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get all existing company IDs to prevent duplicates
+ */
+async function getExistingCompanyIds(userId, authToken) {
+  try {
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+
+    if (!projectId) {
+      return new Set();
+    }
+
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+    const queryBody = {
+      structuredQuery: {
+        from: [{
+          collectionId: 'companies'
+        }],
+        select: {
+          fields: [{ fieldPath: 'apollo_organization_id' }]
+        }
+      }
+    };
+
+    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(queryBody)
+    });
+
+    if (!queryResponse.ok) {
+      console.error(`❌ Failed to query existing companies`);
+      return new Set();
+    }
+
+    const queryResults = await queryResponse.json();
+
+    const ids = queryResults
+      .filter(result => result.document)
+      .map(result => result.document.fields?.apollo_organization_id?.stringValue)
+      .filter(id => id);
+
+    return new Set(ids);
+
+  } catch (error) {
+    console.error('❌ Error getting existing company IDs:', error);
+    return new Set();
   }
 }
 

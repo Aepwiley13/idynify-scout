@@ -24,6 +24,9 @@
 [functions."generate-leads-v2"]
   timeout = 900
 
+[functions."daily-leads-refresh"]
+  timeout = 900
+
 [dev]
   framework = "#custom"
   command = "npm run dev"

@@ -34,7 +34,7 @@ export default function Signup() {
     e.preventDefault();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: email,
         createdAt: new Date(),
@@ -42,6 +42,22 @@ export default function Signup() {
         status: 'active',
         hasCompletedPayment: false // Will be set to true after checkout
       });
+
+      // Send welcome email (async, don't block on this)
+      try {
+        await fetch('/.netlify/functions/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            userId: userCredential.user.uid
+          })
+        });
+        console.log('✅ Welcome email sent');
+      } catch (emailError) {
+        // Log but don't block signup flow
+        console.error('⚠️ Failed to send welcome email:', emailError);
+      }
 
       navigate('/checkout'); // ✅ NEW FLOW: Go to payment after signup
     } catch (error) {

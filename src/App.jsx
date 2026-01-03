@@ -8,6 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import Homepage from './pages/Homepage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import GettingStarted from './pages/GettingStarted';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
@@ -140,6 +141,7 @@ function App() {
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
+        <Route path="/getting-started" element={<GettingStarted />} />
 
         {/* Payment Routes */}
         <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />

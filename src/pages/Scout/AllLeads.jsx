@@ -3,6 +3,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X } from 'lucide-react';
+import ContactDetailModal from '../../components/scout/ContactDetailModal';
 import './AllLeads.css';
 
 export default function AllLeads() {
@@ -13,6 +14,7 @@ export default function AllLeads() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedContact, setSelectedContact] = useState(null);
 
   useEffect(() => {
     loadAllContacts();
@@ -60,6 +62,17 @@ export default function AllLeads() {
       console.error('❌ Failed to load contacts:', error);
       setLoading(false);
     }
+  }
+
+  function handleContactUpdate(updatedContact) {
+    // Update the contact in the local state
+    setContacts(prevContacts =>
+      prevContacts.map(contact =>
+        contact.id === updatedContact.id ? { ...contact, ...updatedContact } : contact
+      )
+    );
+    // Close the modal
+    setSelectedContact(null);
   }
 
   function exportToCSV() {
@@ -456,7 +469,7 @@ export default function AllLeads() {
                       )}
                       <button
                         className="action-link"
-                        onClick={() => navigate(`/scout/contact/${contact.id}`)}
+                        onClick={() => setSelectedContact(contact)}
                         title="View Contact Details"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -480,6 +493,15 @@ export default function AllLeads() {
             Clear Search
           </button>
         </div>
+      )}
+
+      {/* Contact Detail Modal */}
+      {selectedContact && (
+        <ContactDetailModal
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+          onUpdate={handleContactUpdate}
+        />
       )}
     </div>
   );

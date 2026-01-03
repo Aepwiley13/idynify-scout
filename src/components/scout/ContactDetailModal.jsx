@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter } from 'lucide-react';
+import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles } from 'lucide-react';
 import './ContactDetailModal.css';
 
 export default function ContactDetailModal({ contact, onClose, onUpdate }) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const [error, setError] = useState(null);
+  const [enrichSuccess, setEnrichSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: contact.name || '',
     email: contact.email || '',
@@ -138,6 +140,77 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     }
   }
 
+  async function handleEnrichContact() {
+    try {
+      setEnriching(true);
+      setError(null);
+      setEnrichSuccess(false);
+
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      // Check if contact has Apollo person ID
+      if (!contact.apollo_person_id) {
+        setError('This contact cannot be enriched (no Apollo ID)');
+        setEnriching(false);
+        return;
+      }
+
+      console.log('🔄 Enriching contact:', contact.name);
+
+      // Get auth token
+      const authToken = await user.getIdToken();
+
+      // Call enrichContact Netlify function
+      const response = await fetch('/.netlify/functions/enrichContact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: authToken,
+          contactId: contact.apollo_person_id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Enrichment request failed');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Enrichment failed');
+      }
+
+      console.log('✅ Contact enriched successfully');
+
+      // Update contact in Firestore
+      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+      await updateDoc(contactRef, {
+        ...result.enrichedData,
+        last_enriched_at: new Date().toISOString()
+      });
+
+      // Show success message
+      setEnrichSuccess(true);
+      setTimeout(() => setEnrichSuccess(false), 3000);
+
+      // Notify parent component and refresh
+      if (onUpdate) {
+        onUpdate({ ...contact, ...result.enrichedData });
+      }
+
+      setEnriching(false);
+
+    } catch (err) {
+      console.error('Error enriching contact:', err);
+      setError(err.message || 'Failed to enrich contact. Please try again.');
+      setEnriching(false);
+    }
+  }
+
   function getSourceBadge() {
     const badges = {
       manual: { icon: '✍️', text: 'Manual', color: '#1e40af', bg: '#eff6ff' },
@@ -203,19 +276,48 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
             </div>
           )}
 
+          {/* Success Banner */}
+          {enrichSuccess && (
+            <div className="success-banner">
+              <CheckCircle className="w-5 h-5" />
+              <span>Contact enriched successfully! Email and phone updated.</span>
+            </div>
+          )}
+
           {/* Editable Contact Information */}
           <div className="detail-section">
             <div className="section-header-with-action">
               <h3 className="section-title">Contact Information</h3>
-              {!isEditing && isManualOrNetworking && (
-                <button
-                  className="edit-button"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Edit</span>
-                </button>
-              )}
+              <div className="header-actions">
+                {!isEditing && contact.apollo_person_id && (
+                  <button
+                    className="enrich-button"
+                    onClick={handleEnrichContact}
+                    disabled={enriching}
+                  >
+                    {enriching ? (
+                      <>
+                        <Loader className="w-4 h-4 spinner" />
+                        <span>Enriching...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Enrich Contact</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {!isEditing && isManualOrNetworking && (
+                  <button
+                    className="edit-button"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="contact-info-grid">

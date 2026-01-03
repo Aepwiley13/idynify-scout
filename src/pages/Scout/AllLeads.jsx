@@ -380,7 +380,12 @@ export default function AllLeads() {
             {sortedAndFilteredContacts.map(contact => {
               const company = companies[contact.company_id];
               return (
-                <tr key={contact.id}>
+                <tr
+                  key={contact.id}
+                  onClick={() => setSelectedContact(contact)}
+                  className="contact-row-clickable"
+                  style={{ cursor: 'pointer' }}
+                >
                   <td className="contact-cell" data-label="Contact">
                     <div className="contact-info">
                       <div className="avatar">
@@ -433,17 +438,17 @@ export default function AllLeads() {
                         {contact.phone_mobile && (
                           <div className="phone-item">
                             <span className="phone-type-label">M:</span>
-                            <a href={`tel:${contact.phone_mobile}`}>{contact.phone_mobile}</a>
+                            <a href={`tel:${contact.phone_mobile}`} onClick={(e) => e.stopPropagation()}>{contact.phone_mobile}</a>
                           </div>
                         )}
                         {contact.phone_direct && (
                           <div className="phone-item">
                             <span className="phone-type-label">D:</span>
-                            <a href={`tel:${contact.phone_direct}`}>{contact.phone_direct}</a>
+                            <a href={`tel:${contact.phone_direct}`} onClick={(e) => e.stopPropagation()}>{contact.phone_direct}</a>
                           </div>
                         )}
                         {!contact.phone_mobile && !contact.phone_direct && contact.phone && (
-                          <a href={`tel:${contact.phone}`}>{contact.phone}</a>
+                          <a href={`tel:${contact.phone}`} onClick={(e) => e.stopPropagation()}>{contact.phone}</a>
                         )}
                       </div>
                     ) : (

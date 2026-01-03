@@ -328,11 +328,19 @@
 
 .contacts-table tbody tr {
   border-bottom: 1px solid #e5e7eb;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
-.contacts-table tbody tr:hover {
-  background: #f9fafb;
+/* Clickable Row Hover Effects */
+.contacts-table tbody tr.contact-row-clickable:hover {
+  background: linear-gradient(135deg, #eff6ff 0%, #f9fafb 100%);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+  cursor: pointer;
+}
+
+.contacts-table tbody tr.contact-row-clickable:active {
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+  transform: scale(0.995);
 }
 
 .contacts-table tbody tr:last-child {

@@ -149,9 +149,39 @@ export default function DailyLeads() {
       });
       setShowUndo(true);
 
-      // If accepted and haven't seen title setup modal yet, show it
+      // If accepted and haven't seen title setup modal yet, check for ICP defaults
       if (direction === 'right' && !hasSeenTitleSetup) {
-        setShowTitleSetup(true);
+        // Check if user already has title preferences
+        const titlePrefsRef = doc(db, 'users', user.uid, 'contactScoring', 'titlePreferences');
+        const titlePrefsDoc = await getDoc(titlePrefsRef);
+
+        if (!titlePrefsDoc.exists()) {
+          // No existing preferences - check if ICP has target titles
+          const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+          const icpProfileDoc = await getDoc(icpProfileRef);
+
+          if (icpProfileDoc.exists() && icpProfileDoc.data().targetTitles && icpProfileDoc.data().targetTitles.length > 0) {
+            // Auto-populate from ICP target titles
+            const targetTitles = icpProfileDoc.data().targetTitles;
+            const formattedTitles = targetTitles.map((title, index) => ({
+              title,
+              priority: 50, // default priority
+              order: index
+            }));
+
+            await setDoc(titlePrefsRef, {
+              titles: formattedTitles,
+              updatedAt: new Date().toISOString()
+            });
+
+            console.log('✅ Auto-populated contact titles from ICP settings');
+          } else {
+            // No ICP titles - show the modal
+            setShowTitleSetup(true);
+          }
+        }
+
+        // Mark as seen regardless of whether modal was shown
         setHasSeenTitleSetup(true);
         await setDoc(swipeProgressRef, {
           dailySwipeCount: newSwipeCount,

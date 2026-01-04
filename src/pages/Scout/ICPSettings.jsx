@@ -20,6 +20,7 @@ export default function ICPSettings() {
   // Search states for dropdowns
   const [industrySearch, setIndustrySearch] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
+  const [newTitleInput, setNewTitleInput] = useState('');
 
   const companySizeOptions = [
     "1-10", "11-20", "21-50", "51-100", "101-200", "201-500",
@@ -53,6 +54,10 @@ export default function ICPSettings() {
         if (!data.scoringWeights) {
           data.scoringWeights = DEFAULT_WEIGHTS;
         }
+        // Ensure targetTitles exist (for existing profiles)
+        if (!data.targetTitles) {
+          data.targetTitles = [];
+        }
         setProfile(data);
       } else {
         // No profile yet - set defaults
@@ -63,6 +68,7 @@ export default function ICPSettings() {
           skipRevenue: false,
           locations: [],
           isNationwide: false,
+          targetTitles: [],
           scoringWeights: DEFAULT_WEIGHTS
         });
       }
@@ -219,6 +225,37 @@ export default function ICPSettings() {
         [key]: newValue
       }
     }));
+  };
+
+  const handleAddTitle = () => {
+    const trimmedTitle = newTitleInput.trim();
+    if (!trimmedTitle) return;
+
+    // Check if already exists (case-insensitive)
+    if (profile.targetTitles.some(t => t.toLowerCase() === trimmedTitle.toLowerCase())) {
+      setNewTitleInput('');
+      return;
+    }
+
+    setProfile(prev => ({
+      ...prev,
+      targetTitles: [...prev.targetTitles, trimmedTitle]
+    }));
+    setNewTitleInput('');
+  };
+
+  const handleRemoveTitle = (titleToRemove) => {
+    setProfile(prev => ({
+      ...prev,
+      targetTitles: prev.targetTitles.filter(t => t !== titleToRemove)
+    }));
+  };
+
+  const handleTitleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTitle();
+    }
   };
 
   // Calculate total weight for validation
@@ -468,6 +505,56 @@ export default function ICPSettings() {
               )}
             </>
           )}
+        </div>
+
+        {/* Target Contact Titles Section */}
+        <div className="setting-section">
+          <div className="section-header">
+            <div className="section-title-group">
+              <Users className="section-icon" />
+              <h3>Target Contact Titles</h3>
+            </div>
+            <span className="selection-count">{profile.targetTitles?.length || 0} titles</span>
+          </div>
+          <p className="section-description">
+            These titles will be used to pre-populate contacts when you select a company. Optional - leave empty to choose titles manually each time.
+          </p>
+
+          {profile.targetTitles && profile.targetTitles.length > 0 && (
+            <div className="selected-items">
+              {profile.targetTitles.map(title => (
+                <span key={title} className="selected-item">
+                  {title}
+                  <button onClick={() => handleRemoveTitle(title)} className="remove-btn">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="title-input-wrapper">
+            <input
+              type="text"
+              placeholder="e.g., VP Sales, Head of RevOps, Founder"
+              value={newTitleInput}
+              onChange={(e) => setNewTitleInput(e.target.value)}
+              onKeyPress={handleTitleKeyPress}
+              className="title-input"
+            />
+            <button
+              onClick={handleAddTitle}
+              disabled={!newTitleInput.trim()}
+              className="add-title-btn"
+            >
+              Add Title
+            </button>
+          </div>
+
+          <p className="helper-text">
+            <span className="helper-icon">💡</span>
+            Examples: VP Sales, Sales Operations, Head of RevOps, Director of Marketing, Founder
+          </p>
         </div>
 
         {/* ICP Scoring Weights Section */}

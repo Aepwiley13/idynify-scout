@@ -772,6 +772,78 @@
 }
 
 /* ========================================
+   TARGET TITLES INPUT
+   ======================================== */
+.title-input-wrapper {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.title-input {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  color: #111827;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.title-input::placeholder {
+  color: #9ca3af;
+}
+
+.title-input:hover {
+  border-color: #9ca3af;
+}
+
+.title-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.add-title-btn {
+  padding: 0.875rem 1.5rem;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.add-title-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.add-title-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.helper-text {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.helper-icon {
+  font-size: 1rem;
+}
+
+/* ========================================
    SCROLLBAR STYLING
    ======================================== */
 .checkbox-grid::-webkit-scrollbar {

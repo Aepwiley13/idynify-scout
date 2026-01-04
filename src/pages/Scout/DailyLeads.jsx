@@ -271,11 +271,10 @@ export default function DailyLeads() {
       {/* KPI Dashboard */}
       <div className="kpi-dashboard">
         <div className="kpi-card kpi-card-primary">
-          <div className="kpi-header">
-            <Target className="kpi-icon" />
+          <div className="kpi-primary-row">
             <span className="kpi-label">Matched Today</span>
+            <div className="kpi-value">{dailySwipeCount}</div>
           </div>
-          <div className="kpi-value">{dailySwipeCount}</div>
           <div className="kpi-trend">
             <span className="trend-text neutral">Out of {DAILY_SWIPE_LIMIT} daily</span>
           </div>

@@ -74,6 +74,7 @@
 .kpi-card-primary .kpi-value {
   font-size: 2.5rem;
   font-weight: 800;
+  margin-bottom: 0;
 }
 
 .kpi-card-primary .kpi-label {
@@ -84,6 +85,14 @@
 .kpi-card-primary {
   border: 2px solid #e5e7eb;
   background: #fafafa;
+}
+
+/* Horizontal row for label + number in primary card */
+.kpi-primary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
 }
 
 .kpi-header {

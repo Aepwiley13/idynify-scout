@@ -21,6 +21,13 @@ export default function ScoutMain() {
   const [contactCount, setContactCount] = useState(0);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
 
+  // Update active tab when location state changes (e.g., when navigating from Daily Leads)
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state?.activeTab]);
+
   // Load contact count for All Leads tab badge
   useEffect(() => {
     loadContactCount();

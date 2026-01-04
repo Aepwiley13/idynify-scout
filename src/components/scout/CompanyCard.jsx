@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle, Users } from 'lucide-react';
+import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import WebsitePreviewModal from './WebsitePreviewModal';
 import CompanyLogo from './CompanyLogo';
 
@@ -271,7 +271,7 @@ export default function CompanyCard({ company, onSwipe }) {
           <div className="status-score-section">
             <Award className="w-5 h-5" style={{ color: scoreBadge.color === 'green' ? '#10b981' : scoreBadge.color === 'blue' ? '#3b82f6' : '#6b7280' }} />
             <div>
-              <p className="status-label">Lead Score</p>
+              <p className="status-label">Company Lead Score</p>
               <p className="status-score">
                 {leadScore} <span className="status-score-max">/ 100</span>
               </p>
@@ -280,6 +280,16 @@ export default function CompanyCard({ company, onSwipe }) {
 
           <div className={`status-badge status-badge-${scoreBadge.color}`}>
             {scoreBadge.label}
+          </div>
+        </div>
+
+        {/* Static Swipe Arrow Indicators - Always visible affordance hints */}
+        <div className="swipe-affordance-arrows">
+          <div className="swipe-arrow swipe-arrow-left">
+            <ChevronLeft className="w-6 h-6" strokeWidth={2} />
+          </div>
+          <div className="swipe-arrow swipe-arrow-right">
+            <ChevronRight className="w-6 h-6" strokeWidth={2} />
           </div>
         </div>
 

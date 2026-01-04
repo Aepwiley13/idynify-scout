@@ -742,6 +742,51 @@
 }
 
 /* ========================================
+   SWIPE AFFORDANCE ARROWS
+   ======================================== */
+/* Static arrow indicators - always visible as affordance hints */
+.swipe-affordance-arrows {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+}
+
+.swipe-arrow {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
+}
+
+.swipe-arrow-left {
+  color: #ef4444;
+}
+
+.swipe-arrow-right {
+  color: #10b981;
+}
+
+/* Hide on mobile to avoid clutter */
+@media (max-width: 768px) {
+  .swipe-affordance-arrows {
+    display: none;
+  }
+}
+
+/* ========================================
    MOBILE RESPONSIVE
    ======================================== */
 @media (max-width: 768px) {

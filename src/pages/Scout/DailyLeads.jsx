@@ -257,15 +257,14 @@ export default function DailyLeads() {
 
       {/* KPI Dashboard */}
       <div className="kpi-dashboard">
-        <div className="kpi-card">
+        <div className="kpi-card kpi-card-primary">
           <div className="kpi-header">
-            <Users className="kpi-icon" />
-            <span className="kpi-label">Leads Available</span>
+            <Target className="kpi-icon" />
+            <span className="kpi-label">Matched Today</span>
           </div>
-          <div className="kpi-value">{remainingLeads}</div>
+          <div className="kpi-value">{dailySwipeCount}</div>
           <div className="kpi-trend">
-            <TrendingUp className="trend-icon positive" />
-            <span className="trend-text positive">Updated daily</span>
+            <span className="trend-text neutral">Out of {DAILY_SWIPE_LIMIT} daily</span>
           </div>
         </div>
 
@@ -292,30 +291,13 @@ export default function DailyLeads() {
 
         <div className="kpi-card">
           <div className="kpi-header">
-            <TrendingUp className="kpi-icon" />
-            <span className="kpi-label">Lead Quality</span>
+            <Users className="kpi-icon" />
+            <span className="kpi-label">Leads Available</span>
           </div>
-          <div className="kpi-value">{avgLeadScore}</div>
+          <div className="kpi-value">{remainingLeads}</div>
           <div className="kpi-trend">
-            <span className="trend-text neutral">Avg score out of 100</span>
-          </div>
-        </div>
-
-        <div className="kpi-card highlight">
-          <div className="kpi-header">
-            <span className="kpi-label">Matched Today</span>
-          </div>
-          <div className="kpi-value">{dailySwipeCount}</div>
-          <div className="kpi-trend">
-            <span className="trend-text neutral">Out of {DAILY_SWIPE_LIMIT} daily</span>
-          </div>
-          <div className="kpi-progress">
-            <div className="progress-bar">
-              <div
-                className="progress-fill"
-                style={{ width: `${(dailySwipeCount / DAILY_SWIPE_LIMIT) * 100}%` }}
-              />
-            </div>
+            <TrendingUp className="trend-icon positive" />
+            <span className="trend-text positive">Updated daily</span>
           </div>
         </div>
       </div>

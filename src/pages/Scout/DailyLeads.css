@@ -40,7 +40,7 @@
    ======================================== */
 .kpi-dashboard {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
 }
@@ -68,6 +68,22 @@
 .kpi-card.highlight {
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   border-color: #3b82f6;
+}
+
+/* Primary metric card - emphasized for daily mission focus */
+.kpi-card-primary .kpi-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.kpi-card-primary .kpi-label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.kpi-card-primary {
+  border: 2px solid #e5e7eb;
+  background: #fafafa;
 }
 
 .kpi-header {
@@ -234,7 +250,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: #6b7280;
-  text-align: center;
+  text-align: left;
   margin-bottom: 0.75rem;
 }
 

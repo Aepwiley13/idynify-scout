@@ -141,7 +141,9 @@ function App() {
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
-        <Route path="/getting-started" element={<GettingStarted />} />
+
+        {/* Getting Started (Auth Required) */}
+        <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
 
         {/* Payment Routes */}
         <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
@@ -268,6 +270,9 @@ function App() {
           path="/mission-control-v2/scout"
           element={<Navigate to="/scout" />}
         />
+
+        {/* Convenience redirects for email links */}
+        <Route path="/recon" element={<Navigate to="/mission-control-v2/recon" />} />
 
         {/* Protected Routes - OLD DASHBOARD REDIRECTS (Use V2 by default) */}
         <Route path="/mission-control" element={<Navigate to="/mission-control-v2" />} />

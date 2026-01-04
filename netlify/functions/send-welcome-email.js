@@ -96,7 +96,7 @@ export const handler = async (event) => {
 
                 <!-- CTA Button -->
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="https://app.idynify.com/getting-started"
+                  <a href="${process.env.URL}/getting-started"
                      style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
                     See how Scout & Recon work
                   </a>

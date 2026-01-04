@@ -15,6 +15,7 @@ export default function DailyLeads() {
   const [showTitleSetup, setShowTitleSetup] = useState(false);
   const [hasSeenTitleSetup, setHasSeenTitleSetup] = useState(false);
   const [dailySwipeCount, setDailySwipeCount] = useState(0);
+  const [totalAcceptedCompanies, setTotalAcceptedCompanies] = useState(0);
   const [lastSwipeDate, setLastSwipeDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -62,6 +63,11 @@ export default function DailyLeads() {
       companiesData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
 
       setCompanies(companiesData);
+
+      // Count total accepted companies (all time)
+      const acceptedQuery = query(companiesRef, where('status', '==', 'accepted'));
+      const acceptedSnapshot = await getDocs(acceptedQuery);
+      setTotalAcceptedCompanies(acceptedSnapshot.size);
 
       // Load user's swipe progress
       const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
@@ -129,6 +135,11 @@ export default function DailyLeads() {
       setDailySwipeCount(newSwipeCount);
       setLastSwipeDate(today);
 
+      // Increment total accepted companies count for real-time UI update
+      if (isInterested) {
+        setTotalAcceptedCompanies(totalAcceptedCompanies + 1);
+      }
+
       // Track swipe for undo
       setLastSwipe({
         company: company,
@@ -189,6 +200,8 @@ export default function DailyLeads() {
           hasSeenTitleSetup: hasSeenTitleSetup
         });
         setDailySwipeCount(lastSwipe.previousSwipeCount);
+        // Decrement total accepted companies count for real-time UI update
+        setTotalAcceptedCompanies(totalAcceptedCompanies - 1);
       }
 
       // Go back to the previous company
@@ -273,9 +286,9 @@ export default function DailyLeads() {
             <CheckCircle className="kpi-icon" />
             <span className="kpi-label">Matches</span>
           </div>
-          <div className="kpi-value">{dailySwipeCount}</div>
+          <div className="kpi-value">{totalAcceptedCompanies}</div>
           <div className="kpi-trend">
-            {dailySwipeCount > 0 ? (
+            {totalAcceptedCompanies > 0 ? (
               <>
                 <TrendingUp className="trend-icon positive" />
                 <span className="trend-text positive">Companies accepted</span>

@@ -30,8 +30,11 @@ import ScoutMain from './pages/Scout/ScoutMain';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import UserDetail from './pages/Admin/UserDetail';
 
 // Components
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
 import Phase1Discovery from './components/Phase1Discovery';
@@ -262,6 +265,24 @@ function App() {
             <ProtectedRoute>
               <ContactProfile />
             </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDashboard />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/user/:uid"
+          element={
+            <ProtectedAdminRoute>
+              <UserDetail />
+            </ProtectedAdminRoute>
           }
         />
 

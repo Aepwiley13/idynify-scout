@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { isUserAdmin } from '../utils/adminAuth';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState({
     scoutCompanies: 0,
     scoutContacts: 0,
@@ -26,6 +28,10 @@ export default function MissionControlDashboardV2() {
       }
 
       const userId = user.uid;
+
+      // Check if user is admin
+      const adminStatus = await isUserAdmin(userId);
+      setIsAdmin(adminStatus);
 
       // Count accepted companies
       const companiesQuery = query(
@@ -113,8 +119,16 @@ export default function MissionControlDashboardV2() {
         </svg>
       </div>
 
-      {/* LOGOUT Button */}
-      <div className="absolute top-6 right-6 z-50">
+      {/* LOGOUT and ADMIN Buttons */}
+      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/admin')}
+            className="bg-cyan-900/40 hover:bg-cyan-900/60 border border-cyan-500/50 text-cyan-300 px-4 py-2 rounded-lg font-mono text-xs transition-all flex items-center gap-2"
+          >
+            <span>🔧</span> ADMIN
+          </button>
+        )}
         <button
           onClick={handleLogout}
           className="bg-red-900/40 hover:bg-red-900/60 border border-red-500/50 text-red-300 px-4 py-2 rounded-lg font-mono text-xs transition-all flex items-center gap-2"

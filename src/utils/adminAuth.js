@@ -37,13 +37,27 @@ export async function isUserAdmin(uid) {
  *
  * @param {string} userId - Admin user ID
  * @param {string} authToken - Firebase auth token
+ * @param {object} options - Optional pagination options { limit, cursor }
  * @returns {Promise<object>} - Users data and platform stats
  */
-export async function fetchAllUsers(userId, authToken) {
-  const response = await fetch('/.netlify/functions/admin-get-users', {
+export async function fetchAllUsers(userId, authToken, options = {}) {
+  // Use environment variable for admin API base URL
+  const adminApiBase = import.meta.env.VITE_ADMIN_API_BASE;
+
+  if (!adminApiBase) {
+    throw new Error('VITE_ADMIN_API_BASE environment variable not configured');
+  }
+
+  const endpoint = `${adminApiBase}/adminGetUsers`;
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, authToken })
+    body: JSON.stringify({
+      userId,
+      authToken,
+      ...options // Include limit and cursor if provided (for future pagination)
+    })
   });
 
   if (!response.ok) {

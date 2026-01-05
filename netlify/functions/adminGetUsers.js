@@ -2,8 +2,22 @@
  * Admin Get Users - Netlify Function
  *
  * Fetches all users with aggregated data from Firestore for admin dashboard.
- * Uses Firebase REST APIs (no Admin SDK needed).
+ * Uses Firebase Admin SDK with application default credentials.
  */
+
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Initialize Firebase Admin (only once)
+if (getApps().length === 0) {
+  initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev'
+  });
+}
+
+const auth = getAuth();
+const db = getFirestore();
 
 export const handler = async (event) => {
   // CORS headers
@@ -42,26 +56,13 @@ export const handler = async (event) => {
       };
     }
 
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    const projectId = process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev';
-
-    if (!firebaseApiKey) {
-      throw new Error('Firebase API key not configured');
-    }
-
     console.log('📊 Admin API Call:', { userId, timestamp: new Date().toISOString() });
 
     // Step 1: Verify Firebase Auth token
-    const verifyResponse = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: authToken })
-      }
-    );
-
-    if (!verifyResponse.ok) {
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(authToken);
+    } catch (error) {
       return {
         statusCode: 401,
         headers,
@@ -72,10 +73,7 @@ export const handler = async (event) => {
       };
     }
 
-    const verifyData = await verifyResponse.json();
-    const tokenUserId = verifyData.users[0].localId;
-
-    if (tokenUserId !== userId) {
+    if (decodedToken.uid !== userId) {
       return {
         statusCode: 401,
         headers,
@@ -89,7 +87,7 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified for user:', userId);
 
     // Step 2: Check if user is admin
-    const isAdmin = await checkAdminAccess(userId, projectId, authToken);
+    const isAdmin = await checkAdminAccess(userId);
 
     if (!isAdmin) {
       console.warn('⚠️ Unauthorized admin access attempt by:', userId);
@@ -107,22 +105,21 @@ export const handler = async (event) => {
 
     // Step 3: Fetch all users from Firestore users collection
     console.log('📊 Fetching all users from Firestore...');
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-    const allUserIds = await fetchAllFirestoreUsers(firestoreUrl, authToken);
-    console.log(`✅ Found ${allUserIds.length} users in Firestore`);
+    const usersSnapshot = await db.collection('users').get();
+    console.log(`✅ Found ${usersSnapshot.size} users in Firestore`);
 
     // Step 4: Aggregate data for each user
     const usersWithData = [];
     const errors = [];
 
-    for (const userId of allUserIds) {
+    for (const userDoc of usersSnapshot.docs) {
       try {
-        const userData = await aggregateUserData(userId, projectId, firebaseApiKey, authToken);
+        const userData = await aggregateUserData(userDoc.id);
         usersWithData.push(userData);
       } catch (error) {
-        console.error(`❌ Error aggregating data for user ${userId}:`, error.message);
+        console.error(`❌ Error aggregating data for user ${userDoc.id}:`, error.message);
         errors.push({
-          userId,
+          userId: userDoc.id,
           error: error.message
         });
       }
@@ -159,9 +156,9 @@ export const handler = async (event) => {
 };
 
 /**
- * Check if user has admin access via Firestore
+ * Check if user has admin access
  */
-async function checkAdminAccess(userId, projectId, authToken) {
+async function checkAdminAccess(userId) {
   // Check environment variable
   const adminUserIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 
@@ -172,16 +169,10 @@ async function checkAdminAccess(userId, projectId, authToken) {
 
   // Check Firestore role
   try {
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}`;
-    const userDocResponse = await fetch(firestoreUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
+    const userDoc = await db.collection('users').doc(userId).get();
 
-    if (userDocResponse.ok) {
-      const userDoc = await userDocResponse.json();
-      const role = userDoc.fields?.role?.stringValue;
+    if (userDoc.exists) {
+      const role = userDoc.data().role;
 
       if (role === 'admin') {
         console.log('🔑 Admin access granted via Firestore role');
@@ -196,70 +187,19 @@ async function checkAdminAccess(userId, projectId, authToken) {
 }
 
 /**
- * Fetch all user IDs from Firestore users collection
- */
-async function fetchAllFirestoreUsers(firestoreUrl, authToken) {
-  const userIds = [];
-  let pageToken = null;
-
-  do {
-    const url = `${firestoreUrl}/users${pageToken ? `?pageToken=${pageToken}` : ''}`;
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch Firestore users collection: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-
-    // Extract user IDs from document paths
-    if (data.documents) {
-      data.documents.forEach(doc => {
-        // Document name format: projects/{project}/databases/{db}/documents/users/{userId}
-        const userId = doc.name.split('/').pop();
-        userIds.push(userId);
-      });
-    }
-
-    pageToken = data.nextPageToken;
-  } while (pageToken);
-
-  return userIds;
-}
-
-/**
  * Aggregate all data for a single user
  */
-async function aggregateUserData(uid, projectId, firebaseApiKey, authToken) {
-  const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-
+async function aggregateUserData(uid) {
   // Fetch auth data for this user
   let email = null;
   let signupDate = null;
   let lastLogin = null;
 
   try {
-    const authUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`;
-    const authResponse = await fetch(authUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ localId: [uid] })
-    });
-
-    if (authResponse.ok) {
-      const authData = await authResponse.json();
-      if (authData.users && authData.users.length > 0) {
-        const authUser = authData.users[0];
-        email = authUser.email || null;
-        signupDate = authUser.createdAt ? new Date(parseInt(authUser.createdAt)).toISOString() : null;
-        lastLogin = authUser.lastLoginAt ? new Date(parseInt(authUser.lastLoginAt)).toISOString() : null;
-      }
-    }
+    const authUser = await auth.getUser(uid);
+    email = authUser.email || null;
+    signupDate = authUser.metadata.creationTime || null;
+    lastLogin = authUser.metadata.lastSignInTime || null;
   } catch (error) {
     console.error(`Failed to fetch auth data for ${uid}:`, error);
   }
@@ -304,22 +244,17 @@ async function aggregateUserData(uid, projectId, firebaseApiKey, authToken) {
 
   // Fetch API usage summary
   try {
-    const usageSummaryUrl = `${firestoreUrl}/users/${uid}/apiUsage/summary`;
-    const usageResponse = await fetch(usageSummaryUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
+    const usageDoc = await db.collection('users').doc(uid).collection('apiUsage').doc('summary').get();
 
-    if (usageResponse.ok) {
-      const usageDoc = await usageResponse.json();
+    if (usageDoc.exists) {
+      const data = usageDoc.data();
       userData.credits = {
-        total: parseInt(usageDoc.fields?.totalCredits?.integerValue || 0),
-        enrichContact: parseInt(usageDoc.fields?.enrichContact?.integerValue || 0),
-        enrichCompany: parseInt(usageDoc.fields?.enrichCompany?.integerValue || 0),
-        searchPeople: parseInt(usageDoc.fields?.searchPeople?.integerValue || 0),
-        searchCompanies: parseInt(usageDoc.fields?.searchCompanies?.integerValue || 0),
-        lastUsed: usageDoc.fields?.lastUpdated?.timestampValue || null
+        total: data.totalCredits || 0,
+        enrichContact: data.enrichContact || 0,
+        enrichCompany: data.enrichCompany || 0,
+        searchPeople: data.searchPeople || 0,
+        searchCompanies: data.searchCompanies || 0,
+        lastUsed: data.lastUpdated ? data.lastUpdated.toDate().toISOString() : null
       };
     }
   } catch (error) {
@@ -328,19 +263,14 @@ async function aggregateUserData(uid, projectId, firebaseApiKey, authToken) {
 
   // Fetch ICP profile
   try {
-    const icpUrl = `${firestoreUrl}/users/${uid}/companyProfile/current`;
-    const icpResponse = await fetch(icpUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
+    const icpDoc = await db.collection('users').doc(uid).collection('companyProfile').doc('current').get();
 
-    if (icpResponse.ok) {
-      const icpDoc = await icpResponse.json();
-      const industries = icpDoc.fields?.industries?.arrayValue?.values || [];
-      const companySizes = icpDoc.fields?.companySizes?.arrayValue?.values || [];
-      const locations = icpDoc.fields?.locations?.arrayValue?.values || [];
-      const targetTitles = icpDoc.fields?.targetTitles?.arrayValue?.values || [];
+    if (icpDoc.exists) {
+      const data = icpDoc.data();
+      const industries = data.industries || [];
+      const companySizes = data.companySizes || [];
+      const locations = data.locations || [];
+      const targetTitles = data.targetTitles || [];
 
       userData.scout.icpConfigured = industries.length > 0 || companySizes.length > 0;
       userData.scout.icpIndustries = industries.length;
@@ -354,16 +284,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey, authToken) {
 
   // Fetch Scout progress
   try {
-    const progressUrl = `${firestoreUrl}/users/${uid}/scoutProgress/swipes`;
-    const progressResponse = await fetch(progressUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
+    const progressDoc = await db.collection('users').doc(uid).collection('scoutProgress').doc('swipes').get();
 
-    if (progressResponse.ok) {
-      const progressDoc = await progressResponse.json();
-      userData.scout.dailySwipeCount = parseInt(progressDoc.fields?.dailySwipeCount?.integerValue || 0);
+    if (progressDoc.exists) {
+      const data = progressDoc.data();
+      userData.scout.dailySwipeCount = data.dailySwipeCount || 0;
     }
   } catch (error) {
     console.error(`Failed to fetch Scout progress for ${uid}:`, error);
@@ -371,76 +296,44 @@ async function aggregateUserData(uid, projectId, firebaseApiKey, authToken) {
 
   // Count companies by status
   try {
-    const companiesUrl = `${firestoreUrl}/users/${uid}/companies`;
-    const companiesResponse = await fetch(companiesUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
+    const companiesSnapshot = await db.collection('users').doc(uid).collection('companies').get();
+    const companies = companiesSnapshot.docs;
+
+    userData.scout.companiesTotal = companies.length;
+    userData.scout.companiesPending = companies.filter(doc => doc.data().status === 'pending').length;
+    userData.scout.companiesAccepted = companies.filter(doc => doc.data().status === 'accepted').length;
+    userData.scout.companiesRejected = companies.filter(doc => doc.data().status === 'rejected').length;
+
+    // Find last activity
+    let lastActivityTimestamp = null;
+    companies.forEach(doc => {
+      const data = doc.data();
+      const swipedAt = data.swipedAt;
+      const createdAt = data.createdAt;
+      const timestamp = swipedAt || createdAt;
+
+      if (timestamp && (!lastActivityTimestamp || timestamp.toDate() > lastActivityTimestamp)) {
+        lastActivityTimestamp = timestamp.toDate();
       }
     });
 
-    if (companiesResponse.ok) {
-      const companiesData = await companiesResponse.json();
-      const companies = companiesData.documents || [];
-
-      userData.scout.companiesTotal = companies.length;
-      userData.scout.companiesPending = companies.filter(doc =>
-        doc.fields?.status?.stringValue === 'pending'
-      ).length;
-      userData.scout.companiesAccepted = companies.filter(doc =>
-        doc.fields?.status?.stringValue === 'accepted'
-      ).length;
-      userData.scout.companiesRejected = companies.filter(doc =>
-        doc.fields?.status?.stringValue === 'rejected'
-      ).length;
-
-      // Find last activity
-      let lastActivityTimestamp = null;
-      companies.forEach(doc => {
-        const swipedAt = doc.fields?.swipedAt?.timestampValue;
-        const createdAt = doc.fields?.createdAt?.timestampValue;
-        const timestamp = swipedAt || createdAt;
-
-        if (timestamp && (!lastActivityTimestamp || timestamp > lastActivityTimestamp)) {
-          lastActivityTimestamp = timestamp;
-        }
-      });
-
-      userData.scout.lastActivity = lastActivityTimestamp;
-    }
+    userData.scout.lastActivity = lastActivityTimestamp ? lastActivityTimestamp.toISOString() : null;
   } catch (error) {
     console.error(`Failed to fetch companies for ${uid}:`, error);
   }
 
   // Count contacts
   try {
-    const contactsUrl = `${firestoreUrl}/users/${uid}/contacts`;
-    const contactsResponse = await fetch(contactsUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (contactsResponse.ok) {
-      const contactsData = await contactsResponse.json();
-      userData.scout.contactsTotal = (contactsData.documents || []).length;
-    }
+    const contactsSnapshot = await db.collection('users').doc(uid).collection('contacts').get();
+    userData.scout.contactsTotal = contactsSnapshot.size;
   } catch (error) {
     console.error(`Failed to fetch contacts for ${uid}:`, error);
   }
 
   // Count Recon leads
   try {
-    const leadsUrl = `${firestoreUrl}/users/${uid}/leads`;
-    const leadsResponse = await fetch(leadsUrl, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (leadsResponse.ok) {
-      const leadsData = await leadsResponse.json();
-      userData.recon.leadsTotal = (leadsData.documents || []).length;
-    }
+    const leadsSnapshot = await db.collection('users').doc(uid).collection('leads').get();
+    userData.recon.leadsTotal = leadsSnapshot.size;
   } catch (error) {
     console.error(`Failed to fetch leads for ${uid}:`, error);
   }

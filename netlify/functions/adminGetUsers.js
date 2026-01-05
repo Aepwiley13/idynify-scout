@@ -105,24 +105,24 @@ export const handler = async (event) => {
 
     console.log('✅ Admin access confirmed for:', userId);
 
-    // Step 3: Fetch all users from Firebase Auth
-    console.log('📊 Fetching all users from Firebase Auth...');
-    const allUsers = await fetchAllAuthUsers(firebaseApiKey);
-    console.log(`✅ Found ${allUsers.length} users`);
+    // Step 3: Fetch all users from Firestore users collection
+    console.log('📊 Fetching all users from Firestore...');
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+    const allUserIds = await fetchAllFirestoreUsers(firestoreUrl);
+    console.log(`✅ Found ${allUserIds.length} users in Firestore`);
 
     // Step 4: Aggregate data for each user
     const usersWithData = [];
     const errors = [];
 
-    for (const authUser of allUsers) {
+    for (const userId of allUserIds) {
       try {
-        const userData = await aggregateUserData(authUser, projectId);
+        const userData = await aggregateUserData(userId, projectId, firebaseApiKey);
         usersWithData.push(userData);
       } catch (error) {
-        console.error(`❌ Error aggregating data for user ${authUser.localId}:`, error.message);
+        console.error(`❌ Error aggregating data for user ${userId}:`, error.message);
         errors.push({
-          userId: authUser.localId,
-          email: authUser.email,
+          userId,
           error: error.message
         });
       }
@@ -140,7 +140,7 @@ export const handler = async (event) => {
         success: true,
         users: usersWithData,
         platformStats,
-        totalUsers: allUsers.length,
+        totalUsers: usersWithData.length,
         errors: errors.length > 0 ? errors : undefined
       })
     };
@@ -192,49 +192,74 @@ async function checkAdminAccess(userId, projectId) {
 }
 
 /**
- * Fetch all users from Firebase Auth
+ * Fetch all user IDs from Firestore users collection
  */
-async function fetchAllAuthUsers(firebaseApiKey) {
-  const users = [];
-  let nextPageToken = null;
+async function fetchAllFirestoreUsers(firestoreUrl) {
+  const userIds = [];
+  let pageToken = null;
 
   do {
-    const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...(nextPageToken && { nextPageToken })
-      })
-    });
+    const url = `${firestoreUrl}/users${pageToken ? `?pageToken=${pageToken}` : ''}`;
+    const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error('Failed to fetch Firebase Auth users');
+      throw new Error('Failed to fetch Firestore users collection');
     }
 
     const data = await response.json();
-    if (data.users) {
-      users.push(...data.users);
+
+    // Extract user IDs from document paths
+    if (data.documents) {
+      data.documents.forEach(doc => {
+        // Document name format: projects/{project}/databases/{db}/documents/users/{userId}
+        const userId = doc.name.split('/').pop();
+        userIds.push(userId);
+      });
     }
 
-    nextPageToken = data.nextPageToken;
-  } while (nextPageToken);
+    pageToken = data.nextPageToken;
+  } while (pageToken);
 
-  return users;
+  return userIds;
 }
 
 /**
  * Aggregate all data for a single user
  */
-async function aggregateUserData(authUser, projectId) {
-  const uid = authUser.localId;
+async function aggregateUserData(uid, projectId, firebaseApiKey) {
   const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+  // Fetch auth data for this user
+  let email = null;
+  let signupDate = null;
+  let lastLogin = null;
+
+  try {
+    const authUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`;
+    const authResponse = await fetch(authUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId: [uid] })
+    });
+
+    if (authResponse.ok) {
+      const authData = await authResponse.json();
+      if (authData.users && authData.users.length > 0) {
+        const authUser = authData.users[0];
+        email = authUser.email || null;
+        signupDate = authUser.createdAt ? new Date(parseInt(authUser.createdAt)).toISOString() : null;
+        lastLogin = authUser.lastLoginAt ? new Date(parseInt(authUser.lastLoginAt)).toISOString() : null;
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to fetch auth data for ${uid}:`, error);
+  }
 
   const userData = {
     uid,
-    email: authUser.email || null,
-    signupDate: authUser.createdAt ? new Date(parseInt(authUser.createdAt)).toISOString() : null,
-    lastLogin: authUser.lastLoginAt ? new Date(parseInt(authUser.lastLoginAt)).toISOString() : null,
+    email,
+    signupDate,
+    lastLogin,
 
     scout: {
       companiesTotal: 0,

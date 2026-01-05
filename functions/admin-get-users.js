@@ -25,7 +25,8 @@ const corsHandler = cors({
     'https://idynify.com',            // Main domain
     /^http:\/\/localhost(:\d+)?$/     // Localhost (any port)
   ],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 });
 
 /**
@@ -36,15 +37,24 @@ const corsHandler = cors({
  */
 export const adminGetUsers = onRequest(
   {
-    cors: true,
+    cors: [
+      /^https:\/\/.*\.idynify\.com$/,  // All Idynify subdomains
+      'https://idynify.com',            // Main domain
+      /^http:\/\/localhost(:\d+)?$/     // Localhost (any port)
+    ],
     region: 'us-central1',
     maxInstances: 10,
     timeoutSeconds: 540, // 9 minutes (default max)
     memory: '512MiB'
   },
   async (req, res) => {
-    // Wrap with CORS handler
+    // Wrap with CORS handler for additional control
     return corsHandler(req, res, async () => {
+      // Handle OPTIONS request for CORS preflight
+      if (req.method === 'OPTIONS') {
+        return res.status(204).send('');
+      }
+
       // Only allow POST requests
       if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });

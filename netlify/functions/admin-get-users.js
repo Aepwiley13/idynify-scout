@@ -5,6 +5,27 @@
  * Requires admin authentication.
  */
 
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+
+// Initialize Firebase (only once)
+let db;
+function getFirestoreDb() {
+  if (!db) {
+    const firebaseConfig = {
+      apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+      projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control',
+      authDomain: `${process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control'}.firebaseapp.com`,
+    };
+
+    if (getApps().length === 0) {
+      initializeApp(firebaseConfig);
+    }
+    db = getFirestore();
+  }
+  return db;
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -56,14 +77,21 @@ export const handler = async (event) => {
     let isAdmin = adminUserIds.includes(userId);
 
     if (!isAdmin) {
-      // Check Firestore for admin role
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}`;
-      const userDocResponse = await fetch(firestoreUrl);
+      // Check Firestore for admin role using Firebase SDK
+      try {
+        const db = getFirestoreDb();
+        const userRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userRef);
 
-      if (userDocResponse.ok) {
-        const userDoc = await userDocResponse.json();
-        const role = userDoc.fields?.role?.stringValue;
-        isAdmin = role === 'admin';
+        if (userDoc.exists()) {
+          const role = userDoc.data().role;
+          isAdmin = role === 'admin';
+          console.log('🔍 Firestore role check:', { userId, role, isAdmin });
+        } else {
+          console.log('⚠️ User document not found in Firestore');
+        }
+      } catch (error) {
+        console.error('⚠️ Failed to fetch user document from Firestore:', error);
       }
     }
 

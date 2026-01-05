@@ -4,7 +4,7 @@
  * Main entry point for all Firebase Functions
  */
 
-import { adminGetUsers } from './admin-get-users.js';
+import { adminPing } from './admin-ping.js';
 
 // Export all functions
-export { adminGetUsers };
+export { adminPing };

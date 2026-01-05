@@ -32,6 +32,7 @@ import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
+import AdminPingTest from './pages/Admin/AdminPingTest';
 
 // Components
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
@@ -269,6 +270,7 @@ function App() {
         />
 
         {/* Admin Routes */}
+        <Route path="/admin-ping-test" element={<AdminPingTest />} />
         <Route
           path="/admin"
           element={

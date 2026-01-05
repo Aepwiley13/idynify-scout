@@ -11,23 +11,11 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import cors from 'cors';
 
 // Initialize Firebase Admin SDK (uses default credentials in Cloud Functions)
 initializeApp();
 const auth = getAuth();
 const db = getFirestore();
-
-// Configure CORS to allow requests from Idynify domains and localhost
-const corsHandler = cors({
-  origin: [
-    /^https:\/\/.*\.idynify\.com$/,  // All Idynify subdomains
-    'https://idynify.com',            // Main domain
-    /^http:\/\/localhost(:\d+)?$/     // Localhost (any port)
-  ],
-  credentials: true,
-  optionsSuccessStatus: 200
-});
 
 /**
  * Admin Get Users - HTTP Cloud Function
@@ -37,126 +25,114 @@ const corsHandler = cors({
  */
 export const adminGetUsers = onRequest(
   {
-    cors: [
-      /^https:\/\/.*\.idynify\.com$/,  // All Idynify subdomains
-      'https://idynify.com',            // Main domain
-      /^http:\/\/localhost(:\d+)?$/     // Localhost (any port)
-    ],
     region: 'us-central1',
+    cors: ['https://idynify.com', 'http://localhost:5173'],
     maxInstances: 10,
-    timeoutSeconds: 540, // 9 minutes (default max)
+    timeoutSeconds: 540,
     memory: '512MiB'
   },
   async (req, res) => {
-    // Wrap with CORS handler for additional control
-    return corsHandler(req, res, async () => {
-      // Handle OPTIONS request for CORS preflight
-      if (req.method === 'OPTIONS') {
-        return res.status(204).send('');
-      }
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-      // Only allow POST requests
-      if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-      }
+    try {
+      const { userId, authToken, limit, cursor } = req.body;
 
-      try {
-        const { userId, authToken, limit, cursor } = req.body;
-
-        if (!userId || !authToken) {
-          return res.status(400).json({
-            success: false,
-            error: 'Missing required parameters: userId and authToken'
-          });
-        }
-
-        // Log request for observability
-        console.log('📊 Admin API Call:', {
-          function: 'adminGetUsers',
-          callerUid: userId,
-          timestamp: new Date().toISOString(),
-          hasPagination: !!limit
-        });
-
-        // Step 1: Verify Firebase Auth token
-        let decodedToken;
-        try {
-          decodedToken = await auth.verifyIdToken(authToken);
-        } catch (error) {
-          console.error('❌ Invalid auth token:', error.message);
-          return res.status(401).json({
-            success: false,
-            error: 'Invalid authentication token'
-          });
-        }
-
-        if (decodedToken.uid !== userId) {
-          console.error('❌ Token UID mismatch');
-          return res.status(401).json({
-            success: false,
-            error: 'Token does not match user ID'
-          });
-        }
-
-        console.log('✅ Auth token verified for user:', userId);
-
-        // Step 2: Check if user is admin
-        const isAdmin = await checkAdminAccess(userId);
-
-        if (!isAdmin) {
-          console.warn('⚠️ Unauthorized admin access attempt by:', userId);
-          return res.status(403).json({
-            success: false,
-            error: 'Unauthorized - Admin access required'
-          });
-        }
-
-        console.log('✅ Admin access confirmed for:', userId);
-
-        // Step 3: Fetch all users from Firebase Auth
-        console.log('📊 Fetching all users from Firebase Auth...');
-        const allUsers = await fetchAllAuthUsers(limit);
-        console.log(`✅ Found ${allUsers.length} users`);
-
-        // Step 4: Aggregate data for each user
-        const usersWithData = [];
-        const errors = [];
-
-        for (const authUser of allUsers) {
-          try {
-            const userData = await aggregateUserData(authUser);
-            usersWithData.push(userData);
-          } catch (error) {
-            console.error(`❌ Error aggregating data for user ${authUser.uid}:`, error.message);
-            errors.push({
-              userId: authUser.uid,
-              email: authUser.email,
-              error: error.message
-            });
-          }
-        }
-
-        // Step 5: Calculate platform-wide stats
-        const platformStats = calculatePlatformStats(usersWithData);
-
-        console.log('✅ Successfully aggregated data for all users');
-
-        return res.status(200).json({
-          success: true,
-          users: usersWithData,
-          platformStats,
-          totalUsers: allUsers.length,
-          errors: errors.length > 0 ? errors : undefined
-        });
-
-      } catch (error) {
-        console.error('❌ Error in adminGetUsers:', error);
-        return res.status(500).json({
+      if (!userId || !authToken) {
+        return res.status(400).json({
           success: false,
-          error: error.message || 'Internal server error'
+          error: 'Missing required parameters: userId and authToken'
         });
       }
-    });
+
+      // Log request for observability
+      console.log('📊 Admin API Call:', {
+        function: 'adminGetUsers',
+        callerUid: userId,
+        timestamp: new Date().toISOString(),
+        hasPagination: !!limit
+      });
+
+      // Step 1: Verify Firebase Auth token
+      let decodedToken;
+      try {
+        decodedToken = await auth.verifyIdToken(authToken);
+      } catch (error) {
+        console.error('❌ Invalid auth token:', error.message);
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid authentication token'
+        });
+      }
+
+      if (decodedToken.uid !== userId) {
+        console.error('❌ Token UID mismatch');
+        return res.status(401).json({
+          success: false,
+          error: 'Token does not match user ID'
+        });
+      }
+
+      console.log('✅ Auth token verified for user:', userId);
+
+      // Step 2: Check if user is admin
+      const isAdmin = await checkAdminAccess(userId);
+
+      if (!isAdmin) {
+        console.warn('⚠️ Unauthorized admin access attempt by:', userId);
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized - Admin access required'
+        });
+      }
+
+      console.log('✅ Admin access confirmed for:', userId);
+
+      // Step 3: Fetch all users from Firebase Auth
+      console.log('📊 Fetching all users from Firebase Auth...');
+      const allUsers = await fetchAllAuthUsers(limit);
+      console.log(`✅ Found ${allUsers.length} users`);
+
+      // Step 4: Aggregate data for each user
+      const usersWithData = [];
+      const errors = [];
+
+      for (const authUser of allUsers) {
+        try {
+          const userData = await aggregateUserData(authUser);
+          usersWithData.push(userData);
+        } catch (error) {
+          console.error(`❌ Error aggregating data for user ${authUser.uid}:`, error.message);
+          errors.push({
+            userId: authUser.uid,
+            email: authUser.email,
+            error: error.message
+          });
+        }
+      }
+
+      // Step 5: Calculate platform-wide stats
+      const platformStats = calculatePlatformStats(usersWithData);
+
+      console.log('✅ Successfully aggregated data for all users');
+
+      return res.status(200).json({
+        success: true,
+        users: usersWithData,
+        platformStats,
+        totalUsers: allUsers.length,
+        errors: errors.length > 0 ? errors : undefined
+      });
+
+    } catch (error) {
+      console.error('❌ Error in adminGetUsers:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Internal server error'
+      });
+    }
   }
 );
 

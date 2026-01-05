@@ -89,7 +89,7 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified for user:', userId);
 
     // Step 2: Check if user is admin
-    const isAdmin = await checkAdminAccess(userId, projectId);
+    const isAdmin = await checkAdminAccess(userId, projectId, authToken);
 
     if (!isAdmin) {
       console.warn('⚠️ Unauthorized admin access attempt by:', userId);
@@ -108,7 +108,7 @@ export const handler = async (event) => {
     // Step 3: Fetch all users from Firestore users collection
     console.log('📊 Fetching all users from Firestore...');
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
-    const allUserIds = await fetchAllFirestoreUsers(firestoreUrl);
+    const allUserIds = await fetchAllFirestoreUsers(firestoreUrl, authToken);
     console.log(`✅ Found ${allUserIds.length} users in Firestore`);
 
     // Step 4: Aggregate data for each user
@@ -117,7 +117,7 @@ export const handler = async (event) => {
 
     for (const userId of allUserIds) {
       try {
-        const userData = await aggregateUserData(userId, projectId, firebaseApiKey);
+        const userData = await aggregateUserData(userId, projectId, firebaseApiKey, authToken);
         usersWithData.push(userData);
       } catch (error) {
         console.error(`❌ Error aggregating data for user ${userId}:`, error.message);
@@ -161,7 +161,7 @@ export const handler = async (event) => {
 /**
  * Check if user has admin access via Firestore
  */
-async function checkAdminAccess(userId, projectId) {
+async function checkAdminAccess(userId, projectId, authToken) {
   // Check environment variable
   const adminUserIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 
@@ -173,7 +173,11 @@ async function checkAdminAccess(userId, projectId) {
   // Check Firestore role
   try {
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}`;
-    const userDocResponse = await fetch(firestoreUrl);
+    const userDocResponse = await fetch(firestoreUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (userDocResponse.ok) {
       const userDoc = await userDocResponse.json();
@@ -194,16 +198,21 @@ async function checkAdminAccess(userId, projectId) {
 /**
  * Fetch all user IDs from Firestore users collection
  */
-async function fetchAllFirestoreUsers(firestoreUrl) {
+async function fetchAllFirestoreUsers(firestoreUrl, authToken) {
   const userIds = [];
   let pageToken = null;
 
   do {
     const url = `${firestoreUrl}/users${pageToken ? `?pageToken=${pageToken}` : ''}`;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch Firestore users collection');
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch Firestore users collection: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -226,7 +235,7 @@ async function fetchAllFirestoreUsers(firestoreUrl) {
 /**
  * Aggregate all data for a single user
  */
-async function aggregateUserData(uid, projectId, firebaseApiKey) {
+async function aggregateUserData(uid, projectId, firebaseApiKey, authToken) {
   const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
   // Fetch auth data for this user
@@ -296,7 +305,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey) {
   // Fetch API usage summary
   try {
     const usageSummaryUrl = `${firestoreUrl}/users/${uid}/apiUsage/summary`;
-    const usageResponse = await fetch(usageSummaryUrl);
+    const usageResponse = await fetch(usageSummaryUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (usageResponse.ok) {
       const usageDoc = await usageResponse.json();
@@ -316,7 +329,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey) {
   // Fetch ICP profile
   try {
     const icpUrl = `${firestoreUrl}/users/${uid}/companyProfile/current`;
-    const icpResponse = await fetch(icpUrl);
+    const icpResponse = await fetch(icpUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (icpResponse.ok) {
       const icpDoc = await icpResponse.json();
@@ -338,7 +355,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey) {
   // Fetch Scout progress
   try {
     const progressUrl = `${firestoreUrl}/users/${uid}/scoutProgress/swipes`;
-    const progressResponse = await fetch(progressUrl);
+    const progressResponse = await fetch(progressUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (progressResponse.ok) {
       const progressDoc = await progressResponse.json();
@@ -351,7 +372,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey) {
   // Count companies by status
   try {
     const companiesUrl = `${firestoreUrl}/users/${uid}/companies`;
-    const companiesResponse = await fetch(companiesUrl);
+    const companiesResponse = await fetch(companiesUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (companiesResponse.ok) {
       const companiesData = await companiesResponse.json();
@@ -389,7 +414,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey) {
   // Count contacts
   try {
     const contactsUrl = `${firestoreUrl}/users/${uid}/contacts`;
-    const contactsResponse = await fetch(contactsUrl);
+    const contactsResponse = await fetch(contactsUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (contactsResponse.ok) {
       const contactsData = await contactsResponse.json();
@@ -402,7 +431,11 @@ async function aggregateUserData(uid, projectId, firebaseApiKey) {
   // Count Recon leads
   try {
     const leadsUrl = `${firestoreUrl}/users/${uid}/leads`;
-    const leadsResponse = await fetch(leadsUrl);
+    const leadsResponse = await fetch(leadsUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
 
     if (leadsResponse.ok) {
       const leadsData = await leadsResponse.json();

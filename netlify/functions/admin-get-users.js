@@ -5,25 +5,13 @@
  * Requires admin authentication.
  */
 
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import admin from 'firebase-admin';
 
-// Initialize Firebase (only once)
-let db;
-function getFirestoreDb() {
-  if (!db) {
-    const firebaseConfig = {
-      apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
-      projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control',
-      authDomain: `${process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control'}.firebaseapp.com`,
-    };
-
-    if (getApps().length === 0) {
-      initializeApp(firebaseConfig);
-    }
-    db = getFirestore();
-  }
-  return db;
+// Initialize Firebase Admin (only once)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control',
+  });
 }
 
 export const handler = async (event) => {
@@ -77,13 +65,12 @@ export const handler = async (event) => {
     let isAdmin = adminUserIds.includes(userId);
 
     if (!isAdmin) {
-      // Check Firestore for admin role using Firebase SDK
+      // Check Firestore for admin role using Firebase Admin SDK
       try {
-        const db = getFirestoreDb();
-        const userRef = doc(db, 'users', userId);
-        const userDoc = await getDoc(userRef);
+        const db = admin.firestore();
+        const userDoc = await db.collection('users').doc(userId).get();
 
-        if (userDoc.exists()) {
+        if (userDoc.exists) {
           const role = userDoc.data().role;
           isAdmin = role === 'admin';
           console.log('🔍 Firestore role check:', { userId, role, isAdmin });

@@ -1,3 +1,5 @@
+import { logApiUsage } from './utils/logApiUsage.js';
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -78,6 +80,12 @@ export const handler = async (event) => {
     }
 
     console.log('✅ Contact enriched:', person.name);
+
+    // Log API usage for admin tracking
+    await logApiUsage(userId, 'enrichContact', 'success', {
+      contactId,
+      contactName: person.name
+    });
 
     // Extract phone numbers by type
     const phoneNumbers = person.phone_numbers || [];
@@ -178,6 +186,19 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('❌ Error in enrichContact:', error);
+
+    // Log failed API usage (extract userId from body if available)
+    try {
+      const { userId } = JSON.parse(event.body);
+      if (userId) {
+        await logApiUsage(userId, 'enrichContact', 'error', {
+          errorMessage: error.message
+        });
+      }
+    } catch (logError) {
+      console.error('Failed to log API error:', logError);
+    }
+
     return {
       statusCode: 500,
       headers: {

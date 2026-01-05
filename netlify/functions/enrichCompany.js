@@ -1,3 +1,5 @@
+import { logApiUsage } from './utils/logApiUsage.js';
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -203,6 +205,12 @@ export const handler = async (event) => {
 
     console.log('✅ Company enrichment complete');
 
+    // Log API usage for admin tracking
+    await logApiUsage(userId, 'enrichCompany', 'success', {
+      domain,
+      companyName: organization.name
+    });
+
     return {
       statusCode: 200,
       headers: {
@@ -217,6 +225,19 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('❌ Error in enrichCompany:', error);
+
+    // Log failed API usage (extract userId from body if available)
+    try {
+      const { userId } = JSON.parse(event.body);
+      if (userId) {
+        await logApiUsage(userId, 'enrichCompany', 'error', {
+          errorMessage: error.message
+        });
+      }
+    } catch (logError) {
+      console.error('Failed to log API error:', logError);
+    }
+
     return {
       statusCode: 500,
       headers: {

@@ -1,3 +1,5 @@
+import { logApiUsage } from './utils/logApiUsage.js';
+
 // Apollo industry mapping helpers (copied to avoid import issues)
 // Full list of 150+ Apollo industry tag IDs
 const APOLLO_INDUSTRIES = {
@@ -384,6 +386,13 @@ export const handler = async (event) => {
 
     const generationTime = (Date.now() - startTime) / 1000;
 
+    // Log API usage for admin tracking
+    await logApiUsage(userId, 'searchCompanies', 'success', {
+      companiesFound: companies.length,
+      companiesAdded: toAdd.length,
+      generationTime
+    });
+
     return {
       statusCode: 200,
       headers: {
@@ -409,6 +418,18 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('💥 Error in search-companies:', error);
+
+    // Log failed API usage (extract userId from body if available)
+    try {
+      const { userId } = JSON.parse(event.body);
+      if (userId) {
+        await logApiUsage(userId, 'searchCompanies', 'error', {
+          errorMessage: error.message
+        });
+      }
+    } catch (logError) {
+      console.error('Failed to log API error:', logError);
+    }
 
     const generationTime = (Date.now() - startTime) / 1000;
 

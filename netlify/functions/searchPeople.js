@@ -1,3 +1,5 @@
+import { logApiUsage } from './utils/logApiUsage.js';
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -84,6 +86,13 @@ export const handler = async (event) => {
 
     console.log('✅ Found people:', apolloData.people?.length || 0);
 
+    // Log API usage for admin tracking
+    await logApiUsage(userId, 'searchPeople', 'success', {
+      organizationId,
+      titlesSearched: titles,
+      resultsFound: apolloData.people?.length || 0
+    });
+
     return {
       statusCode: 200,
       headers: {
@@ -99,6 +108,19 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('❌ Error in searchPeople:', error);
+
+    // Log failed API usage (extract userId from body if available)
+    try {
+      const { userId } = JSON.parse(event.body);
+      if (userId) {
+        await logApiUsage(userId, 'searchPeople', 'error', {
+          errorMessage: error.message
+        });
+      }
+    } catch (logError) {
+      console.error('Failed to log API error:', logError);
+    }
+
     return {
       statusCode: 500,
       headers: {

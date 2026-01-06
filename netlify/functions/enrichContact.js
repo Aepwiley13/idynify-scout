@@ -1,6 +1,8 @@
 import { logApiUsage } from './utils/logApiUsage.js';
 
 export const handler = async (event) => {
+  const startTime = Date.now();
+
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -82,9 +84,13 @@ export const handler = async (event) => {
     console.log('✅ Contact enriched:', person.name);
 
     // Log API usage for admin tracking
+    const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'enrichContact', 'success', {
-      contactId,
-      contactName: person.name
+      responseTime,
+      metadata: {
+        contactId,
+        contactName: person.name
+      }
     });
 
     // Extract phone numbers by type
@@ -191,8 +197,11 @@ export const handler = async (event) => {
     try {
       const { userId } = JSON.parse(event.body);
       if (userId) {
+        const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'enrichContact', 'error', {
-          errorMessage: error.message
+          responseTime,
+          errorCode: error.message,
+          metadata: {}
         });
       }
     } catch (logError) {

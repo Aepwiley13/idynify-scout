@@ -33,6 +33,7 @@ import ContactProfile from './pages/Scout/ContactProfile';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
+import ApiActivity from './pages/Admin/ApiActivity';
 
 // Components
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
@@ -276,6 +277,14 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <AdminDashboard />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/api-activity"
+          element={
+            <ProtectedAdminRoute>
+              <ApiActivity />
             </ProtectedAdminRoute>
           }
         />

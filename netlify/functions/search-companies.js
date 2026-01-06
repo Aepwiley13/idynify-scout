@@ -384,13 +384,15 @@ export const handler = async (event) => {
     // Save companies to Firestore
     await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile);
 
-    const generationTime = (Date.now() - startTime) / 1000;
+    const responseTime = Date.now() - startTime;
 
     // Log API usage for admin tracking
     await logApiUsage(userId, 'searchCompanies', 'success', {
-      companiesFound: companies.length,
-      companiesAdded: toAdd.length,
-      generationTime
+      responseTime,
+      metadata: {
+        companiesFound: companies.length,
+        companiesAdded: toAdd.length
+      }
     });
 
     return {
@@ -423,8 +425,11 @@ export const handler = async (event) => {
     try {
       const { userId } = JSON.parse(event.body);
       if (userId) {
+        const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'searchCompanies', 'error', {
-          errorMessage: error.message
+          responseTime,
+          errorCode: error.message,
+          metadata: {}
         });
       }
     } catch (logError) {

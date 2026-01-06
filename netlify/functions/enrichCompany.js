@@ -1,6 +1,8 @@
 import { logApiUsage } from './utils/logApiUsage.js';
 
 export const handler = async (event) => {
+  const startTime = Date.now();
+
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -206,9 +208,13 @@ export const handler = async (event) => {
     console.log('✅ Company enrichment complete');
 
     // Log API usage for admin tracking
+    const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'enrichCompany', 'success', {
-      domain,
-      companyName: organization.name
+      responseTime,
+      metadata: {
+        domain,
+        companyName: organization.name
+      }
     });
 
     return {
@@ -230,8 +236,11 @@ export const handler = async (event) => {
     try {
       const { userId } = JSON.parse(event.body);
       if (userId) {
+        const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'enrichCompany', 'error', {
-          errorMessage: error.message
+          responseTime,
+          errorCode: error.message,
+          metadata: {}
         });
       }
     } catch (logError) {

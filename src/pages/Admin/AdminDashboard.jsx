@@ -173,6 +173,13 @@ export default function AdminDashboard() {
           <h1 className="page-title">🔧 Admin Dashboard</h1>
           <p className="page-subtitle">Platform-wide user management and monitoring</p>
         </div>
+        <button
+          onClick={() => navigate('/admin/api-activity')}
+          className="api-activity-btn"
+        >
+          <Database className="w-4 h-4" />
+          <span>API Activity</span>
+        </button>
       </div>
 
       {/* Platform Overview Metrics */}

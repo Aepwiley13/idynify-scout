@@ -67,3 +67,38 @@ export async function fetchAllUsers(userId, authToken, options = {}) {
 
   return await response.json();
 }
+
+/**
+ * Fetch API logs for admin dashboard
+ *
+ * @param {string} userId - Admin user ID
+ * @param {string} authToken - Firebase auth token
+ * @param {object} filters - Optional filters { startDate, endDate, endpoint, userId, environment }
+ * @returns {Promise<object>} - API logs data
+ */
+export async function fetchApiLogs(userId, authToken, filters = {}) {
+  const adminApiBase = import.meta.env.VITE_ADMIN_API_BASE;
+
+  if (!adminApiBase) {
+    throw new Error('VITE_ADMIN_API_BASE environment variable not configured');
+  }
+
+  const endpoint = `${adminApiBase}/adminGetApiLogs`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId,
+      authToken,
+      filters
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to fetch API logs');
+  }
+
+  return await response.json();
+}

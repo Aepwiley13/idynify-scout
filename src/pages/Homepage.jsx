@@ -1,107 +1,490 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function Homepage() {
   const navigate = useNavigate();
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const toggleFaq = (index) => {
+    setOpenFaq(openFaq === index ? null : index);
+  };
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Starfield Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(200)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bg-white rounded-full"
-            style={{
-              width: Math.random() * 2 + 1 + 'px',
-              height: Math.random() * 2 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.7 + 0.3,
-              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 3}s`
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Hero Section */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6">
-        <div className="text-center max-w-4xl">
-          {/* Logo/Icon */}
-          <div className="text-8xl mb-8 animate-float">🎯</div>
-
-          {/* Headline */}
-          <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
-            IDYNIFY SCOUT
-          </h1>
-
-          {/* Subheadline */}
-          <p className="text-2xl md:text-3xl text-cyan-400 mb-4 font-mono">
-            AI-Powered Intelligence for B2B Growth
-          </p>
-
-          <p className="text-lg md:text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
-            Build your ICP, map your market, and generate qualified leads with precision AI reconnaissance.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => navigate('/signup')}
-              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-lg font-mono"
-            >
-              🚀 GET STARTED
-            </button>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black text-white">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-lg border-b border-gray-700/50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="text-2xl font-bold text-cyan-400">Scout</div>
+          <div className="flex gap-4">
             <button
               onClick={() => navigate('/login')}
-              className="bg-gray-800/50 hover:bg-gray-700/50 text-white font-bold py-4 px-12 rounded-xl transition-all border border-cyan-500/30 text-lg font-mono"
+              className="px-6 py-2 text-gray-300 hover:text-white transition-colors"
             >
-              🔐 LOG IN
+              Log In
+            </button>
+            <button
+              onClick={() => navigate('/signup')}
+              className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors font-medium"
+            >
+              Get Started
             </button>
           </div>
+        </div>
+      </nav>
 
-          {/* Features */}
-          <div className="mt-20 grid md:grid-cols-3 gap-8">
-            <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-              <div className="text-4xl mb-4">🔍</div>
-              <h3 className="text-xl font-bold text-white mb-2 font-mono">RECON</h3>
-              <p className="text-gray-400 text-sm">
-                Define your Ideal Customer Profile with AI-guided intelligence gathering
+      {/* Hero Section */}
+      <section className="pt-32 pb-20 px-6">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="text-6xl mb-6">🎯</div>
+
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+            Find Companies You Can Sell To—
+            <br />
+            <span className="text-cyan-400">Get Contact Details in Minutes</span>
+          </h1>
+
+          <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
+            Browse unlimited companies for free. Enrich the ones you want with instant contact details. No contracts, no complexity.
+          </p>
+
+          <button
+            onClick={() => navigate('/signup')}
+            className="px-8 py-4 bg-cyan-500 hover:bg-cyan-600 text-white text-lg font-semibold rounded-lg transition-all shadow-lg shadow-cyan-500/30 mb-4"
+          >
+            Start Finding Companies
+          </button>
+
+          <p className="text-gray-400 text-sm">
+            Plans start at $20/month • 400 credits included • Cancel anytime
+          </p>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-20 px-6 bg-gray-800/30">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
+
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto border-2 border-cyan-500">
+                1
+              </div>
+              <h3 className="text-2xl font-bold mb-4">Answer 4 Questions</h3>
+              <p className="text-gray-300">
+                Tell us your industry, company size, revenue range, and location
               </p>
             </div>
 
-            <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
-              <div className="text-4xl mb-4">🎯</div>
-              <h3 className="text-xl font-bold text-white mb-2 font-mono">SCOUT</h3>
-              <p className="text-gray-400 text-sm">
-                Generate qualified leads matching your perfect customer profile
+            <div className="text-center">
+              <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto border-2 border-cyan-500">
+                2
+              </div>
+              <h3 className="text-2xl font-bold mb-4">Browse Unlimited Companies</h3>
+              <p className="text-gray-300">
+                Scout finds matching companies instantly (always free)
               </p>
             </div>
 
-            <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-pink-500/30">
-              <div className="text-4xl mb-4">🚀</div>
-              <h3 className="text-xl font-bold text-white mb-2 font-mono">SNIPER</h3>
-              <p className="text-gray-400 text-sm">
-                Execute precision outreach campaigns with personalized messaging
+            <div className="text-center">
+              <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto border-2 border-cyan-500">
+                3
+              </div>
+              <h3 className="text-2xl font-bold mb-4">Enrich the Ones You Want</h3>
+              <p className="text-gray-300">
+                Get full company data + 3 contacts with email & phone (uses credits)
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
-        }
-        @keyframes animate-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
-        }
-        .animate-float {
-          animation: animate-float 6s ease-in-out infinite;
-        }
-      `}</style>
+      {/* What You Get */}
+      <section className="py-20 px-6">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-16">What You Get</h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
+              <div className="text-cyan-400 mt-1">
+                <Check size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-2">Unlimited Company Browsing</h3>
+                <p className="text-gray-300 text-sm">Search and filter for free</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
+              <div className="text-cyan-400 mt-1">
+                <Check size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-2">40-125 Enriched Companies/Month</h3>
+                <p className="text-gray-300 text-sm">Depending on tier</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
+              <div className="text-cyan-400 mt-1">
+                <Check size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-2">3 Contacts Per Company</h3>
+                <p className="text-gray-300 text-sm">With verified email and phone</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
+              <div className="text-cyan-400 mt-1">
+                <Check size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-2">Instant Access</h3>
+                <p className="text-gray-300 text-sm">Start outreach the same day</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
+              <div className="text-cyan-400 mt-1">
+                <Check size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-2">Save to Target List</h3>
+                <p className="text-gray-300 text-sm">Build your prospect database</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
+              <div className="text-cyan-400 mt-1">
+                <Check size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-2">CSV Exports</h3>
+                <p className="text-gray-300 text-sm">Download your contacts anytime</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-20 px-6 bg-gray-800/30">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-4">Simple, Credit-Based Pricing</h2>
+          <p className="text-xl text-gray-300 text-center mb-16 max-w-3xl mx-auto">
+            Browse unlimited companies for free. Use credits to enrich the ones you want.
+          </p>
+
+          {/* Credit Explainer Box */}
+          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-8 mb-16 max-w-2xl mx-auto">
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">How Credits Work</h3>
+            <div className="space-y-3 text-gray-200">
+              <p className="text-lg">
+                <span className="font-semibold">Browse companies:</span> FREE (unlimited)
+              </p>
+              <p className="text-lg">
+                <span className="font-semibold">Enrich 1 company with 3 contacts:</span> 10 credits
+              </p>
+              <ul className="pl-8 space-y-2 text-gray-300">
+                <li>• Company data: 1 credit</li>
+                <li>• 3 contact names: 3 credits</li>
+                <li>• 3 emails: 3 credits</li>
+                <li>• 3 phone numbers: 3 credits</li>
+              </ul>
+              <div className="pt-4 border-t border-cyan-500/30 mt-4">
+                <p className="text-sm text-gray-300">
+                  <strong>Starter:</strong> 400 credits = 40 enriched companies/month
+                  <br />
+                  <strong>Pro:</strong> 1,250 credits = 125 enriched companies/month
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Tiers */}
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Starter Tier */}
+            <div className="bg-gray-800 rounded-2xl p-8 border-2 border-gray-700 hover:border-cyan-500/50 transition-all">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold mb-2">Scout Starter</h3>
+                <div className="text-5xl font-bold mb-2">
+                  $20<span className="text-2xl text-gray-400">/mo</span>
+                </div>
+                <p className="text-gray-400">400 credits/month</p>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Browse unlimited companies</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200"><strong>40 enriched companies/month</strong></span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">120 contact details (email + phone)</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Full RECON access</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">CSV exports</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">1 user seat</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Email support (48-hour response)</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/signup?tier=starter')}
+                className="w-full py-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all"
+              >
+                Start with Starter - $20/mo
+              </button>
+            </div>
+
+            {/* Pro Tier */}
+            <div className="bg-gradient-to-br from-cyan-900/40 to-gray-800 rounded-2xl p-8 border-2 border-cyan-500 relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-cyan-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                MOST POPULAR
+              </div>
+
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold mb-2">Scout Pro</h3>
+                <div className="text-5xl font-bold mb-2">
+                  $50<span className="text-2xl text-gray-400">/mo</span>
+                </div>
+                <p className="text-gray-400">1,250 credits/month</p>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200"><strong>Everything in Starter, plus:</strong></span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200"><strong>125 enriched companies/month</strong></span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">375 contact details (email + phone)</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Unlimited CSV exports</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Enhanced RECON reports with PDF export</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Export history & saved searches</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Check className="text-cyan-400 flex-shrink-0 mt-1" size={20} />
+                  <span className="text-gray-200">Priority email support (24-hour response)</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/signup?tier=pro')}
+                className="w-full py-4 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg transition-all shadow-lg shadow-cyan-500/30"
+              >
+                Go Pro - $50/mo
+              </button>
+            </div>
+          </div>
+
+          <p className="text-center text-gray-400 mt-8 text-sm">
+            Credits reset monthly on your billing date. Unused credits don't roll over.
+          </p>
+        </div>
+      </section>
+
+      {/* Who This Is For */}
+      <section className="py-20 px-6">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-16">Who This Is For</h2>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-8">
+              <div className="flex items-center gap-3 mb-4">
+                <Check className="text-green-400" size={32} />
+                <h3 className="text-2xl font-bold">Use Scout if:</h3>
+              </div>
+              <p className="text-gray-200 text-lg">
+                You need companies to contact but don't want to spend hours researching or pay $100+/month for Apollo/ZoomInfo
+              </p>
+            </div>
+
+            <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-8">
+              <div className="flex items-center gap-3 mb-4">
+                <X className="text-red-400" size={32} />
+                <h3 className="text-2xl font-bold">Skip Scout if:</h3>
+              </div>
+              <p className="text-gray-200 text-lg">
+                You already have more leads than you can handle or need enterprise features
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Optional: RECON Section */}
+      <section className="py-20 px-6 bg-gray-800/30">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-gray-800/50 rounded-2xl p-10 border border-gray-700">
+            <div className="flex items-start gap-6">
+              <div className="text-5xl">🔍</div>
+              <div>
+                <h2 className="text-3xl font-bold mb-4">Want Strategic Depth? Use RECON</h2>
+                <p className="text-xl text-gray-300 mb-6">
+                  RECON is a 273-question research tool that helps you deeply understand your ideal customer.
+                  Scout works great without it, but RECON gives you strategic market intelligence.
+                </p>
+                <p className="text-lg text-gray-400 mb-6">
+                  <strong className="text-cyan-400">Best part:</strong> It's included in all plans at no extra credit cost.
+                </p>
+                <button
+                  onClick={() => navigate('/getting-started')}
+                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                >
+                  Learn About RECON
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-20 px-6">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-4xl font-bold text-center mb-16">Frequently Asked Questions</h2>
+
+          <div className="space-y-4">
+            {/* FAQ 1 */}
+            <div className="bg-gray-800 rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggleFaq(0)}
+                className="w-full px-6 py-4 flex justify-between items-center hover:bg-gray-700 transition-colors"
+              >
+                <span className="font-semibold text-lg text-left">What are credits?</span>
+                {openFaq === 0 ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+              </button>
+              {openFaq === 0 && (
+                <div className="px-6 pb-4 text-gray-300">
+                  Credits let you unlock full company data and contact details. Browsing companies is always free—you only use credits when you want to save a company with contact information.
+                </div>
+              )}
+            </div>
+
+            {/* FAQ 2 */}
+            <div className="bg-gray-800 rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggleFaq(1)}
+                className="w-full px-6 py-4 flex justify-between items-center hover:bg-gray-700 transition-colors"
+              >
+                <span className="font-semibold text-lg text-left">What if I run out of credits?</span>
+                {openFaq === 1 ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+              </button>
+              {openFaq === 1 && (
+                <div className="px-6 pb-4 text-gray-300">
+                  You can still browse unlimited companies. To enrich more companies, upgrade your plan or wait for your credits to reset next month.
+                </div>
+              )}
+            </div>
+
+            {/* FAQ 3 */}
+            <div className="bg-gray-800 rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggleFaq(2)}
+                className="w-full px-6 py-4 flex justify-between items-center hover:bg-gray-700 transition-colors"
+              >
+                <span className="font-semibold text-lg text-left">Can I buy extra credits?</span>
+                {openFaq === 2 ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+              </button>
+              {openFaq === 2 && (
+                <div className="px-6 pb-4 text-gray-300">
+                  Not yet. Choose the plan that matches your monthly prospecting volume. Most users start with Starter ($20) and upgrade to Pro ($50) after 60-90 days.
+                </div>
+              )}
+            </div>
+
+            {/* FAQ 4 */}
+            <div className="bg-gray-800 rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggleFaq(3)}
+                className="w-full px-6 py-4 flex justify-between items-center hover:bg-gray-700 transition-colors"
+              >
+                <span className="font-semibold text-lg text-left">How quickly can I start using Scout?</span>
+                {openFaq === 3 ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+              </button>
+              {openFaq === 3 && (
+                <div className="px-6 pb-4 text-gray-300">
+                  Immediately! After signup, you answer 4 quick questions (industry, company size, revenue, location) and Scout delivers 50 matching companies in minutes. You can start browsing and enriching companies the same day.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-20 px-6 bg-gradient-to-b from-cyan-900/20 to-gray-900">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-5xl font-bold mb-6">Ready to Build Your Prospect List?</h2>
+          <p className="text-xl text-gray-300 mb-8">
+            Join founders using Scout to find their next customers
+          </p>
+
+          <div className="flex flex-col items-center gap-4 mb-8">
+            <div className="flex items-center gap-3 text-lg text-gray-200">
+              <Check className="text-cyan-400" size={24} />
+              <span>Browse unlimited</span>
+            </div>
+            <div className="flex items-center gap-3 text-lg text-gray-200">
+              <Check className="text-cyan-400" size={24} />
+              <span>Enrich 40-125 companies/month</span>
+            </div>
+            <div className="flex items-center gap-3 text-lg text-gray-200">
+              <Check className="text-cyan-400" size={24} />
+              <span>Cancel anytime</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/signup')}
+            className="px-12 py-5 bg-cyan-500 hover:bg-cyan-600 text-white text-xl font-bold rounded-lg transition-all shadow-xl shadow-cyan-500/30 mb-4"
+          >
+            Start Finding Companies
+          </button>
+
+          <p className="text-gray-400">
+            Plans start at $20/month
+          </p>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 border-t border-gray-800">
+        <div className="max-w-7xl mx-auto text-center text-gray-400 text-sm">
+          <p>&copy; 2024 Idynify Scout. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }

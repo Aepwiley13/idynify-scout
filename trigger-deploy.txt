@@ -1,0 +1,2 @@
+Deployment trigger for latest main branch
+Commit: a25f188 - Merge PR #1 (Step 3 + Homepage theme)

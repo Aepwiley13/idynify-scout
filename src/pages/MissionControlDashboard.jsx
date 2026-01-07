@@ -4,6 +4,8 @@ import { auth, db } from "../firebase/config";
 import { doc, getDoc, updateDoc, onSnapshot, collection, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import QuotaDisplay from "../components/QuotaDisplay";
+import CreditBalance from "../components/CreditBalance";
+import UpgradeModal from "../components/UpgradeModal";
 
 export default function MissionControlDashboard() {
   const navigate = useNavigate();
@@ -571,6 +573,12 @@ ${data.message}`;
                   🔍 Find More Contacts
                 </button>
               </div>
+            </div>
+
+            {/* Credit Balance Section */}
+            <div className="bg-black/60 backdrop-blur-xl border-2 border-purple-500/30 rounded-2xl p-8 mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6 font-mono">💳 CREDIT BALANCE</h2>
+              <CreditBalance showDetails={true} size="large" />
             </div>
 
             <div className="text-center mb-8">

@@ -24,11 +24,64 @@ export default function Homepage() {
         ))}
       </div>
 
+      {/* Floating Code Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {['[MISSION:ACTIVE]', '[BARRY:ONLINE]', '[ICP:READY]', '[LEADS:TRACKING]', '[STATUS:GO]', '[SCOUT:ARMED]'].map((code, i) => (
+          <div
+            key={i}
+            className="absolute text-cyan-400/30 font-mono text-xs"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animation: `floatCode ${15 + i * 3}s linear infinite`,
+              animationDelay: `${i * 2}s`
+            }}
+          >
+            {code}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid Pattern at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-cyan-900/20 to-transparent">
+        <svg className="w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="cyan" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100" height="100" fill="url(#grid)" />
+        </svg>
+      </div>
+
+      {/* Top Left Branding - "Idynify" */}
+      <div className="absolute top-6 left-6 z-20">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
+          IDYNIFY
+        </h1>
+        <div className="text-cyan-400 font-mono text-xs mt-1 flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span>SYSTEM ONLINE</span>
+        </div>
+      </div>
+
+      {/* Bottom Left Radar Circle */}
+      <div className="absolute bottom-6 left-6 w-24 h-24 border-2 border-cyan-500/30 rounded-full z-20">
+        <div className="absolute inset-0 rounded-full" style={{
+          background: 'conic-gradient(from 0deg, transparent 0deg, cyan 90deg, transparent 90deg)',
+          animation: 'spin 4s linear infinite',
+          opacity: 0.3
+        }}></div>
+        <div className="absolute inset-4 border border-cyan-500/20 rounded-full"></div>
+        <div className="absolute inset-8 border border-cyan-500/20 rounded-full"></div>
+      </div>
+
       {/* Hero Section */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6">
         <div className="text-center max-w-4xl">
-          {/* Logo/Icon */}
-          <div className="text-8xl mb-8 animate-float">🎯</div>
+          {/* Barry Logo */}
+          <div className="text-8xl mb-6 animate-float">🐻</div>
+          <div className="text-2xl text-gray-400 font-mono mb-8">BARRY AI</div>
 
           {/* Headline */}
           <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
@@ -97,6 +150,16 @@ export default function Homepage() {
         @keyframes animate-float {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-20px); }
+        }
+        @keyframes floatCode {
+          0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         .animate-float {
           animation: animate-float 6s ease-in-out infinite;

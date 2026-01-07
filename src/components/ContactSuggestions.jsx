@@ -10,6 +10,8 @@ import ContactCard from './ContactCard';
 import LearningToast from './LearningToast';
 import NavigationBar from './NavigationBar';
 import QuotaDisplay from './QuotaDisplay';
+import CreditBalance from './CreditBalance';
+import UpgradeModal from './UpgradeModal';
 
 export default function ContactSuggestions() {
   const navigate = useNavigate();
@@ -24,6 +26,10 @@ export default function ContactSuggestions() {
 
   // Quota tracking
   const [dailyQuota, setDailyQuota] = useState({ used: 0, limit: 5 });
+
+  // Credit tracking (Module 15)
+  const [userCredits, setUserCredits] = useState(0);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Toast state
   const [showToast, setShowToast] = useState(false);
@@ -42,6 +48,15 @@ export default function ContactSuggestions() {
     }
 
     try {
+      // Load user data (including credits) - Module 15
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setUserCredits(userData.credits || 0);
+      }
+
       // Load user weights
       const weightsPath = getPath.userWeightsCurrent(user.uid);
       const weightsRef = doc(db, weightsPath);
@@ -121,9 +136,15 @@ export default function ContactSuggestions() {
   };
 
   const handleAccept = async () => {
-    // Module 11: Accept Contact → Enrich → Learn
+    // Module 11 + Module 15: Accept Contact → Check Credits → Enrich → Learn
     const user = auth.currentUser;
     if (!user || !selectedCompany) return;
+
+    // Module 15: Check if user has enough credits (10 credits per enrichment)
+    if (userCredits < 10) {
+      setShowUpgradeModal(true);
+      return;
+    }
 
     const currentContact = contacts[currentContactIndex];
     setProcessing(true);
@@ -141,6 +162,11 @@ export default function ContactSuggestions() {
         // Update quota display
         if (result.daily_quota) {
           setDailyQuota(result.daily_quota);
+        }
+
+        // Module 15: Update credits if returned
+        if (typeof result.creditsRemaining === 'number') {
+          setUserCredits(result.creditsRemaining);
         }
 
         // Show learning toast
@@ -279,6 +305,13 @@ export default function ContactSuggestions() {
       {/* Module 15: Navigation Bar */}
       <NavigationBar />
 
+      {/* Module 15: Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentCredits={userCredits}
+      />
+
       <div className="min-h-screen bg-black text-white p-8">
         {/* Learning Toast */}
         {showToast && (
@@ -297,8 +330,9 @@ export default function ContactSuggestions() {
             </p>
           </div>
 
-          {/* Module 15: Quota Display Component */}
-          <div className="mb-6">
+          {/* Module 15: Credit and Quota Display */}
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <CreditBalance showDetails={false} size="medium" />
             <QuotaDisplay
               companyId={selectedCompany?.apollo_company_id}
               companyName={selectedCompany?.name}

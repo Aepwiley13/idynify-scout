@@ -7,6 +7,9 @@
 // users/{userId}/
 //   ├── profile (document)
 //   ├── subscription (document)
+//   ├── credits (number) - Current credit balance
+//   ├── monthlyCredits (number) - Monthly allotment based on tier
+//   ├── lastCreditReset (Timestamp) - Last monthly reset date
 //   ├── icp (document)
 //   ├── icpBrief (document)
 //   ├── section1Answers (object) - Section 1: Company Identity & Foundation answers
@@ -17,7 +20,7 @@
 //   │   └── history/{versionId} (documents)
 //   ├── companies/{companyId} (subcollection)
 //   ├── leads/{leadId} (subcollection)
-//   ├── events/{eventId} (subcollection)
+//   ├── events/{eventId} (subcollection) - Includes credit usage events
 //   └── quotas/ (subcollection)
 //       ├── daily_enrichments (document)
 //       └── weekly_enrichments (document)
@@ -142,6 +145,64 @@ export const getPath = {
  *   section1Completed: boolean,
  *   lastUpdated: Timestamp
  * }
+ */
+
+// ============================================================================
+// CREDIT SYSTEM - Schema Documentation (Module 15)
+// ============================================================================
+
+/**
+ * User Credits
+ * Stored in users/{userId} document
+ *
+ * Fields:
+ * {
+ *   credits: number,              // Current available credits
+ *   monthlyCredits: number,       // Monthly allotment (400 for Starter, 1250 for Pro)
+ *   lastCreditReset: Timestamp,   // Last monthly reset date
+ *   lastCreditUpdate: Timestamp,  // Last credit transaction
+ *   subscriptionTier: string      // 'starter' or 'pro'
+ * }
+ */
+
+/**
+ * Credit Usage Event
+ * Stored in users/{userId}/events/{eventId} subcollection
+ *
+ * Schema:
+ * {
+ *   type: 'company_enrichment',
+ *   companyId: string,
+ *   companyName: string,
+ *   creditsDeducted: number,      // Should be 10 for full enrichment
+ *   costBreakdown: {
+ *     companyData: 1,
+ *     contactNames: 3,
+ *     emails: 3,
+ *     phones: 3
+ *   },
+ *   creditsRemaining: number,
+ *   timestamp: Timestamp,
+ *   contactsEnriched: number,     // Number of contacts enriched (3)
+ *   metadata: {
+ *     enrichedFields: string[]    // ['companyData', 'contacts', 'emails', 'phones']
+ *   }
+ * }
+ */
+
+/**
+ * Credit Pricing
+ * Cost per enrichment: 10 credits
+ *
+ * Breakdown:
+ * - Company data: 1 credit
+ * - 3 contact names: 3 credits
+ * - 3 emails: 3 credits
+ * - 3 phone numbers: 3 credits
+ *
+ * Monthly Plans:
+ * - Starter ($20/mo): 400 credits = 40 companies/month
+ * - Pro ($50/mo): 1,250 credits = 125 companies/month
  */
 
 // ============================================================================

@@ -21,6 +21,9 @@
 [functions."generate-leads-v2"]
   timeout = 900
 
+[functions."enrich-company"]
+  timeout = 900
+
 [dev]
   framework = "#custom"
   command = "npm run dev"

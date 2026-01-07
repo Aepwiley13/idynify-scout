@@ -1,18 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,7 +12,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { answers, userId } = JSON.parse(event.body);
+    const { answers, userId, authToken } = JSON.parse(event.body);
 
     if (!answers) {
       throw new Error('Answers are required');
@@ -36,140 +22,103 @@ export const handler = async (event) => {
       throw new Error('User ID is required');
     }
 
-    console.log('🎯 Generating Section 6 Buying Behavior Profile for user:', userId);
+    if (!authToken) {
+      throw new Error('Authentication token is required');
+    }
 
-    // Validate required fields
-    const requiredFields = [
-      'startTriggers',
-      'researchMethods',
-      'salesCycleLength',
-      'bestBuyingTimes',
-      'linkedinSignals',
-      'competitiveAlternatives',
-      'lastStepBeforeBuy',
-      'stallReasons',
-      'accelerators'
-    ];
-    
-    for (const field of requiredFields) {
-      const value = answers[field];
-      if (!value) {
-        throw new Error(`Required field missing: ${field}`);
+    console.log('🎯 Generating Section 6 Buying Behavior Section 6 Product Deep Dive Triggers for user:', userId);
+
+    // Verify Firebase Auth token using REST API
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new Error('Firebase project ID not configured');
+    }
+
+    console.log('🔐 Verifying auth token...');
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
       }
-      
-      // Validate arrays
-      if (['startTriggers', 'researchMethods', 'bestBuyingTimes', 'linkedinSignals', 'lastStepBeforeBuy'].includes(field)) {
-        if (!Array.isArray(value) || value.length === 0) {
-          throw new Error(`At least one selection required for: ${field}`);
-        }
-      }
-      
-      // Validate text fields
-      if (['competitiveAlternatives', 'stallReasons', 'accelerators'].includes(field)) {
-        if (typeof value === 'string' && value.length < 100) {
-          throw new Error(`${field} must be at least 100 characters`);
-        }
-      }
+    );
+
+    if (!verifyResponse.ok) {
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('❌ Firebase auth verification failed:', {
+        status: verifyResponse.status,
+        statusText: verifyResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Invalid authentication token: ${errorData.error?.message || verifyResponse.statusText}`);
+    }
+
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyData.users || verifyData.users.length === 0) {
+      console.error('❌ No user found in token verification response');
+      throw new Error('Authentication token verification failed: no user found');
+    }
+
+    const tokenUserId = verifyData.users[0].localId;
+
+    // Verify the token belongs to the claimed user
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified for user:', userId);
+
+        // Validate that we have answers (generic validation)
+    if (!answers || Object.keys(answers).length === 0) {
+      throw new Error('No answers provided');
     }
 
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const prompt = `You are generating the Buying Behavior Profile for Section 6 of a RECON ICP intelligence system.
+    const sectionNumber = 6;
+    const sectionTitle = "Buying Behavior & Triggers";
 
-SECTION 6: BUYING BEHAVIOR & TRIGGERS
+    const prompt = `You are generating analysis for Section ${sectionNumber} (${sectionTitle}) of a RECON ICP intelligence system.
 
 User's answers:
 ${JSON.stringify(answers, null, 2)}
 
-Generate the Buying Behavior Profile output following this EXACT JSON schema:
+Generate comprehensive ICP analysis output following this EXACT JSON schema:
 {
-  "section": 6,
-  "title": "Buying Behavior & Triggers",
+  "section": ${sectionNumber},
+  "title": "${sectionTitle}",
   "status": "completed",
   "completedAt": "${new Date().toISOString()}",
   "version": 1,
-  "buyingBehaviorProfile": {
-    "hotTriggers": {
-      "eventBased": ["array of selected triggers from startTriggers"],
-      "performanceBased": "string (elaborate on performance triggers like poor results, missing targets)",
-      "timeBased": "string (elaborate on time-based triggers like fiscal year, quarters, budget cycles)",
-      "triggerStrength": "string (very strong/strong/moderate/weak based on number and type of triggers)"
-    },
-    "researchPatterns": {
-      "primaryChannels": ["array of top 3 research methods from researchMethods"],
-      "influenceSources": "string (who influences decisions - peers, analysts, reviews, etc.)",
-      "contentPreferences": "string (what content they consume - demos, case studies, trials, etc.)",
-      "researchDepth": "string (deep/moderate/light based on methods selected)",
-      "peerInfluence": "string (very high/high/medium/low based on peer/network selections)"
-    },
-    "salesCycleTimeline": {
-      "averageDuration": "string (from salesCycleLength selection)",
-      "durationRange": "string (expand on typical range - e.g., '6-12 weeks typical, 3-4 weeks fast-track')",
-      "variance": "string (what causes cycles to be shorter or longer)",
-      "stages": [
-        {
-          "stage": "Awareness",
-          "duration": "string (estimate based on total cycle length)",
-          "activities": "string (what happens in this stage)"
-        },
-        {
-          "stage": "Evaluation",
-          "duration": "string",
-          "activities": "string"
-        },
-        {
-          "stage": "Decision",
-          "duration": "string",
-          "activities": "string"
-        }
-      ],
-      "industryBenchmark": "string (how this cycle compares to industry standards)"
-    },
-    "seasonalPatterns": {
-      "bestTimes": ["array from bestBuyingTimes selections"],
-      "avoidTimes": ["array from avoidTimes selections or empty array if none"],
-      "seasonalityStrength": "string (very strong/strong/moderate/weak/none)",
-      "planningImplications": "string (how to plan outreach, campaigns, and pipeline building)"
-    },
-    "readinessSignals": {
-      "linkedinSignals": ["array from linkedinSignals selections"],
-      "digitalFootprint": "string (what online behavior indicates buying readiness)",
-      "hiringSignals": "string (if hiring posts selected, elaborate on what hiring signals mean)",
-      "fundingSignals": "string (if funding selected, elaborate on funding as trigger)",
-      "competitiveSignals": "string (if competitor threat selected, explain competitive pressure)",
-      "signalReliability": "string (assess reliability: high 70%+, medium 40-70%, low <40%)"
-    },
-    "competitiveSet": {
-      "directCompetitors": ["array extracted from competitiveAlternatives text - list 2-5 direct competitors"],
-      "alternatives": ["array of indirect alternatives - other categories, DIY, etc."],
-      "doNothing": "string (describe status quo/manual process if mentioned)",
-      "evaluationProcess": "string (how they evaluate you vs competitors - criteria, sequence)"
-    },
-    "decisionMilestones": {
-      "finalSteps": ["array from lastStepBeforeBuy selections"],
-      "approvalLevels": "string (what approvals needed - infer from lastStepBeforeBuy)",
-      "criticalPath": "string (what MUST happen to close deal - sequence of milestones)",
-      "pointOfNoReturn": "string (when deal becomes inevitable - what milestone locks it in)"
-    },
-    "velocityFactors": {
-      "stalls": {
-        "commonBottlenecks": ["array extracted from stallReasons - parse into 3-5 reasons"],
-        "stallDuration": "string (how long stalls typically last - estimate)",
-        "recoveryStrategies": "string (how to get stalled deals moving again)"
-      },
-      "accelerators": {
-        "speedDrivers": ["array extracted from accelerators - parse into 3-5 drivers"],
-        "compressionTactics": "string (specific tactics to compress sales cycle)",
-        "urgencyCreation": "string (how to create urgency when it doesn't exist naturally)"
-      }
-    },
-    "closeTriggers": {
-      "finalPushFactors": ["array from accelerators - what closes deals"],
-      "commitmentMoment": "string (when they mentally commit before signing)",
-      "lastObjection": "string (typical final hurdle before closing)"
-    }
+  "executiveSummary": {
+    "overview": "string (2-3 sentence summary of key insights from this section)",
+    "keyFindings": [
+      "string (3-7 specific, actionable insights derived from the user's answers)",
+      "string (Focus on WHO the ideal customer is and HOW to identify them)",
+      "string (Be specific with numbers, roles, company attributes)",
+      "string (Include observable signals when relevant)",
+      "string (Connect findings to ICP targeting strategy)"
+    ],
+    "icpImplications": [
+      "string (3-5 insights about how this data narrows the ICP definition)",
+      "string (What does this tell us about company size, industry, roles, etc.)",
+      "string (Observable signals for targeting and qualification)"
+    ],
+    "actionableInsights": [
+      "string (2-4 specific next steps or targeting strategies)",
+      "string (How to use this information in prospecting/outreach)",
+      "string (Warning signs or anti-patterns to avoid)"
+    ],
+    "keyInsight": "string (ONE critical takeaway that synthesizes this section's contribution to ICP definition)"
   },
   "rawAnswers": ${JSON.stringify(answers, null, 2)},
   "metadata": {
@@ -181,62 +130,13 @@ Generate the Buying Behavior Profile output following this EXACT JSON schema:
 }
 
 CRITICAL INSTRUCTIONS:
-1. Use EXACT selections from multi-select fields - don't paraphrase or change
-2. Break down salesCycleLength into 3 stages with estimated durations:
-   - < 1 week: Awareness (1-2 days), Evaluation (2-3 days), Decision (1-2 days)
-   - 1-4 weeks: Awareness (3-7 days), Evaluation (1-2 weeks), Decision (3-5 days)
-   - 1-3 months: Awareness (1-2 weeks), Evaluation (4-8 weeks), Decision (2-4 weeks)
-   - 3-6 months: Awareness (2-4 weeks), Evaluation (8-16 weeks), Decision (4-8 weeks)
-   - 6+ months: Awareness (1-2 months), Evaluation (3-6 months), Decision (1-3 months)
-3. Parse competitiveAlternatives text to extract:
-   - Direct competitors (tools in same category)
-   - Indirect alternatives (different approaches to same problem)
-   - Do nothing option (manual/status quo if mentioned)
-4. Extract 3-5 specific bottlenecks from stallReasons text
-5. Extract 3-5 specific drivers from accelerators text
-6. Assess trigger strength based on:
-   - Very strong: 4+ triggers including performance + time-based
-   - Strong: 3+ triggers with clear urgency
-   - Moderate: 2-3 triggers
-   - Weak: 1-2 triggers only
-7. Assess peer influence based on research methods:
-   - Very high: "Ask peers" is #1 or #2 method
-   - High: "Ask peers" selected + LinkedIn recommendations
-   - Medium: Only one peer-related method
-   - Low: No peer-related methods selected
-8. For seasonalPatterns.planningImplications, provide SPECIFIC guidance:
-   - When to accelerate (best times)
-   - When to nurture (avoid times)
-   - How to structure quarterly pipeline
-9. Signal reliability assessment:
-   - Hiring signals: 70%+ (very reliable)
-   - Funding signals: 60-70% (reliable within 90 days)
-   - Job changes: 40-60% (moderate - new leaders take time)
-   - Thought leadership: <40% (low - not buying signal)
-10. For criticalPath, describe sequence: "Trial → References → ROI → Approval" (order matters)
-
-EXAMPLE TRIGGER STRENGTH:
-Input: ["Raised funding", "Poor quarterly results", "Team churn", "New hire", "Scaling phase"]
-Analysis: 5 triggers including funding (budget), poor results (urgency), churn (pain), new hire (champion), scaling (growth)
-Output: "Very strong - multiple converging triggers create perfect storm. Funding + poor results + churn = extreme urgency."
-
-EXAMPLE COMPETITIVE SET PARSING:
-Input: "Direct competitors: Outreach, Salesloft, Apollo. Indirect: ZoomInfo (data only), Instantly (budget). Biggest competitor is do nothing - manual."
-Output:
-directCompetitors: ["Outreach", "Salesloft", "Apollo.io"]
-alternatives: ["ZoomInfo (data provider)", "Instantly.ai (budget option)", "Build internal tool"]
-doNothing: "Status quo is manual prospecting - familiar even if painful. Inertia is strong competitor."
-
-EXAMPLE STALL PARSING:
-Input: "Budget approval delays, champion leaving, too many stakeholders, seasonal slowdown, competing priorities"
-Output:
-commonBottlenecks: [
-  "Budget approval delays (CFO or CEO slow to approve)",
-  "Champion leaves company mid-deal (lose internal advocate)",
-  "Too many stakeholders involved (consensus paralysis)",
-  "Seasonal slowdown (summer/holidays)",
-  "Competing priorities (other initiatives take precedence)"
-]
+1. Use the user's EXACT language from their answers - don't sanitize or rewrite
+2. Be SPECIFIC - include numbers, percentages, company sizes, roles, technologies
+3. Focus on OBSERVABLE signals that can be used for targeting
+4. Connect findings to HOW to identify and qualify prospects
+5. Key Insight must be ACTIONABLE and section-specific
+6. Synthesize across all answers to find patterns and implications
+7. Think about: WHO buys, WHAT they look like, WHERE to find them, WHY they buy
 
 Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.`;
 
@@ -270,16 +170,8 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     }
 
     // Validate schema
-    if (!output.buyingBehaviorProfile || !output.rawAnswers) {
+    if (!output.executiveSummary || !output.rawAnswers) {
       throw new Error('Invalid output schema - missing required fields');
-    }
-
-    // Validate required sections
-    const requiredSections = ['hotTriggers', 'researchPatterns', 'salesCycleTimeline', 'velocityFactors'];
-    for (const section of requiredSections) {
-      if (!output.buyingBehaviorProfile[section]) {
-        throw new Error(`Missing required section in output: ${section}`);
-      }
     }
 
     // Add metadata
@@ -295,18 +187,8 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
 
-    // Save to Firestore
-    try {
-      await db.collection('users').doc(userId).update({
-        section6Output: output,
-        'reconProgress.section6Completed': true,
-        'reconProgress.lastUpdated': admin.firestore.FieldValue.serverTimestamp()
-      });
-      console.log('💾 Saved to Firestore');
-    } catch (firestoreError) {
-      console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
-      // Don't fail the entire request if Firestore save fails
-    }
+    // Note: Client will save to Firestore using its authenticated session
+    console.log('💡 Returning output to client for Firestore save');
 
     return {
       statusCode: 200,

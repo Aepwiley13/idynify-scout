@@ -1,18 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,7 +12,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { answers, userId } = JSON.parse(event.body);
+    const { answers, userId, authToken } = JSON.parse(event.body);
 
     if (!answers) {
       throw new Error('Answers are required');
@@ -36,7 +22,58 @@ export const handler = async (event) => {
       throw new Error('User ID is required');
     }
 
+    if (!authToken) {
+      throw new Error('Authentication token is required');
+    }
+
     console.log('🎯 Generating Section 1 Executive Summary for user:', userId);
+
+    // Verify Firebase Auth token using REST API
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new Error('Firebase project ID not configured');
+    }
+
+    console.log('🔐 Verifying auth token...');
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
+      }
+    );
+
+    if (!verifyResponse.ok) {
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('❌ Firebase auth verification failed:', {
+        status: verifyResponse.status,
+        statusText: verifyResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Invalid authentication token: ${errorData.error?.message || verifyResponse.statusText}`);
+    }
+
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyData.users || verifyData.users.length === 0) {
+      console.error('❌ No user found in token verification response');
+      throw new Error('Authentication token verification failed: no user found');
+    }
+
+    const tokenUserId = verifyData.users[0].localId;
+
+    // Verify the token belongs to the claimed user
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified for user:', userId);
 
     // Validate required fields
     const requiredFields = ['companyName', 'whatYouDo', 'industry', 'stage', 'role', 'mainProduct', 'problemSolved', 'currentCustomers'];
@@ -192,18 +229,8 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
 
-    // Save to Firestore
-    try {
-      await db.collection('users').doc(userId).update({
-        section1Output: output,
-        'reconProgress.section1Completed': true,
-        'reconProgress.lastUpdated': admin.firestore.FieldValue.serverTimestamp()
-      });
-      console.log('💾 Saved to Firestore');
-    } catch (firestoreError) {
-      console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
-      // Don't fail the entire request if Firestore save fails
-    }
+    // Note: Client will save to Firestore using its authenticated session
+    console.log('💡 Returning output to client for Firestore save');
 
     return {
       statusCode: 200,

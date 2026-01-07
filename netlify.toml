@@ -9,6 +9,9 @@
 [functions."generate-icp-brief"]
   timeout = 900
 
+[functions."generate-all-reports"]
+  timeout = 900
+
 [functions."generate-section-1"]
   timeout = 900
 
@@ -21,7 +24,7 @@
 [functions."generate-leads-v2"]
   timeout = 900
 
-[functions."enrich-company"]
+[functions."daily-leads-refresh"]
   timeout = 900
 
 [dev]

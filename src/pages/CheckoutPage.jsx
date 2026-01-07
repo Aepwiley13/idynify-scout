@@ -1,11 +1,52 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [processing, setProcessing] = useState(false);
+
+  // Read tier from URL parameter (default to 'starter')
+  const tier = searchParams.get('tier') || 'starter';
+
+  // Tier configuration
+  const tierConfig = {
+    starter: {
+      name: 'Scout Starter',
+      price: 20,
+      credits: 400,
+      companies: 40,
+      contacts: 120,
+      features: [
+        'Browse unlimited companies',
+        '40 enriched companies/month',
+        '120 contact details (email + phone)',
+        'Full RECON access',
+        'CSV exports',
+        'Email support (48-hour response)'
+      ]
+    },
+    pro: {
+      name: 'Scout Pro',
+      price: 50,
+      credits: 1250,
+      companies: 125,
+      contacts: 375,
+      features: [
+        'Browse unlimited companies',
+        '125 enriched companies/month',
+        '375 contact details (email + phone)',
+        'Full RECON access',
+        'Unlimited CSV exports',
+        'Enhanced RECON reports with PDF',
+        'Priority support (24-hour response)'
+      ]
+    }
+  };
+
+  const selectedTier = tierConfig[tier];
 
   const handleCheckout = async () => {
     setProcessing(true);
@@ -32,6 +73,7 @@ export default function CheckoutPage() {
           },
           body: JSON.stringify({
             userId: user.uid,
+            tier: tier, // Pass the selected tier (starter or pro)
           }),
         });
 
@@ -50,12 +92,26 @@ export default function CheckoutPage() {
 
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Mark payment as completed in Firestore
+        // Mark payment as completed in Firestore (DEV MODE ONLY)
         await updateDoc(doc(db, 'users', user.uid), {
           hasCompletedPayment: true,
           paymentCompletedAt: new Date().toISOString(),
-          subscriptionTier: 'pro',
-          subscriptionStatus: 'active'
+          subscriptionTier: tier,
+          subscriptionStatus: 'active',
+          credits: {
+            total: selectedTier.credits,
+            used: 0,
+            remaining: selectedTier.credits,
+            resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          tierLimits: {
+            creditsPerMonth: selectedTier.credits,
+            companiesPerMonth: selectedTier.companies,
+            contactsPerMonth: selectedTier.contacts,
+            teamSeats: 1,
+            support: tier === 'starter' ? '48-hour email' : '24-hour email'
+          },
+          billingCycleDate: new Date().getDate()
         });
 
         // Redirect to success page
@@ -104,42 +160,29 @@ export default function CheckoutPage() {
           </div>
 
           {/* Pricing Card */}
-          <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-8 border-2 border-cyan-500/30 mb-8">
+          <div className={`bg-black/60 backdrop-blur-xl rounded-2xl p-8 mb-8 ${
+            tier === 'pro'
+              ? 'border-2 border-cyan-500'
+              : 'border-2 border-gray-700'
+          }`}>
             <div className="text-center mb-6">
-              <div className="text-sm text-gray-400 font-mono mb-2">IDYNIFY SCOUT PRO</div>
-              <div className="text-5xl font-bold text-white mb-2">$97<span className="text-2xl text-gray-400">/mo</span></div>
-              <div className="text-gray-400 text-sm">Billed monthly • Cancel anytime</div>
+              <div className="text-sm text-gray-400 font-mono mb-2">{selectedTier.name.toUpperCase()}</div>
+              <div className="text-5xl font-bold text-white mb-2">
+                ${selectedTier.price}
+                <span className="text-2xl text-gray-400">/mo</span>
+              </div>
+              <div className="text-gray-400 text-sm">{selectedTier.credits} credits • Billed monthly • Cancel anytime</div>
             </div>
 
             <div className="space-y-4 mb-8">
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">RECON Module</p>
-                  <p className="text-gray-400 text-sm">AI-powered ICP definition & market intelligence</p>
+              {selectedTier.features.map((feature, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <span className="text-green-400 text-xl">✓</span>
+                  <div>
+                    <p className="text-white">{feature}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">SCOUT Module</p>
-                  <p className="text-gray-400 text-sm">Unlimited lead generation & contact discovery</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">SNIPER Module</p>
-                  <p className="text-gray-400 text-sm">Precision outreach campaigns & analytics</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">Priority Support</p>
-                  <p className="text-gray-400 text-sm">Email support within 24 hours</p>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Checkout Button */}

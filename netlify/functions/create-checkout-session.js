@@ -24,16 +24,33 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId } = JSON.parse(event.body);
+    const { userId, tier } = JSON.parse(event.body);
 
     if (!userId) {
       throw new Error('User ID is required');
     }
 
+    // Default to starter if tier not specified
+    const selectedTier = tier || 'starter';
+
     // Verify Stripe API key is configured
     if (!process.env.STRIPE_SECRET_KEY) {
       throw new Error('Stripe is not configured. Please add STRIPE_SECRET_KEY to environment variables.');
     }
+
+    // Map tier to Stripe Price ID
+    const priceIds = {
+      starter: process.env.STRIPE_PRICE_STARTER,
+      pro: process.env.STRIPE_PRICE_PRO
+    };
+
+    const priceId = priceIds[selectedTier];
+
+    if (!priceId) {
+      throw new Error(`Invalid tier: ${selectedTier}. Price ID not found.`);
+    }
+
+    console.log(`Creating checkout session for tier: ${selectedTier}, priceId: ${priceId}`);
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -44,32 +61,22 @@ export const handler = async (event) => {
     }
     const userData = userDoc.data();
 
-    // Create Stripe Checkout Session
+    // Create Stripe Checkout Session using Price ID
     const session = await stripe.checkout.sessions.create({
       customer_email: userData.email,
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Idynify Scout Pro',
-              description: 'AI-Powered B2B Intelligence & Lead Generation Platform',
-              images: ['https://your-domain.com/logo.png'], // Update with your logo
-            },
-            recurring: {
-              interval: 'month',
-            },
-            unit_amount: 9700, // $97.00 in cents
-          },
+          price: priceId, // Use the Price ID from environment variables
           quantity: 1,
         },
       ],
       mode: 'subscription',
-      success_url: `${event.headers.origin || 'https://your-domain.netlify.app'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${event.headers.origin || 'https://your-domain.netlify.app'}/checkout/cancel`,
+      success_url: `${event.headers.origin || 'https://idynify.com'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${event.headers.origin || 'https://idynify.com'}/checkout/cancel`,
       metadata: {
         userId: userId,
+        tier: selectedTier, // Store tier in metadata for webhook
       },
     });
 

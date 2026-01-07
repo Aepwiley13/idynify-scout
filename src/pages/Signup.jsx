@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -10,6 +10,10 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Read tier from URL parameter (default to 'starter' if not specified)
+  const tier = searchParams.get('tier') || 'starter';
 
   useEffect(() => {
     const calculateCountdown = () => {
@@ -38,8 +42,8 @@ export default function Signup() {
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: email,
         createdAt: new Date(),
-        tier: 'scout',
-        status: 'active',
+        selectedTier: tier, // Store the tier they selected (starter or pro)
+        status: 'pending_payment', // Will change to 'active' after payment
         hasCompletedPayment: false // Will be set to true after checkout
       });
 
@@ -59,7 +63,8 @@ export default function Signup() {
         console.error('⚠️ Failed to send welcome email:', emailError);
       }
 
-      navigate('/checkout'); // ✅ NEW FLOW: Go to payment after signup
+      // Redirect to checkout with tier parameter
+      navigate(`/checkout?tier=${tier}`);
     } catch (error) {
       setError(error.message);
     }

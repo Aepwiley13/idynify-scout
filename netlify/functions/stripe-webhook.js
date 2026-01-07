@@ -56,25 +56,67 @@ export const handler = async (event) => {
       case 'checkout.session.completed': {
         const session = stripeEvent.data.object;
         const userId = session.metadata.userId;
+        const tier = session.metadata.tier || 'starter'; // Default to starter if not specified
 
         if (!userId) {
           console.error('❌ No userId in session metadata');
           break;
         }
 
-        console.log(`✅ Payment successful for user: ${userId}`);
+        console.log(`✅ Payment successful for user: ${userId}, tier: ${tier}`);
 
-        // Update user in Firestore
+        // Map tier to credit allocation
+        const tierCredits = {
+          starter: {
+            credits: 400,
+            companies: 40,
+            contacts: 120,
+            support: '48-hour email'
+          },
+          pro: {
+            credits: 1250,
+            companies: 125,
+            contacts: 375,
+            support: '24-hour email'
+          }
+        };
+
+        const tierConfig = tierCredits[tier] || tierCredits.starter;
+        const billingDate = new Date();
+        const nextBillingDate = new Date(billingDate);
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
+        // Update user in Firestore with tier-based credit allocation
         await db.collection('users').doc(userId).update({
           hasCompletedPayment: true,
-          paymentCompletedAt: new Date().toISOString(),
-          subscriptionTier: 'pro',
+          paymentCompletedAt: billingDate.toISOString(),
+          subscriptionTier: tier,
           subscriptionStatus: 'active',
           stripeCustomerId: session.customer,
           stripeSubscriptionId: session.subscription,
+
+          // Credit allocation
+          credits: {
+            total: tierConfig.credits,
+            used: 0,
+            remaining: tierConfig.credits,
+            resetDate: nextBillingDate.toISOString()
+          },
+
+          // Tier limits
+          tierLimits: {
+            creditsPerMonth: tierConfig.credits,
+            companiesPerMonth: tierConfig.companies,
+            contactsPerMonth: tierConfig.contacts,
+            teamSeats: 1,
+            support: tierConfig.support
+          },
+
+          // Billing cycle day of month for credit reset
+          billingCycleDate: billingDate.getDate()
         });
 
-        console.log(`💾 User ${userId} updated with payment status`);
+        console.log(`💾 User ${userId} updated with ${tier} tier (${tierConfig.credits} credits)`);
         break;
       }
 

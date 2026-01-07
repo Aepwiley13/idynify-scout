@@ -155,7 +155,7 @@ export default function CheckoutPage() {
               Complete Your Purchase
             </h1>
             <p className="text-gray-400 text-lg">
-              Get instant access to RECON intelligence and lead generation
+              Get instant access to Scout & Recon intelligence and lead generation
             </p>
           </div>
 
@@ -206,16 +206,14 @@ export default function CheckoutPage() {
             </button>
 
             <p className="text-center text-xs text-gray-500 mt-4 font-mono">
-              {import.meta.env.VITE_STRIPE_ENABLED === 'true'
-                ? '🔐 Secure payment powered by Stripe'
-                : '⚠️ DEV MODE: Payment simulation (Stripe not configured)'}
+              🔐 Secure payment powered by Stripe
             </p>
           </div>
 
           {/* Security Badge */}
           <div className="text-center">
             <p className="text-gray-500 text-sm font-mono">
-              🔒 Secure checkout • 30-day money-back guarantee
+              🔒 Secure checkout • Cancel anytime
             </p>
           </div>
         </div>

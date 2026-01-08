@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -124,6 +125,16 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleBackToHome = async () => {
+    try {
+      await signOut(auth);
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      navigate('/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       {/* Starfield Background */}
@@ -143,6 +154,17 @@ export default function CheckoutPage() {
             }}
           />
         ))}
+      </div>
+
+      {/* Back to Homepage Button */}
+      <div className="absolute top-6 left-6 z-20">
+        <button
+          onClick={handleBackToHome}
+          className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-mono text-sm transition-all hover:scale-105"
+        >
+          <span className="text-xl">🚀</span>
+          <span>BACK TO HOME</span>
+        </button>
       </div>
 
       {/* Main Content */}

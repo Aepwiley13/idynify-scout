@@ -1,0 +1,700 @@
+import React, { useState } from 'react';
+import { ArrowRight, Target, Zap, Users, CheckCircle, Star } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+
+const Homepage = () => {
+  const [selectedLevel, setSelectedLevel] = useState(2);
+  
+  const handleGetStarted = (level = 1) => {
+    window.location.href = `/signup?level=${level}`;
+  };
+
+  const handleContactTier = (tier) => {
+    window.location.href = `mailto:support@idynify.com?subject=Interested in ${tier}&body=Hi! I'm interested in learning more about ${tier}.`;
+  };
+
+  // Structured data for SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Idynify",
+    "applicationCategory": "BusinessApplication",
+    "description": "AI-powered sales assistant that finds ideal customers, writes personalized emails, and books meetings automatically. Barry AI helps B2B companies save 2-4 hours daily on prospecting.",
+    "offers": [
+      {
+        "@type": "Offer",
+        "name": "Level 1 - RECON",
+        "price": "47",
+        "priceCurrency": "USD",
+        "description": "Quick start AI sales assistant with daily lead delivery"
+      },
+      {
+        "@type": "Offer",
+        "name": "Level 2 - HUNTER",
+        "price": "97",
+        "priceCurrency": "USD",
+        "description": "Advanced AI sales assistant with ICP targeting and LinkedIn automation"
+      },
+      {
+        "@type": "Offer",
+        "name": "Level 3 - SNIPER",
+        "price": "197",
+        "priceCurrency": "USD",
+        "description": "Elite AI sales assistant with full ICP and multi-channel sequences"
+      }
+    ],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "reviewCount": "47"
+    }
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>Idynify - AI Sales Assistant | Find Ideal Customers in 60 Seconds</title>
+        <meta name="description" content="Barry AI finds perfect-fit leads, writes personalized emails, and books meetings automatically. Save 2-4 hours daily on prospecting. Start in 60 seconds." />
+        <meta name="keywords" content="AI sales assistant, lead generation, B2B sales, ideal customer profile, ICP, sales automation, prospecting tool, Barry AI, Idynify" />
+        
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://idynify.com/" />
+        <meta property="og:title" content="Idynify - AI Sales Assistant That Books Meetings" />
+        <meta property="og:description" content="Stop manual prospecting. Barry AI finds your ideal customers and fills your calendar automatically. Save 2-4 hours daily." />
+        <meta property="og:image" content="https://idynify.com/og-image.png" />
+
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://idynify.com/" />
+        <meta property="twitter:title" content="Idynify - AI Sales Assistant" />
+        <meta property="twitter:description" content="Barry AI finds ideal customers and books meetings automatically. Save 2-4 hours daily on prospecting." />
+        <meta property="twitter:image" content="https://idynify.com/twitter-image.png" />
+
+        <link rel="canonical" href="https://idynify.com/" />
+
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Helmet>
+
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        {/* Navigation */}
+        <nav className="container mx-auto px-6 py-6" role="navigation" aria-label="Main navigation">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-4xl" role="img" aria-label="Bear mascot">🐻</span>
+              <h1 className="text-2xl font-bold text-white">Idynify</h1>
+            </div>
+            <button
+              onClick={() => handleGetStarted(1)}
+              className="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-105 transition-all"
+              aria-label="Get started with Idynify"
+            >
+              Get Started
+            </button>
+          </div>
+        </nav>
+
+        {/* Hero Section */}
+        <header className="container mx-auto px-6 py-20 text-center">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6 inline-block">
+              <span className="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-full text-sm font-semibold border border-purple-500/30">
+                🚀 Meet Barry - Your AI Sales Partner
+              </span>
+            </div>
+            
+            <h2 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+              Find Your Ideal Customers
+              <span className="bg-gradient-to-r from-pink-400 to-purple-400 text-transparent bg-clip-text"> in 60 Seconds</span>
+            </h2>
+            
+            <p className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed">
+              Barry AI finds perfect-fit leads, writes personalized emails, and books meetings automatically. 
+              No manual prospecting. No expensive tools. Just results.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+              <button
+                onClick={() => handleGetStarted(1)}
+                className="px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white text-lg font-bold rounded-full hover:shadow-2xl hover:scale-105 transition-all flex items-center gap-2"
+                aria-label="Start using Idynify in 60 seconds"
+              >
+                Start in 60 Seconds
+                <ArrowRight size={20} aria-hidden="true" />
+              </button>
+              <button
+                onClick={() => document.getElementById('how-it-works').scrollIntoView({ behavior: 'smooth' })}
+                className="px-8 py-4 bg-white/10 text-white text-lg font-semibold rounded-full hover:bg-white/20 transition-all border border-white/20"
+                aria-label="Learn how Idynify works"
+              >
+                See How It Works
+              </button>
+            </div>
+
+            <div className="flex items-center justify-center gap-8 text-gray-400 flex-wrap">
+              <div className="flex items-center gap-2">
+                <CheckCircle size={20} className="text-green-400" aria-hidden="true" />
+                <span>Save 2-4 hours daily</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle size={20} className="text-green-400" aria-hidden="true" />
+                <span>Leads same day</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle size={20} className="text-green-400" aria-hidden="true" />
+                <span>Uses your existing tools</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Social Proof Bar */}
+        <section className="container mx-auto px-6 py-8" aria-labelledby="social-proof">
+          <h2 id="social-proof" className="sr-only">Performance Metrics</h2>
+          <div className="max-w-4xl mx-auto bg-white/5 backdrop-blur-lg rounded-2xl p-8 border border-white/10">
+            <div className="grid md:grid-cols-3 gap-8 text-center">
+              <div>
+                <div className="text-4xl font-bold text-white mb-2">2-4 hrs</div>
+                <div className="text-gray-400">Saved Daily Per User</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-white mb-2">10-15%</div>
+                <div className="text-gray-400">Average Reply Rate</div>
+              </div>
+              <div>
+                <div className="text-4xl font-bold text-white mb-2">Same Day</div>
+                <div className="text-gray-400">First Leads Delivered</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* How It Works */}
+        <section id="how-it-works" className="container mx-auto px-6 py-20" aria-labelledby="how-it-works-heading">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 id="how-it-works-heading" className="text-4xl md:text-5xl font-bold text-white mb-4">
+                How Barry Works
+              </h2>
+              <p className="text-xl text-gray-300">
+                Your AI sales partner in 4 simple steps
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-8">
+              {[
+                {
+                  step: '1',
+                  icon: '🚀',
+                  title: 'Pick Your Level',
+                  description: 'Choose your mission: 1 minute (Recon), 5 minutes (Hunter), or 20 minutes (Sniper)',
+                },
+                {
+                  step: '2',
+                  icon: '🔗',
+                  title: 'Connect Tools',
+                  description: 'Link LinkedIn + Gmail. Barry uses what you already have (no new subscriptions)',
+                },
+                {
+                  step: '3',
+                  icon: '✅',
+                  title: 'Approve Leads',
+                  description: 'Barry finds leads daily. You swipe to approve the best ones',
+                },
+                {
+                  step: '4',
+                  icon: '🐻',
+                  title: 'Barry Executes',
+                  description: 'Personalized emails, follow-ups, and meeting booking on autopilot',
+                },
+              ].map((item) => (
+                <article key={item.step} className="relative">
+                  <div className="bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/10 hover:border-purple-500/50 transition-all">
+                    <div className="text-5xl mb-4" role="img" aria-label={item.title}>{item.icon}</div>
+                    <div className="text-purple-400 font-bold mb-2">Step {item.step}</div>
+                    <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
+                    <p className="text-gray-400">{item.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="text-center mt-12">
+              <button
+                onClick={() => handleGetStarted(1)}
+                className="px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white text-lg font-bold rounded-full hover:shadow-2xl hover:scale-105 transition-all"
+              >
+                Start Your Mission Now →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Mission Levels (Pricing) */}
+        <section id="pricing" className="container mx-auto px-6 py-20" aria-labelledby="pricing-heading">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 id="pricing-heading" className="text-4xl md:text-5xl font-bold text-white mb-4">
+                Choose Your Mission Level
+              </h2>
+              <p className="text-xl text-gray-300">
+                Start simple, upgrade anytime. Your Barry AI agent grows with you.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {/* Level 1 - RECON */}
+              <article 
+                className={`bg-white/5 backdrop-blur-lg rounded-2xl p-8 border transition-all cursor-pointer ${
+                  selectedLevel === 1 ? 'border-purple-500 scale-105' : 'border-white/10 hover:border-purple-500/50'
+                }`}
+                onMouseEnter={() => setSelectedLevel(1)}
+              >
+                <div className="text-center mb-6">
+                  <div className="text-6xl mb-4" role="img" aria-label="Rocket">🚀</div>
+                  <div className="text-purple-400 font-semibold mb-2">LEVEL 1</div>
+                  <h3 className="text-2xl font-bold text-white mb-2">RECON</h3>
+                  <p className="text-gray-400 text-sm mb-4">Start Instantly</p>
+                  <div className="mb-4">
+                    <span className="text-5xl font-bold text-white">$47</span>
+                    <span className="text-gray-400">/month</span>
+                  </div>
+                  <p className="text-gray-400 text-sm italic">1-2 minute setup</p>
+                </div>
+
+                <ul className="space-y-3 mb-8" role="list">
+                  {[
+                    '5 quick questions',
+                    'Barry analyzes your LinkedIn',
+                    '5-10 leads daily',
+                    'Basic email sequences',
+                    'Agent Rank: Scout',
+                    'Perfect for testing',
+                  ].map((feature, i) => (
+                    <li key={i} className="flex items-start gap-3 text-gray-300">
+                      <CheckCircle size={20} className="text-green-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => handleGetStarted(1)}
+                  className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold rounded-full hover:shadow-xl hover:scale-105 transition-all"
+                  aria-label="Get started with Level 1 RECON"
+                >
+                  Quick Start →
+                </button>
+
+                <p className="text-center text-gray-500 text-xs mt-4">Cancel anytime</p>
+              </article>
+
+              {/* Level 2 - HUNTER */}
+              <article 
+                className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg rounded-2xl p-8 border-2 border-purple-500 relative transform scale-105"
+                onMouseEnter={() => setSelectedLevel(2)}
+              >
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-pink-500 to-purple-500 text-white px-4 py-1 rounded-full text-sm font-bold">
+                  MOST POPULAR
+                </div>
+                
+                <div className="text-center mb-6">
+                  <div className="text-6xl mb-4" role="img" aria-label="Lightning">⚡</div>
+                  <div className="text-purple-400 font-semibold mb-2">LEVEL 2</div>
+                  <h3 className="text-2xl font-bold text-white mb-2">HUNTER</h3>
+                  <p className="text-gray-400 text-sm mb-4">Get Serious</p>
+                  <div className="mb-4">
+                    <span className="text-5xl font-bold text-white">$97</span>
+                    <span className="text-gray-400">/month</span>
+                  </div>
+                  <p className="text-gray-400 text-sm italic">5-10 minute setup</p>
+                </div>
+
+                <ul className="space-y-3 mb-8" role="list">
+                  {[
+                    '20-25 strategic questions',
+                    'Advanced ICP targeting',
+                    '15-20 scored leads daily (70+)',
+                    'Personalized email + LinkedIn',
+                    'Agent Rank: Hunter',
+                    'Priority support',
+                    '3x better results',
+                  ].map((feature, i) => (
+                    <li key={i} className="flex items-start gap-3 text-gray-300">
+                      <CheckCircle size={20} className="text-green-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => handleGetStarted(2)}
+                  className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold rounded-full hover:shadow-xl hover:scale-105 transition-all"
+                  aria-label="Get started with Level 2 HUNTER"
+                >
+                  Start Smart →
+                </button>
+
+                <p className="text-center text-gray-500 text-xs mt-4">Best value</p>
+              </article>
+
+              {/* Level 3 - SNIPER */}
+              <article 
+                className={`bg-white/5 backdrop-blur-lg rounded-2xl p-8 border transition-all cursor-pointer ${
+                  selectedLevel === 3 ? 'border-purple-500 scale-105' : 'border-white/10 hover:border-purple-500/50'
+                }`}
+                onMouseEnter={() => setSelectedLevel(3)}
+              >
+                <div className="text-center mb-6">
+                  <div className="text-6xl mb-4" role="img" aria-label="Target">🎯</div>
+                  <div className="text-purple-400 font-semibold mb-2">LEVEL 3</div>
+                  <h3 className="text-2xl font-bold text-white mb-2">SNIPER</h3>
+                  <p className="text-gray-400 text-sm mb-4">Go Pro</p>
+                  <div className="mb-4">
+                    <span className="text-5xl font-bold text-white">$197</span>
+                    <span className="text-gray-400">/month</span>
+                  </div>
+                  <p className="text-gray-400 text-sm italic">20-30 minute setup</p>
+                </div>
+
+                <ul className="space-y-3 mb-8" role="list">
+                  {[
+                    'Full 8-section ICP',
+                    'Multiple Target Lists',
+                    '10-15 perfect leads daily (85+)',
+                    'Multi-channel sequences',
+                    'Agent Rank: Sniper',
+                    'Dedicated success manager',
+                    'Boardroom-ready intel',
+                  ].map((feature, i) => (
+                    <li key={i} className="flex items-start gap-3 text-gray-300">
+                      <CheckCircle size={20} className="text-green-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => handleGetStarted(3)}
+                  className="w-full py-4 bg-white/10 text-white font-bold rounded-full hover:bg-white/20 transition-all border border-white/20"
+                  aria-label="Get started with Level 3 SNIPER"
+                >
+                  Go Elite →
+                </button>
+
+                <p className="text-center text-gray-500 text-xs mt-4">For pros</p>
+              </article>
+            </div>
+
+            <div className="text-center mt-12">
+              <p className="text-gray-400 mb-4">Not sure? Start with Level 1 (Recon) and upgrade anytime.</p>
+              <button
+                onClick={() => handleGetStarted(1)}
+                className="text-purple-400 hover:text-purple-300 font-semibold underline"
+              >
+                Start with RECON (Level 1) →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Agent Ranking System */}
+        <section className="container mx-auto px-6 py-20" aria-labelledby="ranking-heading">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 id="ranking-heading" className="text-4xl md:text-5xl font-bold text-white mb-4">
+                Your Agent Gets Smarter
+              </h2>
+              <p className="text-xl text-gray-300">
+                Earn points for replies, meetings, and deals. Level up your agent.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-6">
+              {[
+                { rank: '🥉 Scout', score: '0-50', level: 'Level 1', color: 'from-gray-500 to-gray-600' },
+                { rank: '🥈 Hunter', score: '51-200', level: 'Level 2', color: 'from-purple-500 to-pink-500' },
+                { rank: '🥇 Sniper', score: '201-500', level: 'Level 3', color: 'from-yellow-500 to-orange-500' },
+                { rank: '💎 Elite', score: '500+', level: 'Level 3+', color: 'from-cyan-500 to-blue-500' },
+              ].map((tier, i) => (
+                <article key={i} className="bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-white/10 text-center">
+                  <div className="text-4xl mb-3" role="img" aria-label={tier.rank}>{tier.rank.split(' ')[0]}</div>
+                  <div className="text-xl font-bold text-white mb-2">{tier.rank.split(' ').slice(1).join(' ')}</div>
+                  <div className="text-gray-400 text-sm mb-2">{tier.score} points</div>
+                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${tier.color} text-white`}>
+                    {tier.level}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center">
+              <p className="text-gray-400 text-sm">
+                Email reply = 1 point • Meeting booked = 5 points • Deal closed = 25 points
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* What's Inside Your ICP */}
+        <section className="container mx-auto px-6 py-20" aria-labelledby="features-heading">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 id="features-heading" className="text-4xl md:text-5xl font-bold text-white mb-4">
+                What Barry Builds For You
+              </h2>
+              <p className="text-xl text-gray-300">
+                8 comprehensive sections covering everything you need
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {[
+                {
+                  title: 'Executive Summary',
+                  description: 'Who to target at-a-glance with perfect-fit indicators and anti-profile',
+                  icon: <Target className="text-purple-400" size={24} aria-hidden="true" />,
+                },
+                {
+                  title: 'Firmographics',
+                  description: 'Company size, stage, budget, industries, and decision makers',
+                  icon: <Users className="text-pink-400" size={24} aria-hidden="true" />,
+                },
+                {
+                  title: 'Psychographics',
+                  description: 'Top 5 pain points, core values, goals, and language they use',
+                  icon: '🧠',
+                },
+                {
+                  title: 'Behavioral Signals',
+                  description: 'Hot buying triggers, research patterns, and timing strategy',
+                  icon: '🎯',
+                },
+                {
+                  title: 'ICP Scoring (0-100)',
+                  description: 'Weighted qualification framework to prioritize your best leads',
+                  icon: '📊',
+                },
+                {
+                  title: 'Messaging Guidelines',
+                  description: 'Value proposition, cold email templates, and objection handling',
+                  icon: '💬',
+                },
+                {
+                  title: 'Channel Strategy',
+                  description: 'Where to find them, communities, events, and LinkedIn tactics',
+                  icon: '🔍',
+                },
+                {
+                  title: 'Action Plan',
+                  description: 'Barry executes daily - finding leads, sending emails, booking meetings',
+                  icon: <Zap className="text-yellow-400" size={24} aria-hidden="true" />,
+                },
+              ].map((item, index) => (
+                <article
+                  key={index}
+                  className="bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-white/10 hover:border-purple-500/50 transition-all"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="text-3xl" role={typeof item.icon === 'string' ? 'img' : undefined} aria-label={item.title}>
+                      {typeof item.icon === 'string' ? item.icon : item.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
+                      <p className="text-gray-400">{item.description}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials */}
+        <section className="container mx-auto px-6 py-20" aria-labelledby="testimonials-heading">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 id="testimonials-heading" className="text-4xl md:text-5xl font-bold text-white mb-4">
+                What People Are Saying
+              </h2>
+              <p className="text-gray-400">(Early beta user feedback)</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                {
+                  quote: "Barry found 47 perfect-fit leads in the first week. We're closing deals with companies we never would have found manually. The ROI is insane.",
+                  author: "Sarah",
+                  title: "SaaS Founder",
+                },
+                {
+                  quote: "I was spending 4 hours a day on prospecting. Now I review Barry's leads over coffee and my calendar fills itself. Best $97/month I've ever spent.",
+                  author: "Mike",
+                  title: "Sales Consultant",
+                },
+                {
+                  quote: "The ICP scoring alone was worth 10x the price. We went from 8% close rate to 23% by only targeting 80+ score leads. Game changer.",
+                  author: "Jessica",
+                  title: "VP of Sales",
+                },
+              ].map((testimonial, index) => (
+                <article
+                  key={index}
+                  className="bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-white/10"
+                >
+                  <div className="flex gap-1 mb-4" role="img" aria-label="5 star rating">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={16} className="fill-yellow-400 text-yellow-400" aria-hidden="true" />
+                    ))}
+                  </div>
+                  <blockquote className="text-gray-300 mb-6 italic">"{testimonial.quote}"</blockquote>
+                  <div>
+                    <div className="font-semibold text-white">{testimonial.author}</div>
+                    <div className="text-sm text-gray-400">{testimonial.title}</div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Comparison */}
+        <section className="container mx-auto px-6 py-20" aria-labelledby="comparison-heading">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 id="comparison-heading" className="text-4xl md:text-5xl font-bold text-white mb-4">
+                Why Idynify vs. Alternatives?
+              </h2>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-lg rounded-2xl overflow-hidden border border-white/10">
+              <table className="w-full">
+                <caption className="sr-only">Comparison of Idynify with manual SDR and consultants</caption>
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th scope="col" className="p-4 text-left text-gray-400 font-semibold">Feature</th>
+                    <th scope="col" className="p-4 text-center text-purple-400 font-bold">Idynify</th>
+                    <th scope="col" className="p-4 text-center text-gray-400 font-semibold">Manual SDR</th>
+                    <th scope="col" className="p-4 text-center text-gray-400 font-semibold">Consultants</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-white/10">
+                    <th scope="row" className="p-4 text-gray-300 text-left">Price</th>
+                    <td className="p-4 text-center text-white font-semibold">$47-197/mo</td>
+                    <td className="p-4 text-center text-gray-400">$3K-6K/mo</td>
+                    <td className="p-4 text-center text-gray-400">$5K-50K</td>
+                  </tr>
+                  <tr className="border-b border-white/10">
+                    <th scope="row" className="p-4 text-gray-300 text-left">Setup Time</th>
+                    <td className="p-4 text-center text-white font-semibold">60 seconds</td>
+                    <td className="p-4 text-center text-gray-400">2-4 weeks</td>
+                    <td className="p-4 text-center text-gray-400">2-4 weeks</td>
+                  </tr>
+                  <tr className="border-b border-white/10">
+                    <th scope="row" className="p-4 text-gray-300 text-left">Daily Leads</th>
+                    <td className="p-4 text-center">
+                      <CheckCircle className="text-green-400 mx-auto" size={20} aria-label="Yes" />
+                    </td>
+                    <td className="p-4 text-center text-gray-400">Manual</td>
+                    <td className="p-4 text-center text-gray-400" aria-label="No">❌</td>
+                  </tr>
+                  <tr className="border-b border-white/10">
+                    <th scope="row" className="p-4 text-gray-300 text-left">24/7 Operation</th>
+                    <td className="p-4 text-center">
+                      <CheckCircle className="text-green-400 mx-auto" size={20} aria-label="Yes" />
+                    </td>
+                    <td className="p-4 text-center text-gray-400" aria-label="No">❌</td>
+                    <td className="p-4 text-center text-gray-400" aria-label="No">❌</td>
+                  </tr>
+                  <tr>
+                    <th scope="row" className="p-4 text-gray-300 text-left">Learning AI</th>
+                    <td className="p-4 text-center">
+                      <CheckCircle className="text-green-400 mx-auto" size={20} aria-label="Yes" />
+                    </td>
+                    <td className="p-4 text-center text-gray-400" aria-label="No">❌</td>
+                    <td className="p-4 text-center text-gray-400" aria-label="No">❌</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        {/* Final CTA - ORIGINAL VERSION */}
+        <section className="container mx-auto px-6 py-20">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg rounded-3xl p-12 border border-purple-500/30">
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+                Ready to Stop Wasting Time on Bad Leads?
+              </h2>
+              <p className="text-xl text-gray-300 mb-8">
+                Get your custom ICP in 48 hours. Know exactly who to target and how to reach them.
+              </p>
+              <button
+                onClick={() => handleGetStarted(1)}
+                className="px-12 py-5 bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xl font-bold rounded-full hover:shadow-2xl hover:scale-105 transition-all inline-flex items-center gap-3"
+                aria-label="Build your ICP now"
+              >
+                Build Your ICP Now
+                <ArrowRight size={24} aria-hidden="true" />
+              </button>
+              <p className="text-gray-400 mt-6">
+                ✅ 15-minute setup • ✅ Cancel anytime • ✅ Money-back guarantee
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="container mx-auto px-6 py-12 border-t border-white/10" role="contentinfo">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <span className="text-3xl" role="img" aria-label="Bear mascot">🐻</span>
+                  <span className="text-xl font-bold text-white">Idynify</span>
+                </div>
+                <p className="text-gray-400 text-sm">
+                  Your AI sales partner for finding ideal customers and closing deals.
+                </p>
+              </div>
+              
+              <nav aria-label="Product links">
+                <h3 className="text-white font-semibold mb-4">Product</h3>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  <li><a href="#how-it-works" className="hover:text-purple-400">How It Works</a></li>
+                  <li><a href="#pricing" className="hover:text-purple-400">Mission Levels</a></li>
+                  <li><button onClick={() => handleGetStarted(1)} className="hover:text-purple-400">Get Started</button></li>
+                </ul>
+              </nav>
+              
+              <nav aria-label="Company links">
+                <h3 className="text-white font-semibold mb-4">Company</h3>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  <li><a href="mailto:support@idynify.com" className="hover:text-purple-400">Contact</a></li>
+                  <li><a href="#" className="hover:text-purple-400">About</a></li>
+                </ul>
+              </nav>
+              
+              <nav aria-label="Social links">
+                <h3 className="text-white font-semibold mb-4">Connect</h3>
+                <ul className="space-y-2 text-gray-400 text-sm">
+                  <li><a href="#" className="hover:text-purple-400" rel="noopener noreferrer" target="_blank">LinkedIn</a></li>
+                  <li><a href="#" className="hover:text-purple-400" rel="noopener noreferrer" target="_blank">Twitter</a></li>
+                  <li><a href="mailto:support@idynify.com" className="hover:text-purple-400">support@idynify.com</a></li>
+                </ul>
+              </nav>
+            </div>
+            
+            <div className="border-t border-white/10 pt-8 text-center text-gray-400 text-sm">
+              <p>&copy; 2025 Idynify. Built with 🐻 by Barry AI. All rights reserved.</p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </>
+  );
+};
+
+export default Homepage;

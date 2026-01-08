@@ -26,100 +26,92 @@ export default function CheckoutSuccessPage() {
 
       {/* Success Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center px-6 py-12">
-        <div className="max-w-3xl w-full">
-          {/* Success Icon */}
-          <div className="text-center mb-8">
-            <div className="text-8xl mb-6 animate-bounce">✅</div>
+        <div className="max-w-2xl w-full">
+
+          {/* Hero Section: Emotional Win + Orientation */}
+          <div className="text-center mb-10">
+            <div className="text-7xl mb-6 animate-bounce">✅</div>
             <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-green-400 via-emerald-400 to-cyan-400 bg-clip-text text-transparent font-mono">
-              PAYMENT SUCCESSFUL!
+              Access Granted
             </h1>
-            <p className="text-xl text-gray-300 mb-2">
-              Welcome to Idynify Scout, Agent!
+            <p className="text-2xl text-gray-200 mb-3 font-semibold">
+              Scout is active. Barry is ready.
             </p>
             <p className="text-lg text-cyan-400 font-mono">
-              Mission Control is now active
+              Let's find your ideal customers.
             </p>
           </div>
 
-          {/* Mission Briefing - Next Steps */}
-          <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-8 border-2 border-cyan-500/30 mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4 font-mono flex items-center gap-2">
-              <span>📋</span> MISSION BRIEFING
+          {/* Barry Introduction */}
+          <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-xl p-5 border border-purple-500/40 mb-8 text-center">
+            <p className="text-gray-200 text-base">
+              <span className="text-xl mr-2">🐻</span>
+              <span className="font-semibold text-white">Meet Barry — your AI Scout.</span> Barry searches, filters, and suggests. You decide.
+            </p>
+          </div>
+
+          {/* Mission Briefing - Single Card */}
+          <div className="bg-black/70 backdrop-blur-xl rounded-2xl p-8 border-2 border-cyan-500/40 mb-8">
+            <h2 className="text-2xl font-bold text-white mb-3 font-mono">
+              📋 Your Mission
             </h2>
-            <p className="text-gray-300 mb-6">
-              Need the right intel to win deals? Follow these steps to identify and engage your ideal customers:
+            <p className="text-gray-300 text-lg mb-7 leading-relaxed">
+              Get the right intel to win deals. Here's how it works:
             </p>
 
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Step 1 */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-cyan-500/20 border-2 border-cyan-500 rounded-lg flex items-center justify-center">
-                  <span className="text-cyan-400 font-bold font-mono text-lg">1</span>
+              <div className="flex gap-4 items-start">
+                <div className="flex-shrink-0 w-10 h-10 bg-cyan-500/20 border-2 border-cyan-400 rounded-lg flex items-center justify-center">
+                  <span className="text-cyan-300 font-bold font-mono">1</span>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-lg mb-1">Define Your Ideal Customer Profile (ICP)</h3>
-                  <p className="text-gray-400">Use AI-powered RECON to build a detailed profile of your perfect customer</p>
+                  <h3 className="text-white font-semibold text-lg">Define your ICP</h3>
+                  <p className="text-gray-400 text-sm">Answer 5 questions so Barry knows who to find</p>
                 </div>
               </div>
 
               {/* Step 2 */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-purple-500/20 border-2 border-purple-500 rounded-lg flex items-center justify-center">
-                  <span className="text-purple-400 font-bold font-mono text-lg">2</span>
+              <div className="flex gap-4 items-start">
+                <div className="flex-shrink-0 w-10 h-10 bg-purple-500/20 border-2 border-purple-400 rounded-lg flex items-center justify-center">
+                  <span className="text-purple-300 font-bold font-mono">2</span>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-lg mb-1">Approve or Reject Matching Companies</h3>
-                  <p className="text-gray-400">Scout finds companies that match your ICP - you decide which ones to target</p>
+                  <h3 className="text-white font-semibold text-lg">Review matching companies</h3>
+                  <p className="text-gray-400 text-sm">Scout shows you companies that fit — you approve or skip</p>
                 </div>
               </div>
 
               {/* Step 3 */}
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-pink-500/20 border-2 border-pink-500 rounded-lg flex items-center justify-center">
-                  <span className="text-pink-400 font-bold font-mono text-lg">3</span>
+              <div className="flex gap-4 items-start">
+                <div className="flex-shrink-0 w-10 h-10 bg-pink-500/20 border-2 border-pink-400 rounded-lg flex items-center justify-center">
+                  <span className="text-pink-300 font-bold font-mono">3</span>
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-lg mb-1">Select Contacts & Begin Engagement</h3>
-                  <p className="text-gray-400">Get verified contact details and start building relationships with decision-makers</p>
+                  <h3 className="text-white font-semibold text-lg">Select contacts & engage</h3>
+                  <p className="text-gray-400 text-sm">Get verified contact details and start conversations</p>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* What You Have Access To */}
-          <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-6 border border-purple-500/30 mb-8">
-            <h3 className="text-pink-300 font-bold text-lg mb-4 flex items-center gap-2">
-              <span>🎉</span> YOUR MISSION TOOLS
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-3xl mb-2">🔍</div>
-                <p className="text-white font-semibold text-sm">RECON</p>
-                <p className="text-gray-400 text-xs">Build your ICP</p>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl mb-2">🎯</div>
-                <p className="text-white font-semibold text-sm">SCOUT</p>
-                <p className="text-gray-400 text-xs">Find companies</p>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl mb-2">📧</div>
-                <p className="text-white font-semibold text-sm">CONTACTS</p>
-                <p className="text-gray-400 text-xs">Get decision-makers</p>
-              </div>
+            {/* Reassurance */}
+            <div className="mt-7 pt-6 border-t border-cyan-500/20">
+              <p className="text-cyan-300 text-center font-medium">
+                Scout does the hard part. You stay in control.
+              </p>
             </div>
           </div>
 
-          {/* Next Button */}
+          {/* Single Primary CTA */}
           <div className="text-center">
             <button
               onClick={() => navigate('/mission-control-v2')}
-              className="bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-600 hover:from-cyan-600 hover:via-purple-700 hover:to-pink-700 text-white font-bold py-5 px-12 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-xl font-mono hover:scale-105"
+              className="bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-600 hover:from-cyan-600 hover:via-purple-700 hover:to-pink-700 text-white font-bold py-6 px-16 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-2xl font-mono hover:scale-105 inline-block"
             >
-              🚀 GO TO MISSION CONTROL
+              🚀 Start Mission Control
             </button>
             <p className="text-gray-500 text-sm mt-4 font-mono">
-              Let's get you some qualified leads
+              Takes ~2 minutes to activate Barry
             </p>
           </div>
         </div>

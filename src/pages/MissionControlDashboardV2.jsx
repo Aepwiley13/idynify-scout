@@ -9,6 +9,8 @@ export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hasCompletedICP, setHasCompletedICP] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [stats, setStats] = useState({
     scoutCompanies: 0,
     scoutContacts: 0,
@@ -49,6 +51,16 @@ export default function MissionControlDashboardV2() {
       const reconDoc = await getDoc(doc(db, 'users', userId, 'recon', 'current'));
       const reconCompletion = reconDoc.exists() ? reconDoc.data().completionPercentage || 0 : 0;
 
+      // Check if user has completed ICP settings
+      const icpDoc = await getDoc(doc(db, 'users', userId, 'icp', 'settings'));
+      const hasICP = icpDoc.exists() && icpDoc.data().industry;
+      setHasCompletedICP(hasICP);
+
+      // Show welcome modal for first-time users (no ICP set up)
+      if (!hasICP) {
+        setShowWelcomeModal(true);
+      }
+
       setStats({
         scoutCompanies: companiesSnapshot.size,
         scoutContacts: contactsSnapshot.size,
@@ -70,6 +82,15 @@ export default function MissionControlDashboardV2() {
       } catch (error) {
         console.error('Error logging out:', error);
       }
+    }
+  };
+
+  const handleScoutClick = () => {
+    // If user hasn't completed ICP, take them to ICP settings tab
+    if (!hasCompletedICP) {
+      navigate('/scout', { state: { activeTab: 'icp-settings' } });
+    } else {
+      navigate('/scout');
     }
   };
 
@@ -140,34 +161,34 @@ export default function MissionControlDashboardV2() {
       {/* HEADER */}
       <header className="relative z-40 pt-12 pb-8 border-b border-cyan-500/20 backdrop-blur-sm bg-black/30">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-center gap-8">
-            {/* Barry Astronaut Bear - LEFT SIDE */}
+          {/* Barry the AI Assistant - Top Left */}
+          <div className="absolute left-8 top-8 flex items-center gap-3 group">
             <div className="relative">
-              <img
-                src="/barry-astronaut.png"
-                alt="Barry the AI Assistant"
-                className="w-48 h-48 object-contain drop-shadow-2xl"
-                style={{ filter: 'drop-shadow(0 0 30px rgba(6, 182, 212, 0.3))' }}
-              />
-              {/* Stars around Barry */}
-              <div className="absolute -top-4 -right-2 text-yellow-300 text-3xl animate-pulse">✨</div>
-              <div className="absolute top-8 -left-4 text-yellow-300 text-2xl animate-pulse" style={{ animationDelay: '0.5s' }}>⭐</div>
-              <div className="absolute -bottom-2 right-8 text-yellow-300 text-xl animate-pulse" style={{ animationDelay: '1s' }}>✨</div>
-              {/* Rocket */}
-              <div className="absolute top-0 right-0 text-4xl" style={{ animation: 'rocketFloat 3s ease-in-out infinite' }}>🚀</div>
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 group-hover:scale-110 transition-transform">
+                <span className="text-3xl">🐻</span>
+              </div>
+              {/* Star decoration */}
+              <div className="absolute -top-2 -right-2 text-2xl animate-pulse">⭐</div>
             </div>
+            <div className="hidden md:block">
+              <p className="text-white font-semibold text-sm">Barry the AI Assistant</p>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-cyan-400 font-mono text-xs">Online</span>
+              </div>
+            </div>
+          </div>
 
-            {/* Title */}
-            <div className="text-left">
-              <h1 className="text-7xl font-bold tracking-wider font-mono text-white mb-2" style={{
-                textShadow: '0 0 20px rgba(6, 182, 212, 0.8), 0 0 40px rgba(139, 92, 246, 0.4)',
-                letterSpacing: '0.2em'
-              }}>
-                MISSION CONTROL
-              </h1>
-              <p className="text-lg text-gray-300 font-mono tracking-widest ml-1">
-                Command Center v2.0
-              </p>
+          <div className="text-center">
+            <h1 className="text-6xl font-bold tracking-wider font-mono text-white mb-3" style={{
+              textShadow: '0 0 20px rgba(6, 182, 212, 0.8), 0 0 40px rgba(139, 92, 246, 0.4)',
+              letterSpacing: '0.15em'
+            }}>
+              MISSION CONTROL
+            </h1>
+            <div className="flex items-center justify-center gap-3 text-cyan-400 font-mono text-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>System ready for deployment</span>
             </div>
           </div>
         </div>
@@ -177,11 +198,11 @@ export default function MissionControlDashboardV2() {
       <main className="max-w-7xl mx-auto px-6 py-16 relative z-10">
         {/* WELCOME - Centered */}
         <section className="text-center mb-16">
-          <h2 className="text-5xl font-bold font-mono mb-4 text-white">
-            Welcome to Mission Control
+          <h2 className="text-4xl font-bold font-mono mb-4 text-white">
+            Your Next Steps
           </h2>
-          <p className="text-gray-300 text-xl max-w-3xl mx-auto">
-            Let's get started with your mission with your AI assistant
+          <p className="text-gray-300 text-lg max-w-2xl mx-auto leading-relaxed">
+            Start with <span className="text-cyan-400 font-semibold">SCOUT</span> to find companies that match your ideal customer profile, or use <span className="text-purple-400 font-semibold">RECON</span> to train Barry for better results.
           </p>
         </section>
 
@@ -196,7 +217,7 @@ export default function MissionControlDashboardV2() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {/* SCOUT - Active */}
             <div
-              onClick={() => navigate('/scout')}
+              onClick={handleScoutClick}
               className="group cursor-pointer bg-black/50 backdrop-blur-xl rounded-2xl p-6 border-2 border-cyan-500/50 hover:border-cyan-400 transition-all duration-300 relative overflow-hidden"
               style={{
                 boxShadow: '0 0 30px rgba(6, 182, 212, 0.3), inset 0 0 30px rgba(6, 182, 212, 0.05)'
@@ -404,6 +425,86 @@ export default function MissionControlDashboardV2() {
           </div>
         </section>
       </main>
+
+      {/* Welcome Modal for First-Time Users */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative max-w-2xl w-full bg-gradient-to-br from-gray-900 to-black rounded-2xl border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/30 p-8 animate-fadeIn">
+            {/* Close button */}
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors text-2xl"
+            >
+              ×
+            </button>
+
+            {/* Welcome Header with Barry */}
+            <div className="text-center mb-6">
+              <div className="inline-block relative mb-4">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 mx-auto">
+                  <span className="text-5xl">🐻</span>
+                </div>
+                <div className="absolute -top-2 -right-2 text-3xl animate-pulse">⭐</div>
+              </div>
+              <h2 className="text-4xl font-bold text-white mb-2 font-mono">Welcome to Mission Control!</h2>
+              <p className="text-cyan-400 text-lg font-semibold">Barry is ready to help you find your ideal customers</p>
+            </div>
+
+            {/* Mission Briefing */}
+            <div className="bg-black/50 rounded-xl p-6 border border-cyan-500/30 mb-6">
+              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <span>🎯</span> Your First Mission
+              </h3>
+              <p className="text-gray-300 mb-4 leading-relaxed">
+                Before Barry can start finding companies for you, you need to define your <span className="text-cyan-400 font-semibold">Ideal Customer Profile (ICP)</span>.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-cyan-500/20 border border-cyan-400/50 rounded-lg flex items-center justify-center">
+                    <span className="text-cyan-300 font-bold text-sm">1</span>
+                  </div>
+                  <p className="text-gray-300 text-sm pt-1">Answer 5 quick questions about your ideal customer</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-purple-500/20 border border-purple-400/50 rounded-lg flex items-center justify-center">
+                    <span className="text-purple-300 font-bold text-sm">2</span>
+                  </div>
+                  <p className="text-gray-300 text-sm pt-1">Barry uses this to find companies that match your profile</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-pink-500/20 border border-pink-400/50 rounded-lg flex items-center justify-center">
+                    <span className="text-pink-300 font-bold text-sm">3</span>
+                  </div>
+                  <p className="text-gray-300 text-sm pt-1">Start receiving daily leads of companies ready to engage with</p>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  setShowWelcomeModal(false);
+                  handleScoutClick();
+                }}
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-cyan-500/50 font-mono text-lg"
+              >
+                🚀 Set Up My ICP
+              </button>
+              <button
+                onClick={() => setShowWelcomeModal(false)}
+                className="flex-1 sm:flex-none bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white font-semibold py-4 px-6 rounded-xl transition-all border border-gray-600/50 font-mono"
+              >
+                I'll Do This Later
+              </button>
+            </div>
+
+            <p className="text-gray-500 text-xs text-center mt-4 font-mono">
+              Takes ~2 minutes • You can change this anytime in Scout → ICP Settings
+            </p>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes twinkle {

@@ -1,0 +1,214 @@
+/* ========================================
+   SCOUT MAIN - ENTERPRISE THEME
+   ======================================== */
+
+.scout-main {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+/* ========================================
+   HEADER
+   ======================================== */
+.scout-header {
+  background: #ffffff;
+  border-bottom: 1.5px solid #e5e7eb;
+  padding: 1.25rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.scout-branding {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.scout-branding svg {
+  color: #3b82f6;
+  stroke-width: 2.5;
+}
+
+.back-btn {
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.back-btn:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+/* ========================================
+   TAB NAVIGATION
+   ======================================== */
+.scout-tabs {
+  background: #ffffff;
+  border-bottom: 1.5px solid #e5e7eb;
+  padding: 1rem 2rem;
+  position: sticky;
+  top: 69px;
+  z-index: 40;
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.tabs-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #6b7280;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.tab:hover {
+  background: #f9fafb;
+  color: #111827;
+  border-color: #e5e7eb;
+}
+
+.tab.active {
+  background: #3b82f6;
+  color: #ffffff;
+  font-weight: 700;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.tab-badge {
+  background: #ffffff;
+  color: #3b82f6;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  margin-left: 0.25rem;
+}
+
+.tab.active .tab-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* ========================================
+   TAB CONTENT
+   ======================================== */
+.tab-content {
+  background: #ffffff;
+  min-height: calc(100vh - 140px);
+}
+
+/* ========================================
+   SCROLLBAR STYLING
+   ======================================== */
+.scout-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scout-tabs::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.scout-tabs::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.scout-tabs::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE
+   ======================================== */
+@media (max-width: 1024px) {
+  .scout-tabs {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .scout-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .scout-branding {
+    font-size: 1rem;
+  }
+
+  .scout-tabs {
+    padding: 0.75rem 1rem;
+    top: 61px;
+    justify-content: flex-start;
+  }
+
+  .tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+  }
+
+  .back-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+  }
+
+  .back-btn span {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .scout-branding span {
+    display: none;
+  }
+}

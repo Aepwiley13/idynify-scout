@@ -2,14 +2,19 @@ import { useState, useEffect } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Read tier from URL parameter (default to 'starter' if not specified)
+  const tier = searchParams.get('tier') || 'starter';
 
   useEffect(() => {
     const calculateCountdown = () => {
@@ -32,18 +37,56 @@ export default function Signup() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+
+    // Validate password match
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setError(''); // Clear any previous errors
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+
+      // Determine initial credits based on tier
+      const initialCredits = tier === 'pro' ? 1250 : 400;
+
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: email,
         createdAt: new Date(),
-        tier: 'scout',
-        status: 'active',
-        hasCompletedPayment: false // Will be set to true after checkout
+        selectedTier: tier, // Store the tier they selected (starter or pro)
+        subscriptionTier: tier,
+        status: 'pending_payment', // Will change to 'active' after payment
+        hasCompletedPayment: false, // Will be set to true after checkout
+        credits: initialCredits, // Give them credits based on tier
+        monthlyCredits: initialCredits
       });
 
-      navigate('/checkout'); // ✅ NEW FLOW: Go to payment after signup
+      // Send welcome email (async, don't block on this)
+      try {
+        await fetch('/.netlify/functions/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            userId: userCredential.user.uid
+          })
+        });
+        console.log('✅ Welcome email sent');
+      } catch (emailError) {
+        // Log but don't block signup flow
+        console.error('⚠️ Failed to send welcome email:', emailError);
+      }
+
+      // Redirect to checkout with tier parameter
+      navigate(`/checkout?tier=${tier}`);
     } catch (error) {
       setError(error.message);
     }
@@ -160,19 +203,19 @@ export default function Signup() {
               <ul className="space-y-2 text-gray-300">
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Access Barry AI's lead generation intelligence</span>
+                  <span>Define your Ideal Customer Profile with AI-powered RECON</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Receive 5-10 qualified leads in your first mission</span>
+                  <span>Browse unlimited companies matching your ICP (always free)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Zero cost deployment - 100% free for early crew</span>
+                  <span>Enrich {tier === 'pro' ? '125' : '40'} companies/month with full contact data</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Shape the future of AI-powered sales intelligence</span>
+                  <span>Get {tier === 'pro' ? '375' : '120'} verified contacts with email & phone</span>
                 </li>
               </ul>
             </div>
@@ -191,16 +234,31 @@ export default function Signup() {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="text-cyan-300 text-sm font-semibold mb-2 block font-mono uppercase tracking-wider">
                   SECURE PASSWORD
                 </label>
                 <input
                   type="password"
-                  placeholder="Min 6 characters"
+                  placeholder="Minimum 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-4 bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono"
+                  minLength="6"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-cyan-300 text-sm font-semibold mb-2 block font-mono uppercase tracking-wider">
+                  CONFIRM PASSWORD
+                </label>
+                <input
+                  type="password"
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full p-4 bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono"
                   minLength="6"
                   required
@@ -224,22 +282,33 @@ export default function Signup() {
 
             {/* Footer note */}
             <div className="mt-6 text-center">
-  <p className="text-cyan-500/60 text-sm font-mono">
-    🔒 ENCRYPTED • NO CREDIT CARD • INSTANT ACCESS
-  </p>
-  <p className="text-purple-400 text-xs mt-2">
-    Early crew members get lifetime founder benefits
-  </p>
-  <p className="text-gray-400 text-sm mt-4">
-    Already have an account?{' '}
-    <button
-      onClick={() => navigate('/login')}
-      className="text-cyan-400 hover:text-cyan-300 font-bold underline bg-transparent border-0 cursor-pointer"
-    >
-      Login here →
-    </button>
-  </p>
-</div>
+              <p className="text-cyan-500/60 text-sm font-mono">
+                🔒 ENCRYPTED • {tier === 'pro' ? '1,250 CREDITS' : '400 CREDITS'} • INSTANT ACCESS
+              </p>
+              <p className="text-purple-400 text-xs mt-2">
+                {tier === 'pro' ? '$50/month - 125 companies' : '$20/month - 40 companies'} • Cancel anytime
+              </p>
+              <div className="mt-4 space-y-2">
+                <p className="text-gray-400 text-sm">
+                  Already have an account?{' '}
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="text-cyan-400 hover:text-cyan-300 font-bold underline bg-transparent border-0 cursor-pointer"
+                  >
+                    Login here →
+                  </button>
+                </p>
+                <p className="text-gray-400 text-sm">
+                  Forgot your password?{' '}
+                  <button
+                    onClick={() => navigate('/forgot-password')}
+                    className="text-pink-400 hover:text-pink-300 font-bold underline bg-transparent border-0 cursor-pointer"
+                  >
+                    Reset it here →
+                  </button>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

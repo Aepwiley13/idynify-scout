@@ -107,29 +107,34 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   const [showOutput, setShowOutput] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Initialize answers from initialData or section1Answers from Firestore
+  // Initialize answers from initialData (preferred) or fallback to legacy storage
   useEffect(() => {
     const loadSavedData = async () => {
       try {
         const user = auth.currentUser;
         if (!user) return;
 
+        // Prefer initialData from dashboard state (unified state management)
+        if (initialData && Object.keys(initialData).length > 0) {
+          setAnswers(initialData);
+          setHasUnsavedChanges(false);
+        } else {
+          // Fallback: Check legacy storage for migration
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+
+            if (userData.section1Answers) {
+              setAnswers(userData.section1Answers);
+            }
+          }
+        }
+
+        // Check for saved output in legacy storage
         const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-
-          // Load saved answers
-          if (userData.section1Answers) {
-            setAnswers(userData.section1Answers);
-          } else if (initialData) {
-            setAnswers(initialData);
-          }
-
-          // Load saved output if exists
-          if (userData.section1Output) {
-            setOutput(userData.section1Output);
-            setShowOutput(true);
-          }
+        if (userDoc.exists() && userDoc.data().section1Output) {
+          setOutput(userDoc.data().section1Output);
+          setShowOutput(true);
         }
       } catch (error) {
         console.error('Error loading saved data:', error);
@@ -138,6 +143,21 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
     loadSavedData();
   }, [initialData]);
+
+  // Auto-save functionality - saves every 30 seconds when there are unsaved changes
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    console.log('🔄 Auto-save scheduled in 30 seconds...');
+    const autoSaveTimer = setTimeout(() => {
+      console.log('💾 Auto-saving progress...');
+      handleManualSave();
+    }, 30000); // 30 seconds
+
+    return () => {
+      clearTimeout(autoSaveTimer);
+    };
+  }, [answers, hasUnsavedChanges]);
 
   const handleManualSave = async () => {
     try {
@@ -149,19 +169,18 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
       setSaving(true);
 
-      await updateDoc(doc(db, 'users', user.uid), {
-        section1Answers: answers,
-        'section1Answers.lastSaved': new Date()
-      });
-
-      setHasUnsavedChanges(false);
-
-      // Call parent onSave if provided
+      // Use unified state management through parent's onSave
       if (onSave) {
         await onSave(answers);
+      } else {
+        // Fallback: Save directly to legacy location if no parent handler
+        await updateDoc(doc(db, 'users', user.uid), {
+          section1Answers: answers,
+          'section1Answers.lastSaved': new Date()
+        });
       }
 
-      // Silent save - no popup
+      setHasUnsavedChanges(false);
       console.log('✅ Progress saved');
     } catch (error) {
       console.error('Save error:', error);
@@ -248,6 +267,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
       console.log('🚀 Calling generate-section-1 function...');
 
+      // Get fresh auth token
+      const authToken = await user.getIdToken();
+
       // Call Netlify function
       const response = await fetch('/.netlify/functions/generate-section-1', {
         method: 'POST',
@@ -256,7 +278,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         },
         body: JSON.stringify({
           answers,
-          userId: user.uid
+          userId: user.uid,
+          authToken
         })
       });
 
@@ -280,23 +303,43 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
       console.log('✅ Response data:', data);
 
       if (data.success) {
+        console.log('💾 Setting output and showing results...');
         setOutput(data.output);
         setShowOutput(true);
 
-        // Save output to Firestore (client-side backup)
-        try {
+        // Complete the section using unified state management
+        if (onComplete) {
+          try {
+            console.log('📤 Calling onComplete to mark section as completed...');
+            console.log('🔍 onComplete type:', typeof onComplete);
+            await onComplete(data.output);
+            console.log('✅ onComplete returned successfully!');
+            console.log('🎉 Section marked as completed, Section 2 should be unlocked');
+            console.log('⏳ Parent component should now show alert and navigate...');
+            // Success handled by parent component (shows alert and navigates)
+          } catch (completeError) {
+            console.error('❌ Error in onComplete:', completeError);
+            console.error('❌ Error stack:', completeError.stack);
+            alert(`⚠️ Executive Summary generated but failed to mark section as complete:\n\n${completeError.message}\n\nPlease refresh the page and check the console for details.`);
+            // Still save to legacy location as fallback
+            await updateDoc(doc(db, 'users', user.uid), {
+              section1Output: data.output,
+              'reconProgress.currentSection': 1,
+              'reconProgress.section1Completed': true,
+              'reconProgress.lastUpdated': new Date()
+            });
+          }
+        } else {
+          // Fallback: Save to legacy location if no onComplete handler
+          console.warn('⚠️ No onComplete handler provided, using legacy save');
           await updateDoc(doc(db, 'users', user.uid), {
             section1Output: data.output,
             'reconProgress.currentSection': 1,
             'reconProgress.section1Completed': true,
             'reconProgress.lastUpdated': new Date()
           });
-          console.log('💾 Saved to Firestore (client-side)');
-        } catch (firestoreError) {
-          console.warn('⚠️  Firestore save failed:', firestoreError);
+          alert('✅ Executive Summary generated successfully!\n\nNote: Using legacy save mode. Progress may not sync properly.');
         }
-
-        alert('✅ Executive Summary generated successfully!');
       } else {
         throw new Error(data.error || 'Unknown error');
       }
@@ -313,7 +356,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   };
 
   const handleNextSection = () => {
-    navigate('/mission-control-v2/recon/section/2');
+    // Navigate back to RECON overview where Section 2 should now be unlocked
+    navigate('/mission-control-v2/recon');
   };
 
   const handleMissionControl = () => {
@@ -330,20 +374,20 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         <label className="block mb-2">
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
-              <span className="text-gray-300 font-mono font-bold">
+              <span className="text-gray-900 font-semibold">
                 {index + 1}. {question.question}
-                {question.required && <span className="text-red-400 ml-1">*</span>}
+                {question.required && <span className="text-red-600 ml-1">*</span>}
               </span>
               {question.helpText && (
-                <p className="text-xs text-gray-500 mt-1 font-mono">{question.helpText}</p>
+                <p className="text-sm text-gray-600 mt-1">{question.helpText}</p>
               )}
             </div>
             {question.type === 'textarea' && question.validation?.maxLength && (
-              <span className={`text-xs font-mono ml-4 ${
+              <span className={`text-xs ml-4 ${
                 value.length > question.validation.maxLength
-                  ? 'text-red-400'
+                  ? 'text-red-600'
                   : value.length > question.validation.maxLength * 0.9
-                  ? 'text-yellow-400'
+                  ? 'text-yellow-600'
                   : 'text-gray-500'
               }`}>
                 {value.length}/{question.validation.maxLength}
@@ -356,9 +400,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
               type="text"
               value={value}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
-              className={`w-full bg-black/40 border ${
-                hasError ? 'border-red-500' : 'border-cyan-500/30'
-              } rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none transition-colors`}
+              className={`w-full bg-white border ${
+                hasError ? 'border-red-500' : 'border-gray-300'
+              } rounded-lg p-4 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
               placeholder="Enter your answer..."
             />
           )}
@@ -367,9 +411,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
             <textarea
               value={value}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
-              className={`w-full bg-black/40 border ${
-                hasError ? 'border-red-500' : 'border-cyan-500/30'
-              } rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none transition-colors resize-none`}
+              className={`w-full bg-white border ${
+                hasError ? 'border-red-500' : 'border-gray-300'
+              } rounded-lg p-4 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all resize-none`}
               rows="4"
               placeholder="Enter your answer..."
             />
@@ -379,9 +423,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
             <select
               value={value}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
-              className={`w-full bg-black/40 border ${
-                hasError ? 'border-red-500' : 'border-cyan-500/30'
-              } rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none transition-colors`}
+              className={`w-full bg-white border ${
+                hasError ? 'border-red-500' : 'border-gray-300'
+              } rounded-lg p-4 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
             >
               <option value="">-- Select --</option>
               {question.options.map(option => (
@@ -397,9 +441,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
                   key={option}
                   className={`flex items-center p-3 rounded-lg border ${
                     value === option
-                      ? 'border-cyan-500 bg-cyan-500/10'
-                      : 'border-cyan-500/30 bg-black/20'
-                  } cursor-pointer hover:border-cyan-500/50 transition-colors`}
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 bg-white'
+                  } cursor-pointer hover:border-blue-400 transition-colors`}
                 >
                   <input
                     type="radio"
@@ -407,9 +451,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
                     value={option}
                     checked={value === option}
                     onChange={(e) => handleInputChange(question.id, e.target.value)}
-                    className="mr-3 accent-cyan-500"
+                    className="mr-3 accent-blue-600"
                   />
-                  <span className="text-gray-300 font-mono text-sm">{option}</span>
+                  <span className="text-gray-900 text-sm">{option}</span>
                 </label>
               ))}
             </div>
@@ -419,7 +463,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         {hasError && (
           <div className="mt-2 space-y-1">
             {fieldErrors.map((error, idx) => (
-              <p key={idx} className="text-red-400 text-xs font-mono">⚠️ {error}</p>
+              <p key={idx} className="text-red-600 text-xs">⚠️ {error}</p>
             ))}
           </div>
         )}
@@ -435,48 +479,48 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     return (
       <div className="space-y-6">
         {/* Company Overview */}
-        <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-          <h3 className="text-xl font-bold text-cyan-400 mb-4 font-mono">🏢 COMPANY OVERVIEW</h3>
-          <div className="space-y-2 text-gray-300">
-            <p><strong className="text-white">Name:</strong> {executiveSummary.companyOverview.name}</p>
-            <p><strong className="text-white">Industry:</strong> {executiveSummary.companyOverview.industry}</p>
-            <p><strong className="text-white">Stage:</strong> {executiveSummary.companyOverview.stage}</p>
-            <p className="mt-4 text-cyan-100 italic">"{executiveSummary.companyOverview.elevatorPitch}"</p>
+        <div className="bg-purple-50 rounded-2xl p-6 border border-purple-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">🏢 Company Overview</h3>
+          <div className="space-y-2 text-gray-700">
+            <p><strong className="text-gray-900">Name:</strong> {executiveSummary.companyOverview.name}</p>
+            <p><strong className="text-gray-900">Industry:</strong> {executiveSummary.companyOverview.industry}</p>
+            <p><strong className="text-gray-900">Stage:</strong> {executiveSummary.companyOverview.stage}</p>
+            <p className="mt-4 text-gray-900 italic bg-white p-4 rounded-lg border border-purple-200">"{executiveSummary.companyOverview.elevatorPitch}"</p>
           </div>
         </div>
 
         {/* Core Offering */}
-        <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-          <h3 className="text-xl font-bold text-cyan-400 mb-4 font-mono">🎯 CORE OFFERING</h3>
-          <div className="space-y-3 text-gray-300">
+        <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">🎯 Core Offering</h3>
+          <div className="space-y-3 text-gray-700">
             <div>
-              <strong className="text-white">Product:</strong>
+              <strong className="text-gray-900">Product:</strong>
               <p className="mt-1">{executiveSummary.coreOffering.product}</p>
             </div>
             <div>
-              <strong className="text-white">Problem Solved:</strong>
+              <strong className="text-gray-900">Problem Solved:</strong>
               <p className="mt-1">{executiveSummary.coreOffering.problemSolved}</p>
             </div>
             <div>
-              <strong className="text-white">Target Customer:</strong>
+              <strong className="text-gray-900">Target Customer:</strong>
               <p className="mt-1">{executiveSummary.coreOffering.targetCustomer}</p>
             </div>
           </div>
         </div>
 
         {/* Ideal Customer at a Glance */}
-        <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-          <h3 className="text-xl font-bold text-cyan-400 mb-4 font-mono">👥 IDEAL CUSTOMER AT A GLANCE</h3>
-          <p className="text-gray-300 leading-relaxed">{executiveSummary.idealCustomerGlance}</p>
+        <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">👥 Ideal Customer at a Glance</h3>
+          <p className="text-gray-700 leading-relaxed">{executiveSummary.idealCustomerGlance}</p>
         </div>
 
         {/* Perfect Fit Indicators */}
-        <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-          <h3 className="text-xl font-bold text-cyan-400 mb-4 font-mono">✅ PERFECT FIT INDICATORS</h3>
+        <div className="bg-green-50 rounded-2xl p-6 border border-green-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">✅ Perfect Fit Indicators</h3>
           <ul className="space-y-2">
             {executiveSummary.perfectFitIndicators.map((indicator, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-gray-300">
-                <span className="text-green-400 mt-1">▪</span>
+              <li key={idx} className="flex items-start gap-2 text-gray-700">
+                <span className="text-green-600 mt-1">▪</span>
                 <span>{indicator}</span>
               </li>
             ))}
@@ -484,13 +528,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Anti-Profile */}
-        <div className="bg-gradient-to-br from-red-900/20 to-purple-900/20 backdrop-blur-xl rounded-2xl p-6 border border-red-500/30">
-          <h3 className="text-xl font-bold text-red-400 mb-4 font-mono">🚫 ANTI-PROFILE</h3>
-          <p className="text-xs text-gray-500 mb-3 font-mono">Companies to AVOID targeting:</p>
+        <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">🚫 Anti-Profile</h3>
+          <p className="text-xs text-gray-600 mb-3 font-semibold">Companies to avoid targeting:</p>
           <ul className="space-y-2">
             {executiveSummary.antiProfile.map((profile, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-gray-300">
-                <span className="text-red-400 mt-1">✖</span>
+              <li key={idx} className="flex items-start gap-2 text-gray-700">
+                <span className="text-red-600 mt-1">✖</span>
                 <span>{profile}</span>
               </li>
             ))}
@@ -498,34 +542,34 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Current State */}
-        <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 backdrop-blur-xl rounded-2xl p-6 border border-yellow-500/30">
-          <h3 className="text-xl font-bold text-yellow-400 mb-4 font-mono">📊 CURRENT STATE</h3>
-          <div className="space-y-3 text-gray-300">
+        <div className="bg-yellow-50 rounded-2xl p-6 border border-yellow-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">📊 Current State</h3>
+          <div className="space-y-3 text-gray-700">
             <div>
-              <strong className="text-white">90-Day Goal:</strong>
+              <strong className="text-gray-900">90-Day Goal:</strong>
               <p className="mt-1">{executiveSummary.currentState.ninetyDayGoal}</p>
             </div>
             <div>
-              <strong className="text-white">Biggest Challenge:</strong>
+              <strong className="text-gray-900">Biggest Challenge:</strong>
               <p className="mt-1">{executiveSummary.currentState.biggestChallenge}</p>
             </div>
             <div>
-              <strong className="text-white">Implication for ICP:</strong>
-              <p className="mt-1 text-yellow-100">{executiveSummary.currentState.implication}</p>
+              <strong className="text-gray-900">Implication for ICP:</strong>
+              <p className="mt-1 text-gray-900">{executiveSummary.currentState.implication}</p>
             </div>
           </div>
         </div>
 
         {/* Key Insight */}
-        <div className="bg-gradient-to-br from-pink-900/20 to-purple-900/20 backdrop-blur-xl rounded-2xl p-6 border border-pink-500/30">
-          <h3 className="text-xl font-bold text-pink-400 mb-4 font-mono">💡 KEY INSIGHT</h3>
-          <p className="text-gray-100 text-lg leading-relaxed">{executiveSummary.keyInsight}</p>
+        <div className="bg-pink-50 rounded-2xl p-6 border border-pink-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">💡 Key Insight</h3>
+          <p className="text-gray-900 text-lg leading-relaxed">{executiveSummary.keyInsight}</p>
         </div>
 
         {/* Metadata */}
         {output.metadata && (
-          <div className="bg-black/60 rounded-xl p-4 border border-cyan-500/20">
-            <p className="text-xs text-gray-500 font-mono">
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <p className="text-xs text-gray-600">
               Generated in {output.metadata.generationTime?.toFixed(1)}s |
               Model: {output.metadata.model} |
               Tokens: {output.metadata.tokensUsed}
@@ -537,24 +581,24 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         <div className="flex gap-4">
           <button
             onClick={handleEditAnswers}
-            className="flex-1 bg-gray-700/50 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono border border-gray-500/30"
+            className="flex-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all border border-gray-300"
           >
-            ✏️ EDIT ANSWERS
+            ✏️ Edit Answers
           </button>
           <button
             onClick={handleNextSection}
-            className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono shadow-lg shadow-cyan-500/50"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-md"
           >
-            NEXT SECTION →
+            Next Section →
           </button>
         </div>
 
         {/* Mission Control Button */}
         <button
           onClick={handleMissionControl}
-          className="w-full bg-purple-700/50 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl transition-all font-mono border border-purple-500/30"
+          className="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold py-3 px-6 rounded-xl transition-all border border-purple-300"
         >
-          🏠 RETURN TO MISSION CONTROL
+          🏠 Return to Mission Control
         </button>
       </div>
     );
@@ -563,12 +607,12 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   if (showOutput && output) {
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30">
+        <div className="bg-green-50 rounded-2xl p-6 border border-green-200">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">✅</span>
             <div>
-              <h3 className="text-xl font-bold text-green-400 font-mono">SECTION 1 COMPLETE</h3>
-              <p className="text-sm text-gray-400 font-mono">Executive Summary Generated</p>
+              <h3 className="text-xl font-bold text-gray-900">Section 1 Complete</h3>
+              <p className="text-sm text-gray-600">Executive Summary Generated</p>
             </div>
           </div>
         </div>
@@ -588,60 +632,60 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     <div className="space-y-6">
       {/* Progress & Mission Control Button */}
       <div className="flex gap-4">
-        <div className="flex-1 bg-gradient-to-br from-cyan-900/20 to-blue-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
+        <div className="flex-1 bg-blue-50 rounded-2xl p-6 border border-blue-200">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-white font-mono">📋 PROGRESS</h3>
-            <span className="text-cyan-400 font-mono font-bold">{completedCount}/{totalQuestions}</span>
+            <h3 className="text-lg font-bold text-gray-900">📋 Progress</h3>
+            <span className="text-blue-600 font-bold">{completedCount}/{totalQuestions}</span>
           </div>
-          <div className="w-full bg-black/40 rounded-full h-3 overflow-hidden border border-cyan-500/30">
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500"
+              className="bg-blue-600 h-full transition-all duration-500"
               style={{ width: `${(completedCount / totalQuestions) * 100}%` }}
             />
           </div>
-          <p className="text-xs text-gray-500 font-mono mt-2">
+          <p className="text-xs text-gray-600 mt-2">
             Required fields: {requiredCompleted}/{requiredQuestions.length}
           </p>
         </div>
 
         <button
           onClick={handleMissionControl}
-          className="bg-purple-700/50 hover:bg-purple-700 text-white font-bold px-8 rounded-2xl transition-all font-mono border border-purple-500/30 whitespace-nowrap"
+          className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold px-8 rounded-2xl transition-all border border-purple-300 whitespace-nowrap"
         >
-          🏠 MISSION CONTROL
+          🏠 Mission Control
         </button>
       </div>
 
       {/* Questions */}
-      <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-8 border border-cyan-500/30">
-        <h3 className="text-2xl font-bold text-white mb-6 font-mono">
-          SECTION 1: COMPANY IDENTITY & FOUNDATION
+      <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
+        <h3 className="text-2xl font-bold text-gray-900 mb-6">
+          Section 1: Company Identity & Foundation
         </h3>
 
         {SECTION_1_QUESTIONS.map((question, index) => renderQuestion(question, index))}
       </div>
 
       {/* Action Buttons */}
-      <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30 space-y-4">
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
         {/* Save Button */}
         <button
           onClick={handleManualSave}
           disabled={saving || !hasUnsavedChanges}
-          className={`w-full font-bold py-4 px-6 rounded-xl transition-all font-mono ${
+          className={`w-full font-semibold py-4 px-6 rounded-xl transition-all ${
             hasUnsavedChanges && !saving
-              ? 'bg-gray-700 hover:bg-gray-600 text-white border border-gray-500'
-              : 'bg-gray-800/50 text-gray-500 cursor-not-allowed border border-gray-700/30'
+              ? 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
+              : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-200'
           }`}
         >
           {saving ? (
             <span className="flex items-center justify-center gap-2">
               <span className="animate-spin">⚙️</span>
-              SAVING...
+              Saving...
             </span>
           ) : hasUnsavedChanges ? (
-            '💾 SAVE PROGRESS'
+            '💾 Save Progress'
           ) : (
-            '✅ ALL CHANGES SAVED'
+            '✅ All Changes Saved'
           )}
         </button>
 
@@ -649,32 +693,32 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         <button
           onClick={handleGenerate}
           disabled={!canGenerate || generating}
-          className={`w-full font-bold py-4 px-6 rounded-xl transition-all font-mono ${
+          className={`w-full font-semibold py-4 px-6 rounded-xl transition-all ${
             canGenerate && !generating
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/50'
-              : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
           }`}
         >
           {generating ? (
             <span className="flex items-center justify-center gap-2">
               <span className="animate-spin">⚙️</span>
-              GENERATING EXECUTIVE SUMMARY...
+              Generating Executive Summary...
             </span>
           ) : canGenerate ? (
-            '🚀 GENERATE EXECUTIVE SUMMARY'
+            '🚀 Generate Executive Summary'
           ) : (
-            `⚠️ COMPLETE ALL REQUIRED FIELDS (${requiredCompleted}/${requiredQuestions.length})`
+            `⚠️ Complete all required fields (${requiredCompleted}/${requiredQuestions.length})`
           )}
         </button>
 
         {!canGenerate && (
-          <p className="text-xs text-gray-500 font-mono text-center">
+          <p className="text-xs text-gray-600 text-center">
             Please complete all required fields (*) before generating
           </p>
         )}
 
         {canGenerate && !generating && (
-          <p className="text-xs text-gray-400 font-mono text-center">
+          <p className="text-xs text-gray-600 text-center">
             This will analyze your answers and generate your ICP foundation insights
           </p>
         )}

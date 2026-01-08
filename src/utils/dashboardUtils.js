@@ -28,6 +28,10 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
       throw new Error(`Section ${sectionId} not found`);
     }
 
+    // Check if this is a new completion (before updating)
+    const wasAlreadyCompleted = sections[sectionIndex].status === 'completed';
+    const isBeingCompleted = updates.status === 'completed';
+
     // Update section
     sections[sectionIndex] = {
       ...sections[sectionIndex],
@@ -35,13 +39,14 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
       lastEditedAt: new Date().toISOString()
     };
 
-    // If section is being completed, unlock next section
-    if (updates.status === 'completed' && !sections[sectionIndex].completedAt) {
-      sections[sectionIndex].completedAt = new Date().toISOString();
+    // If section is being completed for the first time, unlock next section
+    if (isBeingCompleted && !wasAlreadyCompleted) {
+      console.log(`🔓 Section ${sectionId} completed! Unlocking next section...`);
 
       // Unlock next section
       if (sectionIndex + 1 < sections.length) {
         sections[sectionIndex + 1].unlocked = true;
+        console.log(`✅ Section ${sections[sectionIndex + 1].sectionId} unlocked!`);
       }
     }
 
@@ -59,6 +64,20 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
     } else if (completedSections === sections.length) {
       modules[moduleIndex].status = 'completed';
       modules[moduleIndex].completedAt = new Date().toISOString();
+
+      // Unlock next module when current module is completed
+      if (moduleIndex + 1 < modules.length) {
+        const nextModule = modules[moduleIndex + 1];
+        if (!nextModule.unlocked) {
+          console.log(`🔓 Module ${moduleId} completed! Unlocking next module: ${nextModule.id}`);
+          modules[moduleIndex + 1].unlocked = true;
+          modules[moduleIndex + 1].status = 'not_started';
+          // Unlock first section of next module
+          if (modules[moduleIndex + 1].sections && modules[moduleIndex + 1].sections.length > 0) {
+            modules[moduleIndex + 1].sections[0].unlocked = true;
+          }
+        }
+      }
     } else {
       modules[moduleIndex].status = 'in-progress';
       if (!modules[moduleIndex].startedAt) {
@@ -88,7 +107,15 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
     });
 
     console.log('✅ Section updated successfully');
-    return true;
+    console.log(`📊 Module progress: ${completedSections}/${sections.length} sections (${progressPercentage}%)`);
+
+    // Return updated section data for verification
+    return {
+      success: true,
+      section: sections[sectionIndex],
+      nextSection: sectionIndex + 1 < sections.length ? sections[sectionIndex + 1] : null,
+      moduleProgress: progressPercentage
+    };
   } catch (error) {
     console.error('❌ Error updating section:', error);
     throw error;
@@ -154,8 +181,11 @@ export async function saveSectionData(userId, moduleId, sectionId, data) {
       lastUpdatedAt: new Date().toISOString()
     });
 
-    console.log('✅ Section data saved');
-    return true;
+    console.log(`✅ Section ${sectionId} data saved (version ${modules[moduleIndex].sections[sectionIndex].version})`);
+    return {
+      success: true,
+      section: modules[moduleIndex].sections[sectionIndex]
+    };
   } catch (error) {
     console.error('❌ Error saving section data:', error);
     throw error;
@@ -174,7 +204,39 @@ export async function getDashboardState(userId) {
       return null;
     }
 
-    return dashboardDoc.data();
+    const data = dashboardDoc.data();
+
+    // Migration: Auto-unlock next modules if previous module is completed
+    const modules = data.modules || [];
+    let needsUpdate = false;
+
+    for (let i = 0; i < modules.length - 1; i++) {
+      const currentModule = modules[i];
+      const nextModule = modules[i + 1];
+
+      // If current module is completed and next module is locked, unlock it
+      if (currentModule.status === 'completed' && !nextModule.unlocked) {
+        console.log(`🔧 Migration: Unlocking ${nextModule.id} because ${currentModule.id} is completed`);
+        nextModule.unlocked = true;
+        nextModule.status = 'not_started';
+        if (nextModule.sections && nextModule.sections.length > 0) {
+          nextModule.sections[0].unlocked = true;
+        }
+        needsUpdate = true;
+      }
+    }
+
+    // Save migration changes
+    if (needsUpdate) {
+      await updateDoc(dashboardRef, {
+        modules,
+        lastUpdatedAt: new Date().toISOString()
+      });
+      console.log('✅ Dashboard state migrated and updated');
+      return { ...data, modules };
+    }
+
+    return data;
   } catch (error) {
     console.error('❌ Error getting dashboard state:', error);
     throw error;

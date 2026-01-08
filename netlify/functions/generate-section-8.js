@@ -1,18 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import admin from 'firebase-admin';
-
-// Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-    })
-  });
-}
-
-const db = admin.firestore();
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,7 +12,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { answers, userId } = JSON.parse(event.body);
+    const { answers, userId, authToken } = JSON.parse(event.body);
 
     if (!answers) {
       throw new Error('Answers are required');
@@ -36,196 +22,103 @@ export const handler = async (event) => {
       throw new Error('User ID is required');
     }
 
-    console.log('🎯 Generating Section 8 Competitive Landscape for user:', userId);
-
-    // Validate required fields
-    const requiredFields = [
-      'directCompetitors',
-      'indirectCompetitors',
-      'whyYouWin',
-      'whyYouLose',
-      'uniqueDifferentiators',
-      'competitorStrengths',
-      'yourWeaknesses',
-      'pricePosition',
-      'idealCompetitor',
-      'avoidCompetitor'
-    ];
-    
-    for (const field of requiredFields) {
-      const value = answers[field];
-      if (!value || (typeof value === 'string' && value.trim() === '')) {
-        throw new Error(`Required field missing: ${field}`);
-      }
-      
-      // Validate text fields
-      if (['whyYouWin', 'whyYouLose'].includes(field)) {
-        if (value.length < 100) {
-          throw new Error(`${field} must be at least 100 characters`);
-        }
-      }
+    if (!authToken) {
+      throw new Error('Authentication token is required');
     }
 
-    // Try to get Section 5 data for cost of inaction
-    let section5Cost = null;
-    try {
-      const userDoc = await db.collection('users').doc(userId).get();
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.section5Output?.painMotivationMap?.costOfInaction?.totalCost) {
-          section5Cost = userData.section5Output.painMotivationMap.costOfInaction.totalCost;
-        }
+    console.log('🎯 Generating Section 8 Competitive Landscape for user:', userId);
+
+    // Verify Firebase Auth token using REST API
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      throw new Error('Firebase project ID not configured');
+    }
+
+    console.log('🔐 Verifying auth token...');
+    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
       }
-    } catch (err) {
-      console.log('Section 5 data not available:', err.message);
+    );
+
+    if (!verifyResponse.ok) {
+      const errorData = await verifyResponse.json().catch(() => ({}));
+      console.error('❌ Firebase auth verification failed:', {
+        status: verifyResponse.status,
+        statusText: verifyResponse.statusText,
+        error: errorData
+      });
+      throw new Error(`Invalid authentication token: ${errorData.error?.message || verifyResponse.statusText}`);
+    }
+
+    const verifyData = await verifyResponse.json();
+
+    if (!verifyData.users || verifyData.users.length === 0) {
+      console.error('❌ No user found in token verification response');
+      throw new Error('Authentication token verification failed: no user found');
+    }
+
+    const tokenUserId = verifyData.users[0].localId;
+
+    // Verify the token belongs to the claimed user
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified for user:', userId);
+
+        // Validate that we have answers (generic validation)
+    if (!answers || Object.keys(answers).length === 0) {
+      throw new Error('No answers provided');
     }
 
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    const prompt = `You are generating the Competitive Landscape Analysis for Section 8 of a RECON ICP intelligence system.
+    const sectionNumber = 8;
+    const sectionTitle = "Competitive Landscape";
 
-SECTION 8: COMPETITIVE LANDSCAPE
+    const prompt = `You are generating analysis for Section ${sectionNumber} (${sectionTitle}) of a RECON ICP intelligence system.
 
 User's answers:
 ${JSON.stringify(answers, null, 2)}
 
-${section5Cost ? `Cost of Inaction from Section 5: ${section5Cost}` : ''}
-
-Generate the Competitive Landscape output following this EXACT JSON schema with comprehensive battle cards.
-
-CRITICAL: Parse competitors from text into structured data. Extract 3-5 direct competitors and 3-5 indirect alternatives.
-
-CRITICAL: Create detailed battle cards with trap questions for each competitive scenario.
-
-CRITICAL: Extract win/loss reasons from text and categorize by frequency (primary/secondary/occasional).
-
-Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.
-
+Generate comprehensive ICP analysis output following this EXACT JSON schema:
 {
-  "section": 8,
-  "title": "Competitive Landscape",
+  "section": ${sectionNumber},
+  "title": "${sectionTitle}",
   "status": "completed",
   "completedAt": "${new Date().toISOString()}",
   "version": 1,
-  "competitiveLandscape": {
-    "competitorMap": {
-      "directCompetitors": [
-        {
-          "name": "string (extract competitor 1 from directCompetitors text)",
-          "category": "string (enterprise/mid-market/budget based on context)",
-          "strengths": ["array of 3-5 strengths from competitorStrengths and whyYouLose"],
-          "weaknesses": ["array of 3-5 weaknesses inferred from whyYouWin and context"],
-          "whenTheyWin": "string (scenarios where they beat you)",
-          "whenYouWin": "string (scenarios where you beat them)",
-          "positioning": "string (how to position against them - specific messaging)"
-        }
-      ],
-      "indirectAlternatives": [
-        {
-          "alternative": "string (extract from indirectCompetitors - e.g., 'Hire more SDRs')",
-          "appeal": "string (why customers consider this)",
-          "weakness": "string (why it's not ideal)",
-          "counterStrategy": "string (how to position against it with numbers)"
-        }
-      ],
-      "statusQuo": {
-        "description": "string (extract 'do nothing' or 'manual' from indirectCompetitors)",
-        "appeal": "string (why customers stick with status quo - comfort, no budget, etc.)",
-        "cost": "string (use section5Cost if available, otherwise estimate from context)",
-        "counterStrategy": "string (how to overcome inertia - quantify cost, create urgency)"
-      }
-    },
-    "winLossAnalysis": {
-      "winReasons": [
-        {
-          "reason": "string (extract reason 1 from whyYouWin)",
-          "frequency": "string (primary=50%+, secondary=30-50%, occasional=<30% - assess based on language)",
-          "customerQuote": "string (rewrite as realistic customer quote)"
-        }
-      ],
-      "lossReasons": [
-        {
-          "reason": "string (extract from whyYouLose)",
-          "frequency": "string (primary/secondary/occasional)",
-          "mitigation": "string (specific tactic to address this weakness)"
-        }
-      ],
-      "winRate": {
-        "estimatedOverall": "string (estimate based on win/loss reasons - if more/stronger wins, higher rate)",
-        "vsEnterprise": "string (if idealCompetitor is enterprise, high rate; if avoidCompetitor, low rate)",
-        "vsBudget": "string (typically higher if you're slightly premium position)",
-        "vsStatusQuo": "string (typically 50-60% - hardest to overcome)"
-      }
-    },
-    "differentiation": {
-      "uniqueValueProps": [
-        {
-          "differentiator": "string (extract from uniqueDifferentiators)",
-          "defendability": "string (hard=unique tech/patent, moderate=expertise/brand, easy=feature parity)",
-          "marketRelevance": "string (high=customers care a lot, medium=nice to have, low=differentiator for sake of it)",
-          "leverage": "string (how to use in sales - demo, messaging, proof)"
-        }
-      ],
-      "competitiveAdvantages": ["array of 3-5 advantages from whyYouWin"],
-      "vulnerabilities": ["array of 3-5 from yourWeaknesses + whyYouLose"]
-    },
-    "positioningStrategy": {
-      "primaryPosition": "string (synthesize from uniqueDifferentiators + pricePosition + idealCompetitor)",
-      "againstEnterprise": "string (if competing: emphasize speed, simplicity, cost vs complexity)",
-      "againstBudget": "string (if competing: emphasize quality, ROI, professionalism vs cheap)",
-      "againstDIY": "string (emphasize opportunity cost, ongoing innovation, focus vs distraction)",
-      "againstStatusQuo": "string (quantify cost, create urgency, use peer proof)",
-      "targetSegment": "string (describe ideal segment based on idealCompetitor selection)"
-    },
-    "priceStrategy": {
-      "positioning": "string (from pricePosition selection)",
-      "implication": "string (what this means for sales - value selling, discount room, etc.)",
-      "justification": "string (how to justify price with ROI, quality, cost vs alternatives)",
-      "objectionHandling": "string (specific scripts for price objections)"
-    },
-    "battleCards": {
-      "vsEnterprise": {
-        "theirStrengths": ["array from competitorStrengths"],
-        "theirWeaknesses": ["array of enterprise weaknesses - complex, slow, expensive"],
-        "ourAdvantages": ["array from whyYouWin relevant to enterprise comparison"],
-        "positioning": "string (specific messaging - emphasize speed, simplicity, ROI)",
-        "trapQuestions": [
-          "string (question 1 - e.g., 'How long is implementation?' exposes 3-6 months)",
-          "string (question 2)",
-          "string (question 3)",
-          "string (question 4)",
-          "string (question 5)"
-        ]
-      },
-      "vsStatusQuo": {
-        "theirAppeal": "string (why status quo is comfortable)",
-        "costOfInaction": "string (use section5Cost if available, otherwise create estimate)",
-        "changeDrivers": ["array of what forces change - urgency, pain, triggers"],
-        "positioning": "string (specific messaging - status quo is expensive, not free)",
-        "urgencyCreation": "string (tactics to create urgency - deadline, cost per day, competitive pressure)"
-      },
-      "vsBudget": {
-        "theirStrengths": ["Cheap price", "Simple to start", "No commitment"],
-        "theirWeaknesses": ["No personalization", "Poor deliverability", "No support", "Damages reputation"],
-        "ourAdvantages": ["array from whyYouWin relevant to budget comparison"],
-        "positioning": "string (professional-grade vs hobby tools, cost of cheap in long run)",
-        "roiJustification": "string (show true cost - reputation damage, wasted time, poor results)"
-      }
-    },
-    "marketOpportunity": {
-      "sweetSpot": {
-        "description": "string (segment from idealCompetitor - who you want to compete against)",
-        "why": "string (why you win in this segment - from whyYouWin)",
-        "penetration": "string (realistic market share estimate - be conservative)"
-      },
-      "avoidSegment": {
-        "description": "string (segment from avoidCompetitor)",
-        "why": "string (why you lose - from whyYouLose)",
-        "strategy": "string (avoid or find different angle)"
-      }
-    }
+  "executiveSummary": {
+    "overview": "string (2-3 sentence summary of key insights from this section)",
+    "keyFindings": [
+      "string (3-7 specific, actionable insights derived from the user's answers)",
+      "string (Focus on WHO the ideal customer is and HOW to identify them)",
+      "string (Be specific with numbers, roles, company attributes)",
+      "string (Include observable signals when relevant)",
+      "string (Connect findings to ICP targeting strategy)"
+    ],
+    "icpImplications": [
+      "string (3-5 insights about how this data narrows the ICP definition)",
+      "string (What does this tell us about company size, industry, roles, etc.)",
+      "string (Observable signals for targeting and qualification)"
+    ],
+    "actionableInsights": [
+      "string (2-4 specific next steps or targeting strategies)",
+      "string (How to use this information in prospecting/outreach)",
+      "string (Warning signs or anti-patterns to avoid)"
+    ],
+    "keyInsight": "string (ONE critical takeaway that synthesizes this section's contribution to ICP definition)"
   },
   "rawAnswers": ${JSON.stringify(answers, null, 2)},
   "metadata": {
@@ -236,28 +129,16 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
   }
 }
 
-PARSING INSTRUCTIONS:
+CRITICAL INSTRUCTIONS:
+1. Use the user's EXACT language from their answers - don't sanitize or rewrite
+2. Be SPECIFIC - include numbers, percentages, company sizes, roles, technologies
+3. Focus on OBSERVABLE signals that can be used for targeting
+4. Connect findings to HOW to identify and qualify prospects
+5. Key Insight must be ACTIONABLE and section-specific
+6. Synthesize across all answers to find patterns and implications
+7. Think about: WHO buys, WHAT they look like, WHERE to find them, WHY they buy
 
-1. Extract competitors from directCompetitors text (comma-separated or line-separated)
-2. Categorize each competitor: enterprise (Outreach, Salesloft), mid-market (Apollo), budget (Instantly)
-3. Extract 3-5 indirect alternatives from indirectCompetitors text
-4. Parse whyYouWin into 3-5 distinct win reasons
-5. Parse whyYouLose into 3-5 distinct loss reasons
-6. Parse uniqueDifferentiators into 3 unique value props
-7. Assess defendability: hard (tech/patent), moderate (expertise), easy (features)
-8. Create trap questions that expose competitor weaknesses
-
-TRAP QUESTION EXAMPLES:
-- "How long is your typical implementation?" (exposes 3-6 months for enterprise)
-- "What's the total cost including admin and training?" (exposes hidden costs)
-- "Do you require a dedicated admin?" (exposes complexity)
-- "How long until we see ROI?" (exposes long payback)
-- "Can we start using it this week?" (exposes long onboarding)
-
-WIN/LOSS FREQUENCY ASSESSMENT:
-- PRIMARY: If mentioned first or emphasized = 50%+ frequency
-- SECONDARY: If mentioned but not emphasized = 30-50% frequency  
-- OCCASIONAL: If mentioned last or weak language = <30% frequency`;
+Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just pure JSON.`;
 
     console.log('🤖 Calling Claude API...');
 
@@ -289,16 +170,8 @@ WIN/LOSS FREQUENCY ASSESSMENT:
     }
 
     // Validate schema
-    if (!output.competitiveLandscape || !output.rawAnswers) {
+    if (!output.executiveSummary || !output.rawAnswers) {
       throw new Error('Invalid output schema - missing required fields');
-    }
-
-    // Validate required sections
-    const requiredSections = ['competitorMap', 'winLossAnalysis', 'differentiation', 'positioningStrategy', 'battleCards'];
-    for (const section of requiredSections) {
-      if (!output.competitiveLandscape[section]) {
-        throw new Error(`Missing required section in output: ${section}`);
-      }
     }
 
     // Add metadata
@@ -313,20 +186,9 @@ WIN/LOSS FREQUENCY ASSESSMENT:
     console.log('✅ Successfully generated Section 8 output');
     console.log(`⏱️  Generation time: ${generationTime.toFixed(2)}s`);
     console.log(`🪙 Tokens used: ${output.metadata.tokensUsed}`);
-    console.log(`⚔️  Competitors mapped: ${output.competitiveLandscape.competitorMap.directCompetitors.length}`);
 
-    // Save to Firestore
-    try {
-      await db.collection('users').doc(userId).update({
-        section8Output: output,
-        'reconProgress.section8Completed': true,
-        'reconProgress.lastUpdated': admin.firestore.FieldValue.serverTimestamp()
-      });
-      console.log('💾 Saved to Firestore');
-    } catch (firestoreError) {
-      console.error('⚠️  Warning: Failed to save to Firestore:', firestoreError.message);
-      // Don't fail the entire request if Firestore save fails
-    }
+    // Note: Client will save to Firestore using its authenticated session
+    console.log('💡 Returning output to client for Firestore save');
 
     return {
       statusCode: 200,

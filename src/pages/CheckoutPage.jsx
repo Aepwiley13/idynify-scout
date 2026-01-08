@@ -1,41 +1,137 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [processing, setProcessing] = useState(false);
+
+  // Read tier from URL parameter (default to 'starter')
+  const tier = searchParams.get('tier') || 'starter';
+
+  // Tier configuration
+  const tierConfig = {
+    starter: {
+      name: 'Scout Starter',
+      price: 20,
+      credits: 400,
+      companies: 40,
+      contacts: 120,
+      features: [
+        'Browse unlimited companies',
+        '40 enriched companies/month',
+        '120 contact details (email + phone)',
+        'Full RECON access',
+        'CSV exports',
+        'Email support (48-hour response)'
+      ]
+    },
+    pro: {
+      name: 'Scout Pro',
+      price: 50,
+      credits: 1250,
+      companies: 125,
+      contacts: 375,
+      features: [
+        'Browse unlimited companies',
+        '125 enriched companies/month',
+        '375 contact details (email + phone)',
+        'Full RECON access',
+        'Unlimited CSV exports',
+        'Enhanced RECON reports with PDF',
+        'Priority support (24-hour response)'
+      ]
+    }
+  };
+
+  const selectedTier = tierConfig[tier];
 
   const handleCheckout = async () => {
     setProcessing(true);
 
     try {
-      // TODO: Replace with actual Stripe integration
-      // For now, simulate payment and mark as completed
       const user = auth.currentUser;
       if (!user) {
         navigate('/login');
         return;
       }
 
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check if Stripe is configured (production mode)
+      const isStripeConfigured = import.meta.env.VITE_STRIPE_ENABLED === 'true';
 
-      // Mark payment as completed in Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
-        hasCompletedPayment: true,
-        paymentCompletedAt: new Date().toISOString(),
-        subscriptionTier: 'pro',
-        subscriptionStatus: 'active'
-      });
+      if (isStripeConfigured) {
+        // PRODUCTION MODE: Use real Stripe integration
+        console.log('🔐 Redirecting to Stripe Checkout...');
 
-      // Redirect to success page
-      navigate('/checkout/success');
+        // Call Netlify function to create Stripe Checkout Session
+        const response = await fetch('/.netlify/functions/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            tier: tier, // Pass the selected tier (starter or pro)
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create checkout session');
+        }
+
+        const { url } = await response.json();
+
+        // Redirect to Stripe Checkout
+        window.location.href = url;
+      } else {
+        // DEVELOPMENT MODE: Simulate payment (for testing without Stripe)
+        console.log('⚠️ DEV MODE: Simulating payment (Stripe not configured)');
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Mark payment as completed in Firestore (DEV MODE ONLY)
+        await updateDoc(doc(db, 'users', user.uid), {
+          hasCompletedPayment: true,
+          paymentCompletedAt: new Date().toISOString(),
+          subscriptionTier: tier,
+          subscriptionStatus: 'active',
+          credits: {
+            total: selectedTier.credits,
+            used: 0,
+            remaining: selectedTier.credits,
+            resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          tierLimits: {
+            creditsPerMonth: selectedTier.credits,
+            companiesPerMonth: selectedTier.companies,
+            contactsPerMonth: selectedTier.contacts,
+            teamSeats: 1,
+            support: tier === 'starter' ? '48-hour email' : '24-hour email'
+          },
+          billingCycleDate: new Date().getDate()
+        });
+
+        // Redirect to success page
+        navigate('/checkout/success');
+      }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
+      alert(`Payment failed: ${error.message}\n\nPlease try again or contact support.`);
       setProcessing(false);
+    }
+  };
+
+  const handleBackToHome = async () => {
+    try {
+      await signOut(auth);
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      navigate('/');
     }
   };
 
@@ -60,6 +156,17 @@ export default function CheckoutPage() {
         ))}
       </div>
 
+      {/* Back to Homepage Button */}
+      <div className="absolute top-6 left-6 z-20">
+        <button
+          onClick={handleBackToHome}
+          className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-mono text-sm transition-all hover:scale-105"
+        >
+          <span className="text-xl">🚀</span>
+          <span>BACK TO HOME</span>
+        </button>
+      </div>
+
       {/* Main Content */}
       <div className="relative z-10 min-h-screen flex items-center justify-center px-6 py-12">
         <div className="max-w-2xl w-full">
@@ -70,47 +177,34 @@ export default function CheckoutPage() {
               Complete Your Purchase
             </h1>
             <p className="text-gray-400 text-lg">
-              Get instant access to RECON intelligence and lead generation
+              Get instant access to Scout & Recon intelligence and lead generation
             </p>
           </div>
 
           {/* Pricing Card */}
-          <div className="bg-black/60 backdrop-blur-xl rounded-2xl p-8 border-2 border-cyan-500/30 mb-8">
+          <div className={`bg-black/60 backdrop-blur-xl rounded-2xl p-8 mb-8 ${
+            tier === 'pro'
+              ? 'border-2 border-cyan-500'
+              : 'border-2 border-gray-700'
+          }`}>
             <div className="text-center mb-6">
-              <div className="text-sm text-gray-400 font-mono mb-2">IDYNIFY SCOUT PRO</div>
-              <div className="text-5xl font-bold text-white mb-2">$97<span className="text-2xl text-gray-400">/mo</span></div>
-              <div className="text-gray-400 text-sm">Billed monthly • Cancel anytime</div>
+              <div className="text-sm text-gray-400 font-mono mb-2">{selectedTier.name.toUpperCase()}</div>
+              <div className="text-5xl font-bold text-white mb-2">
+                ${selectedTier.price}
+                <span className="text-2xl text-gray-400">/mo</span>
+              </div>
+              <div className="text-gray-400 text-sm">{selectedTier.credits} credits • Billed monthly • Cancel anytime</div>
             </div>
 
             <div className="space-y-4 mb-8">
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">RECON Module</p>
-                  <p className="text-gray-400 text-sm">AI-powered ICP definition & market intelligence</p>
+              {selectedTier.features.map((feature, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <span className="text-green-400 text-xl">✓</span>
+                  <div>
+                    <p className="text-white">{feature}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">SCOUT Module</p>
-                  <p className="text-gray-400 text-sm">Unlimited lead generation & contact discovery</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">SNIPER Module</p>
-                  <p className="text-gray-400 text-sm">Precision outreach campaigns & analytics</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-400 text-xl">✓</span>
-                <div>
-                  <p className="text-white font-semibold">Priority Support</p>
-                  <p className="text-gray-400 text-sm">Email support within 24 hours</p>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Checkout Button */}
@@ -134,14 +228,14 @@ export default function CheckoutPage() {
             </button>
 
             <p className="text-center text-xs text-gray-500 mt-4 font-mono">
-              ⚠️ PLACEHOLDER: Replace with actual Stripe integration
+              🔐 Secure payment powered by Stripe
             </p>
           </div>
 
           {/* Security Badge */}
           <div className="text-center">
             <p className="text-gray-500 text-sm font-mono">
-              🔒 Secure checkout • 30-day money-back guarantee
+              🔒 Secure checkout • Cancel anytime
             </p>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import Homepage from './pages/Homepage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import GettingStarted from './pages/GettingStarted';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
@@ -24,8 +25,18 @@ import MissionPhase2Page from './pages/MissionPhase2Page';
 import MissionPhase3Page from './pages/MissionPhase3Page';
 import MissionPhase4Page from './pages/MissionPhase4Page';
 import MissionPhase5Page from './pages/MissionPhase5Page';
+import ScoutDashboardPage from './pages/ScoutDashboardPage';
+import ScoutMain from './pages/Scout/ScoutMain';
+import CompanyDetail from './pages/Scout/CompanyDetail';
+import CompanyLeads from './pages/Scout/CompanyLeads';
+import ContactProfile from './pages/Scout/ContactProfile';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import UserDetail from './pages/Admin/UserDetail';
+import AdminPingTest from './pages/Admin/AdminPingTest';
+import ApiActivity from './pages/Admin/ApiActivity';
 
 // Components
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
 import Phase1Discovery from './components/Phase1Discovery';
@@ -35,6 +46,7 @@ import CompanyList from './components/CompanyList';
 import AddCompanyForm from './components/AddCompanyForm';
 import ContactSuggestions from './components/ContactSuggestions';
 import LeadList from './components/LeadList';
+import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -78,8 +90,8 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Protected Route Component
-  const ProtectedRoute = ({ children }) => {
+  // Protected Route Component - Requires both auth AND payment
+  const ProtectedRoute = ({ children, requirePayment = true }) => {
     if (loading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-black">
@@ -90,6 +102,11 @@ function App() {
 
     if (!user) {
       return <Navigate to="/login" />;
+    }
+
+    // Check if user has completed payment (unless explicitly disabled)
+    if (requirePayment && !userData?.hasCompletedPayment) {
+      return <Navigate to="/checkout" />;
     }
 
     return children;
@@ -135,10 +152,13 @@ function App() {
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
 
-        {/* Payment Routes */}
-        <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-        <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
-        <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancelPage /></ProtectedRoute>} />
+        {/* Getting Started (Auth Required) */}
+        <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
+
+        {/* Payment Routes - Auth required but payment NOT required (to avoid redirect loop) */}
+        <Route path="/checkout" element={<ProtectedRoute requirePayment={false}><CheckoutPage /></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />
@@ -217,10 +237,93 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Scout Module - NEW 4-Tab Structure */}
+        <Route
+          path="/scout"
+          element={
+            <ProtectedRoute>
+              <ScoutMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Scout Sub-Routes */}
+        <Route
+          path="/scout/company/:companyId"
+          element={
+            <ProtectedRoute>
+              <CompanyDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/scout/company/:companyId/leads"
+          element={
+            <ProtectedRoute>
+              <CompanyLeads />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/scout/contact/:contactId"
+          element={
+            <ProtectedRoute>
+              <ContactProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route path="/admin-ping-test" element={<AdminPingTest />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDashboard />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/api-activity"
+          element={
+            <ProtectedAdminRoute>
+              <ApiActivity />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/user/:uid"
+          element={
+            <ProtectedAdminRoute>
+              <UserDetail />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        {/* Redirect old Scout route to new Scout */}
+        <Route
+          path="/mission-control-v2/scout"
+          element={<Navigate to="/scout" />}
+        />
+
+        {/* Convenience redirects for email links */}
+        <Route path="/recon" element={<Navigate to="/mission-control-v2/recon" />} />
 
         {/* Protected Routes - OLD DASHBOARD REDIRECTS (Use V2 by default) */}
         <Route path="/mission-control" element={<Navigate to="/mission-control-v2" />} />
         <Route path="/dashboard" element={<Navigate to="/mission-control-v2" />} />
+
+        {/* NEW: Company Profile Questionnaire (4 Questions) */}
+        <Route
+          path="/onboarding/company-profile"
+          element={
+            <ProtectedRoute>
+              <CompanyQuestionnaire />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protected Routes - MVP Routes (Module 1) */}
         <Route
@@ -247,8 +350,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* OLD Scout route - now replaced by new Scout at /scout */}
         <Route
-          path="/scout"
+          path="/old-scout"
           element={
             <ProtectedRoute>
               <ContactSuggestions />

@@ -343,6 +343,9 @@ export default function Section6BuyingBehaviorTriggers({ initialData = {}, onSav
       // Save answers first
       await saveAnswers();
 
+      // Get fresh auth token
+      const authToken = await user.getIdToken();
+
       const response = await fetch('/.netlify/functions/generate-section-6', {
         method: 'POST',
         headers: {
@@ -350,7 +353,8 @@ export default function Section6BuyingBehaviorTriggers({ initialData = {}, onSav
         },
         body: JSON.stringify({
           answers,
-          userId: user.uid
+          userId: user.uid,
+          authToken  // Send token for server-side verification
         })
       });
 

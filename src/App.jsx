@@ -90,8 +90,8 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Protected Route Component
-  const ProtectedRoute = ({ children }) => {
+  // Protected Route Component - Requires both auth AND payment
+  const ProtectedRoute = ({ children, requirePayment = true }) => {
     if (loading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-black">
@@ -102,6 +102,11 @@ function App() {
 
     if (!user) {
       return <Navigate to="/login" />;
+    }
+
+    // Check if user has completed payment (unless explicitly disabled)
+    if (requirePayment && !userData?.hasCompletedPayment) {
+      return <Navigate to="/checkout" />;
     }
 
     return children;
@@ -150,10 +155,10 @@ function App() {
         {/* Getting Started (Auth Required) */}
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
 
-        {/* Payment Routes */}
-        <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-        <Route path="/checkout/success" element={<ProtectedRoute><CheckoutSuccessPage /></ProtectedRoute>} />
-        <Route path="/checkout/cancel" element={<ProtectedRoute><CheckoutCancelPage /></ProtectedRoute>} />
+        {/* Payment Routes - Auth required but payment NOT required (to avoid redirect loop) */}
+        <Route path="/checkout" element={<ProtectedRoute requirePayment={false}><CheckoutPage /></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />

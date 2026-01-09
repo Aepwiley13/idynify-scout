@@ -5,6 +5,7 @@ import { db, auth } from '../../firebase/config';
 import {
   ArrowLeft,
   User,
+  Users,
   Mail,
   Phone,
   Linkedin,
@@ -22,7 +23,9 @@ import {
   Globe,
   Twitter,
   Facebook,
-  Loader
+  Loader,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import './ContactProfile.css';
 
@@ -34,7 +37,13 @@ export default function ContactProfile() {
   const [enriching, setEnriching] = useState(false);
   const [enrichSuccess, setEnrichSuccess] = useState(false);
   const [enrichError, setEnrichError] = useState(null);
-
+  const [showSummary, setShowSummary] = useState(true);
+  const [showExperience, setShowExperience] = useState(false);
+  const [showEducation, setShowEducation] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
+  const [showSocial, setShowSocial] = useState(false);
+  const [enrichingPublicProfile, setEnrichingPublicProfile] = useState(false);
+  
   useEffect(() => {
     loadContactProfile();
   }, [contactId]);
@@ -137,6 +146,58 @@ export default function ContactProfile() {
     }
   }
 
+  async function handleEnrichPublicProfile() {
+    try {
+      setEnrichingPublicProfile(true);
+      setEnrichError(null);
+      setEnrichSuccess(false);
+
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      console.log('🔍 Enriching public profile for:', contact.name);
+
+      const authToken = await user.getIdToken();
+
+      const response = await fetch('/.netlify/functions/enrichPublicProfile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: authToken,
+          contactId: contact.id,
+          contactName: contact.name,
+          companyName: contact.company_name,
+          linkedinUrl: contact.linkedin_url
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Profile enrichment request failed');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Enrichment failed');
+      }
+
+      console.log('✅ Public profile enriched successfully');
+
+      // Update local state
+      setContact(prev => ({ ...prev, publicProfile: result.profileData }));
+
+      setEnrichSuccess(true);
+      setTimeout(() => setEnrichSuccess(false), 5000);
+      setEnrichingPublicProfile(false);
+
+    } catch (err) {
+      console.error('Error enriching public profile:', err);
+      setEnrichError(err.message || 'Failed to enrich public profile. Please try again.');
+      setEnrichingPublicProfile(false);
+    }
+  }
+
   // Helper: Calculate tenure from job start date
   function calculateTenure(startDate) {
     if (!startDate) return null;
@@ -221,7 +282,7 @@ export default function ContactProfile() {
       {enrichSuccess && (
         <div className="enrich-success-banner">
           <CheckCircle className="w-5 h-5" />
-          <span>Contact enriched successfully! Email and phone updated.</span>
+          <span>Profile enriched successfully!</span>
         </div>
       )}
 
@@ -260,25 +321,23 @@ export default function ContactProfile() {
 
         {/* Quick Contact Actions */}
         <div className="quick-actions">
-          {contact.apollo_person_id && (
-            <button
-              className="quick-action-btn enrich"
-              onClick={handleEnrichContact}
-              disabled={enriching}
-            >
-              {enriching ? (
-                <>
-                  <Loader className="w-4 h-4 spinner" />
-                  <span>Enriching...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>Enrich Contact</span>
-                </>
-              )}
-            </button>
-          )}
+          <button
+            className="quick-action-btn enrich"
+            onClick={handleEnrichPublicProfile}
+            disabled={enrichingPublicProfile}
+          >
+            {enrichingPublicProfile ? (
+              <>
+                <Loader className="w-4 h-4 spinner" />
+                <span>Enriching Profile...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Enrich Public Profile</span>
+              </>
+            )}
+          </button>
           {contact.email && (
             <a href={`mailto:${contact.email}`} className="quick-action-btn email">
               <Mail className="w-4 h-4" />
@@ -304,6 +363,147 @@ export default function ContactProfile() {
           )}
         </div>
       </div>
+
+      {/* Public Professional Profile Section */}
+      {contact.publicProfile && (
+        <div className="public-profile-section">
+          <div className="section-header-main">
+            <h2>Public Professional Profile</h2>
+            <div className="ai-badge">
+              <Globe className="w-4 h-4" />
+              <span>Web Search Enrichment</span>
+            </div>
+          </div>
+
+          {/* Professional Summary */}
+          {contact.publicProfile.professional_summary && (
+            <div className="profile-subsection">
+              <button 
+                className="subsection-toggle"
+                onClick={() => setShowSummary(!showSummary)}
+              >
+                <User className="w-5 h-5" />
+                <span>Professional Summary</span>
+                {showSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showSummary && (
+                <div className="subsection-content">
+                  <p>{contact.publicProfile.professional_summary}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Experience */}
+          {contact.publicProfile.experience && contact.publicProfile.experience.length > 0 && (
+            <div className="profile-subsection">
+              <button 
+                className="subsection-toggle"
+                onClick={() => setShowExperience(!showExperience)}
+              >
+                <Briefcase className="w-5 h-5" />
+                <span>Experience ({contact.publicProfile.experience.length})</span>
+                {showExperience ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showExperience && (
+                <div className="subsection-content">
+                  {contact.publicProfile.experience.map((exp, idx) => (
+                    <div key={idx} className="experience-item">
+                      <h4>{exp.title}</h4>
+                      <p className="experience-company">{exp.company}</p>
+                      {exp.years && <p className="experience-years">{exp.years}</p>}
+                      {exp.description && <p className="experience-desc">{exp.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Education */}
+          {contact.publicProfile.education && contact.publicProfile.education.length > 0 && (
+            <div className="profile-subsection">
+              <button 
+                className="subsection-toggle"
+                onClick={() => setShowEducation(!showEducation)}
+              >
+                <Award className="w-5 h-5" />
+                <span>Education ({contact.publicProfile.education.length})</span>
+                {showEducation ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showEducation && (
+                <div className="subsection-content">
+                  {contact.publicProfile.education.map((edu, idx) => (
+                    <div key={idx} className="education-item">
+                      <h4>{edu.institution}</h4>
+                      <p>{edu.degree}</p>
+                      {edu.years && <p className="education-years">{edu.years}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Publications & Media */}
+          {contact.publicProfile.publications_and_media && contact.publicProfile.publications_and_media.length > 0 && (
+            <div className="profile-subsection">
+              <button 
+                className="subsection-toggle"
+                onClick={() => setShowMedia(!showMedia)}
+              >
+                <Globe className="w-5 h-5" />
+                <span>Publications & Media ({contact.publicProfile.publications_and_media.length})</span>
+                {showMedia ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showMedia && (
+                <div className="subsection-content">
+                  {contact.publicProfile.publications_and_media.map((media, idx) => (
+                    <div key={idx} className="media-item">
+                      <span className="media-type">{media.type}</span>
+                      <a href={media.url} target="_blank" rel="noopener noreferrer">
+                        {media.title}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Public Social Profiles */}
+          {contact.publicProfile.public_social_profiles && (
+            <div className="profile-subsection">
+              <button 
+                className="subsection-toggle"
+                onClick={() => setShowSocial(!showSocial)}
+              >
+                <Users className="w-5 h-5" />
+                <span>Public Social Profiles</span>
+                {showSocial ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showSocial && (
+                <div className="subsection-content">
+                  <div className="social-links">
+                    {contact.publicProfile.public_social_profiles.linkedin && (
+                      <a href={contact.publicProfile.public_social_profiles.linkedin} target="_blank" rel="noopener noreferrer" className="social-link">
+                        <Linkedin className="w-4 h-4" />
+                        <span>LinkedIn</span>
+                      </a>
+                    )}
+                    {contact.publicProfile.public_social_profiles.twitter && (
+                      <a href={contact.publicProfile.public_social_profiles.twitter} target="_blank" rel="noopener noreferrer" className="social-link">
+                        <Twitter className="w-4 h-4" />
+                        <span>Twitter/X</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="profile-content">
         {/* Left Column: Main Info */}

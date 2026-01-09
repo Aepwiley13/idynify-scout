@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
-import TitleSelectionModal from '../../components/TitleSelectionModal';
-import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import { Building2, Users, CheckCircle, TrendingUp, Search, Globe, Linkedin, ChevronRight, Target, DollarSign, Calendar, MapPin, Briefcase } from 'lucide-react';
 import './SavedCompanies.css';
@@ -149,7 +147,7 @@ function CompanyCard({ company, onClick }) {
 
       {/* CTA Button */}
       <button className="saved-view-details-btn">
-        <span>{company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}</span>
+        <span>View Company Profile</span>
         <ChevronRight className="w-4 h-4" />
       </button>
     </div>
@@ -161,9 +159,6 @@ export default function SavedCompanies() {
   const [companies, setCompanies] = useState([]);
   const [filteredCompanies, setFilteredCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showTitleModal, setShowTitleModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -249,38 +244,9 @@ export default function SavedCompanies() {
     }
   }
 
-  // Handle company click - show detail modal with enriched data
+  // Handle company click - navigate directly to company profile page
   function handleCompanyClick(company) {
-    setSelectedCompany(company);
-    setShowDetailModal(true);
-  }
-
-  // Handle detail modal close
-  function handleDetailModalClose() {
-    setShowDetailModal(false);
-
-    // After closing detail modal, check if user wants to find contacts
-    // If company doesn't have titles yet, show title modal
-    if (selectedCompany) {
-      const hasTitles = selectedCompany.selected_titles && selectedCompany.selected_titles.length > 0;
-
-      if (hasTitles) {
-        // Already has titles, go straight to company detail
-        navigate(`/scout/company/${selectedCompany.id}`);
-      } else {
-        // First time, show title selection modal
-        setShowTitleModal(true);
-      }
-    }
-  }
-
-  // Handle titles selected from modal
-  function handleTitlesSelected(titles) {
-    setShowTitleModal(false);
-    // Navigate to company detail page
-    if (selectedCompany) {
-      navigate(`/scout/company/${selectedCompany.id}`);
-    }
+    navigate(`/scout/company/${company.id}`);
   }
 
   // Calculate KPIs
@@ -413,23 +379,6 @@ export default function SavedCompanies() {
           <h3>No companies found</h3>
           <p>Try adjusting your search term</p>
         </div>
-      )}
-
-      {/* Company Detail Modal */}
-      {showDetailModal && selectedCompany && (
-        <CompanyDetailModal
-          company={selectedCompany}
-          onClose={handleDetailModalClose}
-        />
-      )}
-
-      {/* Title Selection Modal */}
-      {showTitleModal && selectedCompany && (
-        <TitleSelectionModal
-          company={selectedCompany}
-          onClose={() => setShowTitleModal(false)}
-          onConfirm={handleTitlesSelected}
-        />
       )}
     </div>
   );

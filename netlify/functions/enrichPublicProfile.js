@@ -1,15 +1,8 @@
-const fetch = require('node-fetch');
-const admin = require('firebase-admin');
+import { logApiUsage } from './utils/logApiUsage.js';
 
-// Initialize Firebase Admin if not already done
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
-}
+export const handler = async (event) => {
+  const startTime = Date.now();
 
-exports.handler = async (event, context) => {
-  // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -20,27 +13,52 @@ exports.handler = async (event, context) => {
   try {
     const { userId, authToken, contactId, contactName, companyName, linkedinUrl } = JSON.parse(event.body);
 
-    // Validate authentication
-    if (!authToken || !userId) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ success: false, error: 'Unauthorized' })
-      };
+    if (!userId || !authToken || !contactId) {
+      throw new Error('Missing required parameters');
     }
 
-    // Verify Firebase token
-    try {
-      await admin.auth().verifyIdToken(authToken);
-    } catch (error) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ success: false, error: 'Invalid auth token' })
-      };
+    console.log('🔍 Enriching public profile for:', contactName);
+
+    // Validate Firebase API key
+    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!firebaseApiKey) {
+      console.error('❌ FIREBASE_API_KEY not configured');
+      throw new Error('Firebase API key not configured');
     }
 
-    console.log(`🔍 Enriching public profile for: ${contactName} at ${companyName}`);
+    // Verify Firebase Auth token using REST API
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
+      }
+    );
 
-    // Step 1: Build search queries
+    if (!verifyResponse.ok) {
+      throw new Error('Invalid authentication token');
+    }
+
+    const verifyData = await verifyResponse.json();
+    const tokenUserId = verifyData.users[0].localId;
+
+    if (tokenUserId !== userId) {
+      throw new Error('Token does not match user ID');
+    }
+
+    console.log('✅ Auth token verified');
+
+    // Check for Google Search API credentials
+    const GOOGLE_API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
+    const GOOGLE_SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
+
+    if (!GOOGLE_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
+      console.error('❌ Google Search API not configured');
+      throw new Error('Search API not configured. Please add GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID to environment variables.');
+    }
+
+    // Build search queries
     const searchQueries = [
       `"${contactName}" "${companyName}" LinkedIn profile`,
       `"${contactName}" "${companyName}" bio`,
@@ -49,20 +67,6 @@ exports.handler = async (event, context) => {
       `"${contactName}" education`,
       `"${contactName}" book OR podcast OR speaking`
     ];
-
-    // Step 2: Call Google Programmable Search API
-    const GOOGLE_API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
-    const GOOGLE_SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
-
-    if (!GOOGLE_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Search API not configured. Please add GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID to environment variables.' 
-        })
-      };
-    }
 
     let allResults = [];
 
@@ -84,19 +88,19 @@ exports.handler = async (event, context) => {
 
     console.log(`✅ Found ${allResults.length} search results`);
 
-    // Step 3: Structure the data
-    const structuredProfile = await structureProfileData(contactName, companyName, linkedinUrl, allResults);
+    // Structure the profile data
+    const structuredProfile = structureProfileData(contactName, companyName, linkedinUrl, allResults);
 
-    // Step 4: Save to Firestore
-    const db = admin.firestore();
-    const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactId);
-
-    await contactRef.update({
-      publicProfile: structuredProfile,
-      publicProfile_enriched_at: admin.firestore.FieldValue.serverTimestamp()
+    // Log API usage
+    const responseTime = Date.now() - startTime;
+    await logApiUsage(userId, 'enrichPublicProfile', 'success', {
+      responseTime,
+      metadata: {
+        contactId,
+        contactName,
+        resultsCount: allResults.length
+      }
     });
-
-    console.log(`✅ Public profile saved to Firestore`);
 
     return {
       statusCode: 200,
@@ -108,6 +112,19 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error('❌ Enrichment error:', error);
+    
+    // Log failed usage
+    const responseTime = Date.now() - startTime;
+    try {
+      const { userId } = JSON.parse(event.body);
+      await logApiUsage(userId, 'enrichPublicProfile', 'error', {
+        responseTime,
+        error: error.message
+      });
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
+    }
+
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -119,8 +136,7 @@ exports.handler = async (event, context) => {
 };
 
 // Helper function to structure profile data from search results
-async function structureProfileData(name, company, linkedinUrl, searchResults) {
-  // Extract relevant information from search results
+function structureProfileData(name, company, linkedinUrl, searchResults) {
   const profile = {
     name: name,
     verified_identity: {
@@ -187,7 +203,6 @@ async function structureProfileData(name, company, linkedinUrl, searchResults) {
     // Extract education mentions
     const educationKeywords = ['university', 'college', 'mba', 'bachelor', 'master', 'phd', 'degree'];
     if (educationKeywords.some(keyword => snippet.toLowerCase().includes(keyword))) {
-      // Basic education extraction - can be enhanced with NLP
       profile.education.push({
         institution: extractUniversityName(snippet),
         degree: extractDegree(snippet),

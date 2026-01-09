@@ -537,10 +537,10 @@ export default function CompanyDetail() {
         <div className="header-left">
           <button
             className="back-btn"
-            onClick={() => navigate('/mission-control-v2')}
+            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Mission Control</span>
+            <span>Back to Saved Companies</span>
           </button>
         </div>
 

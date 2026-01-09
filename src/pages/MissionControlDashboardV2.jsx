@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { isUserAdmin } from '../utils/adminAuth';
 
@@ -56,8 +56,12 @@ export default function MissionControlDashboardV2() {
       const hasICP = icpDoc.exists() && icpDoc.data().industry;
       setHasCompletedICP(hasICP);
 
-      // Show welcome modal for first-time users (no ICP set up)
-      if (!hasICP) {
+      // Check if user has seen the welcome modal before
+      const preferencesDoc = await getDoc(doc(db, 'users', userId, 'preferences', 'general'));
+      const hasSeenModal = preferencesDoc.exists() && preferencesDoc.data().hasSeenWelcomeModal;
+
+      // Show welcome modal only if user hasn't completed ICP AND hasn't seen the modal before
+      if (!hasICP && !hasSeenModal) {
         setShowWelcomeModal(true);
       }
 
@@ -92,6 +96,21 @@ export default function MissionControlDashboardV2() {
     } else {
       navigate('/scout');
     }
+  };
+
+  const handleDismissModal = async () => {
+    // Mark modal as seen in Firestore
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        await setDoc(doc(db, 'users', user.uid, 'preferences', 'general'), {
+          hasSeenWelcomeModal: true
+        }, { merge: true });
+      }
+    } catch (error) {
+      console.error('Error saving modal preference:', error);
+    }
+    setShowWelcomeModal(false);
   };
 
   if (loading) {
@@ -428,78 +447,79 @@ export default function MissionControlDashboardV2() {
 
       {/* Welcome Modal for First-Time Users */}
       {showWelcomeModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="relative max-w-2xl w-full bg-gradient-to-br from-gray-900 to-black rounded-2xl border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/30 p-8 animate-fadeIn">
-            {/* Close button */}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative max-w-2xl w-full bg-gradient-to-br from-gray-900 to-black rounded-2xl border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/30 p-4 sm:p-6 md:p-8 animate-fadeIn max-h-[90vh] overflow-y-auto">
+            {/* Close button - Larger and more touch-friendly */}
             <button
-              onClick={() => setShowWelcomeModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors text-2xl"
+              onClick={handleDismissModal}
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-full transition-all text-3xl sm:text-4xl"
+              aria-label="Close"
             >
               ×
             </button>
 
             {/* Welcome Header with Barry */}
-            <div className="text-center mb-6">
-              <div className="inline-block relative mb-4">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 mx-auto">
-                  <span className="text-5xl">🐻</span>
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="inline-block relative mb-3 sm:mb-4">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 mx-auto">
+                  <span className="text-4xl sm:text-5xl">🐻</span>
                 </div>
-                <div className="absolute -top-2 -right-2 text-3xl animate-pulse">⭐</div>
+                <div className="absolute -top-2 -right-2 text-2xl sm:text-3xl animate-pulse">⭐</div>
               </div>
-              <h2 className="text-4xl font-bold text-white mb-2 font-mono">Welcome to Mission Control!</h2>
-              <p className="text-cyan-400 text-lg font-semibold">Barry is ready to help you find your ideal customers</p>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2 font-mono px-2">Welcome to Mission Control!</h2>
+              <p className="text-cyan-400 text-base sm:text-lg font-semibold px-2">Barry is ready to help you find your ideal customers</p>
             </div>
 
             {/* Mission Briefing */}
-            <div className="bg-black/50 rounded-xl p-6 border border-cyan-500/30 mb-6">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <div className="bg-black/50 rounded-xl p-4 sm:p-6 border border-cyan-500/30 mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
                 <span>🎯</span> Your First Mission
               </h3>
-              <p className="text-gray-300 mb-4 leading-relaxed">
+              <p className="text-gray-300 text-sm sm:text-base mb-3 sm:mb-4 leading-relaxed">
                 Before Barry can start finding companies for you, you need to define your <span className="text-cyan-400 font-semibold">Ideal Customer Profile (ICP)</span>.
               </p>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-cyan-500/20 border border-cyan-400/50 rounded-lg flex items-center justify-center">
-                    <span className="text-cyan-300 font-bold text-sm">1</span>
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-cyan-500/20 border border-cyan-400/50 rounded-lg flex items-center justify-center">
+                    <span className="text-cyan-300 font-bold text-xs sm:text-sm">1</span>
                   </div>
-                  <p className="text-gray-300 text-sm pt-1">Answer 5 quick questions about your ideal customer</p>
+                  <p className="text-gray-300 text-xs sm:text-sm pt-1">Answer 5 quick questions about your ideal customer</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-purple-500/20 border border-purple-400/50 rounded-lg flex items-center justify-center">
-                    <span className="text-purple-300 font-bold text-sm">2</span>
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/20 border border-purple-400/50 rounded-lg flex items-center justify-center">
+                    <span className="text-purple-300 font-bold text-xs sm:text-sm">2</span>
                   </div>
-                  <p className="text-gray-300 text-sm pt-1">Barry uses this to find companies that match your profile</p>
+                  <p className="text-gray-300 text-xs sm:text-sm pt-1">Barry uses this to find companies that match your profile</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-pink-500/20 border border-pink-400/50 rounded-lg flex items-center justify-center">
-                    <span className="text-pink-300 font-bold text-sm">3</span>
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-pink-500/20 border border-pink-400/50 rounded-lg flex items-center justify-center">
+                    <span className="text-pink-300 font-bold text-xs sm:text-sm">3</span>
                   </div>
-                  <p className="text-gray-300 text-sm pt-1">Start receiving daily leads of companies ready to engage with</p>
+                  <p className="text-gray-300 text-xs sm:text-sm pt-1">Start receiving daily leads of companies ready to engage with</p>
                 </div>
               </div>
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
-                onClick={() => {
-                  setShowWelcomeModal(false);
+                onClick={async () => {
+                  await handleDismissModal();
                   handleScoutClick();
                 }}
-                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-cyan-500/50 font-mono text-lg"
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-xl transition-all shadow-lg shadow-cyan-500/50 font-mono text-base sm:text-lg"
               >
                 🚀 Set Up My ICP
               </button>
               <button
-                onClick={() => setShowWelcomeModal(false)}
-                className="flex-1 sm:flex-none bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white font-semibold py-4 px-6 rounded-xl transition-all border border-gray-600/50 font-mono"
+                onClick={handleDismissModal}
+                className="flex-1 sm:flex-none bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-xl transition-all border border-gray-600/50 font-mono text-sm sm:text-base"
               >
                 I'll Do This Later
               </button>
             </div>
 
-            <p className="text-gray-500 text-xs text-center mt-4 font-mono">
+            <p className="text-gray-500 text-xs text-center mt-3 sm:mt-4 font-mono px-2">
               Takes ~2 minutes • You can change this anytime in Scout → ICP Settings
             </p>
           </div>

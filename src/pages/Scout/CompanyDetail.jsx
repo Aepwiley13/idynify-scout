@@ -851,23 +851,7 @@ export default function CompanyDetail() {
                     <CheckCircle className="w-4 h-4" />
                     <span>Saved</span>
                   </div>
-
-                  {/* Source Badge */}
-                  <div className={`source-badge ${contact.source || 'apollo'}`} style={{
-                    position: 'absolute',
-                    top: '0.75rem',
-                    right: '0.75rem',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                    backgroundColor: contact.source === 'manual' ? '#eff6ff' : contact.source === 'networking' ? '#faf5ff' : '#f0fdf4',
-                    color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
-                    border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
-                  }}>
-                    {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Apollo'}
-                  </div>
-
+                  
                   <div className="decision-maker-header">
                     <div className="decision-maker-avatar">
                       {contact.photo_url ? (

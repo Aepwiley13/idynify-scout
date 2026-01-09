@@ -992,3 +992,169 @@
     width: 100%;
   }
 }
+/* ... existing CSS ... */
+
+@media (max-width: 375px) {
+  .contact-profile-page {
+    padding: 0.75rem;
+  }
+
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-name {
+    font-size: 1.375rem;
+  }
+
+  .quick-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .quick-action-btn {
+    width: 100%;
+  }
+}
+
+/* ========================================
+   PUBLIC PROFILE SECTION - ADD HERE
+   ======================================== */
+/* Public Profile Section */
+.public-profile-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 1px solid #e5e7eb;
+}
+
+.section-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.section-header-main h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.profile-subsection {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.subsection-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #374151;
+  transition: background 0.2s;
+}
+
+.subsection-toggle:hover {
+  background: #f3f4f6;
+}
+
+.subsection-toggle svg:last-child {
+  margin-left: auto;
+}
+
+.subsection-content {
+  padding: 16px;
+  background: white;
+}
+
+.experience-item,
+.education-item,
+.media-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.experience-item:last-child,
+.education-item:last-child,
+.media-item:last-child {
+  border-bottom: none;
+}
+
+.experience-item h4,
+.education-item h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.experience-company,
+.experience-years,
+.education-years {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.experience-desc {
+  font-size: 14px;
+  color: #374151;
+  margin-top: 8px;
+}
+
+.media-type {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-right: 8px;
+  text-transform: capitalize;
+}
+
+.media-item a {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.media-item a:hover {
+  text-decoration: underline;
+}
+
+.social-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.social-link:hover {
+  background: #e5e7eb;
+}

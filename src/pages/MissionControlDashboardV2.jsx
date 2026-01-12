@@ -4,6 +4,7 @@ import { auth, db } from '../firebase/config';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { isUserAdmin } from '../utils/adminAuth';
+import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
@@ -35,6 +36,9 @@ export default function MissionControlDashboardV2() {
       const adminStatus = await isUserAdmin(userId);
       setIsAdmin(adminStatus);
 
+      // Initialize dashboard if it doesn't exist
+      await initializeDashboard(userId);
+
       // Count accepted companies
       const companiesQuery = query(
         collection(db, 'users', userId, 'companies'),
@@ -47,9 +51,10 @@ export default function MissionControlDashboardV2() {
         collection(db, 'users', userId, 'contacts')
       );
 
-      // Get RECON completion
-      const reconDoc = await getDoc(doc(db, 'users', userId, 'recon', 'current'));
-      const reconCompletion = reconDoc.exists() ? reconDoc.data().completionPercentage || 0 : 0;
+      // Get RECON completion from dashboard
+      const dashboardState = await getDashboardState(userId);
+      const reconModule = dashboardState?.modules?.find(m => m.id === 'recon');
+      const reconCompletion = reconModule?.progressPercentage || 0;
 
       // Check if user has completed ICP settings
       const icpDoc = await getDoc(doc(db, 'users', userId, 'icp', 'settings'));

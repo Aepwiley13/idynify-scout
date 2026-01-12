@@ -15,7 +15,7 @@ export default function Homepage() {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-lg border-b border-gray-700/50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold text-cyan-400">Scout</div>
+          <div className="text-2xl font-bold text-cyan-400">IDYNIFY</div>
           <div className="flex gap-4">
             <button
               onClick={() => navigate('/login')}
@@ -88,7 +88,7 @@ export default function Homepage() {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-5xl mx-auto text-center">
-          <div className="text-6xl mb-6">🎯</div>
+          <div className="text-6xl mb-6" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
 
           <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
             Find Companies You Can Sell To—
@@ -116,14 +116,17 @@ export default function Homepage() {
       {/* How It Works */}
       <section className="py-20 px-6 bg-gray-800/30">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
+          <h2 className="text-4xl font-bold text-center mb-4">How It Works</h2>
+          <p className="text-xl text-gray-300 text-center mb-12 italic">
+            It's kind of like Tinder, except for owners and executives
+          </p>
 
           <div className="grid md:grid-cols-3 gap-12">
             <div className="text-center">
               <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto border-2 border-cyan-500">
                 1
               </div>
-              <h3 className="text-2xl font-bold mb-4">Answer 4 Questions</h3>
+              <h3 className="text-2xl font-bold mb-4">Answer a Few Questions</h3>
               <p className="text-gray-300">
                 Tell us your industry, company size, revenue range, and location
               </p>
@@ -133,7 +136,7 @@ export default function Homepage() {
               <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto border-2 border-cyan-500">
                 2
               </div>
-              <h3 className="text-2xl font-bold mb-4">Browse Unlimited Companies</h3>
+              <h3 className="text-2xl font-bold mb-4">Browse Companies That Match Your ICP</h3>
               <p className="text-gray-300">
                 Scout finds matching companies instantly (always free)
               </p>
@@ -143,7 +146,7 @@ export default function Homepage() {
               <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto border-2 border-cyan-500">
                 3
               </div>
-              <h3 className="text-2xl font-bold mb-4">Enrich the Ones You Want</h3>
+              <h3 className="text-2xl font-bold mb-4">Enrich Your ICP</h3>
               <p className="text-gray-300">
                 Get full company data + 3 contacts with email & phone (uses credits)
               </p>
@@ -165,16 +168,6 @@ export default function Homepage() {
               <div>
                 <h3 className="font-bold text-lg mb-2">Unlimited Company Browsing</h3>
                 <p className="text-gray-300 text-sm">Search and filter for free</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
-              <div className="text-cyan-400 mt-1">
-                <Check size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">40-125 Enriched Companies/Month</h3>
-                <p className="text-gray-300 text-sm">Depending on tier</p>
               </div>
             </div>
 
@@ -207,16 +200,6 @@ export default function Homepage() {
                 <p className="text-gray-300 text-sm">Build your prospect database</p>
               </div>
             </div>
-
-            <div className="flex items-start gap-4 p-6 bg-gray-800/50 rounded-lg">
-              <div className="text-cyan-400 mt-1">
-                <Check size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-2">CSV Exports</h3>
-                <p className="text-gray-300 text-sm">Download your contacts anytime</p>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -224,36 +207,7 @@ export default function Homepage() {
       {/* Pricing Section */}
       <section className="py-20 px-6 bg-gray-800/30">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4">Simple, Credit-Based Pricing</h2>
-          <p className="text-xl text-gray-300 text-center mb-16 max-w-3xl mx-auto">
-            Browse unlimited companies for free. Use credits to enrich the ones you want.
-          </p>
-
-          {/* Credit Explainer Box */}
-          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-8 mb-16 max-w-2xl mx-auto">
-            <h3 className="text-2xl font-bold mb-4 text-cyan-400">How Credits Work</h3>
-            <div className="space-y-3 text-gray-200">
-              <p className="text-lg">
-                <span className="font-semibold">Browse companies:</span> FREE (unlimited)
-              </p>
-              <p className="text-lg">
-                <span className="font-semibold">Enrich 1 company with 3 contacts:</span> 10 credits
-              </p>
-              <ul className="pl-8 space-y-2 text-gray-300">
-                <li>• Company data: 1 credit</li>
-                <li>• 3 contact names: 3 credits</li>
-                <li>• 3 emails: 3 credits</li>
-                <li>• 3 phone numbers: 3 credits</li>
-              </ul>
-              <div className="pt-4 border-t border-cyan-500/30 mt-4">
-                <p className="text-sm text-gray-300">
-                  <strong>Starter:</strong> 400 credits = 40 enriched companies/month
-                  <br />
-                  <strong>Pro:</strong> 1,250 credits = 125 enriched companies/month
-                </p>
-              </div>
-            </div>
-          </div>
+          <h2 className="text-4xl font-bold text-center mb-16">Pricing</h2>
 
           {/* Pricing Tiers */}
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -366,62 +320,6 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Who This Is For */}
-      <section className="py-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-16">Who This Is For</h2>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-8">
-              <div className="flex items-center gap-3 mb-4">
-                <Check className="text-green-400" size={32} />
-                <h3 className="text-2xl font-bold">Use Scout if:</h3>
-              </div>
-              <p className="text-gray-200 text-lg">
-                You need companies to contact but don't want to spend hours researching or pay $100+/month for Apollo/ZoomInfo
-              </p>
-            </div>
-
-            <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-8">
-              <div className="flex items-center gap-3 mb-4">
-                <X className="text-red-400" size={32} />
-                <h3 className="text-2xl font-bold">Skip Scout if:</h3>
-              </div>
-              <p className="text-gray-200 text-lg">
-                You already have more leads than you can handle or need enterprise features
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Optional: RECON Section */}
-      <section className="py-20 px-6 bg-gray-800/30">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-gray-800/50 rounded-2xl p-10 border border-gray-700">
-            <div className="flex items-start gap-6">
-              <div className="text-5xl">🔍</div>
-              <div>
-                <h2 className="text-3xl font-bold mb-4">Want Strategic Depth? Use RECON</h2>
-                <p className="text-xl text-gray-300 mb-6">
-                  RECON is a 273-question research tool that helps you deeply understand your ideal customer.
-                  Scout works great without it, but RECON gives you strategic market intelligence.
-                </p>
-                <p className="text-lg text-gray-400 mb-6">
-                  <strong className="text-cyan-400">Best part:</strong> It's included in all plans at no extra credit cost.
-                </p>
-                <button
-                  onClick={() => navigate('/getting-started')}
-                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  Learn About RECON
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ Section */}
       <section className="py-20 px-6">
         <div className="max-w-3xl mx-auto">
@@ -510,7 +408,7 @@ export default function Homepage() {
             </div>
             <div className="flex items-center gap-3 text-lg text-gray-200">
               <Check className="text-cyan-400" size={24} />
-              <span>Enrich 40-125 companies/month</span>
+              <span>Get verified contact details</span>
             </div>
             <div className="flex items-center gap-3 text-lg text-gray-200">
               <Check className="text-cyan-400" size={24} />
@@ -537,6 +435,46 @@ export default function Homepage() {
           <p>&copy; 2024 Idynify Scout. All rights reserved.</p>
         </div>
       </footer>
+
+      <style>{`
+        @keyframes floatBear {
+          0%, 100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          25% {
+            transform: translateY(-20px) rotate(-5deg);
+          }
+          50% {
+            transform: translateY(-30px) rotate(0deg);
+          }
+          75% {
+            transform: translateY(-20px) rotate(5deg);
+          }
+        }
+
+        @keyframes floatCode {
+          0% {
+            transform: translateY(0) translateX(0);
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.6;
+          }
+          100% {
+            transform: translateY(-100vh) translateX(50px);
+            opacity: 0;
+          }
+        }
+
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }

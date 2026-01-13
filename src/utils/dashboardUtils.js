@@ -338,8 +338,16 @@ export async function addEditHistory(userId, moduleId, sectionId, field, previou
  */
 export async function initializeDashboard(userId) {
   try {
+    console.log(`🔄 initializeDashboard: Checking dashboard for user ${userId}`);
     const dashboardRef = doc(db, 'dashboards', userId);
-    const dashboardDoc = await getDoc(dashboardRef);
+
+    let dashboardDoc;
+    try {
+      dashboardDoc = await getDoc(dashboardRef);
+    } catch (getError) {
+      console.error('❌ Error reading dashboard (likely Firestore rules issue):', getError.message);
+      throw new Error(`Cannot read dashboard: ${getError.message}. Please deploy Firestore security rules.`);
+    }
 
     // If dashboard already exists, don't recreate it
     if (dashboardDoc.exists()) {
@@ -348,6 +356,7 @@ export async function initializeDashboard(userId) {
     }
 
     // Create dashboard from schema
+    console.log('🔄 Dashboard does not exist, creating from schema...');
     const dashboardData = {
       ...dashboardSchemaData.dashboard,
       userId,
@@ -355,8 +364,13 @@ export async function initializeDashboard(userId) {
       lastUpdatedAt: new Date().toISOString()
     };
 
-    await setDoc(dashboardRef, dashboardData);
-    console.log('✅ Dashboard initialized from schema');
+    try {
+      await setDoc(dashboardRef, dashboardData);
+      console.log('✅ Dashboard initialized from schema successfully!');
+    } catch (setError) {
+      console.error('❌ Error creating dashboard (likely Firestore rules issue):', setError.message);
+      throw new Error(`Cannot create dashboard: ${setError.message}. Please deploy Firestore security rules.`);
+    }
 
     return { success: true, alreadyExists: false };
   } catch (error) {

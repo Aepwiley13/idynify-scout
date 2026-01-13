@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import SectionOutputModal from '../components/recon/SectionOutputModal';
+import { initializeDashboard } from '../utils/dashboardUtils';
 
 export default function RECONModulePage() {
   const navigate = useNavigate();
@@ -28,20 +29,27 @@ export default function RECONModulePage() {
         return;
       }
 
+      // Try to initialize dashboard if it doesn't exist
+      console.log('🔄 Checking if dashboard exists...');
+      await initializeDashboard(user.uid);
+
       const dashboardRef = doc(db, 'dashboards', user.uid);
       const dashboardDoc = await getDoc(dashboardRef);
 
       if (dashboardDoc.exists()) {
+        console.log('✅ Dashboard loaded successfully');
         const data = dashboardDoc.data();
         setDashboardState(data);
         const recon = data.modules.find(m => m.id === 'recon');
         setReconModule(recon);
       } else {
-        console.error('❌ Dashboard not initialized');
+        console.error('❌ Dashboard not initialized - please check Firestore rules');
+        alert('Unable to load RECON. Please ensure Firestore security rules are deployed. Check console for details.');
         navigate('/mission-control-v2');
       }
     } catch (error) {
       console.error('❌ Error loading dashboard:', error);
+      alert(`Error loading RECON: ${error.message}. Please check Firestore rules are deployed.`);
     } finally {
       setLoading(false);
     }

@@ -661,16 +661,12 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
       </div>
 
       {/* Action Buttons */}
-      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
+      <div className="recon-card space-y-4">
         {/* Save Button */}
         <button
           onClick={handleManualSave}
           disabled={saving || !hasUnsavedChanges}
-          className={`w-full font-semibold py-4 px-6 rounded-xl transition-all ${
-            hasUnsavedChanges && !saving
-              ? 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300'
-              : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-200'
-          }`}
+          className={`w-full ${hasUnsavedChanges && !saving ? 'recon-secondary-btn' : 'recon-primary-btn opacity-50 cursor-not-allowed'}`}
         >
           {saving ? (
             <span className="flex items-center justify-center gap-2">
@@ -678,9 +674,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
               Saving...
             </span>
           ) : hasUnsavedChanges ? (
-            '💾 Save Progress'
+            'Save Progress'
           ) : (
-            '✅ All Changes Saved'
+            '✓ All Changes Saved'
           )}
         </button>
 
@@ -688,11 +684,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         <button
           onClick={handleGenerate}
           disabled={!canGenerate || generating}
-          className={`w-full font-semibold py-4 px-6 rounded-xl transition-all ${
-            canGenerate && !generating
-              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
-          }`}
+          className={`w-full ${canGenerate && !generating ? 'recon-primary-btn' : 'recon-secondary-btn opacity-50 cursor-not-allowed'}`}
         >
           {generating ? (
             <span className="flex items-center justify-center gap-2">
@@ -700,9 +692,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
               Generating Executive Summary...
             </span>
           ) : canGenerate ? (
-            '🚀 Generate Executive Summary'
+            'Generate Executive Summary'
           ) : (
-            `⚠️ Complete all required fields (${requiredCompleted}/${requiredQuestions.length})`
+            `Complete all required fields (${requiredCompleted}/${requiredQuestions.length})`
           )}
         </button>
 

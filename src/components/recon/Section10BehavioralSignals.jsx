@@ -181,22 +181,22 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
     const hasError = validationErrors[q.id];
 
     return (
-      <div key={q.id} className="mb-6">
-        <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+      <div key={q.id} className="mb-4">
+        <label className="block text-lg font-semibold mb-2 text-gray-900">
           {q.question}
           {q.required && <span className="text-red-400 ml-1">*</span>}
         </label>
         {q.helpText && (
-          <p className="text-sm text-gray-400 mb-3 font-mono">{q.helpText}</p>
+          <p className="text-sm text-gray-400 mb-3">{q.helpText}</p>
         )}
 
         {q.type === 'textarea' && (
           <textarea
             value={value}
             onChange={(e) => handleInputChange(q.id, e.target.value)}
-            className={`w-full bg-black/40 border ${
-              hasError ? 'border-red-500' : 'border-cyan-500/30'
-            } rounded-lg p-4 text-white font-mono focus:border-cyan-500 focus:outline-none transition-colors resize-none`}
+            className={`w-full bg-white/40 border ${
+              hasError ? 'border-red-500' : 'border-gray-300/30'
+            } rounded-lg p-4 text-gray-900 focus:border-gray-300 focus:outline-none transition-colors resize-none`}
             rows="4"
             placeholder="Enter your answer..."
           />
@@ -205,27 +205,27 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
         {q.type === 'radio' && (
           <div className="space-y-2">
             {q.options.map(option => (
-              <label key={option} className="flex items-center gap-3 p-3 bg-black/40 border border-cyan-500/20 rounded-lg cursor-pointer hover:border-cyan-500/40 transition-colors">
+              <label key={option} className="flex items-center gap-3 p-3 bg-white/40 border border-gray-300/20 rounded-lg cursor-pointer hover:border-gray-300/40 transition-colors">
                 <input
                   type="radio"
                   name={q.id}
                   value={option}
                   checked={value === option}
                   onChange={(e) => handleInputChange(q.id, e.target.value)}
-                  className="text-cyan-500 focus:ring-cyan-500"
+                  className="text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-gray-300 font-mono text-sm">{option}</span>
+                <span className="text-gray-300 text-sm">{option}</span>
               </label>
             ))}
           </div>
         )}
 
         {hasError && (
-          <p className="text-red-400 text-sm mt-2 font-mono">⚠️ {hasError}</p>
+          <p className="text-red-400 text-sm mt-2">⚠️ {hasError}</p>
         )}
 
         {q.validation?.maxLength && q.type === 'textarea' && (
-          <p className={`text-xs mt-2 font-mono ${
+          <p className={`text-xs mt-2 ${
             value.length > q.validation.maxLength
               ? 'text-red-400'
               : value.length > q.validation.maxLength * 0.9
@@ -241,28 +241,28 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
 
   if (showOutput && output) {
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30">
-          <h3 className="text-xl font-bold text-green-400 font-mono mb-2">✅ SECTION 10 COMPLETE</h3>
-          <p className="text-sm text-gray-400 font-mono">Behavioral Signals Intelligence Generated</p>
+      <div className="space-y-4">
+        <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-xl p-4 border border-green-500/30">
+          <h3 className="text-xl font-bold text-green-400 mb-2">✅ SECTION 10 COMPLETE</h3>
+          <p className="text-sm text-gray-400">Behavioral Signals Intelligence Generated</p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-8 border border-cyan-500/30">
-          <h3 className="text-2xl font-bold text-cyan-400 mb-6 font-mono">📊 Behavioral & Timing Intelligence</h3>
+        <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-xl p-6 border border-gray-300/30">
+          <h3 className="text-2xl font-bold text-blue-600 mb-4">📊 Behavioral & Timing Intelligence</h3>
 
           {output.executiveSummary && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div>
-                <h4 className="text-lg font-bold text-white mb-3 font-mono">Overview</h4>
+                <h4 className="text-lg font-bold text-gray-900 mb-3">Overview</h4>
                 <p className="text-gray-300 leading-relaxed">{output.executiveSummary.overview}</p>
               </div>
 
               <div>
-                <h4 className="text-lg font-bold text-white mb-3 font-mono">Key Findings</h4>
+                <h4 className="text-lg font-bold text-gray-900 mb-3">Key Findings</h4>
                 <ul className="space-y-2">
                   {output.executiveSummary.keyFindings?.map((finding, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-gray-300">
-                      <span className="text-cyan-400 mt-1">▪</span>
+                      <span className="text-blue-600 mt-1">▪</span>
                       <span>{finding}</span>
                     </li>
                   ))}
@@ -270,8 +270,8 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
               </div>
 
               <div>
-                <h4 className="text-lg font-bold text-white mb-3 font-mono">💡 Key Insight</h4>
-                <p className="text-cyan-100 text-lg italic">{output.executiveSummary.keyInsight}</p>
+                <h4 className="text-lg font-bold text-gray-900 mb-3">💡 Key Insight</h4>
+                <p className="text-gray-700 text-lg italic">{output.executiveSummary.keyInsight}</p>
               </div>
             </div>
           )}
@@ -280,13 +280,13 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
         <div className="flex gap-4">
           <button
             onClick={() => setShowOutput(false)}
-            className="flex-1 bg-gray-700/50 hover:bg-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono border border-gray-500/30"
+            className="flex-1 bg-gray-700/50 hover:bg-gray-700 text-gray-900 font-bold py-4 px-6 rounded-xl transition-all border border-gray-500/30"
           >
             ✏️ EDIT ANSWERS
           </button>
           <button
             onClick={() => navigate('/mission-control-v2/recon')}
-            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono shadow-lg shadow-green-500/50"
+            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-gray-900 font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-green-500/50"
           >
             🎉 COMPLETE RECON MODULE →
           </button>
@@ -296,39 +296,39 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30">
-        <h3 className="text-xl font-bold text-white mb-4 font-mono">Section 10: Behavioral & Timing Signals</h3>
+    <div className="space-y-4">
+      <div className="bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-xl rounded-xl p-4 border border-gray-300/30">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Section 10: Behavioral & Timing Signals</h3>
         <p className="text-gray-300">
           Identify buying triggers, timing patterns, and engagement signals that indicate purchase readiness.
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {SECTION_10_QUESTIONS.map(renderQuestion)}
       </div>
 
       {error && (
         <div className="bg-red-500/10 border border-red-500 rounded-xl p-4">
-          <p className="text-red-400 font-mono">{error}</p>
+          <p className="text-red-400">{error}</p>
         </div>
       )}
 
       <div className="flex gap-4">
         <button
           onClick={saveAnswers}
-          className="flex-1 bg-purple-700/50 hover:bg-purple-700 text-white font-bold py-4 px-6 rounded-xl transition-all font-mono border border-purple-500/30"
+          className="flex-1 bg-purple-700/50 hover:bg-purple-700 text-gray-900 font-bold py-4 px-6 rounded-xl transition-all border border-purple-500/30"
         >
           💾 SAVE PROGRESS
         </button>
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className={`flex-1 font-bold py-4 px-6 rounded-xl transition-all font-mono ${
+          className={`flex-1 font-bold py-4 px-6 rounded-xl transition-all ${
             generating
               ? 'bg-gray-600 cursor-not-allowed'
               : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/50'
-          } text-white`}
+          } text-gray-900`}
         >
           {generating ? '⏳ GENERATING...' : '🚀 GENERATE BEHAVIORAL INTELLIGENCE'}
         </button>

@@ -283,8 +283,8 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
     const hasError = validationErrors[q.id];
 
     return (
-      <div key={q.id} className="mb-6">
-        <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+      <div key={q.id} className="mb-4">
+        <label className="block text-lg font-semibold mb-2 text-gray-900">
           {q.question}{q.required && '*'}
         </label>
         {q.helpText && (
@@ -295,7 +295,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
           onChange={(e) => handleInputChange(q.id, e.target.value)}
           placeholder={q.placeholder}
           rows={4}
-          className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-sans resize-y`}
+          className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
         />
         {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
         {q.validation?.minLength && (
@@ -310,18 +310,18 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-cyan-400 text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-blue-600 text-xl">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-white text-gray-900 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-cyan-400 font-mono mb-2">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">
             Section 5: Pain Points & Motivations
           </h1>
           <p className="text-gray-400">
@@ -336,7 +336,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
             <p className="text-red-400">{error}</p>
           </div>
         )}
@@ -345,7 +345,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
         {!showOutput ? (
           <>
             {/* Questions */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {SECTION_5_QUESTIONS.map(q => renderQuestion(q))}
             </div>
 
@@ -354,7 +354,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed font-mono text-lg"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed text-lg"
               >
                 {generating ? '🤖 Generating Pain & Motivation Map...' : '🎯 Generate Pain & Motivation Map'}
               </button>
@@ -363,16 +363,16 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-cyan-500/50 rounded-xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-cyan-300 mb-4 font-mono">
+            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 💢 Pain & Motivation Map
               </h2>
               
               {output && output.painMotivationMap && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Primary Pain Point */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Primary Pain Point</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Primary Pain Point</h3>
                     <p className="text-gray-300 mb-2 italic">
                       "{output.painMotivationMap.primaryPainPoint.customerLanguage}"
                     </p>
@@ -386,7 +386,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
                   {/* Cost of Inaction */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Cost of Inaction</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Cost of Inaction</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Time Wasted:</strong> {output.painMotivationMap.costOfInaction.timeWasted}
                     </p>
@@ -396,7 +396,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
                     <p className="text-gray-300 mb-2">
                       <strong>Opportunity Missed:</strong> {output.painMotivationMap.costOfInaction.opportunityMissed}
                     </p>
-                    <p className="text-cyan-300 font-bold text-lg mt-3">
+                    <p className="text-gray-900 font-bold text-lg mt-3">
                       💰 Total Annual Cost: {output.painMotivationMap.costOfInaction.totalCost}
                     </p>
                     <p className="text-green-400 mt-2">
@@ -406,7 +406,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
                   {/* Failed Solution History */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Failed Solution History</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Failed Solution History</h3>
                     <div className="space-y-3">
                       {output.painMotivationMap.failedSolutionHistory.attemptedSolutions.map((attempt, idx) => (
                         <div key={idx} className="bg-red-950/30 p-3 rounded-lg border border-red-500/30">
@@ -427,7 +427,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
                   {/* Urgency Triggers */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Urgency Triggers</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Urgency Triggers</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Urgency Level:</strong> <span className="text-red-400 font-bold">{output.painMotivationMap.urgencyTriggers.urgencyLevel}</span>
                     </p>
@@ -443,7 +443,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
                   {/* Success Vision */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Success Vision</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Success Vision</h3>
                     <p className="text-gray-300 mb-3">{output.painMotivationMap.successVision.idealEndState}</p>
                     <p className="text-gray-300 mb-2"><strong>Key Metrics:</strong></p>
                     <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
@@ -455,7 +455,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
                   {/* Pain Severity */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Pain Severity Assessment</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Pain Severity Assessment</h3>
                     <div className="flex items-center gap-4 mb-3">
                       <div className="text-4xl font-bold text-red-400">
                         {output.painMotivationMap.painSeverityScale.rating}/10
@@ -479,13 +479,13 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
             <div className="flex gap-4">
               <button
                 onClick={handleEditAnswers}
-                className="flex-1 bg-cyan-950/50 hover:bg-cyan-950/70 border-2 border-cyan-500 text-cyan-300 font-bold py-4 px-8 rounded-xl transition-all font-mono"
+                className="flex-1 bg-gray-50 hover:bg-gray-100 border-2 border-gray-300 text-gray-900 font-bold py-4 px-8 rounded-xl transition-all"
               >
                 ✏️ Edit Answers
               </button>
               <button
                 onClick={() => navigate('/recon/section-6')}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 font-mono"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →
               </button>

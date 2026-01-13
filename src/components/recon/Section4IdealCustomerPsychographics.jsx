@@ -366,8 +366,8 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
     switch (q.type) {
       case 'textarea':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -378,7 +378,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
               onChange={(e) => handleInputChange(q.id, e.target.value)}
               placeholder={q.placeholder}
               rows={4}
-              className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-sans resize-y`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
             />
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
             {q.validation?.minLength && (
@@ -391,8 +391,8 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
       case 'radio':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -407,9 +407,9 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
                     value={opt}
                     checked={value === opt}
                     onChange={(e) => handleInputChange(q.id, e.target.value)}
-                    className="w-5 h-5 text-cyan-500 focus:ring-cyan-400"
+                    className="w-5 h-5 text-blue-600 focus:ring-blue-400"
                   />
-                  <span className="text-white">{opt}</span>
+                  <span className="text-gray-900">{opt}</span>
                 </label>
               ))}
             </div>
@@ -423,8 +423,8 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
         const minSelections = q.minSelections || 1;
         
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -448,15 +448,15 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
                     disabled={!canSelect}
                     className={`p-4 rounded-lg border-2 transition-all text-left ${
                       isSelected
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-semibold'
+                        ? 'bg-cyan-500/20 border-gray-300 text-gray-900 font-semibold'
                         : canSelect
-                        ? 'bg-cyan-950/30 border-cyan-500/30 text-gray-300 hover:border-cyan-400/50 hover:bg-cyan-950/50'
-                        : 'bg-gray-900/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
+                        ? 'bg-cyan-950/30 border-gray-300/30 text-gray-300 hover:border-gray-300/50 hover:bg-gray-50'
+                        : 'bg-white/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{opt}</span>
-                      {isSelected && <span className="text-cyan-400">✓</span>}
+                      {isSelected && <span className="text-blue-600">✓</span>}
                     </div>
                   </button>
                 );
@@ -473,18 +473,18 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-cyan-400 text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-blue-600 text-xl">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-white text-gray-900 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-cyan-400 font-mono mb-2">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">
             Section 4: Ideal Customer Psychographics
           </h1>
           <p className="text-gray-400">
@@ -499,7 +499,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
             <p className="text-red-400">{error}</p>
           </div>
         )}
@@ -508,7 +508,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
         {!showOutput ? (
           <>
             {/* Questions */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {SECTION_4_QUESTIONS.map(q => renderQuestion(q))}
             </div>
 
@@ -517,7 +517,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed font-mono text-lg"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed text-lg"
               >
                 {generating ? '🤖 Generating Psychographic Profile...' : '🎯 Generate Psychographic Profile'}
               </button>
@@ -526,16 +526,16 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-cyan-500/50 rounded-xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-cyan-300 mb-4 font-mono">
+            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 🧠 Psychographic Profile
               </h2>
               
               {output && output.psychographicProfile && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Pain Landscape */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Pain Landscape</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Pain Landscape</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Night Fears:</strong> {output.psychographicProfile.painLandscape.nightFears}
                     </p>
@@ -549,11 +549,11 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
                   {/* Value System */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Value System</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Value System</h3>
                     <div className="space-y-2">
                       {output.psychographicProfile.valueSystem.topValues.map((val, idx) => (
-                        <div key={idx} className="bg-cyan-950/50 p-3 rounded-lg">
-                          <p className="text-cyan-300 font-semibold">
+                        <div key={idx} className="bg-gray-50 p-3 rounded-lg">
+                          <p className="text-gray-900 font-semibold">
                             {val.priority}. {val.value}
                           </p>
                           <p className="text-gray-300 text-sm mt-1">{val.implication}</p>
@@ -567,7 +567,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
                   {/* Language Patterns */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Language Patterns</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Language Patterns</h3>
                     <p className="text-gray-300 mb-2"><strong>Exact Phrases:</strong></p>
                     <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4 mb-3">
                       {output.psychographicProfile.languagePatterns.exactPhrases.map((phrase, idx) => (
@@ -581,7 +581,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
                   {/* Change Readiness */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Change Readiness</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Change Readiness</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Adoption Curve:</strong> {output.psychographicProfile.changeReadiness.adoptionCurve}
                     </p>
@@ -592,7 +592,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
                   {/* Success Definition */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Success Definition</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Success Definition</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Success Metrics:</strong> {output.psychographicProfile.successDefinition.successMetrics}
                     </p>
@@ -608,13 +608,13 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
             <div className="flex gap-4">
               <button
                 onClick={handleEditAnswers}
-                className="flex-1 bg-cyan-950/50 hover:bg-cyan-950/70 border-2 border-cyan-500 text-cyan-300 font-bold py-4 px-8 rounded-xl transition-all font-mono"
+                className="flex-1 bg-gray-50 hover:bg-gray-100 border-2 border-gray-300 text-gray-900 font-bold py-4 px-8 rounded-xl transition-all"
               >
                 ✏️ Edit Answers
               </button>
               <button
                 onClick={() => navigate('/recon/section-5')}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 font-mono"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →
               </button>

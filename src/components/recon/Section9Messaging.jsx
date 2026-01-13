@@ -359,8 +359,8 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
     switch (q.type) {
       case 'radio':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -375,9 +375,9 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
                     value={opt}
                     checked={value === opt}
                     onChange={(e) => handleInputChange(q.id, e.target.value)}
-                    className="w-5 h-5 text-cyan-500 focus:ring-cyan-400"
+                    className="w-5 h-5 text-blue-600 focus:ring-blue-400"
                   />
-                  <span className="text-white">{opt}</span>
+                  <span className="text-gray-900">{opt}</span>
                 </label>
               ))}
             </div>
@@ -391,8 +391,8 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
         const minSelections = q.minSelections || 1;
         
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -416,15 +416,15 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
                     disabled={!canSelect}
                     className={`p-4 rounded-lg border-2 transition-all text-left ${
                       isSelected
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-semibold'
+                        ? 'bg-cyan-500/20 border-gray-300 text-gray-900 font-semibold'
                         : canSelect
-                        ? 'bg-cyan-950/30 border-cyan-500/30 text-gray-300 hover:border-cyan-400/50 hover:bg-cyan-950/50'
-                        : 'bg-gray-900/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
+                        ? 'bg-cyan-950/30 border-gray-300/30 text-gray-300 hover:border-gray-300/50 hover:bg-gray-50'
+                        : 'bg-white/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{opt}</span>
-                      {isSelected && <span className="text-cyan-400">✓</span>}
+                      {isSelected && <span className="text-blue-600">✓</span>}
                     </div>
                   </button>
                 );
@@ -441,18 +441,18 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-cyan-400 text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-blue-600 text-xl">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-white text-gray-900 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-cyan-400 font-mono mb-2">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">
             Section 9: Messaging & Communication
           </h1>
           <p className="text-gray-400">
@@ -465,8 +465,8 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
           )}
           
           {/* Previous Sections Status */}
-          <div className="mt-4 p-4 bg-cyan-950/30 rounded-lg border border-cyan-500/30">
-            <p className="text-sm text-cyan-300 font-semibold mb-2">Data Available from Previous Sections:</p>
+          <div className="mt-4 p-4 bg-cyan-950/30 rounded-lg border border-gray-300/30">
+            <p className="text-sm text-gray-900 font-semibold mb-2">Data Available from Previous Sections:</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
               <div className={`p-2 rounded ${sectionsAvailable.section4 ? 'bg-green-500/20 text-green-300' : 'bg-gray-700/20 text-gray-500'}`}>
                 Section 4: {sectionsAvailable.section4 ? '✓' : '✗'}
@@ -492,7 +492,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
             <p className="text-red-400">{error}</p>
           </div>
         )}
@@ -501,7 +501,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
         {!showOutput ? (
           <>
             {/* Questions */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {SECTION_9_QUESTIONS.map(q => renderQuestion(q))}
             </div>
 
@@ -510,7 +510,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed font-mono text-lg"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed text-lg"
               >
                 {generating ? '🤖 Generating Messaging Framework...' : '📧 Generate Messaging Framework'}
               </button>
@@ -519,23 +519,23 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-cyan-500/50 rounded-xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-cyan-300 mb-4 font-mono">
+            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 📧 Messaging Framework
               </h2>
               
               {output && output.messagingFramework && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Email Sequences */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-3">5-Touch Cold Outreach Sequence</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-3">5-Touch Cold Outreach Sequence</h3>
                     <div className="space-y-3">
                       {output.messagingFramework.emailSequences?.coldOutreach?.sequence?.map((touch, idx) => (
                         <div key={idx} className="bg-blue-950/30 p-4 rounded-lg border border-blue-500/30">
                           <p className="text-blue-300 font-semibold mb-2">
                             Touch {touch.touchNumber}: {touch.timing} - {touch.channel}
                           </p>
-                          <p className="text-cyan-300 text-sm font-semibold mb-1">
+                          <p className="text-gray-900 text-sm font-semibold mb-1">
                             Subject: {touch.subjectLine}
                           </p>
                           <p className="text-gray-300 text-sm whitespace-pre-wrap mb-2">
@@ -551,7 +551,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
 
                   {/* Subject Lines */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Subject Line Library</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Subject Line Library</h3>
                     <div className="grid md:grid-cols-2 gap-4">
                       {output.messagingFramework.subjectLines?.painFocused && (
                         <div className="bg-red-950/30 p-3 rounded-lg border border-red-500/30">
@@ -578,7 +578,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
 
                   {/* Objection Handling */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Objection Handling Scripts</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Objection Handling Scripts</h3>
                     <div className="space-y-2">
                       {output.messagingFramework.objectionHandling?.priceObjection && (
                         <div className="bg-orange-950/30 p-3 rounded-lg border border-orange-500/30">
@@ -612,11 +612,11 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
                   {/* Value Props */}
                   {output.messagingFramework.coreValueProps && output.messagingFramework.coreValueProps.length > 0 && (
                     <div>
-                      <h3 className="text-xl font-semibold text-cyan-400 mb-2">Core Value Propositions</h3>
+                      <h3 className="text-xl font-semibold text-blue-600 mb-2">Core Value Propositions</h3>
                       <div className="space-y-2">
                         {output.messagingFramework.coreValueProps.slice(0, 2).map((vp, idx) => (
-                          <div key={idx} className="bg-cyan-950/50 p-3 rounded-lg border-l-4 border-cyan-400">
-                            <p className="text-cyan-300 font-semibold text-sm mb-1">
+                          <div key={idx} className="bg-gray-50 p-3 rounded-lg border-l-4 border-gray-300">
+                            <p className="text-gray-900 font-semibold text-sm mb-1">
                               For: {vp.audience}
                             </p>
                             <p className="text-gray-300 text-xs">
@@ -635,13 +635,13 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
             <div className="flex gap-4">
               <button
                 onClick={handleEditAnswers}
-                className="flex-1 bg-cyan-950/50 hover:bg-cyan-950/70 border-2 border-cyan-500 text-cyan-300 font-bold py-4 px-8 rounded-xl transition-all font-mono"
+                className="flex-1 bg-gray-50 hover:bg-gray-100 border-2 border-gray-300 text-gray-900 font-bold py-4 px-8 rounded-xl transition-all"
               >
                 ✏️ Edit Answers
               </button>
               <button
                 onClick={() => navigate('/recon/section-10')}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 font-mono"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Final Section →
               </button>

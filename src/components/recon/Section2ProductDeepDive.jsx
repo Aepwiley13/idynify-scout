@@ -380,8 +380,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
     switch (q.type) {
       case 'text':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -392,7 +392,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
               value={value || ''}
               onChange={(e) => handleInputChange(q.id, e.target.value)}
               placeholder={q.placeholder}
-              className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
             />
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
             {q.validation?.maxLength && (
@@ -405,8 +405,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
       case 'textarea':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -417,7 +417,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
               onChange={(e) => handleInputChange(q.id, e.target.value)}
               placeholder={q.placeholder}
               rows={4}
-              className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-sans resize-y`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
             />
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
             {q.validation?.minLength && (
@@ -430,8 +430,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
       case 'dropdown':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -440,7 +440,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
             <select
               value={value || ''}
               onChange={(e) => handleInputChange(q.id, e.target.value)}
-              className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
             >
               <option value="">-- Select --</option>
               {q.options.map(opt => (
@@ -453,8 +453,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
       case 'radio':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -469,9 +469,9 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                     value={opt}
                     checked={value === opt}
                     onChange={(e) => handleInputChange(q.id, e.target.value)}
-                    className="w-5 h-5 text-cyan-500 focus:ring-cyan-400"
+                    className="w-5 h-5 text-blue-600 focus:ring-blue-400"
                   />
-                  <span className="text-white">{opt}</span>
+                  <span className="text-gray-900">{opt}</span>
                 </label>
               ))}
             </div>
@@ -484,8 +484,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
         const maxSelections = q.maxSelections || Infinity;
         
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -504,8 +504,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                     onClick={() => handleMultiSelectToggle(q.id, opt)}
                     className={`p-3 rounded-lg border-2 transition-all text-left ${
                       isSelected
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                        : 'bg-cyan-950/30 border-cyan-500/30 text-gray-300 hover:border-cyan-400/50'
+                        ? 'bg-cyan-500/20 border-gray-300 text-gray-900'
+                        : 'bg-cyan-950/30 border-gray-300/30 text-gray-300 hover:border-gray-300/50'
                     }`}
                   >
                     {opt}
@@ -519,8 +519,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
       case 'multi-text':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -537,7 +537,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                       value={itemValue}
                       onChange={(e) => handleMultiTextChange(q.id, idx, e.target.value)}
                       placeholder={`${q.placeholder || q.question} ${idx + 1}`}
-                      className={`w-full bg-cyan-950/50 border-2 ${itemError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono`}
+                      className={`w-full bg-gray-50 border-2 ${itemError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
                     />
                     {itemError && <p className="text-red-400 text-xs mt-1">{itemError}</p>}
                     {q.validation?.maxLength && itemValue && (
@@ -560,18 +560,18 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-cyan-400 text-xl">Loading...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-blue-600 text-xl">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-white text-gray-900 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-cyan-400 font-mono mb-2">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">
             Section 2: Product/Service Deep Dive
           </h1>
           <p className="text-gray-400">
@@ -586,7 +586,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
             <p className="text-red-400">{error}</p>
           </div>
         )}
@@ -595,7 +595,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
         {!showOutput ? (
           <>
             {/* Questions */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {SECTION_2_QUESTIONS.map(q => renderQuestion(q))}
             </div>
 
@@ -604,7 +604,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed font-mono text-lg"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed text-lg"
               >
                 {generating ? '🤖 Generating Product Intelligence Brief...' : '🎯 Generate Product Intelligence Brief'}
               </button>
@@ -613,16 +613,16 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-cyan-500/50 rounded-xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-cyan-300 mb-4 font-mono">
+            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 📊 Product Intelligence Brief
               </h2>
               
               {output && output.productIntelligence && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Product Profile */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Product Profile</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Product Profile</h3>
                     <p className="text-gray-300 mb-2"><strong>Name:</strong> {output.productIntelligence.productProfile.name}</p>
                     <p className="text-gray-300 mb-2"><strong>Category:</strong> {output.productIntelligence.productProfile.category}</p>
                     <p className="text-gray-300 mb-2"><strong>Core Features:</strong></p>
@@ -636,7 +636,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
                   {/* Differentiation */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Differentiation</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Differentiation</h3>
                     <p className="text-gray-300 mb-2"><strong>Unique Value:</strong> {output.productIntelligence.differentiation.uniqueValue}</p>
                     <p className="text-gray-300 mb-2"><strong>Competitive Advantage:</strong> {output.productIntelligence.differentiation.competitiveAdvantage}</p>
                     <p className="text-gray-300"><strong>Positioning:</strong> {output.productIntelligence.differentiation.positioning}</p>
@@ -644,7 +644,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
                   {/* Sweet Spot Customer */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Sweet Spot Customer</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Sweet Spot Customer</h3>
                     <p className="text-gray-300 mb-2">{output.productIntelligence.sweetSpotCustomer.description}</p>
                     <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
                       {output.productIntelligence.sweetSpotCustomer.characteristics.map((char, idx) => (
@@ -660,13 +660,13 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
             <div className="flex gap-4">
               <button
                 onClick={handleEditAnswers}
-                className="flex-1 bg-cyan-950/50 hover:bg-cyan-950/70 border-2 border-cyan-500 text-cyan-300 font-bold py-4 px-8 rounded-xl transition-all font-mono"
+                className="flex-1 bg-gray-50 hover:bg-gray-100 border-2 border-gray-300 text-gray-900 font-bold py-4 px-8 rounded-xl transition-all"
               >
                 ✏️ Edit Answers
               </button>
               <button
                 onClick={() => navigate('/recon/section-3')}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 font-mono"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →
               </button>

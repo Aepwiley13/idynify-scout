@@ -20,5 +20,11 @@ service cloud.firestore {
       allow write: if request.auth != null;
       allow read: if false; // Admin backend uses service account, not user tokens
     }
+
+    // Dashboards collection - users can read and write their own dashboards
+    match /dashboards/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

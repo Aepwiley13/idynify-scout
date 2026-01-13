@@ -1,5 +1,6 @@
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import dashboardSchemaData from '../schemas/dashboardSchema.json';
 
 /**
  * Update a section's status and data
@@ -328,6 +329,38 @@ export async function addEditHistory(userId, moduleId, sectionId, field, previou
     return true;
   } catch (error) {
     console.error('❌ Error adding edit history:', error);
+    throw error;
+  }
+}
+
+/**
+ * Initialize dashboard from schema for a new user
+ */
+export async function initializeDashboard(userId) {
+  try {
+    const dashboardRef = doc(db, 'dashboards', userId);
+    const dashboardDoc = await getDoc(dashboardRef);
+
+    // If dashboard already exists, don't recreate it
+    if (dashboardDoc.exists()) {
+      console.log('✅ Dashboard already exists');
+      return { success: true, alreadyExists: true };
+    }
+
+    // Create dashboard from schema
+    const dashboardData = {
+      ...dashboardSchemaData.dashboard,
+      userId,
+      createdAt: new Date().toISOString(),
+      lastUpdatedAt: new Date().toISOString()
+    };
+
+    await setDoc(dashboardRef, dashboardData);
+    console.log('✅ Dashboard initialized from schema');
+
+    return { success: true, alreadyExists: false };
+  } catch (error) {
+    console.error('❌ Error initializing dashboard:', error);
     throw error;
   }
 }

@@ -37,7 +37,9 @@ export default function MissionControlDashboardV2() {
       setIsAdmin(adminStatus);
 
       // Initialize dashboard if it doesn't exist
-      await initializeDashboard(userId);
+      console.log('🔄 Initializing dashboard...');
+      const initResult = await initializeDashboard(userId);
+      console.log('✅ Dashboard initialization result:', initResult);
 
       // Count accepted companies
       const companiesQuery = query(

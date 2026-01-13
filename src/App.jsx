@@ -34,6 +34,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
 import ApiActivity from './pages/Admin/ApiActivity';
+import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
@@ -271,6 +272,16 @@ function App() {
           element={
             <ProtectedRoute>
               <ContactProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Diagnostic Tools */}
+        <Route
+          path="/diagnostic/dashboard-init"
+          element={
+            <ProtectedRoute requirePayment={false}>
+              <DiagnosticDashboardInit />
             </ProtectedRoute>
           }
         />

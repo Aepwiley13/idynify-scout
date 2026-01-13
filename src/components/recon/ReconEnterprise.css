@@ -1,0 +1,494 @@
+/* ========================================
+   RECON SECTIONS - ENTERPRISE THEME
+   Matches Scout Module Design
+   ======================================== */
+
+.recon-section {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+/* ========================================
+   HEADER
+   ======================================== */
+.recon-header {
+  background: #ffffff;
+  border-bottom: 1.5px solid #e5e7eb;
+  padding: 1.25rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recon-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.recon-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.recon-branding {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.recon-branding svg {
+  color: #8b5cf6;
+  stroke-width: 2.5;
+}
+
+/* ========================================
+   BUTTONS
+   ======================================== */
+.recon-back-btn {
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recon-back-btn:hover {
+  background: #f9fafb;
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+.recon-primary-btn {
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.recon-primary-btn:hover:not(:disabled) {
+  background: #2563eb;
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.recon-primary-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.recon-secondary-btn {
+  background: #ffffff;
+  color: #374151;
+  border: 1.5px solid #d1d5db;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recon-secondary-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* ========================================
+   CONTENT AREA
+   ======================================== */
+.recon-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* ========================================
+   CARDS & SECTIONS
+   ======================================== */
+.recon-card {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.recon-card-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 1.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.recon-card-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+/* ========================================
+   PROGRESS BAR
+   ======================================== */
+.recon-progress-container {
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.recon-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.recon-progress-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.recon-progress-count {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #3b82f6;
+}
+
+.recon-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.recon-progress-fill {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.5s ease;
+  border-radius: 999px;
+}
+
+/* ========================================
+   FORM ELEMENTS
+   ======================================== */
+.recon-form-group {
+  margin-bottom: 1.5rem;
+}
+
+.recon-form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.recon-form-required {
+  color: #dc2626;
+  margin-left: 0.25rem;
+}
+
+.recon-form-help {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+  line-height: 1.5;
+}
+
+.recon-form-input,
+.recon-form-textarea,
+.recon-form-select {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #111827;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.recon-form-input:focus,
+.recon-form-textarea:focus,
+.recon-form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.recon-form-input.error,
+.recon-form-textarea.error,
+.recon-form-select.error {
+  border-color: #dc2626;
+}
+
+.recon-form-input.error:focus,
+.recon-form-textarea.error:focus,
+.recon-form-select.error:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.recon-form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.recon-form-error {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.recon-char-count {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: right;
+  margin-top: 0.25rem;
+}
+
+.recon-char-count.warning {
+  color: #f59e0b;
+}
+
+.recon-char-count.error {
+  color: #dc2626;
+}
+
+/* ========================================
+   RADIO BUTTONS
+   ======================================== */
+.recon-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recon-radio-option {
+  display: flex;
+  align-items: center;
+  padding: 0.875rem 1rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recon-radio-option:hover {
+  border-color: #3b82f6;
+  background: #f9fafb;
+}
+
+.recon-radio-option.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.recon-radio-option input[type="radio"] {
+  margin-right: 0.75rem;
+  accent-color: #3b82f6;
+}
+
+.recon-radio-option label {
+  font-size: 0.875rem;
+  color: #111827;
+  cursor: pointer;
+  flex: 1;
+}
+
+/* ========================================
+   OUTPUT/RESULTS SECTIONS
+   ======================================== */
+.recon-result-card {
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.recon-result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1.5px solid #e5e7eb;
+}
+
+.recon-result-icon {
+  font-size: 1.5rem;
+}
+
+.recon-result-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.recon-result-content {
+  color: #374151;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.recon-result-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recon-result-list li {
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.recon-result-list li::before {
+  content: "•";
+  color: #3b82f6;
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+/* ========================================
+   SUCCESS/STATUS BANNERS
+   ======================================== */
+.recon-success-banner {
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.recon-success-icon {
+  font-size: 2rem;
+}
+
+.recon-success-text {
+  flex: 1;
+}
+
+.recon-success-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 0.25rem;
+}
+
+.recon-success-subtitle {
+  font-size: 0.875rem;
+  color: #15803d;
+}
+
+/* ========================================
+   ACTION AREA
+   ======================================== */
+.recon-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.recon-actions button {
+  flex: 1;
+}
+
+/* ========================================
+   METADATA
+   ======================================== */
+.recon-metadata {
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 1.5rem;
+}
+
+.recon-metadata-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE
+   ======================================== */
+@media (max-width: 768px) {
+  .recon-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .recon-content {
+    padding: 1.5rem 1rem;
+  }
+
+  .recon-card {
+    padding: 1.5rem;
+  }
+
+  .recon-actions {
+    flex-direction: column;
+  }
+
+  .recon-back-btn span {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .recon-branding span {
+    display: none;
+  }
+
+  .recon-card-title {
+    font-size: 1.25rem;
+  }
+}

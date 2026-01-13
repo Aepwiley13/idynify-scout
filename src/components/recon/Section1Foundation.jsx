@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import './ReconEnterprise.css';
 
 const SECTION_1_QUESTIONS = [
   {
@@ -370,25 +371,25 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     const hasError = fieldErrors.length > 0;
 
     return (
-      <div key={question.id} className="mb-6">
-        <label className="block mb-2">
+      <div key={question.id} className="recon-form-group">
+        <label>
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
-              <span className="text-gray-900 font-semibold">
+              <span className="recon-form-label">
                 {index + 1}. {question.question}
-                {question.required && <span className="text-red-600 ml-1">*</span>}
+                {question.required && <span className="recon-form-required">*</span>}
               </span>
               {question.helpText && (
-                <p className="text-sm text-gray-600 mt-1">{question.helpText}</p>
+                <p className="recon-form-help">{question.helpText}</p>
               )}
             </div>
             {question.type === 'textarea' && question.validation?.maxLength && (
-              <span className={`text-xs ml-4 ${
+              <span className={`recon-char-count ml-4 ${
                 value.length > question.validation.maxLength
-                  ? 'text-red-600'
+                  ? 'error'
                   : value.length > question.validation.maxLength * 0.9
-                  ? 'text-yellow-600'
-                  : 'text-gray-500'
+                  ? 'warning'
+                  : ''
               }`}>
                 {value.length}/{question.validation.maxLength}
               </span>
@@ -400,9 +401,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
               type="text"
               value={value}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
-              className={`w-full bg-white border ${
-                hasError ? 'border-red-500' : 'border-gray-300'
-              } rounded-lg p-4 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
+              className={`recon-form-input ${hasError ? 'error' : ''}`}
               placeholder="Enter your answer..."
             />
           )}
@@ -411,9 +410,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
             <textarea
               value={value}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
-              className={`w-full bg-white border ${
-                hasError ? 'border-red-500' : 'border-gray-300'
-              } rounded-lg p-4 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all resize-none`}
+              className={`recon-form-textarea ${hasError ? 'error' : ''}`}
               rows="4"
               placeholder="Enter your answer..."
             />
@@ -423,9 +420,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
             <select
               value={value}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
-              className={`w-full bg-white border ${
-                hasError ? 'border-red-500' : 'border-gray-300'
-              } rounded-lg p-4 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
+              className={`recon-form-select ${hasError ? 'error' : ''}`}
             >
               <option value="">-- Select --</option>
               {question.options.map(option => (
@@ -435,15 +430,11 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
           )}
 
           {question.type === 'radio' && (
-            <div className="space-y-2 mt-2">
+            <div className="recon-radio-group mt-2">
               {question.options.map(option => (
-                <label
+                <div
                   key={option}
-                  className={`flex items-center p-3 rounded-lg border ${
-                    value === option
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 bg-white'
-                  } cursor-pointer hover:border-blue-400 transition-colors`}
+                  className={`recon-radio-option ${value === option ? 'selected' : ''}`}
                 >
                   <input
                     type="radio"
@@ -451,19 +442,20 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
                     value={option}
                     checked={value === option}
                     onChange={(e) => handleInputChange(question.id, e.target.value)}
-                    className="mr-3 accent-blue-600"
                   />
-                  <span className="text-gray-900 text-sm">{option}</span>
-                </label>
+                  <label>{option}</label>
+                </div>
               ))}
             </div>
           )}
         </label>
 
         {hasError && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-2">
             {fieldErrors.map((error, idx) => (
-              <p key={idx} className="text-red-600 text-xs">⚠️ {error}</p>
+              <p key={idx} className="recon-form-error">
+                <span>⚠</span> {error}
+              </p>
             ))}
           </div>
         )}
@@ -477,10 +469,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     const { executiveSummary } = output;
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Company Overview */}
-        <div className="bg-purple-50 rounded-2xl p-6 border border-purple-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">🏢 Company Overview</h3>
+        <div className="recon-result-card">
+          <div className="recon-result-header">
+            <span className="recon-result-icon">🏢</span>
+            <h3 className="recon-result-title">Company Overview</h3>
+          </div>
           <div className="space-y-2 text-gray-700">
             <p><strong className="text-gray-900">Name:</strong> {executiveSummary.companyOverview.name}</p>
             <p><strong className="text-gray-900">Industry:</strong> {executiveSummary.companyOverview.industry}</p>
@@ -490,8 +485,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Core Offering */}
-        <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">🎯 Core Offering</h3>
+        <div className="recon-result-card">
+          <h3 className="recon-result-title">🎯 Core Offering</h3>
           <div className="space-y-3 text-gray-700">
             <div>
               <strong className="text-gray-900">Product:</strong>
@@ -509,14 +504,14 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Ideal Customer at a Glance */}
-        <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">👥 Ideal Customer at a Glance</h3>
+        <div className="recon-result-card">
+          <h3 className="recon-result-title">👥 Ideal Customer at a Glance</h3>
           <p className="text-gray-700 leading-relaxed">{executiveSummary.idealCustomerGlance}</p>
         </div>
 
         {/* Perfect Fit Indicators */}
-        <div className="bg-green-50 rounded-2xl p-6 border border-green-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">✅ Perfect Fit Indicators</h3>
+        <div className="recon-result-card">
+          <h3 className="recon-result-title">✅ Perfect Fit Indicators</h3>
           <ul className="space-y-2">
             {executiveSummary.perfectFitIndicators.map((indicator, idx) => (
               <li key={idx} className="flex items-start gap-2 text-gray-700">
@@ -528,9 +523,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Anti-Profile */}
-        <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">🚫 Anti-Profile</h3>
-          <p className="text-xs text-gray-600 mb-3 font-semibold">Companies to avoid targeting:</p>
+        <div className="recon-result-card">
+          <h3 className="recon-result-title">🚫 Anti-Profile</h3>
+          <p className="recon-metadata-text mb-3 font-semibold">Companies to avoid targeting:</p>
           <ul className="space-y-2">
             {executiveSummary.antiProfile.map((profile, idx) => (
               <li key={idx} className="flex items-start gap-2 text-gray-700">
@@ -542,8 +537,8 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Current State */}
-        <div className="bg-yellow-50 rounded-2xl p-6 border border-yellow-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">📊 Current State</h3>
+        <div className="recon-result-card">
+          <h3 className="recon-result-title">📊 Current State</h3>
           <div className="space-y-3 text-gray-700">
             <div>
               <strong className="text-gray-900">90-Day Goal:</strong>
@@ -561,15 +556,15 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </div>
 
         {/* Key Insight */}
-        <div className="bg-pink-50 rounded-2xl p-6 border border-pink-200">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">💡 Key Insight</h3>
+        <div className="recon-result-card">
+          <h3 className="recon-result-title">💡 Key Insight</h3>
           <p className="text-gray-900 text-lg leading-relaxed">{executiveSummary.keyInsight}</p>
         </div>
 
         {/* Metadata */}
         {output.metadata && (
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-            <p className="text-xs text-gray-600">
+          <div className="recon-metadata">
+            <p className="recon-metadata-text">
               Generated in {output.metadata.generationTime?.toFixed(1)}s |
               Model: {output.metadata.model} |
               Tokens: {output.metadata.tokensUsed}
@@ -581,13 +576,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         <div className="flex gap-4">
           <button
             onClick={handleEditAnswers}
-            className="flex-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all border border-gray-300"
+            className="recon-secondary-btn flex-1"
           >
             ✏️ Edit Answers
           </button>
           <button
             onClick={handleNextSection}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-md"
+            className="recon-primary-btn flex-1"
           >
             Next Section →
           </button>
@@ -596,7 +591,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         {/* Mission Control Button */}
         <button
           onClick={handleMissionControl}
-          className="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold py-3 px-6 rounded-xl transition-all border border-purple-300"
+          className="recon-secondary-btn w-full"
         >
           🏠 Return to Mission Control
         </button>
@@ -607,7 +602,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   if (showOutput && output) {
     return (
       <div className="space-y-6">
-        <div className="bg-green-50 rounded-2xl p-6 border border-green-200">
+        <div className="recon-result-card">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">✅</span>
             <div>
@@ -632,7 +627,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     <div className="space-y-6">
       {/* Progress & Mission Control Button */}
       <div className="flex gap-4">
-        <div className="flex-1 bg-blue-50 rounded-2xl p-6 border border-blue-200">
+        <div className="flex-1 recon-result-card">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-gray-900">📋 Progress</h3>
             <span className="text-blue-600 font-bold">{completedCount}/{totalQuestions}</span>
@@ -643,22 +638,22 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
               style={{ width: `${(completedCount / totalQuestions) * 100}%` }}
             />
           </div>
-          <p className="text-xs text-gray-600 mt-2">
+          <p className="recon-metadata-text mt-2">
             Required fields: {requiredCompleted}/{requiredQuestions.length}
           </p>
         </div>
 
         <button
           onClick={handleMissionControl}
-          className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold px-8 rounded-2xl transition-all border border-purple-300 whitespace-nowrap"
+          className="recon-secondary-btn"
         >
           🏠 Mission Control
         </button>
       </div>
 
       {/* Questions */}
-      <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6">
+      <div className="recon-card">
+        <h3 className="recon-card-title">
           Section 1: Company Identity & Foundation
         </h3>
 
@@ -712,13 +707,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         </button>
 
         {!canGenerate && (
-          <p className="text-xs text-gray-600 text-center">
+          <p className="recon-metadata-text text-center">
             Please complete all required fields (*) before generating
           </p>
         )}
 
         {canGenerate && !generating && (
-          <p className="text-xs text-gray-600 text-center">
+          <p className="recon-metadata-text text-center">
             This will analyze your answers and generate your ICP foundation insights
           </p>
         )}

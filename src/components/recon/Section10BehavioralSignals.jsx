@@ -61,7 +61,7 @@ const SECTION_10_QUESTIONS = [
 
 export default function Section10BehavioralSignals({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState(initialData || {});
   const [output, setOutput] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -70,6 +70,7 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
+      console.log("📥 Section 10 - Loading saved answers:", initialData);
       setAnswers(initialData);
     }
   }, [initialData]);
@@ -108,6 +109,8 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
   };
 
   const handleGenerate = async () => {
+    // Save before generating
+    await handleManualSave();
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;

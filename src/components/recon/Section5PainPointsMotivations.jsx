@@ -99,7 +99,7 @@ const SECTION_5_QUESTIONS = [
 
 export default function Section5PainPointsMotivations({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({
+  const [answers, setAnswers] = useState(initialData || {
     primaryPain: '',
     painCost: '',
     triedBefore: '',
@@ -112,7 +112,6 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
     churnReasons: ''
   });
   const [output, setOutput] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -121,41 +120,11 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
 
   // Load existing data on mount
   useEffect(() => {
-    const loadData = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          
-          // Load answers if they exist
-          if (data.section5Answers) {
-            setAnswers(prev => ({ ...prev, ...data.section5Answers }));
-          }
-          
-          // Load output if it exists
-          if (data.section5Output) {
-            setOutput(data.section5Output);
-            setShowOutput(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load saved data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [navigate]);
+    if (initialData && Object.keys(initialData).length > 0) {
+      console.log("📥 Section 5 - Loading saved answers:", initialData);
+      setAnswers(initialData);
+    }
+  }, [initialData]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -220,6 +189,8 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
   };
 
   const handleGenerate = async () => {
+    // Save before generating
+    await handleManualSave();
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;
@@ -275,6 +246,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
   };
 
   const handleEditAnswers = () => {
+    console.log("✏️ Section 5 - Editing answers - current state:", answers);
     setShowOutput(false);
   };
 
@@ -307,14 +279,6 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
       </div>
     );
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-blue-600 text-xl">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white text-gray-900 p-4">

@@ -142,7 +142,7 @@ const SECTION_2_QUESTIONS = [
 
 export default function Section2ProductDeepDive({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({
+  const [answers, setAnswers] = useState(initialData || {
     productName: '',
     category: '',
     coreFeatures: ['', '', '', '', ''],
@@ -156,7 +156,6 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
     integrations: ['', '', '', '', '']
   });
   const [output, setOutput] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -165,41 +164,11 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
   // Load existing data on mount
   useEffect(() => {
-    const loadData = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          
-          // Load answers if they exist
-          if (data.section2Answers) {
-            setAnswers(prev => ({ ...prev, ...data.section2Answers }));
-          }
-          
-          // Load output if it exists
-          if (data.section2Output) {
-            setOutput(data.section2Output);
-            setShowOutput(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load saved data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [navigate]);
+    if (initialData && Object.keys(initialData).length > 0) {
+      console.log("📥 Section 2 - Loading saved answers:", initialData);
+      setAnswers(initialData);
+    }
+  }, [initialData]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -315,6 +284,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
   };
 
   const handleGenerate = async () => {
+    // Validate before generating
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;
@@ -370,6 +340,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
   };
 
   const handleEditAnswers = () => {
+    console.log("✏️ Section 2 - Editing answers - current state:", answers);
     setShowOutput(false);
   };
 
@@ -558,14 +529,6 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-blue-600 text-xl">Loading...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-white text-gray-900 p-4">
       <div className="max-w-4xl mx-auto">
@@ -612,63 +575,80 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
           </>
         ) : (
           <>
+            {/* Success Message */}
+            <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-xl p-4 border border-green-500/30 mb-4">
+              <h3 className="text-xl font-bold text-green-400 mb-2">✅ SECTION 2 COMPLETE</h3>
+              <p className="text-sm text-gray-400">Product Intelligence Brief Generated</p>
+            </div>
+
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                📊 Product Intelligence Brief
-              </h2>
-              
-              {output && output.productIntelligence && (
-                <div className="space-y-4">
-                  {/* Product Profile */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Product Profile</h3>
-                    <p className="text-gray-300 mb-2"><strong>Name:</strong> {output.productIntelligence.productProfile.name}</p>
-                    <p className="text-gray-300 mb-2"><strong>Category:</strong> {output.productIntelligence.productProfile.category}</p>
-                    <p className="text-gray-300 mb-2"><strong>Core Features:</strong></p>
-                    <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
-                      {output.productIntelligence.productProfile.coreFeatures.map((feature, idx) => (
-                        <li key={idx}>{feature}</li>
-                      ))}
-                    </ul>
-                    <p className="text-gray-300 mt-2"><strong>Feature Priority:</strong> {output.productIntelligence.productProfile.featurePriority}</p>
+            {output && output.productIntelligence && (
+              <div className="space-y-4 mb-4">
+                {/* Product Profile */}
+                <div className="recon-result-card">
+                  <div className="recon-result-header">
+                    <span className="recon-result-icon">📦</span>
+                    <h3 className="recon-result-title">Product Profile</h3>
                   </div>
-
-                  {/* Differentiation */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Differentiation</h3>
-                    <p className="text-gray-300 mb-2"><strong>Unique Value:</strong> {output.productIntelligence.differentiation.uniqueValue}</p>
-                    <p className="text-gray-300 mb-2"><strong>Competitive Advantage:</strong> {output.productIntelligence.differentiation.competitiveAdvantage}</p>
-                    <p className="text-gray-300"><strong>Positioning:</strong> {output.productIntelligence.differentiation.positioning}</p>
+                  <div className="recon-result-content space-y-2">
+                    <p><strong>Name:</strong> {output.productIntelligence.productProfile.name}</p>
+                    <p><strong>Category:</strong> {output.productIntelligence.productProfile.category}</p>
+                    <div>
+                      <strong>Core Features:</strong>
+                      <ul className="list-disc list-inside space-y-1 ml-4 mt-1">
+                        {output.productIntelligence.productProfile.coreFeatures.map((feature, idx) => (
+                          <li key={idx}>{feature}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p><strong>Feature Priority:</strong> {output.productIntelligence.productProfile.featurePriority}</p>
                   </div>
+                </div>
 
-                  {/* Sweet Spot Customer */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Sweet Spot Customer</h3>
-                    <p className="text-gray-300 mb-2">{output.productIntelligence.sweetSpotCustomer.description}</p>
-                    <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                {/* Differentiation */}
+                <div className="recon-result-card">
+                  <div className="recon-result-header">
+                    <span className="recon-result-icon">⭐</span>
+                    <h3 className="recon-result-title">Differentiation</h3>
+                  </div>
+                  <div className="recon-result-content space-y-2">
+                    <p><strong>Unique Value:</strong> {output.productIntelligence.differentiation.uniqueValue}</p>
+                    <p><strong>Competitive Advantage:</strong> {output.productIntelligence.differentiation.competitiveAdvantage}</p>
+                    <p><strong>Positioning:</strong> {output.productIntelligence.differentiation.positioning}</p>
+                  </div>
+                </div>
+
+                {/* Sweet Spot Customer */}
+                <div className="recon-result-card">
+                  <div className="recon-result-header">
+                    <span className="recon-result-icon">🎯</span>
+                    <h3 className="recon-result-title">Sweet Spot Customer</h3>
+                  </div>
+                  <div className="recon-result-content space-y-2">
+                    <p>{output.productIntelligence.sweetSpotCustomer.description}</p>
+                    <ul className="list-disc list-inside space-y-1 ml-4">
                       {output.productIntelligence.sweetSpotCustomer.characteristics.map((char, idx) => (
                         <li key={idx}>{char}</li>
                       ))}
                     </ul>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-4">
               <button
                 onClick={handleEditAnswers}
-                className="flex-1 bg-gray-50 hover:bg-gray-100 border-2 border-gray-300 text-gray-900 font-bold py-4 px-8 rounded-xl transition-all"
+                className="flex-1 bg-gray-700/50 hover:bg-gray-700 text-gray-900 font-bold py-4 px-6 rounded-xl transition-all border border-gray-500/30"
               >
-                ✏️ Edit Answers
+                ✏️ EDIT ANSWERS
               </button>
               <button
-                onClick={() => navigate('/recon/section-3')}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
+                onClick={() => navigate('/mission-control-v2/recon')}
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-gray-900 font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-green-500/50"
               >
-                Next Section →
+                ✅ CONTINUE →
               </button>
             </div>
           </>

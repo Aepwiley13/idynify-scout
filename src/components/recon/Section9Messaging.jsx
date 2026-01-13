@@ -134,7 +134,7 @@ const SECTION_9_QUESTIONS = [
 
 export default function Section9Messaging({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({
+  const [answers, setAnswers] = useState(initialData || {
     emailTone: '',
     emailLength: '',
     keyMessages: [],
@@ -145,7 +145,6 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
     urgencyTactics: ''
   });
   const [output, setOutput] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -161,50 +160,11 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
 
   // Load existing data on mount
   useEffect(() => {
-    const loadData = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          
-          // Check which previous sections are available
-          setSectionsAvailable({
-            section4: !!data.section4Output,
-            section5: !!data.section5Output,
-            section6: !!data.section6Output,
-            section7: !!data.section7Output,
-            section8: !!data.section8Output
-          });
-          
-          // Load answers if they exist
-          if (data.section9Answers) {
-            setAnswers(prev => ({ ...prev, ...data.section9Answers }));
-          }
-          
-          // Load output if it exists
-          if (data.section9Output) {
-            setOutput(data.section9Output);
-            setShowOutput(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load saved data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [navigate]);
+    if (initialData && Object.keys(initialData).length > 0) {
+      console.log("📥 Section 9 - Loading saved answers:", initialData);
+      setAnswers(initialData);
+    }
+  }, [initialData]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -294,6 +254,8 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
   };
 
   const handleGenerate = async () => {
+    // Save before generating
+    await handleManualSave();
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;
@@ -349,6 +311,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
   };
 
   const handleEditAnswers = () => {
+    console.log("✏️ Section 9 - Editing answers - current state:", answers);
     setShowOutput(false);
   };
 
@@ -438,14 +401,6 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
         return null;
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-blue-600 text-xl">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white text-gray-900 p-4">

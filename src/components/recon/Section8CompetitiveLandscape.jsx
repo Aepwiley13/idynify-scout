@@ -114,7 +114,7 @@ const SECTION_8_QUESTIONS = [
 
 export default function Section8CompetitiveLandscape({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({
+  const [answers, setAnswers] = useState(initialData || {
     directCompetitors: '',
     indirectCompetitors: '',
     whyYouWin: '',
@@ -127,7 +127,6 @@ export default function Section8CompetitiveLandscape({ initialData = {}, onSave,
     avoidCompetitor: ''
   });
   const [output, setOutput] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -136,41 +135,11 @@ export default function Section8CompetitiveLandscape({ initialData = {}, onSave,
 
   // Load existing data on mount
   useEffect(() => {
-    const loadData = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          
-          // Load answers if they exist
-          if (data.section8Answers) {
-            setAnswers(prev => ({ ...prev, ...data.section8Answers }));
-          }
-          
-          // Load output if it exists
-          if (data.section8Output) {
-            setOutput(data.section8Output);
-            setShowOutput(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load saved data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [navigate]);
+    if (initialData && Object.keys(initialData).length > 0) {
+      console.log("📥 Section 8 - Loading saved answers:", initialData);
+      setAnswers(initialData);
+    }
+  }, [initialData]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -238,6 +207,8 @@ export default function Section8CompetitiveLandscape({ initialData = {}, onSave,
   };
 
   const handleGenerate = async () => {
+    // Save before generating
+    await handleManualSave();
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;
@@ -293,6 +264,7 @@ export default function Section8CompetitiveLandscape({ initialData = {}, onSave,
   };
 
   const handleEditAnswers = () => {
+    console.log("✏️ Section 8 - Editing answers - current state:", answers);
     setShowOutput(false);
   };
 
@@ -358,14 +330,6 @@ export default function Section8CompetitiveLandscape({ initialData = {}, onSave,
         return null;
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-blue-600 text-xl">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white text-gray-900 p-4">

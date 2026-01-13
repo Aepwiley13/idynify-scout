@@ -35,6 +35,8 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
       const authToken = await user.getIdToken();
 
+      console.log('📤 Sending OCR request to Netlify function...');
+
       const response = await fetch('/.netlify/functions/extractBusinessCard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,7 +47,16 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         })
       });
 
+      console.log('📥 OCR response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ OCR API error response:', errorText);
+        throw new Error(`OCR service error (${response.status}): ${errorText}`);
+      }
+
       const data = await response.json();
+      console.log('📊 OCR response data:', data);
 
       if (!data.success) {
         throw new Error(data.error || 'OCR extraction failed');
@@ -60,7 +71,8 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
       }));
 
     } catch (err) {
-      console.error('OCR extraction error:', err);
+      console.error('❌ OCR extraction error:', err);
+      console.error('Error details:', err.message);
       setError(err.message || 'Failed to extract card data. Please enter details manually.');
       // Set empty extracted data to allow manual entry
       setExtractedData({

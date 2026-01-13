@@ -14,17 +14,20 @@ export const handler = async (event) => {
     const { userId, authToken, imageBase64 } = JSON.parse(event.body);
 
     if (!userId || !authToken || !imageBase64) {
+      console.error('❌ Missing required parameters:', { userId: !!userId, authToken: !!authToken, imageBase64: !!imageBase64 });
       throw new Error('Missing required parameters');
     }
 
-    console.log('🔍 Extracting business card data via OCR');
+    console.log('🔍 Extracting business card data via OCR for user:', userId);
 
     // Validate environment variables
     const googleVisionApiKey = process.env.GOOGLE_VISION_API_KEY;
     if (!googleVisionApiKey) {
-      console.error('❌ GOOGLE_VISION_API_KEY not configured');
-      throw new Error('OCR service not configured');
+      console.error('❌ GOOGLE_VISION_API_KEY not configured in Netlify environment');
+      throw new Error('OCR service not configured. Please add GOOGLE_VISION_API_KEY to Netlify environment variables.');
     }
+
+    console.log('✅ Google Vision API key found');
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -57,8 +60,11 @@ export const handler = async (event) => {
 
     // Remove data URL prefix if present
     const base64Image = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+    const imageSize = base64Image.length;
+    console.log('📷 Image size (base64):', imageSize, 'characters');
 
     // Call Google Cloud Vision API for OCR
+    console.log('🌐 Calling Google Vision API...');
     const visionResponse = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`,
       {
@@ -77,13 +83,17 @@ export const handler = async (event) => {
       }
     );
 
+    console.log('📥 Google Vision response status:', visionResponse.status);
+
     if (!visionResponse.ok) {
       const errorText = await visionResponse.text();
       console.error('❌ Google Vision API error:', visionResponse.status, errorText);
-      throw new Error('OCR extraction failed');
+      throw new Error(`Google Vision API error (${visionResponse.status}): ${errorText}`);
     }
 
     const visionData = await visionResponse.json();
+    console.log('📊 Vision API response structure:', JSON.stringify(visionData, null, 2).substring(0, 500));
+
     const textAnnotations = visionData.responses[0]?.textAnnotations;
 
     if (!textAnnotations || textAnnotations.length === 0) {
@@ -93,7 +103,8 @@ export const handler = async (event) => {
 
     // Extract full text
     const fullText = textAnnotations[0].description;
-    console.log('📄 Extracted text:', fullText);
+    console.log('📄 Extracted text length:', fullText.length, 'characters');
+    console.log('📄 First 200 chars:', fullText.substring(0, 200));
 
     // Parse text into structured contact fields
     const extractedData = parseBusinessCardText(fullText);

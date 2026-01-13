@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Brain } from 'lucide-react';
 import { auth } from '../firebase/config';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../utils/dashboardUtils';
 import Section1Foundation from '../components/recon/Section1Foundation';
@@ -136,19 +137,26 @@ export default function RECONSectionPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      {/* Header - Enterprise Style matching Scout */}
+      <header className="sticky top-0 z-50 bg-white border-b-[1.5px] border-gray-200 shadow-sm backdrop-filter backdrop-blur-lg">
+        <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <button
                 onClick={navigateBack}
-                className="text-2xl hover:scale-110 transition-transform"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border-[1.5px] border-gray-300 rounded-lg hover:bg-gray-50 hover:border-purple-500 hover:text-purple-600 transition-all font-semibold text-sm text-gray-700"
               >
-                ⬅️
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to RECON</span>
               </button>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
+              <div className="inline-flex items-center gap-2 ml-2">
+                <Brain className="w-5 h-5 text-purple-600" strokeWidth={2.5} />
+                <span className="text-lg font-bold text-gray-900">RECON</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end mb-1">
                   <span className="text-xs text-gray-600 font-semibold">Section {section.order}</span>
                   {section.required && (
                     <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-semibold border border-red-300">
@@ -156,32 +164,33 @@ export default function RECONSectionPage() {
                     </span>
                   )}
                 </div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  {section.title}
-                </h1>
-                <p className="text-sm text-gray-600">{section.description}</p>
+                <p className="text-xs text-gray-600 font-semibold">Estimated Time</p>
+                <p className="text-lg font-bold text-blue-600">{section.estimatedTime}</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-600 font-semibold">Estimated Time</p>
-              <p className="text-lg font-bold text-blue-600">{section.estimatedTime}</p>
-            </div>
+          </div>
+          <div className="mt-3">
+            <h1 className="text-xl font-bold text-gray-900">{section.title}</h1>
+            <p className="text-sm text-gray-600 mt-1">{section.description}</p>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-12">
+      <main className="max-w-[900px] mx-auto px-6 py-8">
 
-        {/* Section Instructions */}
-        <section className="mb-8">
-          <div className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">📋 Instructions</h2>
-            <p className="text-gray-700 mb-4">
+        {/* Section Instructions - Enterprise Style */}
+        <section className="mb-6">
+          <div className="bg-gray-50 rounded-xl p-5 border-[1.5px] border-gray-200">
+            <h2 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+              <span className="text-blue-600">📋</span>
+              Instructions
+            </h2>
+            <p className="text-sm text-gray-700 mb-3">
               Answer the questions below to complete this section. Your responses will be used to build your comprehensive ICP.
             </p>
-            <p className="text-sm text-gray-600">
-              💡 You can save your progress at any time and return later to finish.
+            <p className="text-xs text-gray-600">
+              You can save your progress at any time and return later to finish.
             </p>
           </div>
         </section>

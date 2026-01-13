@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './ReconEnterprise.css';
 
 export default function SectionOutputModal({ section, onClose }) {
   const [activeTab, setActiveTab] = useState('summary');

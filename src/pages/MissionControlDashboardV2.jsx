@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { isUserAdmin } from '../utils/adminAuth';
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
@@ -63,8 +63,12 @@ export default function MissionControlDashboardV2() {
       const hasICP = icpDoc.exists() && icpDoc.data().industry;
       setHasCompletedICP(hasICP);
 
-      // Show welcome modal for first-time users (no ICP set up)
-      if (!hasICP) {
+      // Check if user has seen the welcome popup
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const hasSeenWelcome = userDoc.exists() && userDoc.data().hasSeenWelcomePopup === true;
+
+      // Show welcome modal only for first-time users (never seen before AND no ICP set up)
+      if (!hasSeenWelcome && !hasICP) {
         setShowWelcomeModal(true);
       }
 
@@ -90,6 +94,22 @@ export default function MissionControlDashboardV2() {
         console.error('Error logging out:', error);
       }
     }
+  };
+
+  const handleCloseWelcomeModal = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        // Mark welcome popup as seen in Firestore
+        await updateDoc(doc(db, 'users', user.uid), {
+          hasSeenWelcomePopup: true
+        });
+        console.log('✅ Welcome popup marked as seen');
+      } catch (error) {
+        console.error('Error updating welcome popup flag:', error);
+      }
+    }
+    setShowWelcomeModal(false);
   };
 
   const handleScoutClick = () => {
@@ -439,8 +459,9 @@ export default function MissionControlDashboardV2() {
           <div className="relative max-w-2xl w-full bg-gradient-to-br from-gray-900 to-black rounded-2xl border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/30 p-8 animate-fadeIn">
             {/* Close button */}
             <button
-              onClick={() => setShowWelcomeModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors text-2xl"
+              onClick={handleCloseWelcomeModal}
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-all text-3xl md:text-2xl"
+              aria-label="Close welcome popup"
             >
               ×
             </button>
@@ -448,8 +469,8 @@ export default function MissionControlDashboardV2() {
             {/* Welcome Header with Barry */}
             <div className="text-center mb-6">
               <div className="inline-block relative mb-4">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 mx-auto">
-                  <span className="text-5xl">🐻</span>
+                <div className="flex items-center justify-center mx-auto">
+                  <span className="text-6xl">🐻</span>
                 </div>
                 <div className="absolute -top-2 -right-2 text-3xl animate-pulse">⭐</div>
               </div>
@@ -490,8 +511,8 @@ export default function MissionControlDashboardV2() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => {
-                  setShowWelcomeModal(false);
+                onClick={async () => {
+                  await handleCloseWelcomeModal();
                   handleScoutClick();
                 }}
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-cyan-500/50 font-mono text-lg"
@@ -499,7 +520,7 @@ export default function MissionControlDashboardV2() {
                 🚀 Set Up My ICP
               </button>
               <button
-                onClick={() => setShowWelcomeModal(false)}
+                onClick={handleCloseWelcomeModal}
                 className="flex-1 sm:flex-none bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white font-semibold py-4 px-6 rounded-xl transition-all border border-gray-600/50 font-mono"
               >
                 I'll Do This Later

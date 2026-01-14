@@ -3,12 +3,12 @@ import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 
-export default function FindContact({ onContactAdded, onCancel }) {
+export default function FindContact({ onContactAdded, onCancel, initialSearchParams }) {
   const [searchParams, setSearchParams] = useState({
-    name: '',
-    company_name: '',
-    linkedin_url: '',
-    facebook_url: ''
+    name: initialSearchParams?.name || '',
+    company_name: initialSearchParams?.company_name || '',
+    linkedin_url: initialSearchParams?.linkedin_url || '',
+    facebook_url: initialSearchParams?.facebook_url || ''
   });
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
@@ -179,7 +179,7 @@ export default function FindContact({ onContactAdded, onCancel }) {
         // Metadata
         status: 'active',
         saved_at: new Date().toISOString(),
-        source: 'Found via Apollo',
+        source: 'Found via Search',
 
         // Match quality from search
         match_quality: selectedContact.match_quality || 0,
@@ -242,7 +242,7 @@ export default function FindContact({ onContactAdded, onCancel }) {
 
       // Metadata
       saved_at: new Date().toISOString(),
-      source: 'Found via Apollo',
+      source: 'Found via Search',
       status: 'accepted',
       contact_count: 0,
 

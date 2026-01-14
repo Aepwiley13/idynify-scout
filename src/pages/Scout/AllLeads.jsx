@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
-import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X } from 'lucide-react';
+import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X, Smartphone } from 'lucide-react';
 import ContactDetailModal from '../../components/scout/ContactDetailModal';
+import { downloadVCard } from '../../utils/vcard';
 import './AllLeads.css';
 
 export default function AllLeads() {
@@ -407,7 +408,7 @@ export default function AllLeads() {
                           color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
                           border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
                         }}>
-                          {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Apollo'}
+                          {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Search'}
                         </div>
                       </div>
                     </div>
@@ -460,6 +461,16 @@ export default function AllLeads() {
                   </td>
                   <td className="actions-cell" data-label="Actions">
                     <div className="action-links">
+                      <button
+                        className="action-link"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadVCard(contact);
+                        }}
+                        title="Save to Phone"
+                      >
+                        <Smartphone className="w-4 h-4" />
+                      </button>
                       {contact.linkedin_url && (
                         <a
                           href={contact.linkedin_url}

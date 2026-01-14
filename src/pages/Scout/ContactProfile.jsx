@@ -79,7 +79,7 @@ export default function ContactProfile() {
 
       // Check if contact has Apollo person ID
       if (!contact.apollo_person_id) {
-        setEnrichError('This contact cannot be enriched (no Apollo ID)');
+        setEnrichError('This contact cannot be automatically enriched. Use Find Contact to update manually.');
         setEnriching(false);
         return;
       }

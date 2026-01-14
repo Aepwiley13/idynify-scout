@@ -865,7 +865,7 @@ export default function CompanyDetail() {
                     color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
                     border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
                   }}>
-                    {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Apollo'}
+                    {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Search'}
                   </div>
 
                   <div className="decision-maker-header">
@@ -1142,7 +1142,7 @@ export default function CompanyDetail() {
             <h2>Available Contacts</h2>
             <p className="section-subtitle">
               {searchingContacts
-                ? `Searching Apollo for ${selectedTitles.length} title${selectedTitles.length !== 1 ? 's' : ''}...`
+                ? `Searching for ${selectedTitles.length} title${selectedTitles.length !== 1 ? 's' : ''}...`
                 : (() => {
                     const availableCount = contacts.filter(c => !approvedContacts.some(ac => ac.apollo_person_id === c.id)).length;
                     return availableCount > 0
@@ -1200,7 +1200,7 @@ export default function CompanyDetail() {
         {searchingContacts ? (
           <div className="searching-state">
             <div className="loading-spinner"></div>
-            <h4>Searching Apollo</h4>
+            <h4>Searching for Contacts</h4>
             <p>Looking for {selectedTitles.map(t => t.title).join(', ')} at {company.name}</p>
           </div>
         ) : (() => {

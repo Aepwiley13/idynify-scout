@@ -113,12 +113,8 @@ export default function MissionControlDashboardV2() {
   };
 
   const handleScoutClick = () => {
-    // If user hasn't completed ICP, take them to ICP settings tab
-    if (!hasCompletedICP) {
-      navigate('/scout', { state: { activeTab: 'icp-settings' } });
-    } else {
-      navigate('/scout');
-    }
+    // Always route to Daily Leads (default tab)
+    navigate('/scout');
   };
 
   if (loading) {

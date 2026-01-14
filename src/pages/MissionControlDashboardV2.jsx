@@ -187,8 +187,8 @@ export default function MissionControlDashboardV2() {
           {/* Barry the AI Assistant - Top Left */}
           <div className="absolute left-8 top-8 flex items-center gap-3 group">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 group-hover:scale-110 transition-transform">
-                <span className="text-3xl">🐻</span>
+              <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span className="text-6xl">🐻</span>
               </div>
               {/* Star decoration */}
               <div className="absolute -top-2 -right-2 text-2xl animate-pulse">⭐</div>

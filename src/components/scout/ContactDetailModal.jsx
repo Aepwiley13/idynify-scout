@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles, Smartphone, ArrowLeft } from 'lucide-react';
+import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles, Smartphone, ArrowLeft, Send } from 'lucide-react';
 import { downloadVCard } from '../../utils/vcard';
 import FindContact from './FindContact';
 import './ContactDetailModal.css';
 
 export default function ContactDetailModal({ contact, onClose, onUpdate }) {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
@@ -308,6 +310,19 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
                 >
                   <Smartphone className="w-4 h-4" />
                   <span>Save to Phone</span>
+                </button>
+                <button
+                  className="save-phone-button"
+                  onClick={() => navigate(`/hunter/campaign/new?contactIds=${contact.id}`)}
+                  title="Start Campaign"
+                  style={{
+                    background: 'linear-gradient(to right, #ec4899, #a855f7)',
+                    color: 'white',
+                    border: 'none'
+                  }}
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Start Campaign</span>
                 </button>
                 {!isEditing && isManualOrNetworking && (
                   <button

@@ -361,46 +361,46 @@ export default function MissionControlDashboardV2() {
               </button>
             </div>
 
-            {/* HUNTER - Locked */}
-            <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border-2 border-gray-600/30 relative overflow-hidden opacity-70">
-              {/* Lock Icon */}
-              <div className="absolute top-4 right-4 text-3xl">🔒</div>
+            {/* HUNTER - Active */}
+            <div
+              onClick={() => navigate('/hunter')}
+              className="bg-gradient-to-br from-pink-900/30 via-purple-900/30 to-pink-800/30 backdrop-blur-xl rounded-2xl p-6 border-2 border-pink-500/30 relative overflow-hidden cursor-pointer hover:scale-105 transition-all duration-300 hover:border-pink-400/50 group"
+            >
+              {/* Active Badge */}
+              <div className="absolute top-4 right-4">
+                <span className="inline-block text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full font-mono font-semibold animate-pulse">
+                  ACTIVE
+                </span>
+              </div>
 
               {/* Hunter Icon - Crosshair */}
               <div className="relative mb-4 h-32 flex items-center justify-center">
-                <div className="relative grayscale opacity-50">
+                <div className="relative">
                   {/* Crosshair */}
-                  <div className="relative w-24 h-24 rounded-full border-4 border-gray-500 flex items-center justify-center">
-                    <div className="w-1 h-full bg-gray-500 absolute"></div>
-                    <div className="h-1 w-full bg-gray-500 absolute"></div>
-                    <div className="w-8 h-8 rounded-full border-2 border-gray-500"></div>
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                  <div className="relative w-24 h-24 rounded-full border-4 border-pink-400 flex items-center justify-center group-hover:border-pink-300 transition-colors">
+                    <div className="w-1 h-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
+                    <div className="h-1 w-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
+                    <div className="w-8 h-8 rounded-full border-2 border-pink-400 group-hover:border-pink-300 transition-colors"></div>
+                    <div className="w-2 h-2 rounded-full bg-pink-400 group-hover:bg-pink-300 transition-colors animate-pulse"></div>
                   </div>
                   {/* Targeting marks */}
-                  <div className="absolute top-0 left-1/2 w-px h-4 bg-gray-500"></div>
-                  <div className="absolute bottom-0 left-1/2 w-px h-4 bg-gray-500"></div>
-                  <div className="absolute left-0 top-1/2 h-px w-4 bg-gray-500"></div>
-                  <div className="absolute right-0 top-1/2 h-px w-4 bg-gray-500"></div>
+                  <div className="absolute top-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute bottom-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute left-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute right-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
                 </div>
               </div>
 
               <h4 className="font-mono text-2xl mb-3 text-white font-bold">HUNTER</h4>
 
-              <span className="inline-block text-xs bg-gray-600 text-white px-3 py-1 rounded-full font-mono font-semibold">
-                COMING SOON
-              </span>
-
-              <p className="text-sm text-gray-400 mt-4 mb-8">
+              <p className="text-sm text-pink-200/80 mt-4 mb-8">
                 Automated outreach campaigns
               </p>
 
-              {/* Lock icon in button area */}
-              <div className="flex flex-col items-center gap-3 mt-12">
-                <div className="text-5xl opacity-50">🔒</div>
-                <button className="w-full py-3 rounded-xl bg-gray-700/50 text-gray-400 font-mono text-sm font-bold cursor-not-allowed border border-gray-600/50">
-                  Unlock Hunter
-                </button>
-              </div>
+              {/* Action Button */}
+              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-mono text-sm font-bold hover:from-pink-600 hover:to-purple-700 transition-all shadow-lg">
+                Launch Hunter →
+              </button>
             </div>
 
             {/* SNIPER - Locked */}

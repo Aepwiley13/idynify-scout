@@ -60,9 +60,38 @@ export default function HunterDashboard() {
     }
   }
 
-  function handleConnectGmail() {
-    // This will be implemented when OAuth function is ready
-    alert('Gmail OAuth will be implemented in Phase 3B');
+  async function handleConnectGmail() {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        alert('Please log in first');
+        return;
+      }
+
+      const authToken = await user.getIdToken();
+
+      const response = await fetch('/.netlify/functions/gmail-oauth-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initialize Gmail OAuth');
+      }
+
+      const data = await response.json();
+
+      // Redirect to Google OAuth
+      window.location.href = data.authUrl;
+
+    } catch (error) {
+      console.error('Error connecting Gmail:', error);
+      alert('Failed to connect Gmail. Please try again.');
+    }
   }
 
   function getCampaignStats(campaign) {

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, ChevronDown } from 'lucide-react';
+import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, ChevronDown, RefreshCw } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import './CompanyDetailModal.css';
 
@@ -13,6 +13,7 @@ export default function CompanyDetailModal({ company, onClose }) {
   const [error, setError] = useState(null);
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingContacts, setSavingContacts] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Scroll detection states
   const [isScrolled, setIsScrolled] = useState(false);
@@ -61,7 +62,7 @@ export default function CompanyDetailModal({ company, onClose }) {
     };
   }, [enrichedData]);
 
-  async function enrichCompanyData() {
+  async function enrichCompanyData(forceRefresh = false) {
     try {
       setLoading(true);
       setError(null);
@@ -82,13 +83,19 @@ export default function CompanyDetailModal({ company, onClose }) {
       const currentData = companyDoc.data();
 
       // Check if we already have fresh Apollo data (14 days cache)
-      if (currentData.apolloEnrichment &&
+      // Skip cache if forceRefresh is true
+      if (!forceRefresh &&
+          currentData.apolloEnrichment &&
           currentData.apolloEnrichedAt &&
           Date.now() - currentData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
         console.log('✅ Using cached Apollo data');
         setEnrichedData(currentData.apolloEnrichment);
         setLoading(false);
         return;
+      }
+
+      if (forceRefresh) {
+        console.log('🔄 Force refresh requested - bypassing cache');
       }
 
       // Call Netlify Function to enrich with Apollo
@@ -262,6 +269,19 @@ export default function CompanyDetailModal({ company, onClose }) {
     onClose();
   }
 
+  async function handleForceRefresh() {
+    try {
+      setRefreshing(true);
+      console.log('🔄 Force refreshing company data...');
+      await enrichCompanyData(true);
+      console.log('✅ Force refresh complete');
+    } catch (err) {
+      console.error('❌ Force refresh failed:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   return (
     <div className="company-detail-overlay" onClick={onClose}>
       <div className="company-detail-container" onClick={(e) => e.stopPropagation()}>
@@ -275,9 +295,19 @@ export default function CompanyDetailModal({ company, onClose }) {
               <p className="company-detail-industry">{enrichedData?.snapshot?.industry || company.industry || 'Industry not specified'}</p>
             </div>
           </div>
-          <button className="close-button" onClick={onClose}>
-            <X className="w-6 h-6" />
-          </button>
+          <div className="header-actions">
+            <button
+              className="refresh-button"
+              onClick={handleForceRefresh}
+              disabled={refreshing || loading}
+              title="Force refresh company data (bypass cache)"
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'spinning' : ''}`} />
+            </button>
+            <button className="close-button" onClick={onClose}>
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

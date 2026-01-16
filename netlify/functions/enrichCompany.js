@@ -113,6 +113,21 @@ export const handler = async (event) => {
           const peopleData = await peopleResponse.json();
           decisionMakers = (peopleData.people || []).slice(0, 3); // Limit to 3
           console.log('✅ Found decision makers:', decisionMakers.length);
+          // Diagnostic: Log first decision maker structure
+          if (decisionMakers.length > 0) {
+            console.log('📋 Sample decision maker from Apollo:', {
+              id: decisionMakers[0].id,
+              first_name: decisionMakers[0].first_name,
+              last_name: decisionMakers[0].last_name,
+              name: decisionMakers[0].name,
+              title: decisionMakers[0].title,
+              email: decisionMakers[0].email,
+              photo_url: decisionMakers[0].photo_url,
+              linkedin_url: decisionMakers[0].linkedin_url,
+              has_departments: !!decisionMakers[0].departments,
+              has_functions: !!decisionMakers[0].functions
+            });
+          }
         } else {
           console.warn('⚠️ Could not fetch decision makers, continuing without them');
         }
@@ -209,6 +224,17 @@ export const handler = async (event) => {
     };
 
     console.log('✅ Company enrichment complete');
+    // Diagnostic: Log mapped decision makers being returned to frontend
+    if (enrichedData.decisionMakers && enrichedData.decisionMakers.length > 0) {
+      console.log('📤 Mapped decision makers (sent to frontend):', enrichedData.decisionMakers.map(dm => ({
+        id: dm.id,
+        name: dm.name,
+        title: dm.title,
+        email: dm.email,
+        photo_url: dm.photo_url,
+        linkedin_url: dm.linkedin_url
+      })));
+    }
 
     // Log API usage for admin tracking
     const responseTime = Date.now() - startTime;

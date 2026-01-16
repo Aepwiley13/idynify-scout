@@ -88,6 +88,30 @@ export const handler = async (event) => {
 
     console.log('✅ Found people:', apolloData.people?.length || 0);
 
+    // Map Apollo API response fields to match frontend expectations
+    const mappedPeople = (apolloData.people || []).map(person => ({
+      ...person,
+      // Construct full name from first_name + last_name
+      name: person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || null,
+      // Ensure email is mapped correctly
+      email: person.email || null,
+      // Map organization name if needed
+      organization_name: person.organization_name || person.organization?.name || null,
+      // Ensure photo_url is mapped
+      photo_url: person.photo_url || null,
+      // Ensure departments is an array
+      departments: person.departments || person.functions || [],
+      // Map phone numbers
+      phone_numbers: person.phone_numbers || []
+    }));
+
+    console.log('📋 Sample mapped person:', mappedPeople[0] ? {
+      id: mappedPeople[0].id,
+      name: mappedPeople[0].name,
+      email: mappedPeople[0].email,
+      title: mappedPeople[0].title
+    } : 'No people found');
+
     // Log API usage for admin tracking
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'searchPeople', 'success', {
@@ -95,7 +119,7 @@ export const handler = async (event) => {
       metadata: {
         organizationId,
         titlesSearched: titles,
-        resultsFound: apolloData.people?.length || 0
+        resultsFound: mappedPeople.length
       }
     });
 
@@ -107,7 +131,7 @@ export const handler = async (event) => {
       },
       body: JSON.stringify({
         success: true,
-        people: apolloData.people || [],
+        people: mappedPeople,
         total: apolloData.pagination?.total_entries || 0
       })
     };

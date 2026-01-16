@@ -86,11 +86,26 @@ export const handler = async (event) => {
 
     console.log(`✅ Found ${people.length} potential matches`);
 
-    // Enrich results with match quality scores
-    const enrichedResults = people.map(person => ({
-      ...person,
-      match_quality: calculateMatchQuality(person, searchParams)
-    }));
+    // Map Apollo API response fields and enrich with match quality scores
+    const enrichedResults = people.map(person => {
+      // Construct full name from first_name + last_name if name doesn't exist
+      const fullName = person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || null;
+
+      const mappedPerson = {
+        ...person,
+        name: fullName,
+        email: person.email || null,
+        organization_name: person.organization_name || person.organization?.name || null,
+        photo_url: person.photo_url || null,
+        departments: person.departments || person.functions || [],
+        phone_numbers: person.phone_numbers || []
+      };
+
+      return {
+        ...mappedPerson,
+        match_quality: calculateMatchQuality(mappedPerson, searchParams)
+      };
+    });
 
     // Sort by match quality
     enrichedResults.sort((a, b) => b.match_quality - a.match_quality);

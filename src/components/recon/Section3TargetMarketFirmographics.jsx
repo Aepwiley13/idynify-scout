@@ -158,7 +158,7 @@ const SECTION_3_QUESTIONS = [
 
 export default function Section3TargetMarketFirmographics({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({
+  const [answers, setAnswers] = useState(initialData || {
     companySize: [],
     revenueRange: [],
     growthStage: [],
@@ -171,7 +171,6 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
     marketSize: ''
   });
   const [output, setOutput] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
@@ -180,41 +179,11 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
 
   // Load existing data on mount
   useEffect(() => {
-    const loadData = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          
-          // Load answers if they exist
-          if (data.section3Answers) {
-            setAnswers(prev => ({ ...prev, ...data.section3Answers }));
-          }
-          
-          // Load output if it exists
-          if (data.section3Output) {
-            setOutput(data.section3Output);
-            setShowOutput(true);
-          }
-        }
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load saved data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [navigate]);
+    if (initialData && Object.keys(initialData).length > 0) {
+      console.log("📥 Section 3 - Loading saved answers:", initialData);
+      setAnswers(initialData);
+    }
+  }, [initialData]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -304,6 +273,8 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
   };
 
   const handleGenerate = async () => {
+    // Save before generating
+    await handleManualSave();
     if (!validateAnswers()) {
       setError('Please complete all required fields');
       return;
@@ -359,6 +330,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
   };
 
   const handleEditAnswers = () => {
+    console.log("✏️ Section 3 - Editing answers - current state:", answers);
     setShowOutput(false);
   };
 
@@ -369,8 +341,8 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
     switch (q.type) {
       case 'text':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -381,7 +353,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
               value={value || ''}
               onChange={(e) => handleInputChange(q.id, e.target.value)}
               placeholder={q.placeholder}
-              className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
             />
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
           </div>
@@ -389,8 +361,8 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
 
       case 'dropdown':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -399,7 +371,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
             <select
               value={value || ''}
               onChange={(e) => handleInputChange(q.id, e.target.value)}
-              className={`w-full bg-cyan-950/50 border-2 ${hasError ? 'border-red-500' : 'border-cyan-500/30'} rounded-xl p-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
             >
               <option value="">-- Select --</option>
               {q.options.map(opt => (
@@ -412,8 +384,8 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
 
       case 'radio':
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -428,9 +400,9 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
                     value={opt}
                     checked={value === opt}
                     onChange={(e) => handleInputChange(q.id, e.target.value)}
-                    className="w-5 h-5 text-cyan-500 focus:ring-cyan-400"
+                    className="w-5 h-5 text-blue-600 focus:ring-blue-400"
                   />
-                  <span className="text-white">{opt}</span>
+                  <span className="text-gray-900">{opt}</span>
                 </label>
               ))}
             </div>
@@ -444,8 +416,8 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
         const minSelections = q.minSelections || 1;
         
         return (
-          <div key={q.id} className="mb-6">
-            <label className="block text-lg font-semibold mb-2 text-cyan-300 font-mono">
+          <div key={q.id} className="mb-4">
+            <label className="block text-lg font-semibold mb-2 text-gray-900">
               {q.question}{q.required && '*'}
             </label>
             {q.helpText && (
@@ -469,15 +441,15 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
                     disabled={!canSelect}
                     className={`p-4 rounded-lg border-2 transition-all text-left ${
                       isSelected
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-semibold'
+                        ? 'bg-cyan-500/20 border-gray-300 text-gray-900 font-semibold'
                         : canSelect
-                        ? 'bg-cyan-950/30 border-cyan-500/30 text-gray-300 hover:border-cyan-400/50 hover:bg-cyan-950/50'
-                        : 'bg-gray-900/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
+                        ? 'bg-cyan-950/30 border-gray-300/30 text-gray-300 hover:border-gray-300/50 hover:bg-gray-50'
+                        : 'bg-white/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{opt}</span>
-                      {isSelected && <span className="text-cyan-400">✓</span>}
+                      {isSelected && <span className="text-blue-600">✓</span>}
                     </div>
                   </button>
                 );
@@ -492,20 +464,12 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-cyan-400 text-xl">Loading...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-white text-gray-900 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-cyan-400 font-mono mb-2">
+          <h1 className="text-4xl font-bold text-blue-600 mb-2">
             Section 3: Target Market Firmographics
           </h1>
           <p className="text-gray-400">
@@ -520,7 +484,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
+          <div className="mb-4 p-4 bg-red-500/10 border-2 border-red-500 rounded-xl">
             <p className="text-red-400">{error}</p>
           </div>
         )}
@@ -529,7 +493,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
         {!showOutput ? (
           <>
             {/* Questions */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {SECTION_3_QUESTIONS.map(q => renderQuestion(q))}
             </div>
 
@@ -538,7 +502,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed font-mono text-lg"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed text-lg"
               >
                 {generating ? '🤖 Generating Firmographic Profile...' : '🎯 Generate Firmographic Profile'}
               </button>
@@ -547,16 +511,16 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-cyan-500/50 rounded-xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-cyan-300 mb-4 font-mono">
+            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 📊 Firmographic Profile
               </h2>
               
               {output && output.firmographicProfile && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Company Size */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Company Size Parameters</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Company Size Parameters</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Employee Ranges:</strong> {output.firmographicProfile.companySizeParameters.employees.ranges.join(', ')}
                     </p>
@@ -579,7 +543,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
 
                   {/* Market Size */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Market Size</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Market Size</h3>
                     <p className="text-gray-300 mb-2">
                       <strong>Your Estimate:</strong> {output.firmographicProfile.marketSize.userEstimate}
                     </p>
@@ -599,11 +563,11 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
 
                   {/* Firmographic Scoring */}
                   <div>
-                    <h3 className="text-xl font-semibold text-cyan-400 mb-2">Firmographic Scoring Algorithm</h3>
+                    <h3 className="text-xl font-semibold text-blue-600 mb-2">Firmographic Scoring Algorithm</h3>
                     <div className="space-y-3">
                       {output.firmographicProfile.firmographicScoring.criteria.map((criterion, idx) => (
-                        <div key={idx} className="bg-cyan-950/50 p-4 rounded-lg">
-                          <p className="text-cyan-300 font-semibold mb-1">
+                        <div key={idx} className="bg-gray-50 p-4 rounded-lg">
+                          <p className="text-gray-900 font-semibold mb-1">
                             {criterion.factor.toUpperCase()} ({criterion.weight}%)
                           </p>
                           <p className="text-gray-300 text-sm">{criterion.scoring}</p>
@@ -622,13 +586,13 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
             <div className="flex gap-4">
               <button
                 onClick={handleEditAnswers}
-                className="flex-1 bg-cyan-950/50 hover:bg-cyan-950/70 border-2 border-cyan-500 text-cyan-300 font-bold py-4 px-8 rounded-xl transition-all font-mono"
+                className="flex-1 bg-gray-50 hover:bg-gray-100 border-2 border-gray-300 text-gray-900 font-bold py-4 px-8 rounded-xl transition-all"
               >
                 ✏️ Edit Answers
               </button>
               <button
                 onClick={() => navigate('/recon/section-4')}
-                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105 font-mono"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →
               </button>

@@ -273,7 +273,7 @@ export default function ProspectCard({
                       <p className="text-purple-200 text-sm">
                         {action.type === 'email_generated' && 'Email template generated'}
                         {action.type === 'linkedin_generated' && 'LinkedIn message generated'}
-                        {action.type === 'enriched' && 'Profile enriched from Apollo'}
+                        {action.type === 'enriched' && 'Profile enriched'}
                         {action.type === 'priority_changed' && `Priority changed from ${action.from} to ${action.to}`}
                         {action.type === 'status_changed' && `Status changed to ${action.to}`}
                         {action.type === 'notes_updated' && 'Notes updated'}

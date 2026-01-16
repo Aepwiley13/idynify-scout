@@ -300,6 +300,18 @@ export default function DailyLeads() {
 
       {/* KPI Dashboard */}
       <div className="kpi-dashboard">
+        <div className="kpi-card">
+          <div className="kpi-header">
+            <Users className="kpi-icon" />
+            <span className="kpi-label">Leads Available</span>
+          </div>
+          <div className="kpi-value">{remainingLeads}</div>
+          <div className="kpi-trend">
+            <TrendingUp className="trend-icon positive" />
+            <span className="trend-text positive">Updated daily</span>
+          </div>
+        </div>
+
         <div className="kpi-card kpi-card-primary">
           <div className="kpi-primary-row">
             <span className="kpi-label">Matched Today</span>
@@ -313,14 +325,14 @@ export default function DailyLeads() {
         <div className="kpi-card">
           <div className="kpi-header">
             <CheckCircle className="kpi-icon" />
-            <span className="kpi-label">Matches</span>
+            <span className="kpi-label">Companies Accepted</span>
           </div>
           <div className="kpi-value">{totalAcceptedCompanies}</div>
           <div className="kpi-trend">
             {totalAcceptedCompanies > 0 ? (
               <>
                 <TrendingUp className="trend-icon positive" />
-                <span className="trend-text positive">Companies accepted</span>
+                <span className="trend-text positive">Total accepted</span>
               </>
             ) : (
               <>
@@ -328,18 +340,6 @@ export default function DailyLeads() {
                 <span className="trend-text neutral">Start reviewing leads</span>
               </>
             )}
-          </div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <Users className="kpi-icon" />
-            <span className="kpi-label">Leads Available</span>
-          </div>
-          <div className="kpi-value">{remainingLeads}</div>
-          <div className="kpi-trend">
-            <TrendingUp className="trend-icon positive" />
-            <span className="trend-text positive">Updated daily</span>
           </div>
         </div>
       </div>

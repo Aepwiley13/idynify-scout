@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Preview Template - idynify Scout</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: #1a1a1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .preview-container {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+    }
+
+    .canvas {
+      width: 600px;
+      height: 315px;
+      background: linear-gradient(135deg, #000000 0%, #0a0a0a 50%, #000000 100%);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      padding: 60px;
+      box-sizing: border-box;
+    }
+
+    /* Starfield effect */
+    .canvas::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image:
+        radial-gradient(2px 2px at 20% 30%, white, transparent),
+        radial-gradient(2px 2px at 60% 70%, white, transparent),
+        radial-gradient(1px 1px at 50% 50%, white, transparent),
+        radial-gradient(1px 1px at 80% 10%, white, transparent),
+        radial-gradient(2px 2px at 90% 60%, white, transparent),
+        radial-gradient(1px 1px at 33% 50%, white, transparent),
+        radial-gradient(1px 1px at 66% 25%, white, transparent);
+      background-size: 200% 200%;
+      opacity: 0.3;
+    }
+
+    /* Glow effects */
+    .canvas::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 20%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, transparent 70%);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .barry-container {
+      position: relative;
+      z-index: 2;
+      flex-shrink: 0;
+      margin-right: 40px;
+    }
+
+    .barry {
+      font-size: 160px;
+      line-height: 1;
+      filter: drop-shadow(0 10px 20px rgba(6, 182, 212, 0.3));
+    }
+
+    .star {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      font-size: 48px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    .text-content {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+    }
+
+    .headline {
+      font-size: 48px;
+      font-weight: 800;
+      color: white;
+      line-height: 1.2;
+      margin: 0 0 16px 0;
+      text-shadow:
+        0 0 20px rgba(6, 182, 212, 0.5),
+        0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .subheadline {
+      font-size: 28px;
+      font-weight: 400;
+      color: #06B6D4;
+      margin: 0;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .branding {
+      position: absolute;
+      bottom: 20px;
+      right: 30px;
+      font-size: 16px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.6);
+      z-index: 3;
+    }
+
+    .info {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f3f4f6;
+      border-radius: 8px;
+    }
+
+    .info h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      color: #1f2937;
+    }
+
+    .info p {
+      margin: 5px 0;
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .info code {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <div class="canvas">
+      <div class="barry-container">
+        <div class="barry">🐻</div>
+        <div class="star">⭐</div>
+      </div>
+      <div class="text-content">
+        <h1 class="headline">Find your ideal clients in minutes</h1>
+        <p class="subheadline">It's like Tinder for your ICP</p>
+      </div>
+      <div class="branding">idynify Scout</div>
+    </div>
+
+    <div class="info">
+      <h3>🎨 Social Preview Template</h3>
+      <p><strong>Dimensions:</strong> 1200 × 630 px (shown here at 50% scale)</p>
+      <p><strong>Format:</strong> PNG or JPG, optimized for web</p>
+      <p><strong>Target file:</strong> <code>/public/social-preview.png</code></p>
+      <p>This preview shows the layout and design for the social sharing image. Create the final image at full resolution (1200×630px) following these specifications.</p>
+      <p><strong>Next steps:</strong> See <code>SOCIAL-PREVIEW-SPECS.md</code> for detailed design guidelines.</p>
+    </div>
+  </div>
+</body>
+</html>

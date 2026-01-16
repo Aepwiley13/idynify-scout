@@ -93,7 +93,7 @@ export const handler = async (event) => {
       console.log('👥 Fetching decision makers...');
 
       try {
-        const peopleResponse = await fetch('https://api.apollo.io/v1/mixed_people/search', {
+        const peopleResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -178,10 +178,13 @@ export const handler = async (event) => {
         id: person.id,
         first_name: person.first_name,
         last_name: person.last_name,
-        name: person.name,
+        // Construct full name from first_name + last_name if name doesn't exist
+        name: person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || null,
         title: person.title,
+        email: person.email || null,
         seniority: person.seniority,
         department: person.departments?.[0] || person.functions?.[0] || null,
+        departments: person.departments || person.functions || [],
         linkedin_url: person.linkedin_url,
         photo_url: person.photo_url
       })),

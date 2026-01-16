@@ -49,6 +49,11 @@ import ContactSuggestions from './components/ContactSuggestions';
 import LeadList from './components/LeadList';
 import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
 
+// Hunter Pages
+import HunterDashboard from './pages/Hunter/HunterDashboard';
+import CreateCampaign from './pages/Hunter/CreateCampaign';
+import CampaignDetail from './pages/Hunter/CampaignDetail';
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -272,6 +277,32 @@ function App() {
           element={
             <ProtectedRoute>
               <ContactProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Hunter Module - Outreach Execution */}
+        <Route
+          path="/hunter"
+          element={
+            <ProtectedRoute>
+              <HunterDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hunter/campaign/new"
+          element={
+            <ProtectedRoute>
+              <CreateCampaign />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hunter/campaign/:campaignId"
+          element={
+            <ProtectedRoute>
+              <CampaignDetail />
             </ProtectedRoute>
           }
         />

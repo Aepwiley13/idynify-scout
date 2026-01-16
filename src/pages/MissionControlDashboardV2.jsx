@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { isUserAdmin } from '../utils/adminAuth';
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
@@ -63,8 +63,12 @@ export default function MissionControlDashboardV2() {
       const hasICP = icpDoc.exists() && icpDoc.data().industry;
       setHasCompletedICP(hasICP);
 
-      // Show welcome modal for first-time users (no ICP set up)
-      if (!hasICP) {
+      // Check if user has seen the welcome popup
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const hasSeenWelcome = userDoc.exists() && userDoc.data().hasSeenWelcomePopup === true;
+
+      // Show welcome modal only for first-time users (never seen before AND no ICP set up)
+      if (!hasSeenWelcome && !hasICP) {
         setShowWelcomeModal(true);
       }
 
@@ -92,13 +96,25 @@ export default function MissionControlDashboardV2() {
     }
   };
 
-  const handleScoutClick = () => {
-    // If user hasn't completed ICP, take them to ICP settings tab
-    if (!hasCompletedICP) {
-      navigate('/scout', { state: { activeTab: 'icp-settings' } });
-    } else {
-      navigate('/scout');
+  const handleCloseWelcomeModal = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        // Mark welcome popup as seen in Firestore
+        await updateDoc(doc(db, 'users', user.uid), {
+          hasSeenWelcomePopup: true
+        });
+        console.log('✅ Welcome popup marked as seen');
+      } catch (error) {
+        console.error('Error updating welcome popup flag:', error);
+      }
     }
+    setShowWelcomeModal(false);
+  };
+
+  const handleScoutClick = () => {
+    // Always route to Daily Leads (default tab)
+    navigate('/scout');
   };
 
   if (loading) {
@@ -171,8 +187,8 @@ export default function MissionControlDashboardV2() {
           {/* Barry the AI Assistant - Top Left */}
           <div className="absolute left-8 top-8 flex items-center gap-3 group">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 group-hover:scale-110 transition-transform">
-                <span className="text-3xl">🐻</span>
+              <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
+                <span className="text-6xl">🐻</span>
               </div>
               {/* Star decoration */}
               <div className="absolute -top-2 -right-2 text-2xl animate-pulse">⭐</div>
@@ -345,46 +361,46 @@ export default function MissionControlDashboardV2() {
               </button>
             </div>
 
-            {/* HUNTER - Locked */}
-            <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-6 border-2 border-gray-600/30 relative overflow-hidden opacity-70">
-              {/* Lock Icon */}
-              <div className="absolute top-4 right-4 text-3xl">🔒</div>
+            {/* HUNTER - Active */}
+            <div
+              onClick={() => navigate('/hunter')}
+              className="bg-gradient-to-br from-pink-900/30 via-purple-900/30 to-pink-800/30 backdrop-blur-xl rounded-2xl p-6 border-2 border-pink-500/30 relative overflow-hidden cursor-pointer hover:scale-105 transition-all duration-300 hover:border-pink-400/50 group"
+            >
+              {/* Active Badge */}
+              <div className="absolute top-4 right-4">
+                <span className="inline-block text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full font-mono font-semibold animate-pulse">
+                  ACTIVE
+                </span>
+              </div>
 
               {/* Hunter Icon - Crosshair */}
               <div className="relative mb-4 h-32 flex items-center justify-center">
-                <div className="relative grayscale opacity-50">
+                <div className="relative">
                   {/* Crosshair */}
-                  <div className="relative w-24 h-24 rounded-full border-4 border-gray-500 flex items-center justify-center">
-                    <div className="w-1 h-full bg-gray-500 absolute"></div>
-                    <div className="h-1 w-full bg-gray-500 absolute"></div>
-                    <div className="w-8 h-8 rounded-full border-2 border-gray-500"></div>
-                    <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                  <div className="relative w-24 h-24 rounded-full border-4 border-pink-400 flex items-center justify-center group-hover:border-pink-300 transition-colors">
+                    <div className="w-1 h-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
+                    <div className="h-1 w-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
+                    <div className="w-8 h-8 rounded-full border-2 border-pink-400 group-hover:border-pink-300 transition-colors"></div>
+                    <div className="w-2 h-2 rounded-full bg-pink-400 group-hover:bg-pink-300 transition-colors animate-pulse"></div>
                   </div>
                   {/* Targeting marks */}
-                  <div className="absolute top-0 left-1/2 w-px h-4 bg-gray-500"></div>
-                  <div className="absolute bottom-0 left-1/2 w-px h-4 bg-gray-500"></div>
-                  <div className="absolute left-0 top-1/2 h-px w-4 bg-gray-500"></div>
-                  <div className="absolute right-0 top-1/2 h-px w-4 bg-gray-500"></div>
+                  <div className="absolute top-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute bottom-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute left-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute right-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
                 </div>
               </div>
 
               <h4 className="font-mono text-2xl mb-3 text-white font-bold">HUNTER</h4>
 
-              <span className="inline-block text-xs bg-gray-600 text-white px-3 py-1 rounded-full font-mono font-semibold">
-                COMING SOON
-              </span>
-
-              <p className="text-sm text-gray-400 mt-4 mb-8">
+              <p className="text-sm text-pink-200/80 mt-4 mb-8">
                 Automated outreach campaigns
               </p>
 
-              {/* Lock icon in button area */}
-              <div className="flex flex-col items-center gap-3 mt-12">
-                <div className="text-5xl opacity-50">🔒</div>
-                <button className="w-full py-3 rounded-xl bg-gray-700/50 text-gray-400 font-mono text-sm font-bold cursor-not-allowed border border-gray-600/50">
-                  Unlock Hunter
-                </button>
-              </div>
+              {/* Action Button */}
+              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-mono text-sm font-bold hover:from-pink-600 hover:to-purple-700 transition-all shadow-lg">
+                Launch Hunter →
+              </button>
             </div>
 
             {/* SNIPER - Locked */}
@@ -439,8 +455,9 @@ export default function MissionControlDashboardV2() {
           <div className="relative max-w-2xl w-full bg-gradient-to-br from-gray-900 to-black rounded-2xl border-2 border-cyan-500/50 shadow-2xl shadow-cyan-500/30 p-8 animate-fadeIn">
             {/* Close button */}
             <button
-              onClick={() => setShowWelcomeModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors text-2xl"
+              onClick={handleCloseWelcomeModal}
+              className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-all text-3xl md:text-2xl"
+              aria-label="Close welcome popup"
             >
               ×
             </button>
@@ -448,8 +465,8 @@ export default function MissionControlDashboardV2() {
             {/* Welcome Header with Barry */}
             <div className="text-center mb-6">
               <div className="inline-block relative mb-4">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 via-orange-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 mx-auto">
-                  <span className="text-5xl">🐻</span>
+                <div className="flex items-center justify-center mx-auto">
+                  <span className="text-6xl">🐻</span>
                 </div>
                 <div className="absolute -top-2 -right-2 text-3xl animate-pulse">⭐</div>
               </div>
@@ -490,8 +507,8 @@ export default function MissionControlDashboardV2() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => {
-                  setShowWelcomeModal(false);
+                onClick={async () => {
+                  await handleCloseWelcomeModal();
                   handleScoutClick();
                 }}
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-cyan-500/50 font-mono text-lg"
@@ -499,7 +516,7 @@ export default function MissionControlDashboardV2() {
                 🚀 Set Up My ICP
               </button>
               <button
-                onClick={() => setShowWelcomeModal(false)}
+                onClick={handleCloseWelcomeModal}
                 className="flex-1 sm:flex-none bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white font-semibold py-4 px-6 rounded-xl transition-all border border-gray-600/50 font-mono"
               >
                 I'll Do This Later

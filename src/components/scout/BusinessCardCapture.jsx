@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
-import { collection, addDoc } from 'firebase/firestore';
-import { Camera, Upload, Edit3, Calendar } from 'lucide-react';
+import { collection, addDoc, doc, setDoc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const [image, setImage] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
   const [extractedData, setExtractedData] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -12,35 +13,79 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     phone: '',
     company: '',
     title: '',
+    website: '',
     event_name: '',
     date_met: ''
   });
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Mock OCR extraction - simulates what a real OCR service would return
-  const mockOCRExtraction = (imageFile) => {
+  // Real OCR extraction using Google Cloud Vision API
+  const extractBusinessCardData = async (base64Image) => {
     setExtracting(true);
+    setError(null);
 
-    // Simulate API delay
-    setTimeout(() => {
-      // Mock extracted data - in production, this would come from Google Vision, Textract, etc.
-      const mockData = {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('You must be logged in');
+      }
+
+      const authToken = await user.getIdToken();
+
+      console.log('📤 Sending OCR request to Netlify function...');
+
+      const response = await fetch('/.netlify/functions/extractBusinessCard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          imageBase64: base64Image
+        })
+      });
+
+      console.log('📥 OCR response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ OCR API error response:', errorText);
+        throw new Error(`OCR service error (${response.status}): ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('📊 OCR response data:', data);
+
+      if (!data.success) {
+        throw new Error(data.error || 'OCR extraction failed');
+      }
+
+      console.log('✅ OCR extraction successful:', data.extractedData);
+
+      setExtractedData(data.extractedData);
+      setFormData(prev => ({
+        ...prev,
+        ...data.extractedData
+      }));
+
+    } catch (err) {
+      console.error('❌ OCR extraction error:', err);
+      console.error('Error details:', err.message);
+      setError(err.message || 'Failed to extract card data. Please enter details manually.');
+      // Set empty extracted data to allow manual entry
+      setExtractedData({
         name: '',
         email: '',
         phone: '',
         company: '',
-        title: ''
-      };
-
-      setExtractedData(mockData);
-      setFormData(prev => ({
-        ...prev,
-        ...mockData
-      }));
+        title: '',
+        website: ''
+      });
+    } finally {
       setExtracting(false);
-    }, 1500);
+    }
   };
 
   const handleImageSelect = (e) => {
@@ -48,15 +93,17 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      setError('Please upload an image file');
       return;
     }
 
-    // Preview image
+    // Preview image and extract data
     const reader = new FileReader();
     reader.onload = (event) => {
-      setImage(event.target.result);
-      mockOCRExtraction(file);
+      const base64 = event.target.result;
+      setImage(base64);
+      setImageBase64(base64);
+      extractBusinessCardData(base64);
     };
     reader.readAsDataURL(file);
   };
@@ -67,19 +114,27 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
   const handleSave = async () => {
     if (!formData.name || formData.name.trim() === '') {
-      alert('Name is required');
+      setError('Name is required');
       return;
     }
 
     const user = auth.currentUser;
     if (!user) {
-      alert('You must be logged in to add contacts');
+      setError('You must be logged in to add contacts');
       return;
     }
 
     setSaving(true);
+    setError(null);
 
     try {
+      // Step 1: Ensure company exists in Saved Companies (if company provided)
+      let companyId = null;
+      if (formData.company && formData.company.trim()) {
+        companyId = await ensureCompanyExists(formData.company.trim(), formData.website, user.uid);
+      }
+
+      // Step 2: Save contact to /users/{uid}/contacts
       const contactData = {
         name: formData.name.trim(),
         email: formData.email.trim() || null,
@@ -87,9 +142,13 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         company: formData.company.trim() || null,
         title: formData.title.trim() || null,
 
+        // Company association
+        company_id: companyId,
+        company_name: formData.company.trim() || null,
+
         // Source tracking
-        source: 'networking',
-        capture_method: 'business_card',
+        source: 'Scanned Business Card',
+        capture_method: 'business_card_ocr',
         enrichment_status: 'ocr_extracted',
 
         // Networking context (optional)
@@ -101,24 +160,96 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         // Scout metadata
         lead_status: 'saved',
         export_ready: true,
+        saved_at: new Date().toISOString(),
         addedAt: new Date().toISOString(),
 
         // Placeholder for future enrichment
         apollo_data: null,
-        enriched: false
+        enriched: false,
+        status: 'active'
       };
 
       const contactsRef = collection(db, 'users', user.uid, 'contacts');
       const docRef = await addDoc(contactsRef, contactData);
 
-      console.log('✅ Networking contact added:', docRef.id);
+      console.log('✅ Business card contact added:', docRef.id);
+
+      // Update company contact count if applicable
+      if (companyId) {
+        await updateCompanyContactCount(companyId, user.uid);
+      }
 
       onContactAdded([{ id: docRef.id, ...contactData }]);
 
     } catch (error) {
-      console.error('Error saving networking contact:', error);
-      alert('Failed to save contact. Please try again.');
+      console.error('Error saving business card contact:', error);
+      setError(error.message || 'Failed to save contact. Please try again.');
       setSaving(false);
+    }
+  };
+
+  const ensureCompanyExists = async (companyName, website, userId) => {
+    if (!companyName) return null;
+
+    // Check if company already exists by name (simple deduplication)
+    const companiesRef = collection(db, 'users', userId, 'companies');
+    const q = query(companiesRef, where('name', '==', companyName));
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      return snapshot.docs[0].id;
+    }
+
+    // Create new company
+    const companyId = `company_${Date.now()}`;
+    const companyRef = doc(db, 'users', userId, 'companies', companyId);
+
+    const companyData = {
+      name: companyName,
+      website_url: website || null,
+      domain: website ? extractDomain(website) : null,
+
+      // Metadata
+      saved_at: new Date().toISOString(),
+      source: 'Scanned Business Card',
+      status: 'accepted',
+      contact_count: 0,
+
+      // For future enrichment
+      apolloEnriched: false
+    };
+
+    await setDoc(companyRef, companyData);
+    console.log('✅ Company created from business card:', companyId);
+
+    return companyId;
+  };
+
+  const extractDomain = (url) => {
+    if (!url) return null;
+    try {
+      const domain = url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      return domain;
+    } catch {
+      return null;
+    }
+  };
+
+  const updateCompanyContactCount = async (companyId, userId) => {
+    if (!companyId) return;
+
+    try {
+      const companyRef = doc(db, 'users', userId, 'companies', companyId);
+      const companyDoc = await getDoc(companyRef);
+
+      if (companyDoc.exists()) {
+        const currentCount = companyDoc.data().contact_count || 0;
+        await updateDoc(companyRef, {
+          contact_count: currentCount + 1
+        });
+      }
+    } catch (err) {
+      console.error('Error updating company contact count:', err);
     }
   };
 
@@ -190,13 +321,16 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
               <button
                 onClick={() => {
                   setImage(null);
+                  setImageBase64(null);
                   setExtractedData(null);
+                  setError(null);
                   setFormData({
                     name: '',
                     email: '',
                     phone: '',
                     company: '',
                     title: '',
+                    website: '',
                     event_name: '',
                     date_met: ''
                   });
@@ -222,20 +356,36 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
             </div>
           )}
 
+          {/* Error Display */}
+          {error && !extracting && (
+            <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Extraction Issue</h3>
+                  <p className="text-sm text-gray-700">{error}</p>
+                  <p className="text-sm text-gray-600 mt-1">You can still enter the details manually below.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Review & Edit Form */}
           {!extracting && extractedData && (
             <>
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                <div className="flex items-start gap-3">
-                  <Edit3 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Review & Edit</h3>
-                    <p className="text-sm text-gray-700">
-                      OCR extraction complete. Please review and correct any fields before saving.
-                    </p>
+              {!error && (
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                  <div className="flex items-start gap-3">
+                    <Edit3 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-1">Review & Edit</h3>
+                      <p className="text-sm text-gray-700">
+                        OCR extraction complete. Please review and correct any fields before saving.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-4">
                 {/* Name (Required) */}
@@ -305,6 +455,20 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
                     onChange={(e) => handleChange('title', e.target.value)}
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 focus:outline-none transition-all"
                     placeholder="VP of Sales"
+                  />
+                </div>
+
+                {/* Website */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => handleChange('website', e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 focus:outline-none transition-all"
+                    placeholder="https://company.com"
                   />
                 </div>
 

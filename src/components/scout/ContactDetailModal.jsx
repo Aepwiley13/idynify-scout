@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles } from 'lucide-react';
+import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles, Smartphone, ArrowLeft, Send } from 'lucide-react';
+import { downloadVCard } from '../../utils/vcard';
+import FindContact from './FindContact';
 import './ContactDetailModal.css';
 
 export default function ContactDetailModal({ contact, onClose, onUpdate }) {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [enriching, setEnriching] = useState(false);
+  const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
   const [error, setError] = useState(null);
   const [enrichSuccess, setEnrichSuccess] = useState(false);
   const [formData, setFormData] = useState({
@@ -140,82 +144,36 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     }
   }
 
-  async function handleEnrichContact() {
-    try {
-      setEnriching(true);
-      setError(null);
-      setEnrichSuccess(false);
+  function handleEnrichContact() {
+    // Enter enrichment mode to show Find Contact flow
+    setIsEnrichmentMode(true);
+    setError(null);
+  }
 
-      const user = auth.currentUser;
-      if (!user) throw new Error('Not authenticated');
-
-      // Check if contact has Apollo person ID
-      if (!contact.apollo_person_id) {
-        setError('This contact cannot be enriched (no Apollo ID)');
-        setEnriching(false);
-        return;
-      }
-
-      console.log('🔄 Enriching contact:', contact.name);
-
-      // Get auth token
-      const authToken = await user.getIdToken();
-
-      // Call enrichContact Netlify function
-      const response = await fetch('/.netlify/functions/enrichContact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken: authToken,
-          contactId: contact.apollo_person_id
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Enrichment request failed');
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Enrichment failed');
-      }
-
-      console.log('✅ Contact enriched successfully');
-
-      // Update contact in Firestore
-      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
-      await updateDoc(contactRef, {
-        ...result.enrichedData,
-        last_enriched_at: new Date().toISOString()
-      });
-
-      // Show success message
+  function handleEnrichmentComplete(contacts) {
+    // Contact was enriched via Find Contact
+    if (contacts && contacts.length > 0) {
       setEnrichSuccess(true);
       setTimeout(() => setEnrichSuccess(false), 3000);
 
-      // Notify parent component and refresh
+      // Notify parent and exit enrichment mode
       if (onUpdate) {
-        onUpdate({ ...contact, ...result.enrichedData });
+        onUpdate(contacts[0]);
       }
-
-      setEnriching(false);
-
-    } catch (err) {
-      console.error('Error enriching contact:', err);
-      setError(err.message || 'Failed to enrich contact. Please try again.');
-      setEnriching(false);
+      setIsEnrichmentMode(false);
     }
+  }
+
+  function handleCancelEnrichment() {
+    setIsEnrichmentMode(false);
+    setError(null);
   }
 
   function getSourceBadge() {
     const badges = {
       manual: { icon: '✍️', text: 'Manual', color: '#1e40af', bg: '#eff6ff' },
       networking: { icon: '🤝', text: 'Networking', color: '#7e22ce', bg: '#faf5ff' },
-      apollo: { icon: '🔍', text: 'Apollo', color: '#15803d', bg: '#f0fdf4' }
+      apollo: { icon: '🔍', text: 'Search', color: '#15803d', bg: '#f0fdf4' }
     };
 
     const badge = badges[contact.source] || badges.apollo;
@@ -241,12 +199,41 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     );
   }
 
+  // Check if contact is NOT enriched (missing key fields)
+  function isContactNotEnriched() {
+    const hasWorkEmail = !!(contact.work_email || contact.email);
+    const hasPhone = !!(contact.phone || contact.phone_mobile || contact.phone_direct || contact.phone_work);
+    const hasLinkedIn = !!contact.linkedin_url;
+    const hasCompany = !!(contact.company_name || contact.company);
+
+    // Contact is NOT enriched if ANY of these fields are missing
+    return !hasWorkEmail || !hasPhone || !hasLinkedIn || !hasCompany;
+  }
+
   return (
     <div className="contact-detail-overlay" onClick={onClose}>
       <div className="contact-detail-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div ref={headerRef} className={`contact-detail-header ${isScrolled ? 'scrolled' : ''}`}>
           <div className="header-content">
+            {isEnrichmentMode && (
+              <button
+                onClick={handleCancelEnrichment}
+                className="back-button"
+                style={{
+                  marginRight: '1rem',
+                  padding: '0.5rem',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#6b7280'
+                }}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
             <div className="contact-avatar">
               {contact.photo_url ? (
                 <img src={contact.photo_url} alt={contact.name} />
@@ -255,11 +242,17 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
               )}
             </div>
             <div className="header-text">
-              <h2 className="contact-detail-name">{contact.name || 'Unknown Contact'}</h2>
-              <p className="contact-detail-title">{contact.title || 'No title specified'}</p>
-              <div style={{ marginTop: '0.5rem' }}>
-                {getSourceBadge()}
-              </div>
+              <h2 className="contact-detail-name">
+                {isEnrichmentMode ? 'Enrich Contact' : (contact.name || 'Unknown Contact')}
+              </h2>
+              <p className="contact-detail-title">
+                {isEnrichmentMode ? 'Search for updated contact information' : (contact.title || 'No title specified')}
+              </p>
+              {!isEnrichmentMode && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  {getSourceBadge()}
+                </div>
+              )}
             </div>
           </div>
           <button className="close-button" onClick={onClose}>
@@ -268,7 +261,19 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
         </div>
 
         {/* Content */}
-        <div ref={contentRef} className={`contact-detail-content ${hasScroll ? 'has-scroll' : ''}`}>
+        {isEnrichmentMode ? (
+          <div style={{ padding: '1.5rem' }}>
+            <FindContact
+              onContactAdded={handleEnrichmentComplete}
+              onCancel={handleCancelEnrichment}
+              initialSearchParams={{
+                name: contact.name || '',
+                company_name: contact.company_name || contact.company || ''
+              }}
+            />
+          </div>
+        ) : (
+          <div ref={contentRef} className={`contact-detail-content ${hasScroll ? 'has-scroll' : ''}`}>
           {error && (
             <div className="error-banner">
               <AlertCircle className="w-5 h-5" />
@@ -289,25 +294,36 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
             <div className="section-header-with-action">
               <h3 className="section-title">Contact Information</h3>
               <div className="header-actions">
-                {!isEditing && contact.apollo_person_id && (
+                {!isEditing && isContactNotEnriched() && (
                   <button
                     className="enrich-button"
                     onClick={handleEnrichContact}
-                    disabled={enriching}
                   >
-                    {enriching ? (
-                      <>
-                        <Loader className="w-4 h-4 spinner" />
-                        <span>Enriching...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>Enrich Contact</span>
-                      </>
-                    )}
+                    <Sparkles className="w-4 h-4" />
+                    <span>Enrich Contact</span>
                   </button>
                 )}
+                <button
+                  className="save-phone-button"
+                  onClick={() => downloadVCard(contact)}
+                  title="Save to Phone"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Save to Phone</span>
+                </button>
+                <button
+                  className="save-phone-button"
+                  onClick={() => navigate(`/hunter/campaign/new?contactIds=${contact.id}`)}
+                  title="Start Campaign"
+                  style={{
+                    background: 'linear-gradient(to right, #ec4899, #a855f7)',
+                    color: 'white',
+                    border: 'none'
+                  }}
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Start Campaign</span>
+                </button>
                 {!isEditing && isManualOrNetworking && (
                   <button
                     className="edit-button"
@@ -675,7 +691,8 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
               </button>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

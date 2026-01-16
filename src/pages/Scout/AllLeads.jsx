@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
-import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X } from 'lucide-react';
+import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X, Smartphone } from 'lucide-react';
 import ContactDetailModal from '../../components/scout/ContactDetailModal';
+import { downloadVCard } from '../../utils/vcard';
 import './AllLeads.css';
 
 export default function AllLeads() {
@@ -15,6 +16,7 @@ export default function AllLeads() {
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedContact, setSelectedContact] = useState(null);
+  const [selectedContactIds, setSelectedContactIds] = useState([]);
 
   useEffect(() => {
     loadAllContacts();
@@ -73,6 +75,27 @@ export default function AllLeads() {
     );
     // Close the modal
     setSelectedContact(null);
+  }
+
+  function toggleContactSelection(contactId, event) {
+    event.stopPropagation(); // Prevent row click
+    if (selectedContactIds.includes(contactId)) {
+      setSelectedContactIds(selectedContactIds.filter(id => id !== contactId));
+    } else {
+      setSelectedContactIds([...selectedContactIds, contactId]);
+    }
+  }
+
+  function toggleSelectAll() {
+    if (selectedContactIds.length === sortedAndFilteredContacts.length) {
+      setSelectedContactIds([]);
+    } else {
+      setSelectedContactIds(sortedAndFilteredContacts.map(c => c.id));
+    }
+  }
+
+  function handleBulkStartCampaign() {
+    navigate(`/hunter/campaign/new?contactIds=${selectedContactIds.join(',')}`);
   }
 
   function exportToCSV() {
@@ -326,6 +349,59 @@ export default function AllLeads() {
         </div>
       </div>
 
+      {/* Bulk Actions */}
+      {selectedContactIds.length > 0 && (
+        <div style={{
+          padding: '1rem',
+          background: 'linear-gradient(to right, rgba(236, 72, 153, 0.1), rgba(168, 85, 247, 0.1))',
+          border: '2px solid rgba(236, 72, 153, 0.3)',
+          borderRadius: '0.75rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontWeight: '600', color: '#ec4899' }}>
+              {selectedContactIds.length} contact{selectedContactIds.length > 1 ? 's' : ''} selected
+            </span>
+            <button
+              onClick={() => setSelectedContactIds([])}
+              style={{
+                padding: '0.25rem 0.75rem',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '0.5rem',
+                color: '#94a3b8',
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          <button
+            onClick={handleBulkStartCampaign}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(to right, #ec4899, #a855f7)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.75rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Mail className="w-5 h-5" />
+            Start Campaign ({selectedContactIds.length})
+          </button>
+        </div>
+      )}
+
       {/* Results Count */}
       <div className="results-count">
         Showing {sortedAndFilteredContacts.length} of {totalContacts} contacts
@@ -337,6 +413,14 @@ export default function AllLeads() {
         <table className="contacts-table">
           <thead>
             <tr>
+              <th style={{ width: '40px' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedContactIds.length === sortedAndFilteredContacts.length && sortedAndFilteredContacts.length > 0}
+                  onChange={toggleSelectAll}
+                  style={{ cursor: 'pointer' }}
+                />
+              </th>
               <th>
                 <div className="th-content">
                   <UserCircle className="w-4 h-4" />
@@ -386,6 +470,14 @@ export default function AllLeads() {
                   className="contact-row-clickable"
                   style={{ cursor: 'pointer' }}
                 >
+                  <td onClick={(e) => e.stopPropagation()} style={{ padding: '0.5rem', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedContactIds.includes(contact.id)}
+                      onChange={(e) => toggleContactSelection(contact.id, e)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </td>
                   <td className="contact-cell" data-label="Contact">
                     <div className="contact-info">
                       <div className="avatar">
@@ -407,7 +499,7 @@ export default function AllLeads() {
                           color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
                           border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
                         }}>
-                          {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Apollo'}
+                          {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Search'}
                         </div>
                       </div>
                     </div>
@@ -460,6 +552,16 @@ export default function AllLeads() {
                   </td>
                   <td className="actions-cell" data-label="Actions">
                     <div className="action-links">
+                      <button
+                        className="action-link"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadVCard(contact);
+                        }}
+                        title="Save to Phone"
+                      >
+                        <Smartphone className="w-4 h-4" />
+                      </button>
                       {contact.linkedin_url && (
                         <a
                           href={contact.linkedin_url}

@@ -105,6 +105,14 @@ export default function ScoutMain() {
       <nav className="scout-tabs">
         <div className="tabs-container">
           <button
+            className={`tab ${activeTab === 'add-contacts' ? 'active' : ''}`}
+            onClick={() => setShowAddContactModal(true)}
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Add Contacts</span>
+          </button>
+
+          <button
             className={`tab ${activeTab === 'daily-leads' ? 'active' : ''}`}
             onClick={() => setActiveTab('daily-leads')}
           >
@@ -143,6 +151,14 @@ export default function ScoutMain() {
           >
             <Settings className="w-4 h-4" />
             <span>ICP Settings</span>
+          </button>
+
+          <button
+            className={`tab ${activeTab === 'mission-control' ? 'active' : ''}`}
+            onClick={() => navigate('/mission-control-v2')}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Mission Control</span>
           </button>
         </div>
       </nav>

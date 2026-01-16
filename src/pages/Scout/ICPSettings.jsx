@@ -730,7 +730,7 @@ export default function ICPSettings() {
 
           <p className="action-hint">
             <Filter className="w-4 h-4" />
-            <span>Save your changes first, then click "Refresh Results" to fetch new companies from Apollo API</span>
+            <span>Save your changes first, then click "Refresh Results" to fetch new companies</span>
           </p>
         </div>
       </div>

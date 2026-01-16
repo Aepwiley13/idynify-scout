@@ -61,7 +61,7 @@ export const handler = async (event) => {
     console.log('📋 Apollo query:', JSON.stringify(apolloQuery, null, 2));
 
     // Call Apollo People Search API
-    const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_people/search', {
+    const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

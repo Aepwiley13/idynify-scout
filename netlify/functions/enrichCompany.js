@@ -93,7 +93,7 @@ export const handler = async (event) => {
       console.log('👥 Fetching decision makers...');
 
       try {
-        const peopleResponse = await fetch('https://api.apollo.io/v1/mixed_people/search', {
+        const peopleResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

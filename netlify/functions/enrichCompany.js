@@ -93,7 +93,8 @@ export const handler = async (event) => {
       console.log('👥 Fetching decision makers...');
 
       try {
-        const peopleResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
+        // Step 1: Search for decision makers (gets IDs and basic info)
+        const searchResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -109,13 +110,52 @@ export const handler = async (event) => {
           })
         });
 
-        if (peopleResponse.ok) {
-          const peopleData = await peopleResponse.json();
-          decisionMakers = (peopleData.people || []).slice(0, 3); // Limit to 3
-          console.log('✅ Found decision makers:', decisionMakers.length);
-          // Diagnostic: Log first decision maker structure
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const searchResults = (searchData.people || []).slice(0, 3);
+          console.log('✅ Found decision maker candidates:', searchResults.length);
+
+          // Step 2: Enrich each decision maker individually to get full data
+          const enrichedDecisionMakers = [];
+
+          for (const candidate of searchResults) {
+            try {
+              console.log(`🔄 Enriching: ${candidate.first_name || 'Unknown'} (ID: ${candidate.id})`);
+
+              const enrichResponse = await fetch('https://api.apollo.io/v1/people/match', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cache-Control': 'no-cache',
+                  'X-Api-Key': apolloApiKey
+                },
+                body: JSON.stringify({ id: candidate.id })
+              });
+
+              if (enrichResponse.ok) {
+                const enrichData = await enrichResponse.json();
+                const enrichedPerson = enrichData.person;
+
+                if (enrichedPerson) {
+                  enrichedDecisionMakers.push(enrichedPerson);
+                  console.log(`  ✅ Enriched: ${enrichedPerson.name || enrichedPerson.first_name}`);
+                }
+              } else {
+                console.warn(`  ⚠️ Could not enrich ${candidate.first_name}, using basic data`);
+                enrichedDecisionMakers.push(candidate); // Fallback to basic data
+              }
+            } catch (enrichError) {
+              console.error(`  ❌ Error enriching ${candidate.first_name}:`, enrichError.message);
+              enrichedDecisionMakers.push(candidate); // Fallback to basic data
+            }
+          }
+
+          decisionMakers = enrichedDecisionMakers;
+          console.log('✅ Enriched decision makers:', decisionMakers.length);
+
+          // Diagnostic: Log first enriched decision maker
           if (decisionMakers.length > 0) {
-            console.log('📋 Sample decision maker from Apollo:', {
+            console.log('📋 Sample enriched decision maker:', {
               id: decisionMakers[0].id,
               first_name: decisionMakers[0].first_name,
               last_name: decisionMakers[0].last_name,
@@ -129,7 +169,7 @@ export const handler = async (event) => {
             });
           }
         } else {
-          console.warn('⚠️ Could not fetch decision makers, continuing without them');
+          console.warn('⚠️ Could not search for decision makers, continuing without them');
         }
       } catch (error) {
         console.warn('⚠️ Error fetching decision makers:', error.message);

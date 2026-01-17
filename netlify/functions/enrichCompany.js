@@ -1,4 +1,7 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
+import { logApolloError } from './utils/apolloErrorLogger.js';
+import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -19,12 +22,8 @@ export const handler = async (event) => {
 
     console.log('🔄 Enriching company:', domain);
 
-    // Validate environment variables
-    const apolloApiKey = process.env.APOLLO_API_KEY;
-    if (!apolloApiKey) {
-      console.error('❌ APOLLO_API_KEY not configured');
-      throw new Error('Apollo API key not configured');
-    }
+    // Get Apollo API key (throws if not configured)
+    const apolloApiKey = getApolloApiKey();
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -57,21 +56,16 @@ export const handler = async (event) => {
 
     // Step 1: Enrich company data with Apollo Organizations API
     console.log('📊 Calling Apollo Organizations Enrich API...');
-    const orgResponse = await fetch('https://api.apollo.io/v1/organizations/enrich', {
+    const orgBody = { domain: domain };
+
+    const orgResponse = await fetch(APOLLO_ENDPOINTS.ORGANIZATIONS_ENRICH, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'X-Api-Key': apolloApiKey
-      },
-      body: JSON.stringify({
-        domain: domain
-      })
+      headers: getApolloHeaders(),
+      body: JSON.stringify(orgBody)
     });
 
     if (!orgResponse.ok) {
-      const errorText = await orgResponse.text();
-      console.error('❌ Apollo Organizations API error:', orgResponse.status, errorText);
+      const errorText = await logApolloError(orgResponse, orgBody, 'enrichCompany');
       throw new Error(`Apollo Organizations API failed: ${orgResponse.status}`);
     }
 

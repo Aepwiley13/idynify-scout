@@ -1,4 +1,7 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
+import { logApolloError } from './utils/apolloErrorLogger.js';
+import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -20,12 +23,8 @@ export const handler = async (event) => {
     console.log('🔍 Searching for people at organization:', organizationId);
     console.log('📋 Target titles:', titles);
 
-    // Validate environment variables
-    const apolloApiKey = process.env.APOLLO_API_KEY;
-    if (!apolloApiKey) {
-      console.error('❌ APOLLO_API_KEY not configured');
-      throw new Error('Apollo API key not configured');
-    }
+    // Get Apollo API key (throws if not configured)
+    const apolloApiKey = getApolloApiKey();
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -56,31 +55,22 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified');
 
-    // Call Apollo People Search API
-    const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
+    // Step 1: Search Apollo API for contact candidates
+    const searchBody = {
+      organization_ids: [organizationId],
+      person_titles: titles,
+      page: 1,
+      per_page: 10
+    };
+
+    const apolloResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_SEARCH, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'X-Api-Key': apolloApiKey
-      },
-      body: JSON.stringify({
-        organization_ids: [organizationId],
-        person_titles: titles,
-        page: 1,
-        per_page: 10
-      })
+      headers: getApolloHeaders(),
+      body: JSON.stringify(searchBody)
     });
 
     if (!apolloResponse.ok) {
-      const errorText = await apolloResponse.text();
-      console.error('❌ Apollo API error:', apolloResponse.status, errorText);
-      console.error('📊 Request that failed:', JSON.stringify({
-        organization_ids: [organizationId],
-        person_titles: titles,
-        page: 1,
-        per_page: 10
-      }, null, 2));
+      const errorText = await logApolloError(apolloResponse, searchBody, 'searchPeople');
       throw new Error(`Apollo API request failed: ${apolloResponse.status} - ${errorText}`);
     }
 
@@ -98,16 +88,10 @@ export const handler = async (event) => {
       try {
         console.log(`🔄 Enriching: ${candidate.first_name || 'Unknown'} (ID: ${candidate.id})`);
 
-        const enrichResponse = await fetch('https://api.apollo.io/v1/people/match', {
+        const enrichResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'X-Api-Key': apolloApiKey
-          },
-          body: JSON.stringify({
-            id: candidate.id
-          })
+          headers: getApolloHeaders(),
+          body: JSON.stringify({ id: candidate.id })
         });
 
         if (enrichResponse.ok) {
@@ -115,44 +99,31 @@ export const handler = async (event) => {
           const fullPerson = enrichData.person;
 
           if (fullPerson) {
-            // Map the enriched person data
-            const mappedPerson = {
-              ...fullPerson,
-              // Construct full name from first_name + last_name if name doesn't exist
-              name: fullPerson.name || `${fullPerson.first_name || ''} ${fullPerson.last_name || ''}`.trim() || null,
-              email: fullPerson.email || null,
-              photo_url: fullPerson.photo_url || null,
-              linkedin_url: fullPerson.linkedin_url || null,
-              organization_name: fullPerson.organization_name || fullPerson.organization?.name || null,
-              departments: fullPerson.departments || fullPerson.functions || [],
-              phone_numbers: fullPerson.phone_numbers || []
-            };
+            // Use canonical mapper from Scout Contact Contract
+            const mappedPerson = mapApolloToScoutContact(fullPerson);
+
+            // Validate mapped contact (Phase 2: early warning if Apollo changes API)
+            const validation = validateScoutContact(mappedPerson);
+            if (!validation.valid) {
+              logValidationErrors(validation, mappedPerson, 'searchPeople');
+            }
 
             enrichedPeople.push(mappedPerson);
             console.log(`  ✅ Enriched: ${mappedPerson.name || candidate.first_name}`);
           } else {
             // Fallback to candidate data if enrichment returns no person
             console.warn(`  ⚠️ No enrichment data, using candidate data for ${candidate.first_name}`);
-            enrichedPeople.push({
-              ...candidate,
-              name: `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || null
-            });
+            enrichedPeople.push(mapApolloToScoutContact(candidate));
           }
         } else {
           // Fallback to candidate data if enrichment fails
           console.warn(`  ⚠️ Enrichment failed (${enrichResponse.status}), using candidate data`);
-          enrichedPeople.push({
-            ...candidate,
-            name: `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || null
-          });
+          enrichedPeople.push(mapApolloToScoutContact(candidate));
         }
       } catch (enrichError) {
         console.error(`  ❌ Error enriching ${candidate.first_name}:`, enrichError.message);
         // Fallback to candidate data on error
-        enrichedPeople.push({
-          ...candidate,
-          name: `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || null
-        });
+        enrichedPeople.push(mapApolloToScoutContact(candidate));
       }
     }
 

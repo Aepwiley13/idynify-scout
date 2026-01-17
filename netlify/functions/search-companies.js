@@ -1,4 +1,6 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
+import { logApolloError } from './utils/apolloErrorLogger.js';
 
 // Apollo industry mapping helpers (copied to avoid import issues)
 // Full list of 150+ Apollo industry tag IDs
@@ -194,12 +196,8 @@ export const handler = async (event) => {
     console.log('🔍 Starting Apollo company search for user:', userId);
     console.log('📋 Company profile:', JSON.stringify(companyProfile, null, 2));
 
-    // Validate required environment variables
-    const apolloApiKey = process.env.APOLLO_API_KEY;
-    if (!apolloApiKey) {
-      console.error('❌ APOLLO_API_KEY not configured in environment');
-      throw new Error('Apollo API key not configured. Please contact support.');
-    }
+    // Get Apollo API key (throws if not configured)
+    const apolloApiKey = getApolloApiKey();
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -252,21 +250,15 @@ export const handler = async (event) => {
     console.log(`   - Apollo keyword search: ${JSON.stringify(apolloQuery.q_organization_keyword_tags || 'NONE')}`);
 
     // Call Apollo API
-    const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
+    const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'X-Api-Key': apolloApiKey
-      },
+      headers: getApolloHeaders(),
       body: JSON.stringify(apolloQuery)
     });
 
     if (!apolloResponse.ok) {
-      const errorText = await apolloResponse.text();
-      console.error('❌ Apollo API error:', apolloResponse.status, errorText);
-      console.error('📊 Apollo query that failed:', JSON.stringify(apolloQuery, null, 2));
-      throw new Error(`Apollo API request failed: ${apolloResponse.status} - ${errorText}`);
+      const errorText = await logApolloError(apolloResponse, apolloQuery, 'search-companies');
+      throw new Error(`Apollo API request failed: ${apolloResponse.status}`);
     }
 
     const apolloData = await apolloResponse.json();

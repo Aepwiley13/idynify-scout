@@ -1291,33 +1291,19 @@ export default function CompanyDetail() {
                   {/* Title */}
                   <p className="contact-title-enriched">{contact.title || 'Title not available'}</p>
 
-                  {/* Contact Details Grid */}
-                  <div className="contact-details-grid">
-                    {/*
-                      Email and Phone are intentionally hidden from Available Contacts.
-                      Users must add contacts as leads first to see email/phone.
-                      This allows users to validate the person (name, photo, LinkedIn)
-                      before accepting them as a lead.
-                    */}
-
-                    {/* LinkedIn */}
-                    {contact.linkedin_url && (
-                      <div className="contact-detail-item">
-                        <div className="detail-label">
-                          <Linkedin className="w-4 h-4" />
-                          <span>LinkedIn</span>
-                        </div>
-                        <a
-                          href={contact.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="detail-link"
-                        >
-                          View Profile →
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                  {/* LinkedIn Button - Prominent style for contact validation */}
+                  {contact.linkedin_url && (
+                    <button
+                      className="contact-linkedin-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
+                      }}
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      <span>View LinkedIn Profile</span>
+                    </button>
+                  )}
 
                   {/* Action Button */}
                   <div className="contact-card-footer">

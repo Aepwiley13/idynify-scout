@@ -1,4 +1,7 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
+import { logApolloError } from './utils/apolloErrorLogger.js';
+import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -19,12 +22,8 @@ export const handler = async (event) => {
 
     console.log('🔍 Find Contact search with params:', searchParams);
 
-    // Validate environment variables
-    const apolloApiKey = process.env.APOLLO_API_KEY;
-    if (!apolloApiKey) {
-      console.error('❌ APOLLO_API_KEY not configured');
-      throw new Error('Apollo API key not configured');
-    }
+    // Get Apollo API key (throws if not configured)
+    const apolloApiKey = getApolloApiKey();
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -61,23 +60,20 @@ export const handler = async (event) => {
     console.log('📋 Apollo query:', JSON.stringify(apolloQuery, null, 2));
 
     // Call Apollo People Search API
-    const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
+    const searchBody = {
+      ...apolloQuery,
+      page: 1,
+      per_page: 5 // Return max 5 results
+    };
+
+    const apolloResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_SEARCH, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'X-Api-Key': apolloApiKey
-      },
-      body: JSON.stringify({
-        ...apolloQuery,
-        page: 1,
-        per_page: 5 // Return max 5 results
-      })
+      headers: getApolloHeaders(),
+      body: JSON.stringify(searchBody)
     });
 
     if (!apolloResponse.ok) {
-      const errorText = await apolloResponse.text();
-      console.error('❌ Apollo API error:', apolloResponse.status, errorText);
+      const errorText = await logApolloError(apolloResponse, searchBody, 'findContact');
       throw new Error(`Apollo API request failed: ${apolloResponse.status}`);
     }
 
@@ -88,18 +84,14 @@ export const handler = async (event) => {
 
     // Map Apollo API response fields and enrich with match quality scores
     const enrichedResults = people.map(person => {
-      // Construct full name from first_name + last_name if name doesn't exist
-      const fullName = person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || null;
+      // Use canonical mapper from Scout Contact Contract
+      const mappedPerson = mapApolloToScoutContact(person);
 
-      const mappedPerson = {
-        ...person,
-        name: fullName,
-        email: person.email || null,
-        organization_name: person.organization_name || person.organization?.name || null,
-        photo_url: person.photo_url || null,
-        departments: person.departments || person.functions || [],
-        phone_numbers: person.phone_numbers || []
-      };
+      // Validate mapped contact (Phase 2: early warning if Apollo changes API)
+      const validation = validateScoutContact(mappedPerson);
+      if (!validation.valid) {
+        logValidationErrors(validation, mappedPerson, 'findContact');
+      }
 
       return {
         ...mappedPerson,

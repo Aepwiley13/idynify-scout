@@ -88,20 +88,18 @@ export const handler = async (event) => {
 
       try {
         // Step 1: Search for decision makers (gets IDs and basic info)
-        const searchResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
+        const searchBody = {
+          organization_ids: [orgId],
+          person_seniority: ['director', 'vp', 'c_suite', 'founder', 'owner'],
+          person_departments: ['sales', 'marketing', 'operations', 'finance'],
+          page: 1,
+          per_page: 3  // Only get top 3 decision makers
+        };
+
+        const searchResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_SEARCH, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'X-Api-Key': apolloApiKey
-          },
-          body: JSON.stringify({
-            organization_ids: [orgId],
-            person_seniority: ['director', 'vp', 'c_suite', 'founder', 'owner'],
-            person_departments: ['sales', 'marketing', 'operations', 'finance'],
-            page: 1,
-            per_page: 3  // Only get top 3 decision makers
-          })
+          headers: getApolloHeaders(),
+          body: JSON.stringify(searchBody)
         });
 
         if (searchResponse.ok) {
@@ -116,13 +114,9 @@ export const handler = async (event) => {
             try {
               console.log(`🔄 Enriching: ${candidate.first_name || 'Unknown'} (ID: ${candidate.id})`);
 
-              const enrichResponse = await fetch('https://api.apollo.io/v1/people/match', {
+              const enrichResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Cache-Control': 'no-cache',
-                  'X-Api-Key': apolloApiKey
-                },
+                headers: getApolloHeaders(),
                 body: JSON.stringify({ id: candidate.id })
               });
 
@@ -131,16 +125,25 @@ export const handler = async (event) => {
                 const enrichedPerson = enrichData.person;
 
                 if (enrichedPerson) {
-                  enrichedDecisionMakers.push(enrichedPerson);
-                  console.log(`  ✅ Enriched: ${enrichedPerson.name || enrichedPerson.first_name}`);
+                  // Use canonical mapper from Scout Contact Contract
+                  const mappedPerson = mapApolloToScoutContact(enrichedPerson);
+
+                  // Validate mapped contact (Phase 2: early warning if Apollo changes API)
+                  const validation = validateScoutContact(mappedPerson);
+                  if (!validation.valid) {
+                    logValidationErrors(validation, mappedPerson, 'enrichCompany');
+                  }
+
+                  enrichedDecisionMakers.push(mappedPerson);
+                  console.log(`  ✅ Enriched: ${mappedPerson.name || enrichedPerson.first_name}`);
                 }
               } else {
                 console.warn(`  ⚠️ Could not enrich ${candidate.first_name}, using basic data`);
-                enrichedDecisionMakers.push(candidate); // Fallback to basic data
+                enrichedDecisionMakers.push(mapApolloToScoutContact(candidate));
               }
             } catch (enrichError) {
               console.error(`  ❌ Error enriching ${candidate.first_name}:`, enrichError.message);
-              enrichedDecisionMakers.push(candidate); // Fallback to basic data
+              enrichedDecisionMakers.push(mapApolloToScoutContact(candidate));
             }
           }
 

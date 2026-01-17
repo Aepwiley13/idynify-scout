@@ -1,4 +1,7 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
+import { logApolloError } from './utils/apolloErrorLogger.js';
+import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -19,12 +22,8 @@ export const handler = async (event) => {
 
     console.log('🔄 Enriching contact:', contactId);
 
-    // Validate environment variables
-    const apolloApiKey = process.env.APOLLO_API_KEY;
-    if (!apolloApiKey) {
-      console.error('❌ APOLLO_API_KEY not configured');
-      throw new Error('Apollo API key not configured');
-    }
+    // Get Apollo API key (throws if not configured)
+    const apolloApiKey = getApolloApiKey();
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -56,21 +55,16 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified');
 
     // Call Apollo Person Enrichment API
-    const apolloResponse = await fetch('https://api.apollo.io/v1/people/match', {
+    const enrichBody = { id: contactId };
+
+    const apolloResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'X-Api-Key': apolloApiKey
-      },
-      body: JSON.stringify({
-        id: contactId
-      })
+      headers: getApolloHeaders(),
+      body: JSON.stringify(enrichBody)
     });
 
     if (!apolloResponse.ok) {
-      const errorText = await apolloResponse.text();
-      console.error('❌ Apollo enrichment error:', errorText);
+      const errorText = await logApolloError(apolloResponse, enrichBody, 'enrichContact');
       throw new Error('Apollo enrichment failed');
     }
 
@@ -81,7 +75,14 @@ export const handler = async (event) => {
       throw new Error('Person data not found');
     }
 
-    console.log('✅ Contact enriched:', person.name);
+    // Validate basic contact fields (Phase 2: early warning if Apollo changes API)
+    const mappedPerson = mapApolloToScoutContact(person);
+    const validation = validateScoutContact(mappedPerson);
+    if (!validation.valid) {
+      logValidationErrors(validation, mappedPerson, 'enrichContact');
+    }
+
+    console.log('✅ Contact enriched:', person.name || mappedPerson.name);
 
     // Log API usage for admin tracking
     const responseTime = Date.now() - startTime;

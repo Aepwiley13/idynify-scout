@@ -85,31 +85,85 @@ export const handler = async (event) => {
     }
 
     const apolloData = await apolloResponse.json();
+    const candidates = (apolloData.people || []).slice(0, 10);
 
-    console.log('✅ Found people:', apolloData.people?.length || 0);
+    console.log('✅ Found contact candidates:', candidates.length);
 
-    // Map Apollo API response fields to match frontend expectations
-    const mappedPeople = (apolloData.people || []).map(person => ({
-      ...person,
-      // Construct full name from first_name + last_name
-      name: person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || null,
-      // Ensure email is mapped correctly
-      email: person.email || null,
-      // Map organization name if needed
-      organization_name: person.organization_name || person.organization?.name || null,
-      // Ensure photo_url is mapped
-      photo_url: person.photo_url || null,
-      // Ensure departments is an array
-      departments: person.departments || person.functions || [],
-      // Map phone numbers
-      phone_numbers: person.phone_numbers || []
-    }));
+    // Step 2: Enrich each person individually to get full profile data
+    // The /api_search endpoint only returns basic fields (first_name, title)
+    // We need to call /people/match to get full data (name, email, photo, linkedin)
+    const enrichedPeople = [];
 
-    console.log('📋 Sample mapped person:', mappedPeople[0] ? {
-      id: mappedPeople[0].id,
-      name: mappedPeople[0].name,
-      email: mappedPeople[0].email,
-      title: mappedPeople[0].title
+    for (const candidate of candidates) {
+      try {
+        console.log(`🔄 Enriching: ${candidate.first_name || 'Unknown'} (ID: ${candidate.id})`);
+
+        const enrichResponse = await fetch('https://api.apollo.io/v1/people/match', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'X-Api-Key': apolloApiKey
+          },
+          body: JSON.stringify({
+            id: candidate.id
+          })
+        });
+
+        if (enrichResponse.ok) {
+          const enrichData = await enrichResponse.json();
+          const fullPerson = enrichData.person;
+
+          if (fullPerson) {
+            // Map the enriched person data
+            const mappedPerson = {
+              ...fullPerson,
+              // Construct full name from first_name + last_name if name doesn't exist
+              name: fullPerson.name || `${fullPerson.first_name || ''} ${fullPerson.last_name || ''}`.trim() || null,
+              email: fullPerson.email || null,
+              photo_url: fullPerson.photo_url || null,
+              linkedin_url: fullPerson.linkedin_url || null,
+              organization_name: fullPerson.organization_name || fullPerson.organization?.name || null,
+              departments: fullPerson.departments || fullPerson.functions || [],
+              phone_numbers: fullPerson.phone_numbers || []
+            };
+
+            enrichedPeople.push(mappedPerson);
+            console.log(`  ✅ Enriched: ${mappedPerson.name || candidate.first_name}`);
+          } else {
+            // Fallback to candidate data if enrichment returns no person
+            console.warn(`  ⚠️ No enrichment data, using candidate data for ${candidate.first_name}`);
+            enrichedPeople.push({
+              ...candidate,
+              name: `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || null
+            });
+          }
+        } else {
+          // Fallback to candidate data if enrichment fails
+          console.warn(`  ⚠️ Enrichment failed (${enrichResponse.status}), using candidate data`);
+          enrichedPeople.push({
+            ...candidate,
+            name: `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || null
+          });
+        }
+      } catch (enrichError) {
+        console.error(`  ❌ Error enriching ${candidate.first_name}:`, enrichError.message);
+        // Fallback to candidate data on error
+        enrichedPeople.push({
+          ...candidate,
+          name: `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || null
+        });
+      }
+    }
+
+    console.log('✅ Enriched contacts:', enrichedPeople.length);
+    console.log('📋 Sample enriched person:', enrichedPeople[0] ? {
+      id: enrichedPeople[0].id,
+      name: enrichedPeople[0].name,
+      email: enrichedPeople[0].email,
+      photo_url: enrichedPeople[0].photo_url,
+      linkedin_url: enrichedPeople[0].linkedin_url,
+      title: enrichedPeople[0].title
     } : 'No people found');
 
     // Log API usage for admin tracking
@@ -119,7 +173,7 @@ export const handler = async (event) => {
       metadata: {
         organizationId,
         titlesSearched: titles,
-        resultsFound: mappedPeople.length
+        resultsFound: enrichedPeople.length
       }
     });
 
@@ -131,7 +185,7 @@ export const handler = async (event) => {
       },
       body: JSON.stringify({
         success: true,
-        people: mappedPeople,
+        people: enrichedPeople,
         total: apolloData.pagination?.total_entries || 0
       })
     };

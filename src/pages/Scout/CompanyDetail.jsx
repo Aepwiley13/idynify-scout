@@ -1261,7 +1261,7 @@ export default function CompanyDetail() {
               const isSelected = selectedContactIds.has(contact.id);
               const seniority = getSeniorityBadge(contact);
               const department = getDepartment(contact);
-              const emailStatus = getEmailStatus(contact);
+              // emailStatus removed - email/phone hidden from Available Contacts
 
               return (
                 <div
@@ -1316,38 +1316,12 @@ export default function CompanyDetail() {
 
                   {/* Contact Details Grid */}
                   <div className="contact-details-grid">
-                    {/* Email */}
-                    <div className="contact-detail-item">
-                      <div className="detail-label">
-                        <Mail className="w-4 h-4" />
-                        <span>Email</span>
-                      </div>
-                      {contact.email ? (
-                        <div className="detail-value">
-                          <a href={`mailto:${contact.email}`} className="detail-link">
-                            {contact.email}
-                          </a>
-                          <span className={`email-status ${emailStatus.class}`}>
-                            {emailStatus.icon}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="detail-unavailable">Not available</span>
-                      )}
-                    </div>
-
-                    {/* Phone */}
-                    {contact.phone_numbers && contact.phone_numbers[0] && (
-                      <div className="contact-detail-item">
-                        <div className="detail-label">
-                          <Phone className="w-4 h-4" />
-                          <span>Phone</span>
-                        </div>
-                        <a href={`tel:${contact.phone_numbers[0]}`} className="detail-link">
-                          {contact.phone_numbers[0]}
-                        </a>
-                      </div>
-                    )}
+                    {/*
+                      Email and Phone are intentionally hidden from Available Contacts.
+                      Users must add contacts as leads first to see email/phone.
+                      This allows users to validate the person (name, photo, LinkedIn)
+                      before accepting them as a lead.
+                    */}
 
                     {/* LinkedIn */}
                     {contact.linkedin_url && (

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import TitleSelectionModal from '../../components/TitleSelectionModal';
 import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
@@ -21,7 +20,6 @@ export default function CompanyDetail() {
   const [searchingContacts, setSearchingContacts] = useState(false);
   const [approvingContactIds, setApprovingContactIds] = useState(new Set());
   const [savingBulkContacts, setSavingBulkContacts] = useState(false);
-  const [showTitleModal, setShowTitleModal] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showKeywords, setShowKeywords] = useState(false);
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
@@ -95,14 +93,6 @@ export default function CompanyDetail() {
     } catch (error) {
       console.error('❌ Failed to load approved contacts:', error);
     }
-  }
-
-  // Handle new titles selected from modal
-  function handleTitlesSelected(newTitles) {
-    setShowTitleModal(false);
-    setSelectedTitles(newTitles);
-    // Re-search for contacts with new titles
-    searchContacts(company, newTitles);
   }
 
   // Add custom title
@@ -1064,19 +1054,15 @@ export default function CompanyDetail() {
               }
             </p>
           </div>
-          <button className="browse-titles-btn" onClick={() => setShowTitleModal(true)}>
-            <Target className="w-4 h-4" />
-            <span>Browse Common Titles</span>
-          </button>
         </div>
 
-        {/* Custom Title Input */}
+        {/* Title Input */}
         <form onSubmit={handleAddCustomTitle} className="custom-title-form">
           <div className="search-input-wrapper">
             <Search className="search-icon" />
             <input
               type="text"
-              placeholder="Or add a custom title (e.g., 'Head of Revenue Operations')..."
+              placeholder="Add a title to search (e.g., 'VP Sales', 'Marketing Manager', 'CEO')..."
               value={customTitleInput}
               onChange={(e) => setCustomTitleInput(e.target.value)}
               className="custom-title-input"
@@ -1213,12 +1199,7 @@ export default function CompanyDetail() {
                 <CheckCircle className="w-16 h-16" style={{ color: '#10b981' }} />
                 <h4>All Contacts Saved!</h4>
                 <p>You've saved all {contacts.length} contact{contacts.length !== 1 ? 's' : ''} found for these titles at {company.name}</p>
-                <div className="empty-actions">
-                  <button className="try-different-btn" onClick={() => setShowTitleModal(true)}>
-                    <Target className="w-4 h-4" />
-                    <span>Add More Titles</span>
-                  </button>
-                </div>
+                <p className="empty-hint">Add more titles above to find additional contacts</p>
               </div>
             );
           } else if (contacts.length === 0 && selectedTitles.length > 0) {
@@ -1229,10 +1210,6 @@ export default function CompanyDetail() {
                 <h4>No Contacts Found</h4>
                 <p>We couldn't find any contacts with these titles at {company.name}</p>
                 <div className="empty-actions">
-                  <button className="try-different-btn" onClick={() => setShowTitleModal(true)}>
-                    <Target className="w-4 h-4" />
-                    <span>Browse Common Titles</span>
-                  </button>
                   <button className="clear-titles-btn" onClick={() => setSelectedTitles([])}>
                     <X className="w-4 h-4" />
                     <span>Clear Titles & Try Again</span>
@@ -1373,15 +1350,6 @@ export default function CompanyDetail() {
         })()}
       </div>
       </div>
-
-      {/* Title Selection Modal */}
-      {showTitleModal && company && (
-        <TitleSelectionModal
-          company={company}
-          onClose={() => setShowTitleModal(false)}
-          onConfirm={handleTitlesSelected}
-        />
-      )}
     </div>
   );
 }

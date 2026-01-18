@@ -377,27 +377,25 @@ export default function CompanyDetail() {
     }
   }
 
-  // Helper: Get seniority badge
-  function getSeniorityBadge(contact) {
+  // Helper: Get leadership badge (star system)
+  function getLeadershipBadge(contact) {
     const seniority = contact.seniority?.toLowerCase() || '';
     const title = (contact.title || '').toLowerCase();
 
     if (seniority.includes('c_') || seniority.includes('c-') || title.includes('chief') || title.includes(' ceo') || title.includes(' cfo') || title.includes(' cto')) {
-      return { label: 'C-Suite', class: 'c-suite' };
+      return { letter: 'C', class: 'c-level' };
     }
     if (seniority.includes('vp') || seniority.includes('vice president') || title.includes(' vp ') || title.includes('vice president')) {
-      return { label: 'VP', class: 'vp' };
+      return { letter: 'V', class: 'vp-level' };
     }
     if (seniority.includes('director') || title.includes('director')) {
-      return { label: 'Director', class: 'director' };
+      return { letter: 'D', class: 'director-level' };
     }
     if (seniority.includes('manager') || title.includes('manager')) {
-      return { label: 'Manager', class: 'manager' };
+      return { letter: 'M', class: 'manager-level' };
     }
-    if (seniority.includes('senior') || title.includes('senior') || title.includes(' sr ')) {
-      return { label: 'Senior', class: 'senior' };
-    }
-    return { label: 'Individual', class: 'individual' };
+    // No leadership badge for non-leadership roles
+    return null;
   }
 
   // Helper: Get department
@@ -960,56 +958,60 @@ export default function CompanyDetail() {
               {company.apolloEnrichment.decisionMakers.map((person, idx) => {
                 const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
                 const isAlreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
+                const leadershipBadge = getLeadershipBadge(person);
+
+                // Background image: use person photo or Barry fallback
+                const backgroundImage = person.photo_url || '/barry.png';
 
                 return (
-                  <div
-                    key={idx}
-                    className={`decision-maker-card ${isSelected ? 'selected' : ''} ${isAlreadySaved ? 'already-saved' : ''}`}
-                    onClick={() => !isAlreadySaved && handleToggleDecisionMaker(person)}
-                  >
-                    {/* Selection Checkbox or Saved Badge */}
-                    {isAlreadySaved ? (
-                      <div className="decision-maker-saved-badge">
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Saved</span>
-                      </div>
-                    ) : (
-                      <div className="decision-maker-select-indicator">
-                        <div className={`checkbox ${isSelected ? 'checked' : ''}`}>
-                          {isSelected && <CheckCircle className="w-5 h-5" />}
+                  <div key={idx} className="decision-maker-card-container">
+                    <div
+                      className={`decision-maker-card-photo ${isSelected ? 'selected' : ''} ${isAlreadySaved ? 'already-saved' : ''}`}
+                      style={{ backgroundImage: `url(${backgroundImage})` }}
+                      onClick={() => !isAlreadySaved && handleToggleDecisionMaker(person)}
+                    >
+                      {/* Leadership Badge - Top Left */}
+                      {leadershipBadge && (
+                        <div className={`leadership-badge ${leadershipBadge.class}`}>
+                          <Award className="w-3 h-3" />
+                          <span>{leadershipBadge.letter}</span>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    <div className="decision-maker-header">
-                      <div className="decision-maker-avatar">
-                        {person.photo_url ? (
-                          <img src={person.photo_url} alt={person.name} />
-                        ) : (
-                          <div className="avatar-placeholder">
-                            <Users className="w-6 h-6" />
+                      {/* Selection Checkbox or Saved Badge - Top Right */}
+                      {isAlreadySaved ? (
+                        <div className="decision-maker-saved-badge">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Saved</span>
+                        </div>
+                      ) : (
+                        <div className="decision-maker-select-indicator">
+                          <div className={`checkbox ${isSelected ? 'checked' : ''}`}>
+                            {isSelected && <CheckCircle className="w-5 h-5" />}
                           </div>
-                        )}
-                      </div>
-                      <div className="decision-maker-info">
-                        <p className="decision-maker-name">{person.name}</p>
-                        <p className="decision-maker-title">{person.title}</p>
-                        {person.department && (
-                          <span className="decision-maker-dept">{person.department}</span>
-                        )}
+                        </div>
+                      )}
+
+                      {/* Gradient Overlay with Text */}
+                      <div className="card-gradient-overlay">
+                        <div className="card-text-overlay">
+                          <p className="card-name">{person.name}</p>
+                          <p className="card-title">{person.title}</p>
+                        </div>
                       </div>
                     </div>
 
+                    {/* LinkedIn Button - Below Card */}
                     {person.linkedin_url && (
                       <button
-                        className="decision-maker-linkedin"
+                        className="card-linkedin-btn"
                         onClick={(e) => {
                           e.stopPropagation();
                           window.open(person.linkedin_url, '_blank', 'noopener,noreferrer');
                         }}
                       >
                         <Linkedin className="w-4 h-4" />
-                        <span>LinkedIn</span>
+                        <span>View LinkedIn</span>
                       </button>
                     )}
                   </div>
@@ -1236,72 +1238,57 @@ export default function CompanyDetail() {
               const isApproved = approvedContacts.some(c => c.apollo_person_id === contact.id);
               const isApproving = approvingContactIds.has(contact.id);
               const isSelected = selectedContactIds.has(contact.id);
-              const seniority = getSeniorityBadge(contact);
-              const department = getDepartment(contact);
-              // emailStatus removed - email/phone hidden from Available Contacts
+              const leadershipBadge = getLeadershipBadge(contact);
+
+              // Background image: use contact photo or Barry fallback
+              const backgroundImage = contact.photo_url || '/barry.png';
 
               return (
-                <div
-                  key={contact.id}
-                  className={`contact-card-enriched ${isApproved ? 'approved' : ''} ${isSelected ? 'selected' : ''}`}
-                >
-                  {/* Selection Checkbox */}
-                  {!isApproved && (
-                    <div className="contact-select-indicator">
-                      <div
-                        className={`checkbox ${isSelected ? 'checked' : ''}`}
-                        onClick={() => handleToggleContact(contact.id)}
-                      >
-                        {isSelected && <CheckCircle className="w-5 h-5" />}
+                <div key={contact.id} className="contact-card-container">
+                  <div
+                    className={`contact-card-photo ${isApproved ? 'approved' : ''} ${isSelected ? 'selected' : ''}`}
+                    style={{ backgroundImage: `url(${backgroundImage})` }}
+                  >
+                    {/* Leadership Badge - Top Left */}
+                    {leadershipBadge && (
+                      <div className={`leadership-badge ${leadershipBadge.class}`}>
+                        <Award className="w-3 h-3" />
+                        <span>{leadershipBadge.letter}</span>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Contact Header with Photo */}
-                  <div className="contact-card-header">
-                    <div className="contact-avatar-enriched">
-                      {contact.photo_url ? (
-                        <img src={contact.photo_url} alt={contact.name} />
-                      ) : (
-                        <div className="avatar-fallback">
-                          {contact.name?.charAt(0).toUpperCase() || '?'}
+                    {/* Selection Checkbox - Top Right */}
+                    {!isApproved && (
+                      <div className="contact-select-indicator">
+                        <div
+                          className={`checkbox ${isSelected ? 'checked' : ''}`}
+                          onClick={() => handleToggleContact(contact.id)}
+                        >
+                          {isSelected && <CheckCircle className="w-5 h-5" />}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    <div className="contact-header-info">
-                      <h3 className="contact-name">{contact.name || 'Unknown'}</h3>
-
-                      {/* Badges Row */}
-                      <div className="contact-badges">
-                        <span className={`seniority-badge ${seniority.class}`}>
-                          <Award className="w-3 h-3" />
-                          {seniority.label}
-                        </span>
-                        {department && (
-                          <span className="department-badge">
-                            <Briefcase className="w-3 h-3" />
-                            {department}
-                          </span>
-                        )}
+                    {/* Gradient Overlay with Text */}
+                    <div className="card-gradient-overlay">
+                      <div className="card-text-overlay">
+                        <p className="card-name">{contact.name || 'Unknown'}</p>
+                        <p className="card-title">{contact.title || 'Title not available'}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Title */}
-                  <p className="contact-title-enriched">{contact.title || 'Title not available'}</p>
-
-                  {/* LinkedIn Button - Prominent style for contact validation */}
+                  {/* LinkedIn Button - Below Card */}
                   {contact.linkedin_url && (
                     <button
-                      className="contact-linkedin-btn"
+                      className="card-linkedin-btn"
                       onClick={(e) => {
                         e.stopPropagation();
                         window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
                       }}
                     >
                       <Linkedin className="w-4 h-4" />
-                      <span>View LinkedIn Profile</span>
+                      <span>View LinkedIn</span>
                     </button>
                   )}
 

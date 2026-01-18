@@ -60,9 +60,17 @@ export default function HunterDashboard() {
     }
   }
 
-  function handleConnectGmail() {
-    // This will be implemented when OAuth function is ready
-    alert('Gmail OAuth will be implemented in Phase 3B');
+  async function handleConnectGmail() {
+    const user = auth.currentUser;
+    const authToken = await user.getIdToken();
+
+    const response = await fetch('/.netlify/functions/gmail-oauth-init', {
+      method: 'POST',
+      body: JSON.stringify({ userId: user.uid, authToken })
+    });
+
+    const data = await response.json();
+    window.location.href = data.authUrl;
   }
 
   function getCampaignStats(campaign) {

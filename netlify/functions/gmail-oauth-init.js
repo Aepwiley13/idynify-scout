@@ -64,10 +64,13 @@ export const handler = async (event) => {
       googleRedirectUri
     );
 
-    // Generate authorization URL
+    // Generate authorization URL with correct scopes
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline', // Get refresh token
-      scope: ['https://www.googleapis.com/auth/gmail.send'],
+      scope: [
+        'https://www.googleapis.com/auth/gmail.send',      // Send emails
+        'https://www.googleapis.com/auth/userinfo.email'   // Get user email address
+      ],
       state: userId, // Pass userId in state for callback
       prompt: 'consent' // Force consent screen to get refresh token
     });

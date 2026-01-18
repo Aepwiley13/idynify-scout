@@ -832,109 +832,81 @@ export default function CompanyDetail() {
             </div>
 
             <div className="decision-makers-grid">
-              {approvedContacts.map(contact => (
-                <div key={contact.id} className="decision-maker-card already-saved">
-                  {/* Saved Badge */}
-                  <div className="decision-maker-saved-badge">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Saved</span>
-                  </div>
+              {approvedContacts.map(contact => {
+                const leadershipBadge = getLeadershipBadge(contact);
+                const backgroundImage = contact.photo_url || '/barry.png';
 
-                  {/* Source Badge */}
-                  <div className={`source-badge ${contact.source || 'apollo'}`} style={{
-                    position: 'absolute',
-                    top: '0.75rem',
-                    right: '0.75rem',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                    backgroundColor: contact.source === 'manual' ? '#eff6ff' : contact.source === 'networking' ? '#faf5ff' : '#f0fdf4',
-                    color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
-                    border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
-                  }}>
-                    {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Search'}
-                  </div>
+                return (
+                  <div key={contact.id} className="saved-contact-card-container">
+                    <div
+                      className="saved-contact-card-photo"
+                      style={{ backgroundImage: `url(${backgroundImage})` }}
+                    >
+                      {/* Leadership Badge - Top Left */}
+                      {leadershipBadge && (
+                        <div className={`leadership-badge ${leadershipBadge.class}`}>
+                          <Award className="w-3 h-3" />
+                          <span>{leadershipBadge.letter}</span>
+                        </div>
+                      )}
 
-                  <div className="decision-maker-header">
-                    <div className="decision-maker-avatar">
-                      {contact.photo_url ? (
-                        <img src={contact.photo_url} alt={contact.name} />
-                      ) : (
-                        <div className="avatar-placeholder">
-                          <Users className="w-6 h-6" />
+                      {/* Saved Badge - Top Right */}
+                      <div className="decision-maker-saved-badge">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Saved</span>
+                      </div>
+
+                      {/* Gradient Overlay with Text */}
+                      <div className="card-gradient-overlay">
+                        <div className="card-text-overlay">
+                          <p className="card-name">{contact.name}</p>
+                          <p className="card-title">{contact.title}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact Info - Email/Phone Below Card */}
+                    <div className="saved-contact-info">
+                      {contact.email && (
+                        <div className="saved-info-item">
+                          <Mail className="w-3.5 h-3.5" />
+                          <a href={`mailto:${contact.email}`} className="saved-info-link">
+                            {contact.email}
+                          </a>
+                        </div>
+                      )}
+                      {(contact.phone_mobile || contact.phone_direct || contact.phone) && (
+                        <div className="saved-info-item">
+                          <Phone className="w-3.5 h-3.5" />
+                          <a
+                            href={`tel:${contact.phone_mobile || contact.phone_direct || contact.phone}`}
+                            className="saved-info-link"
+                          >
+                            {contact.phone_mobile || contact.phone_direct || contact.phone}
+                          </a>
                         </div>
                       )}
                     </div>
-                    <div className="decision-maker-info">
-                      <p className="decision-maker-name">{contact.name}</p>
-                      <p className="decision-maker-title">{contact.title}</p>
-                      {(contact.departments?.[0] || contact.department) && (
-                        <span className="decision-maker-dept">
-                          {contact.departments?.[0] || contact.department}
-                        </span>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Enriched Contact Info */}
-                  <div className="contact-enriched-info">
-                    {contact.email && (
-                      <div className="enriched-info-item">
-                        <Mail className="w-4 h-4" />
-                        <a href={`mailto:${contact.email}`} className="enriched-info-value">
-                          {contact.email}
-                        </a>
-                        {contact.email_status === 'verified' && (
-                          <span className="verified-badge">✓</span>
-                        )}
-                      </div>
+                    {/* LinkedIn Button */}
+                    {contact.linkedin_url && (
+                      <button
+                        className="card-linkedin-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        <Linkedin className="w-4 h-4" />
+                        <span>View LinkedIn</span>
+                      </button>
                     )}
-                    {contact.phone_mobile && (
-                      <div className="enriched-info-item">
-                        <Phone className="w-4 h-4" />
-                        <a href={`tel:${contact.phone_mobile}`} className="enriched-info-value">
-                          <span className="phone-label">Mobile:</span> {contact.phone_mobile}
-                        </a>
-                      </div>
-                    )}
-                    {contact.phone_direct && (
-                      <div className="enriched-info-item">
-                        <Phone className="w-4 h-4" />
-                        <a href={`tel:${contact.phone_direct}`} className="enriched-info-value">
-                          <span className="phone-label">Direct:</span> {contact.phone_direct}
-                        </a>
-                      </div>
-                    )}
-                    {!contact.phone_mobile && !contact.phone_direct && contact.phone && (
-                      <div className="enriched-info-item">
-                        <Phone className="w-4 h-4" />
-                        <a href={`tel:${contact.phone}`} className="enriched-info-value">
-                          {contact.phone}
-                        </a>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* LinkedIn Button */}
-                  {contact.linkedin_url && (
+                    {/* View Full Profile Button */}
                     <button
-                      className="decision-maker-linkedin"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
-                      }}
+                      className="view-profile-btn"
+                      onClick={() => navigate(`/scout/contact/${contact.id}`)}
                     >
-                      <Linkedin className="w-4 h-4" />
-                      <span>LinkedIn</span>
-                    </button>
-                  )}
-
-                  {/* View Profile Button */}
-                  <button
-                    className="decision-maker-view-profile"
-                    onClick={() => navigate(`/scout/contact/${contact.id}`)}
-                  >
                     View Profile →
                   </button>
                 </div>

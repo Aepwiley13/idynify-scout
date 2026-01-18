@@ -1314,42 +1314,9 @@ export default function CompanyDetail() {
                   {/* Title */}
                   <p className="contact-title-enriched">{contact.title || 'Title not available'}</p>
 
-                  {/* Contact Details Grid */}
+                  {/* Contact Details Grid - Only show LinkedIn before approval */}
                   <div className="contact-details-grid">
-                    {/* Email */}
-                    <div className="contact-detail-item">
-                      <div className="detail-label">
-                        <Mail className="w-4 h-4" />
-                        <span>Email</span>
-                      </div>
-                      {contact.email ? (
-                        <div className="detail-value">
-                          <a href={`mailto:${contact.email}`} className="detail-link">
-                            {contact.email}
-                          </a>
-                          <span className={`email-status ${emailStatus.class}`}>
-                            {emailStatus.icon}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="detail-unavailable">Not available</span>
-                      )}
-                    </div>
-
-                    {/* Phone */}
-                    {contact.phone_numbers && contact.phone_numbers[0] && (
-                      <div className="contact-detail-item">
-                        <div className="detail-label">
-                          <Phone className="w-4 h-4" />
-                          <span>Phone</span>
-                        </div>
-                        <a href={`tel:${contact.phone_numbers[0]}`} className="detail-link">
-                          {contact.phone_numbers[0]}
-                        </a>
-                      </div>
-                    )}
-
-                    {/* LinkedIn */}
+                    {/* LinkedIn - Only field shown before approval */}
                     {contact.linkedin_url && (
                       <div className="contact-detail-item">
                         <div className="detail-label">
@@ -1366,6 +1333,8 @@ export default function CompanyDetail() {
                         </a>
                       </div>
                     )}
+
+                    {/* Email and Phone are hidden - only visible after adding to leads */}
                   </div>
 
                   {/* Action Button */}

@@ -56,8 +56,8 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified');
 
-    // Call Apollo People Search API
-    const apolloResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
+    // Step 1: Search for people by title (gets IDs and basic info)
+    const searchResponse = await fetch('https://api.apollo.io/v1/mixed_people/api_search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,47 +68,83 @@ export const handler = async (event) => {
         organization_ids: [organizationId],
         person_titles: titles,
         page: 1,
-        per_page: 10
+        per_page: 10  // Max 10 results
       })
     });
 
-    if (!apolloResponse.ok) {
-      const errorText = await apolloResponse.text();
-      console.error('❌ Apollo API error:', apolloResponse.status, errorText);
+    if (!searchResponse.ok) {
+      const errorText = await searchResponse.text();
+      console.error('❌ Apollo API error:', searchResponse.status, errorText);
       console.error('📊 Request that failed:', JSON.stringify({
         organization_ids: [organizationId],
         person_titles: titles,
         page: 1,
         per_page: 10
       }, null, 2));
-      throw new Error(`Apollo API request failed: ${apolloResponse.status} - ${errorText}`);
+      throw new Error(`Apollo API request failed: ${searchResponse.status} - ${errorText}`);
     }
 
-    const apolloData = await apolloResponse.json();
+    const searchData = await searchResponse.json();
+    const searchResults = searchData.people || [];
 
-    console.log('✅ Found people:', apolloData.people?.length || 0);
+    console.log('✅ Found candidate contacts:', searchResults.length);
 
-    // Map Apollo API response fields to match frontend expectations
-    const mappedPeople = (apolloData.people || []).map(person => ({
+    // Step 2: Enrich each contact individually to get full profile data
+    const enrichedPeople = [];
+
+    for (const candidate of searchResults) {
+      try {
+        console.log(`🔄 Enriching: ${candidate.first_name || 'Unknown'} (ID: ${candidate.id})`);
+
+        const enrichResponse = await fetch('https://api.apollo.io/v1/people/match', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'X-Api-Key': apolloApiKey
+          },
+          body: JSON.stringify({ id: candidate.id })
+        });
+
+        if (enrichResponse.ok) {
+          const enrichData = await enrichResponse.json();
+          const enrichedPerson = enrichData.person;
+
+          if (enrichedPerson) {
+            enrichedPeople.push(enrichedPerson);
+            console.log(`  ✅ Enriched: ${enrichedPerson.name || enrichedPerson.first_name}`);
+          }
+        } else {
+          console.warn(`  ⚠️ Could not enrich ${candidate.first_name}, using basic data`);
+          enrichedPeople.push(candidate); // Fallback to basic search data
+        }
+      } catch (enrichError) {
+        console.error(`  ❌ Error enriching ${candidate.first_name}:`, enrichError.message);
+        enrichedPeople.push(candidate); // Fallback to basic search data
+      }
+    }
+
+    console.log('✅ Total enriched contacts:', enrichedPeople.length);
+
+    // Map enriched data to ensure consistent field names
+    const mappedPeople = enrichedPeople.map(person => ({
       ...person,
-      // Construct full name from first_name + last_name
+      // Construct full name if not already present
       name: person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || null,
-      // Ensure email is mapped correctly
       email: person.email || null,
-      // Map organization name if needed
       organization_name: person.organization_name || person.organization?.name || null,
-      // Ensure photo_url is mapped
       photo_url: person.photo_url || null,
-      // Ensure departments is an array
+      linkedin_url: person.linkedin_url || null,
       departments: person.departments || person.functions || [],
-      // Map phone numbers
       phone_numbers: person.phone_numbers || []
     }));
 
-    console.log('📋 Sample mapped person:', mappedPeople[0] ? {
+    console.log('📋 Sample enriched contact:', mappedPeople[0] ? {
       id: mappedPeople[0].id,
       name: mappedPeople[0].name,
       email: mappedPeople[0].email,
+      photo_url: mappedPeople[0].photo_url,
+      linkedin_url: mappedPeople[0].linkedin_url,
       title: mappedPeople[0].title
     } : 'No people found');
 

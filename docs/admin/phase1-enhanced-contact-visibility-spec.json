@@ -1,0 +1,1610 @@
+{
+  "feature_id": "enhanced_user_contact_visibility",
+  "feature_name": "Enhanced User & Contact Visibility",
+  "phase": "Phase 1: Core Admin & Support Essentials",
+  "version": "1.0",
+  "created_at": "2026-01-19",
+
+  "overview": {
+    "description": "Allow admin users to view a complete list of all contacts belonging to any user, with full metadata visibility including enrichment status, source, and engagement data. This is a read-only feature focused purely on visibility - no modification, impersonation, or Scout/Recon/Hunter integration.",
+    "scope": "Admin visibility only - does not modify existing Scout, Recon, or Hunter modules",
+    "objective": "Enable admins to troubleshoot data quality issues, verify enrichment accuracy, and provide effective user support by viewing contact-level details"
+  },
+
+  "user_story": {
+    "as": "Admin user",
+    "i_want": "to view a complete list of all contacts for any selected user, with full metadata including enrichment status, contact details, company association, and data quality indicators",
+    "so_that": "I can troubleshoot user-reported issues (missing emails, incorrect titles, enrichment failures), verify data accuracy, audit contact sources, and provide informed support without needing direct Firestore console access",
+    "acceptance_summary": "Admin can navigate from user list → user detail page → contacts tab → see paginated contact list with search/filter → click individual contact → view full contact metadata in read-only mode"
+  },
+
+  "ui_requirements": {
+    "screens": [
+      {
+        "screen_id": "user_detail_contacts_tab",
+        "name": "User Detail - Contacts Tab",
+        "location": "/admin/user/:uid (enhancement to existing UserDetail.jsx)",
+        "description": "New tab in existing User Detail page to display contact list",
+        "components": [
+          {
+            "component": "Tab Navigation",
+            "description": "Add 'Contacts' tab alongside existing Account/Scout/Recon/Credits sections",
+            "states": ["active", "inactive"]
+          },
+          {
+            "component": "Contacts Summary Card",
+            "description": "Quick stats at top: Total contacts, Enriched count, Unenriched count, Failed enrichments, Contacts by source (decision_makers, business_card, manual, csv_upload)",
+            "data_source": "Aggregated from users/{uid}/contacts collection"
+          },
+          {
+            "component": "Search & Filter Bar",
+            "description": "Search by name/email/title, filter by status/source/company/enrichment_status",
+            "inputs": [
+              "Search text input (name, email, title)",
+              "Status dropdown: All, Active, Pending Enrichment, Enrichment Failed, Archived",
+              "Source dropdown: All, Decision Makers, Business Card, Manual, CSV Upload",
+              "Enrichment dropdown: All, Enriched, Not Enriched, Failed",
+              "Company dropdown: All companies (populated from user's companies)",
+              "Clear filters button"
+            ]
+          },
+          {
+            "component": "Contacts Table",
+            "description": "Paginated table of contacts with key fields",
+            "columns": [
+              "Photo (avatar or placeholder)",
+              "Name (clickable to detail modal)",
+              "Title",
+              "Company",
+              "Email (with status badge: verified/likely/unverified/missing)",
+              "Phone (masked: show last 4 digits, full on hover)",
+              "Source (badge)",
+              "Status (badge with color coding)",
+              "Enriched (checkmark/x icon)",
+              "Saved Date",
+              "Actions (View Details button)"
+            ],
+            "pagination": {
+              "page_size_options": [25, 50, 100],
+              "default_page_size": 50,
+              "display": "Showing X-Y of Z contacts"
+            },
+            "sorting": [
+              "Name (A-Z, Z-A)",
+              "Title (A-Z, Z-A)",
+              "Company (A-Z, Z-A)",
+              "Saved Date (newest first, oldest first)",
+              "Status"
+            ],
+            "empty_state": {
+              "icon": "Users icon",
+              "title": "No contacts found",
+              "description": "This user hasn't saved any contacts yet, or no contacts match your filters.",
+              "action": "Clear filters button if filters are active"
+            }
+          },
+          {
+            "component": "Export Button",
+            "description": "Export visible/filtered contacts to CSV",
+            "fields_exported": "All contact fields including metadata",
+            "filename_format": "contacts_{userId}_{timestamp}.csv"
+          }
+        ],
+        "states": {
+          "loading": {
+            "display": "Loading skeleton for table with 10 rows, shimmer effect",
+            "message": "Loading contacts..."
+          },
+          "loaded": {
+            "display": "Full contact table with data"
+          },
+          "empty": {
+            "display": "Empty state component (no contacts exist for user)"
+          },
+          "filtered_empty": {
+            "display": "Empty state component (contacts exist but none match filters)",
+            "action": "Show 'Clear filters' button"
+          },
+          "error": {
+            "display": "Error alert banner at top of tab",
+            "message": "Failed to load contacts. [Error details]",
+            "action": "Retry button",
+            "icon": "AlertCircle"
+          },
+          "permission_denied": {
+            "display": "Permission denied message",
+            "message": "You don't have permission to view this user's contacts.",
+            "icon": "Lock",
+            "action": "Redirect to admin dashboard"
+          }
+        }
+      },
+      {
+        "screen_id": "contact_detail_modal",
+        "name": "Contact Detail Modal",
+        "trigger": "Click 'View Details' or contact name in table",
+        "description": "Read-only modal showing full contact metadata",
+        "layout": "Modal overlay, 800px width, scrollable content",
+        "sections": [
+          {
+            "section": "Header",
+            "fields": [
+              "Contact photo or avatar placeholder",
+              "Contact name (h1)",
+              "Title (subtitle)",
+              "Company name with link to company (if company_id exists)",
+              "Close button (X icon)"
+            ]
+          },
+          {
+            "section": "Contact Information",
+            "icon": "User",
+            "fields": [
+              {
+                "label": "Email",
+                "value": "contact.email || 'Not available'",
+                "format": "Clickable mailto link if present",
+                "badge": "Email status (verified/likely/unverified) if email_status field exists"
+              },
+              {
+                "label": "Phone",
+                "value": "contact.phone || 'Not available'",
+                "format": "Clickable tel link if present, formatted (xxx) xxx-xxxx"
+              },
+              {
+                "label": "LinkedIn",
+                "value": "contact.linkedin_url || 'Not available'",
+                "format": "External link with icon if present"
+              },
+              {
+                "label": "Location",
+                "value": "Formatted: city, state, country",
+                "icon": "MapPin"
+              }
+            ]
+          },
+          {
+            "section": "Professional Details",
+            "icon": "Briefcase",
+            "fields": [
+              {
+                "label": "Current Title",
+                "value": "contact.title"
+              },
+              {
+                "label": "Department",
+                "value": "contact.department || 'Not specified'"
+              },
+              {
+                "label": "Seniority Level",
+                "value": "contact.seniority || 'Not specified'"
+              },
+              {
+                "label": "Tenure in Role",
+                "value": "Calculated from job_start_date if available",
+                "format": "X years, Y months"
+              },
+              {
+                "label": "Decision Maker Status",
+                "value": "contact.is_likely_decision_maker",
+                "format": "Badge: 'High' (green) or 'Low/Influencer' (gray) with icon"
+              }
+            ]
+          },
+          {
+            "section": "Company Association",
+            "icon": "Building2",
+            "fields": [
+              {
+                "label": "Company",
+                "value": "contact.company_name",
+                "action": "Link to /admin/user/{uid}/company/{company_id} if company_id exists"
+              },
+              {
+                "label": "Industry",
+                "value": "contact.company_industry || 'Not specified'"
+              },
+              {
+                "label": "Apollo Company ID",
+                "value": "contact.apollo_company_id || 'N/A'",
+                "format": "Monospace font, copy button"
+              }
+            ]
+          },
+          {
+            "section": "Data Metadata",
+            "icon": "Database",
+            "fields": [
+              {
+                "label": "Contact ID",
+                "value": "contact.id",
+                "format": "Monospace font, copy button"
+              },
+              {
+                "label": "Apollo Person ID",
+                "value": "contact.apollo_person_id || 'N/A'",
+                "format": "Monospace font, copy button"
+              },
+              {
+                "label": "Source",
+                "value": "contact.source",
+                "format": "Badge with color: decision_makers (blue), business_card (purple), manual (green), csv_upload (orange)"
+              },
+              {
+                "label": "Status",
+                "value": "contact.status",
+                "format": "Badge: active (green), pending_enrichment (yellow), enrichment_failed (red), archived (gray)"
+              },
+              {
+                "label": "Enriched",
+                "value": "contact.enriched || false",
+                "format": "Checkmark icon (green) or X icon (gray)"
+              },
+              {
+                "label": "Saved At",
+                "value": "contact.saved_at",
+                "format": "Formatted date: Jan 15, 2026, 3:45 PM"
+              },
+              {
+                "label": "Last Enriched At",
+                "value": "contact.last_enriched_at || contact.enriched_at || 'Never'",
+                "format": "Formatted date or 'Never'"
+              },
+              {
+                "label": "Enrichment Error",
+                "value": "contact.enrichment_error",
+                "display_condition": "Only show if status === 'enrichment_failed'",
+                "format": "Error message in red text"
+              }
+            ]
+          },
+          {
+            "section": "Enriched Profile Data (if available)",
+            "icon": "Sparkles",
+            "display_condition": "Only show if contact.enrichedProfile exists",
+            "fields": [
+              {
+                "label": "Career Pattern Summary",
+                "value": "contact.enrichedProfile.careerPatternSummary",
+                "format": "Paragraph text"
+              },
+              {
+                "label": "Public Presence Signals",
+                "value": "contact.enrichedProfile.publicPresenceSignals",
+                "format": "JSON pretty-print or structured display"
+              },
+              {
+                "label": "Outreach Angle",
+                "value": "contact.enrichedProfile.outreachAngle",
+                "format": "Paragraph text"
+              }
+            ]
+          }
+        ],
+        "states": {
+          "loading": {
+            "display": "Modal with skeleton loaders for all sections"
+          },
+          "loaded": {
+            "display": "Full contact details"
+          },
+          "error": {
+            "display": "Error message in modal body",
+            "message": "Failed to load contact details",
+            "action": "Close button"
+          }
+        },
+        "actions": {
+          "close_modal": "X button or click outside modal or ESC key",
+          "copy_id": "Copy contact ID or Apollo IDs to clipboard with success toast"
+        }
+      }
+    ],
+    "navigation_flow": {
+      "entry_points": [
+        "Admin Dashboard → Click user row → User Detail page → Contacts tab",
+        "Direct URL: /admin/user/:uid?tab=contacts"
+      ],
+      "breadcrumbs": "Admin Dashboard > Users > [User Email] > Contacts"
+    },
+    "responsive_behavior": {
+      "desktop": "Full table with all columns",
+      "tablet": "Hide photo, phone, source columns; stack filters",
+      "mobile": "Card layout instead of table; show name, title, email, status"
+    },
+    "accessibility": {
+      "keyboard_navigation": "Tab through filters, table rows, action buttons; Enter to open modal",
+      "screen_reader": "ARIA labels on all interactive elements, table headers properly labeled",
+      "focus_indicators": "Clear focus outline on all interactive elements",
+      "color_contrast": "All text meets WCAG AA standards (4.5:1 minimum)"
+    }
+  },
+
+  "api_backend_requirements": {
+    "endpoints": [
+      {
+        "endpoint_id": "get_user_contacts",
+        "method": "POST",
+        "path": "/.netlify/functions/adminGetUserContacts",
+        "description": "Fetch all contacts for a specific user with pagination, search, and filters",
+        "authentication": {
+          "required": true,
+          "method": "Firebase Auth ID Token",
+          "header": "Authorization: Bearer {idToken}",
+          "validation": "Verify token via Firebase Admin SDK"
+        },
+        "authorization": {
+          "required": true,
+          "method": "checkAdminAccess(userId)",
+          "logic": "Check if requesting user is admin via ADMIN_USER_IDS env var OR users/{uid}.role === 'admin'",
+          "failure_response": {
+            "statusCode": 403,
+            "body": {
+              "success": false,
+              "error": "Admin access required"
+            }
+          }
+        },
+        "request_schema": {
+          "authToken": {
+            "type": "string",
+            "required": true,
+            "description": "Firebase ID token of requesting admin"
+          },
+          "targetUserId": {
+            "type": "string",
+            "required": true,
+            "description": "UID of user whose contacts to fetch"
+          },
+          "pagination": {
+            "type": "object",
+            "required": false,
+            "properties": {
+              "page": {
+                "type": "number",
+                "default": 1,
+                "min": 1
+              },
+              "pageSize": {
+                "type": "number",
+                "default": 50,
+                "enum": [25, 50, 100]
+              }
+            }
+          },
+          "search": {
+            "type": "string",
+            "required": false,
+            "description": "Search term for name, email, or title (case-insensitive)"
+          },
+          "filters": {
+            "type": "object",
+            "required": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["active", "pending_enrichment", "enrichment_failed", "archived", "all"],
+                "default": "all"
+              },
+              "source": {
+                "type": "string",
+                "enum": ["decision_makers", "business_card", "manual", "csv_upload", "all"],
+                "default": "all"
+              },
+              "enriched": {
+                "type": "string",
+                "enum": ["true", "false", "failed", "all"],
+                "default": "all"
+              },
+              "companyId": {
+                "type": "string",
+                "description": "Filter by specific company_id"
+              }
+            }
+          },
+          "sort": {
+            "type": "object",
+            "required": false,
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": ["name", "title", "company_name", "saved_at", "status"],
+                "default": "saved_at"
+              },
+              "direction": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "default": "desc"
+              }
+            }
+          }
+        },
+        "response_schema": {
+          "success": true,
+          "data": {
+            "contacts": [
+              {
+                "id": "string (contact document ID)",
+                "apollo_person_id": "string or null",
+                "name": "string",
+                "title": "string or null",
+                "email": "string or null",
+                "email_status": "verified | likely | unverified | null",
+                "phone": "string or null",
+                "linkedin_url": "string or null",
+                "photo_url": "string or null",
+                "company_id": "string or null",
+                "company_name": "string or null",
+                "company_industry": "string or null",
+                "department": "string or null",
+                "seniority": "string or null",
+                "is_likely_decision_maker": "boolean or null",
+                "job_start_date": "string (ISO) or null",
+                "city": "string or null",
+                "state": "string or null",
+                "country": "string or null",
+                "status": "active | pending_enrichment | enrichment_failed | archived",
+                "source": "decision_makers | business_card | manual | csv_upload",
+                "enriched": "boolean",
+                "saved_at": "string (ISO)",
+                "enriched_at": "string (ISO) or null",
+                "last_enriched_at": "string (ISO) or null",
+                "enrichment_error": "string or null",
+                "enrichedProfile": {
+                  "careerPatternSummary": "string or null",
+                  "publicPresenceSignals": "object or null",
+                  "outreachAngle": "string or null"
+                }
+              }
+            ],
+            "summary": {
+              "total": "number (total contacts for user)",
+              "filtered": "number (contacts matching filters)",
+              "enriched": "number (contacts with enriched=true)",
+              "unenriched": "number (contacts with enriched=false)",
+              "failed": "number (contacts with status=enrichment_failed)",
+              "bySource": {
+                "decision_makers": "number",
+                "business_card": "number",
+                "manual": "number",
+                "csv_upload": "number"
+              }
+            },
+            "pagination": {
+              "page": "number",
+              "pageSize": "number",
+              "totalPages": "number",
+              "hasNextPage": "boolean",
+              "hasPreviousPage": "boolean"
+            }
+          }
+        },
+        "error_responses": [
+          {
+            "statusCode": 400,
+            "condition": "Invalid request parameters",
+            "body": {
+              "success": false,
+              "error": "Invalid pagination parameters"
+            }
+          },
+          {
+            "statusCode": 401,
+            "condition": "Missing or invalid auth token",
+            "body": {
+              "success": false,
+              "error": "Authentication required"
+            }
+          },
+          {
+            "statusCode": 403,
+            "condition": "Requesting user is not admin",
+            "body": {
+              "success": false,
+              "error": "Admin access required"
+            }
+          },
+          {
+            "statusCode": 404,
+            "condition": "Target user not found",
+            "body": {
+              "success": false,
+              "error": "User not found"
+            }
+          },
+          {
+            "statusCode": 500,
+            "condition": "Server error during fetch",
+            "body": {
+              "success": false,
+              "error": "Failed to fetch contacts"
+            }
+          }
+        ],
+        "performance_requirements": {
+          "max_response_time": "3000ms for 100 contacts",
+          "timeout": "10000ms",
+          "caching": "No caching (always fetch fresh data)"
+        },
+        "implementation_notes": [
+          "Use Firestore collection group query: db.collection('users').doc(targetUserId).collection('contacts')",
+          "Apply filters using Firestore where() clauses where possible",
+          "For text search (name/email/title), fetch all contacts and filter in memory (Firestore has limited text search)",
+          "Use Firestore limit() and offset() for pagination (or startAfter cursor for better performance)",
+          "Calculate summary stats in single pass over filtered results",
+          "Sanitize all user inputs to prevent injection attacks",
+          "Log admin access: record which admin accessed which user's contacts and when"
+        ]
+      },
+      {
+        "endpoint_id": "get_contact_detail",
+        "method": "POST",
+        "path": "/.netlify/functions/adminGetContactDetail",
+        "description": "Fetch full details for a single contact (used for detail modal)",
+        "authentication": {
+          "required": true,
+          "method": "Firebase Auth ID Token"
+        },
+        "authorization": {
+          "required": true,
+          "method": "checkAdminAccess(userId)"
+        },
+        "request_schema": {
+          "authToken": "string (required)",
+          "targetUserId": "string (required)",
+          "contactId": "string (required)"
+        },
+        "response_schema": {
+          "success": true,
+          "data": {
+            "contact": {
+              "...all fields from get_user_contacts plus any additional metadata"
+            }
+          }
+        },
+        "error_responses": [
+          {
+            "statusCode": 404,
+            "condition": "Contact not found",
+            "body": {
+              "success": false,
+              "error": "Contact not found"
+            }
+          }
+        ]
+      },
+      {
+        "endpoint_id": "export_user_contacts",
+        "method": "POST",
+        "path": "/.netlify/functions/adminExportUserContacts",
+        "description": "Export user contacts to CSV format",
+        "authentication": {
+          "required": true,
+          "method": "Firebase Auth ID Token"
+        },
+        "authorization": {
+          "required": true,
+          "method": "checkAdminAccess(userId)"
+        },
+        "request_schema": {
+          "authToken": "string (required)",
+          "targetUserId": "string (required)",
+          "filters": "object (optional, same as get_user_contacts)"
+        },
+        "response_schema": {
+          "success": true,
+          "data": {
+            "csv": "string (CSV formatted data)",
+            "filename": "contacts_{userId}_{timestamp}.csv",
+            "rowCount": "number"
+          }
+        },
+        "csv_columns": [
+          "Contact ID",
+          "Apollo Person ID",
+          "Name",
+          "Title",
+          "Email",
+          "Email Status",
+          "Phone",
+          "LinkedIn URL",
+          "Company Name",
+          "Company Industry",
+          "Department",
+          "Seniority",
+          "Decision Maker",
+          "Location",
+          "Source",
+          "Status",
+          "Enriched",
+          "Saved Date",
+          "Enriched Date",
+          "Enrichment Error"
+        ]
+      }
+    ],
+    "shared_utilities": [
+      {
+        "function": "checkAdminAccess",
+        "location": "netlify/functions/utils/adminAuth.js",
+        "enhancement": "Add audit logging - log which admin accessed which user's data",
+        "signature": "async function checkAdminAccess(userId, targetUserId, action)",
+        "audit_log_schema": {
+          "collection": "adminAuditLogs",
+          "fields": {
+            "adminUserId": "string",
+            "action": "string (e.g., 'view_user_contacts')",
+            "targetUserId": "string",
+            "targetResource": "string (e.g., 'contacts')",
+            "timestamp": "Timestamp",
+            "ipAddress": "string (from request headers)",
+            "userAgent": "string (from request headers)"
+          }
+        }
+      }
+    ],
+    "security_requirements": [
+      "All endpoints must verify Firebase Auth token",
+      "All endpoints must verify admin role before processing",
+      "Validate all input parameters against schema",
+      "Sanitize search and filter inputs to prevent injection",
+      "Log all admin access to user data for audit trail",
+      "Rate limit: 100 requests per minute per admin user",
+      "CORS: Restrict to https://idynify.com origin only",
+      "No PII should be logged in console or error messages",
+      "Mask phone numbers in logs (show only last 4 digits)"
+    ]
+  },
+
+  "data_models": {
+    "existing_collections": {
+      "users/{uid}/contacts/{contactId}": {
+        "description": "Existing contact storage - no schema changes needed",
+        "current_fields": [
+          "id (auto-generated document ID)",
+          "apollo_person_id",
+          "name",
+          "title",
+          "email",
+          "email_status (verified | likely | unverified)",
+          "phone",
+          "linkedin_url",
+          "photo_url",
+          "company_id",
+          "company_name",
+          "company_industry",
+          "department",
+          "seniority",
+          "is_likely_decision_maker",
+          "job_start_date",
+          "city",
+          "state",
+          "country",
+          "status (active | pending_enrichment | enrichment_failed | archived)",
+          "source (decision_makers | business_card | manual | csv_upload)",
+          "enriched (boolean)",
+          "saved_at (ISO timestamp)",
+          "enriched_at (ISO timestamp)",
+          "last_enriched_at (ISO timestamp)",
+          "enrichment_error (string)",
+          "enrichedProfile (object)",
+          "lead_owner (uid)",
+          "apollo_company_id"
+        ],
+        "no_changes_required": true
+      }
+    },
+    "new_collections": {
+      "adminAuditLogs": {
+        "description": "New top-level collection to log admin access to user data",
+        "purpose": "Compliance, security monitoring, and admin accountability",
+        "schema": {
+          "adminUserId": {
+            "type": "string",
+            "description": "UID of admin who performed action"
+          },
+          "adminEmail": {
+            "type": "string",
+            "description": "Email of admin (denormalized for easier auditing)"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "view_user_contacts",
+              "view_contact_detail",
+              "export_user_contacts",
+              "view_user_detail"
+            ],
+            "description": "Type of admin action performed"
+          },
+          "targetUserId": {
+            "type": "string",
+            "description": "UID of user whose data was accessed"
+          },
+          "targetUserEmail": {
+            "type": "string",
+            "description": "Email of target user (denormalized)"
+          },
+          "targetResource": {
+            "type": "string",
+            "description": "Resource accessed (e.g., 'contacts', 'contact_detail', 'user_profile')"
+          },
+          "resourceId": {
+            "type": "string",
+            "description": "Specific resource ID if applicable (e.g., contactId)"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional context (filters used, record count, etc.)"
+          },
+          "timestamp": {
+            "type": "Timestamp",
+            "description": "When action occurred"
+          },
+          "ipAddress": {
+            "type": "string",
+            "description": "IP address of admin (from request headers)"
+          },
+          "userAgent": {
+            "type": "string",
+            "description": "Browser user agent string"
+          }
+        },
+        "indexes": [
+          {
+            "fields": ["adminUserId", "timestamp"],
+            "description": "Query all actions by a specific admin, sorted by time"
+          },
+          {
+            "fields": ["targetUserId", "timestamp"],
+            "description": "Query all admin access to a specific user's data"
+          },
+          {
+            "fields": ["action", "timestamp"],
+            "description": "Query all instances of a specific action type"
+          }
+        ],
+        "retention_policy": "Retain for 2 years minimum for compliance",
+        "security_rules": {
+          "read": "if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+          "write": "if false // Only backend service account can write"
+        }
+      }
+    },
+    "firestore_indexes": {
+      "required_composite_indexes": [
+        {
+          "collection": "users/{uid}/contacts",
+          "fields": [
+            {"field": "status", "order": "ASCENDING"},
+            {"field": "saved_at", "order": "DESCENDING"}
+          ],
+          "description": "Support filtering by status and sorting by date"
+        },
+        {
+          "collection": "users/{uid}/contacts",
+          "fields": [
+            {"field": "source", "order": "ASCENDING"},
+            {"field": "saved_at", "order": "DESCENDING"}
+          ],
+          "description": "Support filtering by source and sorting by date"
+        },
+        {
+          "collection": "users/{uid}/contacts",
+          "fields": [
+            {"field": "company_id", "order": "ASCENDING"},
+            {"field": "saved_at", "order": "DESCENDING"}
+          ],
+          "description": "Support filtering by company and sorting by date"
+        }
+      ],
+      "note": "Firestore will auto-create single-field indexes. Composite indexes must be created via Firestore console or Firebase CLI when queries fail with index requirement error."
+    },
+    "firestore_security_rules": {
+      "no_changes_required": true,
+      "rationale": "Existing rules allow authenticated users to read user subcollections (line 12-14 in firestore.rules). Admin backend uses Firebase Admin SDK with service account credentials, which bypass security rules. Frontend should never directly query Firestore for admin features - always go through Netlify functions with admin checks."
+    }
+  },
+
+  "workflows": {
+    "primary_workflow": {
+      "name": "View User Contacts from Admin Dashboard",
+      "steps": [
+        {
+          "step": 1,
+          "actor": "Admin",
+          "action": "Navigate to Admin Dashboard (/admin)",
+          "ui": "AdminDashboard.jsx displays user list"
+        },
+        {
+          "step": 2,
+          "actor": "Admin",
+          "action": "Click on user row or 'View Details' button",
+          "ui": "Navigate to /admin/user/{uid}"
+        },
+        {
+          "step": 3,
+          "actor": "System",
+          "action": "Load UserDetail page with tabs: Account, Scout, Recon, Credits, Contacts (new)",
+          "ui": "UserDetail.jsx with new Contacts tab"
+        },
+        {
+          "step": 4,
+          "actor": "Admin",
+          "action": "Click 'Contacts' tab",
+          "ui": "Activate Contacts tab, trigger data fetch"
+        },
+        {
+          "step": 5,
+          "actor": "System",
+          "action": "Call adminGetUserContacts endpoint with targetUserId",
+          "backend": "Verify admin auth, fetch contacts from Firestore, apply default sorting (saved_at desc), return paginated results"
+        },
+        {
+          "step": 6,
+          "actor": "System",
+          "action": "Display contacts table with summary stats",
+          "ui": "Show summary card (total, enriched, failed counts), render contacts table with first 50 results"
+        },
+        {
+          "step": 7,
+          "actor": "Admin",
+          "action": "Apply filters or search (optional)",
+          "ui": "Select status/source/enrichment filters, enter search term"
+        },
+        {
+          "step": 8,
+          "actor": "System",
+          "action": "Re-fetch contacts with filters applied",
+          "backend": "Call adminGetUserContacts with filter parameters, return filtered results"
+        },
+        {
+          "step": 9,
+          "actor": "Admin",
+          "action": "Click 'View Details' on a contact row",
+          "ui": "Open Contact Detail Modal"
+        },
+        {
+          "step": 10,
+          "actor": "System",
+          "action": "Call adminGetContactDetail endpoint",
+          "backend": "Verify admin auth, fetch specific contact document, return full data"
+        },
+        {
+          "step": 11,
+          "actor": "System",
+          "action": "Display contact detail modal with all metadata",
+          "ui": "Modal shows contact info, professional details, company association, enrichment data, metadata"
+        },
+        {
+          "step": 12,
+          "actor": "Admin",
+          "action": "Review contact details, optionally copy IDs",
+          "ui": "Read contact data, click copy buttons for IDs"
+        },
+        {
+          "step": 13,
+          "actor": "Admin",
+          "action": "Close modal and optionally export contacts",
+          "ui": "Click X to close modal, click Export button to download CSV"
+        },
+        {
+          "step": 14,
+          "actor": "System",
+          "action": "Generate CSV export (if requested)",
+          "backend": "Call adminExportUserContacts, generate CSV with all contact fields, trigger browser download"
+        }
+      ],
+      "success_criteria": "Admin successfully views contact list, applies filters, views contact details, and exports data without errors"
+    },
+    "alternate_workflow": {
+      "name": "Direct URL Access to Contacts Tab",
+      "steps": [
+        {
+          "step": 1,
+          "actor": "Admin",
+          "action": "Navigate directly to /admin/user/{uid}?tab=contacts",
+          "ui": "Page loads with Contacts tab pre-selected"
+        },
+        {
+          "step": 2,
+          "actor": "System",
+          "action": "Continue from step 5 of primary workflow"
+        }
+      ]
+    },
+    "error_workflows": [
+      {
+        "scenario": "Non-admin user tries to access contacts",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Non-admin user",
+            "action": "Navigate to /admin/user/{uid}?tab=contacts"
+          },
+          {
+            "step": 2,
+            "actor": "System",
+            "action": "ProtectedAdminRoute checks isUserAdmin()",
+            "result": "Returns false"
+          },
+          {
+            "step": 3,
+            "actor": "System",
+            "action": "Display 'Access Denied' message and redirect to /dashboard"
+          }
+        ]
+      },
+      {
+        "scenario": "User has no contacts",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Admin",
+            "action": "Open Contacts tab for user with 0 contacts"
+          },
+          {
+            "step": 2,
+            "actor": "System",
+            "action": "API returns empty array"
+          },
+          {
+            "step": 3,
+            "actor": "System",
+            "action": "Display empty state: 'No contacts found' with icon and message"
+          }
+        ]
+      },
+      {
+        "scenario": "Network error during fetch",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Admin",
+            "action": "Click Contacts tab"
+          },
+          {
+            "step": 2,
+            "actor": "System",
+            "action": "API call fails with network error"
+          },
+          {
+            "step": 3,
+            "actor": "System",
+            "action": "Display error banner: 'Failed to load contacts' with Retry button"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "Click Retry button"
+          },
+          {
+            "step": 5,
+            "actor": "System",
+            "action": "Re-attempt API call"
+          }
+        ]
+      },
+      {
+        "scenario": "Large contact dataset (500+ contacts)",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Admin",
+            "action": "Open Contacts tab for user with 500 contacts"
+          },
+          {
+            "step": 2,
+            "actor": "System",
+            "action": "API returns first 50 contacts (page 1)"
+          },
+          {
+            "step": 3,
+            "actor": "System",
+            "action": "Display pagination controls: 'Showing 1-50 of 500 contacts', page 1 of 10"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "Click page 2 or 'Next' button"
+          },
+          {
+            "step": 5,
+            "actor": "System",
+            "action": "Fetch contacts 51-100, update table"
+          }
+        ]
+      }
+    ]
+  },
+
+  "acceptance_criteria": {
+    "functional_requirements": [
+      {
+        "id": "AC-1",
+        "requirement": "Admin can access Contacts tab from User Detail page",
+        "test": "Navigate to /admin/user/{valid_uid}, verify 'Contacts' tab is visible and clickable"
+      },
+      {
+        "id": "AC-2",
+        "requirement": "Contacts tab displays summary statistics",
+        "test": "Click Contacts tab, verify summary card shows: Total contacts, Enriched count, Unenriched count, Failed enrichments, Contacts by source breakdown"
+      },
+      {
+        "id": "AC-3",
+        "requirement": "Contacts table displays all required columns",
+        "test": "Verify table has columns: Photo, Name, Title, Company, Email, Phone, Source, Status, Enriched, Saved Date, Actions"
+      },
+      {
+        "id": "AC-4",
+        "requirement": "Contacts table is paginated",
+        "test": "For user with 100+ contacts, verify only 50 contacts load initially, pagination controls appear, can navigate to page 2"
+      },
+      {
+        "id": "AC-5",
+        "requirement": "Search filters contacts by name, email, or title",
+        "test": "Enter 'john' in search box, verify only contacts with 'john' in name/email/title are shown"
+      },
+      {
+        "id": "AC-6",
+        "requirement": "Status filter works correctly",
+        "test": "Select 'Active' from status dropdown, verify only contacts with status='active' are shown"
+      },
+      {
+        "id": "AC-7",
+        "requirement": "Source filter works correctly",
+        "test": "Select 'Decision Makers' from source dropdown, verify only contacts with source='decision_makers' are shown"
+      },
+      {
+        "id": "AC-8",
+        "requirement": "Enrichment filter works correctly",
+        "test": "Select 'Not Enriched' from enrichment dropdown, verify only contacts with enriched=false are shown"
+      },
+      {
+        "id": "AC-9",
+        "requirement": "Company filter works correctly",
+        "test": "Select specific company from dropdown, verify only contacts associated with that company are shown"
+      },
+      {
+        "id": "AC-10",
+        "requirement": "Clear filters button resets all filters",
+        "test": "Apply multiple filters, click 'Clear filters', verify all filters reset to 'All' and full contact list displays"
+      },
+      {
+        "id": "AC-11",
+        "requirement": "Sorting works for each sortable column",
+        "test": "Click 'Name' column header, verify contacts sort A-Z, click again for Z-A. Repeat for Title, Company, Saved Date"
+      },
+      {
+        "id": "AC-12",
+        "requirement": "Contact detail modal opens on row click",
+        "test": "Click 'View Details' button or contact name, verify modal opens with contact details"
+      },
+      {
+        "id": "AC-13",
+        "requirement": "Contact detail modal displays all sections",
+        "test": "Verify modal has sections: Header, Contact Information, Professional Details, Company Association, Data Metadata, Enriched Profile (if applicable)"
+      },
+      {
+        "id": "AC-14",
+        "requirement": "Copy ID buttons work in modal",
+        "test": "Click copy button next to Contact ID or Apollo Person ID, verify ID copied to clipboard and success toast appears"
+      },
+      {
+        "id": "AC-15",
+        "requirement": "Email status badges display correctly",
+        "test": "For contacts with email_status field, verify badge shows 'Verified' (green), 'Likely' (yellow), or 'Unverified' (gray)"
+      },
+      {
+        "id": "AC-16",
+        "requirement": "Enrichment error displays for failed contacts",
+        "test": "For contact with status='enrichment_failed', verify enrichment_error message displays in modal"
+      },
+      {
+        "id": "AC-17",
+        "requirement": "Export to CSV works",
+        "test": "Click Export button, verify CSV file downloads with correct filename format and contains all contact data"
+      },
+      {
+        "id": "AC-18",
+        "requirement": "Export respects active filters",
+        "test": "Apply filters (e.g., status='active'), click Export, verify CSV contains only filtered contacts"
+      },
+      {
+        "id": "AC-19",
+        "requirement": "Empty state displays when no contacts exist",
+        "test": "View contacts for user with 0 contacts, verify empty state displays: icon, 'No contacts found' message"
+      },
+      {
+        "id": "AC-20",
+        "requirement": "Filtered empty state displays with clear filters option",
+        "test": "Apply filters that return 0 results, verify empty state displays: 'No contacts match your filters' with 'Clear filters' button"
+      },
+      {
+        "id": "AC-21",
+        "requirement": "Loading state displays during fetch",
+        "test": "Click Contacts tab, verify skeleton loader displays while data fetches"
+      },
+      {
+        "id": "AC-22",
+        "requirement": "Error state displays on API failure",
+        "test": "Simulate API error, verify error banner displays: 'Failed to load contacts' with Retry button"
+      },
+      {
+        "id": "AC-23",
+        "requirement": "Non-admin users cannot access contacts",
+        "test": "As non-admin user, attempt to navigate to /admin/user/{uid}?tab=contacts, verify access denied and redirect"
+      },
+      {
+        "id": "AC-24",
+        "requirement": "Admin audit log is created for each access",
+        "test": "As admin, view user contacts, verify adminAuditLogs collection has new entry with correct adminUserId, action, targetUserId, timestamp"
+      }
+    ],
+    "performance_requirements": [
+      {
+        "id": "PERF-1",
+        "requirement": "Contacts tab loads within 3 seconds for 100 contacts",
+        "test": "Measure time from tab click to table render for user with 100 contacts, verify ≤3000ms"
+      },
+      {
+        "id": "PERF-2",
+        "requirement": "Search/filter applies within 2 seconds",
+        "test": "Apply filter, measure time to table update, verify ≤2000ms"
+      },
+      {
+        "id": "PERF-3",
+        "requirement": "Contact detail modal opens within 1 second",
+        "test": "Click View Details, measure time to modal display, verify ≤1000ms"
+      },
+      {
+        "id": "PERF-4",
+        "requirement": "CSV export completes within 10 seconds for 500 contacts",
+        "test": "Export 500 contacts, measure time to file download, verify ≤10000ms"
+      },
+      {
+        "id": "PERF-5",
+        "requirement": "Pagination navigation is instantaneous",
+        "test": "Click next page, measure time to table update, verify ≤500ms (should be cached or pre-fetched)"
+      }
+    ],
+    "security_requirements": [
+      {
+        "id": "SEC-1",
+        "requirement": "All API calls require valid Firebase Auth token",
+        "test": "Call adminGetUserContacts without auth token, verify 401 Unauthorized response"
+      },
+      {
+        "id": "SEC-2",
+        "requirement": "All API calls verify admin role",
+        "test": "As authenticated non-admin, call adminGetUserContacts, verify 403 Forbidden response"
+      },
+      {
+        "id": "SEC-3",
+        "requirement": "Admin access is logged to audit trail",
+        "test": "View user contacts, verify adminAuditLogs has entry with all required fields"
+      },
+      {
+        "id": "SEC-4",
+        "requirement": "Phone numbers are masked in public logs",
+        "test": "Check server logs for contact fetches, verify phone numbers show only last 4 digits or are fully redacted"
+      },
+      {
+        "id": "SEC-5",
+        "requirement": "CORS restricted to idynify.com",
+        "test": "Call API from different origin, verify CORS error"
+      },
+      {
+        "id": "SEC-6",
+        "requirement": "Input validation prevents injection attacks",
+        "test": "Submit malicious search term (e.g., SQL injection attempt), verify sanitized and no error"
+      }
+    ],
+    "accessibility_requirements": [
+      {
+        "id": "A11Y-1",
+        "requirement": "Keyboard navigation works for all interactive elements",
+        "test": "Using only keyboard, Tab through filters, table rows, buttons; Enter to activate; verify all are accessible"
+      },
+      {
+        "id": "A11Y-2",
+        "requirement": "Screen reader announces table headers",
+        "test": "Use screen reader, navigate table, verify column headers are announced"
+      },
+      {
+        "id": "A11Y-3",
+        "requirement": "Focus indicators are visible",
+        "test": "Tab through page, verify clear focus outline on all focused elements"
+      },
+      {
+        "id": "A11Y-4",
+        "requirement": "Color contrast meets WCAG AA",
+        "test": "Use contrast checker on all text, verify 4.5:1 minimum ratio"
+      },
+      {
+        "id": "A11Y-5",
+        "requirement": "Modal is keyboard-accessible",
+        "test": "Open modal with Enter key, Tab through content, close with ESC key"
+      }
+    ]
+  },
+
+  "edge_cases": {
+    "data_edge_cases": [
+      {
+        "case": "Contact with all null/missing fields",
+        "expected_behavior": "Display 'Not available' or 'Not specified' for missing fields, no UI breaks",
+        "test": "Create contact with only name field populated, verify modal and table display gracefully"
+      },
+      {
+        "case": "Contact with very long name (100+ characters)",
+        "expected_behavior": "Truncate name in table with ellipsis, show full name in modal and on hover",
+        "test": "Create contact with 150-character name, verify table truncates, modal shows full"
+      },
+      {
+        "case": "Contact with special characters in name/email",
+        "expected_behavior": "Display correctly without encoding issues or XSS vulnerabilities",
+        "test": "Create contact with name 'O'Brien <test@test.com>', verify displays correctly and safely"
+      },
+      {
+        "case": "User with 0 contacts",
+        "expected_behavior": "Show empty state with helpful message",
+        "test": "View contacts for new user with no contacts, verify empty state appears"
+      },
+      {
+        "case": "User with 1,000+ contacts",
+        "expected_behavior": "Pagination handles large dataset, no performance degradation",
+        "test": "View contacts for user with 1000 contacts, verify pagination shows correct total pages, performance is acceptable"
+      },
+      {
+        "case": "Contact with enrichedProfile but missing sub-fields",
+        "expected_behavior": "Display only populated enrichedProfile fields, hide empty sections",
+        "test": "Create contact with enrichedProfile={careerPatternSummary: 'text'} but no other fields, verify only that field displays"
+      },
+      {
+        "case": "Multiple contacts from same company",
+        "expected_behavior": "All display correctly, company filter shows all when selected",
+        "test": "User has 5 contacts from 'Acme Corp', filter by that company, verify all 5 appear"
+      },
+      {
+        "case": "Contact with invalid date format in saved_at",
+        "expected_behavior": "Display raw value or 'Invalid date', no app crash",
+        "test": "Manually set saved_at to invalid string, verify graceful handling"
+      },
+      {
+        "case": "Contact saved before source field existed (legacy data)",
+        "expected_behavior": "Display 'Unknown' or similar for source, include in 'All' filter",
+        "test": "Contact with source=null/undefined, verify displays and filters work"
+      }
+    ],
+    "performance_edge_cases": [
+      {
+        "case": "User with contacts having very large enrichedProfile objects",
+        "expected_behavior": "Page remains responsive, consider lazy-loading enrichedProfile in modal only",
+        "test": "Contact with 50KB enrichedProfile JSON, verify table loads quickly, modal may be slower but doesn't freeze"
+      },
+      {
+        "case": "Rapid filter changes (user clicking filters quickly)",
+        "expected_behavior": "Debounce API calls, show loading state, cancel pending requests",
+        "test": "Click 5 different filters rapidly within 2 seconds, verify only final filter triggers API call"
+      },
+      {
+        "case": "Slow network connection",
+        "expected_behavior": "Loading state displays, timeout at 10s with error message and retry option",
+        "test": "Simulate 3G network, verify loading state, timeout behavior"
+      },
+      {
+        "case": "Exporting 1,000+ contacts to CSV",
+        "expected_behavior": "Show progress indicator, generate CSV in chunks if needed, complete within 30s or show progress",
+        "test": "Export 1000 contacts, verify completion or progress indicator"
+      }
+    ],
+    "ui_edge_cases": [
+      {
+        "case": "Very narrow browser window (mobile)",
+        "expected_behavior": "Switch to card layout or horizontal scroll, maintain usability",
+        "test": "Resize browser to 375px width, verify UI adapts"
+      },
+      {
+        "case": "Modal content exceeds viewport height",
+        "expected_behavior": "Modal body scrolls, header and footer remain fixed",
+        "test": "Open modal with contact having all fields populated, verify scrollable content"
+      },
+      {
+        "case": "User quickly closes and reopens modal",
+        "expected_behavior": "No stale data, no duplicate API calls, smooth animation",
+        "test": "Open modal, immediately close, reopen different contact, verify correct data displays"
+      },
+      {
+        "case": "Filter dropdown with 50+ companies",
+        "expected_behavior": "Dropdown is searchable or scrollable, displays performantly",
+        "test": "User has contacts from 50 companies, open company filter dropdown, verify usable"
+      }
+    ],
+    "security_edge_cases": [
+      {
+        "case": "Admin tries to access deleted user's contacts",
+        "expected_behavior": "Return 404 User Not Found error",
+        "test": "Call API with UID of deleted user, verify 404 response"
+      },
+      {
+        "case": "Admin manipulates URL to access another admin's audit logs",
+        "expected_behavior": "Only super-admin or same admin can view own audit logs (future feature)",
+        "test": "For now, all admins can view all audit logs (document this limitation)"
+      },
+      {
+        "case": "Malicious search input (SQL injection attempt)",
+        "expected_behavior": "Input sanitized, no database breach, query fails gracefully",
+        "test": "Search for ' OR '1'='1, verify no unauthorized data returned"
+      },
+      {
+        "case": "XSS attempt via contact name",
+        "expected_behavior": "Script tags escaped, no script execution",
+        "test": "Contact name = '<script>alert(1)</script>', verify displays as text, no alert"
+      },
+      {
+        "case": "Admin session expires mid-use",
+        "expected_behavior": "API returns 401, user redirected to login, can resume after re-auth",
+        "test": "Let auth token expire, make API call, verify 401 and redirect"
+      }
+    ]
+  },
+
+  "security_rbac_impact": {
+    "role_definitions": {
+      "admin": {
+        "can_access": [
+          "Admin Dashboard (/admin)",
+          "User List",
+          "User Detail pages",
+          "User Contacts (new)",
+          "Contact Details (new)",
+          "API Activity Logs",
+          "Platform Statistics",
+          "Export user data (new)"
+        ],
+        "cannot_access": [
+          "Modify user data (Phase 2)",
+          "Impersonate users (Phase 2)",
+          "Delete contacts",
+          "Modify contacts"
+        ],
+        "data_access_level": "Read-only access to all user data including PII (email, phone, location)"
+      },
+      "user": {
+        "can_access": [
+          "Own Scout/Recon/Hunter modules",
+          "Own contacts",
+          "Own dashboard"
+        ],
+        "cannot_access": [
+          "Admin routes",
+          "Other users' data",
+          "Platform statistics",
+          "Audit logs"
+        ],
+        "data_access_level": "Full read/write access to own data only"
+      }
+    },
+    "least_privilege_considerations": [
+      {
+        "principle": "Admin access should be limited to those who need it",
+        "implementation": "Admins must be explicitly granted admin role via Firestore users/{uid}.role='admin' or ADMIN_USER_IDS env var",
+        "audit": "All admin access logged to adminAuditLogs for review"
+      },
+      {
+        "principle": "Read-only access for Phase 1",
+        "implementation": "No write operations exposed in Contact Visibility feature. Admin can only view, search, filter, export.",
+        "rationale": "Minimize risk of accidental data modification or corruption"
+      },
+      {
+        "principle": "PII access should be justified and logged",
+        "implementation": "Admin access to PII (email, phone) is logged with timestamp, admin ID, and purpose (implied by action type)",
+        "compliance": "Supports GDPR Article 30 (Records of processing activities) and CCPA audit requirements"
+      },
+      {
+        "principle": "Session management",
+        "implementation": "Admin sessions use Firebase Auth with standard timeout (1 hour). No extended sessions for admin features.",
+        "security": "Reduces window for compromised admin credentials"
+      }
+    ],
+    "permission_checks": [
+      {
+        "check": "Frontend Route Protection",
+        "component": "ProtectedAdminRoute",
+        "logic": "Calls isUserAdmin(uid) to check Firestore users/{uid}.role === 'admin'",
+        "on_fail": "Redirect to /dashboard with 'Access Denied' message"
+      },
+      {
+        "check": "Backend API Authorization",
+        "function": "checkAdminAccess(userId)",
+        "logic": "Check ADMIN_USER_IDS env var OR Firestore role field",
+        "on_fail": "Return 403 Forbidden"
+      },
+      {
+        "check": "Firestore Security Rules",
+        "rule": "allow read: if request.auth != null",
+        "note": "Permissive rules allow authenticated users to read user data. Admin enforcement happens at backend function level, not database level. This is intentional for current architecture.",
+        "risk": "Authenticated non-admin users could theoretically query Firestore directly if they bypass frontend. Mitigation: Monitor for unusual query patterns, educate users not to share credentials."
+      }
+    ],
+    "data_privacy_controls": {
+      "pii_handling": [
+        {
+          "field": "email",
+          "classification": "PII - Direct Identifier",
+          "display": "Visible to admins in table and modal",
+          "masking": "None",
+          "justification": "Required for user support and troubleshooting",
+          "compliance_note": "GDPR requires purpose limitation - admin access is for legitimate interest (user support)"
+        },
+        {
+          "field": "phone",
+          "classification": "PII - Direct Identifier",
+          "display": "Visible to admins, partially masked in table (last 4 digits), full in modal on hover/click",
+          "masking": "Table: (***) ***-1234, Modal: Full number",
+          "justification": "Required for user support and verification"
+        },
+        {
+          "field": "name",
+          "classification": "PII - Direct Identifier",
+          "display": "Visible to admins",
+          "masking": "None",
+          "justification": "Required for contact identification and support"
+        },
+        {
+          "field": "location (city, state, country)",
+          "classification": "PII - Quasi-Identifier",
+          "display": "Visible to admins",
+          "masking": "None",
+          "justification": "Required for data quality verification"
+        },
+        {
+          "field": "apollo_person_id",
+          "classification": "Non-PII System Identifier",
+          "display": "Visible to admins in modal only",
+          "masking": "None",
+          "justification": "Technical identifier for debugging enrichment issues"
+        }
+      ],
+      "audit_logging": {
+        "what_is_logged": [
+          "Admin user ID and email",
+          "Target user ID and email",
+          "Action type (view_user_contacts, view_contact_detail, export_user_contacts)",
+          "Timestamp",
+          "IP address",
+          "User agent"
+        ],
+        "retention": "2 years minimum (compliance requirement)",
+        "access_control": "Only admins can view audit logs (future feature to build audit log viewer)",
+        "immutability": "Firestore security rules prevent modification/deletion of audit logs"
+      },
+      "data_minimization": {
+        "principle": "Only fetch and display data necessary for admin tasks",
+        "implementation": "Contact list API returns all fields. Consider future enhancement to allow admins to select which fields to view/export.",
+        "current_approach": "Phase 1 returns all fields for simplicity. Phase 2+ can add field-level access control."
+      }
+    },
+    "compliance_considerations": {
+      "gdpr": {
+        "article_15": "Right to access - Users can request copy of their data. Admin contact visibility supports generating user data exports.",
+        "article_30": "Records of processing - Admin audit logs provide record of who accessed user data and when.",
+        "article_32": "Security - Admin access control and audit logging support security requirements."
+      },
+      "ccpa": {
+        "section_1798_100": "Right to know - Admin can export user data to fulfill disclosure requests.",
+        "section_1798_105": "Right to delete - Admin visibility doesn't implement deletion (Phase 2+)."
+      },
+      "soc2": {
+        "cc6_1": "Logical access controls - Admin role-based access control implemented.",
+        "cc6_3": "Access removal - Future: Process to remove admin access (currently manual).",
+        "cc7_2": "Monitoring - Admin audit logs support monitoring of privileged access."
+      }
+    }
+  },
+
+  "implementation_notes": {
+    "frontend": [
+      "Enhance UserDetail.jsx to add Contacts tab",
+      "Create new component: ContactsTab.jsx (table, filters, pagination)",
+      "Create new component: ContactDetailModal.jsx (read-only modal)",
+      "Create new component: ContactSummaryCard.jsx (stats at top of tab)",
+      "Reuse existing UI patterns from AdminDashboard.jsx (table styling, filters)",
+      "Use lucide-react icons for consistency",
+      "Implement debounce for search/filter inputs (300ms delay)",
+      "Use React state for pagination, filters, search",
+      "Display loading skeletons during data fetch",
+      "Add error boundaries to gracefully handle component errors"
+    ],
+    "backend": [
+      "Create netlify/functions/adminGetUserContacts.js",
+      "Create netlify/functions/adminGetContactDetail.js",
+      "Create netlify/functions/adminExportUserContacts.js",
+      "Enhance netlify/functions/utils/adminAuth.js to add audit logging",
+      "Use Firebase Admin SDK for Firestore queries",
+      "Implement pagination using Firestore startAfter cursor or offset",
+      "For text search, fetch all contacts and filter in-memory (Firestore lacks full-text search)",
+      "Use Firestore where() clauses for structured filters (status, source, enriched)",
+      "Generate CSV using csv-stringify library or manual string building",
+      "Log all admin access to adminAuditLogs collection"
+    ],
+    "testing": [
+      "Unit tests for filter logic, search logic, pagination calculations",
+      "Integration tests for API endpoints with mock Firestore",
+      "E2E tests using Playwright or Cypress for full user flows",
+      "Load tests for large datasets (1000+ contacts)",
+      "Security tests for auth/authz bypass attempts",
+      "Accessibility tests using axe-core or pa11y"
+    ],
+    "deployment": [
+      "Create Firestore composite indexes (will be auto-prompted when queries fail)",
+      "Update firestore.rules to add adminAuditLogs security rules",
+      "Set ADMIN_USER_IDS environment variable in Netlify with initial admin UIDs",
+      "Deploy backend functions first, then frontend",
+      "Test in staging environment before production",
+      "Monitor error rates and performance in production using Netlify Analytics"
+    ],
+    "future_enhancements": [
+      "Add bulk actions (select multiple contacts, export selected)",
+      "Add contact comparison view (compare 2 contacts side-by-side)",
+      "Add timeline view of contact enrichment history",
+      "Add ability to manually trigger re-enrichment (Phase 2)",
+      "Add notes/comments on contacts (admin annotations for support)",
+      "Integrate with CRM export (Salesforce, HubSpot)",
+      "Add advanced search with boolean operators (AND, OR, NOT)",
+      "Add saved filter presets for common admin tasks"
+    ]
+  },
+
+  "dependencies": {
+    "existing_features": [
+      "Admin Dashboard (AdminDashboard.jsx) - provides user list navigation",
+      "User Detail Page (UserDetail.jsx) - will be enhanced with Contacts tab",
+      "Protected Admin Route (ProtectedAdminRoute.jsx) - provides auth check",
+      "Admin Auth Utility (adminAuth.js) - provides isUserAdmin() and checkAdminAccess()",
+      "Firebase Admin SDK - for Firestore queries in backend",
+      "Firestore contacts collection - existing data structure"
+    ],
+    "new_dependencies": [
+      {
+        "name": "csv-stringify",
+        "purpose": "Generate CSV exports in backend",
+        "install": "npm install csv-stringify"
+      },
+      {
+        "name": "date-fns",
+        "purpose": "Format dates in frontend",
+        "install": "npm install date-fns"
+      }
+    ],
+    "version_requirements": {
+      "react": "^18.0.0 (already installed)",
+      "firebase": "^9.0.0 (already installed)",
+      "firebase-admin": "^11.0.0 (already installed)"
+    }
+  },
+
+  "success_metrics": {
+    "user_satisfaction": [
+      "Admin users report reduced time to diagnose user issues (measure via survey)",
+      "Reduction in Firestore console access for admin tasks (measure via Firebase Analytics)"
+    ],
+    "technical_metrics": [
+      "Page load time <3s for 100 contacts",
+      "API error rate <1%",
+      "Zero security incidents related to unauthorized contact access"
+    ],
+    "business_metrics": [
+      "Support ticket resolution time reduced by 20% (admins can view user data faster)",
+      "Compliance audit readiness improved (audit logs available)"
+    ]
+  },
+
+  "rollback_plan": {
+    "frontend": "Remove Contacts tab from UserDetail.jsx, deploy previous version",
+    "backend": "Remove/disable adminGetUserContacts and related functions via Netlify dashboard",
+    "data": "No data modifications in this feature, no data rollback needed",
+    "monitoring": "Monitor error logs for 24 hours post-deployment, rollback if error rate >5%"
+  }
+}

@@ -1,21 +1,22 @@
 /**
- * Search Companies Manual
+ * Manual Company Search via Apollo API
  *
- * Simple company search function that takes a query string and returns
- * up to 10 matching companies from Apollo API.
+ * This function allows users to manually search for companies by name
+ * and returns matching results for user confirmation before saving.
  *
- * This is a lightweight version without the complex filtering, queuing,
- * and duplicate checking of the main search-companies function.
+ * Unlike search-companies.js (which uses ICP settings), this function
+ * accepts a direct company name query from the user.
  *
  * Endpoint: /.netlify/functions/search-companies-manual
  * Method: POST
  * Auth: Requires valid Firebase auth token
  */
 
+import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 
-export const handler = async (event) => {
+export async function handler(event, context) {
   const startTime = Date.now();
 
   // CORS headers
@@ -26,7 +27,7 @@ export const handler = async (event) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle OPTIONS request for CORS
+  // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -41,70 +42,95 @@ export const handler = async (event) => {
   }
 
   try {
-    // Parse request body
-    const { query: searchQuery, authToken } = JSON.parse(event.body || '{}');
+    const { companyName, authToken, userId } = JSON.parse(event.body);
 
-    console.log('🔍 Manual company search request:', {
-      query: searchQuery,
-      hasAuthToken: !!authToken
-    });
-
-    // Validate inputs
-    if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim().length === 0) {
+    // Validate input
+    if (!companyName || !companyName.trim()) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Missing or invalid query parameter. Please provide a company name to search.'
-        })
+        body: JSON.stringify({ success: false, error: 'Company name is required' })
       };
     }
 
-    if (!authToken) {
+    if (!authToken || !userId) {
       return {
         statusCode: 401,
         headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'Authentication required. Please provide authToken.'
-        })
+        body: JSON.stringify({ success: false, error: 'Authentication required' })
       };
     }
 
-    // Build Apollo API request
-    // IMPORTANT: Apollo expects keyword search, not exact name match
+    console.log('🔍 Manual company search for:', companyName);
+    console.log('👤 User ID:', userId);
+
+    // Verify Firebase Auth token
+    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!firebaseApiKey) {
+      throw new Error('Firebase API key not configured');
+    }
+
+    const verifyResponse = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: authToken })
+      }
+    );
+
+    if (!verifyResponse.ok) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Invalid authentication token' })
+      };
+    }
+
+    const verifyData = await verifyResponse.json();
+    const tokenUserId = verifyData.users[0].localId;
+
+    if (tokenUserId !== userId) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Token does not match user ID' })
+      };
+    }
+
+    console.log('✅ Auth token verified');
+
+    // Build Apollo search query
+    // CRITICAL: API key goes in HEADERS (via getApolloHeaders), NOT in body
+    // CRITICAL: Use q_organization_keyword_tags, NOT q_organization_name
     const apolloQuery = {
       page: 1,
       per_page: 10,
-      q_organization_keyword_tags: [searchQuery.trim().toLowerCase()]
+      q_organization_keyword_tags: [companyName.trim().toLowerCase()],
+      sort_by_field: 'organization_num_employees',
+      sort_ascending: false
     };
 
-    console.log('📋 Apollo API request:', JSON.stringify(apolloQuery, null, 2));
+    console.log('📊 Apollo query:', JSON.stringify(apolloQuery, null, 2));
 
     // Call Apollo API
-    // NOTE: API key goes in HEADERS (X-Api-Key), NOT in body
     const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
       method: 'POST',
-      headers: getApolloHeaders(), // Contains X-Api-Key header
+      headers: getApolloHeaders(),
       body: JSON.stringify(apolloQuery)
     });
 
     console.log('📡 Apollo API response status:', apolloResponse.status);
 
-    // Handle API errors with detailed logging
     if (!apolloResponse.ok) {
-      // Log detailed error for debugging
       const errorText = await logApolloError(apolloResponse, apolloQuery, 'search-companies-manual');
 
-      // Return user-friendly error messages
       let userMessage = 'Company search service is temporarily unavailable.';
       let statusCode = 500;
 
       if (apolloResponse.status === 422) {
-        console.error('❌ VALIDATION ERROR: Apollo rejected the request parameters');
-        console.error('   Query sent:', apolloQuery);
-        userMessage = 'Invalid search parameters. The search query may contain unsupported characters or format.';
+        console.error('❌ VALIDATION ERROR: Invalid search parameters');
+        userMessage = 'Invalid search parameters. The search query may contain unsupported characters.';
         statusCode = 400;
       } else if (apolloResponse.status === 429) {
         userMessage = 'Search rate limit exceeded. Please try again in a few minutes.';
@@ -122,71 +148,93 @@ export const handler = async (event) => {
         headers,
         body: JSON.stringify({
           success: false,
-          error: userMessage,
-          details: process.env.NODE_ENV === 'development' ? {
-            apolloStatus: apolloResponse.status,
-            apolloError: errorText.substring(0, 200)
-          } : undefined
+          error: userMessage
         })
       };
     }
 
-    // Parse response
     const apolloData = await apolloResponse.json();
     const companies = apolloData.organizations || [];
 
-    console.log(`✅ Found ${companies.length} companies from Apollo`);
+    console.log(`✅ Found ${companies.length} matching companies`);
 
-    // Transform companies to simplified format
-    const results = companies.map(company => ({
-      id: company.id,
-      name: company.name,
-      website: company.website_url || company.primary_domain,
-      domain: company.primary_domain,
-      industry: company.industry || company.primary_industry,
-      employees: company.estimated_num_employees,
-      location: {
-        city: company.city,
-        state: company.state,
-        country: company.country
-      },
-      description: company.short_description || company.description,
-      linkedinUrl: company.linkedin_url,
-      logo: company.logo_url
-    }));
+    // Transform companies to our format
+    const transformedCompanies = companies.map(company => {
+      const location = company.primary_location || company.headquarters_location || {};
+      const locationStr = [
+        location.city,
+        location.state,
+        location.country
+      ].filter(Boolean).join(', ');
+
+      let revenue = null;
+      if (company.estimated_annual_revenue) {
+        const revenueNum = parseFloat(company.estimated_annual_revenue);
+        if (revenueNum >= 1e9) {
+          revenue = `$${(revenueNum / 1e9).toFixed(1)}B`;
+        } else if (revenueNum >= 1e6) {
+          revenue = `$${(revenueNum / 1e6).toFixed(0)}M`;
+        } else if (revenueNum >= 1e3) {
+          revenue = `$${(revenueNum / 1e3).toFixed(0)}K`;
+        }
+      }
+
+      return {
+        apollo_organization_id: company.id,
+        name: company.name,
+        industry: company.industry || company.primary_industry || 'Unknown',
+        employee_count: company.estimated_num_employees || 0,
+        revenue: revenue,
+        founded_year: company.founded_year || null,
+        phone: company.phone || null,
+        website_url: company.website_url || null,
+        linkedin_url: company.linkedin_url || null,
+        location: locationStr || 'Unknown',
+        description: company.short_description || company.description || null,
+        logo_url: company.logo_url || null,
+        raw_revenue: company.estimated_annual_revenue || null,
+        technology_names: company.technology_names || [],
+        keywords: company.keywords || []
+      };
+    });
+
+    // Log API usage
+    await logApiUsage({
+      userId,
+      endpoint: 'search-companies-manual',
+      requestType: 'apollo_company_search',
+      apolloCreditsUsed: 1,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        companyName: companyName,
+        resultsCount: companies.length
+      }
+    });
 
     const responseTime = Date.now() - startTime;
-
-    console.log(`✅ Returning ${results.length} companies (${responseTime}ms)`);
+    console.log(`✅ Returning ${transformedCompanies.length} companies (${responseTime}ms)`);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        count: results.length,
-        companies: results,
-        query: searchQuery,
-        responseTime: `${responseTime}ms`
+        companies: transformedCompanies,
+        count: transformedCompanies.length,
+        query: companyName
       })
     };
 
   } catch (error) {
-    console.error('💥 Error in search-companies-manual:', error);
-    console.error('   Error message:', error.message);
-    console.error('   Error stack:', error.stack);
-
-    const responseTime = Date.now() - startTime;
+    console.error('❌ Manual company search error:', error);
 
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
         success: false,
-        error: 'An unexpected error occurred while searching for companies.',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        responseTime: `${responseTime}ms`
+        error: error.message || 'Failed to search companies'
       })
     };
   }
-};
+}

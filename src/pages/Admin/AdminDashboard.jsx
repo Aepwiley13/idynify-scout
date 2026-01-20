@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { Users, TrendingUp, Database, Building2, Filter, Search } from 'lucide-react';
+import { Users, TrendingUp, Database, Building2, Filter, Search, FileText } from 'lucide-react';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -173,13 +173,22 @@ export default function AdminDashboard() {
           <h1 className="page-title">🔧 Admin Dashboard</h1>
           <p className="page-subtitle">Platform-wide user management and monitoring</p>
         </div>
-        <button
-          onClick={() => navigate('/admin/api-activity')}
-          className="api-activity-btn"
-        >
-          <Database className="w-4 h-4" />
-          <span>API Activity</span>
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => navigate('/admin/api-activity')}
+            className="api-activity-btn"
+          >
+            <Database className="w-4 h-4" />
+            <span>API Activity</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/audit-logs')}
+            className="api-activity-btn"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Audit Logs</span>
+          </button>
+        </div>
       </div>
 
       {/* Platform Overview Metrics */}

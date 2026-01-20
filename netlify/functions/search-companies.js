@@ -244,12 +244,28 @@ export const handler = async (event) => {
     // Map company profile to Apollo API format
     const apolloQuery = buildApolloQuery(companyProfile);
 
-    console.log('📊 Apollo query:', JSON.stringify(apolloQuery, null, 2));
+    console.log('📊 Search query:', JSON.stringify(apolloQuery, null, 2));
     console.log('🔍 Industry filter check:');
     console.log(`   - Requested industries: ${JSON.stringify(companyProfile.industries)}`);
-    console.log(`   - Apollo keyword search: ${JSON.stringify(apolloQuery.q_organization_keyword_tags || 'NONE')}`);
+    console.log(`   - Keyword search: ${JSON.stringify(apolloQuery.q_organization_keyword_tags || 'NONE')}`);
 
-    // Call Apollo API
+    // Validate query parameters before sending
+    console.log('🔍 Validating request parameters...');
+    console.log('   - Industries count:', apolloQuery.organization_industry_tag_ids?.length || 0);
+    console.log('   - Employee range valid:', !!apolloQuery.organization_num_employees_ranges);
+    console.log('   - Keywords:', apolloQuery.q_organization_keyword_tags);
+    console.log('   - Per page:', apolloQuery.per_page);
+
+    if (!apolloQuery.organization_industry_tag_ids || apolloQuery.organization_industry_tag_ids.length === 0) {
+      console.warn('⚠️  No industry filters provided - search may return broad results');
+    }
+
+    if (!apolloQuery.per_page || apolloQuery.per_page < 1) {
+      console.error('❌ Invalid per_page value:', apolloQuery.per_page);
+      throw new Error('Invalid search parameters - please contact support');
+    }
+
+    // Call external company search API
     const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
       method: 'POST',
       headers: getApolloHeaders(),
@@ -257,18 +273,37 @@ export const handler = async (event) => {
     });
 
     if (!apolloResponse.ok) {
+      // Log detailed error for server-side debugging
       const errorText = await logApolloError(apolloResponse, apolloQuery, 'search-companies');
-      throw new Error(`Apollo API request failed: ${apolloResponse.status}`);
+      console.error('External API request failed:', apolloResponse.status);
+      console.error('Error details logged above');
+
+      // Return user-friendly error messages based on status
+      let userMessage = 'Company search service is temporarily unavailable. Please try again later.';
+
+      if (apolloResponse.status === 422) {
+        console.error('❌ VALIDATION ERROR: Invalid search parameters detected');
+        console.error('   This usually means empty or malformed query data');
+        userMessage = 'Invalid search criteria. Please check your company profile settings and try again, or contact support if this persists.';
+      } else if (apolloResponse.status === 429) {
+        userMessage = 'Search service rate limit exceeded. Please try again in a few minutes.';
+      } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
+        userMessage = 'Search service authentication error. Please contact support.';
+      } else if (apolloResponse.status >= 500) {
+        userMessage = 'Search service is experiencing issues. Please try again later.';
+      }
+
+      throw new Error(userMessage);
     }
 
     const apolloData = await apolloResponse.json();
     let companies = apolloData.organizations || [];
 
-    console.log(`✅ Found ${companies.length} companies from Apollo`);
+    console.log(`✅ Found ${companies.length} companies from external API`);
 
     // Log first 3 companies details for debugging
     if (companies.length > 0) {
-      console.log('\n📊 Sample companies returned by Apollo:');
+      console.log('\n📊 Sample companies returned:');
       console.log('\n🔍 First company RAW DATA:');
       console.log(JSON.stringify(companies[0], null, 2));
 
@@ -284,7 +319,7 @@ export const handler = async (event) => {
     }
 
     // VALIDATION: Filter companies to ensure they match requested industries
-    // Apollo sometimes returns companies that don't match the filter
+    // External API sometimes returns companies that don't match the filter
     const requestedIndustries = companyProfile.industries || [];
     const debugInfo = {
       apolloReturned: companies.length,
@@ -295,7 +330,7 @@ export const handler = async (event) => {
       }))
     };
 
-    // TEMPORARILY DISABLED - Apollo API is not returning industry field
+    // TEMPORARILY DISABLED - External API is not returning industry field reliably
     // Need to investigate raw response structure first
     console.log('⚠️  INDUSTRY VALIDATION TEMPORARILY DISABLED');
     console.log('⚠️  All companies from Apollo will be saved regardless of industry');

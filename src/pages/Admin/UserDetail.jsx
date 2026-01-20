@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp } from 'lucide-react';
+import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye } from 'lucide-react';
 import './UserDetail.css';
 
 export default function UserDetail() {
@@ -11,6 +11,7 @@ export default function UserDetail() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
+  const [startingImpersonation, setStartingImpersonation] = useState(false);
 
   useEffect(() => {
     loadUserDetail();
@@ -66,6 +67,60 @@ export default function UserDetail() {
     return `${Math.floor(diffDays / 30)} months ago`;
   };
 
+  const handleStartImpersonation = async () => {
+    const reason = prompt('Please provide a reason for impersonation (e.g., "User reported bug with XYZ feature"):');
+
+    if (!reason || reason.trim() === '') {
+      alert('A reason is required to start impersonation');
+      return;
+    }
+
+    if (!confirm(`Start impersonation session for ${user.email}?\n\nReason: ${reason}\n\nThis session will last 30 minutes and all actions will be logged.`)) {
+      return;
+    }
+
+    try {
+      setStartingImpersonation(true);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('Not authenticated');
+      }
+
+      const authToken = await currentUser.getIdToken();
+
+      const response = await fetch('/.netlify/functions/adminStartImpersonation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          authToken,
+          targetUserId: uid,
+          reason: reason.trim()
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to start impersonation');
+      }
+
+      const data = await response.json();
+
+      alert(`Impersonation session started successfully!\n\nViewing as: ${user.email}\nExpires in: 30 minutes\n\nYou will be redirected to the main dashboard.`);
+
+      // Redirect to main dashboard as the impersonated user
+      window.location.href = '/';
+
+    } catch (error) {
+      console.error('Error starting impersonation:', error);
+      alert(`Failed to start impersonation: ${error.message}`);
+    } finally {
+      setStartingImpersonation(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="user-detail-loading">
@@ -94,6 +149,15 @@ export default function UserDetail() {
         <button onClick={() => navigate('/admin')} className="back-button">
           <ArrowLeft className="w-5 h-5" />
           <span>Back to Dashboard</span>
+        </button>
+        <button
+          onClick={handleStartImpersonation}
+          disabled={startingImpersonation}
+          className="impersonate-button"
+          title="View the platform as this user for troubleshooting"
+        >
+          <Eye className="w-4 h-4" />
+          <span>{startingImpersonation ? 'Starting...' : 'View as User'}</span>
         </button>
       </div>
 

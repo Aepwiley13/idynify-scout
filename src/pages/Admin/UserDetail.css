@@ -15,6 +15,10 @@
    ======================================== */
 .detail-header {
   margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
 }
 
 .back-button {
@@ -36,6 +40,36 @@
   border-color: #3b82f6;
   color: #3b82f6;
   transform: translateX(-2px);
+}
+
+.impersonate-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.impersonate-button:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.impersonate-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.impersonate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* ========================================

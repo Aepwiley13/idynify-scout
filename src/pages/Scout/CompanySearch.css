@@ -289,61 +289,95 @@
   line-height: 1.3;
 }
 
-/* Company Links */
-.company-links {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+/* Metadata Grid (2x2) */
+.company-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
   margin-bottom: 0.75rem;
 }
 
-.company-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 0.875rem;
-  background: #f3f4f6;
-  border-radius: 8px;
-  color: #3b82f6;
-  text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.company-link:hover {
-  background: #e5e7eb;
-  transform: translateX(2px);
-}
-
-.company-link span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Company Meta */
-.company-meta {
+.meta-cell {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 0;
-  border-top: 1px solid #f3f4f6;
-  border-bottom: 1px solid #f3f4f6;
+  gap: 0.25rem;
 }
 
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.meta-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: #9ca3af;
+}
+
+.meta-value {
   font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.meta-item span {
+  font-weight: 600;
+  color: #1f2937;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Website & LinkedIn Buttons */
+.company-link-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.link-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.link-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.website-btn {
+  background: #8b5cf6;
+  color: white;
+}
+
+.website-btn:hover:not(.disabled) {
+  background: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.linkedin-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.linkedin-btn:hover:not(.disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.link-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Action Buttons - Dating App Style */
@@ -490,5 +524,19 @@
 
   .company-name {
     font-size: 1.125rem;
+  }
+
+  .company-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+  }
+
+  .company-link-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .link-btn {
+    width: 100%;
   }
 }

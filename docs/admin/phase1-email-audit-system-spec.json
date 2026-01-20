@@ -1,0 +1,2218 @@
+{
+  "specification_metadata": {
+    "title": "Phase 1 Email & Audit System - Implementation Specification",
+    "version": "1.0",
+    "created_at": "2026-01-20",
+    "features_included": [
+      "Email Delivery Insights",
+      "Admin & User Action Audit Logs"
+    ],
+    "phase": "Phase 1: Core Admin & Support Essentials"
+  },
+
+  "emailDeliveryInsights": {
+    "feature_id": "email_delivery_insights",
+    "feature_name": "Email Delivery Insights & Tracking",
+    "description": "Comprehensive tracking and monitoring of all system-generated emails including delivery status, open rates, bounce handling, and retry logic. Provides admins with visibility into email reliability and helps troubleshoot user communication issues.",
+
+    "user_story": {
+      "as": "Admin user",
+      "i_want": "to see all emails sent by the system, their delivery status, open/click rates, and any failures",
+      "so_that": "I can verify users received important notifications, troubleshoot email delivery issues, identify problematic email addresses, and ensure communication reliability",
+      "acceptance_summary": "Admin can view paginated email log with filters by type/status/user/date, see delivery details including opens and clicks, retry failed sends, and export email data for analysis",
+      "value_propositions": [
+        "Troubleshoot 'I never got the email' support requests",
+        "Identify systematic delivery issues (spam filters, invalid domains)",
+        "Monitor email engagement rates (opens, clicks)",
+        "Ensure compliance with email audit requirements",
+        "Detect and fix configuration issues quickly"
+      ]
+    },
+
+    "ui_requirements": {
+      "primary_screen": {
+        "location": "/admin/email-insights",
+        "navigation": "Admin Dashboard main menu → 'Email Insights' link",
+        "layout": "Full-width dashboard with filters, stats cards, and email log table",
+        "permissions": "Admin-only (ProtectedAdminRoute)"
+      },
+      "stats_overview_cards": {
+        "location": "Top of Email Insights page",
+        "layout": "4-card grid, responsive",
+        "cards": [
+          {
+            "card": "Total Emails Sent",
+            "metric": "Count of all emails in selected time range",
+            "icon": "Mail",
+            "color": "Blue",
+            "sub_metric": "+X% vs previous period"
+          },
+          {
+            "card": "Delivery Rate",
+            "metric": "Percentage of successfully delivered emails",
+            "icon": "CheckCircle",
+            "color": "Green",
+            "formula": "(delivered / sent) * 100",
+            "threshold_indicator": "Red if < 95%, Yellow if < 98%, Green if >= 98%"
+          },
+          {
+            "card": "Failed Emails",
+            "metric": "Count of failed/bounced emails",
+            "icon": "AlertTriangle",
+            "color": "Red",
+            "sub_metric": "Most common failure reason"
+          },
+          {
+            "card": "Open Rate",
+            "metric": "Percentage of delivered emails that were opened",
+            "icon": "Eye",
+            "color": "Purple",
+            "formula": "(opened / delivered) * 100",
+            "note": "Only for emails with tracking enabled"
+          }
+        ]
+      },
+      "filters_search_bar": {
+        "location": "Below stats cards, above email table",
+        "layout": "Horizontal filter bar with search input",
+        "components": [
+          {
+            "component": "Search Input",
+            "placeholder": "Search by recipient email or user ID",
+            "type": "text",
+            "debounce": "300ms"
+          },
+          {
+            "component": "Email Type Filter",
+            "type": "dropdown",
+            "options": [
+              "All Types",
+              "Welcome Email",
+              "Password Reset",
+              "Account Suspended",
+              "Account Reactivated",
+              "Payment Receipt",
+              "Subscription Expiring",
+              "Support Reply"
+            ]
+          },
+          {
+            "component": "Status Filter",
+            "type": "dropdown",
+            "options": [
+              "All Statuses",
+              "Queued",
+              "Sent",
+              "Delivered",
+              "Opened",
+              "Clicked",
+              "Bounced",
+              "Failed",
+              "Complained (Spam)"
+            ]
+          },
+          {
+            "component": "Date Range Filter",
+            "type": "date-range-picker",
+            "presets": [
+              "Last 24 hours",
+              "Last 7 days",
+              "Last 30 days",
+              "Last 90 days",
+              "Custom range"
+            ],
+            "default": "Last 7 days"
+          },
+          {
+            "component": "User Filter",
+            "type": "autocomplete",
+            "placeholder": "Filter by specific user",
+            "search": "Search users by email"
+          },
+          {
+            "component": "Clear Filters",
+            "type": "button",
+            "style": "Secondary",
+            "action": "Reset all filters to defaults"
+          }
+        ]
+      },
+      "email_log_table": {
+        "component": "Paginated data table",
+        "columns": [
+          {
+            "column": "Status",
+            "width": "80px",
+            "display": "Icon + badge",
+            "states": {
+              "queued": "Clock icon, gray badge",
+              "sent": "Send icon, blue badge",
+              "delivered": "CheckCircle icon, green badge",
+              "opened": "Eye icon, purple badge",
+              "clicked": "MousePointer icon, indigo badge",
+              "bounced": "AlertCircle icon, orange badge",
+              "failed": "XCircle icon, red badge",
+              "complained": "Flag icon, red badge"
+            }
+          },
+          {
+            "column": "Recipient",
+            "width": "200px",
+            "display": "Email address (clickable to filter)",
+            "action": "Click to view user detail page"
+          },
+          {
+            "column": "Email Type",
+            "width": "150px",
+            "display": "Badge with type name",
+            "colors": {
+              "welcome_email": "Green",
+              "password_reset": "Blue",
+              "account_suspended": "Red",
+              "account_reactivated": "Green",
+              "payment_receipt": "Purple",
+              "subscription_expiring": "Orange"
+            }
+          },
+          {
+            "column": "Subject",
+            "width": "250px",
+            "display": "Email subject line",
+            "truncate": "35 characters with ellipsis"
+          },
+          {
+            "column": "Sent At",
+            "width": "150px",
+            "display": "Formatted timestamp",
+            "format": "MMM DD, YYYY HH:mm",
+            "sort": "Default descending"
+          },
+          {
+            "column": "Delivered At",
+            "width": "150px",
+            "display": "Timestamp or '-' if not delivered",
+            "format": "MMM DD, YYYY HH:mm"
+          },
+          {
+            "column": "Opened",
+            "width": "100px",
+            "display": "Checkmark or '-'",
+            "tooltip": "First opened at: [timestamp]"
+          },
+          {
+            "column": "Actions",
+            "width": "120px",
+            "buttons": [
+              {
+                "label": "View Details",
+                "icon": "Eye",
+                "action": "Open email detail modal"
+              },
+              {
+                "label": "Retry",
+                "icon": "RefreshCw",
+                "display_condition": "Only if status is 'failed' or 'bounced'",
+                "action": "Trigger retry send"
+              }
+            ]
+          }
+        ],
+        "pagination": {
+          "page_size_options": [25, 50, 100],
+          "default": 50,
+          "display": "Showing X-Y of Z emails"
+        },
+        "empty_state": {
+          "icon": "Mail",
+          "title": "No emails found",
+          "message": "No emails match your filters, or no emails have been sent in this time period.",
+          "action": "Clear filters button if filters active"
+        }
+      },
+      "email_detail_modal": {
+        "trigger": "Click 'View Details' or email row",
+        "modal_title": "Email Delivery Details",
+        "width": "800px",
+        "sections": [
+          {
+            "section": "Email Information",
+            "icon": "Mail",
+            "fields": [
+              {
+                "label": "Email ID",
+                "value": "Unique email log ID",
+                "display": "Monospace with copy button"
+              },
+              {
+                "label": "Type",
+                "value": "Email type badge"
+              },
+              {
+                "label": "Recipient",
+                "value": "Email address",
+                "link": "Link to user detail if user exists"
+              },
+              {
+                "label": "Subject",
+                "value": "Full subject line"
+              },
+              {
+                "label": "From",
+                "value": "Sender email and name"
+              },
+              {
+                "label": "Reply-To",
+                "value": "Reply-to email if different"
+              }
+            ]
+          },
+          {
+            "section": "Delivery Status",
+            "icon": "TrendingUp",
+            "fields": [
+              {
+                "label": "Current Status",
+                "value": "Status badge with icon"
+              },
+              {
+                "label": "Queued At",
+                "value": "Timestamp when email entered send queue"
+              },
+              {
+                "label": "Sent At",
+                "value": "Timestamp when email sent to provider (Resend)"
+              },
+              {
+                "label": "Delivered At",
+                "value": "Timestamp when recipient server accepted email"
+              },
+              {
+                "label": "First Opened At",
+                "value": "Timestamp of first open (if tracking enabled)"
+              },
+              {
+                "label": "Last Opened At",
+                "value": "Timestamp of most recent open"
+              },
+              {
+                "label": "Total Opens",
+                "value": "Count of open events"
+              },
+              {
+                "label": "Clicked At",
+                "value": "Timestamp if any link clicked"
+              }
+            ]
+          },
+          {
+            "section": "Failure Information",
+            "icon": "AlertTriangle",
+            "display_condition": "Only if status is 'failed', 'bounced', or 'complained'",
+            "fields": [
+              {
+                "label": "Failure Reason",
+                "value": "Error message from email provider",
+                "display": "Red text"
+              },
+              {
+                "label": "Bounce Type",
+                "value": "Hard bounce / Soft bounce / Spam complaint",
+                "note": "Hard bounce = permanent (invalid email), Soft bounce = temporary (mailbox full)"
+              },
+              {
+                "label": "Failed At",
+                "value": "Timestamp of failure"
+              },
+              {
+                "label": "Retry Count",
+                "value": "Number of retry attempts"
+              },
+              {
+                "label": "Next Retry At",
+                "value": "Scheduled retry time (if applicable)"
+              },
+              {
+                "label": "SMTP Error Code",
+                "value": "Technical error code if available"
+              }
+            ]
+          },
+          {
+            "section": "Email Content Preview",
+            "icon": "FileText",
+            "display": "Expandable section",
+            "content": {
+              "html_preview": "Iframe showing HTML email content",
+              "text_fallback": "Plain text version if HTML fails to load",
+              "view_source": "Button to view raw HTML in new window"
+            }
+          },
+          {
+            "section": "Event Timeline",
+            "icon": "Clock",
+            "display": "Vertical timeline of all email events",
+            "events": [
+              {
+                "event": "Email queued",
+                "timestamp": "ISO timestamp",
+                "icon": "Clock",
+                "color": "Gray"
+              },
+              {
+                "event": "Sent to provider",
+                "timestamp": "ISO timestamp",
+                "icon": "Send",
+                "color": "Blue"
+              },
+              {
+                "event": "Delivered to recipient",
+                "timestamp": "ISO timestamp",
+                "icon": "CheckCircle",
+                "color": "Green"
+              },
+              {
+                "event": "Email opened",
+                "timestamp": "ISO timestamp (can be multiple)",
+                "icon": "Eye",
+                "color": "Purple"
+              },
+              {
+                "event": "Link clicked",
+                "timestamp": "ISO timestamp",
+                "icon": "MousePointer",
+                "color": "Indigo",
+                "metadata": "Which link was clicked"
+              },
+              {
+                "event": "Bounced/Failed",
+                "timestamp": "ISO timestamp",
+                "icon": "XCircle",
+                "color": "Red",
+                "metadata": "Failure reason"
+              }
+            ]
+          },
+          {
+            "section": "Technical Metadata",
+            "icon": "Code",
+            "display": "Collapsible JSON viewer",
+            "fields": [
+              "Provider Email ID (Resend ID)",
+              "Message ID (SMTP header)",
+              "IP address of sender server",
+              "User agent of recipient (for opens)",
+              "ESP response data",
+              "Webhook event payloads"
+            ]
+          }
+        ],
+        "actions": {
+          "retry_send": {
+            "label": "Retry Send",
+            "icon": "RefreshCw",
+            "display_condition": "Only if failed/bounced and retry count < 3",
+            "confirmation": "Confirm retry modal",
+            "action": "Call retryEmailSend API"
+          },
+          "mark_as_invalid": {
+            "label": "Mark Email Invalid",
+            "icon": "Ban",
+            "display_condition": "If hard bounce",
+            "action": "Add email to suppression list"
+          },
+          "close": {
+            "label": "Close",
+            "action": "Close modal"
+          }
+        }
+      },
+      "export_functionality": {
+        "location": "Top-right of Email Insights page",
+        "button_label": "Export Email Logs",
+        "icon": "Download",
+        "modal": {
+          "title": "Export Email Logs",
+          "options": [
+            {
+              "option": "Export Format",
+              "choices": ["CSV", "JSON"],
+              "default": "CSV"
+            },
+            {
+              "option": "Date Range",
+              "type": "date-range-picker",
+              "max_range": "90 days",
+              "note": "Maximum 90 days per export for performance"
+            },
+            {
+              "option": "Include Filters",
+              "type": "checkbox",
+              "default": true,
+              "note": "Apply current filters to export"
+            },
+            {
+              "option": "Fields to Include",
+              "type": "checkbox-group",
+              "options": [
+                "Email ID",
+                "Recipient",
+                "Type",
+                "Subject",
+                "Status",
+                "Sent At",
+                "Delivered At",
+                "Opened At",
+                "Failure Reason",
+                "Retry Count"
+              ],
+              "default": "All selected"
+            }
+          ],
+          "actions": {
+            "export": {
+              "label": "Export",
+              "action": "Generate CSV/JSON, trigger browser download"
+            },
+            "cancel": {
+              "label": "Cancel"
+            }
+          }
+        }
+      },
+      "retry_confirmation_modal": {
+        "trigger": "Click 'Retry' button on failed email",
+        "title": "Retry Email Send",
+        "content": {
+          "message": "Retry sending this email to:\n\n**[Recipient Email]**\n\nOriginal failure reason: [Reason]\n\nThis will create a new email send attempt. The original email log will be preserved.\n\nContinue?",
+          "warning": "If the original failure was due to invalid email address, retry will likely fail again."
+        },
+        "actions": {
+          "confirm": {
+            "label": "Retry Send",
+            "style": "Primary"
+          },
+          "cancel": {
+            "label": "Cancel",
+            "style": "Secondary"
+          }
+        }
+      },
+      "states": {
+        "loading": {
+          "display": "Skeleton loaders for stats cards and table rows"
+        },
+        "loaded": {
+          "display": "Full data with stats and table"
+        },
+        "error": {
+          "display": "Error alert banner",
+          "message": "Failed to load email insights. [Error details]",
+          "action": "Retry button"
+        },
+        "empty": {
+          "display": "Empty state illustration and message"
+        }
+      },
+      "accessibility": {
+        "keyboard_navigation": "Tab through filters, table rows, modal elements",
+        "screen_reader": "Status icons have aria-labels describing delivery state",
+        "color_contrast": "All status badges meet WCAG AA contrast requirements",
+        "focus_indicators": "Clear focus outlines on all interactive elements"
+      }
+    },
+
+    "api_backend_requirements": {
+      "endpoints": [
+        {
+          "endpoint_id": "get_email_logs",
+          "method": "POST",
+          "path": "/.netlify/functions/adminGetEmailLogs",
+          "description": "Fetch paginated email logs with filters and search",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "authorization": {
+            "required": true,
+            "method": "checkAdminAccess(adminUserId)"
+          },
+          "request_schema": {
+            "authToken": "string (required)",
+            "pagination": {
+              "page": "number (default: 1)",
+              "pageSize": "number (default: 50, max: 100)"
+            },
+            "filters": {
+              "emailType": "string (enum: welcome_email, password_reset, etc.) or null",
+              "status": "string (enum: queued, sent, delivered, etc.) or null",
+              "userId": "string or null",
+              "recipientEmail": "string or null",
+              "dateRange": {
+                "start": "ISO timestamp",
+                "end": "ISO timestamp"
+              }
+            },
+            "search": "string or null (searches recipient email)",
+            "sort": {
+              "field": "string (default: sentAt)",
+              "direction": "string (asc/desc, default: desc)"
+            }
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "emails": [
+                {
+                  "emailId": "string (unique ID)",
+                  "type": "string (email type)",
+                  "recipient": "string (email address)",
+                  "userId": "string or null",
+                  "subject": "string",
+                  "from": "string (sender email)",
+                  "fromName": "string (sender name)",
+                  "status": "string (current status)",
+                  "queuedAt": "ISO timestamp",
+                  "sentAt": "ISO timestamp or null",
+                  "deliveredAt": "ISO timestamp or null",
+                  "openedAt": "ISO timestamp or null (first open)",
+                  "lastOpenedAt": "ISO timestamp or null",
+                  "openCount": "number",
+                  "clickedAt": "ISO timestamp or null",
+                  "bouncedAt": "ISO timestamp or null",
+                  "failedAt": "ISO timestamp or null",
+                  "failureReason": "string or null",
+                  "bounceType": "string (hard/soft) or null",
+                  "retryCount": "number",
+                  "providerEmailId": "string (Resend email ID)"
+                }
+              ],
+              "stats": {
+                "totalSent": "number",
+                "deliveryRate": "number (percentage)",
+                "failedCount": "number",
+                "openRate": "number (percentage)"
+              },
+              "pagination": {
+                "page": "number",
+                "pageSize": "number",
+                "totalCount": "number",
+                "totalPages": "number",
+                "hasNextPage": "boolean",
+                "hasPreviousPage": "boolean"
+              }
+            }
+          },
+          "error_responses": [
+            {
+              "statusCode": 403,
+              "condition": "Non-admin access",
+              "body": {
+                "success": false,
+                "error": "Admin access required"
+              }
+            }
+          ],
+          "implementation": {
+            "firestore_query": "Query emailLogs collection with filters",
+            "indexes_required": [
+              "emailType + sentAt",
+              "status + sentAt",
+              "userId + sentAt",
+              "recipientEmail + sentAt"
+            ]
+          }
+        },
+        {
+          "endpoint_id": "get_email_detail",
+          "method": "POST",
+          "path": "/.netlify/functions/adminGetEmailDetail",
+          "description": "Fetch complete details for single email including content and event timeline",
+          "request_schema": {
+            "authToken": "string (required)",
+            "emailId": "string (required)"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "email": {
+                "...all fields from get_email_logs": "...",
+                "htmlContent": "string (full HTML content)",
+                "textContent": "string (plain text version)",
+                "replyTo": "string or null",
+                "cc": "array of emails or null",
+                "bcc": "array of emails or null",
+                "providerResponse": "object (Resend API response)",
+                "smtpMessageId": "string",
+                "events": [
+                  {
+                    "event": "string (queued, sent, delivered, opened, clicked, bounced)",
+                    "timestamp": "ISO timestamp",
+                    "metadata": "object (event-specific data)"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "endpoint_id": "retry_email_send",
+          "method": "POST",
+          "path": "/.netlify/functions/adminRetryEmailSend",
+          "description": "Retry sending a failed email",
+          "request_schema": {
+            "authToken": "string (required)",
+            "emailId": "string (required)"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "newEmailId": "string (ID of new email attempt)",
+              "status": "queued",
+              "message": "Email queued for retry"
+            }
+          },
+          "error_responses": [
+            {
+              "statusCode": 400,
+              "condition": "Email not in failed/bounced status",
+              "body": {
+                "success": false,
+                "error": "Can only retry failed or bounced emails"
+              }
+            },
+            {
+              "statusCode": 429,
+              "condition": "Max retry count exceeded",
+              "body": {
+                "success": false,
+                "error": "Maximum retry attempts (3) reached"
+              }
+            }
+          ],
+          "implementation": {
+            "check_current_status": "Verify email is failed/bounced",
+            "check_retry_count": "Max 3 retries",
+            "create_new_email_log": "New document in emailLogs with retryOf field",
+            "send_via_resend": "Call Resend API",
+            "update_original": "Link original email to retry attempt"
+          }
+        },
+        {
+          "endpoint_id": "export_email_logs",
+          "method": "POST",
+          "path": "/.netlify/functions/adminExportEmailLogs",
+          "description": "Generate CSV or JSON export of email logs",
+          "request_schema": {
+            "authToken": "string (required)",
+            "format": "string (csv or json)",
+            "dateRange": {
+              "start": "ISO timestamp",
+              "end": "ISO timestamp"
+            },
+            "filters": "object (same as get_email_logs)",
+            "fields": "array of field names to include"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "downloadUrl": "string (signed URL for download, expires in 10 minutes)",
+              "filename": "string",
+              "rowCount": "number"
+            }
+          },
+          "implementation": {
+            "max_records": "10,000 per export",
+            "generation": "Stream to Cloud Storage or generate in-memory for small datasets",
+            "signed_url": "Generate temporary download URL"
+          }
+        }
+      ],
+      "resend_webhook_integration": {
+        "webhook_endpoint": {
+          "path": "/.netlify/functions/resendWebhook",
+          "method": "POST",
+          "description": "Receive delivery status webhooks from Resend",
+          "authentication": {
+            "method": "Resend webhook signature verification",
+            "header": "svix-signature"
+          },
+          "events_handled": [
+            "email.sent",
+            "email.delivered",
+            "email.delivery_delayed",
+            "email.bounced",
+            "email.complained",
+            "email.opened",
+            "email.clicked"
+          ],
+          "payload_example": {
+            "type": "email.delivered",
+            "created_at": "2026-01-20T10:00:00.000Z",
+            "data": {
+              "email_id": "re_abc123",
+              "from": "support@idynify.com",
+              "to": ["user@example.com"],
+              "subject": "Welcome to iDynify",
+              "created_at": "2026-01-20T09:59:00.000Z"
+            }
+          },
+          "implementation": {
+            "verify_signature": "Use Resend SDK to verify webhook authenticity",
+            "find_email_log": "Query emailLogs by providerEmailId",
+            "update_status": "Update status field and add event to timeline",
+            "handle_bounces": "If hard bounce, add to suppression list",
+            "idempotency": "Handle duplicate webhook deliveries (Resend may retry)"
+          }
+        },
+        "webhook_configuration": {
+          "setup_location": "Resend Dashboard > Webhooks",
+          "webhook_url": "https://idynify.com/.netlify/functions/resendWebhook",
+          "events_to_subscribe": [
+            "email.sent",
+            "email.delivered",
+            "email.bounced",
+            "email.complained",
+            "email.opened",
+            "email.clicked"
+          ],
+          "retry_behavior": "Resend retries failed webhooks with exponential backoff"
+        }
+      },
+      "email_suppression_list": {
+        "collection": "emailSuppressionList",
+        "purpose": "Track emails that should not be sent to (hard bounces, spam complaints)",
+        "schema": {
+          "email": "string (lowercase)",
+          "reason": "string (hard_bounce, spam_complaint, manual)",
+          "addedAt": "Timestamp",
+          "addedBy": "string (admin UID or 'system')",
+          "originalEmailId": "string (ID of email that caused suppression)"
+        },
+        "check_before_send": "Before sending any email, check if recipient is in suppression list",
+        "manual_management": "Admin UI to view and remove emails from suppression list"
+      },
+      "retry_logic": {
+        "automatic_retry": {
+          "soft_bounces": "Retry soft bounces automatically",
+          "schedule": [
+            "1st retry: 15 minutes after failure",
+            "2nd retry: 1 hour after 1st retry",
+            "3rd retry: 4 hours after 2nd retry"
+          ],
+          "max_retries": 3,
+          "implementation": "Cloud Function scheduled to run every 15 minutes, query failed emails, check retry schedule"
+        },
+        "manual_retry": {
+          "trigger": "Admin clicks Retry button",
+          "validation": "Check retry count < 3",
+          "immediate": "Queue immediately, don't wait for scheduled retry"
+        },
+        "hard_bounces": {
+          "retry": "Never retry hard bounces automatically",
+          "action": "Add to suppression list",
+          "manual_override": "Admin can manually retry, but requires confirmation"
+        }
+      }
+    },
+
+    "data_models": {
+      "firestore_collections": {
+        "emailLogs": {
+          "description": "Top-level collection storing all email send attempts",
+          "document_id": "Auto-generated unique ID",
+          "schema": {
+            "emailId": "string (document ID, duplicated for convenience)",
+            "type": "string (welcome_email, password_reset, account_suspended, etc.)",
+            "recipient": "string (email address, lowercase)",
+            "userId": "string or null (if email is user-specific)",
+            "subject": "string",
+            "from": "string (sender email)",
+            "fromName": "string (sender name)",
+            "replyTo": "string or null",
+            "status": "string (queued, sent, delivered, opened, clicked, bounced, failed, complained)",
+            "queuedAt": "Timestamp",
+            "sentAt": "Timestamp or null",
+            "deliveredAt": "Timestamp or null",
+            "openedAt": "Timestamp or null (first open)",
+            "lastOpenedAt": "Timestamp or null (most recent open)",
+            "openCount": "number (total opens)",
+            "clickedAt": "Timestamp or null (first click)",
+            "clickCount": "number (total clicks)",
+            "bouncedAt": "Timestamp or null",
+            "failedAt": "Timestamp or null",
+            "failureReason": "string or null",
+            "bounceType": "string (hard, soft, spam_complaint) or null",
+            "retryCount": "number (default: 0)",
+            "retryOf": "string or null (emailId of original failed email)",
+            "nextRetryAt": "Timestamp or null (scheduled retry time)",
+            "providerEmailId": "string or null (Resend email ID)",
+            "smtpMessageId": "string or null",
+            "htmlContent": "string (full HTML email body)",
+            "textContent": "string (plain text version)",
+            "providerResponse": "object or null (Resend API response)",
+            "events": "array of event objects (timeline)",
+            "metadata": "object (additional context, e.g., suspension reason for suspend emails)"
+          },
+          "indexes": [
+            {
+              "fields": ["type", "sentAt desc"],
+              "description": "Filter by email type, sort by date"
+            },
+            {
+              "fields": ["status", "sentAt desc"],
+              "description": "Filter by status, sort by date"
+            },
+            {
+              "fields": ["userId", "sentAt desc"],
+              "description": "Get all emails for a user"
+            },
+            {
+              "fields": ["recipient", "sentAt desc"],
+              "description": "Search by recipient email"
+            },
+            {
+              "fields": ["status", "nextRetryAt"],
+              "description": "Find emails ready for retry"
+            }
+          ],
+          "security_rules": {
+            "read": "if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+            "write": "if false // Only backend can write"
+          }
+        },
+        "emailSuppressionList": {
+          "description": "Emails that should never be sent to",
+          "document_id": "Email address (lowercase)",
+          "schema": {
+            "email": "string (document ID)",
+            "reason": "string (hard_bounce, spam_complaint, manual, unsubscribe)",
+            "addedAt": "Timestamp",
+            "addedBy": "string (admin UID or 'system')",
+            "originalEmailId": "string or null (email that triggered suppression)",
+            "notes": "string or null (admin notes)"
+          },
+          "indexes": [
+            {
+              "fields": ["reason", "addedAt desc"]
+            }
+          ]
+        }
+      },
+      "event_object_schema": {
+        "event": "string (queued, sent, delivered, opened, clicked, bounced, failed, complained)",
+        "timestamp": "ISO timestamp",
+        "metadata": {
+          "userAgent": "string or null (for opens/clicks)",
+          "ipAddress": "string or null (for opens/clicks)",
+          "linkUrl": "string or null (for clicks)",
+          "smtpCode": "string or null (for bounces/failures)",
+          "errorMessage": "string or null (for failures)"
+        }
+      }
+    },
+
+    "workflows": {
+      "primary_workflow": {
+        "name": "Admin Investigates 'Email Not Received' Support Request",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "User",
+            "action": "Contacts support: 'I never received the welcome email'",
+            "context": "User signed up but can't find welcome email"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Navigate to Email Insights (/admin/email-insights)",
+            "ui": "Admin dashboard menu"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Search for user's email in search bar",
+            "ui": "Email Insights page"
+          },
+          {
+            "step": 4,
+            "actor": "System",
+            "action": "Filter email logs to show emails sent to that recipient",
+            "backend": "Query emailLogs where recipient = user's email"
+          },
+          {
+            "step": 5,
+            "actor": "Admin",
+            "action": "Locate welcome email in results",
+            "ui": "Email table shows matching emails"
+          },
+          {
+            "step": 6,
+            "actor": "Admin",
+            "action": "Check status column - sees 'Bounced' status with orange badge",
+            "ui": "Table row"
+          },
+          {
+            "step": 7,
+            "actor": "Admin",
+            "action": "Click 'View Details' button",
+            "ui": "Email detail modal opens"
+          },
+          {
+            "step": 8,
+            "actor": "System",
+            "action": "Display full email details including failure information",
+            "ui": "Modal shows Failure Information section"
+          },
+          {
+            "step": 9,
+            "actor": "Admin",
+            "action": "Review failure reason: 'Mailbox full (soft bounce)'",
+            "ui": "Failure Information section"
+          },
+          {
+            "step": 10,
+            "actor": "Admin",
+            "action": "Check retry count: 0 retries attempted",
+            "ui": "Modal"
+          },
+          {
+            "step": 11,
+            "actor": "Admin",
+            "action": "Click 'Retry Send' button in modal",
+            "ui": "Retry confirmation modal appears"
+          },
+          {
+            "step": 12,
+            "actor": "Admin",
+            "action": "Confirm retry",
+            "ui": "Confirmation modal"
+          },
+          {
+            "step": 13,
+            "actor": "System",
+            "action": "Call adminRetryEmailSend API",
+            "backend": "Create new email log entry, queue email via Resend"
+          },
+          {
+            "step": 14,
+            "actor": "System",
+            "action": "Display success toast: 'Email queued for retry'",
+            "ui": "Toast notification"
+          },
+          {
+            "step": 15,
+            "actor": "System",
+            "action": "Resend API sends email",
+            "external": "Resend service"
+          },
+          {
+            "step": 16,
+            "actor": "System",
+            "action": "Webhook received: email.delivered",
+            "backend": "Update email log status to 'delivered'"
+          },
+          {
+            "step": 17,
+            "actor": "Admin",
+            "action": "Refresh email detail modal, sees 'Delivered' status",
+            "ui": "Modal updates"
+          },
+          {
+            "step": 18,
+            "actor": "Admin",
+            "action": "Confirms with user that email was resent successfully",
+            "context": "Support ticket resolved"
+          }
+        ]
+      },
+      "automatic_retry_workflow": {
+        "name": "System Automatically Retries Soft Bounce",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "System",
+            "action": "Password reset email sent to user",
+            "result": "Soft bounce: Mailbox temporarily unavailable"
+          },
+          {
+            "step": 2,
+            "actor": "System",
+            "action": "Webhook received: email.bounced with bounceType=soft",
+            "backend": "Update emailLog status, set nextRetryAt = now + 15 minutes"
+          },
+          {
+            "step": 3,
+            "actor": "System",
+            "action": "Cloud Function scheduled job runs every 15 minutes",
+            "function": "Email Retry Processor"
+          },
+          {
+            "step": 4,
+            "actor": "System",
+            "action": "Query emailLogs where status=bounced AND bounceType=soft AND nextRetryAt <= now AND retryCount < 3",
+            "result": "Find emails ready for retry"
+          },
+          {
+            "step": 5,
+            "actor": "System",
+            "action": "Create new email log entry with retryOf field",
+            "data": "New emailId, retryCount incremented"
+          },
+          {
+            "step": 6,
+            "actor": "System",
+            "action": "Send via Resend API",
+            "external": "Resend"
+          },
+          {
+            "step": 7,
+            "actor": "System",
+            "action": "If successful, mark as delivered. If fails again, schedule 2nd retry (1 hour later)",
+            "logic": "Exponential backoff"
+          }
+        ]
+      }
+    },
+
+    "log_retention_policy": {
+      "retention_period": "1 year (365 days)",
+      "justification": [
+        "Support troubleshooting - Users may report email issues weeks after occurrence",
+        "Compliance - Some regulations require email audit trails (e.g., financial services)",
+        "Analytics - Year-over-year delivery rate comparisons",
+        "Dispute resolution - Evidence of notification delivery for legal/compliance"
+      ],
+      "implementation": {
+        "storage_cost_optimization": {
+          "method": "Cloud Function to delete logs older than 365 days",
+          "schedule": "Daily at 2 AM UTC",
+          "query": "emailLogs where sentAt < (now - 365 days)"
+        },
+        "archive_before_delete": {
+          "optional": true,
+          "method": "Export to Cloud Storage before deletion for long-term archive",
+          "format": "Compressed JSON (gzip)"
+        }
+      },
+      "exceptions": {
+        "legal_hold": "Emails related to legal disputes should be manually flagged and excluded from auto-deletion",
+        "compliance_records": "For highly regulated industries, may need 7-year retention"
+      }
+    },
+
+    "acceptance_criteria": [
+      {
+        "id": "EMAIL-AC-1",
+        "requirement": "Email Insights dashboard displays stats overview",
+        "test": "Navigate to /admin/email-insights, verify 4 stat cards show: Total Sent, Delivery Rate, Failed Count, Open Rate"
+      },
+      {
+        "id": "EMAIL-AC-2",
+        "requirement": "Email log table displays all sent emails",
+        "test": "Verify table shows columns: Status, Recipient, Type, Subject, Sent At, Delivered At, Opened, Actions"
+      },
+      {
+        "id": "EMAIL-AC-3",
+        "requirement": "Filter by email type works",
+        "test": "Select 'Password Reset' from type filter, verify only password reset emails shown"
+      },
+      {
+        "id": "EMAIL-AC-4",
+        "requirement": "Filter by status works",
+        "test": "Select 'Failed' from status filter, verify only failed emails shown"
+      },
+      {
+        "id": "EMAIL-AC-5",
+        "requirement": "Search by recipient email works",
+        "test": "Enter user email in search, verify only emails to that recipient shown"
+      },
+      {
+        "id": "EMAIL-AC-6",
+        "requirement": "Date range filter works",
+        "test": "Select 'Last 7 days', verify only emails from past 7 days shown"
+      },
+      {
+        "id": "EMAIL-AC-7",
+        "requirement": "Email detail modal shows full information",
+        "test": "Click 'View Details', verify modal shows: email info, delivery status, event timeline, content preview"
+      },
+      {
+        "id": "EMAIL-AC-8",
+        "requirement": "Retry failed email works",
+        "test": "For failed email, click Retry, confirm, verify new email queued and sent"
+      },
+      {
+        "id": "EMAIL-AC-9",
+        "requirement": "Delivery status updates via webhook",
+        "test": "Send test email, trigger Resend webhook for delivery, verify status updates to 'Delivered'"
+      },
+      {
+        "id": "EMAIL-AC-10",
+        "requirement": "Open tracking works",
+        "test": "Send email with tracking, open email, verify webhook updates openedAt and openCount"
+      },
+      {
+        "id": "EMAIL-AC-11",
+        "requirement": "Hard bounce adds to suppression list",
+        "test": "Send email, trigger hard bounce webhook, verify email added to emailSuppressionList"
+      },
+      {
+        "id": "EMAIL-AC-12",
+        "requirement": "Suppression list prevents sending",
+        "test": "Add email to suppression list, attempt to send email to that address, verify rejected"
+      },
+      {
+        "id": "EMAIL-AC-13",
+        "requirement": "Automatic retry works for soft bounces",
+        "test": "Trigger soft bounce, wait 15 minutes, verify automatic retry attempted"
+      },
+      {
+        "id": "EMAIL-AC-14",
+        "requirement": "Export email logs to CSV",
+        "test": "Click Export, select CSV format, verify file downloads with correct data"
+      },
+      {
+        "id": "EMAIL-AC-15",
+        "requirement": "Non-admin cannot access email insights",
+        "test": "As non-admin, navigate to /admin/email-insights, verify redirect with Access Denied"
+      }
+    ],
+
+    "security_privacy": {
+      "access_control": {
+        "who_can_view": "Only users with role='admin'",
+        "rbac_enforcement": "ProtectedAdminRoute on frontend, checkAdminAccess() on backend"
+      },
+      "data_masking": {
+        "email_content": "No masking - admins can see full email content for troubleshooting",
+        "justification": "Admins need full visibility to debug delivery issues",
+        "alternative": "For highly sensitive emails (e.g., containing passwords), don't log content, only metadata"
+      },
+      "pii_considerations": {
+        "email_addresses": "Stored in logs - necessary for troubleshooting",
+        "ip_addresses": "Stored for open/click tracking - used to detect spam opens",
+        "user_agents": "Stored for analytics",
+        "gdpr_compliance": "Email logs constitute processing records (Article 30), required for legitimate interest (troubleshooting)"
+      },
+      "webhook_security": {
+        "signature_verification": "Verify Resend webhook signatures to prevent spoofing",
+        "https_only": "Webhook endpoint must use HTTPS",
+        "rate_limiting": "Webhook endpoint has separate rate limit (1000 req/min)"
+      }
+    }
+  },
+
+  "auditLogs": {
+    "feature_id": "admin_user_audit_logs",
+    "feature_name": "Admin & User Action Audit Logs",
+    "description": "Comprehensive logging and viewing system for all admin actions (user management, impersonation, etc.) and key user actions (login, signup, password changes). Provides accountability, security monitoring, and compliance evidence.",
+
+    "user_story": {
+      "as": "Admin user",
+      "i_want": "to view a searchable log of all admin actions and critical user actions with timestamps, actors, and details",
+      "so_that": "I can investigate security incidents, audit admin activity, comply with regulations (GDPR/SOC2), detect suspicious behavior, and maintain accountability",
+      "acceptance_summary": "Admin can view paginated audit logs with filters by action type/actor/target/date, search by user/admin email, see detailed action metadata, and export logs for compliance reporting",
+      "value_propositions": [
+        "Security incident investigation (who accessed what, when)",
+        "Admin accountability (track admin actions on user accounts)",
+        "Compliance evidence (GDPR Article 30, SOC2 CC7.2)",
+        "Suspicious activity detection (unusual login patterns, multiple failed attempts)",
+        "Dispute resolution (prove notification was sent, account was not accessed)"
+      ]
+    },
+
+    "ui_requirements": {
+      "primary_screen": {
+        "location": "/admin/audit-logs",
+        "navigation": "Admin Dashboard main menu → 'Audit Logs' link",
+        "layout": "Full-width with filters and log table",
+        "permissions": "Admin-only (ProtectedAdminRoute)"
+      },
+      "log_type_tabs": {
+        "component": "Tab navigation",
+        "tabs": [
+          {
+            "tab": "Admin Actions",
+            "default": true,
+            "description": "Actions performed by admins on user accounts",
+            "examples": "View user, impersonate, reset password, suspend, reactivate"
+          },
+          {
+            "tab": "User Actions",
+            "description": "Security-relevant user actions",
+            "examples": "Login, signup, password change, failed login, account deletion request"
+          },
+          {
+            "tab": "System Events",
+            "description": "Automated system actions",
+            "examples": "Email sent, subscription renewed, payment failed, auto-logout"
+          },
+          {
+            "tab": "All Logs",
+            "description": "Combined view of all log types"
+          }
+        ]
+      },
+      "filters_search_bar": {
+        "location": "Below tabs, above log table",
+        "components": [
+          {
+            "component": "Search Input",
+            "placeholder": "Search by admin email, user email, or user ID",
+            "type": "text",
+            "debounce": "300ms"
+          },
+          {
+            "component": "Action Type Filter",
+            "type": "multi-select dropdown",
+            "options": {
+              "admin_actions": [
+                "view_user_detail",
+                "view_user_contacts",
+                "start_impersonation",
+                "end_impersonation",
+                "password_reset_triggered",
+                "account_suspended",
+                "account_reactivated",
+                "export_user_data"
+              ],
+              "user_actions": [
+                "user_signup",
+                "user_login",
+                "user_login_failed",
+                "user_logout",
+                "password_change",
+                "password_reset_requested",
+                "email_verified",
+                "two_factor_enabled",
+                "two_factor_disabled"
+              ],
+              "system_events": [
+                "email_sent",
+                "subscription_renewed",
+                "payment_succeeded",
+                "payment_failed",
+                "session_expired"
+              ]
+            }
+          },
+          {
+            "component": "Actor Filter (Admin Actions only)",
+            "type": "autocomplete",
+            "placeholder": "Filter by specific admin",
+            "search": "Search admins by email"
+          },
+          {
+            "component": "Target User Filter",
+            "type": "autocomplete",
+            "placeholder": "Filter by specific user",
+            "search": "Search users by email or UID"
+          },
+          {
+            "component": "Date Range Filter",
+            "type": "date-range-picker",
+            "presets": [
+              "Last hour",
+              "Last 24 hours",
+              "Last 7 days",
+              "Last 30 days",
+              "Last 90 days",
+              "Custom range"
+            ],
+            "default": "Last 7 days"
+          },
+          {
+            "component": "IP Address Filter",
+            "type": "text input",
+            "placeholder": "Filter by IP address"
+          },
+          {
+            "component": "Clear Filters",
+            "type": "button"
+          }
+        ]
+      },
+      "audit_log_table": {
+        "component": "Paginated data table with expandable rows",
+        "columns": [
+          {
+            "column": "Timestamp",
+            "width": "180px",
+            "display": "Formatted datetime",
+            "format": "MMM DD, YYYY HH:mm:ss",
+            "sort": "Default descending (newest first)",
+            "timezone": "Show in user's local timezone with UTC offset"
+          },
+          {
+            "column": "Action",
+            "width": "200px",
+            "display": "Human-readable action name with icon",
+            "examples": {
+              "view_user_detail": "👁️ Viewed User",
+              "start_impersonation": "🔄 Started Impersonation",
+              "password_reset_triggered": "🔑 Reset Password",
+              "account_suspended": "🚫 Suspended Account",
+              "user_login": "✅ User Login",
+              "user_login_failed": "❌ Login Failed"
+            },
+            "color_coding": {
+              "view_actions": "Blue",
+              "modify_actions": "Orange",
+              "security_actions": "Red",
+              "user_actions": "Green"
+            }
+          },
+          {
+            "column": "Actor",
+            "width": "200px",
+            "display": "Admin email (for admin actions) or User email (for user actions)",
+            "link": "Clickable to filter by that actor"
+          },
+          {
+            "column": "Target",
+            "width": "200px",
+            "display": "Target user email or resource",
+            "link": "Clickable to view user detail page (if applicable)",
+            "examples": "user@example.com, Contact: John Doe, Company: Acme Corp"
+          },
+          {
+            "column": "IP Address",
+            "width": "150px",
+            "display": "IPv4 or IPv6 address",
+            "tooltip": "User agent and location (if available)"
+          },
+          {
+            "column": "Status",
+            "width": "100px",
+            "display": "Badge",
+            "values": {
+              "success": "Green badge",
+              "failed": "Red badge",
+              "partial": "Yellow badge (e.g., email sent but delivery failed)"
+            }
+          },
+          {
+            "column": "Actions",
+            "width": "100px",
+            "buttons": [
+              {
+                "label": "Details",
+                "icon": "ChevronDown/ChevronUp",
+                "action": "Expand/collapse row to show metadata"
+              }
+            ]
+          }
+        ],
+        "expandable_row_details": {
+          "trigger": "Click Details button or row",
+          "display": "Expanded section below row",
+          "sections": [
+            {
+              "section": "Event Details",
+              "fields": [
+                {
+                  "label": "Log ID",
+                  "value": "Unique log entry ID",
+                  "display": "Monospace with copy button"
+                },
+                {
+                  "label": "Action Type",
+                  "value": "Technical action name (e.g., start_impersonation)"
+                },
+                {
+                  "label": "Resource",
+                  "value": "What was accessed/modified (e.g., user_account, contacts, password)"
+                },
+                {
+                  "label": "Result",
+                  "value": "Success, Failed, Partial"
+                },
+                {
+                  "label": "Error Message",
+                  "value": "If failed, show error details",
+                  "display_condition": "Only if status = failed"
+                }
+              ]
+            },
+            {
+              "section": "Actor Information",
+              "fields": [
+                {
+                  "label": "Actor ID",
+                  "value": "UID of admin or user who performed action"
+                },
+                {
+                  "label": "Actor Email",
+                  "value": "Email address"
+                },
+                {
+                  "label": "IP Address",
+                  "value": "IPv4/IPv6"
+                },
+                {
+                  "label": "User Agent",
+                  "value": "Browser and OS information"
+                },
+                {
+                  "label": "Location",
+                  "value": "City, Country (if geolocation available)",
+                  "note": "Optional: Requires IP geolocation service"
+                }
+              ]
+            },
+            {
+              "section": "Target Information",
+              "display_condition": "If action has a target",
+              "fields": [
+                {
+                  "label": "Target User ID",
+                  "value": "UID of affected user"
+                },
+                {
+                  "label": "Target Email",
+                  "value": "Email of affected user"
+                },
+                {
+                  "label": "Resource ID",
+                  "value": "Specific resource (e.g., contactId, companyId)"
+                }
+              ]
+            },
+            {
+              "section": "Action Metadata",
+              "display": "JSON viewer or key-value pairs",
+              "examples": {
+                "impersonation": {
+                  "sessionId": "abc123",
+                  "duration": "1800 seconds",
+                  "expiresAt": "ISO timestamp"
+                },
+                "password_reset": {
+                  "resetLinkExpiresAt": "ISO timestamp",
+                  "emailSent": true
+                },
+                "account_suspended": {
+                  "reason": "Terms of service violation",
+                  "notificationSent": true
+                },
+                "login_failed": {
+                  "reason": "Invalid password",
+                  "attemptCount": 3
+                }
+              }
+            }
+          ]
+        },
+        "pagination": {
+          "page_size_options": [50, 100, 250],
+          "default": 100,
+          "display": "Showing X-Y of Z logs"
+        },
+        "empty_state": {
+          "icon": "FileText",
+          "title": "No audit logs found",
+          "message": "No logs match your filters, or no actions have been logged in this time period.",
+          "action": "Clear filters button"
+        }
+      },
+      "export_functionality": {
+        "button_label": "Export Logs",
+        "icon": "Download",
+        "modal": {
+          "title": "Export Audit Logs",
+          "options": [
+            {
+              "option": "Export Format",
+              "choices": ["CSV", "JSON"],
+              "default": "CSV"
+            },
+            {
+              "option": "Date Range",
+              "type": "date-range-picker",
+              "max_range": "365 days (1 year)",
+              "note": "Maximum 1 year per export"
+            },
+            {
+              "option": "Apply Current Filters",
+              "type": "checkbox",
+              "default": true
+            },
+            {
+              "option": "Include Metadata",
+              "type": "checkbox",
+              "default": false,
+              "note": "Include full metadata JSON (makes file larger)"
+            }
+          ],
+          "actions": {
+            "export": {
+              "label": "Export",
+              "action": "Generate file, trigger download"
+            },
+            "cancel": {
+              "label": "Cancel"
+            }
+          }
+        },
+        "csv_columns": [
+          "Timestamp",
+          "Action",
+          "Actor Email",
+          "Actor ID",
+          "Target Email",
+          "Target ID",
+          "Resource",
+          "Status",
+          "IP Address",
+          "User Agent",
+          "Metadata (if included)"
+        ]
+      },
+      "real_time_updates": {
+        "optional_feature": true,
+        "implementation": "Firestore onSnapshot listener for real-time log updates",
+        "display": "Toast notification when new log entry appears: 'New audit log entry'",
+        "auto_refresh": "Optionally auto-refresh table every 30 seconds"
+      },
+      "states": {
+        "loading": {
+          "display": "Skeleton loaders for table rows"
+        },
+        "loaded": {
+          "display": "Full table with data"
+        },
+        "error": {
+          "display": "Error banner",
+          "message": "Failed to load audit logs",
+          "action": "Retry button"
+        },
+        "empty": {
+          "display": "Empty state component"
+        }
+      },
+      "accessibility": {
+        "keyboard_navigation": "Tab through filters, table rows, expand/collapse buttons",
+        "screen_reader": "Action icons have descriptive aria-labels",
+        "focus_indicators": "Clear focus outlines",
+        "table_semantics": "Proper th/td headers for screen readers"
+      }
+    },
+
+    "api_backend_requirements": {
+      "endpoints": [
+        {
+          "endpoint_id": "get_audit_logs",
+          "method": "POST",
+          "path": "/.netlify/functions/adminGetAuditLogs",
+          "description": "Fetch paginated audit logs with filters and search",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "authorization": {
+            "required": true,
+            "method": "checkAdminAccess(adminUserId)"
+          },
+          "request_schema": {
+            "authToken": "string (required)",
+            "pagination": {
+              "page": "number (default: 1)",
+              "pageSize": "number (default: 100, max: 250)"
+            },
+            "filters": {
+              "logType": "string (admin_action, user_action, system_event, all) or null",
+              "actionTypes": "array of action strings or null",
+              "actorUserId": "string or null",
+              "targetUserId": "string or null",
+              "ipAddress": "string or null",
+              "dateRange": {
+                "start": "ISO timestamp",
+                "end": "ISO timestamp"
+              },
+              "status": "string (success, failed, partial) or null"
+            },
+            "search": "string or null (searches actor email, target email, user IDs)",
+            "sort": {
+              "field": "string (default: timestamp)",
+              "direction": "string (asc/desc, default: desc)"
+            }
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "logs": [
+                {
+                  "logId": "string",
+                  "timestamp": "ISO timestamp",
+                  "action": "string (technical action name)",
+                  "actionLabel": "string (human-readable label)",
+                  "logType": "string (admin_action, user_action, system_event)",
+                  "actorUserId": "string or null",
+                  "actorEmail": "string or null",
+                  "targetUserId": "string or null",
+                  "targetUserEmail": "string or null",
+                  "targetResource": "string or null",
+                  "resourceId": "string or null",
+                  "status": "string (success, failed, partial)",
+                  "ipAddress": "string or null",
+                  "userAgent": "string or null",
+                  "metadata": "object (action-specific data)",
+                  "errorMessage": "string or null"
+                }
+              ],
+              "pagination": {
+                "page": "number",
+                "pageSize": "number",
+                "totalCount": "number",
+                "totalPages": "number"
+              }
+            }
+          },
+          "implementation": {
+            "firestore_query": "Query adminAuditLogs collection",
+            "indexes_required": [
+              "action + timestamp",
+              "actorUserId + timestamp",
+              "targetUserId + timestamp",
+              "logType + timestamp"
+            ],
+            "search_implementation": "For email search, query by actorEmail or targetUserEmail fields (requires separate queries or array-contains)"
+          }
+        },
+        {
+          "endpoint_id": "export_audit_logs",
+          "method": "POST",
+          "path": "/.netlify/functions/adminExportAuditLogs",
+          "description": "Generate CSV or JSON export of audit logs",
+          "request_schema": {
+            "authToken": "string (required)",
+            "format": "string (csv or json)",
+            "dateRange": {
+              "start": "ISO timestamp",
+              "end": "ISO timestamp"
+            },
+            "filters": "object (same as get_audit_logs)",
+            "includeMetadata": "boolean (default: false)"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "downloadUrl": "string (signed URL, expires in 10 minutes)",
+              "filename": "string",
+              "rowCount": "number"
+            }
+          },
+          "implementation": {
+            "max_records": "50,000 per export",
+            "generation": "Stream to Cloud Storage for large exports"
+          }
+        }
+      ],
+      "audit_logging_utility": {
+        "function": "logAuditEvent",
+        "location": "netlify/functions/utils/auditLog.js",
+        "signature": "async function logAuditEvent(eventData)",
+        "parameters": {
+          "action": "string (required, e.g., 'view_user_detail')",
+          "logType": "string (admin_action, user_action, system_event)",
+          "actorUserId": "string or null",
+          "actorEmail": "string or null",
+          "targetUserId": "string or null",
+          "targetUserEmail": "string or null",
+          "targetResource": "string or null (e.g., 'user_account', 'contacts')",
+          "resourceId": "string or null",
+          "status": "string (success, failed, partial)",
+          "ipAddress": "string or null",
+          "userAgent": "string or null",
+          "metadata": "object or null",
+          "errorMessage": "string or null"
+        },
+        "implementation": {
+          "firestore_write": "Write to adminAuditLogs collection",
+          "timestamp": "Auto-add server timestamp",
+          "validation": "Validate required fields",
+          "error_handling": "Log silently fails (don't break main operation if audit log fails)"
+        },
+        "usage_examples": [
+          {
+            "scenario": "Admin views user detail",
+            "code": "await logAuditEvent({\n  action: 'view_user_detail',\n  logType: 'admin_action',\n  actorUserId: adminUid,\n  actorEmail: adminEmail,\n  targetUserId: userId,\n  targetUserEmail: userEmail,\n  targetResource: 'user_account',\n  status: 'success',\n  ipAddress: req.headers['x-forwarded-for'],\n  userAgent: req.headers['user-agent']\n})"
+          },
+          {
+            "scenario": "User logs in successfully",
+            "code": "await logAuditEvent({\n  action: 'user_login',\n  logType: 'user_action',\n  actorUserId: userId,\n  actorEmail: userEmail,\n  status: 'success',\n  ipAddress: req.ip,\n  userAgent: req.headers['user-agent'],\n  metadata: { loginMethod: 'email/password' }\n})"
+          },
+          {
+            "scenario": "User login fails",
+            "code": "await logAuditEvent({\n  action: 'user_login_failed',\n  logType: 'user_action',\n  actorEmail: attemptedEmail,\n  status: 'failed',\n  ipAddress: req.ip,\n  userAgent: req.headers['user-agent'],\n  metadata: { reason: 'Invalid password', attemptCount: 3 },\n  errorMessage: 'Authentication failed'\n})"
+          }
+        ]
+      },
+      "logged_actions": {
+        "admin_actions": [
+          "view_user_detail",
+          "view_user_contacts",
+          "view_contact_detail",
+          "export_user_contacts",
+          "start_impersonation",
+          "end_impersonation",
+          "password_reset_triggered",
+          "account_suspended",
+          "account_reactivated",
+          "view_email_logs",
+          "retry_email_send",
+          "export_user_data",
+          "view_audit_logs",
+          "export_audit_logs"
+        ],
+        "user_actions": [
+          "user_signup",
+          "user_login",
+          "user_login_failed",
+          "user_logout",
+          "password_change",
+          "password_reset_requested",
+          "email_verified",
+          "email_change",
+          "two_factor_enabled",
+          "two_factor_disabled",
+          "account_deletion_requested",
+          "subscription_upgraded",
+          "subscription_downgraded",
+          "subscription_canceled",
+          "payment_method_added",
+          "payment_method_removed"
+        ],
+        "system_events": [
+          "email_sent",
+          "email_delivered",
+          "email_bounced",
+          "subscription_renewed",
+          "subscription_expired",
+          "payment_succeeded",
+          "payment_failed",
+          "session_expired",
+          "auto_logout"
+        ]
+      },
+      "integration_points": {
+        "firebase_auth_triggers": {
+          "onCreate": "Log user_signup when new user created",
+          "onDelete": "Log account_deleted when user deleted"
+        },
+        "frontend_login_logout": {
+          "login": "Log user_login on successful auth",
+          "login_failed": "Log user_login_failed on auth error",
+          "logout": "Log user_logout on sign out"
+        },
+        "admin_endpoints": {
+          "all_admin_endpoints": "Log at start of each admin action (view, modify, export)"
+        },
+        "stripe_webhooks": {
+          "payment_succeeded": "Log payment_succeeded",
+          "payment_failed": "Log payment_failed",
+          "subscription_updated": "Log subscription changes"
+        }
+      }
+    },
+
+    "data_models": {
+      "firestore_collection": {
+        "collection": "adminAuditLogs",
+        "description": "Top-level collection storing all audit log entries (already partially defined in previous specs)",
+        "document_id": "Auto-generated unique ID",
+        "schema": {
+          "logId": "string (document ID)",
+          "timestamp": "Timestamp (server timestamp)",
+          "action": "string (technical action name)",
+          "logType": "string (admin_action, user_action, system_event)",
+          "actorUserId": "string or null (who performed the action)",
+          "actorEmail": "string or null",
+          "targetUserId": "string or null (who was affected)",
+          "targetUserEmail": "string or null",
+          "targetResource": "string or null (what was accessed/modified)",
+          "resourceId": "string or null (specific resource ID)",
+          "status": "string (success, failed, partial)",
+          "ipAddress": "string or null",
+          "userAgent": "string or null",
+          "metadata": "object or null (action-specific data)",
+          "errorMessage": "string or null (if status = failed)"
+        },
+        "indexes": [
+          {
+            "fields": ["timestamp desc"],
+            "description": "Default sort order"
+          },
+          {
+            "fields": ["action", "timestamp desc"],
+            "description": "Filter by action type"
+          },
+          {
+            "fields": ["actorUserId", "timestamp desc"],
+            "description": "Get all actions by specific admin/user"
+          },
+          {
+            "fields": ["targetUserId", "timestamp desc"],
+            "description": "Get all actions affecting specific user"
+          },
+          {
+            "fields": ["logType", "timestamp desc"],
+            "description": "Filter by log type"
+          },
+          {
+            "fields": ["status", "timestamp desc"],
+            "description": "Filter by status"
+          }
+        ],
+        "security_rules": {
+          "read": "if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+          "write": "if false // Only backend service account can write"
+        }
+      }
+    },
+
+    "workflows": {
+      "primary_workflow": {
+        "name": "Admin Investigates Suspicious Login Activity",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Security alert",
+            "action": "Multiple failed login attempts detected for user account",
+            "context": "Automated alert or user report"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Navigate to Audit Logs (/admin/audit-logs)",
+            "ui": "Admin dashboard menu"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Switch to 'User Actions' tab",
+            "ui": "Tab navigation"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "Filter by Action Type: 'Login Failed'",
+            "ui": "Action type filter dropdown"
+          },
+          {
+            "step": 5,
+            "actor": "Admin",
+            "action": "Search for user's email in search bar",
+            "ui": "Search input"
+          },
+          {
+            "step": 6,
+            "actor": "System",
+            "action": "Display filtered audit logs showing failed login attempts",
+            "backend": "Query adminAuditLogs where action='user_login_failed' and actorEmail=userEmail"
+          },
+          {
+            "step": 7,
+            "actor": "Admin",
+            "action": "Review results: 5 failed attempts in 10 minutes from same IP",
+            "ui": "Table shows timestamp, IP address columns"
+          },
+          {
+            "step": 8,
+            "actor": "Admin",
+            "action": "Click Details button on first failed attempt",
+            "ui": "Expandable row opens"
+          },
+          {
+            "step": 9,
+            "actor": "System",
+            "action": "Display full details including metadata",
+            "ui": "Expanded row shows: IP address, user agent, failure reason ('Invalid password'), attempt count"
+          },
+          {
+            "step": 10,
+            "actor": "Admin",
+            "action": "Check IP address: 123.45.67.89 (unfamiliar location)",
+            "analysis": "IP lookup shows location different from user's normal login location"
+          },
+          {
+            "step": 11,
+            "actor": "Admin",
+            "action": "Filter by same IP address to see all activity from that IP",
+            "ui": "IP Address filter"
+          },
+          {
+            "step": 12,
+            "actor": "System",
+            "action": "Show all logs from IP 123.45.67.89",
+            "result": "Multiple failed login attempts for different users - brute force attack pattern"
+          },
+          {
+            "step": 13,
+            "actor": "Admin",
+            "action": "Export logs for security team",
+            "ui": "Click Export, select JSON with metadata, download"
+          },
+          {
+            "step": 14,
+            "actor": "Admin",
+            "action": "Take mitigation action: Block IP, notify user, enable 2FA requirement",
+            "context": "Use other admin tools or external firewall"
+          }
+        ]
+      },
+      "compliance_audit_workflow": {
+        "name": "Generate Audit Report for Compliance Review",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Compliance team",
+            "action": "Requests audit report for last quarter",
+            "context": "SOC2 audit or GDPR compliance check"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Navigate to Audit Logs",
+            "ui": "/admin/audit-logs"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Select 'Admin Actions' tab",
+            "ui": "Tab navigation"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "Set date range to last 90 days",
+            "ui": "Date range filter"
+          },
+          {
+            "step": 5,
+            "actor": "Admin",
+            "action": "Click Export Logs button",
+            "ui": "Top-right corner"
+          },
+          {
+            "step": 6,
+            "actor": "Admin",
+            "action": "Configure export: CSV format, current filters applied, include metadata",
+            "ui": "Export modal"
+          },
+          {
+            "step": 7,
+            "actor": "System",
+            "action": "Generate CSV file with all admin actions from last 90 days",
+            "backend": "Query adminAuditLogs, format as CSV, upload to Cloud Storage, generate signed URL"
+          },
+          {
+            "step": 8,
+            "actor": "System",
+            "action": "Trigger download",
+            "filename": "audit_logs_admin_actions_2026-01-01_to_2026-03-31.csv"
+          },
+          {
+            "step": 9,
+            "actor": "Admin",
+            "action": "Provide CSV to compliance team",
+            "context": "Compliance team reviews for proper access controls and accountability"
+          }
+        ]
+      }
+    },
+
+    "log_retention_policy": {
+      "retention_period": "2 years (730 days)",
+      "justification": [
+        "SOC2 Compliance - Audit logs typically required for 1-2 years",
+        "GDPR Article 30 - Records of processing activities should be maintained",
+        "Security incident investigation - Historical data needed for forensics",
+        "Legal disputes - Evidence of user notifications and admin actions",
+        "Regulatory audits - May require historical access logs"
+      ],
+      "implementation": {
+        "storage_cost_optimization": {
+          "method": "Cloud Function to delete logs older than 730 days",
+          "schedule": "Weekly on Sundays at 3 AM UTC",
+          "query": "adminAuditLogs where timestamp < (now - 730 days)",
+          "batch_delete": "Delete in batches of 500 to avoid timeouts"
+        },
+        "archive_before_delete": {
+          "optional": true,
+          "method": "Export to Cloud Storage before deletion for long-term archive",
+          "format": "Compressed JSON (gzip)",
+          "storage_class": "Cloud Storage Archive (lowest cost)"
+        }
+      },
+      "exceptions": {
+        "legal_hold": "Logs related to legal disputes or security incidents should be flagged and excluded from auto-deletion",
+        "compliance_requirements": "Some industries (healthcare, finance) may require 7+ year retention",
+        "security_incidents": "Logs related to confirmed security incidents should be preserved indefinitely"
+      },
+      "user_action_logs": {
+        "retention": "Same as admin logs (2 years)",
+        "rationale": "User login history and account changes may be needed for security investigations"
+      },
+      "system_event_logs": {
+        "retention": "1 year (365 days) - shorter retention acceptable",
+        "rationale": "Email deliveries and subscription renewals less critical for long-term compliance"
+      }
+    },
+
+    "acceptance_criteria": [
+      {
+        "id": "AUDIT-AC-1",
+        "requirement": "Audit Logs dashboard displays logs table",
+        "test": "Navigate to /admin/audit-logs, verify table shows: Timestamp, Action, Actor, Target, IP Address, Status, Actions"
+      },
+      {
+        "id": "AUDIT-AC-2",
+        "requirement": "Tab navigation works",
+        "test": "Click 'User Actions' tab, verify only user action logs shown. Click 'Admin Actions', verify only admin logs."
+      },
+      {
+        "id": "AUDIT-AC-3",
+        "requirement": "Filter by action type works",
+        "test": "Select 'Login Failed' from action filter, verify only login failure logs shown"
+      },
+      {
+        "id": "AUDIT-AC-4",
+        "requirement": "Filter by actor works",
+        "test": "Select specific admin from actor filter, verify only logs from that admin shown"
+      },
+      {
+        "id": "AUDIT-AC-5",
+        "requirement": "Filter by target user works",
+        "test": "Select specific user from target filter, verify only logs affecting that user shown"
+      },
+      {
+        "id": "AUDIT-AC-6",
+        "requirement": "Date range filter works",
+        "test": "Select 'Last 24 hours', verify only logs from past 24 hours shown"
+      },
+      {
+        "id": "AUDIT-AC-7",
+        "requirement": "Search by email works",
+        "test": "Enter admin email in search, verify logs filtered to that admin's actions"
+      },
+      {
+        "id": "AUDIT-AC-8",
+        "requirement": "Expandable row details show metadata",
+        "test": "Click Details on log entry, verify expanded section shows: Log ID, Actor Info, Target Info, Metadata JSON"
+      },
+      {
+        "id": "AUDIT-AC-9",
+        "requirement": "Admin actions are logged",
+        "test": "As admin, view user detail page, check audit logs, verify 'view_user_detail' entry created with correct admin UID, target UID, timestamp"
+      },
+      {
+        "id": "AUDIT-AC-10",
+        "requirement": "User login is logged",
+        "test": "User logs in, check audit logs, verify 'user_login' entry with user UID, IP address, timestamp"
+      },
+      {
+        "id": "AUDIT-AC-11",
+        "requirement": "Failed login is logged",
+        "test": "Attempt login with wrong password, check logs, verify 'user_login_failed' entry with attempted email, failure reason"
+      },
+      {
+        "id": "AUDIT-AC-12",
+        "requirement": "Impersonation is logged",
+        "test": "Start impersonation, check logs, verify 'start_impersonation' entry. End impersonation, verify 'end_impersonation' entry with duration."
+      },
+      {
+        "id": "AUDIT-AC-13",
+        "requirement": "Password reset is logged",
+        "test": "Trigger password reset as admin, verify 'password_reset_triggered' entry with admin UID, target user UID"
+      },
+      {
+        "id": "AUDIT-AC-14",
+        "requirement": "Account suspension is logged",
+        "test": "Suspend user account, verify 'account_suspended' entry with reason in metadata"
+      },
+      {
+        "id": "AUDIT-AC-15",
+        "requirement": "Export logs to CSV works",
+        "test": "Click Export, select CSV, verify file downloads with correct columns and data"
+      },
+      {
+        "id": "AUDIT-AC-16",
+        "requirement": "Export includes metadata when selected",
+        "test": "Export with 'Include Metadata' checked, verify CSV has metadata column with JSON data"
+      },
+      {
+        "id": "AUDIT-AC-17",
+        "requirement": "Non-admin cannot access audit logs",
+        "test": "As non-admin, navigate to /admin/audit-logs, verify redirect with Access Denied"
+      },
+      {
+        "id": "AUDIT-AC-18",
+        "requirement": "Logs are immutable",
+        "test": "Attempt to modify audit log via Firestore (simulate), verify Firestore rules reject write"
+      },
+      {
+        "id": "AUDIT-AC-19",
+        "requirement": "IP address and user agent captured",
+        "test": "Perform admin action, check log entry, verify ipAddress and userAgent fields populated"
+      },
+      {
+        "id": "AUDIT-AC-20",
+        "requirement": "Pagination works for large result sets",
+        "test": "Query logs that return 500+ results, verify pagination controls, navigate to page 2, verify different logs loaded"
+      }
+    ],
+
+    "security_privacy": {
+      "access_control": {
+        "who_can_view": "Only users with role='admin'",
+        "rbac_enforcement": "ProtectedAdminRoute on frontend, checkAdminAccess() on backend",
+        "admin_on_admin": "Admins can see logs of other admins' actions (transparency)",
+        "future_enhancement": "Role-based log access (super admin sees all, regular admin sees own actions only)"
+      },
+      "data_sensitivity": {
+        "pii_in_logs": [
+          "Email addresses (actor and target) - necessary for accountability",
+          "User IDs - necessary for correlation",
+          "IP addresses - necessary for security investigation"
+        ],
+        "no_pii": [
+          "Passwords - never logged",
+          "Payment details - only status (succeeded/failed), not card numbers",
+          "Private user data - only fact that data was accessed, not content"
+        ]
+      },
+      "immutability": {
+        "firestore_rules": "write: if false - only backend service account can write",
+        "no_delete_api": "No API endpoint to delete individual logs (only automated retention cleanup)",
+        "tamper_evidence": "Consider optional: Add cryptographic hashes to detect tampering"
+      },
+      "log_integrity": {
+        "server_timestamps": "Use Firestore server timestamps to prevent time manipulation",
+        "ip_address_trust": "Capture from x-forwarded-for header (may be spoofed behind proxy)",
+        "user_agent_trust": "Informational only, easily spoofed"
+      },
+      "compliance_alignment": {
+        "gdpr": {
+          "article_30": "Records of processing activities - audit logs demonstrate compliance",
+          "article_15": "Right to access - logs show who accessed user data",
+          "article_17": "Right to erasure - if user requests deletion, should their logs be deleted? (NO - legitimate interest in security/compliance)"
+        },
+        "soc2": {
+          "cc6_1": "Logical access controls - logs prove access restricted to admins",
+          "cc6_6": "Logical access logs - comprehensive logging of privileged access",
+          "cc7_2": "System monitoring - audit logs support security monitoring"
+        },
+        "hipaa": {
+          "164_312_b": "Audit controls - if handling PHI in future, audit logs required"
+        }
+      },
+      "privacy_by_design": {
+        "data_minimization": "Only log data necessary for accountability and security",
+        "purpose_limitation": "Logs used only for security, compliance, troubleshooting - not marketing or other purposes",
+        "storage_limitation": "2-year retention balances compliance needs with privacy",
+        "transparency": "Consider: Allow users to view logs of who accessed their data (user transparency portal)"
+      }
+    }
+  }
+}

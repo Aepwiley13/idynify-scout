@@ -34,6 +34,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
 import ApiActivity from './pages/Admin/ApiActivity';
+import AuditLogs from './pages/Admin/AuditLogs';
 import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
@@ -340,6 +341,14 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <UserDetail />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/audit-logs"
+          element={
+            <ProtectedAdminRoute>
+              <AuditLogs />
             </ProtectedAdminRoute>
           }
         />

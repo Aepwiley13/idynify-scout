@@ -1,3 +1,7 @@
+import { logApiUsage } from './utils/logApiUsage.js';
+import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
+import { logApolloError } from './utils/apolloErrorLogger.js';
+
 /**
  * Manual Company Search via Apollo API
  *
@@ -11,10 +15,6 @@
  * Method: POST
  * Auth: Requires valid Firebase auth token
  */
-
-import { logApiUsage } from './utils/logApiUsage.js';
-import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
-import { logApolloError } from './utils/apolloErrorLogger.js';
 
 export async function handler(event, context) {
   const startTime = Date.now();

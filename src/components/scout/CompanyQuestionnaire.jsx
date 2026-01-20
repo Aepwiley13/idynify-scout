@@ -239,20 +239,19 @@ export default function CompanyQuestionnaire() {
       // Show debug info if 0 companies found
       if (data.companiesFound === 0 && data.debug) {
         console.error('\n❌ ZERO COMPANIES FOUND - DEBUG INFO:');
-        console.error('   Apollo returned:', data.debug.apolloReturnedCount, 'companies');
+        console.error('   Search service returned:', data.debug.apolloReturnedCount, 'companies');
         console.error('   Requested industries:', data.debug.requestedIndustries);
-        console.error('   Apollo query sent:', data.debug.apolloQuery);
-        console.error('   Sample industries from Apollo:');
+        console.error('   Query sent:', data.debug.apolloQuery);
+        console.error('   Sample industries returned:');
         data.debug.sampleIndustriesFromApollo.forEach(c => {
           console.error(`      - ${c.name}: ${c.industry}`);
         });
-        console.error('\n   ⚠️  This means Apollo API is ignoring the industry filter!');
+        console.error('\n   ⚠️  Search service may not be filtering industries correctly!');
       }
 
     } catch (error) {
-      console.error('❌ Apollo search error:', error);
+      console.error('❌ Company search error:', error);
       console.error('❌ Error details:', error.message);
-      console.error('❌ Full error:', error);
       // Don't block user flow on search error - user can still proceed to Scout
       alert(`Warning: Company search encountered an error:\n\n${error.message}\n\nYou can still access Scout, but you may not have any companies yet.\n\nPlease check the browser console for details or contact support.`);
     }

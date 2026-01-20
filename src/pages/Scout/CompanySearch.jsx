@@ -23,6 +23,7 @@ export default function CompanySearch() {
   const [searchResults, setSearchResults] = useState([]);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -36,6 +37,7 @@ export default function CompanySearch() {
     setError(null);
     setSearchResults([]);
     setSuccessMessage(null);
+    setSelectedCompanyId(null);
 
     try {
       const user = auth.currentUser;
@@ -139,6 +141,13 @@ export default function CompanySearch() {
   function handleSkipCompany(company) {
     console.log('⏭️  Skipping company:', company.name);
     setSearchResults(prev => prev.filter(c => c.apollo_organization_id !== company.apollo_organization_id));
+    if (selectedCompanyId === company.apollo_organization_id) {
+      setSelectedCompanyId(null);
+    }
+  }
+
+  function handleSelectCompany(companyId) {
+    setSelectedCompanyId(selectedCompanyId === companyId ? null : companyId);
   }
 
   return (
@@ -208,89 +217,109 @@ export default function CompanySearch() {
           </div>
 
           <div className="results-grid">
-            {searchResults.map((company) => (
-              <div key={company.apollo_organization_id} className="company-result-card">
-                {/* Company Logo/Icon */}
-                <div className="company-logo">
-                  {company.logo_url ? (
-                    <img src={company.logo_url} alt={company.name} />
-                  ) : (
-                    <div className="company-logo-placeholder">
-                      {company.name.charAt(0).toUpperCase()}
+            {searchResults.map((company) => {
+              const isSelected = selectedCompanyId === company.apollo_organization_id;
+
+              return (
+                <div
+                  key={company.apollo_organization_id}
+                  className={`company-result-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => handleSelectCompany(company.apollo_organization_id)}
+                >
+                  {/* Selection Indicator */}
+                  {isSelected && (
+                    <div className="selection-indicator">
+                      <Check className="w-5 h-5" />
                     </div>
                   )}
-                </div>
 
-                {/* Company Info */}
-                <div className="company-info">
-                  <h3>{company.name}</h3>
-
-                  <div className="company-details">
-                    <div className="detail-item">
-                      <Building2 className="w-4 h-4" />
-                      <span>{company.industry}</span>
+                  {/* Company Logo */}
+                  <div className="company-header">
+                    <div className="company-logo">
+                      {company.logo_url ? (
+                        <img src={company.logo_url} alt={company.name} />
+                      ) : (
+                        <div className="company-logo-placeholder">
+                          {company.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
+                  </div>
 
+                  {/* Company Name */}
+                  <h3 className="company-name">{company.name}</h3>
+
+                  {/* Company Links & Details */}
+                  <div className="company-links">
+                    {company.website_url && (
+                      <a
+                        href={company.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="company-link"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span>{company.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+                      </a>
+                    )}
+
+                    {company.linkedin_url && (
+                      <a
+                        href={company.linkedin_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="company-link"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Building2 className="w-4 h-4" />
+                        <span>LinkedIn Profile</span>
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Optional Info */}
+                  <div className="company-meta">
+                    {company.industry && (
+                      <div className="meta-item">
+                        <Building2 className="w-4 h-4" />
+                        <span>{company.industry}</span>
+                      </div>
+                    )}
                     {company.location && (
-                      <div className="detail-item">
+                      <div className="meta-item">
                         <MapPin className="w-4 h-4" />
                         <span>{company.location}</span>
                       </div>
                     )}
-
-                    {company.employee_count > 0 && (
-                      <div className="detail-item">
-                        <Users className="w-4 h-4" />
-                        <span>{company.employee_count.toLocaleString()} employees</span>
-                      </div>
-                    )}
-
-                    {company.revenue && (
-                      <div className="detail-item">
-                        <DollarSign className="w-4 h-4" />
-                        <span>{company.revenue} revenue</span>
-                      </div>
-                    )}
-
-                    {company.website_url && (
-                      <div className="detail-item">
-                        <Globe className="w-4 h-4" />
-                        <a
-                          href={company.website_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {company.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                        </a>
-                      </div>
-                    )}
                   </div>
 
-                  {company.description && (
-                    <p className="company-description">{company.description}</p>
-                  )}
+                  {/* Action Buttons */}
+                  <div className="company-actions">
+                    <button
+                      className="action-btn accept"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddCompany(company);
+                      }}
+                    >
+                      <Check className="w-5 h-5" />
+                      Add to Saved
+                    </button>
+                    <button
+                      className="action-btn reject"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSkipCompany(company);
+                      }}
+                    >
+                      <X className="w-5 h-5" />
+                      Skip
+                    </button>
+                  </div>
                 </div>
-
-                {/* Action Buttons */}
-                <div className="company-actions">
-                  <button
-                    className="add-button"
-                    onClick={() => handleAddCompany(company)}
-                  >
-                    <Check className="w-5 h-5" />
-                    Add to Saved Companies
-                  </button>
-                  <button
-                    className="skip-button"
-                    onClick={() => handleSkipCompany(company)}
-                  >
-                    <X className="w-5 h-5" />
-                    Skip
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -177,18 +177,22 @@ export async function handler(event, context) {
       };
     });
 
-    // Log API usage
-    await logApiUsage({
-      userId,
-      endpoint: 'search-companies-manual',
-      requestType: 'apollo_company_search',
-      apolloCreditsUsed: 1,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        companyName: companyName,
-        resultsCount: companies.length
-      }
-    });
+    // Log API usage - wrapped in try/catch to prevent logging failures from crashing search
+    try {
+      await logApiUsage({
+        userId: userId || 'ANONYMOUS',
+        endpoint: 'search-companies-manual',
+        requestType: 'apollo_company_search',
+        apolloCreditsUsed: 1,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          companyName: companyName || 'UNKNOWN',
+          resultsCount: companies.length
+        }
+      });
+    } catch (err) {
+      console.warn('⚠️ Failed to log API usage:', err);
+    }
 
     return {
       statusCode: 200,

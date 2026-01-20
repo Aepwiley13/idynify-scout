@@ -35,6 +35,7 @@ import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
 import ApiActivity from './pages/Admin/ApiActivity';
 import AuditLogs from './pages/Admin/AuditLogs';
+import EmailInsights from './pages/Admin/EmailInsights';
 import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
@@ -349,6 +350,14 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <AuditLogs />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/email-insights"
+          element={
+            <ProtectedAdminRoute>
+              <EmailInsights />
             </ProtectedAdminRoute>
           }
         />

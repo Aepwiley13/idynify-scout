@@ -249,63 +249,71 @@ export default function CompanySearch() {
                   {/* Company Name */}
                   <h3 className="company-name">{company.name}</h3>
 
-                  {/* Company Links & Details */}
-                  <div className="company-links">
-                    {company.website_url && (
+                  {/* Metadata Grid (2x2) */}
+                  <div className="company-meta-grid">
+                    <div className="meta-cell">
+                      <div className="meta-label">INDUSTRY</div>
+                      <div className="meta-value">{company.industry || 'Not available'}</div>
+                    </div>
+                    <div className="meta-cell">
+                      <div className="meta-label">EMPLOYEES</div>
+                      <div className="meta-value">
+                        {company.employee_count > 0
+                          ? company.employee_count.toLocaleString()
+                          : 'Not available'}
+                      </div>
+                    </div>
+                    <div className="meta-cell">
+                      <div className="meta-label">REVENUE</div>
+                      <div className="meta-value">{company.revenue || 'Not available'}</div>
+                    </div>
+                    <div className="meta-cell">
+                      <div className="meta-label">FOUNDED</div>
+                      <div className="meta-value">{company.founded_year || 'Not available'}</div>
+                    </div>
+                  </div>
+
+                  {/* Website & LinkedIn Buttons */}
+                  <div className="company-link-buttons">
+                    {company.website_url ? (
                       <a
                         href={company.website_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="company-link"
+                        className="link-btn website-btn"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Globe className="w-4 h-4" />
-                        <span>{company.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+                        <span>Visit Website</span>
                       </a>
+                    ) : (
+                      <div className="link-btn website-btn disabled">
+                        <Globe className="w-4 h-4" />
+                        <span>No Website</span>
+                      </div>
                     )}
 
-                    {company.linkedin_url && (
+                    {company.linkedin_url ? (
                       <a
                         href={company.linkedin_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="company-link"
+                        className="link-btn linkedin-btn"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Building2 className="w-4 h-4" />
-                        <span>LinkedIn Profile</span>
+                        <span>LinkedIn</span>
                       </a>
-                    )}
-                  </div>
-
-                  {/* Optional Info */}
-                  <div className="company-meta">
-                    {company.industry && (
-                      <div className="meta-item">
+                    ) : (
+                      <div className="link-btn linkedin-btn disabled">
                         <Building2 className="w-4 h-4" />
-                        <span>{company.industry}</span>
-                      </div>
-                    )}
-                    {company.location && (
-                      <div className="meta-item">
-                        <MapPin className="w-4 h-4" />
-                        <span>{company.location}</span>
+                        <span>No LinkedIn</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Action Buttons */}
+                  {/* Action Buttons (Skip first, Add to Saved second) */}
                   <div className="company-actions">
-                    <button
-                      className="action-btn accept"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddCompany(company);
-                      }}
-                    >
-                      <Check className="w-5 h-5" />
-                      Add to Saved
-                    </button>
                     <button
                       className="action-btn reject"
                       onClick={(e) => {
@@ -315,6 +323,16 @@ export default function CompanySearch() {
                     >
                       <X className="w-5 h-5" />
                       Skip
+                    </button>
+                    <button
+                      className="action-btn accept"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddCompany(company);
+                      }}
+                    >
+                      <Check className="w-5 h-5" />
+                      Add to Saved
                     </button>
                   </div>
                 </div>

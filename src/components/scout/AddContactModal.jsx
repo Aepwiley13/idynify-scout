@@ -47,7 +47,7 @@ export default function AddContactModal({ onClose, onContactAdded }) {
               </button>
             )}
             <h2 className="text-2xl font-bold text-gray-900">
-              {currentView === 'menu' && 'Add Contact'}
+              {currentView === 'menu' && 'Scout+'}
               {currentView === 'manual' && 'Add Manually'}
               {currentView === 'csv' && 'Upload CSV'}
               {currentView === 'business-card' && 'Scan Business Card'}

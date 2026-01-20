@@ -129,7 +129,7 @@ export default function CompanyLeads() {
             className="add-contacts-btn"
             onClick={() => navigate(`/scout/company/${companyId}`)}
           >
-            Add Contacts
+            Scout+
           </button>
         </div>
       ) : (

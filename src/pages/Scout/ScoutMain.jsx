@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { ArrowLeft, Target, Building2, Users, TrendingUp, Settings, UserPlus } from 'lucide-react';
+import { ArrowLeft, Target, Building2, Users, TrendingUp, Settings, UserPlus, Search } from 'lucide-react';
 import SavedCompanies from './SavedCompanies';
 import TotalMarket from './TotalMarket';
 import ICPSettings from './ICPSettings';
 import DailyLeads from './DailyLeads';
 import AllLeads from './AllLeads';
+import CompanySearch from './CompanySearch';
 import AddContactModal from '../../components/scout/AddContactModal';
 import './ScoutMain.css';
 
@@ -92,7 +93,7 @@ export default function ScoutMain() {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
           >
             <UserPlus className="w-4 h-4" />
-            <span>Add Contact</span>
+            <span>Scout+</span>
           </button>
           <div className="scout-branding">
             <Target className="w-5 h-5" />
@@ -109,7 +110,15 @@ export default function ScoutMain() {
             onClick={() => setShowAddContactModal(true)}
           >
             <UserPlus className="w-4 h-4" />
-            <span>Add Contacts</span>
+            <span>Scout+</span>
+          </button>
+
+          <button
+            className={`tab ${activeTab === 'company-search' ? 'active' : ''}`}
+            onClick={() => setActiveTab('company-search')}
+          >
+            <Search className="w-4 h-4" />
+            <span>Company Search</span>
           </button>
 
           <button
@@ -165,6 +174,7 @@ export default function ScoutMain() {
 
       {/* Tab Content */}
       <div className="tab-content">
+        {activeTab === 'company-search' && <CompanySearch />}
         {activeTab === 'daily-leads' && <DailyLeads />}
         {activeTab === 'saved-companies' && <SavedCompanies />}
         {activeTab === 'all-leads' && <AllLeads />}
@@ -172,7 +182,7 @@ export default function ScoutMain() {
         {activeTab === 'icp-settings' && <ICPSettings />}
       </div>
 
-      {/* Add Contact Modal */}
+      {/* Scout+ Modal */}
       {showAddContactModal && (
         <AddContactModal
           onClose={() => setShowAddContactModal(false)}

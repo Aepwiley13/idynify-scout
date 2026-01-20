@@ -240,7 +240,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           ) : (
             <>
               <UserPlus className="w-5 h-5" />
-              Add Contact
+              Scout+
             </>
           )}
         </button>

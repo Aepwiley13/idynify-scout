@@ -1,0 +1,2626 @@
+{
+  "specification_metadata": {
+    "title": "Phase 1 Admin Support Tools - Implementation Specification",
+    "version": "1.0",
+    "created_at": "2026-01-20",
+    "features_included": [
+      "View as User / Account Impersonation (read-only)",
+      "Reset User Password",
+      "Suspend & Reactivate User Accounts"
+    ],
+    "phase": "Phase 1: Core Admin & Support Essentials"
+  },
+
+  "impersonation": {
+    "feature_id": "admin_user_impersonation",
+    "feature_name": "View as User / Account Impersonation (Read-Only)",
+    "description": "Allow admin users to view the platform exactly as a specific user would see it, without the ability to modify data. This enables admins to diagnose user-reported issues, verify feature access, and troubleshoot UI problems in the exact user context.",
+
+    "user_story": {
+      "as": "Admin user",
+      "i_want": "to view the platform as if I were a specific user, seeing their exact dashboard, Scout cards, Recon data, and Hunter campaigns",
+      "so_that": "I can reproduce user-reported bugs, verify data visibility issues, troubleshoot feature access problems, and provide accurate support without asking users for screenshots or detailed explanations",
+      "acceptance_summary": "Admin can initiate impersonation from user detail page, see banner indicating active impersonation session, navigate entire platform as target user (read-only), and exit impersonation to return to admin view",
+      "user_facing_notifications": [
+        {
+          "trigger": "Admin starts impersonation",
+          "message": "You are now viewing as [User Email]. All changes are disabled. Click 'Exit View As User' to return to admin mode.",
+          "location": "Persistent banner at top of screen",
+          "style": "Warning banner (yellow/orange background) with Exit button"
+        },
+        {
+          "trigger": "Admin attempts to modify data while impersonating",
+          "message": "Action blocked: You are in View-Only mode. Exit impersonation to make changes.",
+          "location": "Toast notification",
+          "style": "Warning toast, 3-second duration"
+        },
+        {
+          "trigger": "Admin exits impersonation",
+          "message": "You have exited View-As-User mode and returned to admin view.",
+          "location": "Toast notification",
+          "style": "Success toast, 2-second duration"
+        },
+        {
+          "trigger": "Impersonation session expires (30 minutes)",
+          "message": "Your View-As-User session has expired for security. Returning to admin view.",
+          "location": "Toast notification + automatic redirect",
+          "style": "Info toast, 5-second duration"
+        }
+      ]
+    },
+
+    "ui_requirements": {
+      "entry_points": [
+        {
+          "location": "User Detail Page (/admin/user/:uid)",
+          "component": "Action button",
+          "label": "View as User",
+          "icon": "Eye icon",
+          "placement": "Top-right corner next to user email",
+          "permissions": "Only visible to admin users",
+          "state_disabled": "If user account is deleted or impersonation already active"
+        }
+      ],
+      "impersonation_banner": {
+        "component": "Persistent top banner",
+        "display_condition": "Shown on all pages while impersonation is active",
+        "layout": {
+          "background": "Linear gradient orange/yellow (#FFA500 to #FFD700)",
+          "height": "60px",
+          "position": "Fixed top, above main navigation",
+          "z_index": "9999 (always on top)"
+        },
+        "content": {
+          "left_section": {
+            "icon": "Eye icon (white)",
+            "text": "Viewing as: [User Email]",
+            "font": "Bold, 14px, white"
+          },
+          "center_section": {
+            "badge": "READ-ONLY MODE",
+            "style": "Red badge with white text"
+          },
+          "right_section": {
+            "timer": "Session expires in: MM:SS",
+            "exit_button": {
+              "label": "Exit View As User",
+              "icon": "X icon",
+              "style": "White button with red hover",
+              "action": "End impersonation, return to admin dashboard"
+            }
+          }
+        },
+        "responsive": {
+          "mobile": "Stack elements vertically, reduce padding, smaller font"
+        }
+      },
+      "confirmation_modal": {
+        "trigger": "Click 'View as User' button",
+        "modal_title": "Confirm View-As-User Mode",
+        "modal_content": {
+          "warning_icon": "AlertTriangle (yellow)",
+          "message": "You are about to view the platform as:\n\n**[User Name]**\n([User Email])\n\nIn this mode:\n• You will see exactly what this user sees\n• All actions are read-only (changes disabled)\n• Your session will auto-expire after 30 minutes\n• This action will be logged for security audit\n\nDo you want to continue?",
+          "checkbox": {
+            "label": "I understand this is for troubleshooting purposes only",
+            "required": true
+          }
+        },
+        "actions": {
+          "cancel": {
+            "label": "Cancel",
+            "style": "Secondary button (gray)",
+            "action": "Close modal, stay on current page"
+          },
+          "confirm": {
+            "label": "Start Impersonation",
+            "style": "Primary button (blue)",
+            "disabled_until": "Checkbox is checked",
+            "action": "Initialize impersonation session, redirect to user's dashboard"
+          }
+        }
+      },
+      "read_only_enforcement": {
+        "disabled_interactions": [
+          "All form submit buttons (Save, Update, Create, Delete)",
+          "All data modification actions in Scout (approve/reject companies, add contacts)",
+          "All data modification actions in Recon (save questionnaire, generate ICP)",
+          "All data modification actions in Hunter (create campaign, send emails)",
+          "Payment actions (upgrade subscription, add payment method)",
+          "Account settings modifications"
+        ],
+        "visual_indicators": {
+          "disabled_buttons": "Grayed out with cursor:not-allowed, tooltip: 'Disabled in View-Only mode'",
+          "input_fields": "Disabled attribute, gray background",
+          "clickable_elements": "Add overlay with click prevention"
+        },
+        "navigation": {
+          "allowed": "Full navigation to all user pages (Dashboard, Scout, Recon, Hunter, Settings)",
+          "restricted": "Admin-only routes remain admin-only (cannot access /admin while impersonating)"
+        }
+      },
+      "exit_impersonation": {
+        "methods": [
+          {
+            "method": "Click 'Exit View As User' button in banner",
+            "action": "End session immediately, redirect to /admin/user/:uid (return to user detail page)"
+          },
+          {
+            "method": "Session timeout (30 minutes)",
+            "action": "Auto-end session, show timeout toast, redirect to /admin"
+          },
+          {
+            "method": "Navigate to /admin route manually",
+            "action": "Auto-end impersonation (admin routes cannot be accessed during impersonation)"
+          },
+          {
+            "method": "Browser refresh",
+            "action": "Session persists (stored in sessionStorage), banner re-appears"
+          },
+          {
+            "method": "Close browser tab",
+            "action": "Session ends (sessionStorage cleared)"
+          }
+        ]
+      },
+      "states": {
+        "loading": {
+          "display": "Full-screen loader with message: 'Switching to [User Name]'s view...'",
+          "duration": "Until user data loads and redirect completes"
+        },
+        "active": {
+          "display": "User's dashboard with impersonation banner at top",
+          "all_pages": "Banner persists across navigation"
+        },
+        "error": {
+          "condition": "Failed to load user context",
+          "display": "Error modal: 'Unable to impersonate user. [Error details]'",
+          "action": "Stay on admin user detail page, allow retry"
+        },
+        "expired": {
+          "condition": "30-minute timeout reached",
+          "display": "Toast notification: 'Session expired'",
+          "action": "Automatic redirect to /admin"
+        },
+        "permission_denied": {
+          "condition": "Non-admin tries to access impersonation feature",
+          "display": "Button not visible, or 403 error if accessed via API"
+        }
+      },
+      "accessibility": {
+        "screen_reader": "Banner announces: 'Warning: You are viewing as [User Email] in read-only mode'",
+        "keyboard_navigation": "Exit button is keyboard-accessible (Tab + Enter)",
+        "focus_management": "Focus moves to banner after impersonation starts, focus returns to previous location after exit",
+        "aria_labels": "aria-live='polite' on banner for state changes"
+      }
+    },
+
+    "api_backend_requirements": {
+      "endpoints": [
+        {
+          "endpoint_id": "start_impersonation",
+          "method": "POST",
+          "path": "/.netlify/functions/adminStartImpersonation",
+          "description": "Initialize impersonation session for admin to view platform as target user",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "authorization": {
+            "required": true,
+            "method": "checkAdminAccess(adminUserId)",
+            "failure_response": {
+              "statusCode": 403,
+              "body": {
+                "success": false,
+                "error": "Admin access required"
+              }
+            }
+          },
+          "request_schema": {
+            "authToken": {
+              "type": "string",
+              "required": true,
+              "description": "Firebase ID token of requesting admin"
+            },
+            "targetUserId": {
+              "type": "string",
+              "required": true,
+              "description": "UID of user to impersonate"
+            },
+            "purpose": {
+              "type": "string",
+              "required": false,
+              "description": "Reason for impersonation (for audit log)",
+              "maxLength": 500
+            }
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "sessionId": "string (unique impersonation session ID)",
+              "targetUser": {
+                "uid": "string",
+                "email": "string",
+                "displayName": "string or null",
+                "photoURL": "string or null"
+              },
+              "expiresAt": "string (ISO timestamp, 30 minutes from now)",
+              "sessionToken": "string (JWT token for frontend to verify active session)"
+            }
+          },
+          "error_responses": [
+            {
+              "statusCode": 404,
+              "condition": "Target user not found",
+              "body": {
+                "success": false,
+                "error": "User not found"
+              }
+            },
+            {
+              "statusCode": 409,
+              "condition": "Admin already has active impersonation session",
+              "body": {
+                "success": false,
+                "error": "You already have an active impersonation session. Exit current session first."
+              }
+            },
+            {
+              "statusCode": 400,
+              "condition": "Cannot impersonate another admin",
+              "body": {
+                "success": false,
+                "error": "Cannot impersonate admin users"
+              }
+            }
+          ],
+          "implementation": {
+            "firebase_admin_sdk": "Use admin.auth().getUser(targetUserId) to verify user exists",
+            "session_storage": "Store session in Firestore collection: activateImpersonationSessions",
+            "jwt_generation": "Generate JWT with payload: {adminUid, targetUid, sessionId, exp}",
+            "audit_logging": "Log to adminAuditLogs collection"
+          }
+        },
+        {
+          "endpoint_id": "end_impersonation",
+          "method": "POST",
+          "path": "/.netlify/functions/adminEndImpersonation",
+          "description": "Terminate active impersonation session",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "request_schema": {
+            "authToken": "string (required)",
+            "sessionId": "string (required)"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "message": "Impersonation session ended",
+              "duration": "number (seconds session was active)"
+            }
+          },
+          "implementation": {
+            "session_cleanup": "Delete session from activeImpersonationSessions",
+            "audit_logging": "Log end time and duration to adminAuditLogs"
+          }
+        },
+        {
+          "endpoint_id": "verify_impersonation_session",
+          "method": "POST",
+          "path": "/.netlify/functions/adminVerifyImpersonation",
+          "description": "Verify that impersonation session is still valid (called on page load)",
+          "request_schema": {
+            "sessionToken": "string (required, JWT from sessionStorage)"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "valid": "boolean",
+              "targetUser": "object (if valid)",
+              "remainingTime": "number (seconds until expiration)"
+            }
+          }
+        }
+      ],
+      "session_management": {
+        "storage": {
+          "collection": "activeImpersonationSessions",
+          "schema": {
+            "sessionId": "string (auto-generated UUID)",
+            "adminUserId": "string",
+            "adminEmail": "string",
+            "targetUserId": "string",
+            "targetEmail": "string",
+            "startedAt": "Timestamp",
+            "expiresAt": "Timestamp (startedAt + 30 minutes)",
+            "purpose": "string or null",
+            "status": "active | expired | ended"
+          },
+          "indexes": [
+            {
+              "fields": ["adminUserId", "status"],
+              "description": "Find active sessions for admin"
+            },
+            {
+              "fields": ["expiresAt", "status"],
+              "description": "Cleanup expired sessions"
+            }
+          ]
+        },
+        "expiration": {
+          "duration": "30 minutes (1800 seconds)",
+          "auto_cleanup": "Cloud Function scheduled to run every 5 minutes, delete sessions where expiresAt < now()",
+          "extension": "Not allowed - must start new session"
+        },
+        "concurrency": {
+          "limit": "1 active impersonation session per admin",
+          "enforcement": "Before creating new session, check for existing active session and end it"
+        }
+      },
+      "read_only_enforcement": {
+        "method": "Frontend enforcement only (no backend changes)",
+        "rationale": "Firebase security rules already enforce users/{uid} write only by owner. Admin impersonation doesn't change auth context - admin is still authenticated as themselves. Frontend prevents UI actions but backend would reject writes anyway.",
+        "verification": "All existing write operations check request.auth.uid == userId, which will fail for admin impersonating"
+      }
+    },
+
+    "workflows": {
+      "primary_workflow": {
+        "name": "Admin Impersonates User to Troubleshoot Issue",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Admin",
+            "action": "Navigate to Admin Dashboard, search for user by email or UID",
+            "ui": "AdminDashboard.jsx"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Click user row to open User Detail page",
+            "ui": "Navigate to /admin/user/:uid"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Click 'View as User' button in top-right corner",
+            "ui": "UserDetail.jsx"
+          },
+          {
+            "step": 4,
+            "actor": "System",
+            "action": "Display confirmation modal with user details and warnings",
+            "ui": "ImpersonationConfirmModal component"
+          },
+          {
+            "step": 5,
+            "actor": "Admin",
+            "action": "Check 'I understand' checkbox and click 'Start Impersonation'",
+            "ui": "Modal"
+          },
+          {
+            "step": 6,
+            "actor": "System",
+            "action": "Call adminStartImpersonation API endpoint",
+            "backend": "Verify admin auth, check for existing sessions, create new session in Firestore, generate session JWT, log to audit trail"
+          },
+          {
+            "step": 7,
+            "actor": "System",
+            "action": "Store session data in browser sessionStorage",
+            "frontend": "sessionStorage.setItem('impersonationSession', JSON.stringify({sessionId, targetUid, targetEmail, expiresAt, sessionToken}))"
+          },
+          {
+            "step": 8,
+            "actor": "System",
+            "action": "Redirect admin to target user's dashboard",
+            "ui": "Navigate to /dashboard (user's main page)"
+          },
+          {
+            "step": 9,
+            "actor": "System",
+            "action": "Display impersonation banner at top of page",
+            "ui": "ImpersonationBanner component renders above navigation"
+          },
+          {
+            "step": 10,
+            "actor": "System",
+            "action": "Disable all write actions (form submits, save buttons, etc.)",
+            "frontend": "useImpersonation hook returns isImpersonating=true, components check this flag to disable actions"
+          },
+          {
+            "step": 11,
+            "actor": "Admin",
+            "action": "Navigate through user's Scout, Recon, Hunter pages to diagnose issue",
+            "ui": "All pages accessible, banner persists, timer counts down"
+          },
+          {
+            "step": 12,
+            "actor": "Admin",
+            "action": "Identify issue (e.g., missing data, UI bug, permission problem)",
+            "ui": "View-only mode allows inspection but no modification"
+          },
+          {
+            "step": 13,
+            "actor": "Admin",
+            "action": "Click 'Exit View As User' button in banner",
+            "ui": "ImpersonationBanner"
+          },
+          {
+            "step": 14,
+            "actor": "System",
+            "action": "Call adminEndImpersonation API endpoint",
+            "backend": "Mark session as ended in Firestore, log end time and duration"
+          },
+          {
+            "step": 15,
+            "actor": "System",
+            "action": "Clear sessionStorage, show success toast, redirect to admin dashboard",
+            "frontend": "sessionStorage.removeItem('impersonationSession'), navigate to /admin"
+          }
+        ],
+        "success_criteria": "Admin successfully views user's exact UI, identifies issue, and exits impersonation cleanly"
+      },
+      "session_expiration_workflow": {
+        "name": "Impersonation Session Auto-Expires After 30 Minutes",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Admin",
+            "action": "Has active impersonation session, 30 minutes elapsed",
+            "context": "Timer in banner reaches 00:00"
+          },
+          {
+            "step": 2,
+            "actor": "System",
+            "action": "Frontend timer detects expiration, calls adminEndImpersonation",
+            "frontend": "setTimeout triggers at expiresAt timestamp"
+          },
+          {
+            "step": 3,
+            "actor": "System",
+            "action": "Display expiration toast notification",
+            "ui": "Toast: 'Your View-As-User session has expired for security'"
+          },
+          {
+            "step": 4,
+            "actor": "System",
+            "action": "Clear sessionStorage, redirect to /admin",
+            "frontend": "Auto-redirect after 2 second delay"
+          },
+          {
+            "step": 5,
+            "actor": "System",
+            "action": "Backend cleanup: Cloud Function marks expired sessions",
+            "backend": "Scheduled function updates status to 'expired' for sessions past expiresAt"
+          }
+        ]
+      },
+      "error_workflows": [
+        {
+          "scenario": "User being impersonated is deleted mid-session",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Active impersonation session for User A"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "User A's account is deleted (by another admin or automated process)"
+            },
+            {
+              "step": 3,
+              "actor": "Admin",
+              "action": "Navigates to new page during impersonation"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Page load fails due to missing user data"
+            },
+            {
+              "step": 5,
+              "actor": "System",
+              "action": "Detect user deletion, auto-end session, show error toast",
+              "message": "Impersonation ended: Target user account no longer exists"
+            },
+            {
+              "step": 6,
+              "actor": "System",
+              "action": "Redirect to /admin"
+            }
+          ]
+        },
+        {
+          "scenario": "Admin loses network connection mid-session",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Active impersonation session, network disconnects"
+            },
+            {
+              "step": 2,
+              "actor": "Admin",
+              "action": "Navigates to new page"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Page load fails with network error"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Show offline message, preserve session in sessionStorage"
+            },
+            {
+              "step": 5,
+              "actor": "Admin",
+              "action": "Network reconnects"
+            },
+            {
+              "step": 6,
+              "actor": "System",
+              "action": "Verify session still valid (call adminVerifyImpersonation)"
+            },
+            {
+              "step": 7,
+              "actor": "System",
+              "action": "If valid, resume session. If expired, end session and redirect."
+            }
+          ]
+        },
+        {
+          "scenario": "Non-admin attempts to access impersonation",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Non-admin user",
+              "action": "Manually navigates to /admin/user/:uid"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "ProtectedAdminRoute redirects to /dashboard with 'Access Denied'"
+            },
+            {
+              "step": 3,
+              "actor": "Non-admin user",
+              "action": "Attempts to call adminStartImpersonation API directly"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "checkAdminAccess fails, return 403 Forbidden"
+            }
+          ]
+        }
+      ]
+    },
+
+    "data_logging_requirements": {
+      "audit_log_collection": "adminAuditLogs",
+      "log_entry_schema": {
+        "start_impersonation": {
+          "adminUserId": "string",
+          "adminEmail": "string",
+          "action": "start_impersonation",
+          "targetUserId": "string",
+          "targetUserEmail": "string",
+          "targetResource": "user_account",
+          "sessionId": "string",
+          "purpose": "string or null",
+          "timestamp": "Timestamp",
+          "ipAddress": "string",
+          "userAgent": "string",
+          "metadata": {
+            "expiresAt": "ISO timestamp"
+          }
+        },
+        "end_impersonation": {
+          "adminUserId": "string",
+          "adminEmail": "string",
+          "action": "end_impersonation",
+          "targetUserId": "string",
+          "targetUserEmail": "string",
+          "sessionId": "string",
+          "timestamp": "Timestamp",
+          "metadata": {
+            "duration": "number (seconds)",
+            "endReason": "manual | expired | error"
+          }
+        },
+        "impersonation_page_view": {
+          "adminUserId": "string",
+          "action": "impersonation_page_view",
+          "targetUserId": "string",
+          "sessionId": "string",
+          "timestamp": "Timestamp",
+          "metadata": {
+            "page": "string (e.g., /scout, /recon, /hunter)",
+            "path": "string (full path)"
+          },
+          "note": "Optional: Log every page viewed during impersonation for detailed audit trail"
+        }
+      },
+      "retention": "2 years minimum for compliance",
+      "access_control": "Only admins can view audit logs (future feature: Audit Log Viewer)",
+      "immutability": "Firestore security rules prevent modification/deletion"
+    },
+
+    "security_compliance_considerations": {
+      "security_measures": [
+        {
+          "measure": "Time-limited sessions",
+          "implementation": "30-minute hard limit, no extensions",
+          "rationale": "Minimize window for unauthorized access if admin credentials compromised"
+        },
+        {
+          "measure": "Read-only enforcement",
+          "implementation": "Frontend disables all write actions, backend Firebase rules enforce user ownership",
+          "rationale": "Prevent accidental or malicious data modification"
+        },
+        {
+          "measure": "Comprehensive audit logging",
+          "implementation": "Log start, end, duration, pages viewed, reason",
+          "rationale": "Accountability and compliance (GDPR, SOC2)"
+        },
+        {
+          "measure": "Prevent admin-to-admin impersonation",
+          "implementation": "API checks if target user has role='admin', rejects if true",
+          "rationale": "Prevent privilege escalation or admin spying"
+        },
+        {
+          "measure": "Session isolation",
+          "implementation": "One active session per admin, stored in sessionStorage (cleared on tab close)",
+          "rationale": "Prevent confusion and ensure clean session boundaries"
+        },
+        {
+          "measure": "Visual indicators",
+          "implementation": "Persistent banner, disabled UI elements",
+          "rationale": "Prevent admin confusion about current context"
+        },
+        {
+          "measure": "IP and User-Agent logging",
+          "implementation": "Capture request metadata for audit trail",
+          "rationale": "Forensic analysis in case of security incident"
+        }
+      ],
+      "compliance": {
+        "gdpr": {
+          "article_15": "Admin can view user data to fulfill access requests",
+          "article_30": "Audit logs provide record of data access",
+          "article_32": "Security measures include time limits, read-only, logging"
+        },
+        "ccpa": {
+          "section_1798_100": "Admin can view data to fulfill disclosure requests",
+          "section_1798_140": "Audit logs document who accessed consumer data"
+        },
+        "soc2": {
+          "cc6_1": "Role-based access control (admin-only)",
+          "cc6_6": "Logical access logs (audit trail)",
+          "cc7_2": "System monitoring (session tracking)"
+        },
+        "hipaa": {
+          "note": "If handling health data in future, impersonation audit logs support § 164.308(a)(1)(ii)(D) access audit controls"
+        }
+      },
+      "safe_defaults": [
+        "Default session duration: 30 minutes (not configurable)",
+        "Default mode: Read-only (no write access)",
+        "Default on session end: Redirect to admin dashboard (not user dashboard)",
+        "Default on error: End session and return to admin view"
+      ],
+      "rbac_checks": {
+        "frontend": "ProtectedAdminRoute checks isUserAdmin() before showing View as User button",
+        "backend": "adminStartImpersonation checks checkAdminAccess() before creating session",
+        "database": "Firebase rules enforce user ownership, impersonation doesn't bypass this"
+      }
+    },
+
+    "acceptance_criteria": [
+      {
+        "id": "IMP-AC-1",
+        "requirement": "Admin can initiate impersonation from User Detail page",
+        "test": "Navigate to /admin/user/:uid, click 'View as User' button, confirm in modal, verify redirect to user's dashboard with banner"
+      },
+      {
+        "id": "IMP-AC-2",
+        "requirement": "Impersonation banner displays on all pages",
+        "test": "During impersonation, navigate to Scout, Recon, Hunter, Settings - verify banner persists"
+      },
+      {
+        "id": "IMP-AC-3",
+        "requirement": "All write actions are disabled",
+        "test": "Attempt to save Scout company, update Recon questionnaire, create Hunter campaign - verify all buttons disabled with tooltip"
+      },
+      {
+        "id": "IMP-AC-4",
+        "requirement": "Session timer counts down correctly",
+        "test": "Start impersonation, verify timer shows 30:00, wait 1 minute, verify shows 29:00"
+      },
+      {
+        "id": "IMP-AC-5",
+        "requirement": "Admin can manually exit impersonation",
+        "test": "Click 'Exit View As User' button, verify session ends, toast appears, redirect to /admin"
+      },
+      {
+        "id": "IMP-AC-6",
+        "requirement": "Session auto-expires after 30 minutes",
+        "test": "Start impersonation, wait 30 minutes (or mock timer), verify auto-logout and redirect"
+      },
+      {
+        "id": "IMP-AC-7",
+        "requirement": "Session persists across page refreshes (until expiration)",
+        "test": "Start impersonation, refresh browser, verify session continues with banner and remaining time"
+      },
+      {
+        "id": "IMP-AC-8",
+        "requirement": "Session ends on tab close",
+        "test": "Start impersonation, close browser tab, reopen /admin, verify no active session"
+      },
+      {
+        "id": "IMP-AC-9",
+        "requirement": "Cannot impersonate another admin",
+        "test": "Attempt to impersonate user with role='admin', verify error message and rejection"
+      },
+      {
+        "id": "IMP-AC-10",
+        "requirement": "Only one active session per admin",
+        "test": "Start impersonation for User A, attempt to start for User B, verify error or auto-end first session"
+      },
+      {
+        "id": "IMP-AC-11",
+        "requirement": "Audit log created on session start",
+        "test": "Start impersonation, check adminAuditLogs, verify entry with admin UID, target UID, sessionId, timestamp"
+      },
+      {
+        "id": "IMP-AC-12",
+        "requirement": "Audit log created on session end",
+        "test": "End impersonation, check adminAuditLogs, verify entry with duration and endReason"
+      },
+      {
+        "id": "IMP-AC-13",
+        "requirement": "Non-admin cannot access impersonation",
+        "test": "As non-admin, navigate to /admin/user/:uid, verify redirect. Call API directly, verify 403."
+      },
+      {
+        "id": "IMP-AC-14",
+        "requirement": "Deleted user account ends session gracefully",
+        "test": "During impersonation, delete target user (via console), navigate to new page, verify error and auto-logout"
+      },
+      {
+        "id": "IMP-AC-15",
+        "requirement": "Confirmation modal requires checkbox acknowledgment",
+        "test": "Click 'View as User', verify 'Start Impersonation' button disabled until checkbox checked"
+      }
+    ]
+  },
+
+  "passwordReset": {
+    "feature_id": "admin_password_reset",
+    "feature_name": "Reset User Password (Trigger Reset Email)",
+    "description": "Allow admin users to trigger a password reset email for any user account. This sends the user a secure link to reset their password, without the admin knowing or setting the password directly.",
+
+    "user_story": {
+      "as": "Admin user",
+      "i_want": "to send a password reset email to a user who has forgotten their password or is locked out",
+      "so_that": "I can help users regain access to their accounts without requiring them to contact Firebase support directly, and without me knowing their new password",
+      "acceptance_summary": "Admin can trigger password reset from user detail page, system sends email to user with reset link, admin receives confirmation, action is logged",
+      "user_facing_notifications": [
+        {
+          "trigger": "Admin clicks 'Reset Password' button",
+          "message": "Send password reset email to [User Email]?",
+          "location": "Confirmation modal",
+          "style": "Warning modal (yellow) with Cancel/Send buttons"
+        },
+        {
+          "trigger": "Password reset email sent successfully",
+          "message": "Password reset email sent to [User Email]. The user will receive an email with instructions to reset their password.",
+          "location": "Toast notification",
+          "style": "Success toast (green), 5-second duration"
+        },
+        {
+          "trigger": "Password reset email failed to send",
+          "message": "Failed to send password reset email: [Error reason]. Please try again or contact support.",
+          "location": "Toast notification",
+          "style": "Error toast (red), 10-second duration with Retry button"
+        },
+        {
+          "trigger": "User receives reset email (user-facing)",
+          "email_subject": "Reset your iDynify password",
+          "email_from": "noreply@idynify.com (Firebase default)",
+          "email_content": "Firebase default template with customized link (handled by Firebase Auth, not application code)"
+        }
+      ]
+    },
+
+    "ui_requirements": {
+      "entry_points": [
+        {
+          "location": "User Detail Page - Account Section (/admin/user/:uid)",
+          "component": "Action button in Account Info section",
+          "label": "Reset Password",
+          "icon": "Key or RefreshCw icon",
+          "placement": "Below user email field, in Account Information card",
+          "permissions": "Only visible to admin users",
+          "state_disabled": "If user account is deleted or has no email (OAuth-only accounts)"
+        }
+      ],
+      "confirmation_modal": {
+        "trigger": "Click 'Reset Password' button",
+        "modal_title": "Confirm Password Reset",
+        "modal_content": {
+          "icon": "AlertTriangle (yellow)",
+          "message": "You are about to send a password reset email to:\n\n**[User Email]**\n\nThe user will receive an email with a link to reset their password. The link will expire in 1 hour.\n\n**This action will:**\n• Send an automated email from Firebase Auth\n• Allow the user to create a new password\n• Not log the user out of existing sessions\n• Be logged in the admin audit trail\n\nDo you want to continue?",
+          "warning_notes": [
+            "The reset link expires in 1 hour",
+            "The user can use this link only once",
+            "You will not see or control the new password"
+          ]
+        },
+        "actions": {
+          "cancel": {
+            "label": "Cancel",
+            "style": "Secondary button (gray)",
+            "action": "Close modal, no action taken"
+          },
+          "confirm": {
+            "label": "Send Reset Email",
+            "style": "Primary button (blue)",
+            "icon": "Mail icon",
+            "action": "Call adminResetUserPassword API, show loading spinner during request"
+          }
+        }
+      },
+      "success_feedback": {
+        "toast_notification": {
+          "icon": "CheckCircle (green)",
+          "title": "Password Reset Email Sent",
+          "message": "An email has been sent to [User Email] with instructions to reset their password.",
+          "duration": "5 seconds",
+          "dismissible": true
+        },
+        "ui_indicator": {
+          "component": "Small badge next to Reset Password button",
+          "text": "Last reset: [timestamp]",
+          "display_condition": "After successful reset, show for 24 hours",
+          "purpose": "Prevent accidental multiple resets"
+        }
+      },
+      "error_feedback": {
+        "toast_notification": {
+          "icon": "AlertCircle (red)",
+          "title": "Failed to Send Reset Email",
+          "message": "[Specific error message from backend]",
+          "duration": "10 seconds",
+          "actions": {
+            "retry_button": "Retry",
+            "close_button": "Dismiss"
+          }
+        },
+        "common_errors": [
+          {
+            "error": "User not found",
+            "message": "This user account no longer exists. Password reset cannot be sent.",
+            "action": "Dismiss only (no retry)"
+          },
+          {
+            "error": "Email not verified",
+            "message": "This user's email is not verified. Password reset may not be received. Continue anyway?",
+            "action": "Show secondary confirmation"
+          },
+          {
+            "error": "Rate limit exceeded",
+            "message": "Too many password reset requests. Please wait 15 minutes before trying again.",
+            "action": "Dismiss only (no retry)"
+          },
+          {
+            "error": "Network error",
+            "message": "Network error. Please check your connection and try again.",
+            "action": "Retry button available"
+          }
+        ]
+      },
+      "states": {
+        "idle": {
+          "button_state": "Enabled, 'Reset Password' label"
+        },
+        "confirming": {
+          "modal_state": "Open, buttons enabled"
+        },
+        "sending": {
+          "button_state": "Disabled, loading spinner",
+          "modal_state": "Buttons disabled, loading spinner on 'Send' button",
+          "message": "Sending reset email..."
+        },
+        "success": {
+          "button_state": "Enabled, badge shows 'Last reset: just now'",
+          "modal_state": "Closed",
+          "toast": "Success message displayed"
+        },
+        "error": {
+          "button_state": "Enabled",
+          "modal_state": "Closed or stays open (depending on error)",
+          "toast": "Error message displayed with retry option"
+        }
+      },
+      "accessibility": {
+        "keyboard_navigation": "Tab to button, Enter to activate, Tab through modal, Enter to confirm",
+        "screen_reader": "Button announces 'Reset password for [User Email]'",
+        "focus_management": "Focus returns to Reset Password button after modal closes",
+        "aria_labels": "Modal has role='dialog', aria-labelledby points to title"
+      }
+    },
+
+    "api_backend_requirements": {
+      "endpoints": [
+        {
+          "endpoint_id": "admin_reset_user_password",
+          "method": "POST",
+          "path": "/.netlify/functions/adminResetUserPassword",
+          "description": "Trigger password reset email for target user via Firebase Auth",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "authorization": {
+            "required": true,
+            "method": "checkAdminAccess(adminUserId)",
+            "failure_response": {
+              "statusCode": 403,
+              "body": {
+                "success": false,
+                "error": "Admin access required"
+              }
+            }
+          },
+          "request_schema": {
+            "authToken": {
+              "type": "string",
+              "required": true,
+              "description": "Firebase ID token of requesting admin"
+            },
+            "targetUserId": {
+              "type": "string",
+              "required": true,
+              "description": "UID of user whose password to reset"
+            },
+            "targetEmail": {
+              "type": "string",
+              "required": false,
+              "description": "User's email (for validation/audit, optional)"
+            }
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "email": "string (email where reset link was sent)",
+              "expiresIn": "3600 (seconds, Firebase default 1 hour)",
+              "message": "Password reset email sent successfully"
+            }
+          },
+          "error_responses": [
+            {
+              "statusCode": 404,
+              "condition": "User not found",
+              "body": {
+                "success": false,
+                "error": "User not found",
+                "code": "USER_NOT_FOUND"
+              }
+            },
+            {
+              "statusCode": 400,
+              "condition": "User has no email (OAuth-only account)",
+              "body": {
+                "success": false,
+                "error": "Cannot reset password for OAuth-only accounts",
+                "code": "NO_EMAIL"
+              }
+            },
+            {
+              "statusCode": 429,
+              "condition": "Rate limit exceeded (Firebase throttles to prevent abuse)",
+              "body": {
+                "success": false,
+                "error": "Too many password reset requests. Try again later.",
+                "code": "RATE_LIMIT",
+                "retryAfter": 900
+              }
+            },
+            {
+              "statusCode": 500,
+              "condition": "Firebase Admin SDK error",
+              "body": {
+                "success": false,
+                "error": "Failed to send password reset email",
+                "code": "INTERNAL_ERROR"
+              }
+            }
+          ],
+          "implementation": {
+            "firebase_admin_sdk_method": "admin.auth().generatePasswordResetLink(email, actionCodeSettings)",
+            "action_code_settings": {
+              "url": "https://idynify.com/login?passwordReset=true",
+              "handleCodeInApp": false
+            },
+            "send_email": "Firebase automatically sends email using default template (or custom template if configured in Firebase Console > Authentication > Templates)",
+            "rate_limiting": {
+              "firebase_default": "Multiple reset requests for same user are throttled by Firebase",
+              "application_layer": "Optional: Track last reset time per user in Firestore, prevent admin from sending more than 1 reset per 15 minutes"
+            },
+            "audit_logging": "Log to adminAuditLogs with action='password_reset_triggered'"
+          }
+        }
+      ],
+      "firebase_configuration": {
+        "email_template_customization": {
+          "location": "Firebase Console > Authentication > Templates > Password reset",
+          "customization_options": [
+            "Email subject line",
+            "Email body HTML",
+            "From name (default: Firebase Auth)",
+            "Reply-to email"
+          ],
+          "recommended_customization": {
+            "subject": "Reset your iDynify password",
+            "from_name": "iDynify Support",
+            "body": "Include iDynify branding, match welcome email style",
+            "link_text": "Reset Password"
+          }
+        },
+        "reset_link_expiration": {
+          "default": "1 hour (3600 seconds)",
+          "configurable": "No (Firebase limitation)",
+          "security_note": "Link is single-use - expires after password is reset"
+        }
+      },
+      "rate_limiting": {
+        "admin_api_level": {
+          "limit": "10 password resets per admin per hour",
+          "implementation": "Track reset count in Firestore or Redis cache with 1-hour TTL",
+          "exceeded_response": {
+            "statusCode": 429,
+            "body": {
+              "success": false,
+              "error": "Admin rate limit exceeded. Maximum 10 password resets per hour.",
+              "code": "ADMIN_RATE_LIMIT"
+            }
+          }
+        },
+        "user_level": {
+          "limit": "1 reset per user per 15 minutes",
+          "implementation": "Store lastPasswordResetSentAt in users/{uid} document",
+          "rationale": "Prevent abuse and email spam to user"
+        }
+      }
+    },
+
+    "workflows": {
+      "primary_workflow": {
+        "name": "Admin Resets User Password via Email",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "User",
+            "action": "Contacts support: 'I forgot my password'",
+            "context": "User cannot access platform"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Navigate to Admin Dashboard, search for user by email",
+            "ui": "AdminDashboard.jsx"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Click user row to open User Detail page",
+            "ui": "Navigate to /admin/user/:uid"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "In Account section, click 'Reset Password' button",
+            "ui": "UserDetail.jsx - Account tab"
+          },
+          {
+            "step": 5,
+            "actor": "System",
+            "action": "Display confirmation modal with user email and warnings",
+            "ui": "PasswordResetConfirmModal component"
+          },
+          {
+            "step": 6,
+            "actor": "Admin",
+            "action": "Review confirmation details, click 'Send Reset Email'",
+            "ui": "Modal"
+          },
+          {
+            "step": 7,
+            "actor": "System",
+            "action": "Call adminResetUserPassword API endpoint",
+            "backend": "Verify admin auth, get user details, call Firebase admin.auth().generatePasswordResetLink()"
+          },
+          {
+            "step": 8,
+            "actor": "System",
+            "action": "Firebase sends password reset email to user",
+            "email": "User receives email with subject 'Reset your iDynify password' and reset link"
+          },
+          {
+            "step": 9,
+            "actor": "System",
+            "action": "Log action to adminAuditLogs",
+            "data": {
+              "action": "password_reset_triggered",
+              "adminUserId": "admin UID",
+              "targetUserId": "user UID",
+              "targetEmail": "user email",
+              "timestamp": "now"
+            }
+          },
+          {
+            "step": 10,
+            "actor": "System",
+            "action": "Return success response to frontend",
+            "response": {
+              "success": true,
+              "email": "user@example.com"
+            }
+          },
+          {
+            "step": 11,
+            "actor": "System",
+            "action": "Display success toast notification",
+            "ui": "Toast: 'Password reset email sent to user@example.com'"
+          },
+          {
+            "step": 12,
+            "actor": "System",
+            "action": "Update UI to show 'Last reset: just now' badge",
+            "ui": "Badge appears below Reset Password button"
+          },
+          {
+            "step": 13,
+            "actor": "User",
+            "action": "Checks email, clicks reset link",
+            "external": "Firebase-hosted password reset page"
+          },
+          {
+            "step": 14,
+            "actor": "User",
+            "action": "Enters new password, submits",
+            "external": "Firebase handles password update"
+          },
+          {
+            "step": 15,
+            "actor": "User",
+            "action": "Redirected to login page, logs in with new password",
+            "ui": "User can now access platform"
+          },
+          {
+            "step": 16,
+            "actor": "Admin",
+            "action": "Confirms with user that issue is resolved",
+            "context": "Support ticket closed"
+          }
+        ],
+        "success_criteria": "User receives reset email within 1 minute, successfully resets password, regains account access"
+      },
+      "error_workflows": [
+        {
+          "scenario": "User account does not exist",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Clicks 'Reset Password' for user"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "API calls Firebase admin.auth().getUserByEmail(), throws UserNotFoundError"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Return 404 error response"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Display error toast: 'User account not found. Cannot send reset email.'"
+            },
+            {
+              "step": 5,
+              "actor": "Admin",
+              "action": "Verifies user email with requester, realizes account was deleted or never created"
+            }
+          ]
+        },
+        {
+          "scenario": "User has OAuth-only account (Google, Microsoft)",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Clicks 'Reset Password' for OAuth user"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "API checks user's providerData, finds no email/password provider"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Return 400 error: 'Cannot reset password for OAuth-only accounts'"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Display error toast with explanation and suggested action"
+            },
+            {
+              "step": 5,
+              "actor": "Admin",
+              "action": "Informs user to use 'Sign in with Google' instead of password"
+            }
+          ]
+        },
+        {
+          "scenario": "Rate limit exceeded",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Attempts 3rd password reset for same user within 15 minutes"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "API checks lastPasswordResetSentAt timestamp, finds < 15 min ago"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Return 429 error: 'Rate limit exceeded. Try again in X minutes.'"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Display error toast with retry time"
+            },
+            {
+              "step": 5,
+              "actor": "Admin",
+              "action": "Waits or asks user to check spam folder for previous email"
+            }
+          ]
+        },
+        {
+          "scenario": "Email delivery failure",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Sends password reset email"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "Firebase attempts to send email, fails (invalid email, bounced, etc.)"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Firebase may or may not report error (depends on configuration)"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "API returns success (Firebase doesn't always report send failures)"
+            },
+            {
+              "step": 5,
+              "actor": "User",
+              "action": "Does not receive email after 10 minutes"
+            },
+            {
+              "step": 6,
+              "actor": "Admin",
+              "action": "Advises user to check spam, verify email address, or escalate to Firebase support"
+            }
+          ]
+        }
+      ]
+    },
+
+    "data_logging_requirements": {
+      "audit_log_collection": "adminAuditLogs",
+      "log_entry_schema": {
+        "password_reset_triggered": {
+          "adminUserId": "string",
+          "adminEmail": "string",
+          "action": "password_reset_triggered",
+          "targetUserId": "string",
+          "targetUserEmail": "string",
+          "targetResource": "user_password",
+          "timestamp": "Timestamp",
+          "ipAddress": "string",
+          "userAgent": "string",
+          "metadata": {
+            "resetLinkExpiresAt": "ISO timestamp (now + 1 hour)",
+            "emailSent": "boolean (true if Firebase didn't throw error)"
+          }
+        }
+      },
+      "user_document_update": {
+        "collection": "users/{uid}",
+        "field": "lastPasswordResetSentAt",
+        "type": "Timestamp",
+        "purpose": "Track last reset time for rate limiting",
+        "updated_when": "After successful Firebase API call"
+      },
+      "retention": "2 years for audit logs",
+      "compliance_note": "Password reset logs may be required for security audits to investigate unauthorized access attempts"
+    },
+
+    "security_compliance_considerations": {
+      "security_measures": [
+        {
+          "measure": "Admin cannot see or set user passwords",
+          "implementation": "Use Firebase generatePasswordResetLink() - admin only triggers email",
+          "rationale": "Prevent admin from knowing user passwords or setting weak passwords"
+        },
+        {
+          "measure": "Reset links expire after 1 hour",
+          "implementation": "Firebase default, not configurable",
+          "rationale": "Minimize window for link interception or unauthorized use"
+        },
+        {
+          "measure": "Reset links are single-use",
+          "implementation": "Firebase invalidates link after password reset",
+          "rationale": "Prevent link reuse after password change"
+        },
+        {
+          "measure": "Rate limiting prevents abuse",
+          "implementation": "1 reset per user per 15 minutes, 10 resets per admin per hour",
+          "rationale": "Prevent email spam and admin abuse"
+        },
+        {
+          "measure": "Audit logging for accountability",
+          "implementation": "Log every password reset trigger with admin ID, user ID, timestamp",
+          "rationale": "Detect unauthorized password reset attempts by rogue admins"
+        },
+        {
+          "measure": "Confirmation modal prevents accidental resets",
+          "implementation": "Require explicit confirmation before sending email",
+          "rationale": "Reduce user confusion from unsolicited reset emails"
+        },
+        {
+          "measure": "Email verification not required",
+          "implementation": "Firebase sends reset email to user's registered email even if not verified",
+          "rationale": "User may have lost access to verified email, reset helps recovery",
+          "risk": "Unverified emails may not be user's - show warning in confirmation modal"
+        }
+      ],
+      "compliance": {
+        "gdpr": {
+          "article_32": "Security of processing - password resets support account security",
+          "note": "Audit logs document password reset actions for security monitoring"
+        },
+        "soc2": {
+          "cc6_1": "Logical access controls - only admins can trigger resets",
+          "cc6_7": "Access revocation - password reset allows user to regain access",
+          "cc7_2": "System monitoring - audit logs track reset actions"
+        },
+        "nist_800_63b": {
+          "section_5_1_1": "Password reset should verify user identity - Firebase link sent to registered email",
+          "section_5_1_2": "Reset links should expire - 1 hour expiration meets requirement"
+        }
+      },
+      "safe_defaults": [
+        "Default link expiration: 1 hour (Firebase default)",
+        "Default rate limit: 1 reset per user per 15 minutes",
+        "Default email template: Firebase default (or custom if configured)",
+        "Default on error: No email sent, admin notified of failure"
+      ],
+      "rbac_checks": {
+        "frontend": "Reset Password button only visible to admins (ProtectedAdminRoute)",
+        "backend": "adminResetUserPassword checks checkAdminAccess() before calling Firebase",
+        "firebase": "Email sent via Firebase Admin SDK (server-side), not client SDK"
+      },
+      "privacy_considerations": {
+        "email_sent_to": "User's registered email address only",
+        "admin_visibility": "Admin sees confirmation that email was sent, but not reset link contents",
+        "email_content": "Does not include any user data beyond email address and reset link",
+        "third_party_access": "Firebase sends email via SendGrid or similar (check Firebase config)"
+      }
+    },
+
+    "acceptance_criteria": [
+      {
+        "id": "PWD-AC-1",
+        "requirement": "Admin can trigger password reset from User Detail page",
+        "test": "Navigate to /admin/user/:uid, click 'Reset Password', confirm in modal, verify API call and success toast"
+      },
+      {
+        "id": "PWD-AC-2",
+        "requirement": "User receives password reset email",
+        "test": "Trigger reset for test user, check user's email inbox, verify reset email received within 1 minute"
+      },
+      {
+        "id": "PWD-AC-3",
+        "requirement": "Reset link allows user to change password",
+        "test": "Click link in email, enter new password, verify password updated and user can login with new password"
+      },
+      {
+        "id": "PWD-AC-4",
+        "requirement": "Reset link expires after 1 hour",
+        "test": "Generate reset link, wait 61 minutes, attempt to use link, verify error: 'Link expired'"
+      },
+      {
+        "id": "PWD-AC-5",
+        "requirement": "Reset link is single-use",
+        "test": "Use reset link to change password, attempt to use same link again, verify error: 'Link already used'"
+      },
+      {
+        "id": "PWD-AC-6",
+        "requirement": "Rate limiting prevents multiple resets for same user",
+        "test": "Send reset for User A, immediately send another, verify 2nd request rejected with rate limit error"
+      },
+      {
+        "id": "PWD-AC-7",
+        "requirement": "Admin rate limit prevents abuse",
+        "test": "Send 10 password resets within 1 hour, attempt 11th, verify rejection"
+      },
+      {
+        "id": "PWD-AC-8",
+        "requirement": "Cannot reset password for deleted user",
+        "test": "Delete user account, attempt password reset, verify 404 User Not Found error"
+      },
+      {
+        "id": "PWD-AC-9",
+        "requirement": "Cannot reset password for OAuth-only account",
+        "test": "For user with only Google sign-in provider, attempt reset, verify error message"
+      },
+      {
+        "id": "PWD-AC-10",
+        "requirement": "Audit log created on password reset trigger",
+        "test": "Trigger reset, check adminAuditLogs, verify entry with action='password_reset_triggered', admin UID, user UID, timestamp"
+      },
+      {
+        "id": "PWD-AC-11",
+        "requirement": "Non-admin cannot trigger password reset",
+        "test": "As non-admin, navigate to /admin/user/:uid, verify button not visible. Call API directly, verify 403."
+      },
+      {
+        "id": "PWD-AC-12",
+        "requirement": "Success toast shows user email",
+        "test": "Trigger reset, verify toast message includes exact user email"
+      },
+      {
+        "id": "PWD-AC-13",
+        "requirement": "Error toast allows retry for transient errors",
+        "test": "Simulate network error, verify error toast has 'Retry' button, click retry, verify new API call"
+      },
+      {
+        "id": "PWD-AC-14",
+        "requirement": "Last reset timestamp displayed after successful reset",
+        "test": "Trigger reset, verify 'Last reset: just now' badge appears. Refresh page, verify persists."
+      },
+      {
+        "id": "PWD-AC-15",
+        "requirement": "Confirmation modal prevents accidental clicks",
+        "test": "Click Reset Password, verify modal appears with warnings. Click outside modal, verify closes without action."
+      }
+    ]
+  },
+
+  "suspendReactivate": {
+    "feature_id": "admin_suspend_reactivate_accounts",
+    "feature_name": "Suspend & Reactivate User Accounts",
+    "description": "Allow admin users to temporarily disable (suspend) or re-enable (reactivate) user accounts. Suspended users cannot log in or access the platform. This is useful for handling policy violations, payment issues, or security incidents without permanently deleting accounts.",
+
+    "user_story": {
+      "as": "Admin user",
+      "i_want": "to suspend a user account to immediately block their access, and reactivate it later to restore access",
+      "so_that": "I can enforce terms of service, handle payment failures, respond to security threats, or comply with user requests without permanently deleting data",
+      "acceptance_summary": "Admin can suspend active accounts (user immediately logged out and cannot login), view suspended status, reactivate accounts (user can login again), with all actions logged and user notified via email",
+      "user_facing_notifications": [
+        {
+          "trigger": "Admin suspends user account",
+          "admin_message": "Are you sure you want to suspend [User Email]? This will immediately log them out and prevent login.",
+          "location": "Confirmation modal",
+          "style": "Danger modal (red) with Cancel/Suspend buttons"
+        },
+        {
+          "trigger": "Account successfully suspended",
+          "admin_message": "Account suspended. [User Email] has been logged out and cannot access the platform.",
+          "location": "Toast notification",
+          "style": "Warning toast (orange), 5-second duration"
+        },
+        {
+          "trigger": "User attempts to login while suspended (user-facing)",
+          "user_error_message": "Your account has been suspended. Please contact support at support@idynify.com for assistance.",
+          "location": "Login page error message",
+          "style": "Error alert (red) on login form"
+        },
+        {
+          "trigger": "Admin reactivates user account",
+          "admin_message": "Are you sure you want to reactivate [User Email]? They will be able to log in immediately.",
+          "location": "Confirmation modal",
+          "style": "Warning modal (yellow) with Cancel/Reactivate buttons"
+        },
+        {
+          "trigger": "Account successfully reactivated",
+          "admin_message": "Account reactivated. [User Email] can now log in and access the platform.",
+          "location": "Toast notification",
+          "style": "Success toast (green), 5-second duration"
+        },
+        {
+          "trigger": "User receives suspension notification email (optional)",
+          "email_subject": "Your iDynify account has been suspended",
+          "email_from": "support@idynify.com",
+          "email_content": "Template with reason (if provided), contact support instructions, appeal process"
+        },
+        {
+          "trigger": "User receives reactivation notification email (optional)",
+          "email_subject": "Your iDynify account has been reactivated",
+          "email_from": "support@idynify.com",
+          "email_content": "Account restored, welcome back message, login link"
+        }
+      ]
+    },
+
+    "ui_requirements": {
+      "account_status_indicator": {
+        "location": "User Detail Page - Account Section",
+        "component": "Status badge next to user email",
+        "states": [
+          {
+            "status": "active",
+            "badge_text": "Active",
+            "badge_color": "Green",
+            "icon": "CheckCircle"
+          },
+          {
+            "status": "suspended",
+            "badge_text": "Suspended",
+            "badge_color": "Red",
+            "icon": "Ban"
+          },
+          {
+            "status": "deleted",
+            "badge_text": "Deleted",
+            "badge_color": "Gray",
+            "icon": "Trash"
+          }
+        ]
+      },
+      "action_buttons": {
+        "suspend_button": {
+          "location": "User Detail Page - Account Section",
+          "label": "Suspend Account",
+          "icon": "Ban or Lock icon",
+          "style": "Danger button (red)",
+          "placement": "Below account status badge",
+          "visibility": "Only shown when account status is 'active'",
+          "permissions": "Only visible to admins"
+        },
+        "reactivate_button": {
+          "location": "User Detail Page - Account Section",
+          "label": "Reactivate Account",
+          "icon": "Unlock or RefreshCw icon",
+          "style": "Success button (green)",
+          "placement": "Below account status badge",
+          "visibility": "Only shown when account status is 'suspended'",
+          "permissions": "Only visible to admins"
+        }
+      },
+      "suspend_confirmation_modal": {
+        "trigger": "Click 'Suspend Account' button",
+        "modal_title": "Confirm Account Suspension",
+        "modal_content": {
+          "icon": "AlertTriangle (red)",
+          "warning_message": "You are about to suspend:\n\n**[User Name]**\n([User Email])\n\n**Immediate effects:**\n• User will be logged out of all active sessions\n• User cannot log in or access the platform\n• User data is preserved (not deleted)\n• Subscription/billing may continue (requires manual cancellation)\n• User will see suspension notice on login attempts\n\n**This action:**\n• Is reversible (you can reactivate later)\n• Will be logged in admin audit trail\n• Can optionally send notification email to user",
+          "reason_input": {
+            "label": "Reason for suspension (optional, internal only)",
+            "type": "textarea",
+            "placeholder": "E.g., Terms of service violation, payment failure, security incident...",
+            "maxLength": 500,
+            "required": false
+          },
+          "notify_user_checkbox": {
+            "label": "Send suspension notification email to user",
+            "default": false,
+            "note": "User will receive email explaining account suspension"
+          }
+        },
+        "actions": {
+          "cancel": {
+            "label": "Cancel",
+            "style": "Secondary button (gray)",
+            "action": "Close modal, no action"
+          },
+          "confirm": {
+            "label": "Suspend Account",
+            "style": "Danger button (red)",
+            "icon": "Ban icon",
+            "action": "Call adminSuspendAccount API"
+          }
+        }
+      },
+      "reactivate_confirmation_modal": {
+        "trigger": "Click 'Reactivate Account' button",
+        "modal_title": "Confirm Account Reactivation",
+        "modal_content": {
+          "icon": "AlertTriangle (yellow)",
+          "message": "You are about to reactivate:\n\n**[User Name]**\n([User Email])\n\n**Immediate effects:**\n• User can log in immediately\n• Full platform access restored\n• All data remains intact\n\n**Suspension details:**\n• Suspended on: [timestamp]\n• Suspended by: [Admin name]\n• Reason: [reason if provided]\n• Duration: [X days]\n\nDo you want to restore this account?",
+          "notes_input": {
+            "label": "Reactivation notes (optional, internal only)",
+            "type": "textarea",
+            "placeholder": "E.g., Issue resolved, payment received, appeal approved...",
+            "maxLength": 500,
+            "required": false
+          },
+          "notify_user_checkbox": {
+            "label": "Send reactivation notification email to user",
+            "default": true,
+            "note": "User will receive email confirming account restoration"
+          }
+        },
+        "actions": {
+          "cancel": {
+            "label": "Cancel",
+            "style": "Secondary button (gray)",
+            "action": "Close modal, no action"
+          },
+          "confirm": {
+            "label": "Reactivate Account",
+            "style": "Success button (green)",
+            "icon": "Unlock icon",
+            "action": "Call adminReactivateAccount API"
+          }
+        }
+      },
+      "suspension_history": {
+        "location": "User Detail Page - New 'Account History' section",
+        "component": "Timeline showing suspension/reactivation events",
+        "display": [
+          {
+            "event_type": "account_suspended",
+            "icon": "Ban (red)",
+            "text": "Account suspended by [Admin Email]",
+            "timestamp": "ISO timestamp",
+            "reason": "Displayed if provided"
+          },
+          {
+            "event_type": "account_reactivated",
+            "icon": "Unlock (green)",
+            "text": "Account reactivated by [Admin Email]",
+            "timestamp": "ISO timestamp",
+            "notes": "Displayed if provided"
+          }
+        ],
+        "sorting": "Newest first (descending timestamp)",
+        "limit": "Show last 10 events, 'View All' button for more"
+      },
+      "admin_dashboard_filtering": {
+        "location": "Admin Dashboard - User List",
+        "enhancement": "Add account status filter dropdown",
+        "options": [
+          "All Accounts",
+          "Active Only",
+          "Suspended Only"
+        ],
+        "table_indicator": {
+          "suspended_rows": "Highlighted with red background (light)",
+          "status_column": "Add 'Status' column to table showing badge"
+        }
+      },
+      "states": {
+        "suspending": {
+          "button_state": "Disabled, loading spinner",
+          "modal_state": "Buttons disabled, 'Suspending account...' message"
+        },
+        "suspended_success": {
+          "button_state": "'Suspend Account' button hidden, 'Reactivate Account' button shown",
+          "badge_update": "Status badge changes to 'Suspended' (red)",
+          "toast": "Success toast displayed"
+        },
+        "reactivating": {
+          "button_state": "Disabled, loading spinner",
+          "modal_state": "Buttons disabled, 'Reactivating account...' message"
+        },
+        "reactivated_success": {
+          "button_state": "'Reactivate Account' button hidden, 'Suspend Account' button shown",
+          "badge_update": "Status badge changes to 'Active' (green)",
+          "toast": "Success toast displayed"
+        },
+        "error": {
+          "toast": "Error toast with specific error message and retry option"
+        }
+      },
+      "accessibility": {
+        "keyboard_navigation": "Tab to buttons, Enter to activate, Tab through modal",
+        "screen_reader": "Status badge announces 'Account status: [Active/Suspended]'",
+        "focus_management": "Focus returns to action button after modal closes",
+        "color_independence": "Icons supplement color coding for status"
+      }
+    },
+
+    "api_backend_requirements": {
+      "endpoints": [
+        {
+          "endpoint_id": "admin_suspend_account",
+          "method": "POST",
+          "path": "/.netlify/functions/adminSuspendAccount",
+          "description": "Disable user account via Firebase Auth, preventing all login attempts",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "authorization": {
+            "required": true,
+            "method": "checkAdminAccess(adminUserId)",
+            "additional_check": "Prevent suspending other admin accounts",
+            "failure_response": {
+              "statusCode": 403,
+              "body": {
+                "success": false,
+                "error": "Admin access required"
+              }
+            }
+          },
+          "request_schema": {
+            "authToken": {
+              "type": "string",
+              "required": true
+            },
+            "targetUserId": {
+              "type": "string",
+              "required": true
+            },
+            "reason": {
+              "type": "string",
+              "required": false,
+              "maxLength": 500,
+              "description": "Internal reason for suspension"
+            },
+            "notifyUser": {
+              "type": "boolean",
+              "default": false,
+              "description": "Send suspension notification email"
+            }
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "userId": "string",
+              "email": "string",
+              "status": "suspended",
+              "suspendedAt": "ISO timestamp",
+              "suspendedBy": "admin email",
+              "emailSent": "boolean (if notifyUser was true)"
+            }
+          },
+          "error_responses": [
+            {
+              "statusCode": 404,
+              "condition": "User not found",
+              "body": {
+                "success": false,
+                "error": "User not found"
+              }
+            },
+            {
+              "statusCode": 400,
+              "condition": "User already suspended",
+              "body": {
+                "success": false,
+                "error": "User account is already suspended"
+              }
+            },
+            {
+              "statusCode": 403,
+              "condition": "Attempting to suspend admin account",
+              "body": {
+                "success": false,
+                "error": "Cannot suspend admin accounts"
+              }
+            },
+            {
+              "statusCode": 500,
+              "condition": "Firebase Admin SDK error",
+              "body": {
+                "success": false,
+                "error": "Failed to suspend account"
+              }
+            }
+          ],
+          "implementation": {
+            "firebase_admin_sdk_method": "admin.auth().updateUser(uid, { disabled: true })",
+            "firestore_update": {
+              "collection": "users/{uid}",
+              "fields": {
+                "accountStatus": "suspended",
+                "suspendedAt": "Timestamp",
+                "suspendedBy": "admin UID",
+                "suspensionReason": "string or null"
+              }
+            },
+            "session_revocation": "Firebase automatically invalidates all active sessions when user is disabled",
+            "notification_email": {
+              "condition": "If notifyUser === true",
+              "method": "Call sendSuspensionEmail Netlify function or Resend API",
+              "template": "suspension-notification.html"
+            },
+            "audit_logging": "Log to adminAuditLogs with action='account_suspended'"
+          }
+        },
+        {
+          "endpoint_id": "admin_reactivate_account",
+          "method": "POST",
+          "path": "/.netlify/functions/adminReactivateAccount",
+          "description": "Re-enable previously suspended user account",
+          "authentication": {
+            "required": true,
+            "method": "Firebase Auth ID Token"
+          },
+          "authorization": {
+            "required": true,
+            "method": "checkAdminAccess(adminUserId)"
+          },
+          "request_schema": {
+            "authToken": {
+              "type": "string",
+              "required": true
+            },
+            "targetUserId": {
+              "type": "string",
+              "required": true
+            },
+            "notes": {
+              "type": "string",
+              "required": false,
+              "maxLength": 500,
+              "description": "Internal notes for reactivation"
+            },
+            "notifyUser": {
+              "type": "boolean",
+              "default": true,
+              "description": "Send reactivation notification email"
+            }
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "userId": "string",
+              "email": "string",
+              "status": "active",
+              "reactivatedAt": "ISO timestamp",
+              "reactivatedBy": "admin email",
+              "suspensionDuration": "number (days suspended)",
+              "emailSent": "boolean"
+            }
+          },
+          "error_responses": [
+            {
+              "statusCode": 404,
+              "condition": "User not found",
+              "body": {
+                "success": false,
+                "error": "User not found"
+              }
+            },
+            {
+              "statusCode": 400,
+              "condition": "User not currently suspended",
+              "body": {
+                "success": false,
+                "error": "User account is not suspended"
+              }
+            }
+          ],
+          "implementation": {
+            "firebase_admin_sdk_method": "admin.auth().updateUser(uid, { disabled: false })",
+            "firestore_update": {
+              "collection": "users/{uid}",
+              "fields": {
+                "accountStatus": "active",
+                "reactivatedAt": "Timestamp",
+                "reactivatedBy": "admin UID",
+                "reactivationNotes": "string or null",
+                "suspensionReason": "null (clear previous reason)"
+              }
+            },
+            "notification_email": {
+              "condition": "If notifyUser === true",
+              "method": "Call sendReactivationEmail function",
+              "template": "reactivation-notification.html"
+            },
+            "audit_logging": "Log to adminAuditLogs with action='account_reactivated'"
+          }
+        },
+        {
+          "endpoint_id": "get_suspension_history",
+          "method": "POST",
+          "path": "/.netlify/functions/adminGetSuspensionHistory",
+          "description": "Fetch suspension/reactivation event history for user",
+          "request_schema": {
+            "authToken": "string (required)",
+            "targetUserId": "string (required)"
+          },
+          "response_schema": {
+            "success": true,
+            "data": {
+              "events": [
+                {
+                  "eventId": "string",
+                  "action": "account_suspended | account_reactivated",
+                  "timestamp": "ISO timestamp",
+                  "adminUserId": "string",
+                  "adminEmail": "string",
+                  "reason": "string or null",
+                  "notes": "string or null"
+                }
+              ],
+              "summary": {
+                "totalSuspensions": "number",
+                "currentStatus": "active | suspended",
+                "lastSuspendedAt": "ISO timestamp or null",
+                "lastReactivatedAt": "ISO timestamp or null"
+              }
+            }
+          }
+        }
+      ],
+      "email_notifications": {
+        "suspension_email": {
+          "template_id": "suspension-notification",
+          "subject": "Your iDynify account has been suspended",
+          "from": "iDynify Support <support@idynify.com>",
+          "content_sections": [
+            "Account suspended notice",
+            "Reason (if provided by admin)",
+            "Contact support instructions (support@idynify.com)",
+            "Appeal process (if applicable)",
+            "Link to Terms of Service"
+          ],
+          "tone": "Professional, not accusatory",
+          "send_method": "Resend API or Netlify function"
+        },
+        "reactivation_email": {
+          "template_id": "reactivation-notification",
+          "subject": "Your iDynify account has been reactivated",
+          "from": "iDynify Support <support@idynify.com>",
+          "content_sections": [
+            "Account restored notice",
+            "Welcome back message",
+            "Login link (https://idynify.com/login)",
+            "Support contact if issues logging in"
+          ],
+          "tone": "Welcoming, positive",
+          "send_method": "Resend API"
+        }
+      },
+      "firebase_auth_behavior": {
+        "disabled_user_login_attempt": {
+          "error_code": "auth/user-disabled",
+          "error_message": "The user account has been disabled by an administrator.",
+          "frontend_handling": "Catch error on login, display user-friendly message with support contact"
+        },
+        "session_revocation": {
+          "automatic": true,
+          "mechanism": "Firebase automatically invalidates all refresh tokens when user.disabled = true",
+          "timing": "Immediate (within seconds)",
+          "user_experience": "User logged out of all sessions (web, mobile) and redirected to login"
+        }
+      }
+    },
+
+    "workflows": {
+      "primary_workflow_suspend": {
+        "name": "Admin Suspends User Account for ToS Violation",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "Admin",
+            "action": "Receives report of user violating terms of service",
+            "context": "E.g., abusive behavior, spam, fraudulent activity"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Navigate to Admin Dashboard, search for user",
+            "ui": "AdminDashboard.jsx"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Click user row to open User Detail page",
+            "ui": "/admin/user/:uid"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "Review user data, confirm violation",
+            "ui": "UserDetail.jsx - Account, Scout, Recon tabs"
+          },
+          {
+            "step": 5,
+            "actor": "Admin",
+            "action": "Click 'Suspend Account' button",
+            "ui": "UserDetail.jsx - Account section"
+          },
+          {
+            "step": 6,
+            "actor": "System",
+            "action": "Display suspension confirmation modal",
+            "ui": "SuspendAccountModal component"
+          },
+          {
+            "step": 7,
+            "actor": "Admin",
+            "action": "Enter reason: 'Terms of service violation - spam activity'",
+            "ui": "Reason textarea in modal"
+          },
+          {
+            "step": 8,
+            "actor": "Admin",
+            "action": "Check 'Send suspension notification email' checkbox",
+            "ui": "Modal checkbox"
+          },
+          {
+            "step": 9,
+            "actor": "Admin",
+            "action": "Click 'Suspend Account' button",
+            "ui": "Modal confirmation button"
+          },
+          {
+            "step": 10,
+            "actor": "System",
+            "action": "Call adminSuspendAccount API",
+            "backend": "Verify admin auth, call Firebase admin.auth().updateUser(uid, {disabled: true})"
+          },
+          {
+            "step": 11,
+            "actor": "System",
+            "action": "Update Firestore users/{uid} document",
+            "data": {
+              "accountStatus": "suspended",
+              "suspendedAt": "Timestamp",
+              "suspendedBy": "admin UID",
+              "suspensionReason": "Terms of service violation - spam activity"
+            }
+          },
+          {
+            "step": 12,
+            "actor": "System",
+            "action": "Firebase revokes all active user sessions",
+            "effect": "User immediately logged out from all devices"
+          },
+          {
+            "step": 13,
+            "actor": "System",
+            "action": "Send suspension notification email to user",
+            "email": "suspension-notification template with reason"
+          },
+          {
+            "step": 14,
+            "actor": "System",
+            "action": "Log action to adminAuditLogs",
+            "data": {
+              "action": "account_suspended",
+              "adminUserId": "admin UID",
+              "targetUserId": "user UID",
+              "reason": "reason text",
+              "timestamp": "now"
+            }
+          },
+          {
+            "step": 15,
+            "actor": "System",
+            "action": "Return success response, update UI",
+            "frontend": "Close modal, show success toast, update status badge to 'Suspended', show 'Reactivate Account' button"
+          },
+          {
+            "step": 16,
+            "actor": "User",
+            "action": "Attempts to login",
+            "ui": "Login page"
+          },
+          {
+            "step": 17,
+            "actor": "System",
+            "action": "Firebase returns auth/user-disabled error",
+            "frontend": "Display error: 'Your account has been suspended. Contact support@idynify.com.'"
+          }
+        ],
+        "success_criteria": "User account disabled, sessions revoked, user cannot login, notification sent, action logged"
+      },
+      "primary_workflow_reactivate": {
+        "name": "Admin Reactivates User Account After Issue Resolved",
+        "steps": [
+          {
+            "step": 1,
+            "actor": "User",
+            "action": "Contacts support, explains violation was mistake or issue resolved",
+            "context": "E.g., payment received, appeal approved"
+          },
+          {
+            "step": 2,
+            "actor": "Admin",
+            "action": "Verifies issue resolved, decides to reactivate",
+            "context": "Reviews suspension history and user communication"
+          },
+          {
+            "step": 3,
+            "actor": "Admin",
+            "action": "Navigate to suspended user's detail page",
+            "ui": "/admin/user/:uid, status badge shows 'Suspended'"
+          },
+          {
+            "step": 4,
+            "actor": "Admin",
+            "action": "Click 'Reactivate Account' button",
+            "ui": "UserDetail.jsx - Account section"
+          },
+          {
+            "step": 5,
+            "actor": "System",
+            "action": "Display reactivation confirmation modal with suspension details",
+            "ui": "Shows: suspended date, suspended by, reason, duration"
+          },
+          {
+            "step": 6,
+            "actor": "Admin",
+            "action": "Enter notes: 'Issue resolved - payment received'",
+            "ui": "Notes textarea in modal"
+          },
+          {
+            "step": 7,
+            "actor": "Admin",
+            "action": "Leave 'Send reactivation email' checked (default)",
+            "ui": "Modal checkbox"
+          },
+          {
+            "step": 8,
+            "actor": "Admin",
+            "action": "Click 'Reactivate Account' button",
+            "ui": "Modal confirmation button"
+          },
+          {
+            "step": 9,
+            "actor": "System",
+            "action": "Call adminReactivateAccount API",
+            "backend": "Verify admin auth, call Firebase admin.auth().updateUser(uid, {disabled: false})"
+          },
+          {
+            "step": 10,
+            "actor": "System",
+            "action": "Update Firestore users/{uid} document",
+            "data": {
+              "accountStatus": "active",
+              "reactivatedAt": "Timestamp",
+              "reactivatedBy": "admin UID",
+              "reactivationNotes": "Issue resolved - payment received",
+              "suspensionReason": null
+            }
+          },
+          {
+            "step": 11,
+            "actor": "System",
+            "action": "Send reactivation notification email to user",
+            "email": "reactivation-notification template"
+          },
+          {
+            "step": 12,
+            "actor": "System",
+            "action": "Log action to adminAuditLogs",
+            "data": {
+              "action": "account_reactivated",
+              "adminUserId": "admin UID",
+              "targetUserId": "user UID",
+              "notes": "notes text",
+              "timestamp": "now"
+            }
+          },
+          {
+            "step": 13,
+            "actor": "System",
+            "action": "Return success response, update UI",
+            "frontend": "Close modal, show success toast, update status badge to 'Active', show 'Suspend Account' button"
+          },
+          {
+            "step": 14,
+            "actor": "User",
+            "action": "Receives reactivation email, clicks login link",
+            "external": "Email client"
+          },
+          {
+            "step": 15,
+            "actor": "User",
+            "action": "Successfully logs in and accesses platform",
+            "ui": "User dashboard"
+          }
+        ],
+        "success_criteria": "User account enabled, user can login, notification sent, action logged"
+      },
+      "error_workflows": [
+        {
+          "scenario": "Attempting to suspend already suspended account",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Views user with status='suspended', but 'Suspend Account' button still visible (UI bug)"
+            },
+            {
+              "step": 2,
+              "actor": "Admin",
+              "action": "Clicks 'Suspend Account'"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "API checks current status, returns 400 error: 'User already suspended'"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Display error toast, refresh page to fix UI state"
+            }
+          ]
+        },
+        {
+          "scenario": "Attempting to suspend admin account",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin A",
+              "action": "Attempts to suspend Admin B's account"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "API checks if target user has role='admin'"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Returns 403 error: 'Cannot suspend admin accounts'"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Display error toast, log attempted admin suspension for security review"
+            }
+          ]
+        },
+        {
+          "scenario": "Email notification fails but suspension succeeds",
+          "steps": [
+            {
+              "step": 1,
+              "actor": "Admin",
+              "action": "Suspends account with 'Notify user' checked"
+            },
+            {
+              "step": 2,
+              "actor": "System",
+              "action": "Firebase successfully disables account"
+            },
+            {
+              "step": 3,
+              "actor": "System",
+              "action": "Resend API call fails (network error, invalid email, etc.)"
+            },
+            {
+              "step": 4,
+              "actor": "System",
+              "action": "Log email failure but still return success for suspension"
+            },
+            {
+              "step": 5,
+              "actor": "System",
+              "action": "Display warning toast: 'Account suspended but notification email failed to send'"
+            },
+            {
+              "step": 6,
+              "actor": "Admin",
+              "action": "Manually contacts user via alternate channel"
+            }
+          ]
+        }
+      ]
+    },
+
+    "data_logging_requirements": {
+      "audit_log_collection": "adminAuditLogs",
+      "log_entry_schema": {
+        "account_suspended": {
+          "adminUserId": "string",
+          "adminEmail": "string",
+          "action": "account_suspended",
+          "targetUserId": "string",
+          "targetUserEmail": "string",
+          "targetResource": "user_account",
+          "timestamp": "Timestamp",
+          "ipAddress": "string",
+          "userAgent": "string",
+          "metadata": {
+            "reason": "string or null",
+            "notificationSent": "boolean",
+            "previousStatus": "active"
+          }
+        },
+        "account_reactivated": {
+          "adminUserId": "string",
+          "adminEmail": "string",
+          "action": "account_reactivated",
+          "targetUserId": "string",
+          "targetUserEmail": "string",
+          "targetResource": "user_account",
+          "timestamp": "Timestamp",
+          "ipAddress": "string",
+          "userAgent": "string",
+          "metadata": {
+            "notes": "string or null",
+            "notificationSent": "boolean",
+            "suspensionDuration": "number (days)",
+            "suspendedBy": "admin UID",
+            "suspendedAt": "ISO timestamp"
+          }
+        }
+      },
+      "user_document_fields": {
+        "collection": "users/{uid}",
+        "new_fields": [
+          {
+            "field": "accountStatus",
+            "type": "string",
+            "values": ["active", "suspended", "deleted"],
+            "default": "active"
+          },
+          {
+            "field": "suspendedAt",
+            "type": "Timestamp or null",
+            "description": "When account was suspended"
+          },
+          {
+            "field": "suspendedBy",
+            "type": "string (admin UID) or null",
+            "description": "Admin who suspended account"
+          },
+          {
+            "field": "suspensionReason",
+            "type": "string or null",
+            "description": "Internal reason for suspension"
+          },
+          {
+            "field": "reactivatedAt",
+            "type": "Timestamp or null",
+            "description": "When account was last reactivated"
+          },
+          {
+            "field": "reactivatedBy",
+            "type": "string (admin UID) or null",
+            "description": "Admin who reactivated account"
+          },
+          {
+            "field": "reactivationNotes",
+            "type": "string or null",
+            "description": "Internal notes for reactivation"
+          }
+        ]
+      },
+      "suspension_history_collection": {
+        "collection": "users/{uid}/accountHistory",
+        "purpose": "Detailed timeline of suspension/reactivation events",
+        "schema": {
+          "eventId": "string (auto-generated)",
+          "action": "account_suspended | account_reactivated",
+          "timestamp": "Timestamp",
+          "adminUserId": "string",
+          "adminEmail": "string",
+          "reason": "string or null (for suspensions)",
+          "notes": "string or null (for reactivations)",
+          "metadata": "object (additional context)"
+        },
+        "retention": "Permanent (part of user data)"
+      },
+      "retention": "2 years for audit logs, permanent for user document fields and history"
+    },
+
+    "security_compliance_considerations": {
+      "security_measures": [
+        {
+          "measure": "Prevent admin-to-admin suspension",
+          "implementation": "API checks if target user has role='admin', rejects if true",
+          "rationale": "Prevent admin abuse or account lockout scenarios"
+        },
+        {
+          "measure": "Immediate session revocation",
+          "implementation": "Firebase automatically invalidates all sessions when user.disabled=true",
+          "rationale": "Ensure suspended users cannot continue using platform"
+        },
+        {
+          "measure": "Comprehensive audit logging",
+          "implementation": "Log all suspensions and reactivations with admin ID, reason, timestamp",
+          "rationale": "Accountability and compliance"
+        },
+        {
+          "measure": "Suspension reason tracking",
+          "implementation": "Store reason in Firestore, not visible to user but logged",
+          "rationale": "Support policy enforcement and compliance audits"
+        },
+        {
+          "measure": "Reversible suspensions",
+          "implementation": "Suspension doesn't delete data, only sets disabled flag",
+          "rationale": "Allow account recovery if suspension was error or issue resolved"
+        },
+        {
+          "measure": "User notification (optional)",
+          "implementation": "Admin can choose to send email notification explaining suspension",
+          "rationale": "Transparency and user rights (GDPR), but optional to avoid tipping off bad actors"
+        },
+        {
+          "measure": "Suspension history preservation",
+          "implementation": "Store full timeline in accountHistory subcollection",
+          "rationale": "Support appeals, compliance investigations, pattern detection"
+        }
+      ],
+      "compliance": {
+        "gdpr": {
+          "article_17": "Right to erasure - Suspension is not deletion. User can still request data deletion separately.",
+          "article_18": "Right to restriction of processing - Suspension can be used to restrict processing pending investigation.",
+          "article_30": "Records of processing - Audit logs document suspension actions.",
+          "transparency": "Suspension notification email supports transparency obligations"
+        },
+        "ccpa": {
+          "section_1798_105": "Right to delete - Suspension doesn't fulfill deletion requests.",
+          "section_1798_140": "Audit logs document access to consumer data"
+        },
+        "soc2": {
+          "cc6_2": "Logical access - Suspension provides access removal mechanism",
+          "cc6_3": "Access revocation - Immediate session termination",
+          "cc7_2": "System monitoring - Audit logs track suspension actions"
+        },
+        "terms_of_service_enforcement": {
+          "legal_basis": "Suspension supports ToS enforcement without data loss",
+          "documentation": "Reason field supports documenting violation type"
+        }
+      },
+      "safe_defaults": [
+        "Default notification: False for suspension (don't alert bad actors), True for reactivation (welcome back)",
+        "Default on error: No action taken, admin notified of failure",
+        "Default status: Active (new users)",
+        "Default session revocation: Immediate (Firebase default)"
+      ],
+      "rbac_checks": {
+        "frontend": "Suspend/Reactivate buttons only visible to admins",
+        "backend": "Both APIs check checkAdminAccess() before processing",
+        "additional": "Prevent suspending admin accounts (role check)"
+      },
+      "privacy_considerations": {
+        "user_visibility_of_reason": "Suspension reason is internal only, not shown to user",
+        "email_content": "Suspension email can include generic reason (ToS violation) or specific (at admin discretion)",
+        "data_retention": "Suspended user data is preserved unchanged",
+        "billing_impact": "Suspension doesn't auto-cancel subscription - admin must handle separately"
+      }
+    },
+
+    "acceptance_criteria": [
+      {
+        "id": "SUS-AC-1",
+        "requirement": "Admin can suspend active user account",
+        "test": "Navigate to active user, click 'Suspend Account', confirm in modal, verify account disabled in Firebase and UI updated"
+      },
+      {
+        "id": "SUS-AC-2",
+        "requirement": "Suspended user is immediately logged out",
+        "test": "Suspend account while user is logged in, verify user session ends within 30 seconds and redirected to login"
+      },
+      {
+        "id": "SUS-AC-3",
+        "requirement": "Suspended user cannot log in",
+        "test": "After suspension, attempt to login as user, verify auth/user-disabled error and user-friendly message"
+      },
+      {
+        "id": "SUS-AC-4",
+        "requirement": "Suspension reason is stored",
+        "test": "Suspend with reason 'Test violation', check users/{uid}.suspensionReason in Firestore, verify text stored"
+      },
+      {
+        "id": "SUS-AC-5",
+        "requirement": "Suspension notification email sent (if enabled)",
+        "test": "Suspend with 'Notify user' checked, verify user receives suspension email within 1 minute"
+      },
+      {
+        "id": "SUS-AC-6",
+        "requirement": "Admin can reactivate suspended account",
+        "test": "Reactivate suspended user, verify Firebase user.disabled=false and UI updated"
+      },
+      {
+        "id": "SUS-AC-7",
+        "requirement": "Reactivated user can log in",
+        "test": "After reactivation, login as user, verify successful login and platform access"
+      },
+      {
+        "id": "SUS-AC-8",
+        "requirement": "Reactivation notification email sent (if enabled)",
+        "test": "Reactivate with 'Notify user' checked, verify user receives welcome back email"
+      },
+      {
+        "id": "SUS-AC-9",
+        "requirement": "Cannot suspend admin accounts",
+        "test": "Attempt to suspend user with role='admin', verify API rejection and error message"
+      },
+      {
+        "id": "SUS-AC-10",
+        "requirement": "Cannot suspend already suspended account",
+        "test": "Suspend account, attempt to suspend again, verify error: 'Already suspended'"
+      },
+      {
+        "id": "SUS-AC-11",
+        "requirement": "Cannot reactivate already active account",
+        "test": "Attempt to reactivate active user, verify error or button not visible"
+      },
+      {
+        "id": "SUS-AC-12",
+        "requirement": "Suspension creates audit log entry",
+        "test": "Suspend account, check adminAuditLogs, verify entry with action='account_suspended', admin UID, user UID, reason, timestamp"
+      },
+      {
+        "id": "SUS-AC-13",
+        "requirement": "Reactivation creates audit log entry",
+        "test": "Reactivate account, check adminAuditLogs, verify entry with action='account_reactivated', duration, notes"
+      },
+      {
+        "id": "SUS-AC-14",
+        "requirement": "Account status badge displays correctly",
+        "test": "View active user (green 'Active' badge), suspended user (red 'Suspended' badge)"
+      },
+      {
+        "id": "SUS-AC-15",
+        "requirement": "Suspension history timeline displays events",
+        "test": "Suspend then reactivate user, view Account History section, verify both events shown with timestamps and admin emails"
+      },
+      {
+        "id": "SUS-AC-16",
+        "requirement": "Admin dashboard filters by account status",
+        "test": "In admin dashboard, select 'Suspended Only' filter, verify only suspended accounts shown"
+      },
+      {
+        "id": "SUS-AC-17",
+        "requirement": "Non-admin cannot suspend accounts",
+        "test": "As non-admin, navigate to user detail, verify no Suspend button. Call API directly, verify 403."
+      },
+      {
+        "id": "SUS-AC-18",
+        "requirement": "Reactivation modal shows suspension details",
+        "test": "Click Reactivate, verify modal displays: suspended date, suspended by, reason, duration"
+      },
+      {
+        "id": "SUS-AC-19",
+        "requirement": "User data preserved during suspension",
+        "test": "Suspend user, verify all Scout/Recon/Hunter data unchanged in Firestore"
+      },
+      {
+        "id": "SUS-AC-20",
+        "requirement": "Confirmation modals prevent accidental actions",
+        "test": "Click Suspend, click outside modal, verify closes without action. Click Cancel, verify no suspension."
+      }
+    ]
+  }
+}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye } from 'lucide-react';
+import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound } from 'lucide-react';
 import UserContacts from '../../components/UserContacts';
 import './UserDetail.css';
 
@@ -13,6 +13,7 @@ export default function UserDetail() {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [startingImpersonation, setStartingImpersonation] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   useEffect(() => {
     loadUserDetail();
@@ -122,6 +123,56 @@ export default function UserDetail() {
     }
   };
 
+  const handleResetPassword = async () => {
+    const reason = prompt('Please provide a reason for resetting this user\'s password:');
+
+    if (!reason || reason.trim() === '') {
+      alert('A reason is required to reset password');
+      return;
+    }
+
+    if (!confirm(`Send password reset email to ${user.email}?\n\nReason: ${reason}\n\nThe user will receive an email with instructions to reset their password.`)) {
+      return;
+    }
+
+    try {
+      setResettingPassword(true);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('Not authenticated');
+      }
+
+      const authToken = await currentUser.getIdToken();
+
+      const response = await fetch('/.netlify/functions/adminResetUserPassword', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          authToken,
+          targetUserId: uid,
+          reason: reason.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send password reset email');
+      }
+
+      alert(`Password reset email sent successfully to ${user.email}!\n\nThe user will receive instructions to reset their password.`);
+
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      alert(`Failed to send password reset email: ${error.message}`);
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="user-detail-loading">
@@ -151,15 +202,26 @@ export default function UserDetail() {
           <ArrowLeft className="w-5 h-5" />
           <span>Back to Dashboard</span>
         </button>
-        <button
-          onClick={handleStartImpersonation}
-          disabled={startingImpersonation}
-          className="impersonate-button"
-          title="View the platform as this user for troubleshooting"
-        >
-          <Eye className="w-4 h-4" />
-          <span>{startingImpersonation ? 'Starting...' : 'View as User'}</span>
-        </button>
+        <div className="header-actions">
+          <button
+            onClick={handleResetPassword}
+            disabled={resettingPassword}
+            className="reset-password-button"
+            title="Send password reset email to this user"
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>{resettingPassword ? 'Sending...' : 'Reset Password'}</span>
+          </button>
+          <button
+            onClick={handleStartImpersonation}
+            disabled={startingImpersonation}
+            className="impersonate-button"
+            title="View the platform as this user for troubleshooting"
+          >
+            <Eye className="w-4 h-4" />
+            <span>{startingImpersonation ? 'Starting...' : 'View as User'}</span>
+          </button>
+        </div>
       </div>
 
       {/* User Overview */}

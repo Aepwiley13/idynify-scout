@@ -42,6 +42,42 @@
   transform: translateX(-2px);
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.reset-password-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.reset-password-button:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+  transform: translateY(-1px);
+}
+
+.reset-password-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.reset-password-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .impersonate-button {
   display: inline-flex;
   align-items: center;

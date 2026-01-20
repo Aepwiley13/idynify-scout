@@ -4,22 +4,10 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
 
 /**
  * Manual Company Search via Apollo API
- *
- * This function allows users to manually search for companies by name
- * and returns matching results for user confirmation before saving.
- *
- * Unlike search-companies.js (which uses ICP settings), this function
- * accepts a direct company name query from the user.
- *
- * Endpoint: /.netlify/functions/search-companies-manual
- * Method: POST
- * Auth: Requires valid Firebase auth token
+ * Searches for companies by name and returns up to 10 matches
  */
 
 export async function handler(event, context) {
-  const startTime = Date.now();
-
-  // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -27,12 +15,10 @@ export async function handler(event, context) {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  // Only allow POST
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -44,7 +30,6 @@ export async function handler(event, context) {
   try {
     const { companyName, authToken, userId } = JSON.parse(event.body);
 
-    // Validate input
     if (!companyName || !companyName.trim()) {
       return {
         statusCode: 400,
@@ -61,13 +46,16 @@ export async function handler(event, context) {
       };
     }
 
-    console.log('🔍 Manual company search for:', companyName);
-    console.log('👤 User ID:', userId);
+    console.log('🔍 Searching for:', companyName);
 
-    // Verify Firebase Auth token
+    // Verify Firebase Auth
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
-      throw new Error('Firebase API key not configured');
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Server configuration error' })
+      };
     }
 
     const verifyResponse = await fetch(
@@ -98,11 +86,7 @@ export async function handler(event, context) {
       };
     }
 
-    console.log('✅ Auth token verified');
-
-    // Build Apollo search query
-    // CRITICAL: API key goes in HEADERS (via getApolloHeaders), NOT in body
-    // CRITICAL: Use q_organization_keyword_tags, NOT q_organization_name
+    // Build Apollo query - CORRECT FORMAT
     const apolloQuery = {
       page: 1,
       per_page: 10,
@@ -111,61 +95,51 @@ export async function handler(event, context) {
       sort_ascending: false
     };
 
-    console.log('📊 Apollo query:', JSON.stringify(apolloQuery, null, 2));
-
-    // Call Apollo API
+    // Call Apollo API - API key in HEADERS only
     const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
       method: 'POST',
       headers: getApolloHeaders(),
       body: JSON.stringify(apolloQuery)
     });
 
-    console.log('📡 Apollo API response status:', apolloResponse.status);
-
     if (!apolloResponse.ok) {
-      const errorText = await logApolloError(apolloResponse, apolloQuery, 'search-companies-manual');
+      await logApolloError(apolloResponse, apolloQuery, 'search-companies-manual');
 
-      let userMessage = 'Company search service is temporarily unavailable.';
+      let userMessage = 'Company search service unavailable';
       let statusCode = 500;
 
       if (apolloResponse.status === 422) {
-        console.error('❌ VALIDATION ERROR: Invalid search parameters');
-        userMessage = 'Invalid search parameters. The search query may contain unsupported characters.';
+        userMessage = 'Invalid search parameters';
         statusCode = 400;
       } else if (apolloResponse.status === 429) {
-        userMessage = 'Search rate limit exceeded. Please try again in a few minutes.';
+        userMessage = 'Rate limit exceeded. Try again in a few minutes';
         statusCode = 429;
       } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
-        userMessage = 'Search service authentication error. Please contact support.';
+        userMessage = 'Search service authentication error';
         statusCode = 500;
       } else if (apolloResponse.status >= 500) {
-        userMessage = 'External search service is experiencing issues. Please try again later.';
+        userMessage = 'Search service experiencing issues';
         statusCode = 503;
       }
 
       return {
         statusCode,
         headers,
-        body: JSON.stringify({
-          success: false,
-          error: userMessage
-        })
+        body: JSON.stringify({ success: false, error: userMessage })
       };
     }
 
     const apolloData = await apolloResponse.json();
     const companies = apolloData.organizations || [];
 
-    console.log(`✅ Found ${companies.length} matching companies`);
+    console.log(`✅ Found ${companies.length} companies`);
 
-    // Transform companies to our format
+    // Transform to frontend format
     const transformedCompanies = companies.map(company => {
       const location = company.primary_location || company.headquarters_location || {};
-      const locationStr = [
-        location.city,
-        location.state,
-        location.country
-      ].filter(Boolean).join(', ');
+      const locationStr = [location.city, location.state, location.country]
+        .filter(Boolean)
+        .join(', ');
 
       let revenue = null;
       if (company.estimated_annual_revenue) {
@@ -211,9 +185,6 @@ export async function handler(event, context) {
       }
     });
 
-    const responseTime = Date.now() - startTime;
-    console.log(`✅ Returning ${transformedCompanies.length} companies (${responseTime}ms)`);
-
     return {
       statusCode: 200,
       headers,
@@ -226,7 +197,7 @@ export async function handler(event, context) {
     };
 
   } catch (error) {
-    console.error('❌ Manual company search error:', error);
+    console.error('❌ Search error:', error.message);
 
     return {
       statusCode: 500,

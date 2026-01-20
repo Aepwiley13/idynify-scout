@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound } from 'lucide-react';
+import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound, Ban, CheckCircle } from 'lucide-react';
 import UserContacts from '../../components/UserContacts';
 import './UserDetail.css';
 
@@ -14,6 +14,8 @@ export default function UserDetail() {
   const [error, setError] = useState(null);
   const [startingImpersonation, setStartingImpersonation] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [suspendingAccount, setSuspendingAccount] = useState(false);
+  const [reactivatingAccount, setReactivatingAccount] = useState(false);
 
   useEffect(() => {
     loadUserDetail();
@@ -173,6 +175,112 @@ export default function UserDetail() {
     }
   };
 
+  const handleSuspendAccount = async () => {
+    const reason = prompt('Please provide a reason for suspending this account:');
+
+    if (!reason || reason.trim() === '') {
+      alert('A reason is required to suspend the account');
+      return;
+    }
+
+    if (!confirm(`Suspend account for ${user.email}?\n\nReason: ${reason}\n\nThis will:\n- Immediately revoke all active sessions\n- Disable login access\n- Require admin reactivation\n\nThis action will be logged.`)) {
+      return;
+    }
+
+    try {
+      setSuspendingAccount(true);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('Not authenticated');
+      }
+
+      const authToken = await currentUser.getIdToken();
+
+      const response = await fetch('/.netlify/functions/adminSuspendAccount', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          authToken,
+          targetUserId: uid,
+          reason: reason.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to suspend account');
+      }
+
+      alert(`Account suspended successfully!\n\nUser: ${user.email}\nAll active sessions have been revoked.\n\nRefreshing page...`);
+
+      // Reload to show updated status
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error suspending account:', error);
+      alert(`Failed to suspend account: ${error.message}`);
+    } finally {
+      setSuspendingAccount(false);
+    }
+  };
+
+  const handleReactivateAccount = async () => {
+    const reason = prompt('Please provide a reason for reactivating this account:');
+
+    if (!reason || reason.trim() === '') {
+      alert('A reason is required to reactivate the account');
+      return;
+    }
+
+    if (!confirm(`Reactivate account for ${user.email}?\n\nReason: ${reason}\n\nThis will restore full access to the account.\n\nThis action will be logged.`)) {
+      return;
+    }
+
+    try {
+      setReactivatingAccount(true);
+
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('Not authenticated');
+      }
+
+      const authToken = await currentUser.getIdToken();
+
+      const response = await fetch('/.netlify/functions/adminReactivateAccount', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          authToken,
+          targetUserId: uid,
+          reason: reason.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reactivate account');
+      }
+
+      alert(`Account reactivated successfully!\n\nUser: ${user.email}\nThe user can now log in again.\n\nRefreshing page...`);
+
+      // Reload to show updated status
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Error reactivating account:', error);
+      alert(`Failed to reactivate account: ${error.message}`);
+    } finally {
+      setReactivatingAccount(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="user-detail-loading">
@@ -203,9 +311,30 @@ export default function UserDetail() {
           <span>Back to Dashboard</span>
         </button>
         <div className="header-actions">
+          {user.accountStatus === 'suspended' ? (
+            <button
+              onClick={handleReactivateAccount}
+              disabled={reactivatingAccount}
+              className="reactivate-button"
+              title="Reactivate this user's account"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>{reactivatingAccount ? 'Reactivating...' : 'Reactivate Account'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleSuspendAccount}
+              disabled={suspendingAccount}
+              className="suspend-button"
+              title="Suspend this user's account"
+            >
+              <Ban className="w-4 h-4" />
+              <span>{suspendingAccount ? 'Suspending...' : 'Suspend Account'}</span>
+            </button>
+          )}
           <button
             onClick={handleResetPassword}
-            disabled={resettingPassword}
+            disabled={resettingPassword || user.accountStatus === 'suspended'}
             className="reset-password-button"
             title="Send password reset email to this user"
           >
@@ -214,7 +343,7 @@ export default function UserDetail() {
           </button>
           <button
             onClick={handleStartImpersonation}
-            disabled={startingImpersonation}
+            disabled={startingImpersonation || user.accountStatus === 'suspended'}
             className="impersonate-button"
             title="View the platform as this user for troubleshooting"
           >
@@ -230,7 +359,15 @@ export default function UserDetail() {
           <User className="w-12 h-12" />
         </div>
         <div className="user-header-info">
-          <h1 className="user-name">{user.email || 'No email'}</h1>
+          <div className="user-name-row">
+            <h1 className="user-name">{user.email || 'No email'}</h1>
+            {user.accountStatus === 'suspended' && (
+              <span className="account-status-badge suspended">
+                <Ban className="w-3 h-3" />
+                Suspended
+              </span>
+            )}
+          </div>
           <p className="user-id">UID: {user.uid}</p>
           <div className="user-meta">
             <span className="meta-item">

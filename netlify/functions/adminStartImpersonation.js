@@ -1,0 +1,183 @@
+/**
+ * Admin Start Impersonation
+ *
+ * Starts an impersonation session for an admin to view the platform as a specific user.
+ * Session expires after 30 minutes.
+ *
+ * Endpoint: /.netlify/functions/adminStartImpersonation
+ * Method: POST
+ * Auth: Requires valid Firebase auth token + admin role
+ */
+
+import { admin } from './firebase-admin.js';
+import { checkAdminAccess } from './utils/adminAuth.js';
+import { createImpersonationSession } from './utils/impersonation.js';
+import { logAuditEvent, getIpAddress, getUserAgent, AUDIT_ACTIONS } from './utils/auditLog.js';
+
+export const handler = async (event) => {
+  // CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': 'https://idynify.com',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
+  // Handle OPTIONS request for CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
+
+  // Only allow POST
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ success: false, error: 'Method not allowed' })
+    };
+  }
+
+  try {
+    // Parse request body
+    const { authToken, targetUserId, reason } = JSON.parse(event.body);
+
+    // Verify auth token
+    if (!authToken) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Authentication required' })
+      };
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(authToken);
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Invalid authentication token' })
+      };
+    }
+
+    const adminUserId = decodedToken.uid;
+
+    // Check admin access
+    const isAdmin = await checkAdminAccess(adminUserId);
+    if (!isAdmin) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Admin access required' })
+      };
+    }
+
+    // Get admin email for audit logging
+    const adminUser = await admin.auth().getUser(adminUserId);
+    const adminEmail = adminUser.email;
+
+    // Validate targetUserId
+    if (!targetUserId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success: false, error: 'targetUserId is required' })
+      };
+    }
+
+    // Get target user info for audit log
+    let targetUserEmail = '';
+    try {
+      const targetUser = await admin.auth().getUser(targetUserId);
+      targetUserEmail = targetUser.email;
+    } catch (error) {
+      console.error('Error fetching target user:', error);
+    }
+
+    // Create impersonation session
+    try {
+      const ipAddress = getIpAddress(event);
+      const session = await createImpersonationSession(
+        adminUserId,
+        targetUserId,
+        reason,
+        ipAddress
+      );
+
+      console.log(`✅ Impersonation session started: Admin ${adminEmail} -> User ${targetUserEmail} (Session: ${session.sessionId})`);
+
+      // Log successful audit event
+      await logAuditEvent({
+        action: AUDIT_ACTIONS.START_IMPERSONATION,
+        logType: 'admin_action',
+        actorUserId: adminUserId,
+        actorEmail: adminEmail,
+        targetUserId: targetUserId,
+        targetUserEmail: targetUserEmail,
+        targetResource: 'impersonation_session',
+        resourceId: session.sessionId,
+        status: 'success',
+        ipAddress: ipAddress,
+        userAgent: getUserAgent(event),
+        metadata: {
+          reason: reason || 'Support troubleshooting',
+          expiresAt: session.expiresAt
+        }
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: 'Impersonation session started',
+          data: session
+        })
+      };
+
+    } catch (error) {
+      console.error('❌ Error creating impersonation session:', error);
+
+      // Log failed audit event
+      await logAuditEvent({
+        action: AUDIT_ACTIONS.START_IMPERSONATION,
+        logType: 'admin_action',
+        actorUserId: adminUserId,
+        actorEmail: adminEmail,
+        targetUserId: targetUserId,
+        targetUserEmail: targetUserEmail,
+        targetResource: 'impersonation_session',
+        status: 'failed',
+        ipAddress: getIpAddress(event),
+        userAgent: getUserAgent(event),
+        errorMessage: error.message,
+        metadata: {
+          reason: reason || 'Support troubleshooting'
+        }
+      });
+
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: error.message
+        })
+      };
+    }
+
+  } catch (error) {
+    console.error('❌ Error in start impersonation handler:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: 'Internal server error',
+        details: error.message
+      })
+    };
+  }
+};

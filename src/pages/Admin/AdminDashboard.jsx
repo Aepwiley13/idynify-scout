@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { Users, TrendingUp, Database, Building2, Filter, Search, FileText } from 'lucide-react';
+import { Users, TrendingUp, Database, Building2, Filter, Search, FileText, Mail } from 'lucide-react';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -187,6 +187,13 @@ export default function AdminDashboard() {
           >
             <FileText className="w-4 h-4" />
             <span>Audit Logs</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/email-insights')}
+            className="api-activity-btn"
+          >
+            <Mail className="w-4 h-4" />
+            <span>Email Insights</span>
           </button>
         </div>
       </div>

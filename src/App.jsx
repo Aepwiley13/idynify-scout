@@ -35,6 +35,7 @@ import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
 import ApiActivity from './pages/Admin/ApiActivity';
 import AuditLogs from './pages/Admin/AuditLogs';
+import EmailInsights from './pages/Admin/EmailInsights';
 import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
@@ -49,6 +50,7 @@ import AddCompanyForm from './components/AddCompanyForm';
 import ContactSuggestions from './components/ContactSuggestions';
 import LeadList from './components/LeadList';
 import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
+import ImpersonationBanner from './components/ImpersonationBanner';
 
 // Hunter Pages
 import HunterDashboard from './pages/Hunter/HunterDashboard';
@@ -59,6 +61,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [impersonationSession, setImpersonationSession] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -96,6 +99,57 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Check for active impersonation session
+  useEffect(() => {
+    const checkImpersonation = async () => {
+      if (!user || !userData?.role || userData.role !== 'admin') {
+        setImpersonationSession(null);
+        return;
+      }
+
+      try {
+        const authToken = await auth.currentUser.getIdToken();
+
+        const response = await fetch('/.netlify/functions/adminGetImpersonationSession', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ authToken })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.hasActiveSession) {
+            setImpersonationSession(data.session);
+            // Add class to body for padding adjustment
+            document.body.classList.add('impersonating');
+          } else {
+            setImpersonationSession(null);
+            document.body.classList.remove('impersonating');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking impersonation session:', error);
+      }
+    };
+
+    checkImpersonation();
+
+    // Check every 30 seconds for session updates
+    const interval = setInterval(checkImpersonation, 30000);
+
+    return () => {
+      clearInterval(interval);
+      document.body.classList.remove('impersonating');
+    };
+  }, [user, userData]);
+
+  const handleEndImpersonation = () => {
+    setImpersonationSession(null);
+    document.body.classList.remove('impersonating');
+  };
 
   // Protected Route Component - Requires both auth AND payment
   const ProtectedRoute = ({ children, requirePayment = true }) => {
@@ -153,6 +207,12 @@ function App() {
 
   return (
     <BrowserRouter>
+      {impersonationSession && (
+        <ImpersonationBanner
+          session={impersonationSession}
+          onEndSession={handleEndImpersonation}
+        />
+      )}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
@@ -349,6 +409,14 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <AuditLogs />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/email-insights"
+          element={
+            <ProtectedAdminRoute>
+              <EmailInsights />
             </ProtectedAdminRoute>
           }
         />

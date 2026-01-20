@@ -86,14 +86,19 @@ export async function handler(event, context) {
       };
     }
 
-    // Build Apollo query - CORRECT FORMAT
+    // Build Apollo query - mixed search endpoint does NOT support sorting
+    const trimmedName = companyName.trim();
     const apolloQuery = {
       page: 1,
-      per_page: 10,
-      q_organization_keyword_tags: [companyName.trim().toLowerCase()],
-      sort_by_field: 'organization_num_employees',
-      sort_ascending: false
+      per_page: 10
     };
+
+    // Smart search: short names (<=4 chars) use exact name matching, longer names use keyword tags
+    if (trimmedName.length <= 4) {
+      apolloQuery.q_organization_name = trimmedName;
+    } else {
+      apolloQuery.q_organization_keyword_tags = [trimmedName.toLowerCase()];
+    }
 
     // Call Apollo API - API key in HEADERS only
     const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {

@@ -157,67 +157,43 @@ export default function CompanyCard({ company, onSwipe }) {
       >
         {/* Card Content */}
         <div className="card-content">
-          {/* Company Header */}
+          {/* Company Logo - Centered */}
           <div className="company-header">
-            {/* Company Logo - Robust multi-source fallback */}
-            <CompanyLogo company={company} size="default" />
+            <CompanyLogo company={company} size="large" />
+          </div>
 
-            {/* Company Name */}
-            <div className="company-info">
-              <h2 className="company-name">
-                {company.name}
-              </h2>
+          {/* Company Name - Centered */}
+          <h2 className="company-name">{company.name}</h2>
+
+          {/* Metadata Grid (2x2) - Matching Manual Search */}
+          <div className="company-meta-grid">
+            <div className="meta-cell">
+              <div className="meta-label">INDUSTRY</div>
+              <div className="meta-value">{company.industry || 'Not available'}</div>
+            </div>
+            <div className="meta-cell">
+              <div className="meta-label">EMPLOYEES</div>
+              <div className="meta-value">
+                {company.employee_count > 0
+                  ? company.employee_count.toLocaleString()
+                  : 'Not available'}
+              </div>
+            </div>
+            <div className="meta-cell">
+              <div className="meta-label">REVENUE</div>
+              <div className="meta-value">{company.revenue || 'Not available'}</div>
+            </div>
+            <div className="meta-cell">
+              <div className="meta-label">FOUNDED</div>
+              <div className="meta-value">{company.founded_year || 'Not available'}</div>
             </div>
           </div>
 
-          {/* Company Stats Grid */}
-          <div className="stats-grid">
-            <div className="stat-item">
-              <div className="stat-icon">
-                <Building2 className="w-5 h-5 text-gray-500" />
-              </div>
-              <div className="stat-content">
-                <p className="stat-label">Industry</p>
-                <p className="stat-value">{company.industry || 'Not specified'}</p>
-              </div>
-            </div>
-
-            <div className="stat-item">
-              <div className="stat-icon">
-                <Users className="w-5 h-5 text-gray-500" />
-              </div>
-              <div className="stat-content">
-                <p className="stat-label">Employees</p>
-                <p className="stat-value">{company.employee_count || company.company_size || 'Not available'}</p>
-              </div>
-            </div>
-
-            <div className="stat-item">
-              <div className="stat-icon">
-                <DollarSign className="w-5 h-5 text-gray-500" />
-              </div>
-              <div className="stat-content">
-                <p className="stat-label">Revenue</p>
-                <p className="stat-value">{company.revenue || 'Not available'}</p>
-              </div>
-            </div>
-
-            <div className="stat-item">
-              <div className="stat-icon">
-                <Calendar className="w-5 h-5 text-gray-500" />
-              </div>
-              <div className="stat-content">
-                <p className="stat-label">Founded</p>
-                <p className="stat-value">{company.founded_year || 'Not available'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="quick-links">
-            {company.website_url && (
+          {/* Website & LinkedIn Buttons - Solid Style */}
+          <div className="company-link-buttons">
+            {company.website_url ? (
               <button
-                className="quick-link website"
+                className="link-btn website-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleOpenPreview(company.website_url, `${company.name} - Website`);
@@ -226,10 +202,16 @@ export default function CompanyCard({ company, onSwipe }) {
                 <Globe className="w-4 h-4" />
                 <span>Visit Website</span>
               </button>
+            ) : (
+              <div className="link-btn website-btn disabled">
+                <Globe className="w-4 h-4" />
+                <span>No Website</span>
+              </div>
             )}
-            {company.linkedin_url && (
+
+            {company.linkedin_url ? (
               <button
-                className="quick-link linkedin"
+                className="link-btn linkedin-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleOpenPreview(company.linkedin_url, `${company.name} - LinkedIn`);
@@ -238,10 +220,15 @@ export default function CompanyCard({ company, onSwipe }) {
                 <Linkedin className="w-4 h-4" />
                 <span>LinkedIn</span>
               </button>
+            ) : (
+              <div className="link-btn linkedin-btn disabled">
+                <Linkedin className="w-4 h-4" />
+                <span>No LinkedIn</span>
+              </div>
             )}
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons - Keep callbacks, update styling */}
           <div className="action-buttons">
             <button
               onClick={(e) => {

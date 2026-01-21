@@ -701,6 +701,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       if (index === 0) {
         console.log('\n📊 First company data extraction (using available fields):');
         console.log(`  Name: ${company.name}`);
+        console.log(`  Logo URL: ${company.logo_url || 'N/A'}`);
         console.log(`  Revenue: ${revenue}`);
         console.log(`  Founded: ${foundedYear}`);
         console.log(`  Phone: ${phone}`);
@@ -725,6 +726,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         // Links (critical for user research)
         website_url: company.website_url || (company.primary_domain ? `https://${company.primary_domain}` : null),
         linkedin_url: company.linkedin_url || null,
+        logo_url: company.logo_url || null,
 
         // Metadata
         found_at: new Date().toISOString(),
@@ -752,6 +754,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           phone: { stringValue: String(company.phone || '') },
           linkedin_url: { stringValue: String(company.linkedin_url || '') },
           website_url: { stringValue: String(company.website_url || '') },
+          logo_url: { stringValue: String(company.logo_url || '') },
           status: { stringValue: 'pending' },
           found_at: { timestampValue: company.found_at },
           source: { stringValue: 'apollo_api' }

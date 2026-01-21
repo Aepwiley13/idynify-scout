@@ -28,7 +28,23 @@ const MainLayout = ({ children, user }) => {
       return 'Mission Control';
     }
 
-    if (pathname === '/scout' || pathname.startsWith('/scout')) {
+    // Company Profile page - focused view
+    if (pathname.match(/^\/scout\/company\/[^/]+$/)) {
+      return 'Company Profile';
+    }
+
+    // Company Leads page
+    if (pathname.match(/^\/scout\/company\/[^/]+\/leads$/)) {
+      return 'Company Leads';
+    }
+
+    // Contact Profile page
+    if (pathname.match(/^\/scout\/contact\/[^/]+$/)) {
+      return 'Contact Profile';
+    }
+
+    // Scout main pages with tabs
+    if (pathname === '/scout') {
       if (activeTab === 'daily-leads' || !activeTab) {
         return 'Daily Lead Insights';
       }

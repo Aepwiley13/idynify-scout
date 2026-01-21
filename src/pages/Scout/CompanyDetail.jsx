@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, ArrowLeft, Target, Building2, Users, TrendingUp, Settings, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
 
@@ -520,72 +520,7 @@ export default function CompanyDetail() {
 
   return (
     <div className="company-detail">
-      {/* Scout Header */}
-      <header className="scout-header">
-        <div className="header-left">
-          <button
-            className="back-btn"
-            onClick={() => navigate('/mission-control-v2')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Mission Control</span>
-          </button>
-        </div>
-
-        <div className="header-right">
-          <div className="scout-branding">
-            <Target className="w-5 h-5" />
-            <span>Scout</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Scout Tab Navigation */}
-      <nav className="scout-tabs">
-        <div className="tabs-container">
-          <button
-            className="tab"
-            onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}
-          >
-            <Target className="w-4 h-4" />
-            <span>Daily Leads</span>
-          </button>
-
-          <button
-            className="tab active"
-            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Saved Companies</span>
-          </button>
-
-          <button
-            className="tab"
-            onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
-          >
-            <Users className="w-4 h-4" />
-            <span>All Leads</span>
-          </button>
-
-          <button
-            className="tab"
-            onClick={() => navigate('/scout', { state: { activeTab: 'total-market' } })}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Total Market</span>
-          </button>
-
-          <button
-            className="tab"
-            onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
-          >
-            <Settings className="w-4 h-4" />
-            <span>ICP Settings</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* Company Info Card - Matching SavedCompanies Design */}
+      {/* Company Info Card */}
       <div className="company-detail-content">
         <div className="company-info-card">
           {/* Contact Badge */}

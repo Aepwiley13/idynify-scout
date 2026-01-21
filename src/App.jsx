@@ -51,6 +51,7 @@ import ContactSuggestions from './components/ContactSuggestions';
 import LeadList from './components/LeadList';
 import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
 import ImpersonationBanner from './components/ImpersonationBanner';
+import MainLayout from './components/layout/MainLayout';
 
 // Hunter Pages
 import HunterDashboard from './pages/Hunter/HunterDashboard';
@@ -152,7 +153,7 @@ function App() {
   };
 
   // Protected Route Component - Requires both auth AND payment
-  const ProtectedRoute = ({ children, requirePayment = true }) => {
+  const ProtectedRoute = ({ children, requirePayment = true, withLayout = false }) => {
     if (loading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-black">
@@ -168,6 +169,11 @@ function App() {
     // Check if user has completed payment (unless explicitly disabled)
     if (requirePayment && !userData?.hasCompletedPayment) {
       return <Navigate to="/checkout" />;
+    }
+
+    // Wrap with MainLayout if requested
+    if (withLayout) {
+      return <MainLayout user={user}>{children}</MainLayout>;
     }
 
     return children;
@@ -291,7 +297,7 @@ function App() {
         <Route
           path="/mission-control-v2/recon"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <RECONModulePage />
             </ProtectedRoute>
           }
@@ -299,7 +305,7 @@ function App() {
         <Route
           path="/mission-control-v2/recon/section/:sectionId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <RECONSectionPage />
             </ProtectedRoute>
           }
@@ -308,7 +314,7 @@ function App() {
         <Route
           path="/scout"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <ScoutMain />
             </ProtectedRoute>
           }
@@ -318,7 +324,7 @@ function App() {
         <Route
           path="/scout/company/:companyId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <CompanyDetail />
             </ProtectedRoute>
           }
@@ -327,7 +333,7 @@ function App() {
         <Route
           path="/scout/company/:companyId/leads"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <CompanyLeads />
             </ProtectedRoute>
           }
@@ -336,7 +342,7 @@ function App() {
         <Route
           path="/scout/contact/:contactId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <ContactProfile />
             </ProtectedRoute>
           }
@@ -346,7 +352,7 @@ function App() {
         <Route
           path="/hunter"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <HunterDashboard />
             </ProtectedRoute>
           }
@@ -354,7 +360,7 @@ function App() {
         <Route
           path="/hunter/campaign/new"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <CreateCampaign />
             </ProtectedRoute>
           }
@@ -362,7 +368,7 @@ function App() {
         <Route
           path="/hunter/campaign/:campaignId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <CampaignDetail />
             </ProtectedRoute>
           }

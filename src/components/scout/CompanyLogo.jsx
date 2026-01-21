@@ -8,15 +8,15 @@ const clearbitFailureCache = new Set();
 /**
  * CompanyLogo - Robust logo rendering with multi-source fallback
  *
- * Resolution order:
- * 1. Apollo-provided logo URL (if exists)
- * 2. Clearbit Logo API (https://logo.clearbit.com/{domain}) - attempted once per session
- * 3. Company initials (first letter of each word)
- * 4. Fallback building icon
+ * Resolution order (Hybrid approach - best of both worlds):
+ * 1. Direct logo_url from backend (if exists)
+ * 2. Apollo enrichment logo URL (if exists)
+ * 3. Clearbit Logo API (https://logo.clearbit.com/{domain}) - attempted once per session
+ * 4. Company initial (single letter - matches Manual Search clean feel)
  */
 export default function CompanyLogo({ company, size = 'default', className = '' }) {
   const [logoSrc, setLogoSrc] = useState(null);
-  const [logoType, setLogoType] = useState(null); // 'apollo' | 'clearbit' | 'initials'
+  const [logoType, setLogoType] = useState(null); // 'direct' | 'apollo' | 'clearbit' | 'initials'
   const [logoLoading, setLogoLoading] = useState(true);
   const clearbitAttemptedRef = useRef(false);
 
@@ -33,28 +33,27 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     large: 'w-10 h-10'
   };
 
-  // Extract company initials for fallback
-  const getCompanyInitials = (name) => {
+  // Extract company initial for fallback (single letter - matches Manual Search)
+  const getCompanyInitial = (name) => {
     if (!name) return '?';
-
-    // Split by spaces, take first letter of each word (max 2)
-    const words = name.split(' ').filter(word => word.length > 0);
-    if (words.length === 0) return '?';
-
-    if (words.length === 1) {
-      return words[0].charAt(0).toUpperCase();
-    }
-
-    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+    return name.charAt(0).toUpperCase();
   };
 
-  const initials = getCompanyInitials(company.name);
+  const initial = getCompanyInitial(company.name);
 
-  // Resolve logo source
+  // Resolve logo source (Hybrid approach)
   useEffect(() => {
     setLogoLoading(true);
 
-    // Priority 1: Apollo enrichment logo (if available)
+    // Priority 1: Direct logo_url from backend (most reliable)
+    if (company.logo_url) {
+      setLogoSrc(company.logo_url);
+      setLogoType('direct');
+      setLogoLoading(false);
+      return;
+    }
+
+    // Priority 2: Apollo enrichment logo (if available)
     const apolloLogo = company.apolloEnrichment?.snapshot?.logo_url;
     if (apolloLogo) {
       setLogoSrc(apolloLogo);
@@ -63,7 +62,7 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
       return;
     }
 
-    // Priority 2: Clearbit logo via domain (only if not previously failed)
+    // Priority 3: Clearbit logo via domain (only if not previously failed)
     const domain = company.domain || company.website_url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
 
     if (domain && !clearbitFailureCache.has(domain) && !clearbitAttemptedRef.current) {
@@ -75,7 +74,7 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
       return;
     }
 
-    // Priority 3: Use initials fallback immediately
+    // Priority 4: Use single letter fallback
     // (Either no domain, or Clearbit known to fail)
     setLogoSrc(null);
     setLogoType('initials');
@@ -83,13 +82,33 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
   }, [company]);
 
   const handleLogoError = () => {
+    // If direct logo_url failed, try Apollo enrichment
+    if (logoType === 'direct') {
+      const apolloLogo = company.apolloEnrichment?.snapshot?.logo_url;
+      if (apolloLogo) {
+        setLogoSrc(apolloLogo);
+        setLogoType('apollo');
+        return;
+      }
+    }
+
+    // If Apollo failed, try Clearbit
+    if (logoType === 'apollo' || logoType === 'direct') {
+      const domain = company.domain || company.website_url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      if (domain && !clearbitFailureCache.has(domain)) {
+        setLogoSrc(`https://logo.clearbit.com/${domain}`);
+        setLogoType('clearbit');
+        return;
+      }
+    }
+
     // Mark Clearbit as failed for this domain
     const domain = company.domain || company.website_url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
     if (domain && logoType === 'clearbit') {
       clearbitFailureCache.add(domain);
     }
 
-    // Switch to initials fallback
+    // Final fallback: single letter initial
     setLogoSrc(null);
     setLogoType('initials');
   };
@@ -118,10 +137,10 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     );
   }
 
-  // Fallback: Company initials
+  // Fallback: Company initial (single letter - matches Manual Search)
   return (
     <div className={`${sizeClasses[size]} ${className} bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-sm`}>
-      {initials}
+      {initial}
     </div>
   );
 }

@@ -45,8 +45,11 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
   useEffect(() => {
     setLogoLoading(true);
 
+    console.log('🔍 CompanyLogo: Resolving logo for', company.name);
+
     // Priority 1: Direct logo_url from backend (most reliable)
     if (company.logo_url) {
+      console.log('✅ Using direct logo_url:', company.logo_url);
       setLogoSrc(company.logo_url);
       setLogoType('direct');
       setLogoLoading(false);
@@ -56,6 +59,7 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     // Priority 2: Apollo enrichment logo (if available)
     const apolloLogo = company.apolloEnrichment?.snapshot?.logo_url;
     if (apolloLogo) {
+      console.log('✅ Using Apollo enrichment logo:', apolloLogo);
       setLogoSrc(apolloLogo);
       setLogoType('apollo');
       setLogoLoading(false);
@@ -66,6 +70,7 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     const domain = company.domain || company.website_url?.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
 
     if (domain && !clearbitFailureCache.has(domain) && !clearbitAttemptedRef.current) {
+      console.log('🌐 Trying Clearbit for domain:', domain);
       // Attempt Clearbit once
       clearbitAttemptedRef.current = true;
       setLogoSrc(`https://logo.clearbit.com/${domain}`);
@@ -75,7 +80,7 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     }
 
     // Priority 4: Use single letter fallback
-    // (Either no domain, or Clearbit known to fail)
+    console.log('💭 Using single letter fallback');
     setLogoSrc(null);
     setLogoType('initials');
     setLogoLoading(false);

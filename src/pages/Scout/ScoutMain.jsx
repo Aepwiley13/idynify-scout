@@ -29,6 +29,15 @@ export default function ScoutMain() {
     }
   }, [location.state?.activeTab]);
 
+  // Handle Scout+ tab - open modal instead of rendering content
+  useEffect(() => {
+    if (activeTab === 'scout-plus') {
+      setShowAddContactModal(true);
+      // Reset to daily-leads to avoid staying on scout-plus "tab"
+      setActiveTab('daily-leads');
+    }
+  }, [activeTab]);
+
   // Load contact count for All Leads tab badge
   useEffect(() => {
     loadContactCount();
@@ -58,121 +67,7 @@ export default function ScoutMain() {
 
   return (
     <div className="scout-main">
-      {/* Scout Header */}
-      <header className="scout-header">
-        <div className="header-left">
-          <button
-            className="back-btn"
-            onClick={() => navigate('/mission-control-v2')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Mission Control</span>
-          </button>
-        </div>
-
-        <div className="header-right">
-          <button
-            className="add-contact-btn"
-            onClick={() => setShowAddContactModal(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.625rem 1.25rem',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.75rem',
-              fontWeight: '600',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              marginRight: '1rem'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Scout+</span>
-          </button>
-          <div className="scout-branding">
-            <Target className="w-5 h-5" />
-            <span>Scout</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Tab Navigation */}
-      <nav className="scout-tabs">
-        <div className="tabs-container">
-          <button
-            className={`tab ${activeTab === 'add-contacts' ? 'active' : ''}`}
-            onClick={() => setShowAddContactModal(true)}
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Scout+</span>
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'company-search' ? 'active' : ''}`}
-            onClick={() => setActiveTab('company-search')}
-          >
-            <Search className="w-4 h-4" />
-            <span>Company Search</span>
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'daily-leads' ? 'active' : ''}`}
-            onClick={() => setActiveTab('daily-leads')}
-          >
-            <Target className="w-4 h-4" />
-            <span>Daily Leads</span>
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'saved-companies' ? 'active' : ''}`}
-            onClick={() => setActiveTab('saved-companies')}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Saved Companies</span>
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'all-leads' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all-leads')}
-          >
-            <Users className="w-4 h-4" />
-            <span>All Leads</span>
-            {contactCount > 0 && <span className="tab-badge">{contactCount}</span>}
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'total-market' ? 'active' : ''}`}
-            onClick={() => setActiveTab('total-market')}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Total Market</span>
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'icp-settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('icp-settings')}
-          >
-            <Settings className="w-4 h-4" />
-            <span>ICP Settings</span>
-          </button>
-
-          <button
-            className={`tab ${activeTab === 'mission-control' ? 'active' : ''}`}
-            onClick={() => navigate('/mission-control-v2')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Mission Control</span>
-          </button>
-        </div>
-      </nav>
-
-      {/* Tab Content */}
+      {/* Tab Content - Navigation now handled by sidebar */}
       <div className="tab-content">
         {activeTab === 'company-search' && <CompanySearch />}
         {activeTab === 'daily-leads' && <DailyLeads />}

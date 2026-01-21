@@ -24,6 +24,7 @@ export default function DailyLeads() {
   });
   const [lastSwipe, setLastSwipe] = useState(null); // Track last swipe for undo
   const [showUndo, setShowUndo] = useState(false);
+  const [showSessionOverview, setShowSessionOverview] = useState(false); // Collapsible session stats
 
   const DAILY_SWIPE_LIMIT = 25; // 25 interested companies per day
 
@@ -290,117 +291,70 @@ export default function DailyLeads() {
 
   return (
     <div className="daily-leads">
-      {/* Enterprise Header */}
-      <div className="enterprise-header">
-        <div className="header-content">
-          <h1 className="page-title">Daily Lead Insights</h1>
-          <p className="page-subtitle">AI-matched companies for your ICP criteria</p>
-        </div>
+      {/* Discovery Header - Swipe App Style */}
+      <div className="discovery-header">
+        <h1 className="discovery-title">Your Daily Matches</h1>
+        <p className="discovery-subtitle">AI-curated companies aligned with your goals</p>
       </div>
 
-      {/* KPI Dashboard */}
-      <div className="kpi-dashboard">
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <Users className="kpi-icon" />
-            <span className="kpi-label">Leads Available</span>
+      {/* Compact Filters Button - Top Right */}
+      <button
+        className="filters-compact-btn"
+        onClick={() => setShowFilters(!showFilters)}
+        title="Filters & Sort"
+      >
+        <Filter size={18} />
+        {showFilters && <span>Close</span>}
+        {!showFilters && <span>Filters</span>}
+      </button>
+
+      {/* Filters Panel (Collapsed by Default) */}
+      {showFilters && (
+        <div className="filters-panel">
+          <div className="filter-group">
+            <label>Lead Quality</label>
+            <select
+              value={filters.quality}
+              onChange={(e) => setFilters({...filters, quality: e.target.value})}
+            >
+              <option value="all">All Leads</option>
+              <option value="high">High Quality (80+)</option>
+              <option value="medium">Medium Quality (50-79)</option>
+              <option value="low">Needs Review (&lt;50)</option>
+            </select>
           </div>
-          <div className="kpi-value">{remainingLeads}</div>
-          <div className="kpi-trend">
-            <TrendingUp className="trend-icon positive" />
-            <span className="trend-text positive">Updated daily</span>
+
+          <div className="filter-group">
+            <label>Sort By</label>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => setFilters({...filters, sortBy: e.target.value})}
+            >
+              <option value="score">Lead Score (High to Low)</option>
+              <option value="recent">Recently Added</option>
+              <option value="revenue">Revenue (High to Low)</option>
+            </select>
           </div>
         </div>
+      )}
 
-        <div className="kpi-card kpi-card-primary">
-          <div className="kpi-primary-row">
-            <span className="kpi-label">Matched Today</span>
-            <div className="kpi-value">{dailySwipeCount}</div>
-          </div>
-          <div className="kpi-trend">
-            <span className="trend-text neutral">Out of {DAILY_SWIPE_LIMIT} daily</span>
-          </div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <CheckCircle className="kpi-icon" />
-            <span className="kpi-label">Companies Accepted</span>
-          </div>
-          <div className="kpi-value">{totalAcceptedCompanies}</div>
-          <div className="kpi-trend">
-            {totalAcceptedCompanies > 0 ? (
-              <>
-                <TrendingUp className="trend-icon positive" />
-                <span className="trend-text positive">Total accepted</span>
-              </>
-            ) : (
-              <>
-                <TrendingDown className="trend-icon neutral" />
-                <span className="trend-text neutral">Start reviewing leads</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Filters Section */}
-      <div className="filters-section">
-        <button
-          className="filter-toggle"
-          onClick={() => setShowFilters(!showFilters)}
-        >
-          <Filter className="w-4 h-4" />
-          <span>Filters & Sort</span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-        </button>
-
-        {showFilters && (
-          <div className="filter-controls">
-            <div className="filter-group">
-              <label>Lead Quality</label>
-              <select
-                value={filters.quality}
-                onChange={(e) => setFilters({...filters, quality: e.target.value})}
-              >
-                <option value="all">All Leads</option>
-                <option value="high">High Quality (80+)</option>
-                <option value="medium">Medium Quality (50-79)</option>
-                <option value="low">Needs Review (&lt;50)</option>
-              </select>
-            </div>
-
-            <div className="filter-group">
-              <label>Sort By</label>
-              <select
-                value={filters.sortBy}
-                onChange={(e) => setFilters({...filters, sortBy: e.target.value})}
-              >
-                <option value="score">Lead Score (High to Low)</option>
-                <option value="recent">Recently Added</option>
-                <option value="revenue">Revenue (High to Low)</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Progress Indicator */}
-      <div className="progress-indicator">
-        <div className="progress-text">
-          Reviewing lead {currentIndex + 1} of {companies.length}
-        </div>
-        <div className="progress-bar-container">
+      {/* Visual Progress - Dots Style */}
+      <div className="progress-dots">
+        {companies.slice(0, Math.min(companies.length, 7)).map((_, index) => (
           <div
-            className="progress-bar-fill"
-            style={{ width: `${((currentIndex + 1) / companies.length) * 100}%` }}
+            key={index}
+            className={`progress-dot ${index === currentIndex ? 'active' : ''} ${index < currentIndex ? 'completed' : ''}`}
           />
-        </div>
+        ))}
+        {companies.length > 7 && <span className="progress-more">+{companies.length - 7}</span>}
+      </div>
+      <div className="progress-count">
+        {currentIndex + 1} of {companies.length}
       </div>
 
-      {/* Company Card */}
+      {/* Company Card - Hero Element */}
       {currentCompany && (
-        <div className="company-card-container">
+        <div className="swipe-card-hero">
           <CompanyCard
             company={currentCompany}
             onSwipe={handleSwipe}
@@ -416,21 +370,63 @@ export default function DailyLeads() {
             onClick={handleUndo}
           >
             <RotateCcw className="w-5 h-5" />
-            <span>Undo Last Swipe</span>
+            <span>Undo</span>
           </button>
         </div>
       )}
 
-      {/* View Saved Companies Button */}
-      <div className="action-footer">
-        <button
-          className="view-saved-companies-btn"
-          onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-        >
-          <CheckCircle className="w-5 h-5" />
-          <span>View Saved Companies {dailySwipeCount > 0 && `(${dailySwipeCount})`}</span>
-        </button>
+      {/* Swipe Button Microcopy */}
+      <div className="swipe-microcopy">
+        <div className="microcopy-item reject-hint">
+          <span className="microcopy-icon">👈</span>
+          <span className="microcopy-text">Improves future matches</span>
+        </div>
+        <div className="microcopy-item accept-hint">
+          <span className="microcopy-text">Builds your pipeline</span>
+          <span className="microcopy-icon">👉</span>
+        </div>
       </div>
+
+      {/* Collapsible Session Overview */}
+      <div className="session-overview-wrapper">
+        <button
+          className="session-overview-toggle"
+          onClick={() => setShowSessionOverview(!showSessionOverview)}
+        >
+          <span>Session Overview</span>
+          <ChevronDown className={`toggle-icon ${showSessionOverview ? 'rotated' : ''}`} size={18} />
+        </button>
+
+        {showSessionOverview && (
+          <div className="session-stats">
+            <div className="session-stat">
+              <div className="stat-label">Remaining</div>
+              <div className="stat-value">{remainingLeads}</div>
+            </div>
+            <div className="session-stat primary">
+              <div className="stat-label">Matched Today</div>
+              <div className="stat-value">{dailySwipeCount} <span className="stat-max">/ {DAILY_SWIPE_LIMIT}</span></div>
+            </div>
+            <div className="session-stat">
+              <div className="stat-label">Total Accepted</div>
+              <div className="stat-value">{totalAcceptedCompanies}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* View Saved Companies Button */}
+      {dailySwipeCount > 0 && (
+        <div className="action-footer">
+          <button
+            className="view-saved-companies-btn"
+            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+          >
+            <CheckCircle className="w-5 h-5" />
+            <span>View Saved Companies ({dailySwipeCount})</span>
+          </button>
+        </div>
+      )}
 
       {/* Contact Title Setup Modal */}
       {showTitleSetup && (

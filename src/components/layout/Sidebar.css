@@ -231,25 +231,34 @@
   color: #374151;
 }
 
-/* Responsive Design */
+/* Responsive Design - Mobile Hides Sidebar */
 @media (max-width: 768px) {
   .sidebar {
-    width: 64px;
+    transform: translateX(-100%);
+    width: 260px;
+    z-index: 200;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.collapsed {
+    width: 260px; /* Full width on mobile when open */
+  }
+
+  /* When explicitly opened on mobile */
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
   }
 
   .section-label,
   .nav-item-content,
   .primary-badge,
-  .nav-children {
-    display: none;
+  .nav-children,
+  .collapse-toggle {
+    display: block; /* Show all when sidebar is open on mobile */
   }
 
-  .nav-item {
-    justify-content: center;
-    padding: 0.75rem;
-  }
-
-  .nav-item.primary {
-    margin: 0 0.25rem;
+  .collapse-toggle {
+    display: flex;
   }
 }

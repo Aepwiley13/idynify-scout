@@ -1,268 +1,101 @@
 /* ========================================
-   DAILY LEADS - ENTERPRISE DESIGN
+   DAILY LEADS - PREMIUM SWIPE EXPERIENCE
+   Dating App Inspired UX
    ======================================== */
 
-/* Main Container */
+/* Main Container - Swipe App Canvas */
 .daily-leads {
-  max-width: 1200px;
+  max-width: 750px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: 1.5rem 1.5rem 3rem;
   background: #ffffff;
   min-height: 100vh;
+  position: relative;
 }
 
 /* ========================================
-   ENTERPRISE HEADER - ENHANCED PROMINENCE
+   DISCOVERY HEADER - Emotional & Inviting
    ======================================== */
-.enterprise-header {
-  margin-bottom: 2.5rem;
+.discovery-header {
   text-align: center;
-  padding: 2rem 2rem;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #e0f2fe 100%);
-  border-radius: 16px;
-  border: 2px solid #3b82f6;
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
-  position: relative;
-  overflow: hidden;
+  margin-bottom: 1.5rem;
+  padding: 0 1rem;
 }
 
-.enterprise-header::before {
-  content: "⭐ PRIMARY DAILY TASK";
-  position: absolute;
-  top: 0.75rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: #ffffff;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 0.375rem 1rem;
-  border-radius: 9999px;
-  text-transform: uppercase;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
-}
-
-.header-content {
-  margin-top: 1.5rem;
-}
-
-.page-title {
-  font-size: 2.5rem;
+.discovery-title {
+  font-size: 2rem;
   font-weight: 800;
   color: #111827;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.5rem 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   line-height: 1.2;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.page-subtitle {
-  font-size: 1.125rem;
-  color: #4b5563;
+.discovery-subtitle {
+  font-size: 0.9375rem;
+  color: #6b7280;
   margin: 0;
   font-weight: 500;
 }
 
 /* ========================================
-   KPI DASHBOARD
+   COMPACT FILTERS BUTTON - Non-Intrusive
    ======================================== */
-.kpi-dashboard {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-  margin-bottom: 2rem;
-}
-
-@media (max-width: 1024px) {
-  .kpi-dashboard {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.kpi-card {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: all 0.2s ease;
-}
-
-.kpi-card:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
-  transform: translateY(-2px);
-}
-
-.kpi-card.highlight {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: #3b82f6;
-}
-
-/* Primary metric card - emphasized for daily mission focus */
-.kpi-card-primary .kpi-value {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin-bottom: 0;
-}
-
-.kpi-card-primary .kpi-label {
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
-.kpi-card-primary {
-  border: 2px solid #e5e7eb;
-  background: #fafafa;
-}
-
-/* Horizontal row for label + number in primary card */
-.kpi-primary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.kpi-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.kpi-icon {
-  width: 20px;
-  height: 20px;
-  color: #3b82f6;
-  stroke-width: 2;
-}
-
-.kpi-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.kpi-value {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #111827;
-  line-height: 1;
-  margin-bottom: 0.75rem;
-  font-feature-settings: 'tnum';
-}
-
-.kpi-trend {
+.filters-compact-btn {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.trend-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.5;
-}
-
-.trend-icon.positive {
-  color: #10b981;
-}
-
-.trend-icon.neutral {
+  padding: 0.625rem 1rem;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 9999px;
   color: #6b7280;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
 }
 
-.trend-text {
-  font-size: 0.875rem;
-  font-weight: 500;
+.filters-compact-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
 }
 
-.trend-text.positive {
-  color: #10b981;
-}
-
-.trend-text.neutral {
-  color: #6b7280;
-}
-
-.kpi-progress {
-  margin-top: 0.75rem;
-}
-
-.kpi-progress .progress-bar {
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.kpi-progress .progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
-  border-radius: 999px;
-  transition: width 0.5s ease;
-}
-
-/* ========================================
-   FILTERS SECTION
-   ======================================== */
-.filters-section {
+/* Filters Panel */
+.filters-panel {
   background: #f9fafb;
   border: 1.5px solid #e5e7eb;
   border-radius: 12px;
-  overflow: hidden;
+  padding: 1.25rem;
   margin-bottom: 1.5rem;
-}
-
-.filter-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
-  transition: all 0.2s ease;
-}
-
-.filter-toggle:hover {
-  background: #f3f4f6;
-  color: #111827;
-}
-
-.filter-controls {
-  padding: 1.5rem;
-  border-top: 1.5px solid #e5e7eb;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.25rem;
-  background: #ffffff;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
 }
 
 .filter-group label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #374151;
-  margin-bottom: 0.5rem;
+  color: #6b7280;
+  margin-bottom: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .filter-group select {
   width: 100%;
-  padding: 0.625rem 0.875rem;
+  padding: 0.5rem 0.75rem;
   background: #ffffff;
   border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #111827;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -279,48 +112,82 @@
 }
 
 /* ========================================
-   PROGRESS INDICATOR
+   PROGRESS DOTS - Visual & Motivating
    ======================================== */
-.progress-indicator {
-  margin-bottom: 1.5rem;
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
-.progress-text {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #6b7280;
-  text-align: left;
-  margin-bottom: 0.75rem;
-}
-
-.progress-bar-container {
-  height: 4px;
+.progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: #e5e7eb;
-  border-radius: 999px;
-  overflow: hidden;
+  transition: all 0.3s ease;
 }
 
-.progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-  border-radius: 999px;
-  transition: width 0.3s ease;
+.progress-dot.completed {
+  background: #10b981;
+  transform: scale(0.85);
+}
+
+.progress-dot.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  transform: scale(1.3);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.progress-more {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+
+.progress-count {
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 2rem;
 }
 
 /* ========================================
-   COMPANY CARD
+   SWIPE CARD HERO - Dominates the Canvas
+   ======================================== */
+.swipe-card-hero {
+  max-width: 700px;
+  margin: 0 auto 1.5rem;
+  transform: scale(1);
+  transition: transform 0.3s ease;
+}
+
+.swipe-card-hero:hover {
+  transform: scale(1.01);
+}
+
+/* ========================================
+   COMPANY CARD STYLES
+   (Keeping existing card styling)
    ======================================== */
 .company-card-container {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto 2rem;
 }
 
 .enterprise-company-card {
   background: #ffffff;
-  border: 1px solid #000000;
-  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.05),
+    0 10px 24px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.02);
   cursor: grab;
   user-select: none;
 }
@@ -357,16 +224,16 @@
   padding: 2rem;
 }
 
-/* Company Header - Centered Logo (matches Manual Search) */
+/* Company Header - Centered Logo */
 .company-header {
   display: flex;
   justify-content: center;
   margin-bottom: 0.5rem;
 }
 
-/* Company Name - Centered (matches Manual Search) */
+/* Company Name - Centered */
 .company-name {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
   color: #1f2937;
   text-align: center;
@@ -390,7 +257,7 @@
   text-decoration: underline;
 }
 
-/* Metadata Grid (2x2) - Matches Manual Search */
+/* Metadata Grid (2x2) */
 .company-meta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -424,7 +291,7 @@
   white-space: nowrap;
 }
 
-/* Website & LinkedIn Buttons - Solid Style (Matches Manual Search) */
+/* Website & LinkedIn Buttons */
 .company-link-buttons {
   display: flex;
   gap: 0.75rem;
@@ -481,7 +348,7 @@
   pointer-events: none;
 }
 
-/* Action Buttons - Matches Manual Search Style */
+/* Action Buttons - Enhanced with Microcopy Integration */
 .action-buttons {
   display: flex;
   gap: 0.75rem;
@@ -494,14 +361,15 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.875rem 1rem;
+  padding: 1rem 1rem;
   border: 2px solid;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   background: white;
+  position: relative;
 }
 
 .action-btn.reject {
@@ -510,11 +378,15 @@
 }
 
 .action-btn.reject:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: #fef2f2;
   border-color: #dc2626;
   color: #dc2626;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(239, 68, 68, 0.2);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.25);
+}
+
+.action-btn.reject:active {
+  transform: translateY(-1px) scale(0.98);
 }
 
 .action-btn.accept {
@@ -523,11 +395,15 @@
 }
 
 .action-btn.accept:hover {
-  background: rgba(16, 185, 129, 0.1);
+  background: #f0fdf4;
   border-color: #059669;
   color: #059669;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(16, 185, 129, 0.2);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.25);
+}
+
+.action-btn.accept:active {
+  transform: translateY(-1px) scale(0.98);
 }
 
 /* Status Section */
@@ -614,10 +490,43 @@
 }
 
 /* ========================================
-   UNDO BUTTON
+   SWIPE MICROCOPY - Reassurance & Motivation
+   ======================================== */
+.swipe-microcopy {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 700px;
+  margin: 0 auto 2rem;
+  padding: 0 1rem;
+}
+
+.microcopy-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.microcopy-icon {
+  font-size: 1.125rem;
+}
+
+.reject-hint {
+  flex-direction: row;
+}
+
+.accept-hint {
+  flex-direction: row-reverse;
+}
+
+/* ========================================
+   UNDO BUTTON - Quick Access
    ======================================== */
 .undo-container {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto 1.5rem;
   display: flex;
   justify-content: center;
@@ -627,34 +536,114 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 0.875rem 1.75rem;
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.9375rem;
-  font-weight: 700;
+  gap: 0.625rem;
+  padding: 0.75rem 1.5rem;
+  background: #f9fafb;
+  color: #6b7280;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  transition: all 0.2s ease;
 }
 
 .undo-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-}
-
-.undo-btn:active {
-  transform: translateY(0);
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+  transform: translateY(-1px);
 }
 
 /* ========================================
-   ACTION FOOTER
+   SESSION OVERVIEW - Collapsible Stats
+   ======================================== */
+.session-overview-wrapper {
+  max-width: 700px;
+  margin: 0 auto 2rem;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.session-overview-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.session-overview-toggle:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.toggle-icon {
+  transition: transform 0.2s ease;
+}
+
+.toggle-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.session-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #ffffff;
+  border-top: 1.5px solid #e5e7eb;
+}
+
+.session-stat {
+  text-align: center;
+  padding: 1rem 0.75rem;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.session-stat.primary {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #93c5fd;
+}
+
+.stat-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+}
+
+.stat-max {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+/* ========================================
+   ACTION FOOTER - View Saved Companies
    ======================================== */
 .action-footer {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
@@ -664,7 +653,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  padding: 1.25rem 2rem;
+  padding: 1.125rem 2rem;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: #ffffff;
   border: none;
@@ -776,7 +765,6 @@
 /* ========================================
    SWIPE AFFORDANCE ARROWS
    ======================================== */
-/* Static arrow indicators - always visible as affordance hints */
 .swipe-affordance-arrows {
   position: absolute;
   top: 50%;
@@ -811,40 +799,54 @@
   color: #10b981;
 }
 
-/* Hide on mobile to avoid clutter */
-@media (max-width: 768px) {
-  .swipe-affordance-arrows {
-    display: none;
-  }
-}
-
 /* ========================================
-   MOBILE RESPONSIVE
+   MOBILE RESPONSIVE - Swipe First Priority
    ======================================== */
 @media (max-width: 768px) {
   .daily-leads {
-    padding: 1.5rem 1rem;
+    padding: 1rem 1rem 2rem;
   }
 
-  .page-title {
-    font-size: 1.5rem;
+  /* Header Compact */
+  .discovery-title {
+    font-size: 1.625rem;
   }
 
-  .kpi-dashboard {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.875rem;
+  .discovery-subtitle {
+    font-size: 0.875rem;
   }
 
-  .kpi-card {
-    padding: 1.25rem;
+  /* Filters to Top Right */
+  .filters-compact-btn {
+    top: 1rem;
+    right: 1rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.75rem;
   }
 
-  .kpi-value {
-    font-size: 1.75rem;
-  }
-
-  .filter-controls {
+  .filters-panel {
     grid-template-columns: 1fr;
+  }
+
+  /* Progress Dots Smaller */
+  .progress-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .progress-dot.active {
+    transform: scale(1.5);
+  }
+
+  .progress-count {
+    font-size: 0.8125rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Card Takes Center Stage */
+  .swipe-card-hero {
+    max-width: 100%;
+    margin-bottom: 1.25rem;
   }
 
   .company-card-container {
@@ -869,18 +871,57 @@
     gap: 0.5rem;
   }
 
-  .link-btn {
-    width: 100%;
-  }
-
   .action-buttons {
-    flex-direction: row;
-    gap: 0.5rem;
+    gap: 0.625rem;
   }
 
   .action-btn {
-    padding: 0.75rem 0.75rem;
-    font-size: 0.8125rem;
+    padding: 0.875rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  /* Microcopy Compact */
+  .swipe-microcopy {
+    padding: 0 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .microcopy-item {
+    font-size: 0.75rem;
+  }
+
+  .microcopy-icon {
+    font-size: 1rem;
+  }
+
+  /* Session Overview */
+  .session-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.625rem;
+    padding: 1rem;
+  }
+
+  .session-stat {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .stat-value {
+    font-size: 1.375rem;
+  }
+
+  .stat-label {
+    font-size: 0.625rem;
+  }
+
+  /* Action Footer */
+  .view-saved-companies-btn {
+    padding: 1rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  /* Hide swipe arrows on mobile */
+  .swipe-affordance-arrows {
+    display: none;
   }
 
   .hint-desktop {
@@ -904,16 +945,16 @@
 }
 
 @media (max-width: 480px) {
-  .kpi-dashboard {
+  .discovery-title {
+    font-size: 1.375rem;
+  }
+
+  .session-stats {
     grid-template-columns: 1fr;
   }
 
-  .page-title {
-    font-size: 1.25rem;
-  }
-
-  .company-header {
-    justify-content: center;
+  .stat-value {
+    font-size: 1.5rem;
   }
 
   .card-status-section {
@@ -922,5 +963,9 @@
 
   .status-score {
     font-size: 1.25rem;
+  }
+
+  .company-header {
+    justify-content: center;
   }
 }

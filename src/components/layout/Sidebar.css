@@ -234,31 +234,45 @@
 /* Responsive Design - Mobile Hides Sidebar */
 @media (max-width: 768px) {
   .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
     transform: translateX(-100%);
-    width: 260px;
+    width: 280px;
     z-index: 200;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0);
   }
 
   .sidebar.collapsed {
-    width: 260px; /* Full width on mobile when open */
+    width: 280px; /* Full width on mobile when open */
+    transform: translateX(-100%); /* Still hidden when collapsed */
   }
 
   /* When explicitly opened on mobile */
   .sidebar.mobile-open {
     transform: translateX(0);
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
   }
 
-  .section-label,
-  .nav-item-content,
-  .primary-badge,
-  .nav-children,
-  .collapse-toggle {
-    display: block; /* Show all when sidebar is open on mobile */
+  /* Always show all content on mobile sidebar */
+  .sidebar .section-label,
+  .sidebar .nav-item-content,
+  .sidebar .primary-badge,
+  .sidebar .nav-children {
+    display: block;
   }
 
-  .collapse-toggle {
+  .sidebar .nav-item {
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+  }
+
+  .sidebar .nav-item.primary {
+    margin: 0 0.5rem;
+  }
+
+  .sidebar .collapse-toggle {
     display: flex;
   }
 }

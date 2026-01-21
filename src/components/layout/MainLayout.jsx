@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Menu } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './MainLayout.css';
 
 const MainLayout = ({ children, user }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -48,12 +49,30 @@ const MainLayout = ({ children, user }) => {
 
   return (
     <div className="main-layout">
-      <Sidebar />
+      <Sidebar
+        mobileMenuOpen={mobileMenuOpen}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
+      />
+
+      {/* Mobile Menu Backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="mobile-menu-backdrop"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
       <div className="main-content">
         {/* Top Bar */}
         <header className="top-bar">
           <div className="top-bar-left">
+            <button
+              className="mobile-menu-trigger"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              <Menu size={24} />
+            </button>
             <h1 className="page-title">{getPageTitle()}</h1>
           </div>
 

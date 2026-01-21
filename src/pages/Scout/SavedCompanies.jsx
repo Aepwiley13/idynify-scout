@@ -249,10 +249,9 @@ export default function SavedCompanies() {
     }
   }
 
-  // Handle company click - show detail modal with enriched data
+  // Handle company click - navigate directly to company profile
   function handleCompanyClick(company) {
-    setSelectedCompany(company);
-    setShowDetailModal(true);
+    navigate(`/scout/company/${company.id}`);
   }
 
   // Handle detail modal close

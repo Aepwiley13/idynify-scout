@@ -14,13 +14,15 @@ import {
 } from 'lucide-react';
 import './Sidebar.css';
 
-const Sidebar = () => {
+const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleNavigation = (path, state = {}) => {
     navigate(path, { state });
+    // Close mobile menu after navigation
+    onCloseMobileMenu();
   };
 
   const isActive = (path, tabName) => {
@@ -112,7 +114,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
       {/* Sidebar Header */}
       <div className="sidebar-header">
         {!isCollapsed && (

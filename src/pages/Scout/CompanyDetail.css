@@ -75,8 +75,22 @@
   border-radius: 16px;
   padding: 1.75rem;
   margin-bottom: 2rem;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.company-info-card::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.03), transparent);
+  pointer-events: none;
 }
 
 /* Contact Badge */
@@ -447,18 +461,39 @@
 }
 
 /* ========================================
-   KEY DECISION MAKERS SECTION
+   SECTION HIERARCHY & SPACING
    ======================================== */
-.decision-makers-section {
+.saved-contacts-section,
+.decision-makers-section,
+.title-search-section,
+.contacts-section {
   background: #ffffff;
   border: 1.5px solid #e5e7eb;
   border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+  padding: 2.5rem;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.saved-contacts-section:hover,
+.decision-makers-section:hover,
+.title-search-section:hover,
+.contacts-section:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ========================================
+   KEY DECISION MAKERS SECTION
+   ======================================== */
+.decision-makers-section {
+  /* Inherits from section hierarchy above */
 }
 
 .section-header-main {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #f3f4f6;
 }
 
 .section-title-main {
@@ -576,9 +611,26 @@
   font-size: 0.9375rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.95);
-  margin: 0;
+  margin: 0 0 0.5rem 0;
   line-height: 1.4;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Department Badge on Card Overlay */
+.card-dept-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Leadership Badge - Star + Letter (Top Left) */
@@ -630,28 +682,54 @@
   color: #059669;
 }
 
-/* LinkedIn Button - Below Card */
+/* LinkedIn Button - Below Card (Secondary Action) */
 .card-linkedin-btn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1.5px solid rgba(59, 130, 246, 0.3);
-  color: #3b82f6;
+  padding: 0.625rem 1rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1.5px solid rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
   border-radius: 10px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .card-linkedin-btn:hover {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.15);
   border-color: #3b82f6;
+  color: #3b82f6;
   transform: translateY(-1px);
+}
+
+/* Primary Action Button for Saved Contacts */
+.saved-contact-primary-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.75rem;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.saved-contact-primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
 }
 
 /* Selection Checkbox - Updated for photo backgrounds */
@@ -955,11 +1033,7 @@
    TITLE SEARCH SECTION
    ======================================== */
 .title-search-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+  /* Inherits from section hierarchy above */
 }
 
 .title-search-header {
@@ -1243,11 +1317,7 @@
    CONTACTS SECTION
    ======================================== */
 .contacts-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+  /* Inherits from section hierarchy above */
 }
 
 .section-header {
@@ -1828,18 +1898,13 @@
    SAVED CONTACTS SECTION
    ======================================== */
 .saved-contacts-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
+  /* Inherits from section hierarchy above */
 }
 
 .saved-contacts-section .section-header-main {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
 }
 
 .saved-contacts-section .section-title-main {
@@ -1854,6 +1919,7 @@
 
 .saved-contacts-section .section-title-main svg {
   color: #10b981;
+  stroke-width: 2;
 }
 
 .saved-contacts-section .section-header {
@@ -2062,6 +2128,12 @@
     padding: 1.5rem 1rem;
   }
 
+  /* Sticky header adjustments for mobile */
+  .company-info-card {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
   .company-card-header {
     flex-direction: column;
     align-items: flex-start;
@@ -2091,6 +2163,15 @@
 
   .company-quick-link {
     width: 100%;
+  }
+
+  /* Section spacing adjustments */
+  .saved-contacts-section,
+  .decision-makers-section,
+  .title-search-section,
+  .contacts-section {
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
   }
 
   .title-search-header {
@@ -2179,6 +2260,7 @@
   .contacts-section,
   .saved-contacts-section {
     padding: 1.25rem;
+    margin-bottom: 1.25rem;
   }
 
   .company-name {
@@ -2191,5 +2273,11 @@
 
   .section-header h2 {
     font-size: 1.125rem;
+  }
+
+  /* Adjust card heights for smaller screens */
+  .decision-maker-card-photo,
+  .contact-card-photo {
+    height: 360px;
   }
 }

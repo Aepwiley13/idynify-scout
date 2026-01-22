@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { X, UserPlus, Upload, Camera, Search, CheckCircle, Eye, PlusCircle } from 'lucide-react';
+import { X, UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ManualContactForm from './ManualContactForm';
 import CSVUpload from './CSVUpload';
 import BusinessCardCapture from './BusinessCardCapture';
-import FindContact from './FindContact';
 
 export default function AddContactModal({ onClose, onContactAdded }) {
   const navigate = useNavigate();
-  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'find-contact', 'success'
+  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'success'
   const [addedContacts, setAddedContacts] = useState([]);
 
   const handleBack = () => {
@@ -51,7 +50,6 @@ export default function AddContactModal({ onClose, onContactAdded }) {
               {currentView === 'manual' && 'Add Manually'}
               {currentView === 'csv' && 'Upload CSV'}
               {currentView === 'business-card' && 'Scan Business Card'}
-              {currentView === 'find-contact' && 'Find Contact'}
               {currentView === 'success' && 'Contact Added Successfully!'}
             </h2>
           </div>
@@ -120,24 +118,6 @@ export default function AddContactModal({ onClose, onContactAdded }) {
                   </div>
                 </div>
               </button>
-
-              {/* Find Contact */}
-              <button
-                onClick={() => setCurrentView('find-contact')}
-                className="w-full bg-white hover:bg-cyan-50 border-2 border-gray-200 hover:border-cyan-400 rounded-xl p-6 text-left transition-all group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-cyan-200 transition-colors">
-                    <Search className="w-6 h-6 text-cyan-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">Find Contact</h3>
-                    <p className="text-sm text-gray-600">
-                      Search for a person using name, company, or LinkedIn. Barry will help you find and validate the right match.
-                    </p>
-                  </div>
-                </div>
-              </button>
             </div>
           )}
 
@@ -151,10 +131,6 @@ export default function AddContactModal({ onClose, onContactAdded }) {
 
           {currentView === 'business-card' && (
             <BusinessCardCapture onContactAdded={handleContactAdded} onCancel={handleBack} />
-          )}
-
-          {currentView === 'find-contact' && (
-            <FindContact onContactAdded={handleContactAdded} onCancel={handleBack} />
           )}
 
           {currentView === 'success' && (

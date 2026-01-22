@@ -9,6 +9,7 @@ import ICPSettings from './ICPSettings';
 import DailyLeads from './DailyLeads';
 import AllLeads from './AllLeads';
 import CompanySearch from './CompanySearch';
+import ContactSearch from './ContactSearch';
 import AddContactModal from '../../components/scout/AddContactModal';
 import './ScoutMain.css';
 
@@ -70,6 +71,7 @@ export default function ScoutMain() {
       {/* Tab Content - Navigation now handled by sidebar */}
       <div className="tab-content">
         {activeTab === 'company-search' && <CompanySearch />}
+        {activeTab === 'contact-search' && <ContactSearch />}
         {activeTab === 'daily-leads' && <DailyLeads />}
         {activeTab === 'saved-companies' && <SavedCompanies />}
         {activeTab === 'all-leads' && <AllLeads />}

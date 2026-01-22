@@ -3,13 +3,25 @@ import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 
+/**
+ * LINKEDIN LINK SEARCH - EXACT MATCH ONLY
+ *
+ * This component is for the LinkedIn Link option in Scout+.
+ *
+ * Flow:
+ * 1. User pastes LinkedIn URL
+ * 2. Call findContactByLinkedInUrl (exact match, no fuzzy search)
+ * 3. Show preview of exact person
+ * 4. User confirms and saves
+ *
+ * NO Barry validation (not needed for exact URL match)
+ * NO "potential matches" (only exact match)
+ * NO fuzzy search fallback
+ */
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState(null);
-  const [barryRecommendation, setBarryRecommendation] = useState(null);
-  const [validating, setValidating] = useState(false);
-  const [selectedContact, setSelectedContact] = useState(null);
+  const [contact, setContact] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -35,8 +47,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
 
     setSearching(true);
     setError(null);
-    setSearchResults(null);
-    setBarryRecommendation(null);
+    setContact(null);
 
     try {
       const user = auth.currentUser;
@@ -46,36 +57,30 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
 
       const authToken = await user.getIdToken();
 
-      // Step 1: Search Apollo using LinkedIn URL
-      const response = await fetch('/.netlify/functions/findContact', {
+      // Call NEW function for exact LinkedIn URL lookup
+      const response = await fetch('/.netlify/functions/findContactByLinkedInUrl', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid,
           authToken,
-          searchParams: {
-            linkedin_url: linkedinUrl.trim()
-          }
+          linkedin_url: linkedinUrl.trim()
         })
       });
 
       const data = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || 'Search failed');
+        // Use the exact error message from the function
+        throw new Error(data.error || 'Failed to find contact');
       }
 
-      if (data.results.length === 0) {
-        setError('No contact found for this LinkedIn URL. The profile may not be in our database.');
-        setSearching(false);
-        return;
+      if (!data.contact) {
+        throw new Error('Unable to retrieve public profile details from this LinkedIn link. Please verify the URL or try again.');
       }
 
-      console.log(`✅ Found ${data.results.length} potential matches`);
-      setSearchResults(data.results);
-
-      // Step 2: Get Barry's AI recommendation
-      await getBarryRecommendation(data.results, { linkedin_url: linkedinUrl.trim() });
+      console.log(`✅ Found exact match: ${data.contact.name}`);
+      setContact(data.contact);
 
     } catch (err) {
       console.error('Search error:', err);
@@ -85,52 +90,8 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
     }
   };
 
-  const getBarryRecommendation = async (results, originalSearchParams) => {
-    setValidating(true);
-
-    try {
-      // Call Claude API for Barry's validation
-      const user = auth.currentUser;
-      const authToken = await user.getIdToken();
-
-      const response = await fetch('/.netlify/functions/barryValidateContact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          results,
-          searchParams: originalSearchParams
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setBarryRecommendation(data.recommendation);
-      } else {
-        // Fallback: just show top match
-        setBarryRecommendation({
-          contact: results[0],
-          confidence: 'high',
-          explanation: 'This contact matches the LinkedIn profile URL you provided.'
-        });
-      }
-    } catch (err) {
-      console.error('Barry validation error:', err);
-      // Fallback: show top match
-      setBarryRecommendation({
-        contact: results[0],
-        confidence: 'high',
-        explanation: 'This contact matches the LinkedIn profile URL you provided.'
-      });
-    } finally {
-      setValidating(false);
-    }
-  };
-
   const handleConfirmAndSave = async () => {
-    if (!selectedContact) return;
+    if (!contact) return;
 
     setSaving(true);
     setError(null);
@@ -142,47 +103,41 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       }
 
       // Step 1: Ensure company exists in Saved Companies
-      const companyId = await ensureCompanyExists(selectedContact, user.uid);
+      const companyId = await ensureCompanyExists(contact, user.uid);
 
       // Step 2: Save contact to /users/{uid}/contacts
-      const contactId = selectedContact.id || `apollo_${Date.now()}`;
+      const contactId = contact.id || `apollo_${Date.now()}`;
       const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
 
       const contactData = {
         // Apollo IDs
-        apollo_person_id: selectedContact.id,
+        apollo_person_id: contact.id,
 
         // Basic Info
-        name: selectedContact.name || 'Unknown',
-        title: selectedContact.title || selectedContact.headline || '',
-        email: selectedContact.email || null,
-        phone: selectedContact.phone_numbers?.[0]?.sanitized_number || null,
-        linkedin_url: selectedContact.linkedin_url || null,
-        facebook_url: selectedContact.facebook_url || null,
-        photo_url: selectedContact.photo_url || null,
+        name: contact.name || 'Unknown',
+        title: contact.title || '',
+        email: contact.email || null,
+        phone: contact.phone_numbers?.[0]?.sanitized_number || null,
+        linkedin_url: contact.linkedin_url || null,
+        photo_url: contact.photo_url || null,
 
         // Company Association
         company_id: companyId,
-        company_name: selectedContact.organization_name || selectedContact.organization?.name || null,
-        company_industry: selectedContact.organization?.industry || null,
+        company_name: contact.organization_name || null,
+        company_industry: contact.organization?.industry || null,
 
         // Apollo Enrichment Fields
-        department: selectedContact.departments?.[0] || null,
-        seniority: selectedContact.seniority || null,
-        location: selectedContact.city && selectedContact.state
-          ? `${selectedContact.city}, ${selectedContact.state}`
-          : selectedContact.city || selectedContact.state || null,
+        department: contact.departments?.[0] || null,
+        seniority: contact.seniority || null,
+        location: contact.location || null,
 
         // Metadata
         status: 'active',
         saved_at: new Date().toISOString(),
         source: 'LinkedIn Link',
 
-        // Match quality from search
-        match_quality: selectedContact.match_quality || 100,
-
-        // Barry's confidence
-        barry_confidence: barryRecommendation?.confidence || 'high'
+        // Match quality is always 100 for exact LinkedIn URL
+        match_quality: 100
       };
 
       await setDoc(contactRef, contactData);
@@ -277,19 +232,19 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-xl">🐻</span>
+            <Linkedin className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900 mb-1">Barry will find the contact for you</p>
+            <p className="text-sm font-semibold text-gray-900 mb-1">Find contact by LinkedIn URL</p>
             <p className="text-xs text-gray-700">
-              Paste the LinkedIn profile URL below and Barry will instantly retrieve the contact information.
+              Paste the LinkedIn profile URL below to retrieve contact information.
             </p>
           </div>
         </div>
       </div>
 
       {/* Search Form */}
-      {!searchResults && (
+      {!contact && (
         <form onSubmit={handleFindContact} className="space-y-4">
           {/* LinkedIn URL Input */}
           <div>
@@ -349,144 +304,102 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
         </form>
       )}
 
-      {/* Validation & Results */}
-      {searchResults && (
-        <div className="space-y-6">
-          {/* Barry's Validation Loading */}
-          {validating && (
-            <div className="bg-blue-50 rounded-xl p-6 border border-blue-200 text-center">
-              <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-gray-900">Barry is validating the contact...</p>
+      {/* Contact Preview and Save */}
+      {contact && (
+        <div className="space-y-4">
+          {/* Success message */}
+          <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Contact Found!</p>
+                <p className="text-xs text-gray-700">Review the details below and confirm to save.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Preview Card */}
+          <ContactPreviewCard contact={contact} />
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
 
-          {/* Barry's Recommendation */}
-          {barryRecommendation && !selectedContact && (
-            <div className="space-y-4">
-              <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-xl">🐻</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900 mb-1">Contact Found!</p>
-                    <p className="text-xs text-gray-700">{barryRecommendation.explanation}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recommended Contact Preview */}
-              <ContactPreviewCard
-                contact={barryRecommendation.contact}
-                confidence={barryRecommendation.confidence}
-                onConfirm={() => setSelectedContact(barryRecommendation.contact)}
-                onReject={() => {
-                  setSearchResults(null);
-                  setBarryRecommendation(null);
-                  setError('Please try a different LinkedIn URL.');
-                }}
-              />
-            </div>
-          )}
-
-          {/* Final Confirmation */}
-          {selectedContact && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                <p className="text-sm font-semibold text-gray-900">Confirm this is the right person before saving</p>
-              </div>
-
-              <ContactPreviewCard
-                contact={selectedContact}
-                confidence={barryRecommendation?.confidence || 'high'}
-                showActions={false}
-              />
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-800">{error}</p>
-                </div>
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleConfirmAndSave}
+              disabled={saving}
+              className="flex-1 px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  Save Contact
+                </>
               )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleConfirmAndSave}
-                  disabled={saving}
-                  className="flex-1 px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <Loader className="w-5 h-5 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      Save Contact
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedContact(null);
-                    setSearchResults(null);
-                    setBarryRecommendation(null);
-                  }}
-                  className="px-6 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
-                  disabled={saving}
-                >
-                  Start Over
-                </button>
-              </div>
-            </div>
-          )}
+            </button>
+            <button
+              onClick={() => {
+                setContact(null);
+                setLinkedinUrl('');
+              }}
+              className="px-6 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
+              disabled={saving}
+            >
+              Start Over
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// Contact Preview Card Component
-function ContactPreviewCard({ contact, confidence, onConfirm, onReject, showActions = true }) {
-  const confidenceColors = {
-    high: 'bg-green-100 text-green-800 border-green-300',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    low: 'bg-orange-100 text-orange-800 border-orange-300'
-  };
-
+// Contact Preview Card Component (Simplified - No confidence badge needed for exact match)
+function ContactPreviewCard({ contact }) {
   return (
     <div className="bg-white border-2 border-blue-400 rounded-xl p-6 shadow-lg">
-      {/* Confidence Badge */}
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-3">
-          {contact.photo_url ? (
-            <img
-              src={contact.photo_url}
-              alt={contact.name}
-              className="w-16 h-16 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-              <User className="w-8 h-8 text-blue-600" />
-            </div>
-          )}
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">{contact.name}</h3>
-            <p className="text-sm text-gray-600">{contact.title || 'Title not available'}</p>
+      {/* Contact Header */}
+      <div className="flex items-start gap-4 mb-4">
+        {contact.photo_url ? (
+          <img
+            src={contact.photo_url}
+            alt={contact.name}
+            className="w-16 h-16 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+            <User className="w-8 h-8 text-blue-600" />
           </div>
+        )}
+        <div className="flex-1">
+          <h3 className="text-xl font-bold text-gray-900">{contact.name}</h3>
+          <p className="text-sm text-gray-600">{contact.title || 'Title not available'}</p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${confidenceColors[confidence] || confidenceColors.high}`}>
-          {confidence === 'high' ? '✓ High Match' : confidence === 'medium' ? '~ Medium Match' : '⚠ Low Match'}
-        </span>
       </div>
 
-      {/* Contact Details */}
-      <div className="space-y-3 mb-4">
+      {/* Contact Details - ONLY Required Fields */}
+      <div className="space-y-3">
         {contact.organization_name && (
           <div className="flex items-center gap-2 text-sm">
             <Building2 className="w-4 h-4 text-gray-500" />
             <span className="text-gray-700">{contact.organization_name}</span>
+          </div>
+        )}
+        {contact.location && (
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="w-4 h-4 text-gray-500" />
+            <span className="text-gray-700">{contact.location}</span>
           </div>
         )}
         {contact.email && (
@@ -514,35 +427,7 @@ function ContactPreviewCard({ contact, confidence, onConfirm, onReject, showActi
             </a>
           </div>
         )}
-        {(contact.city || contact.state) && (
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-700">
-              {contact.city && contact.state ? `${contact.city}, ${contact.state}` : contact.city || contact.state}
-            </span>
-          </div>
-        )}
       </div>
-
-      {/* Actions */}
-      {showActions && (
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
-          >
-            <CheckCircle className="w-4 h-4" />
-            This is the Right Person
-          </button>
-          <button
-            onClick={onReject}
-            className="flex-1 px-4 py-2 rounded-lg bg-white border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-          >
-            <X className="w-4 h-4" />
-            Not the Right Person
-          </button>
-        </div>
-      )}
     </div>
   );
 }

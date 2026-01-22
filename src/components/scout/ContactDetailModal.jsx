@@ -213,52 +213,73 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
   return (
     <div className="contact-detail-overlay" onClick={onClose}>
       <div className="contact-detail-container" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div ref={headerRef} className={`contact-detail-header ${isScrolled ? 'scrolled' : ''}`}>
-          <div className="header-content">
-            {isEnrichmentMode && (
+        {/* Close Button - Absolute positioned over header */}
+        <button className="close-button-absolute" onClick={onClose}>
+          <X className="w-6 h-6" />
+        </button>
+
+        {/* Hero Photo Header */}
+        {!isEnrichmentMode && (
+          <div
+            className="contact-hero-header"
+            style={{
+              backgroundImage: `url(${contact.photo_url || '/barry.png'})`,
+            }}
+          >
+            {/* Gradient Overlay */}
+            <div className="contact-hero-overlay">
+              {/* Back button for enrichment mode */}
+              {isEnrichmentMode && (
+                <button
+                  onClick={handleCancelEnrichment}
+                  className="back-button-hero"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+              )}
+
+              {/* Contact Info Overlay */}
+              <div className="contact-hero-content">
+                {/* Source Badge */}
+                <div className="hero-source-badge">
+                  {getSourceBadge()}
+                </div>
+
+                {/* Name and Title */}
+                <h2 className="contact-hero-name">
+                  {contact.name || 'Unknown Contact'}
+                </h2>
+                <p className="contact-hero-title">
+                  {contact.title || 'No title specified'}
+                </p>
+                {contact.company_name && (
+                  <p className="contact-hero-company">
+                    <Building2 className="w-4 h-4" />
+                    {contact.company_name}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enrichment Mode Header (Simple) */}
+        {isEnrichmentMode && (
+          <div ref={headerRef} className="contact-detail-header-simple">
+            <div className="header-content">
               <button
                 onClick={handleCancelEnrichment}
                 className="back-button"
-                style={{
-                  marginRight: '1rem',
-                  padding: '0.5rem',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: '#6b7280'
-                }}
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-            )}
-            <div className="contact-avatar">
-              {contact.photo_url ? (
-                <img src={contact.photo_url} alt={contact.name} />
-              ) : (
-                <User className="w-8 h-8 text-gray-400" />
-              )}
-            </div>
-            <div className="header-text">
-              <h2 className="contact-detail-name">
-                {isEnrichmentMode ? 'Enrich Contact' : (contact.name || 'Unknown Contact')}
-              </h2>
-              <p className="contact-detail-title">
-                {isEnrichmentMode ? 'Search for updated contact information' : (contact.title || 'No title specified')}
-              </p>
-              {!isEnrichmentMode && (
-                <div style={{ marginTop: '0.5rem' }}>
-                  {getSourceBadge()}
-                </div>
-              )}
+              <div className="header-text">
+                <h2 className="contact-detail-name">Enrich Contact</h2>
+                <p className="contact-detail-title">Search for updated contact information</p>
+              </div>
             </div>
           </div>
-          <button className="close-button" onClick={onClose}>
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+        )}
 
         {/* Content */}
         {isEnrichmentMode ? (
@@ -274,6 +295,44 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
           </div>
         ) : (
           <div ref={contentRef} className={`contact-detail-content ${hasScroll ? 'has-scroll' : ''}`}>
+          {/* Quick Actions Bar */}
+          <div className="quick-actions-bar">
+            <button
+              className="action-button action-button-primary"
+              onClick={() => navigate(`/hunter/campaign/new?contactIds=${contact.id}`)}
+              title="Start Campaign"
+            >
+              <Send className="w-5 h-5" />
+              <span>Start Campaign</span>
+            </button>
+            <button
+              className="action-button action-button-secondary"
+              onClick={() => downloadVCard(contact)}
+              title="Save to Phone"
+            >
+              <Smartphone className="w-5 h-5" />
+              <span>Save to Phone</span>
+            </button>
+            {!isEditing && isContactNotEnriched() && (
+              <button
+                className="action-button action-button-enrich"
+                onClick={handleEnrichContact}
+              >
+                <Sparkles className="w-5 h-5" />
+                <span>Enrich</span>
+              </button>
+            )}
+            {!isEditing && isManualOrNetworking && (
+              <button
+                className="action-button action-button-outline"
+                onClick={() => setIsEditing(true)}
+              >
+                <Edit3 className="w-5 h-5" />
+                <span>Edit</span>
+              </button>
+            )}
+          </div>
+
           {error && (
             <div className="error-banner">
               <AlertCircle className="w-5 h-5" />
@@ -291,50 +350,7 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
 
           {/* Editable Contact Information */}
           <div className="detail-section">
-            <div className="section-header-with-action">
-              <h3 className="section-title">Contact Information</h3>
-              <div className="header-actions">
-                {!isEditing && isContactNotEnriched() && (
-                  <button
-                    className="enrich-button"
-                    onClick={handleEnrichContact}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Enrich Contact</span>
-                  </button>
-                )}
-                <button
-                  className="save-phone-button"
-                  onClick={() => downloadVCard(contact)}
-                  title="Save to Phone"
-                >
-                  <Smartphone className="w-4 h-4" />
-                  <span>Save to Phone</span>
-                </button>
-                <button
-                  className="save-phone-button"
-                  onClick={() => navigate(`/hunter/campaign/new?contactIds=${contact.id}`)}
-                  title="Start Campaign"
-                  style={{
-                    background: 'linear-gradient(to right, #ec4899, #a855f7)',
-                    color: 'white',
-                    border: 'none'
-                  }}
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Start Campaign</span>
-                </button>
-                {!isEditing && isManualOrNetworking && (
-                  <button
-                    className="edit-button"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    <span>Edit</span>
-                  </button>
-                )}
-              </div>
-            </div>
+            <h3 className="section-title">Contact Information</h3>
 
             <div className="contact-info-grid">
               {/* Name */}

@@ -365,69 +365,175 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   );
 }
 
-// Contact Preview Card Component (Simplified - No confidence badge needed for exact match)
+// Contact Preview Card Component - Key Decision Maker Card Style
 function ContactPreviewCard({ contact }) {
+  // Background image: use person photo or Barry fallback
+  const backgroundImage = contact.photo_url || '/barry.png';
+
   return (
-    <div className="bg-white border-2 border-blue-400 rounded-xl p-6 shadow-lg">
-      {/* Contact Header */}
-      <div className="flex items-start gap-4 mb-4">
-        {contact.photo_url ? (
-          <img
-            src={contact.photo_url}
-            alt={contact.name}
-            className="w-16 h-16 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
-            <User className="w-8 h-8 text-blue-600" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {/* Photo Background Card with Gradient Overlay */}
+      <div
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          borderRadius: '16px',
+          height: '420px',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden',
+          border: '2px solid transparent',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#3b82f6';
+          e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.2)';
+          e.currentTarget.style.transform = 'translateY(-4px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = 'transparent';
+          e.currentTarget.style.boxShadow = 'none';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+      >
+        {/* Gradient Overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '50%',
+            background: 'linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.6) 40%, rgba(0, 0, 0, 0.3) 70%, transparent 100%)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            padding: '1.5rem'
+          }}
+        >
+          {/* Text Overlay on Gradient */}
+          <div style={{ width: '100%' }}>
+            {/* Name */}
+            <p
+              style={{
+                fontSize: '1.375rem',
+                fontWeight: 700,
+                color: '#ffffff',
+                margin: '0 0 0.375rem 0',
+                lineHeight: 1.2,
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              {contact.name}
+            </p>
+
+            {/* Title */}
+            <p
+              style={{
+                fontSize: '0.9375rem',
+                fontWeight: 500,
+                color: 'rgba(255, 255, 255, 0.95)',
+                margin: '0 0 0.5rem 0',
+                lineHeight: 1.4,
+                textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              {contact.title || 'Title not available'}
+            </p>
+
+            {/* Location */}
+            {contact.location && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                  marginBottom: '0.5rem'
+                }}
+              >
+                <MapPin className="w-4 h-4" style={{ color: 'rgba(255, 255, 255, 0.9)' }} />
+                <p
+                  style={{
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    margin: 0,
+                    textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)'
+                  }}
+                >
+                  {contact.location}
+                </p>
+              </div>
+            )}
+
+            {/* Company Badge */}
+            {contact.organization_name && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.25rem 0.625rem',
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  backdropFilter: 'blur(8px)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '6px',
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.02em',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                {contact.organization_name}
+              </span>
+            )}
           </div>
-        )}
-        <div className="flex-1">
-          <h3 className="text-xl font-bold text-gray-900">{contact.name}</h3>
-          <p className="text-sm text-gray-600">{contact.title || 'Title not available'}</p>
         </div>
       </div>
 
-      {/* Contact Details - ONLY Required Fields */}
-      <div className="space-y-3">
-        {contact.organization_name && (
-          <div className="flex items-center gap-2 text-sm">
-            <Building2 className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-700">{contact.organization_name}</span>
-          </div>
-        )}
-        {contact.location && (
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-700">{contact.location}</span>
-          </div>
-        )}
-        {contact.email && (
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-700">{contact.email}</span>
-          </div>
-        )}
-        {contact.phone_numbers && contact.phone_numbers.length > 0 && (
-          <div className="flex items-center gap-2 text-sm">
-            <Phone className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-700">{contact.phone_numbers[0].sanitized_number || contact.phone_numbers[0].raw_number}</span>
-          </div>
-        )}
-        {contact.linkedin_url && (
-          <div className="flex items-center gap-2 text-sm">
-            <Linkedin className="w-4 h-4 text-gray-500" />
-            <a
-              href={contact.linkedin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              View LinkedIn Profile
-            </a>
-          </div>
-        )}
-      </div>
+      {/* LinkedIn Button - Below Card */}
+      {contact.linkedin_url && (
+        <a
+          href={contact.linkedin_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            padding: '0.625rem 1rem',
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1.5px solid rgba(59, 130, 246, 0.25)',
+            color: '#60a5fa',
+            borderRadius: '10px',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            textDecoration: 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+            e.currentTarget.style.borderColor = '#3b82f6';
+            e.currentTarget.style.color = '#3b82f6';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.25)';
+            e.currentTarget.style.color = '#60a5fa';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <Linkedin className="w-4 h-4" />
+          <span>View LinkedIn Profile</span>
+        </a>
+      )}
     </div>
   );
 }

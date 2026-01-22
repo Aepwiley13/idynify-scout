@@ -408,186 +408,311 @@ export default function AllLeads() {
         {searchTerm && ` matching "${searchTerm}"`}
       </div>
 
-      {/* Contacts Table */}
-      <div className="table-container">
-        <table className="contacts-table">
-          <thead>
-            <tr>
-              <th style={{ width: '40px' }}>
-                <input
-                  type="checkbox"
-                  checked={selectedContactIds.length === sortedAndFilteredContacts.length && sortedAndFilteredContacts.length > 0}
-                  onChange={toggleSelectAll}
-                  style={{ cursor: 'pointer' }}
-                />
-              </th>
-              <th>
-                <div className="th-content">
-                  <UserCircle className="w-4 h-4" />
-                  <span>Contact</span>
-                </div>
-              </th>
-              <th>
-                <div className="th-content">
-                  <Building2 className="w-4 h-4" />
-                  <span>Title</span>
-                </div>
-              </th>
-              <th>
-                <div className="th-content">
-                  <Building2 className="w-4 h-4" />
-                  <span>Company</span>
-                </div>
-              </th>
-              <th>
-                <div className="th-content">
-                  <Mail className="w-4 h-4" />
-                  <span>Email</span>
-                </div>
-              </th>
-              <th>
-                <div className="th-content">
-                  <Phone className="w-4 h-4" />
-                  <span>Phone</span>
-                </div>
-              </th>
-              <th>
-                <div className="th-content">
-                  <Calendar className="w-4 h-4" />
-                  <span>Added</span>
-                </div>
-              </th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedAndFilteredContacts.map(contact => {
-              const company = companies[contact.company_id];
-              return (
-                <tr
-                  key={contact.id}
-                  onClick={() => setSelectedContact(contact)}
-                  className="contact-row-clickable"
-                  style={{ cursor: 'pointer' }}
+      {/* Contacts Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: '1.5rem',
+        marginBottom: '2rem'
+      }}>
+        {sortedAndFilteredContacts.map(contact => {
+          const company = companies[contact.company_id];
+          const isSelected = selectedContactIds.includes(contact.id);
+          const backgroundImage = contact.photo_url || '/barry.png';
+
+          return (
+            <div key={contact.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Photo Background Card */}
+              <div
+                onClick={() => setSelectedContact(contact)}
+                style={{
+                  backgroundImage: `url(${backgroundImage})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  borderRadius: '16px',
+                  height: '280px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.2)';
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }
+                }}
+              >
+                {/* Selection Checkbox - Top Right */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleContactSelection(contact.id, e);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1rem',
+                    zIndex: 10
+                  }}
                 >
-                  <td onClick={(e) => e.stopPropagation()} style={{ padding: '0.5rem', textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedContactIds.includes(contact.id)}
-                      onChange={(e) => toggleContactSelection(contact.id, e)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
-                  <td className="contact-cell" data-label="Contact">
-                    <div className="contact-info">
-                      <div className="avatar">
-                        {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
-                      </div>
-                      <div>
-                        <span className="contact-name">
-                          {contact.name || 'Unknown'}
-                        </span>
-                        {/* Source Badge */}
-                        <div style={{
-                          display: 'inline-block',
-                          marginLeft: '0.5rem',
-                          padding: '0.125rem 0.5rem',
-                          borderRadius: '0.5rem',
-                          fontSize: '0.625rem',
-                          fontWeight: '600',
-                          backgroundColor: contact.source === 'manual' ? '#eff6ff' : contact.source === 'networking' ? '#faf5ff' : '#f0fdf4',
-                          color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : '#15803d',
-                          border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : '#22c55e'}`
-                        }}>
-                          {contact.source === 'manual' ? '✍️ Manual' : contact.source === 'networking' ? '🤝 Networking' : '🔍 Search'}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="title-cell" data-label="Title">{contact.title || '—'}</td>
-                  <td className="company-cell" data-label="Company">{company?.name || 'Unknown Company'}</td>
-                  <td className="email-cell" data-label="Email">
-                    {contact.email ? (
-                      <div className="email-with-status">
-                        <a
-                          href={`mailto:${contact.email}`}
-                          className="email-link"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {contact.email}
-                        </a>
-                        {contact.email_status === 'verified' && (
-                          <span className="verified-badge-table" title="Verified Email">✓</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="empty-value">—</span>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    border: '2px solid rgba(255, 255, 255, 0.9)',
+                    background: isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(8px)'
+                  }}>
+                    {isSelected && <CheckCircle className="w-5 h-5" style={{ color: '#ffffff' }} />}
+                  </div>
+                </div>
+
+                {/* Source Badge - Top Left */}
+                <div style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  left: '1rem',
+                  padding: '0.25rem 0.625rem',
+                  borderRadius: '6px',
+                  fontSize: '0.625rem',
+                  fontWeight: '600',
+                  backgroundColor: contact.source === 'manual' ? '#eff6ff' : contact.source === 'networking' ? '#faf5ff' : contact.source === 'LinkedIn Link' ? '#dbeafe' : '#f0fdf4',
+                  color: contact.source === 'manual' ? '#1e40af' : contact.source === 'networking' ? '#7e22ce' : contact.source === 'LinkedIn Link' ? '#1e40af' : '#15803d',
+                  border: `1px solid ${contact.source === 'manual' ? '#3b82f6' : contact.source === 'networking' ? '#a855f7' : contact.source === 'LinkedIn Link' ? '#3b82f6' : '#22c55e'}`,
+                  backdropFilter: 'blur(8px)',
+                  zIndex: 10
+                }}>
+                  {contact.source === 'manual' ? '✍️ Manual' :
+                   contact.source === 'networking' ? '🤝 Network' :
+                   contact.source === 'LinkedIn Link' ? '🔗 LinkedIn' : '🔍 Search'}
+                </div>
+
+                {/* Gradient Overlay */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '50%',
+                  background: 'linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.6) 40%, rgba(0, 0, 0, 0.3) 70%, transparent 100%)',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: '1.25rem'
+                }}>
+                  <div style={{ width: '100%' }}>
+                    {/* Name */}
+                    <p style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      margin: '0 0 0.25rem 0',
+                      lineHeight: 1.2,
+                      textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                    }}>
+                      {contact.name || 'Unknown'}
+                    </p>
+
+                    {/* Title */}
+                    <p style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: 'rgba(255, 255, 255, 0.95)',
+                      margin: '0 0 0.375rem 0',
+                      lineHeight: 1.3,
+                      textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)'
+                    }}>
+                      {contact.title || 'Title not available'}
+                    </p>
+
+                    {/* Company Badge */}
+                    {company?.name && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '0.25rem 0.625rem',
+                        background: 'rgba(255, 255, 255, 0.25)',
+                        backdropFilter: 'blur(8px)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: '6px',
+                        fontSize: '0.6875rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.02em',
+                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+                      }}>
+                        {company.name}
+                      </span>
                     )}
-                  </td>
-                  <td className="phone-cell" data-label="Phone">
-                    {contact.phone_mobile || contact.phone_direct || contact.phone ? (
-                      <div className="phone-with-type">
-                        {contact.phone_mobile && (
-                          <div className="phone-item">
-                            <span className="phone-type-label">M:</span>
-                            <a href={`tel:${contact.phone_mobile}`} onClick={(e) => e.stopPropagation()}>{contact.phone_mobile}</a>
-                          </div>
-                        )}
-                        {contact.phone_direct && (
-                          <div className="phone-item">
-                            <span className="phone-type-label">D:</span>
-                            <a href={`tel:${contact.phone_direct}`} onClick={(e) => e.stopPropagation()}>{contact.phone_direct}</a>
-                          </div>
-                        )}
-                        {!contact.phone_mobile && !contact.phone_direct && contact.phone && (
-                          <a href={`tel:${contact.phone}`} onClick={(e) => e.stopPropagation()}>{contact.phone}</a>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="empty-value">—</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Info Below Card */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '12px',
+                padding: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                {/* Email */}
+                {contact.email && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Mail className="w-4 h-4" style={{ color: '#6b7280', flexShrink: 0 }} />
+                    <a
+                      href={`mailto:${contact.email}`}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        fontSize: '0.875rem',
+                        color: '#3b82f6',
+                        textDecoration: 'none',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {contact.email}
+                    </a>
+                    {contact.email_status === 'verified' && (
+                      <span style={{
+                        color: '#10b981',
+                        fontSize: '0.75rem',
+                        fontWeight: 600
+                      }}>✓</span>
                     )}
-                  </td>
-                  <td className="date-cell" data-label="Added">
-                    {contact.addedAt ? new Date(contact.addedAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="actions-cell" data-label="Actions">
-                    <div className="action-links">
-                      <button
-                        className="action-link"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          downloadVCard(contact);
-                        }}
-                        title="Save to Phone"
-                      >
-                        <Smartphone className="w-4 h-4" />
-                      </button>
-                      {contact.linkedin_url && (
-                        <a
-                          href={contact.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="action-link"
-                          onClick={(e) => e.stopPropagation()}
-                          title="View LinkedIn Profile"
-                        >
-                          <Linkedin className="w-4 h-4" />
-                        </a>
-                      )}
-                      <button
-                        className="action-link"
-                        onClick={() => setSelectedContact(contact)}
-                        title="View Contact Details"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </div>
+                )}
+
+                {/* Phone */}
+                {(contact.phone_mobile || contact.phone_direct || contact.phone) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Phone className="w-4 h-4" style={{ color: '#6b7280', flexShrink: 0 }} />
+                    <a
+                      href={`tel:${contact.phone_mobile || contact.phone_direct || contact.phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        fontSize: '0.875rem',
+                        color: '#3b82f6',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      {contact.phone_mobile ? `M: ${contact.phone_mobile}` :
+                       contact.phone_direct ? `D: ${contact.phone_direct}` :
+                       contact.phone}
+                    </a>
+                  </div>
+                )}
+
+                {/* Added Date */}
+                {contact.addedAt && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Calendar className="w-4 h-4" style={{ color: '#6b7280', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                      Added {new Date(contact.addedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {contact.linkedin_url && (
+                  <a
+                    href={contact.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      padding: '0.625rem 1rem',
+                      background: 'rgba(59, 130, 246, 0.08)',
+                      border: '1.5px solid rgba(59, 130, 246, 0.25)',
+                      color: '#60a5fa',
+                      borderRadius: '10px',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      textDecoration: 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.color = '#3b82f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.25)';
+                      e.currentTarget.style.color = '#60a5fa';
+                    }}
+                  >
+                    <Linkedin className="w-4 h-4" />
+                    <span>LinkedIn</span>
+                  </a>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    downloadVCard(contact);
+                  }}
+                  style={{
+                    flex: contact.linkedin_url ? 0 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    padding: '0.625rem 1rem',
+                    background: 'rgba(139, 92, 246, 0.08)',
+                    border: '1.5px solid rgba(139, 92, 246, 0.25)',
+                    color: '#a78bfa',
+                    borderRadius: '10px',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                    e.currentTarget.style.borderColor = '#a78bfa';
+                    e.currentTarget.style.color = '#8b5cf6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)';
+                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.25)';
+                    e.currentTarget.style.color = '#a78bfa';
+                  }}
+                >
+                  <Smartphone className="w-4 h-4" />
+                  {!contact.linkedin_url && <span>Save vCard</span>}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* No Search Results */}

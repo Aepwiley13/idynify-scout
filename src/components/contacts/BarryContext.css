@@ -191,7 +191,7 @@
 
 /* FULL MODE (for profile page) */
 .barry-context-card.barry-full {
-  padding: 2rem;
+  padding: 0;
 }
 
 .barry-content-full {
@@ -209,12 +209,36 @@
 .barry-section-title {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1.5px solid #e5e7eb;
+  color: #1e40af;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Add icons to section titles */
+.barry-section:nth-child(1) .barry-section-title::before {
+  content: "👤";
+  font-size: 1rem;
+}
+
+.barry-section:nth-child(2) .barry-section-title::before {
+  content: "🎯";
+  font-size: 1rem;
+}
+
+.barry-section:nth-child(3) .barry-section-title::before {
+  content: "🏢";
+  font-size: 1rem;
+}
+
+.barry-section:nth-child(4) .barry-section-title::before {
+  content: "💬";
+  font-size: 1rem;
 }
 
 /* Who You're Meeting */
@@ -264,33 +288,49 @@
   padding: 1rem 1.25rem;
   background: #ffffff;
   border: 1.5px solid #e5e7eb;
+  border-left: 3px solid #3b82f6;
   border-radius: 10px;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .barry-conversation-starters li:hover {
   border-color: #3b82f6;
-  background: #f0f9ff;
-  transform: translateX(4px);
+  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 /* Calm Reframe */
 .barry-reframe {
   margin-top: 0.5rem;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  border: 1.5px solid #86efac;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #10b981;
   border-radius: 10px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.barry-reframe::before {
+  content: "🌟";
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 2rem;
+  opacity: 0.2;
 }
 
 .barry-reframe-text {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
-  color: #15803d;
+  color: #047857;
   line-height: 1.7;
   margin: 0;
   font-style: italic;
+  position: relative;
+  z-index: 1;
 }
 
 /* Responsive adjustments */

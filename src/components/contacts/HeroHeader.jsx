@@ -39,15 +39,15 @@ export default function HeroHeader({ contact, size = 'compact' }) {
         backgroundImage: `url(${contact.photo_url || '/barry.png'})`,
       }}
     >
+      {/* Source Badge - Absolutely Positioned */}
+      <div className="hero-source-badge">
+        {getSourceBadge()}
+      </div>
+
       {/* Gradient Overlay */}
       <div className="contact-hero-overlay">
         {/* Contact Info Overlay */}
         <div className="contact-hero-content">
-          {/* Source Badge */}
-          <div className="hero-source-badge">
-            {getSourceBadge()}
-          </div>
-
           {/* Name and Title */}
           <h2 className="contact-hero-name">
             {contact.name || 'Unknown Contact'}

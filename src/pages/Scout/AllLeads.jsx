@@ -3,7 +3,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import { Users, Building2, Mail, Linkedin, Search, Download, ChevronRight, UserCircle, Calendar, Phone, X, Smartphone } from 'lucide-react';
-import ContactDetailModal from '../../components/scout/ContactDetailModal';
+import ContactSnapshot from '../../components/contacts/ContactSnapshot';
 import { downloadVCard } from '../../utils/vcard';
 import './AllLeads.css';
 
@@ -727,12 +727,13 @@ export default function AllLeads() {
         </div>
       )}
 
-      {/* Contact Detail Modal */}
+      {/* Contact Snapshot */}
       {selectedContact && (
-        <ContactDetailModal
+        <ContactSnapshot
           contact={selectedContact}
           onClose={() => setSelectedContact(null)}
           onUpdate={handleContactUpdate}
+          context="leads"
         />
       )}
     </div>

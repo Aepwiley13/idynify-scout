@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 
 export const handler = async (event) => {
@@ -55,6 +56,11 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified');
 
+    // Initialize Anthropic client
+    const anthropic = new Anthropic({
+      apiKey: claudeApiKey
+    });
+
     // Prepare data for Claude
     const contactSummaries = results.slice(0, 5).map((contact, idx) => ({
       index: idx + 1,
@@ -99,34 +105,19 @@ Respond ONLY with valid JSON in this exact format:
   "explanation": "This looks like the best match based on..."
 }`;
 
-    // Call Claude API
-    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': claudeApiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-latest',
-        max_tokens: 500,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
+    // Call Claude API using SDK
+    const claudeResponse = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ]
     });
 
-    if (!claudeResponse.ok) {
-      const errorText = await claudeResponse.text();
-      console.error('❌ Claude API error:', claudeResponse.status, errorText);
-      throw new Error('AI validation failed');
-    }
-
-    const claudeData = await claudeResponse.json();
-    const responseText = claudeData.content[0].text;
+    const responseText = claudeResponse.content[0].text;
 
     console.log('🐻 Barry response:', responseText);
 

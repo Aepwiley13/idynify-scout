@@ -34,6 +34,8 @@ export default function ContactProfile() {
   const [enriching, setEnriching] = useState(false);
   const [enrichSuccess, setEnrichSuccess] = useState(false);
   const [enrichError, setEnrichError] = useState(null);
+  const [barryContext, setBarryContext] = useState(null);
+  const [generatingContext, setGeneratingContext] = useState(false);
 
   useEffect(() => {
     loadContactProfile();
@@ -61,10 +63,72 @@ export default function ContactProfile() {
       const contactData = { id: contactDoc.id, ...contactDoc.data() };
       setContact(contactData);
       console.log('✅ Contact profile loaded:', contactData.name);
+
+      // Load Barry context if available
+      if (contactData.barryContext) {
+        setBarryContext(contactData.barryContext);
+        console.log('✅ Barry context loaded from cache');
+      } else {
+        // Generate Barry context if missing
+        console.log('🐻 No Barry context found, generating...');
+        generateBarryContext(contactData, user);
+      }
+
       setLoading(false);
     } catch (error) {
       console.error('❌ Failed to load contact:', error);
       setLoading(false);
+    }
+  }
+
+  async function generateBarryContext(contactData, user) {
+    try {
+      setGeneratingContext(true);
+
+      // Get auth token
+      const authToken = await user.getIdToken();
+
+      console.log('🐻 Calling Barry to generate context...');
+
+      // Call barryGenerateContext Netlify function
+      const response = await fetch('/.netlify/functions/barryGenerateContext', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: authToken,
+          contact: contactData,
+          companyData: null // TODO: Load company data if needed
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Context generation failed');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate context');
+      }
+
+      console.log('✅ Barry context generated successfully');
+
+      // Update contact in Firestore with Barry context
+      const contactRef = doc(db, 'users', user.uid, 'contacts', contactData.id);
+      await updateDoc(contactRef, {
+        barryContext: result.barryContext
+      });
+
+      // Update local state
+      setBarryContext(result.barryContext);
+      setGeneratingContext(false);
+
+    } catch (err) {
+      console.error('❌ Error generating Barry context:', err);
+      setGeneratingContext(false);
     }
   }
 
@@ -122,7 +186,12 @@ export default function ContactProfile() {
       });
 
       // Update local state
-      setContact(prev => ({ ...prev, ...result.enrichedData }));
+      const updatedContact = { ...contact, ...result.enrichedData };
+      setContact(updatedContact);
+
+      // Regenerate Barry context after enrichment
+      console.log('🐻 Regenerating Barry context after enrichment...');
+      generateBarryContext(updatedContact, user);
 
       // Show success message
       setEnrichSuccess(true);
@@ -137,37 +206,6 @@ export default function ContactProfile() {
     }
   }
 
-  // Helper: Calculate tenure from job start date
-  function calculateTenure(startDate) {
-    if (!startDate) return null;
-
-    try {
-      const start = new Date(startDate);
-      const now = new Date();
-      const months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      const years = Math.floor(months / 12);
-      const remainingMonths = months % 12;
-
-      if (years === 0) {
-        return `${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
-      } else if (remainingMonths === 0) {
-        return `${years} year${years !== 1 ? 's' : ''}`;
-      } else {
-        return `${years} year${years !== 1 ? 's' : ''}, ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
-      }
-    } catch {
-      return null;
-    }
-  }
-
-  // Helper: Format location
-  function formatLocation(contact) {
-    const parts = [];
-    if (contact.city) parts.push(contact.city);
-    if (contact.state) parts.push(contact.state);
-    if (contact.country) parts.push(contact.country);
-    return parts.join(', ') || 'Not available';
-  }
 
   if (loading) {
     return (
@@ -194,9 +232,6 @@ export default function ContactProfile() {
       </div>
     );
   }
-
-  const tenure = calculateTenure(contact.job_start_date);
-  const hasEnrichedProfile = contact.enrichedProfile;
 
   return (
     <div className="contact-profile-page">
@@ -306,143 +341,6 @@ export default function ContactProfile() {
       </div>
 
       <div className="profile-content">
-        {/* Left Column: Main Info */}
-        <div className="profile-left-column">
-          {/* Section 1: Professional Snapshot */}
-          <div className="profile-section">
-            <div className="section-header">
-              <div className="section-icon">
-                <Briefcase className="w-5 h-5" />
-              </div>
-              <h2>Professional Snapshot</h2>
-            </div>
-
-            <div className="snapshot-grid">
-              <div className="snapshot-item">
-                <span className="snapshot-label">Current Role</span>
-                <span className="snapshot-value">{contact.title || 'Not specified'}</span>
-              </div>
-
-              <div className="snapshot-item">
-                <span className="snapshot-label">Company</span>
-                <span className="snapshot-value">{contact.company_name || 'Not available'}</span>
-              </div>
-
-              {contact.department && (
-                <div className="snapshot-item">
-                  <span className="snapshot-label">Department</span>
-                  <span className="snapshot-value">{contact.department}</span>
-                </div>
-              )}
-
-              {contact.seniority && (
-                <div className="snapshot-item">
-                  <span className="snapshot-label">Seniority Level</span>
-                  <span className="snapshot-value">{contact.seniority}</span>
-                </div>
-              )}
-
-              {tenure && (
-                <div className="snapshot-item">
-                  <span className="snapshot-label">Tenure in Role</span>
-                  <div className="tenure-value">
-                    <Clock className="w-4 h-4" />
-                    <span>{tenure}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="snapshot-item">
-                <span className="snapshot-label">Location</span>
-                <div className="location-value">
-                  <MapPin className="w-4 h-4" />
-                  <span>{formatLocation(contact)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Decision-Making Context */}
-          <div className="profile-section">
-            <div className="section-header">
-              <div className="section-icon">
-                <Target className="w-5 h-5" />
-              </div>
-              <h2>Decision-Making Context</h2>
-            </div>
-
-            <div className="decision-context">
-              <div className="context-item">
-                <div className="context-header">
-                  <Award className="w-5 h-5" />
-                  <span className="context-label">Decision Maker Likelihood</span>
-                </div>
-                <div className={`likelihood-badge ${contact.is_likely_decision_maker ? 'high' : 'low'}`}>
-                  {contact.is_likely_decision_maker ? (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      <span>High</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Low / Influencer</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="context-reasoning">
-                <p className="reasoning-label">Reasoning</p>
-                <p className="reasoning-text">
-                  {contact.is_likely_decision_maker
-                    ? `Based on ${contact.seniority || 'seniority level'} and title "${contact.title}", this contact likely holds decision-making authority or significant budget influence within their department.`
-                    : `Based on ${contact.seniority || 'role'} and title "${contact.title}", this contact may be an influencer or contributor but likely requires approval from higher authority for major decisions.`
-                  }
-                </p>
-              </div>
-
-              {contact.departments && contact.departments.length > 0 && (
-                <div className="context-item">
-                  <p className="context-label">Relevant Departments</p>
-                  <div className="department-tags">
-                    {contact.departments.map((dept, idx) => (
-                      <span key={idx} className="dept-tag">{dept}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section 3: Career Pattern Summary (AI Placeholder) */}
-          <div className="profile-section ai-section">
-            <div className="section-header">
-              <div className="section-icon">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <h2>Career Pattern Summary</h2>
-              <div className="ai-badge">
-                <Sparkles className="w-3 h-3" />
-                <span>AI-Powered</span>
-              </div>
-            </div>
-
-            {hasEnrichedProfile && contact.enrichedProfile.careerPatternSummary ? (
-              <div className="career-pattern-content">
-                <p>{contact.enrichedProfile.careerPatternSummary}</p>
-              </div>
-            ) : (
-              <div className="ai-placeholder">
-                <Sparkles className="w-8 h-8" />
-                <p className="placeholder-title">Analyzing career trajectory...</p>
-                <p className="placeholder-text">
-                  AI analysis of career patterns, stability, and experience will appear here once processed.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Right Column: Insights */}
         <div className="profile-right-column">
@@ -504,65 +402,76 @@ export default function ContactProfile() {
             </div>
           </div>
 
-          {/* Section 4: Public Presence Signals (AI Placeholder) */}
-          <div className="info-card ai-card">
-            <div className="card-header">
-              <h3>Public Presence Signals</h3>
-              <div className="ai-badge-small">
-                <Sparkles className="w-3 h-3" />
-                <span>AI</span>
-              </div>
-            </div>
-
-            {hasEnrichedProfile && contact.enrichedProfile.publicPresenceSignals ? (
-              <div className="presence-content">
-                {/* Show AI-generated presence signals */}
-                <p>{JSON.stringify(contact.enrichedProfile.publicPresenceSignals)}</p>
-              </div>
-            ) : (
-              <div className="ai-placeholder-small">
-                <div className="presence-items">
-                  <div className="presence-item">
-                    <Linkedin className="w-4 h-4" />
-                    <span>LinkedIn: {contact.linkedin_url ? 'Profile Found' : 'Not Found'}</span>
-                  </div>
-                  <div className="presence-item analyzing">
-                    <Twitter className="w-4 h-4" />
-                    <span>Twitter/X: Analyzing...</span>
-                  </div>
-                  <div className="presence-item analyzing">
-                    <Globe className="w-4 h-4" />
-                    <span>Thought Leadership: Analyzing...</span>
-                  </div>
+          {/* Context by Barry */}
+          {barryContext && (
+            <div className="info-card barry-context-card">
+              <div className="card-header">
+                <h3>Context by Barry</h3>
+                <div className="barry-source-badge">
+                  <span>Source: Barry</span>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Section 5: Outreach Angle (AI Placeholder) */}
-          <div className="info-card ai-card outreach-card">
-            <div className="card-header">
-              <h3>Suggested Outreach Angle</h3>
-              <div className="ai-badge-small">
-                <Sparkles className="w-3 h-3" />
-                <span>AI</span>
+              <div className="barry-context-content">
+                {/* 1. Who You're Meeting */}
+                <div className="barry-section">
+                  <h4 className="barry-section-title">Who You're Meeting</h4>
+                  <p className="barry-intro-text">{barryContext.whoYoureMeeting}</p>
+                </div>
+
+                {/* 2. What This Role Usually Cares About */}
+                <div className="barry-section">
+                  <h4 className="barry-section-title">What This Role Usually Cares About</h4>
+                  <ul className="barry-bullet-list">
+                    {barryContext.whatRoleCaresAbout.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* 3. What This Company Appears Focused On Right Now */}
+                <div className="barry-section">
+                  <h4 className="barry-section-title">What This Company Appears Focused On Right Now</h4>
+                  <ul className="barry-bullet-list">
+                    {barryContext.whatCompanyFocusedOn.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* 4. Ways a Conversation Could Naturally Begin */}
+                <div className="barry-section">
+                  <h4 className="barry-section-title">Ways a Conversation Could Naturally Begin</h4>
+                  <ul className="barry-conversation-starters">
+                    {barryContext.conversationStarters.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* 5. Calm Reframe */}
+                <div className="barry-section barry-reframe">
+                  <p className="barry-reframe-text">{barryContext.calmReframe}</p>
+                </div>
               </div>
             </div>
+          )}
 
-            {hasEnrichedProfile && contact.enrichedProfile.outreachAngle ? (
-              <div className="outreach-content">
-                <p>{contact.enrichedProfile.outreachAngle}</p>
+          {/* Loading State for Barry Context */}
+          {generatingContext && !barryContext && (
+            <div className="info-card barry-loading-card">
+              <div className="card-header">
+                <h3>Context by Barry</h3>
+                <div className="barry-source-badge">
+                  <span>Source: Barry</span>
+                </div>
               </div>
-            ) : (
-              <div className="ai-placeholder-small">
-                <MessageSquare className="w-8 h-8" />
-                <p className="placeholder-title-small">Generating personalized approach...</p>
-                <p className="placeholder-text-small">
-                  AI will suggest how to approach this contact based on their role, tenure, and public presence.
-                </p>
+              <div className="barry-loading">
+                <Loader className="w-8 h-8 spinner" />
+                <p>Barry is preparing contextual intelligence...</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Company Info Card */}
           {contact.company_name && (

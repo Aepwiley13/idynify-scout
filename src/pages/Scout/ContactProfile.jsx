@@ -22,8 +22,14 @@ import {
   Globe,
   Twitter,
   Facebook,
-  Loader
+  Loader,
+  StickyNote,
+  Calendar,
+  FileText
 } from 'lucide-react';
+import HeroHeader from '../../components/contacts/HeroHeader';
+import BarryContext from '../../components/contacts/BarryContext';
+import ContactInfo from '../../components/contacts/ContactInfo';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -270,28 +276,8 @@ export default function ContactProfile() {
 
       {/* Profile Header Card */}
       <div className="profile-header-card">
-        <div className="profile-header-content">
-          <div className="profile-avatar">
-            {contact.photo_url ? (
-              <img src={contact.photo_url} alt={contact.name} />
-            ) : (
-              <div className="avatar-fallback">
-                <User className="w-12 h-12" />
-              </div>
-            )}
-          </div>
-
-          <div className="profile-header-info">
-            <h1 className="profile-name">{contact.name || 'Unknown Contact'}</h1>
-            <p className="profile-title">{contact.title || 'No title specified'}</p>
-            {contact.company_name && (
-              <div className="profile-company">
-                <Building2 className="w-4 h-4" />
-                <span>{contact.company_name}</span>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Hero Header */}
+        <HeroHeader contact={contact} size="full" />
 
         {/* Quick Contact Actions */}
         <div className="quick-actions">
@@ -345,133 +331,50 @@ export default function ContactProfile() {
         {/* Right Column: Insights */}
         <div className="profile-right-column">
           {/* Contact Information Card */}
-          <div className="info-card">
-            <h3>Contact Information</h3>
+          <ContactInfo contact={contact} mode="expanded" />
 
-            <div className="info-items">
-              {contact.email ? (
-                <div className="info-item">
-                  <div className="info-icon">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div className="info-content">
-                    <span className="info-label">Email</span>
-                    <a href={`mailto:${contact.email}`} className="info-value">{contact.email}</a>
-                    {contact.email_status && (
-                      <span className={`email-status ${contact.email_status}`}>
-                        {contact.email_status === 'verified' && '✓ Verified'}
-                        {contact.email_status === 'likely' && '~ Likely'}
-                        {contact.email_status === 'unverified' && 'Unverified'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="info-item">
-                  <div className="info-icon">
-                    <Mail className="w-4 h-4" />
-                  </div>
-                  <div className="info-content">
-                    <span className="info-label">Email</span>
-                    <span className="info-value unavailable">Not available</span>
-                  </div>
-                </div>
-              )}
+          {/* Context by Barry */}
+          <BarryContext
+            barryContext={barryContext}
+            mode="full"
+            loading={generatingContext && !barryContext}
+          />
 
-              {contact.phone ? (
-                <div className="info-item">
-                  <div className="info-icon">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <div className="info-content">
-                    <span className="info-label">Phone</span>
-                    <a href={`tel:${contact.phone}`} className="info-value">{contact.phone}</a>
-                  </div>
-                </div>
-              ) : (
-                <div className="info-item">
-                  <div className="info-icon">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <div className="info-content">
-                    <span className="info-label">Phone</span>
-                    <span className="info-value unavailable">Not available</span>
-                  </div>
-                </div>
-              )}
+          {/* Notes Section - Placeholder */}
+          <div className="info-card notes-placeholder-card">
+            <div className="card-header">
+              <h3>Notes</h3>
+              <StickyNote className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="placeholder-content">
+              <p className="placeholder-text">No notes yet. Add notes to track important details about this contact.</p>
+              <button className="placeholder-btn" disabled>
+                Add Note
+              </button>
             </div>
           </div>
 
-          {/* Context by Barry */}
-          {barryContext && (
-            <div className="info-card barry-context-card">
-              <div className="card-header">
-                <h3>Context by Barry</h3>
-                <div className="barry-source-badge">
-                  <span>Source: Barry</span>
-                </div>
-              </div>
-
-              <div className="barry-context-content">
-                {/* 1. Who You're Meeting */}
-                <div className="barry-section">
-                  <h4 className="barry-section-title">Who You're Meeting</h4>
-                  <p className="barry-intro-text">{barryContext.whoYoureMeeting}</p>
-                </div>
-
-                {/* 2. What This Role Usually Cares About */}
-                <div className="barry-section">
-                  <h4 className="barry-section-title">What This Role Usually Cares About</h4>
-                  <ul className="barry-bullet-list">
-                    {barryContext.whatRoleCaresAbout.map((item, idx) => (
-                      <li key={idx}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* 3. What This Company Appears Focused On Right Now */}
-                <div className="barry-section">
-                  <h4 className="barry-section-title">What This Company Appears Focused On Right Now</h4>
-                  <ul className="barry-bullet-list">
-                    {barryContext.whatCompanyFocusedOn.map((item, idx) => (
-                      <li key={idx}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* 4. Ways a Conversation Could Naturally Begin */}
-                <div className="barry-section">
-                  <h4 className="barry-section-title">Ways a Conversation Could Naturally Begin</h4>
-                  <ul className="barry-conversation-starters">
-                    {barryContext.conversationStarters.map((item, idx) => (
-                      <li key={idx}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* 5. Calm Reframe */}
-                <div className="barry-section barry-reframe">
-                  <p className="barry-reframe-text">{barryContext.calmReframe}</p>
-                </div>
-              </div>
+          {/* Events Section - Placeholder */}
+          <div className="info-card events-placeholder-card">
+            <div className="card-header">
+              <h3>Events</h3>
+              <Calendar className="w-5 h-5 text-gray-400" />
             </div>
-          )}
-
-          {/* Loading State for Barry Context */}
-          {generatingContext && !barryContext && (
-            <div className="info-card barry-loading-card">
-              <div className="card-header">
-                <h3>Context by Barry</h3>
-                <div className="barry-source-badge">
-                  <span>Source: Barry</span>
-                </div>
-              </div>
-              <div className="barry-loading">
-                <Loader className="w-8 h-8 spinner" />
-                <p>Barry is preparing contextual intelligence...</p>
-              </div>
+            <div className="placeholder-content">
+              <p className="placeholder-text">No events tracked. Activity history will appear here.</p>
             </div>
-          )}
+          </div>
+
+          {/* History Section - Placeholder */}
+          <div className="info-card history-placeholder-card">
+            <div className="card-header">
+              <h3>History</h3>
+              <FileText className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="placeholder-content">
+              <p className="placeholder-text">Interaction history will be tracked here.</p>
+            </div>
+          </div>
 
           {/* Company Info Card */}
           {contact.company_name && (

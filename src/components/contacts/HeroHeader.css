@@ -1,0 +1,110 @@
+/* Hero Photo Header */
+.contact-hero-header {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+}
+
+.contact-hero-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.7) 40%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2rem;
+}
+
+.contact-hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hero-source-badge {
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.hero-source-badge .source-badge {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.contact-hero-name {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.contact-hero-title {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+  margin: 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.contact-hero-company {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  margin: 0.25rem 0 0 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .contact-hero-header {
+    height: 280px;
+  }
+
+  .contact-hero-overlay {
+    padding: 1.5rem;
+  }
+
+  .contact-hero-name {
+    font-size: 1.5rem;
+  }
+
+  .contact-hero-title {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-hero-header {
+    height: 240px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .contact-hero-overlay {
+    padding: 1rem;
+  }
+
+  .contact-hero-name {
+    font-size: 1.25rem;
+  }
+
+  .contact-hero-title {
+    font-size: 0.875rem;
+  }
+
+  .contact-hero-company {
+    font-size: 0.8125rem;
+  }
+}

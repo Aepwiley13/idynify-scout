@@ -1,0 +1,280 @@
+/* Contact Snapshot Modal Overlay */
+.contact-snapshot-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+  padding: 1rem;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
+.contact-snapshot-container {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 800px;
+  max-height: 85vh;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Close Button - Absolute Positioned */
+.close-button-absolute {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 10001;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #ffffff;
+}
+
+.close-button-absolute:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.05);
+}
+
+/* Simple Header for Enrichment Mode */
+.contact-snapshot-header-simple {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+}
+
+.contact-snapshot-header-simple .header-content {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-snapshot-header-simple .back-button {
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #6b7280;
+  transition: color 0.2s ease;
+}
+
+.contact-snapshot-header-simple .back-button:hover {
+  color: #111827;
+}
+
+.header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.snapshot-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.375rem 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.snapshot-subtitle {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Content */
+.contact-snapshot-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  position: relative;
+}
+
+/* Scroll gradient indicator */
+.contact-snapshot-content::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.contact-snapshot-content.has-scroll::after {
+  opacity: 1;
+}
+
+/* Success Banner */
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 10px;
+  color: #15803d;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 2rem 1.5rem 2rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Footer with Open Full Profile Button */
+.snapshot-footer {
+  padding: 1.5rem 2rem 2rem 2rem;
+  border-top: 2px solid #f3f4f6;
+  background: #ffffff;
+}
+
+.open-full-profile-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.open-full-profile-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .contact-snapshot-container {
+    min-height: 0;
+  }
+
+  .snapshot-footer {
+    padding: 1.5rem;
+  }
+
+  .success-banner {
+    margin: 0 1.5rem 1.5rem 1.5rem;
+  }
+
+  .close-button-absolute {
+    top: 1rem;
+    right: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-snapshot-header-simple {
+    padding: 1.5rem;
+  }
+
+  .snapshot-title {
+    font-size: 1.25rem;
+  }
+
+  .snapshot-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .snapshot-footer {
+    padding: 1rem;
+  }
+
+  .open-full-profile-btn {
+    padding: 0.75rem 1.25rem;
+  }
+
+  .close-button-absolute {
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Shorter Screens (Laptops under 1080p) */
+@media (max-height: 800px) {
+  .contact-snapshot-container {
+    max-height: 85vh;
+    min-height: 0;
+  }
+}
+
+/* Very Short Screens (Mobile landscape, small laptops) */
+@media (max-height: 600px) {
+  .contact-snapshot-container {
+    max-height: 90vh;
+    min-height: 0;
+  }
+}

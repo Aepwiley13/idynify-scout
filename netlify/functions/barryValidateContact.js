@@ -107,7 +107,7 @@ Respond ONLY with valid JSON in this exact format:
 
     // Call Claude API using SDK
     const claudeResponse = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 500,
       messages: [
         {

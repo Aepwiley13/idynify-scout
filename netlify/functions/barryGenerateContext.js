@@ -153,7 +153,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
 
     // Call Claude API using SDK
     const claudeResponse = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1500,
       messages: [
         {

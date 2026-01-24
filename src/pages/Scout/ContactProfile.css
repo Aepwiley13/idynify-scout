@@ -60,13 +60,20 @@
   max-width: 400px;
 }
 
-/* Main Page Container */
+/* Main Page Container - Barry-First Design */
 .contact-profile-page {
   padding: 2rem;
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
-  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  background: #F8F8F6;
   min-height: 100vh;
+}
+
+/* Barry-First Container */
+.contact-profile-container {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 /* Navigation Bar */
@@ -105,25 +112,35 @@
   stroke-width: 2.5;
 }
 
-.btn-export {
+.btn-enrich-nav {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   border: none;
   border-radius: 10px;
-  color: #ffffff;
+  color: #78350f;
   font-size: 0.9375rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.25);
 }
 
-.btn-export:hover {
+.btn-enrich-nav:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 8px 20px rgba(251, 191, 36, 0.35);
+}
+
+.btn-enrich-nav:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-enrich-nav .spinner {
+  animation: spin 1s linear infinite;
 }
 
 /* Enrichment Banners */
@@ -166,6 +183,35 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Barry Loading State */
+.barry-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  margin: 0 auto 48px auto;
+  max-width: 680px;
+  background: linear-gradient(135deg, #fafcfe 0%, #f0f7ff 100%);
+  border: 1px solid rgba(191, 219, 254, 0.3);
+  border-radius: 16px;
+  gap: 1rem;
+}
+
+.barry-loading-state .loading-icon {
+  width: 32px;
+  height: 32px;
+  color: #3b82f6;
+  animation: spin 1s linear infinite;
+}
+
+.barry-loading-state p {
+  font-size: 16px;
+  font-weight: 500;
+  color: #6b7280;
+  margin: 0;
 }
 
 .btn-back {

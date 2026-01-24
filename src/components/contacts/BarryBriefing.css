@@ -1,0 +1,86 @@
+/* Barry Briefing - The Hero (60% visual weight) */
+.barry-briefing {
+  max-width: 680px;
+  margin: 0 auto 48px auto;
+  padding: 32px 0;
+}
+
+.briefing-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Prose statements - natural language, not bullets */
+.briefing-statement {
+  font-size: 20px;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #1f2937;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* Loading state - subtle shimmer */
+.briefing-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loading-shimmer {
+  height: 56px;
+  background: linear-gradient(
+    90deg,
+    #f3f4f6 0%,
+    #e5e7eb 50%,
+    #f3f4f6 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.loading-shimmer:first-child {
+  width: 100%;
+}
+
+.loading-shimmer:nth-child(2) {
+  width: 85%;
+}
+
+.loading-shimmer:nth-child(3) {
+  width: 70%;
+}
+
+/* Mobile responsive - maintain hierarchy */
+@media (max-width: 768px) {
+  .barry-briefing {
+    padding: 24px 0;
+    margin-bottom: 32px;
+  }
+
+  .briefing-statement {
+    font-size: 18px;
+    line-height: 1.6;
+  }
+}
+
+@media (max-width: 480px) {
+  .briefing-content {
+    gap: 12px;
+  }
+
+  .loading-shimmer {
+    height: 48px;
+  }
+}

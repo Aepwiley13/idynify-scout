@@ -4,32 +4,14 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   ArrowLeft,
-  User,
-  Mail,
-  Phone,
-  Linkedin,
-  MapPin,
-  Briefcase,
-  Building2,
-  Clock,
-  TrendingUp,
-  Award,
-  Target,
-  MessageSquare,
   AlertCircle,
   CheckCircle,
-  Sparkles,
-  Globe,
-  Twitter,
-  Facebook,
-  Loader,
-  StickyNote,
-  Calendar,
-  FileText
+  Loader
 } from 'lucide-react';
-import HeroHeader from '../../components/contacts/HeroHeader';
-import BarryContext from '../../components/contacts/BarryContext';
-import ContactInfo from '../../components/contacts/ContactInfo';
+import BarryBriefing from '../../components/contacts/BarryBriefing';
+import IdentityCard from '../../components/contacts/IdentityCard';
+import RecessiveActions from '../../components/contacts/RecessiveActions';
+import DetailDrawer from '../../components/contacts/DetailDrawer';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -245,17 +227,27 @@ export default function ContactProfile() {
       <div className="profile-nav">
         <button
           className="btn-back-nav"
-          onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+          onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Company</span>
+          <span>Back to All Leads</span>
         </button>
-        <button
-          className="btn-export"
-          onClick={() => alert('Export to CSV feature coming soon')}
-        >
-          Export Profile
-        </button>
+        {contact.apollo_person_id && (
+          <button
+            className="btn-enrich-nav"
+            onClick={handleEnrichContact}
+            disabled={enriching}
+          >
+            {enriching ? (
+              <>
+                <Loader className="w-4 h-4 spinner" />
+                <span>Enriching...</span>
+              </>
+            ) : (
+              <span>Enrich Contact</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Success Banner */}
@@ -274,135 +266,26 @@ export default function ContactProfile() {
         </div>
       )}
 
-      {/* Profile Header Card */}
-      <div className="profile-header-card">
-        {/* Hero Header */}
-        <HeroHeader contact={contact} size="full" />
-
-        {/* Quick Contact Actions */}
-        <div className="quick-actions">
-          {contact.apollo_person_id && (
-            <button
-              className="quick-action-btn enrich"
-              onClick={handleEnrichContact}
-              disabled={enriching}
-            >
-              {enriching ? (
-                <>
-                  <Loader className="w-4 h-4 spinner" />
-                  <span>Enriching...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>Enrich Contact</span>
-                </>
-              )}
-            </button>
-          )}
-          {contact.email && (
-            <a href={`mailto:${contact.email}`} className="quick-action-btn email">
-              <Mail className="w-4 h-4" />
-              <span>Email</span>
-            </a>
-          )}
-          {contact.phone && (
-            <a href={`tel:${contact.phone}`} className="quick-action-btn phone">
-              <Phone className="w-4 h-4" />
-              <span>Call</span>
-            </a>
-          )}
-          {contact.linkedin_url && (
-            <a
-              href={contact.linkedin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="quick-action-btn linkedin"
-            >
-              <Linkedin className="w-4 h-4" />
-              <span>LinkedIn</span>
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div className="profile-content">
-
-        {/* Right Column: Insights */}
-        <div className="profile-right-column">
-          {/* Contact Information Card */}
-          <ContactInfo contact={contact} mode="expanded" />
-
-          {/* Context by Barry */}
-          <BarryContext
-            barryContext={barryContext}
-            mode="full"
-            loading={generatingContext && !barryContext}
-          />
-
-          {/* Notes Section - Placeholder */}
-          <div className="info-card notes-placeholder-card">
-            <div className="card-header">
-              <h3>Notes</h3>
-              <StickyNote className="w-5 h-5 text-gray-400" />
-            </div>
-            <div className="placeholder-content">
-              <p className="placeholder-text">No notes yet. Add notes to track important details about this contact.</p>
-              <button className="placeholder-btn" disabled>
-                Add Note
-              </button>
-            </div>
+      {/* Barry-First Structure: 60-20-10-10 */}
+      <div className="contact-profile-container">
+        {/* HERO: Barry's Briefing (60% visual weight) */}
+        {barryContext ? (
+          <BarryBriefing barryContext={barryContext} contact={contact} />
+        ) : generatingContext ? (
+          <div className="barry-loading-state">
+            <Loader className="loading-icon" />
+            <p>Barry is analyzing this contact...</p>
           </div>
+        ) : null}
 
-          {/* Events Section - Placeholder */}
-          <div className="info-card events-placeholder-card">
-            <div className="card-header">
-              <h3>Events</h3>
-              <Calendar className="w-5 h-5 text-gray-400" />
-            </div>
-            <div className="placeholder-content">
-              <p className="placeholder-text">No events tracked. Activity history will appear here.</p>
-            </div>
-          </div>
+        {/* MINIMAL IDENTITY (20% visual weight) */}
+        <IdentityCard contact={contact} />
 
-          {/* History Section - Placeholder */}
-          <div className="info-card history-placeholder-card">
-            <div className="card-header">
-              <h3>History</h3>
-              <FileText className="w-5 h-5 text-gray-400" />
-            </div>
-            <div className="placeholder-content">
-              <p className="placeholder-text">Interaction history will be tracked here.</p>
-            </div>
-          </div>
+        {/* QUIET ACTIONS (10% visual weight) */}
+        <RecessiveActions contact={contact} />
 
-          {/* Company Info Card */}
-          {contact.company_name && (
-            <div className="info-card">
-              <h3>Company Context</h3>
-              <div className="company-info">
-                <div className="company-item">
-                  <Building2 className="w-4 h-4" />
-                  <span>{contact.company_name}</span>
-                </div>
-                {contact.company_industry && (
-                  <div className="company-item">
-                    <Briefcase className="w-4 h-4" />
-                    <span>{contact.company_industry}</span>
-                  </div>
-                )}
-                {contact.company_id && (
-                  <button
-                    className="view-company-link"
-                    onClick={() => navigate(`/scout/company/${contact.company_id}`)}
-                  >
-                    View Full Company Profile →
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* COLLAPSED DETAILS (10% visual weight) */}
+        <DetailDrawer contact={contact} />
       </div>
     </div>
   );

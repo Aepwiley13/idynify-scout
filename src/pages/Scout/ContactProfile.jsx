@@ -8,8 +8,8 @@ import {
   CheckCircle,
   Loader
 } from 'lucide-react';
-import BarryBriefing from '../../components/contacts/BarryBriefing';
 import IdentityCard from '../../components/contacts/IdentityCard';
+import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
 import './ContactProfile.css';
@@ -266,11 +266,14 @@ export default function ContactProfile() {
         </div>
       )}
 
-      {/* Barry-First Structure: 60-20-10-10 */}
+      {/* "Meet [FirstName]" Structure */}
       <div className="contact-profile-container">
-        {/* HERO: Barry's Briefing (60% visual weight) */}
+        {/* 1. IDENTITY CARD - TOP */}
+        <IdentityCard contact={contact} />
+
+        {/* 2. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (
-          <BarryBriefing barryContext={barryContext} contact={contact} />
+          <MeetSection barryContext={barryContext} contact={contact} />
         ) : generatingContext ? (
           <div className="barry-loading-state">
             <Loader className="loading-icon" />
@@ -278,13 +281,10 @@ export default function ContactProfile() {
           </div>
         ) : null}
 
-        {/* MINIMAL IDENTITY (20% visual weight) */}
-        <IdentityCard contact={contact} />
-
-        {/* QUIET ACTIONS (10% visual weight) */}
+        {/* 3. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* COLLAPSED DETAILS (10% visual weight) */}
+        {/* 4. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} />
       </div>
     </div>

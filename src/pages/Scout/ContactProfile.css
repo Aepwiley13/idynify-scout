@@ -69,11 +69,11 @@
   min-height: 100vh;
 }
 
-/* Barry-First Container */
+/* Contact Profile Container - "Meet [FirstName]" Structure */
 .contact-profile-container {
   max-width: 840px;
   margin: 0 auto;
-  padding: 0;
+  padding: 48px 32px;
 }
 
 /* Navigation Bar */

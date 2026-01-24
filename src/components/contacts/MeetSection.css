@@ -1,0 +1,147 @@
+/* Meet [FirstName] Section - Barry's Intelligence */
+.meet-section {
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 32px;
+}
+
+.meet-section > h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 24px 0;
+  color: #1a1a1a;
+}
+
+/* Barry's Summary */
+.barry-summary {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #1a1a1a;
+  margin-bottom: 24px;
+}
+
+/* Section Dividers */
+.role-priorities,
+.conversation-starters {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Subsection Headings */
+.meet-section h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  margin: 0 0 12px 0;
+  text-transform: none;
+}
+
+/* Role Priorities List */
+.role-priorities ul {
+  list-style: disc;
+  padding-left: 20px;
+  margin: 0;
+}
+
+.role-priorities li {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+/* Conversation Starters */
+.conversation-starters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conversation-option {
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+}
+
+.conversation-option:hover {
+  background: white;
+  border-color: rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Engagement Helper Box */
+.engagement-helper {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #065f46;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Calm Reframe */
+.calm-reframe {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.calm-reframe p {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #047857;
+  font-style: italic;
+  margin: 0;
+  padding: 16px;
+  background: rgba(236, 253, 245, 0.5);
+  border-left: 3px solid #10b981;
+  border-radius: 6px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .meet-section {
+    padding: 24px;
+  }
+
+  .meet-section > h2 {
+    font-size: 20px;
+  }
+
+  .barry-summary {
+    font-size: 16px;
+  }
+
+  .role-priorities li,
+  .conversation-option {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .meet-section {
+    padding: 20px;
+  }
+
+  .meet-section > h2 {
+    font-size: 18px;
+  }
+
+  .barry-summary {
+    font-size: 15px;
+  }
+}

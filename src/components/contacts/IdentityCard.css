@@ -1,11 +1,13 @@
-/* Identity Card - Minimal (20% visual weight, max 300x120px) */
+/* Identity Card - TOP OF PAGE */
 .identity-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  max-width: 300px;
-  margin: 0 auto 48px auto;
-  padding: 0;
+  gap: 20px;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
 }
 
 /* Photo - circular, clean */
@@ -15,7 +17,6 @@
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  border: 2px solid #e5e7eb;
   background: #f9fafb;
 }
 
@@ -39,35 +40,34 @@
 .identity-info {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 4px;
   min-width: 0;
 }
 
-/* Name - semibold (600) maximum per spec */
+/* Name - prominent */
 .identity-name {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   line-height: 1.2;
-  color: #111827;
-  margin: 0;
-  letter-spacing: -0.02em;
+  color: #1a1a1a;
+  margin: 0 0 4px 0;
 }
 
-/* Title - regular weight */
+/* Title - readable size */
 .identity-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.4;
-  color: #6b7280;
+  color: #666;
   margin: 0;
 }
 
-/* Company - regular weight */
+/* Company - readable size */
 .identity-company {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   line-height: 1.4;
-  color: #6b7280;
+  color: #666;
   margin: 0;
 }
 

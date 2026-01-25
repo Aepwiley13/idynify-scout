@@ -1,0 +1,179 @@
+/* Activity History Section */
+.activity-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.activity-header {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* No Activity State */
+.no-activity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  color: #9ca3af;
+}
+
+.no-activity svg {
+  color: #d1d5db;
+  margin-bottom: 0.75rem;
+}
+
+.no-activity p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  max-width: 300px;
+}
+
+/* Activity Timeline */
+.activity-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+/* Individual Activity Item */
+.activity-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.875rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Activity Icon Wrapper */
+.activity-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.activity-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+
+/* Different colors for different activity types */
+.activity-icon.note {
+  color: #fbbf24;
+}
+
+.activity-icon.edit {
+  color: #3b82f6;
+}
+
+.activity-icon.delete {
+  color: #ef4444;
+}
+
+.activity-icon.enriched {
+  color: #a855f7;
+}
+
+.activity-icon.viewed {
+  color: #6b7280;
+}
+
+.activity-icon.email {
+  color: #3b82f6;
+}
+
+.activity-icon.sent {
+  color: #10b981;
+}
+
+.activity-icon.created {
+  color: #10b981;
+}
+
+.activity-icon.default {
+  color: #9ca3af;
+}
+
+/* Activity Content */
+.activity-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.activity-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.activity-details {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.activity-timestamp {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.125rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .activity-item {
+    padding: 0.75rem;
+  }
+
+  .activity-icon-wrapper {
+    width: 28px;
+    height: 28px;
+  }
+
+  .activity-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .activity-label {
+    font-size: 0.875rem;
+  }
+
+  .activity-details {
+    font-size: 0.8125rem;
+  }
+
+  .activity-timestamp {
+    font-size: 0.6875rem;
+  }
+}

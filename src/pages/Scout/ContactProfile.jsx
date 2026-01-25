@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   ArrowLeft,
@@ -51,6 +51,16 @@ export default function ContactProfile() {
       const contactData = { id: contactDoc.id, ...contactDoc.data() };
       setContact(contactData);
       console.log('✅ Contact profile loaded:', contactData.name);
+
+      // Track profile view in activity log
+      const contactRef = doc(db, 'users', userId, 'contacts', contactId);
+      await updateDoc(contactRef, {
+        activity_log: arrayUnion({
+          type: 'profile_viewed',
+          timestamp: new Date().toISOString(),
+          details: 'Profile viewed'
+        })
+      });
 
       // Load Barry context if available
       if (contactData.barryContext) {
@@ -118,6 +128,10 @@ export default function ContactProfile() {
       console.error('❌ Error generating Barry context:', err);
       setGeneratingContext(false);
     }
+  }
+
+  function handleContactUpdate(updatedContact) {
+    setContact(updatedContact);
   }
 
   async function handleEnrichContact() {
@@ -285,7 +299,7 @@ export default function ContactProfile() {
         <RecessiveActions contact={contact} />
 
         {/* 4. VIEW DETAILS DRAWER - BOTTOM */}
-        <DetailDrawer contact={contact} />
+        <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
     </div>
   );

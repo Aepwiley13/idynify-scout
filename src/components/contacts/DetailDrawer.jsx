@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Mail, Phone, Linkedin, MapPin, Building2, Calendar, StickyNote, FileText } from 'lucide-react';
-import ContactInfo from './ContactInfo';
+import { ChevronDown, ChevronUp, Mail, Phone, Linkedin, MapPin, Building2, Calendar } from 'lucide-react';
+import StickyNotes from './StickyNotes';
+import ActivityHistory from './ActivityHistory';
 import './DetailDrawer.css';
 
-export default function DetailDrawer({ contact }) {
+export default function DetailDrawer({ contact, onUpdate }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -108,35 +109,18 @@ export default function DetailDrawer({ contact }) {
             </div>
           )}
 
-          {/* Notes Placeholder */}
+          {/* Sticky Notes */}
           <div className="drawer-section">
-            <h3 className="drawer-section-title">Notes</h3>
-            <div className="drawer-placeholder">
-              <StickyNote className="placeholder-icon" />
-              <p className="placeholder-text">No notes yet</p>
-            </div>
+            <StickyNotes contact={contact} onUpdate={onUpdate} />
           </div>
 
-          {/* Events Placeholder */}
+          {/* Activity History */}
           <div className="drawer-section">
-            <h3 className="drawer-section-title">Events</h3>
-            <div className="drawer-placeholder">
-              <Calendar className="placeholder-icon" />
-              <p className="placeholder-text">No events tracked</p>
-            </div>
-          </div>
-
-          {/* History Placeholder */}
-          <div className="drawer-section">
-            <h3 className="drawer-section-title">History</h3>
-            <div className="drawer-placeholder">
-              <FileText className="placeholder-icon" />
-              <p className="placeholder-text">No activity history</p>
-            </div>
+            <ActivityHistory contact={contact} />
           </div>
 
           {/* Metadata */}
-          {(contact.source || contact.addedAt || contact.updated_at) && (
+          {(contact.source || contact.addedAt || contact.updated_at || contact.apollo_person_id) && (
             <div className="drawer-section">
               <h3 className="drawer-section-title">Metadata</h3>
               <div className="drawer-metadata">
@@ -144,6 +128,12 @@ export default function DetailDrawer({ contact }) {
                   <div className="metadata-item">
                     <span className="metadata-label">Source</span>
                     <span className="metadata-value">{contact.source}</span>
+                  </div>
+                )}
+                {contact.apollo_person_id && (
+                  <div className="metadata-item">
+                    <span className="metadata-label">Barry Contact ID</span>
+                    <span className="metadata-value">{contact.apollo_person_id}</span>
                   </div>
                 )}
                 {(contact.addedAt || contact.saved_at) && (

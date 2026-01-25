@@ -112,10 +112,46 @@
   border-radius: 6px;
 }
 
-/* Responsive adjustments */
+/* Responsive adjustments - Better Mobile Typography */
 @media (max-width: 768px) {
   .meet-section {
-    padding: 24px;
+    padding: 24px 20px;
+  }
+
+  .meet-section > h2 {
+    font-size: 22px;
+  }
+
+  .barry-summary {
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  .meet-section h3 {
+    font-size: 15px;
+  }
+
+  .role-priorities li {
+    font-size: 16px;
+  }
+
+  .conversation-option {
+    font-size: 16px;
+    padding: 16px 18px;
+  }
+
+  .engagement-helper {
+    font-size: 15px;
+  }
+
+  .calm-reframe p {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 480px) {
+  .meet-section {
+    padding: 20px 16px;
   }
 
   .meet-section > h2 {
@@ -126,22 +162,11 @@
     font-size: 16px;
   }
 
-  .role-priorities li,
-  .conversation-option {
+  .role-priorities li {
     font-size: 15px;
   }
-}
 
-@media (max-width: 480px) {
-  .meet-section {
-    padding: 20px;
-  }
-
-  .meet-section > h2 {
-    font-size: 18px;
-  }
-
-  .barry-summary {
+  .conversation-option {
     font-size: 15px;
   }
 }

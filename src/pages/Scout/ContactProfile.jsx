@@ -248,6 +248,16 @@ export default function ContactProfile() {
             )}
           </button>
         )}
+        {/* NEW: Hunter engage button (Phase 1) */}
+        <button
+          className="btn-hunter-engage"
+          onClick={() => {
+            // Pass contact to Hunter via URL params
+            navigate(`/hunter/create?contactIds=${contact.id}`);
+          }}
+        >
+          <span>🎯 Engage with Hunter</span>
+        </button>
       </div>
 
       {/* Success Banner */}

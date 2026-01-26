@@ -95,7 +95,8 @@ export default function AllLeads() {
   }
 
   function handleBulkStartCampaign() {
-    navigate(`/hunter/campaign/new?contactIds=${selectedContactIds.join(',')}`);
+    // Navigate to Hunter with selected contacts (Phase 1)
+    navigate(`/hunter/create?contactIds=${selectedContactIds.join(',')}`);
   }
 
   function exportToCSV() {

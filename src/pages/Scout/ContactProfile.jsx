@@ -24,8 +24,8 @@ export default function ContactProfile() {
   const [enrichError, setEnrichError] = useState(null);
   const [barryContext, setBarryContext] = useState(null);
   const [generatingContext, setGeneratingContext] = useState(false);
-  const [notes, setNotes] = useState(''); // PHASE 2: Contact notes
-  const [savingNotes, setSavingNotes] = useState(false); // PHASE 2: Saving state
+  const [notes, setNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
     loadContactProfile();
@@ -125,7 +125,10 @@ export default function ContactProfile() {
     }
   }
 
-  // PHASE 2: Save contact notes
+  function handleContactUpdate(updatedContact) {
+    setContact(updatedContact);
+  }
+
   async function handleSaveNotes() {
     try {
       setSavingNotes(true);
@@ -339,7 +342,7 @@ export default function ContactProfile() {
         </div>
 
         {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
-        <DetailDrawer contact={contact} />
+        <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
     </div>
   );

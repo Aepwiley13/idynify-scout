@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Mail, Send, CheckCircle, Clock, Edit3, Save, X, Loader, AlertCircle, Sparkles } from 'lucide-react';
+import OutcomeTracker from '../../components/hunter/OutcomeTracker';
 
 export default function CampaignDetail() {
   const navigate = useNavigate();
@@ -46,27 +47,31 @@ export default function CampaignDetail() {
 
   function startEditing(index) {
     setEditingIndex(index);
+    const items = campaign.contacts || campaign.messages;
     setEditedMessage({
-      subject: campaign.messages[index].subject,
-      body: campaign.messages[index].body
+      subject: items[index].subject,
+      body: items[index].body
     });
   }
 
   async function saveEdit() {
     try {
       const user = auth.currentUser;
-      const updatedMessages = [...campaign.messages];
-      updatedMessages[editingIndex] = {
-        ...updatedMessages[editingIndex],
+      const items = campaign.contacts || campaign.messages;
+      const updatedItems = [...items];
+      updatedItems[editingIndex] = {
+        ...updatedItems[editingIndex],
         ...editedMessage
       };
 
+      // Update using the correct field name (contacts or messages)
+      const updateField = campaign.contacts ? 'contacts' : 'messages';
       await updateDoc(doc(db, 'users', user.uid, 'campaigns', campaignId), {
-        messages: updatedMessages,
+        [updateField]: updatedItems,
         updatedAt: new Date().toISOString()
       });
 
-      setCampaign({ ...campaign, messages: updatedMessages });
+      setCampaign({ ...campaign, [updateField]: updatedItems });
       setEditingIndex(null);
     } catch (err) {
       console.error('Error saving edit:', err);
@@ -86,7 +91,8 @@ export default function CampaignDetail() {
     try {
       const user = auth.currentUser;
       const authToken = await user.getIdToken();
-      const message = campaign.messages[index];
+      const items = campaign.contacts || campaign.messages;
+      const message = items[index];
 
       const response = await fetch('/.netlify/functions/gmail-send', {
         method: 'POST',
@@ -110,18 +116,19 @@ export default function CampaignDetail() {
 
       const data = await response.json();
 
-      // Update local state
-      const updatedMessages = [...campaign.messages];
-      updatedMessages[index] = {
-        ...updatedMessages[index],
+      // Update local state (support both structures)
+      const updatedItems = [...items];
+      updatedItems[index] = {
+        ...updatedItems[index],
         status: 'sent',
         sentAt: data.sentAt,
         gmailMessageId: data.gmailMessageId
       };
 
+      const updateField = campaign.contacts ? 'contacts' : 'messages';
       setCampaign({
         ...campaign,
-        messages: updatedMessages,
+        [updateField]: updatedItems,
         status: 'in_progress'
       });
 
@@ -140,10 +147,31 @@ export default function CampaignDetail() {
     }
   }
 
+  // NEW: Handle outcome updates from OutcomeTracker
+  function handleOutcomeUpdate(contactId, outcome, isTerminal) {
+    // Update local state immediately
+    setCampaign(prev => ({
+      ...prev,
+      contacts: prev.contacts.map(c =>
+        c.contactId === contactId
+          ? {
+              ...c,
+              outcome,
+              outcomeMarkedAt: new Date(),
+              outcomeLocked: isTerminal || false,
+              outcomeLockedAt: isTerminal ? new Date() : null
+            }
+          : c
+      )
+    }));
+  }
+
   function getCampaignStats() {
     if (!campaign) return { total: 0, sent: 0, pending: 0 };
-    const total = campaign.messages?.length || 0;
-    const sent = campaign.messages?.filter(m => m.status === 'sent').length || 0;
+    // Support both old (messages) and new (contacts) structure
+    const items = campaign.contacts || campaign.messages || [];
+    const total = items.length;
+    const sent = items.filter(item => item.status === 'sent').length;
     const pending = total - sent;
     return { total, sent, pending };
   }
@@ -184,23 +212,26 @@ export default function CampaignDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       {/* Send Confirmation Modal */}
-      {showSendConfirm !== null && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">Send Email?</h3>
-            <div className="mb-6">
-              <p className="text-slate-300 mb-2">
-                Send email to <span className="font-bold">{campaign.messages[showSendConfirm].contactName}</span>?
-              </p>
-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 mt-4">
-                <div className="text-sm text-slate-400 mb-2">Subject:</div>
-                <div className="font-medium mb-3">{campaign.messages[showSendConfirm].subject}</div>
-                <div className="text-sm text-slate-400 mb-2">Preview:</div>
-                <div className="text-sm text-slate-300 line-clamp-3">
-                  {campaign.messages[showSendConfirm].body.substring(0, 150)}...
+      {showSendConfirm !== null && (() => {
+        const items = campaign.contacts || campaign.messages;
+        const currentMessage = items[showSendConfirm];
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold mb-4">Send Email?</h3>
+              <div className="mb-6">
+                <p className="text-slate-300 mb-2">
+                  Send email to <span className="font-bold">{currentMessage.contactName || currentMessage.name}</span>?
+                </p>
+                <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 mt-4">
+                  <div className="text-sm text-slate-400 mb-2">Subject:</div>
+                  <div className="font-medium mb-3">{currentMessage.subject}</div>
+                  <div className="text-sm text-slate-400 mb-2">Preview:</div>
+                  <div className="text-sm text-slate-300 line-clamp-3">
+                    {currentMessage.body.substring(0, 150)}...
+                  </div>
                 </div>
               </div>
-            </div>
             <div className="flex gap-4">
               <button
                 onClick={() => setShowSendConfirm(null)}
@@ -228,7 +259,8 @@ export default function CampaignDetail() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Header */}
       <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
@@ -287,7 +319,8 @@ export default function CampaignDetail() {
 
         {/* Messages List */}
         <div className="space-y-6">
-          {campaign.messages.map((message, index) => (
+          {/* Support both old (messages) and new (contacts) structure */}
+          {(campaign.contacts || campaign.messages).map((message, index) => (
             <div
               key={index}
               className={`bg-slate-800/50 border rounded-xl p-6 transition-all ${
@@ -318,8 +351,18 @@ export default function CampaignDetail() {
 
                 <div className="flex items-center gap-2">
                   {message.status === 'sent' ? (
-                    <div className="text-sm text-green-400">
-                      ✓ Sent {new Date(message.sentAt).toLocaleString()}
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm text-green-400">
+                        ✓ Sent {new Date(message.sentAt).toLocaleString()}
+                      </div>
+                      {/* NEW: Outcome tracker for Phase 1 campaigns (only if using contacts structure) */}
+                      {campaign.contacts && (
+                        <OutcomeTracker
+                          contact={message}
+                          campaignId={campaign.id}
+                          onOutcomeUpdate={handleOutcomeUpdate}
+                        />
+                      )}
                     </div>
                   ) : editingIndex === index ? (
                     <>

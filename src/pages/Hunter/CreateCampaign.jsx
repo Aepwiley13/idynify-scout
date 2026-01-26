@@ -3,12 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Mail, Users, Sparkles, Loader, AlertCircle, CheckCircle, ChevronRight } from 'lucide-react';
+import MissionSetup from '../../components/hunter/MissionSetup';
 
 export default function CreateCampaign() {
   const navigate = useNavigate();
   const location = useLocation();
   const [step, setStep] = useState(1);
   const [campaignName, setCampaignName] = useState('');
+  const [engagementIntent, setEngagementIntent] = useState(''); // NEW: Engagement intent
   const [allContacts, setAllContacts] = useState([]);
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -16,6 +18,7 @@ export default function CreateCampaign() {
   const [error, setError] = useState(null);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [reconUsed, setReconUsed] = useState(false);
+  const [reconSectionsUsed, setReconSectionsUsed] = useState({}); // NEW: Track which sections were actually used
 
   useEffect(() => {
     checkGmailAndLoadContacts();
@@ -79,7 +82,8 @@ export default function CreateCampaign() {
           userId: user.uid,
           authToken,
           contactIds: selectedContactIds,
-          campaignName
+          campaignName,
+          engagementIntent // NEW: Pass engagement intent to backend
         })
       });
 
@@ -90,7 +94,8 @@ export default function CreateCampaign() {
       const data = await response.json();
       setMessages(data.messages);
       setReconUsed(data.reconUsed);
-      setStep(4);
+      setReconSectionsUsed(data.reconSectionsUsed || {}); // NEW: Store which sections were used
+      setStep(5); // NEW: Step 5 instead of 4 (added Mission Setup step)
     } catch (err) {
       console.error('Error generating messages:', err);
       setError('Failed to generate messages. Please try again.');
@@ -106,13 +111,32 @@ export default function CreateCampaign() {
     try {
       const user = auth.currentUser;
 
+      // Transform messages into contacts array with outcome tracking fields
+      const contacts = messages.map(msg => ({
+        contactId: msg.contactId,
+        name: msg.contactName,
+        email: msg.contactEmail,
+        company_name: msg.companyName || '',
+        title: msg.title || '',
+        subject: msg.subject,
+        body: msg.body,
+        status: 'pending',
+        sentAt: null,
+        outcome: null,
+        outcomeMarkedAt: null,
+        outcomeLocked: false,
+        outcomeLockedAt: null
+      }));
+
       const campaignData = {
         name: campaignName,
+        engagementIntent: engagementIntent, // NEW
+        weapon: 'email', // NEW
         userId: user.uid,
-        contactIds: selectedContactIds,
-        messages: messages,
+        contacts: contacts, // NEW: Store contacts with messages inline
         status: 'draft',
         reconUsed: reconUsed,
+        reconSectionsUsed: reconSectionsUsed, // NEW: Store exactly which sections were used
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         completedAt: null
@@ -187,15 +211,19 @@ export default function CreateCampaign() {
               </div>
               <ChevronRight className="w-4 h-4 text-slate-600" />
               <div className={`px-3 py-1 rounded-full ${step >= 2 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
-                2. Contacts
+                2. Mission
               </div>
               <ChevronRight className="w-4 h-4 text-slate-600" />
               <div className={`px-3 py-1 rounded-full ${step >= 3 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
-                3. Generate
+                3. Contacts
               </div>
               <ChevronRight className="w-4 h-4 text-slate-600" />
               <div className={`px-3 py-1 rounded-full ${step >= 4 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
-                4. Review
+                4. Generate
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+              <div className={`px-3 py-1 rounded-full ${step >= 5 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
+                5. Review
               </div>
             </div>
           </div>
@@ -237,14 +265,45 @@ export default function CreateCampaign() {
                     : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                 }`}
               >
-                Next: Select Contacts
+                Next: Mission Setup
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2: Select Contacts */}
+        {/* Step 2: Mission Setup (Engagement Intent) */}
         {step === 2 && (
+          <MissionSetup
+            intent={engagementIntent}
+            onIntentChange={setEngagementIntent}
+            contacts={selectedContacts}
+          />
+        )}
+
+        {step === 2 && (
+          <div className="mt-6 flex gap-4 max-w-5xl mx-auto">
+            <button
+              onClick={() => setStep(1)}
+              className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
+            >
+              Back
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              disabled={!engagementIntent}
+              className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
+                engagementIntent
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
+                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              Next: Select Contacts
+            </button>
+          </div>
+        )}
+
+        {/* Step 3: Select Contacts */}
+        {step === 3 && (
           <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
             <h2 className="text-2xl font-bold mb-2">Select Contacts</h2>
             <p className="text-slate-400 mb-6">{selectedContactIds.length} contacts selected</p>
@@ -289,13 +348,13 @@ export default function CreateCampaign() {
 
             <div className="flex gap-4">
               <button
-                onClick={() => setStep(1)}
+                onClick={() => setStep(2)}
                 className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
               >
                 Back
               </button>
               <button
-                onClick={() => setStep(3)}
+                onClick={() => setStep(4)}
                 disabled={selectedContactIds.length === 0}
                 className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
                   selectedContactIds.length > 0
@@ -309,8 +368,8 @@ export default function CreateCampaign() {
           </div>
         )}
 
-        {/* Step 3: Generate Messages */}
-        {step === 3 && (
+        {/* Step 4: Generate Messages */}
+        {step === 4 && (
           <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 text-center">
             <h2 className="text-2xl font-bold mb-6">Generate Personalized Messages</h2>
 
@@ -330,7 +389,7 @@ export default function CreateCampaign() {
             ) : (
               <div className="flex gap-4">
                 <button
-                  onClick={() => setStep(2)}
+                  onClick={() => setStep(3)}
                   className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
                 >
                   Back
@@ -347,8 +406,8 @@ export default function CreateCampaign() {
           </div>
         )}
 
-        {/* Step 4: Review & Edit Messages */}
-        {step === 4 && (
+        {/* Step 5: Review & Edit Messages */}
+        {step === 5 && (
           <div>
             <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 mb-6">
               <div className="flex items-center justify-between">
@@ -406,7 +465,7 @@ export default function CreateCampaign() {
 
             <div className="flex gap-4">
               <button
-                onClick={() => setStep(3)}
+                onClick={() => setStep(4)}
                 className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
               >
                 Back

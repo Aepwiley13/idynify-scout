@@ -31,7 +31,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, contactIds, campaignName } = JSON.parse(event.body);
+    const { userId, authToken, contactIds, campaignName, engagementIntent } = JSON.parse(event.body);
 
     if (!userId || !authToken || !contactIds || !Array.isArray(contactIds)) {
       throw new Error('Missing required parameters');
@@ -90,6 +90,16 @@ export const handler = async (event) => {
     let section5 = null;
     let section9 = null;
     let reconUsed = false;
+    let reconSectionsUsed = {}; // NEW: Track which sections are actually used
+
+    // NEW: Tone mapping based on engagement intent (defaults to cold if not provided)
+    const toneMap = {
+      cold: 'professional, value-driven, establish credibility without being pushy',
+      warm: 'friendly but professional, reference shared context or connections',
+      hot: 'direct and conversational, assume rapport and get to the point',
+      followup: 'persistent but respectful, add new value or perspective'
+    };
+    const selectedTone = toneMap[engagementIntent] || toneMap.cold; // DEFAULT: cold if missing
 
     try {
       const dashboardDoc = await db.collection('dashboards').doc(userId).get();
@@ -104,6 +114,9 @@ export const handler = async (event) => {
 
           if (section5 || section9) {
             reconUsed = true;
+            // NEW: Track which sections are actually used
+            if (section5) reconSectionsUsed.section5 = true;
+            if (section9) reconSectionsUsed.section9 = true;
             console.log('✅ RECON data found and will be used');
           }
         }
@@ -151,7 +164,7 @@ export const handler = async (event) => {
         }
 
         // Build email generation prompt
-        const prompt = `You are a B2B sales email writer. Generate a personalized cold outreach email.
+        const prompt = `You are a B2B sales email writer. Generate a personalized ${engagementIntent || 'cold'} outreach email.
 
 CONTACT:
 - Name: ${contact.name}
@@ -159,13 +172,15 @@ CONTACT:
 - Company: ${contact.company_name || 'their company'}
 ${reconContext}
 REQUIREMENTS:
-- Tone: ${section9?.userInput?.emailTone || 'Professional but friendly'}
+- Engagement Intent: ${engagementIntent || 'cold'}
+- Tone: ${selectedTone}
 - Length: ${section9?.userInput?.emailLength || 'Short (4-5 sentences)'}
 - CTA: ${section9?.userInput?.callsToAction?.[0] || 'Book a quick call'}
 - Subject line: Make it relevant and non-salesy (max 50 characters)
 - Body: Address specific pain points if available, provide quick value prop, clear CTA
 - Do NOT use buzzwords like "game-changer", "revolutionize", or "cutting-edge"
 - Be conversational and genuine
+- Match the ${engagementIntent || 'cold'} intent appropriately
 
 Generate:
 1. Subject line (50 chars max)
@@ -230,7 +245,8 @@ BODY:
       },
       body: JSON.stringify({
         messages,
-        reconUsed
+        reconUsed,
+        reconSectionsUsed // NEW: Return exactly which sections were used
       })
     };
 

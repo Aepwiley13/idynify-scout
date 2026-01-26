@@ -972,9 +972,22 @@
   }
 }
 
+/* Mobile Improvements - Better Typography & Full Width */
 @media (max-width: 768px) {
   .contact-profile-page {
-    padding: 1.5rem;
+    padding: 1rem;
+  }
+
+  .contact-profile-container {
+    padding: 24px 16px;
+    max-width: 100%;
+  }
+
+  .identity-card,
+  .meet-section,
+  .recessive-actions,
+  .detail-drawer {
+    margin-bottom: 20px;
   }
 
   .profile-header-card {

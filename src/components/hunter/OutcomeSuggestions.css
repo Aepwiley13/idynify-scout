@@ -1,0 +1,70 @@
+/* HUNTER PHASE 2: Outcome Suggestions Styles */
+
+.outcome-suggestions {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  border-left: 3px solid;
+  border-radius: 8px;
+}
+
+.outcome-suggestions-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.outcome-suggestions-header h4 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.outcome-suggestions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.outcome-suggestions-list li {
+  position: relative;
+  padding-left: 1.25rem;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.outcome-suggestions-list li:last-child {
+  margin-bottom: 0;
+}
+
+.outcome-suggestions-list li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.btn-followup-action {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  color: #a78bfa;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-followup-action:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #c4b5fd;
+}

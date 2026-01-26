@@ -24,6 +24,8 @@ export default function ContactProfile() {
   const [enrichError, setEnrichError] = useState(null);
   const [barryContext, setBarryContext] = useState(null);
   const [generatingContext, setGeneratingContext] = useState(false);
+  const [notes, setNotes] = useState(''); // PHASE 2: Contact notes
+  const [savingNotes, setSavingNotes] = useState(false); // PHASE 2: Saving state
 
   useEffect(() => {
     loadContactProfile();
@@ -61,6 +63,9 @@ export default function ContactProfile() {
         console.log('🐻 No Barry context found, generating...');
         generateBarryContext(contactData, user);
       }
+
+      // PHASE 2: Load contact notes
+      setNotes(contactData.notes || '');
 
       setLoading(false);
     } catch (error) {
@@ -117,6 +122,24 @@ export default function ContactProfile() {
     } catch (err) {
       console.error('❌ Error generating Barry context:', err);
       setGeneratingContext(false);
+    }
+  }
+
+  // PHASE 2: Save contact notes
+  async function handleSaveNotes() {
+    try {
+      setSavingNotes(true);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+      await updateDoc(contactRef, { notes });
+
+      console.log('✅ Notes saved');
+      setSavingNotes(false);
+    } catch (error) {
+      console.error('❌ Failed to save notes:', error);
+      setSavingNotes(false);
     }
   }
 
@@ -294,7 +317,28 @@ export default function ContactProfile() {
         {/* 3. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 4. VIEW DETAILS DRAWER - BOTTOM */}
+        {/* 4. NOTES SECTION (PHASE 2) */}
+        <div className="contact-notes-section">
+          <div className="notes-header">
+            <h3>Notes</h3>
+            <button
+              className="btn-save-notes"
+              onClick={handleSaveNotes}
+              disabled={savingNotes}
+            >
+              {savingNotes ? 'Saving...' : 'Save Notes'}
+            </button>
+          </div>
+          <textarea
+            className="notes-textarea"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add notes about this contact... (e.g., conversation highlights, next steps, preferences)"
+            rows={6}
+          />
+        </div>
+
+        {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} />
       </div>
     </div>

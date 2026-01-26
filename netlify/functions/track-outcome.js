@@ -105,6 +105,7 @@ exports.handler = async (event) => {
       companyName: contactData.company_name || '',
       companyIndustry: contactData.company_industry || '',
       companySize: contactData.company_size || '',
+      contactNotes: contactData.notes || '', // PHASE 2: Include user notes
 
       // Engagement data
       sentAt: contact.sentAt,

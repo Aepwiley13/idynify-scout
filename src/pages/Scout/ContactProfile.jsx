@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   ArrowLeft,
@@ -24,6 +24,8 @@ export default function ContactProfile() {
   const [enrichError, setEnrichError] = useState(null);
   const [barryContext, setBarryContext] = useState(null);
   const [generatingContext, setGeneratingContext] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
     loadContactProfile();
@@ -52,16 +54,6 @@ export default function ContactProfile() {
       setContact(contactData);
       console.log('✅ Contact profile loaded:', contactData.name);
 
-      // Track profile view in activity log
-      const contactRef = doc(db, 'users', userId, 'contacts', contactId);
-      await updateDoc(contactRef, {
-        activity_log: arrayUnion({
-          type: 'profile_viewed',
-          timestamp: new Date().toISOString(),
-          details: 'Profile viewed'
-        })
-      });
-
       // Load Barry context if available
       if (contactData.barryContext) {
         setBarryContext(contactData.barryContext);
@@ -71,6 +63,9 @@ export default function ContactProfile() {
         console.log('🐻 No Barry context found, generating...');
         generateBarryContext(contactData, user);
       }
+
+      // PHASE 2: Load contact notes
+      setNotes(contactData.notes || '');
 
       setLoading(false);
     } catch (error) {
@@ -132,6 +127,23 @@ export default function ContactProfile() {
 
   function handleContactUpdate(updatedContact) {
     setContact(updatedContact);
+  }
+
+  async function handleSaveNotes() {
+    try {
+      setSavingNotes(true);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+      await updateDoc(contactRef, { notes });
+
+      console.log('✅ Notes saved');
+      setSavingNotes(false);
+    } catch (error) {
+      console.error('❌ Failed to save notes:', error);
+      setSavingNotes(false);
+    }
   }
 
   async function handleEnrichContact() {
@@ -308,7 +320,28 @@ export default function ContactProfile() {
         {/* 3. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 4. VIEW DETAILS DRAWER - BOTTOM */}
+        {/* 4. NOTES SECTION (PHASE 2) */}
+        <div className="contact-notes-section">
+          <div className="notes-header">
+            <h3>Notes</h3>
+            <button
+              className="btn-save-notes"
+              onClick={handleSaveNotes}
+              disabled={savingNotes}
+            >
+              {savingNotes ? 'Saving...' : 'Save Notes'}
+            </button>
+          </div>
+          <textarea
+            className="notes-textarea"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add notes about this contact... (e.g., conversation highlights, next steps, preferences)"
+            rows={6}
+          />
+        </div>
+
+        {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
     </div>

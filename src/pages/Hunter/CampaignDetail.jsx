@@ -4,6 +4,8 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Mail, Send, CheckCircle, Clock, Edit3, Save, X, Loader, AlertCircle, Sparkles } from 'lucide-react';
 import OutcomeTracker from '../../components/hunter/OutcomeTracker';
+import FollowUpComposer from '../../components/hunter/FollowUpComposer';
+import OutcomeSuggestions from '../../components/hunter/OutcomeSuggestions';
 
 export default function CampaignDetail() {
   const navigate = useNavigate();
@@ -15,6 +17,7 @@ export default function CampaignDetail() {
   const [sendingIndex, setSendingIndex] = useState(null);
   const [error, setError] = useState(null);
   const [showSendConfirm, setShowSendConfirm] = useState(null);
+  const [followUpContact, setFollowUpContact] = useState(null); // PHASE 2: Follow-up modal state
 
   useEffect(() => {
     loadCampaign();
@@ -437,12 +440,34 @@ export default function CampaignDetail() {
                       {message.body}
                     </div>
                   </div>
+
+                  {/* PHASE 2: Outcome Suggestions (only for sent messages with outcomes) */}
+                  {message.status === 'sent' && message.outcome && (
+                    <OutcomeSuggestions
+                      outcome={message.outcome}
+                      onFollowUp={() => setFollowUpContact(message)}
+                    />
+                  )}
                 </div>
               )}
             </div>
           ))}
         </div>
       </div>
+
+      {/* PHASE 2: Follow-Up Composer Modal */}
+      {followUpContact && (
+        <FollowUpComposer
+          contact={followUpContact}
+          originalCampaign={campaign}
+          onClose={() => setFollowUpContact(null)}
+          onFollowUpCreated={(data) => {
+            console.log('Follow-up sent:', data);
+            setFollowUpContact(null);
+            // Optionally reload campaign to show follow-up was sent
+          }}
+        />
+      )}
     </div>
   );
 }

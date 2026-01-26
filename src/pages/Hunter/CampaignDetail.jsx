@@ -117,7 +117,6 @@ export default function CampaignDetail() {
       const data = await response.json();
 
       // Update local state (support both structures)
-      const items = campaign.contacts || campaign.messages;
       const updatedItems = [...items];
       updatedItems[index] = {
         ...updatedItems[index],

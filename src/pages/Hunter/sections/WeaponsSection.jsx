@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Mail, MessageSquare, Calendar, Zap } from 'lucide-react';
+import { Mail, MessageSquare, Calendar, Zap, Phone, Share2, Video } from 'lucide-react';
 import EmailWeapon from '../weapons/EmailWeapon';
+import TextWeapon from '../weapons/TextWeapon';
 import './WeaponsSection.css';
 
 /**
@@ -10,9 +11,12 @@ import './WeaponsSection.css';
  * Philosophy: Weapon-first approach - user chooses weapon, then builds message
  *
  * Weapons Available:
- * - Email (Intro + Follow-up)
+ * - Email (Intro + Follow-up) ✅
+ * - Text Message (SMS) ✅
  * - LinkedIn Message (Future)
- * - Text Message (Future)
+ * - LinkedIn Post (Future)
+ * - Phone Call (Future)
+ * - Video Message (Future)
  * - Event Invite (Future)
  */
 
@@ -26,20 +30,44 @@ const WEAPONS = [
     types: ['Intro Email', 'Follow-Up Email']
   },
   {
-    id: 'linkedin',
-    name: 'LinkedIn',
+    id: 'text',
+    name: 'Text Message',
+    icon: Zap,
+    description: 'SMS outreach',
+    available: true,
+    types: ['Intro Text', 'Follow-Up Text']
+  },
+  {
+    id: 'linkedin-dm',
+    name: 'LinkedIn Message',
     icon: MessageSquare,
     description: 'Direct message or InMail',
     available: false,
     types: ['Connection Request', 'Direct Message']
   },
   {
-    id: 'text',
-    name: 'Text Message',
-    icon: Zap,
-    description: 'SMS outreach',
+    id: 'linkedin-post',
+    name: 'LinkedIn Post',
+    icon: Share2,
+    description: 'Public post or article',
     available: false,
-    types: ['Intro Text', 'Follow-Up Text']
+    types: ['Thought Leadership', 'Company Update']
+  },
+  {
+    id: 'phone',
+    name: 'Phone Call',
+    icon: Phone,
+    description: 'Cold call or follow-up',
+    available: false,
+    types: ['Cold Call', 'Follow-Up Call']
+  },
+  {
+    id: 'video',
+    name: 'Video Message',
+    icon: Video,
+    description: 'Loom or recorded video',
+    available: false,
+    types: ['Intro Video', 'Demo Video']
   },
   {
     id: 'event',
@@ -59,6 +87,14 @@ export default function WeaponsSection() {
     if (selectedWeapon === 'email') {
       return (
         <EmailWeapon
+          onBack={() => setSelectedWeapon(null)}
+        />
+      );
+    }
+
+    if (selectedWeapon === 'text') {
+      return (
+        <TextWeapon
           onBack={() => setSelectedWeapon(null)}
         />
       );

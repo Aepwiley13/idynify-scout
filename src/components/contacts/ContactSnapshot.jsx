@@ -8,9 +8,9 @@ import BarryContext from './BarryContext';
 import FindContact from '../scout/FindContact';
 import './ContactSnapshot.css';
 
-export default function ContactSnapshot({ contact, onClose, onUpdate, context = 'leads' }) {
+export default function ContactSnapshot({ contact, onClose, onUpdate, context = 'leads', autoEnrich = false }) {
   const navigate = useNavigate();
-  const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
+  const [isEnrichmentMode, setIsEnrichmentMode] = useState(autoEnrich);
   const [enrichSuccess, setEnrichSuccess] = useState(false);
   const [hasScroll, setHasScroll] = useState(false);
   const [barryContext, setBarryContext] = useState(contact.barryContext || null);

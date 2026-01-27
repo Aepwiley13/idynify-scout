@@ -6,12 +6,15 @@ import {
   ArrowLeft,
   AlertCircle,
   CheckCircle,
-  Loader
+  Loader,
+  Target
 } from 'lucide-react';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
+import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
+import ContactHunterActivity from '../../components/hunter/ContactHunterActivity';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -26,6 +29,7 @@ export default function ContactProfile() {
   const [generatingContext, setGeneratingContext] = useState(false);
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
 
   useEffect(() => {
     loadContactProfile();
@@ -274,15 +278,13 @@ export default function ContactProfile() {
             )}
           </button>
         )}
-        {/* NEW: Hunter engage button (Phase 1) */}
+        {/* Hunter engage button - opens in-context drawer */}
         <button
           className="btn-hunter-engage"
-          onClick={() => {
-            // Pass contact to Hunter via URL params
-            navigate(`/hunter/create?contactIds=${contact.id}`);
-          }}
+          onClick={() => setHunterDrawerOpen(true)}
         >
-          <span>🎯 Engage with Hunter</span>
+          <Target className="w-4 h-4" />
+          <span>Engage with Hunter</span>
         </button>
       </div>
 
@@ -341,9 +343,20 @@ export default function ContactProfile() {
           />
         </div>
 
-        {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
+        {/* 5. HUNTER ACTIVITY - Shows missions and engagement */}
+        <ContactHunterActivity contactId={contact.id} />
+
+        {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
+
+      {/* Hunter Contact Drawer - In-context engagement */}
+      <HunterContactDrawer
+        contact={contact}
+        isOpen={hunterDrawerOpen}
+        onClose={() => setHunterDrawerOpen(false)}
+        onContactUpdate={handleContactUpdate}
+      />
     </div>
   );
 }

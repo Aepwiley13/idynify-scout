@@ -57,6 +57,7 @@ import MainLayout from './components/layout/MainLayout';
 import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
 import CreateCampaign from './pages/Hunter/CreateCampaign';
 import CampaignDetail from './pages/Hunter/CampaignDetail';
+import CreateMission from './pages/Hunter/CreateMission';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -354,6 +355,22 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <HunterWeaponRoom />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hunter/create-mission"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <CreateMission />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hunter/mission/:missionId"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <CampaignDetail />
             </ProtectedRoute>
           }
         />

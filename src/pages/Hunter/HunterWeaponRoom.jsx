@@ -24,8 +24,9 @@ import './HunterWeaponRoom.css';
 
 export default function HunterWeaponRoom() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('weapons');
-  const [campaigns, setCampaigns] = useState([]);
+  const [activeTab, setActiveTab] = useState('missions'); // Default to missions tab
+  const [missions, setMissions] = useState([]);
+  const [campaigns, setCampaigns] = useState([]); // Keep old campaigns for backward compatibility
   const [loading, setLoading] = useState(true);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState('');
@@ -50,12 +51,24 @@ export default function HunterWeaponRoom() {
         setGmailEmail(gmailData.email || '');
       }
 
-      // Load campaigns
+      // Load missions (new intent-driven)
+      const missionsRef = collection(db, 'users', user.uid, 'missions');
+      const missionsQuery = query(missionsRef, orderBy('createdAt', 'desc'));
+      const missionsSnapshot = await getDocs(missionsQuery);
+
+      const missionsList = missionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setMissions(missionsList);
+
+      // Load old campaigns for backward compatibility
       const campaignsRef = collection(db, 'users', user.uid, 'campaigns');
       const campaignsQuery = query(campaignsRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(campaignsQuery);
+      const campaignsSnapshot = await getDocs(campaignsQuery);
 
-      const campaignsList = snapshot.docs.map(doc => ({
+      const campaignsList = campaignsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
@@ -82,7 +95,7 @@ export default function HunterWeaponRoom() {
   }
 
   // Get badge counts
-  const activeMissionsCount = campaigns.filter(c => c.status !== 'completed').length;
+  const activeMissionsCount = missions.filter(m => m.status === 'autopilot' || m.status === 'draft').length;
 
   if (loading) {
     return (
@@ -192,9 +205,9 @@ export default function HunterWeaponRoom() {
         )}
 
         {activeTab === 'weapons' && <WeaponsSection />}
-        {activeTab === 'missions' && <MissionsSection campaigns={campaigns} loading={false} />}
+        {activeTab === 'missions' && <MissionsSection missions={missions} loading={false} />}
         {activeTab === 'arsenal' && <ArsenalSection />}
-        {activeTab === 'outcomes' && <OutcomesSection campaigns={campaigns} />}
+        {activeTab === 'outcomes' && <OutcomesSection campaigns={campaigns} missions={missions} />}
       </div>
     </div>
   );

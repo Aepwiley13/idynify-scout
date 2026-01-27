@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, Users, Sparkles, Rocket, CheckCircle, Edit2, Trash2 } from 'lucide-react';
@@ -22,6 +22,7 @@ import './CreateMission.css';
 
 export default function CreateMission() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [missionData, setMissionData] = useState(null);
@@ -34,7 +35,14 @@ export default function CreateMission() {
 
   useEffect(() => {
     loadContacts();
-  }, []);
+
+    // Pre-select contact if coming from contact profile
+    const params = new URLSearchParams(location.search);
+    const contactId = params.get('contactId');
+    if (contactId) {
+      setSelectedContactIds([contactId]);
+    }
+  }, [location.search]);
 
   async function loadContacts() {
     try {

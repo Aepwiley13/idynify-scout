@@ -6,6 +6,7 @@ import QuickActions from './QuickActions';
 import ContactInfo from './ContactInfo';
 import BarryContext from './BarryContext';
 import FindContact from '../scout/FindContact';
+import HunterContactDrawer from '../hunter/HunterContactDrawer';
 import './ContactSnapshot.css';
 
 export default function ContactSnapshot({ contact, onClose, onUpdate, context = 'leads', autoEnrich = false }) {
@@ -14,6 +15,7 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
   const [enrichSuccess, setEnrichSuccess] = useState(false);
   const [hasScroll, setHasScroll] = useState(false);
   const [barryContext, setBarryContext] = useState(contact.barryContext || null);
+  const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
   const contentRef = useRef(null);
 
   // Scroll detection effect
@@ -66,6 +68,12 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
     navigate(`/scout/contact/${contact.id}`);
   }
 
+  function handleContactUpdate(updatedContact) {
+    if (onUpdate) {
+      onUpdate(updatedContact);
+    }
+  }
+
   return (
     <div className="contact-snapshot-overlay" onClick={onClose}>
       <div className="contact-snapshot-container" onClick={(e) => e.stopPropagation()}>
@@ -107,7 +115,11 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
         ) : (
           <div ref={contentRef} className={`contact-snapshot-content ${hasScroll ? 'has-scroll' : ''}`}>
             {/* Quick Actions Bar (Sticky) */}
-            <QuickActions contact={contact} onEnrich={handleEnrichContact} />
+            <QuickActions
+              contact={contact}
+              onEnrich={handleEnrichContact}
+              onHunter={() => setHunterDrawerOpen(true)}
+            />
 
             {/* Success Banner */}
             {enrichSuccess && (
@@ -137,6 +149,14 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
           </div>
         )}
       </div>
+
+      {/* Hunter Contact Drawer - In-context engagement */}
+      <HunterContactDrawer
+        contact={contact}
+        isOpen={hunterDrawerOpen}
+        onClose={() => setHunterDrawerOpen(false)}
+        onContactUpdate={handleContactUpdate}
+      />
     </div>
   );
 }

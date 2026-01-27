@@ -650,13 +650,6 @@ export default function AllLeads() {
                 onClick={() => handleCardClick(contact)}
                 style={{ backgroundImage: `url(${backgroundImage})` }}
               >
-                {/* Readiness Badge - Top Left */}
-                <div className={`readiness-badge readiness-${readiness}`}>
-                  {readiness === 'ready' && <><CheckCircle className="w-3 h-3" /> Ready</>}
-                  {readiness === 'partial' && <><Zap className="w-3 h-3" /> Partial</>}
-                  {readiness === 'needs-enrichment' && <><Sparkles className="w-3 h-3" /> Needs Data</>}
-                </div>
-
                 {/* Top Right: Checkbox + Menu */}
                 <div className="card-top-actions" onClick={e => e.stopPropagation()}>
                   <div
@@ -808,7 +801,7 @@ export default function AllLeads() {
                     setHunterContact(contact);
                   }}
                 >
-                  <Target className="w-4 h-4" />
+                  <Target className="w-5 h-5" />
                   <span>Hunter</span>
                 </button>
 

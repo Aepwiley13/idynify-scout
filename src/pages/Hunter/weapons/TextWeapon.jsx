@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../../firebase/config';
-import { Users, Target, Sparkles, FileText, Send, Loader, AlertCircle } from 'lucide-react';
+import { Users, Target, Sparkles, FileText, Send, Loader, AlertCircle, Copy, Check } from 'lucide-react';
 import EngagementIntentSelector from '../../../components/hunter/EngagementIntentSelector';
 import './TextWeapon.css';
 
@@ -11,13 +11,14 @@ import './TextWeapon.css';
  *
  * Purpose: Build intro or follow-up SMS with confidence
  * Philosophy: Short, direct, respectful of SMS medium
+ * Sending: Manual (copy-paste workflow, no automated sending)
  *
  * Flow:
  * 1. Choose text type (Intro vs Follow-up)
  * 2. Select contacts (who to send to - must have phone numbers)
  * 3. Set engagement intent (cold/warm/hot/followup)
  * 4. Build message (AI-generated with character limit)
- * 5. Review & Launch
+ * 5. Review & Copy (user sends manually via their SMS app)
  *
  * SMS Rules:
  * - 160 characters = 1 SMS
@@ -35,11 +36,10 @@ export default function TextWeapon({ onBack }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [twilioSetup, setTwilioSetup] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState(null);
 
   useEffect(() => {
     loadContacts();
-    checkTwilioSetup();
   }, []);
 
   async function loadContacts() {
@@ -61,34 +61,22 @@ export default function TextWeapon({ onBack }) {
     }
   }
 
-  async function checkTwilioSetup() {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // Check if Twilio is configured for this user
-      const authToken = await user.getIdToken();
-      const response = await fetch('/.netlify/functions/check-twilio-setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: authToken })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTwilioSetup(data.isSetup);
-      }
-    } catch (error) {
-      console.error('Error checking Twilio setup:', error);
-      setTwilioSetup(false);
-    }
-  }
-
   function toggleContactSelection(contactId) {
     if (selectedContactIds.includes(contactId)) {
       setSelectedContactIds(selectedContactIds.filter(id => id !== contactId));
     } else {
       setSelectedContactIds([...selectedContactIds, contactId]);
+    }
+  }
+
+  async function copyMessage(index, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      alert('Failed to copy message. Please copy manually.');
     }
   }
 
@@ -125,7 +113,7 @@ export default function TextWeapon({ onBack }) {
     }
   }
 
-  async function handleLaunchCampaign() {
+  async function handleSaveCampaign() {
     setLoading(true);
 
     try {
@@ -159,13 +147,12 @@ export default function TextWeapon({ onBack }) {
         completedAt: null
       };
 
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'campaigns'), campaignData);
+      await addDoc(collection(db, 'users', user.uid, 'campaigns'), campaignData);
 
-      // Navigate to campaign detail
-      navigate(`/hunter/campaign/${docRef.id}`);
+      alert('Campaign saved! Copy the messages below and send them via your phone\'s SMS app.');
     } catch (error) {
-      console.error('Error launching campaign:', error);
-      alert('Failed to launch campaign. Please try again.');
+      console.error('Error saving campaign:', error);
+      alert('Failed to save campaign. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -188,51 +175,6 @@ export default function TextWeapon({ onBack }) {
   const canProceedToStep3 = selectedContactIds.length > 0;
   const canProceedToStep4 = engagementIntent !== '';
   const canLaunch = messages.length > 0;
-
-  // Check if Twilio is not setup
-  if (!twilioSetup && currentStep === 1) {
-    return (
-      <div className="text-weapon">
-        <div className="weapon-header">
-          <button className="btn-back-weapon" onClick={onBack}>
-            ← Back to Weapons
-          </button>
-        </div>
-
-        <div className="twilio-setup-required">
-          <div className="setup-icon">
-            <AlertCircle className="w-12 h-12 text-yellow-400" />
-          </div>
-          <h2>SMS Setup Required</h2>
-          <p>
-            To send text messages, you need to connect a Twilio account. Twilio is an SMS provider that enables programmatic text messaging.
-          </p>
-          <div className="setup-steps">
-            <h3>What you'll need:</h3>
-            <ol>
-              <li>Twilio Account (free tier available)</li>
-              <li>Twilio Phone Number</li>
-              <li>Account SID & Auth Token</li>
-            </ol>
-          </div>
-          <div className="setup-actions">
-            <button className="btn-secondary" onClick={onBack}>
-              Back to Weapons
-            </button>
-            <button
-              className="btn-primary-hunter"
-              onClick={() => window.open('https://www.twilio.com/try-twilio', '_blank')}
-            >
-              Get Twilio Account →
-            </button>
-          </div>
-          <p className="setup-note">
-            Once you have Twilio credentials, contact support to complete integration.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   if (allContacts.length === 0 && currentStep === 1) {
     return (
@@ -456,14 +398,19 @@ export default function TextWeapon({ onBack }) {
         </div>
       )}
 
-      {/* Step 5: Review & Launch */}
+      {/* Step 5: Review & Copy Messages */}
       {currentStep === 5 && (
         <div className="weapon-step">
           <div className="step-header">
-            <h2 className="step-title">Review & Launch</h2>
+            <h2 className="step-title">Copy & Send Messages</h2>
             <p className="step-description">
-              Edit any message before launching
+              Copy each message and send via your phone's SMS app
             </p>
+          </div>
+
+          <div className="sms-notice" style={{ marginBottom: '1.5rem' }}>
+            <AlertCircle className="w-5 h-5" />
+            <span>Click the copy button for each message, then paste into your SMS app to send manually.</span>
           </div>
 
           <div className="messages-review">
@@ -490,6 +437,23 @@ export default function TextWeapon({ onBack }) {
                       maxLength={500}
                     />
                   </div>
+                  <button
+                    className="btn-primary-hunter"
+                    onClick={() => copyMessage(index, message.body)}
+                    style={{ width: '100%' }}
+                  >
+                    {copiedIndex === index ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-5 h-5" />
+                        Copy Message
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             ))}
@@ -501,18 +465,18 @@ export default function TextWeapon({ onBack }) {
             </button>
             <button
               className="btn-primary-hunter"
-              onClick={handleLaunchCampaign}
+              onClick={handleSaveCampaign}
               disabled={!canLaunch || loading}
             >
               {loading ? (
                 <>
                   <Loader className="w-5 h-5 animate-spin" />
-                  Launching...
+                  Saving...
                 </>
               ) : (
                 <>
-                  <Send className="w-5 h-5" />
-                  Launch Campaign
+                  <FileText className="w-5 h-5" />
+                  Save Campaign
                 </>
               )}
             </button>

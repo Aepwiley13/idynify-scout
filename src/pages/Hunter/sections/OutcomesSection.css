@@ -1,0 +1,160 @@
+/* OUTCOMES SECTION - Analytics & Performance */
+
+.outcomes-section {
+  animation: fadeIn 0.3s ease;
+}
+
+.outcomes-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.outcome-metric-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 2px solid rgba(71, 85, 105, 0.5);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.outcome-metric-card:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  transform: translateY(-2px);
+}
+
+.metric-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metric-info {
+  flex: 1;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: white;
+  line-height: 1;
+  margin-bottom: 0.375rem;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Breakdown Section */
+.outcomes-breakdown {
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  border-radius: 16px;
+  padding: 2rem;
+}
+
+.breakdown-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 1.5rem 0;
+}
+
+.breakdown-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.intent-breakdown-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.intent-breakdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.intent-badge {
+  padding: 0.375rem 0.875rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.intent-badge[data-intent="cold"] {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.intent-badge[data-intent="warm"] {
+  background: rgba(251, 146, 60, 0.2);
+  color: #fb923c;
+}
+
+.intent-badge[data-intent="hot"] {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.intent-badge[data-intent="followup"] {
+  background: rgba(168, 85, 247, 0.2);
+  color: #a855f7;
+}
+
+.intent-campaigns {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.intent-breakdown-stats {
+  display: flex;
+  gap: 2rem;
+}
+
+.intent-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.intent-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.intent-stat-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .outcomes-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .intent-breakdown-stats {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}

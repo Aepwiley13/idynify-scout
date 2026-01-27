@@ -1,0 +1,157 @@
+/* MISSIONS SECTION - Active Campaigns */
+
+.missions-section {
+  animation: fadeIn 0.3s ease;
+}
+
+.missions-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.mission-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 2px solid rgba(71, 85, 105, 0.5);
+  border-radius: 16px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mission-card:hover {
+  border-color: rgba(139, 92, 246, 0.6);
+  background: rgba(30, 41, 59, 0.7);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.15);
+}
+
+.mission-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.mission-info {
+  flex: 1;
+}
+
+.mission-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.75rem 0;
+}
+
+.mission-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mission-status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.mission-recon-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.mission-intent-badge {
+  padding: 0.25rem 0.75rem;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #60a5fa;
+  text-transform: capitalize;
+}
+
+.mission-date {
+  font-size: 0.8125rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.mission-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.mission-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.mission-stat.success {
+  color: #10b981;
+}
+
+.mission-stat.pending {
+  color: #64748b;
+}
+
+.mission-outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.outcome-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.outcome-badge.replied {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.outcome-badge.meeting {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.outcome-badge.opportunity {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .mission-card-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .mission-card-stats {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}

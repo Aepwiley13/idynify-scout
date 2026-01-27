@@ -54,7 +54,7 @@ import ImpersonationBanner from './components/ImpersonationBanner';
 import MainLayout from './components/layout/MainLayout';
 
 // Hunter Pages
-import HunterDashboard from './pages/Hunter/HunterDashboard';
+import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
 import CreateCampaign from './pages/Hunter/CreateCampaign';
 import CampaignDetail from './pages/Hunter/CampaignDetail';
 
@@ -353,7 +353,7 @@ function App() {
           path="/hunter"
           element={
             <ProtectedRoute withLayout={true}>
-              <HunterDashboard />
+              <HunterWeaponRoom />
             </ProtectedRoute>
           }
         />

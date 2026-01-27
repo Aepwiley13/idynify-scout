@@ -1,0 +1,334 @@
+/* HUNTER WEAPON ROOM - Main Dashboard Styles */
+
+.hunter-weapon-room {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+/* Header */
+.hunter-header {
+  border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.hunter-header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hunter-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hunter-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+}
+
+.hunter-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: white;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.02em;
+}
+
+.hunter-subtitle {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 0;
+  font-weight: 500;
+}
+
+.hunter-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.gmail-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #10b981;
+}
+
+/* Tab Navigation */
+.hunter-tabs {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.hunter-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #94a3b8;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.hunter-tab:hover {
+  color: white;
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.hunter-tab.active {
+  color: white;
+  border-bottom-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.hunter-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c4b5fd;
+}
+
+.hunter-tab.active .hunter-tab-badge {
+  background: rgba(139, 92, 246, 0.5);
+  color: white;
+}
+
+/* Content Area */
+.hunter-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.section-description {
+  font-size: 0.9375rem;
+  color: #94a3b8;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Empty States */
+.hunter-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  background: rgba(30, 41, 59, 0.3);
+  border: 2px dashed rgba(71, 85, 105, 0.5);
+  border-radius: 16px;
+}
+
+.hunter-empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.hunter-empty-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.75rem 0;
+}
+
+.hunter-empty-text {
+  font-size: 0.9375rem;
+  color: #94a3b8;
+  margin: 0 0 2rem 0;
+  max-width: 400px;
+}
+
+/* Action Buttons */
+.btn-primary-hunter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.btn-primary-hunter:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+}
+
+.btn-primary-hunter:active {
+  transform: translateY(0);
+}
+
+.btn-primary-hunter:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Loading States */
+.hunter-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: #8b5cf6;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.hunter-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(139, 92, 246, 0.2);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .hunter-header-content {
+    padding: 1rem 1.5rem;
+  }
+
+  .hunter-tabs {
+    padding: 0 1.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hunter-content {
+    padding: 1.5rem;
+  }
+
+  .hunter-tab {
+    padding: 0.875rem 1.25rem;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .hunter-title {
+    font-size: 1.5rem;
+  }
+
+  .hunter-subtitle {
+    font-size: 0.8125rem;
+  }
+
+  .hunter-header-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+}
+
+/* Gmail Connection Notice */
+.gmail-notice {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+}
+
+.gmail-notice-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.gmail-notice-content > svg {
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.gmail-notice-content > div {
+  flex: 1;
+}
+
+.gmail-notice-content h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 0.375rem 0;
+}
+
+.gmail-notice-content p {
+  font-size: 0.875rem;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+.gmail-notice-content .btn-primary-hunter {
+  flex-shrink: 0;
+}

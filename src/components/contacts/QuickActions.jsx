@@ -3,7 +3,7 @@ import { Send, Smartphone, Sparkles } from 'lucide-react';
 import { downloadVCard } from '../../utils/vcard';
 import './QuickActions.css';
 
-export default function QuickActions({ contact, onEnrich }) {
+export default function QuickActions({ contact, onEnrich, onHunter }) {
   const navigate = useNavigate();
 
   // Check if contact needs enrichment
@@ -20,7 +20,14 @@ export default function QuickActions({ contact, onEnrich }) {
     <div className="quick-actions-bar">
       <button
         className="action-button action-button-primary"
-        onClick={() => navigate(`/hunter/campaign/new?contactIds=${contact.id}`)}
+        onClick={() => {
+          if (onHunter) {
+            onHunter();
+          } else {
+            // Fallback: navigate to create mission
+            navigate(`/hunter/create-mission?contactId=${contact.id}`);
+          }
+        }}
         title="Start Campaign"
       >
         <Send className="w-5 h-5" />

@@ -1,0 +1,477 @@
+.create-mission {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.create-mission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+}
+
+.btn-back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #a855f7;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: #a855f7;
+}
+
+.create-mission-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progress-dot {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(168, 85, 247, 0.3);
+  color: #666;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.progress-dot.active {
+  background: #a855f7;
+  border-color: #a855f7;
+  color: white;
+}
+
+.progress-connector {
+  width: 2rem;
+  height: 2px;
+  background: rgba(168, 85, 247, 0.2);
+  transition: all 0.3s;
+}
+
+.progress-connector.active {
+  background: #a855f7;
+}
+
+/* Mission Step */
+.mission-step {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.step-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.step-header svg {
+  margin: 0 auto 1rem;
+}
+
+.step-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.step-description {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Goals Grid */
+.goals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.goal-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 12px;
+  padding: 2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.goal-card:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: #a855f7;
+  transform: translateY(-4px);
+}
+
+.goal-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.goal-name {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.goal-description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.goal-steps-preview {
+  font-size: 0.85rem;
+  color: #a855f7;
+  font-weight: 500;
+}
+
+/* Orchestration Timeline */
+.orchestration-timeline {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(168, 85, 247, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.timeline-step {
+  display: flex;
+  gap: 1.5rem;
+  position: relative;
+  padding-bottom: 2rem;
+  transition: opacity 0.2s;
+}
+
+.timeline-step.disabled {
+  opacity: 0.4;
+}
+
+.timeline-step:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.timeline-dot {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #a855f7;
+  border: 3px solid rgba(168, 85, 247, 0.3);
+  z-index: 1;
+}
+
+.timeline-line {
+  width: 2px;
+  flex: 1;
+  background: rgba(168, 85, 247, 0.2);
+  margin-top: 0.5rem;
+}
+
+.timeline-content {
+  flex: 1;
+  padding: 0.5rem 0;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.timeline-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.timeline-timing {
+  font-size: 0.85rem;
+  color: #a855f7;
+  font-weight: 600;
+  background: rgba(168, 85, 247, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+}
+
+.timeline-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.timeline-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+}
+
+.timeline-description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.75rem;
+}
+
+.timeline-meta {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.weapon-badge,
+.type-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.weapon-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.type-badge {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+/* Contacts List */
+.contacts-list {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(168, 85, 247, 0.1);
+  border-radius: 12px;
+  max-height: 500px;
+  overflow-y: auto;
+  margin-bottom: 2rem;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.contact-item:last-child {
+  border-bottom: none;
+}
+
+.contact-item:hover {
+  background: rgba(168, 85, 247, 0.05);
+}
+
+.contact-item.selected {
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.contact-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+  accent-color: #a855f7;
+}
+
+.contact-info {
+  flex: 1;
+}
+
+.contact-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.contact-meta {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Mission Summary */
+.mission-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 12px;
+  padding: 2rem;
+}
+
+.summary-card h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 1.5rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+}
+
+.summary-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.summary-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.mission-name-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mission-name-input label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+}
+
+.form-input {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
+}
+
+/* Step Actions */
+.step-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #a855f7;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: #a855f7;
+}
+
+.btn-primary-hunter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #a855f7;
+  border: none;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-primary-hunter:hover {
+  background: #9333ea;
+  transform: translateY(-1px);
+}
+
+.btn-primary-hunter:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.empty-state svg {
+  margin: 0 auto 1rem;
+}
+
+.empty-state p {
+  margin-bottom: 1.5rem;
+}

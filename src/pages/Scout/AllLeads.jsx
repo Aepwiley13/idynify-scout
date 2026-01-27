@@ -6,9 +6,10 @@ import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Smartphone, MoreVertical,
   Archive, Sparkles, Send, CheckCircle, Zap,
-  RefreshCcw, RotateCcw
+  RefreshCcw, RotateCcw, Target
 } from 'lucide-react';
 import ContactSnapshot from '../../components/contacts/ContactSnapshot';
+import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import { downloadVCard } from '../../utils/vcard';
 import './AllLeads.css';
 
@@ -97,6 +98,7 @@ export default function AllLeads() {
 
   // Selection & interaction
   const [selectedContact, setSelectedContact] = useState(null);
+  const [hunterContact, setHunterContact] = useState(null);
   const [autoEnrichMode, setAutoEnrichMode] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [menuOpenFor, setMenuOpenFor] = useState(null);
@@ -798,26 +800,26 @@ export default function AllLeads() {
 
               {/* ── Actions ────────────────────────── */}
               <div className="lead-card-actions">
-                {hasEmail ? (
-                  /* Primary: Engage (only if they have email) */
+                {/* Primary: Hunter button */}
+                <button
+                  className="action-btn action-hunter"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setHunterContact(contact);
+                  }}
+                >
+                  <Target className="w-4 h-4" />
+                  <span>Hunter</span>
+                </button>
+
+                {!hasEmail && (
+                  /* Enrich button if no email */
                   <button
-                    className="action-btn action-engage"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStartMission([contact.id]);
-                    }}
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Engage</span>
-                  </button>
-                ) : (
-                  /* Primary: Enrich (if no email, can't engage) */
-                  <button
-                    className="action-btn action-enrich-primary"
+                    className="action-btn action-enrich-secondary"
                     onClick={(e) => handleEnrichFromCard(contact, e)}
                   >
                     <Sparkles className="w-4 h-4" />
-                    <span>Enrich to Engage</span>
+                    <span>Enrich</span>
                   </button>
                 )}
 
@@ -884,6 +886,16 @@ export default function AllLeads() {
           onUpdate={handleContactUpdate}
           context="leads"
           autoEnrich={autoEnrichMode}
+        />
+      )}
+
+      {/* ── Hunter Contact Drawer ──────────────────── */}
+      {hunterContact && (
+        <HunterContactDrawer
+          contact={hunterContact}
+          isOpen={!!hunterContact}
+          onClose={() => setHunterContact(null)}
+          onContactUpdate={handleContactUpdate}
         />
       )}
     </div>

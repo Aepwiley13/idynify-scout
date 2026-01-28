@@ -793,7 +793,7 @@ export default function AllLeads() {
 
               {/* ── Actions ────────────────────────── */}
               <div className="lead-card-actions">
-                {/* Primary: Hunter button */}
+                {/* Primary: Engage button */}
                 <button
                   className="action-btn action-hunter"
                   onClick={(e) => {
@@ -802,7 +802,7 @@ export default function AllLeads() {
                   }}
                 >
                   <Target className="w-5 h-5" />
-                  <span>Hunter</span>
+                  <span>Engage</span>
                 </button>
 
                 {!hasEmail && (

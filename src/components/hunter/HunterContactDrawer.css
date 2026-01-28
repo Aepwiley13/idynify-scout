@@ -110,7 +110,322 @@
   background: transparent !important;
 }
 
-/* Contact Info Status */
+/* Barry's Question Section */
+.barry-question-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.barry-avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.barry-avatar svg {
+  color: white;
+}
+
+.barry-question {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  padding-top: 0.5rem;
+  line-height: 1.4;
+}
+
+/* Quick Actions Grid */
+.quick-actions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.quick-action-btn svg {
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+.quick-action-btn .action-arrow {
+  margin-left: auto;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: #a855f7;
+  transform: translateX(4px);
+}
+
+.quick-action-btn:hover .action-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Contact Info (Subtle) */
+.contact-info-subtle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
+.info-row-subtle {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.info-row-subtle svg {
+  color: rgba(168, 85, 247, 0.5);
+  flex-shrink: 0;
+}
+
+.btn-add-subtle {
+  margin-left: auto;
+  padding: 0.25rem 0.625rem;
+  background: transparent;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  color: #a855f7;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add-subtle:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: #a855f7;
+}
+
+/* Active Missions (Subtle) */
+.active-missions-subtle {
+  padding: 0.5rem 1rem;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 6px;
+}
+
+.missions-label {
+  font-size: 0.8rem;
+  color: #10b981;
+  font-weight: 500;
+}
+
+/* Add to Mission Button (Subtle) */
+.btn-add-mission-subtle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: 1px dashed rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  color: rgba(168, 85, 247, 0.8);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-add-mission-subtle:hover {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: #a855f7;
+  color: #a855f7;
+}
+
+/* Intent Options */
+.intent-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.intent-option-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.intent-option-btn:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: #a855f7;
+  transform: translateX(4px);
+}
+
+.intent-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+}
+
+.intent-description {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Skip Button */
+.btn-skip {
+  align-self: center;
+  padding: 0.625rem 1.25rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-skip:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Custom Goal Input */
+.custom-goal-input {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.custom-goal-input:focus {
+  outline: none;
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.custom-goal-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Message Options List */
+.message-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.message-option-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1.125rem 1.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.message-option-card:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: #a855f7;
+  transform: translateX(4px);
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.option-strategy-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a855f7;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.option-header svg {
+  color: rgba(168, 85, 247, 0.6);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.2s ease;
+}
+
+.message-option-card:hover .option-header svg {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.option-preview {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.loading-state svg {
+  color: #a855f7;
+}
+
+.loading-state p {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+/* Legacy Contact Info Status (keep for backwards compatibility) */
 .contact-info-status {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(168, 85, 247, 0.2);

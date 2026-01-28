@@ -1283,6 +1283,142 @@
   transform: translateY(-1px);
 }
 
+/* === NEW: Honest Communication UX Styles === */
+
+/* Weapon Badges - indicate execution method */
+.weapon-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.weapon-badge-alt {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Handoff Notice - warn user about native app handoff */
+.handoff-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.handoff-notice svg {
+  color: #fbbf24;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.handoff-notice span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
+}
+
+/* Gmail Connected Notice */
+.gmail-connected-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.gmail-connected-notice svg {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.gmail-connected-notice span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Success Icon Variants */
+.success-icon-sent {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.success-icon-sent svg {
+  color: #10b981;
+}
+
+.success-icon-opened {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.success-icon-opened svg {
+  color: #3b82f6;
+}
+
+.success-icon-failed {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.success-icon-failed svg {
+  color: #ef4444;
+}
+
+.success-icon-unavailable {
+  background: rgba(156, 163, 175, 0.2);
+}
+
+.success-icon-unavailable svg {
+  color: #9ca3af;
+}
+
+/* Success Detail Text */
+.success-detail {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Fallback Reason Notice */
+.fallback-reason {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: rgba(251, 191, 36, 0.9);
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 6px;
+}
+
+.fallback-reason svg {
+  flex-shrink: 0;
+}
+
+/* Error States */
+.error-title {
+  color: #ef4444;
+}
+
+.error-description {
+  color: rgba(239, 68, 68, 0.9);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .hunter-contact-drawer {
@@ -1305,5 +1441,10 @@
 
   .success-view {
     padding: 1.5rem 0.75rem;
+  }
+
+  .handoff-notice,
+  .gmail-connected-notice {
+    font-size: 0.8rem;
   }
 }

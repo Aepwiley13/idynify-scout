@@ -16,6 +16,7 @@ import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
+import EnrichmentPanel from '../../components/contacts/EnrichmentPanel';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import ContactHunterActivity from '../../components/hunter/ContactHunterActivity';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
@@ -36,6 +37,7 @@ export default function ContactProfile() {
   const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
   const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
   const [staleDismissed, setStaleDismissed] = useState(false);
+  const [enrichResult, setEnrichResult] = useState(null);
 
   useEffect(() => {
     loadContactProfile();
@@ -182,32 +184,37 @@ export default function ContactProfile() {
       setEnriching(true);
       setEnrichError(null);
       setEnrichSuccess(false);
+      setEnrichResult(null);
 
       const user = auth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
-      // Check if contact has Apollo person ID
-      if (!contact.apollo_person_id) {
-        setEnrichError('This contact cannot be automatically enriched. Use Find Contact to update manually.');
+      // Barry enrichment works with any contact (LinkedIn URL, Apollo ID, or name+company)
+      if (!contact.apollo_person_id && !contact.linkedin_url && !contact.name) {
+        setEnrichError('This contact needs at least a name, LinkedIn URL, or Apollo ID to enrich.');
         setEnriching(false);
         return;
       }
 
-      console.log('🔄 Enriching contact:', contact.name);
+      console.log('🐻 Barry Enrichment starting for:', contact.name);
 
-      // Get auth token
       const authToken = await user.getIdToken();
 
-      // Call enrichContact Netlify function
-      const response = await fetch('/.netlify/functions/enrichContact', {
+      // Call barryEnrich - the orchestrated multi-source enrichment
+      const response = await fetch('/.netlify/functions/barryEnrich', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid,
           authToken: authToken,
-          contactId: contact.apollo_person_id
+          contact: {
+            ...contact,
+            apollo_person_id: contact.apollo_person_id || null,
+            linkedin_url: contact.linkedin_url || null,
+            name: contact.name || null,
+            company_name: contact.company_name || null,
+            title: contact.title || null
+          }
         })
       });
 
@@ -221,9 +228,12 @@ export default function ContactProfile() {
         throw new Error(result.error || 'Enrichment failed');
       }
 
-      console.log('✅ Contact enriched successfully');
+      console.log('✅ Barry Enrichment complete');
 
-      // Update contact in Firestore
+      // Store enrichment result for the UI panel
+      setEnrichResult(result);
+
+      // Update contact in Firestore with enriched data
       const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
       await updateDoc(contactRef, {
         ...result.enrichedData,
@@ -234,18 +244,16 @@ export default function ContactProfile() {
       const updatedContact = { ...contact, ...result.enrichedData };
       setContact(updatedContact);
 
-      // Regenerate Barry context after enrichment
+      // Regenerate Barry context after enrichment (more data = better context)
       console.log('🐻 Regenerating Barry context after enrichment...');
       generateBarryContext(updatedContact, user);
 
-      // Show success message
       setEnrichSuccess(true);
       setTimeout(() => setEnrichSuccess(false), 5000);
-
       setEnriching(false);
 
     } catch (err) {
-      console.error('Error enriching contact:', err);
+      console.error('Error in Barry Enrichment:', err);
       setEnrichError(err.message || 'Failed to enrich contact. Please try again.');
       setEnriching(false);
     }
@@ -368,7 +376,15 @@ export default function ContactProfile() {
         {/* 1. IDENTITY CARD - TOP */}
         <IdentityCard contact={contact} />
 
-        {/* 2. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
+        {/* 2. ENRICHMENT PANEL - USER-INITIATED BARRY ENRICHMENT */}
+        <EnrichmentPanel
+          contact={contact}
+          onEnrich={handleEnrichContact}
+          enriching={enriching}
+          enrichResult={enrichResult}
+        />
+
+        {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (
           <MeetSection barryContext={barryContext} contact={contact} />
         ) : generatingContext ? (
@@ -378,10 +394,10 @@ export default function ContactProfile() {
           </div>
         ) : null}
 
-        {/* 3. ACTIONS - BELOW BARRY */}
+        {/* 4. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 4. NOTES SECTION (PHASE 2) */}
+        {/* 5. NOTES SECTION (PHASE 2) */}
         <div className="contact-notes-section">
           <div className="notes-header">
             <h3>Notes</h3>
@@ -402,10 +418,10 @@ export default function ContactProfile() {
           />
         </div>
 
-        {/* 5. HUNTER ACTIVITY - Shows missions and engagement */}
+        {/* 6. HUNTER ACTIVITY - Shows missions and engagement */}
         <ContactHunterActivity contactId={contact.id} />
 
-        {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
+        {/* 7. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
 

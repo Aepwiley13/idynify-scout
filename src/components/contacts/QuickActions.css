@@ -75,6 +75,20 @@
   box-shadow: 0 4px 8px rgba(245, 158, 11, 0.2);
 }
 
+/* Re-enrich Action (subtle - already enriched) */
+.action-button-enrich-subtle {
+  background: transparent;
+  border: 2px solid #e5e7eb;
+  color: #6b7280;
+}
+
+.action-button-enrich-subtle:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #4b5563;
+  transform: translateY(-1px);
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .quick-actions-bar {

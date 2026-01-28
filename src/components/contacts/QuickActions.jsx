@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Send, Smartphone, Sparkles } from 'lucide-react';
+import { Send, Smartphone, Sparkles, Brain } from 'lucide-react';
 import { downloadVCard } from '../../utils/vcard';
 import './QuickActions.css';
 
@@ -16,6 +16,9 @@ export default function QuickActions({ contact, onEnrich, onHunter }) {
     return !hasWorkEmail || !hasPhone || !hasLinkedIn || !hasCompany;
   }
 
+  const needsEnrichment = isContactNotEnriched();
+  const hasBeenEnriched = !!contact.last_enriched_at;
+
   return (
     <div className="quick-actions-bar">
       <button
@@ -24,7 +27,6 @@ export default function QuickActions({ contact, onEnrich, onHunter }) {
           if (onHunter) {
             onHunter();
           } else {
-            // Fallback: navigate to create mission
             navigate(`/hunter/create-mission?contactId=${contact.id}`);
           }
         }}
@@ -41,14 +43,14 @@ export default function QuickActions({ contact, onEnrich, onHunter }) {
         <Smartphone className="w-5 h-5" />
         <span>Save to Phone</span>
       </button>
-      {isContactNotEnriched() && onEnrich && (
+      {onEnrich && (
         <button
-          className="action-button action-button-enrich"
+          className={`action-button ${needsEnrichment ? 'action-button-enrich' : 'action-button-enrich-subtle'}`}
           onClick={onEnrich}
-          title="Enrich Contact"
+          title={needsEnrichment ? 'Enrich with Barry' : 'Re-enrich with Barry'}
         >
-          <Sparkles className="w-5 h-5" />
-          <span>Enrich</span>
+          <Brain className="w-5 h-5" />
+          <span>{needsEnrichment ? 'Enrich' : 'Re-enrich'}</span>
         </button>
       )}
     </div>

@@ -206,6 +206,44 @@ export const getPath = {
  */
 
 // ============================================================================
+// CONTACT ENRICHMENT PROVENANCE - Schema Documentation (Barry Enrichment)
+// ============================================================================
+
+/**
+ * Contact Enrichment Provenance Fields
+ * Stored in users/{userId}/contacts/{contactId} document
+ *
+ * Added by barryEnrich function when user triggers enrichment.
+ *
+ * Fields:
+ * {
+ *   enrichment_provenance: {         // Maps field name -> source
+ *     email: 'apollo_match',
+ *     linkedin_url: 'apollo_match',
+ *     seniority: 'apollo_search',
+ *     // ... each enriched field maps to its data source
+ *   },
+ *   enrichment_steps: [              // Ordered list of enrichment steps
+ *     {
+ *       source: 'apollo_match' | 'apollo_search' | 'barry_ai',
+ *       status: 'success' | 'error' | 'no_data' | 'no_match' | 'no_results',
+ *       fieldsFound: string[],       // e.g., ['email', 'phone', 'location']
+ *       timestamp: string,           // ISO timestamp
+ *       message: string | null       // Error or status message
+ *     }
+ *   ],
+ *   enrichment_analysis: {           // Barry AI's analysis of enrichment results
+ *     summary: string,               // One sentence overview
+ *     found: string[],               // Human-readable descriptions of findings
+ *     notFound: string[],            // Human-readable descriptions of missing data
+ *     confidence: 'high' | 'medium' | 'low',
+ *     confidenceReason: string,      // Explanation of confidence level
+ *     suggestion: string | null      // Next step if data still missing
+ *   }
+ * }
+ */
+
+// ============================================================================
 // SECTION 2: PRODUCT/SERVICE DEEP DIVE - Schema Documentation
 // ============================================================================
 

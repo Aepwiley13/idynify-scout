@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Brain } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
+import ReconFeedbackToast from '../../components/recon/ReconFeedbackToast';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../../utils/dashboardUtils';
 import Section1Foundation from '../../components/recon/Section1Foundation';
 import Section2ProductDeepDive from '../../components/recon/Section2ProductDeepDive';
@@ -48,6 +49,8 @@ export default function ReconSectionEditor() {
   const [section, setSection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({});
+  const [showToast, setShowToast] = useState(false);
+  const [toastVariant, setToastVariant] = useState('save');
 
   const sectionNum = parseInt(sectionId);
   const parentModule = SECTION_TO_MODULE[sectionNum];
@@ -102,6 +105,10 @@ export default function ReconSectionEditor() {
       if (data) {
         setFormData(data);
       }
+
+      // Show feedback toast
+      setToastVariant('save');
+      setShowToast(true);
     } catch (error) {
       console.error('Error saving:', error);
       throw error;
@@ -116,9 +123,14 @@ export default function ReconSectionEditor() {
       const dataToSave = data || formData;
       const result = await completeSection(user.uid, 'recon', sectionNum, dataToSave);
 
-      alert('Section completed!');
-      // Navigate back to parent module
-      navigate(`/recon/${parentModule || ''}`);
+      // Show completion toast then navigate
+      setToastVariant('complete');
+      setShowToast(true);
+
+      // Delay navigation to allow toast to be seen
+      setTimeout(() => {
+        navigate(`/recon/${parentModule || ''}`);
+      }, 2000);
     } catch (error) {
       console.error('Error completing section:', error);
       alert(`Failed to complete section: ${error.message}`);
@@ -190,6 +202,14 @@ export default function ReconSectionEditor() {
         initialData={formData}
         onSave={handleSave}
         onComplete={handleComplete}
+      />
+
+      {/* Feedback Toast */}
+      <ReconFeedbackToast
+        sectionId={sectionNum}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+        variant={toastVariant}
       />
     </div>
   );

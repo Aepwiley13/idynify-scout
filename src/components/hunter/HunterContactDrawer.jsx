@@ -4,8 +4,17 @@ import { collection, getDocs, addDoc, updateDoc, doc, arrayUnion } from 'firebas
 import { db, auth } from '../../firebase/config';
 import {
   X, Target, Plus, Mail, MessageSquare, Phone, Check,
-  ArrowLeft, ArrowRight, Sparkles, Linkedin, Send, Loader, RefreshCw
+  ArrowLeft, ArrowRight, Sparkles, Linkedin, Send, Loader, RefreshCw,
+  ExternalLink, Calendar, AlertCircle
 } from 'lucide-react';
+import {
+  executeSendAction,
+  resolveSendMethod,
+  checkGmailConnection,
+  CHANNELS,
+  SEND_RESULT,
+  getActionLabels
+} from '../../utils/sendActionResolver';
 import './HunterContactDrawer.css';
 
 /**
@@ -57,6 +66,13 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // Edit info state
   const [editedContact, setEditedContact] = useState(contact);
 
+  // Gmail connection status
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailChecking, setGmailChecking] = useState(false);
+
+  // Send result tracking (for honest UX)
+  const [sendResult, setSendResult] = useState(null); // { result, message, method }
+
   useEffect(() => {
     if (isOpen) {
       loadData();
@@ -76,6 +92,24 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     setSubject('');
     setMessageOptions([]);
     setGenerationError(null);
+    setSendResult(null);
+  }
+
+  // Check Gmail connection status
+  async function checkGmailStatus() {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      setGmailChecking(true);
+      const status = await checkGmailConnection(user.uid);
+      setGmailConnected(status.connected);
+    } catch (error) {
+      console.error('Error checking Gmail status:', error);
+      setGmailConnected(false);
+    } finally {
+      setGmailChecking(false);
+    }
   }
 
   async function loadData() {
@@ -98,6 +132,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       setContactMissions(inMissions);
 
       setEditedContact(contact);
+
+      // Check Gmail connection status
+      checkGmailStatus();
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -232,36 +269,92 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     setActiveView('review');
   }
 
-  // === SEND MESSAGE ===
+  // === SEND MESSAGE (REAL EXECUTION) ===
 
   async function handleSendMessage() {
     setLoading(true);
+    setSendResult(null);
+
     try {
       const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
 
-      // Save to activity log
+      // Map weapon to channel
+      const channelMap = {
+        email: CHANNELS.EMAIL,
+        text: CHANNELS.TEXT,
+        call: CHANNELS.CALL,
+        linkedin: CHANNELS.LINKEDIN,
+        calendar: CHANNELS.CALENDAR
+      };
+
+      const channel = channelMap[selectedWeapon];
+      if (!channel) throw new Error('Invalid weapon selected');
+
+      // Execute the send action (real send or native handoff)
+      const result = await executeSendAction({
+        channel,
+        userId: user.uid,
+        contact,
+        subject,
+        body: message,
+        userIntent,
+        engagementIntent,
+        strategy: selectedStrategy
+      });
+
+      // Store result for success view
+      setSendResult(result);
+
+      // Update engagement intent on contact
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
-        activity_log: arrayUnion({
-          type: `${selectedWeapon}_sent`,
-          timestamp: new Date().toISOString(),
-          message: message,
-          subject: subject || null,
-          weapon: selectedWeapon,
-          userIntent: userIntent,
-          engagementIntent: engagementIntent,
-          strategy: selectedStrategy
-        }),
-        last_contacted: new Date().toISOString(),
         engagementIntent: engagementIntent
       });
 
+      // Show success/result view
       setActiveView('success');
+
     } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+      console.error('Error executing send action:', error);
+      setSendResult({
+        result: SEND_RESULT.FAILED,
+        error: error.message
+      });
+      setActiveView('success'); // Show result (even if failed)
     } finally {
       setLoading(false);
     }
+  }
+
+  // Get button label based on weapon and integration status
+  function getSendButtonLabel() {
+    if (!selectedWeapon) return 'Send';
+
+    const user = auth.currentUser;
+    if (!user) return 'Send';
+
+    // Determine if this will be a real send or native handoff
+    if (selectedWeapon === 'email' && gmailConnected) {
+      return 'Send Email';
+    } else if (selectedWeapon === 'email') {
+      return 'Open Email Draft';
+    } else if (selectedWeapon === 'text') {
+      return 'Open Text Message';
+    } else if (selectedWeapon === 'call') {
+      return 'Call Contact';
+    } else if (selectedWeapon === 'linkedin') {
+      return 'Open LinkedIn';
+    } else if (selectedWeapon === 'calendar') {
+      return 'Create Event';
+    }
+
+    return 'Send';
+  }
+
+  // Check if action will be native handoff
+  function isNativeHandoff() {
+    if (selectedWeapon === 'email' && gmailConnected) return false;
+    return true; // All other actions are native handoffs for now
   }
 
   // === ADD TO MISSION ===
@@ -581,6 +674,8 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   <Mail className="w-6 h-6" />
                   <span>Email</span>
                   {!hasEmail && <span className="weapon-disabled">No email</span>}
+                  {hasEmail && gmailConnected && <span className="weapon-badge">Gmail</span>}
+                  {hasEmail && !gmailConnected && <span className="weapon-badge-alt">Opens App</span>}
                 </button>
                 <button
                   className="weapon-btn"
@@ -590,15 +685,17 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   <MessageSquare className="w-6 h-6" />
                   <span>Text</span>
                   {!hasPhone && <span className="weapon-disabled">No phone</span>}
+                  {hasPhone && <span className="weapon-badge-alt">Opens App</span>}
                 </button>
                 <button
                   className="weapon-btn"
                   onClick={() => handleSelectWeapon('linkedin')}
-                  disabled
+                  disabled={!contact.linkedin_url}
                 >
                   <Linkedin className="w-6 h-6" />
                   <span>LinkedIn</span>
-                  <span className="weapon-disabled">Coming soon</span>
+                  {!contact.linkedin_url && <span className="weapon-disabled">No profile</span>}
+                  {contact.linkedin_url && <span className="weapon-badge-alt">Opens LinkedIn</span>}
                 </button>
                 <button
                   className="weapon-btn"
@@ -608,6 +705,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   <Phone className="w-6 h-6" />
                   <span>Call</span>
                   {!hasPhone && <span className="weapon-disabled">No phone</span>}
+                  {hasPhone && <span className="weapon-badge-alt">Opens Dialer</span>}
                 </button>
               </div>
             </div>
@@ -621,10 +719,31 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 Back
               </button>
 
-              <h3 className="view-title">Review & Send</h3>
+              <h3 className="view-title">Review & {isNativeHandoff() ? 'Open' : 'Send'}</h3>
               <p className="view-description">
-                Sending via {selectedWeapon} to {contact.firstName} {contact.lastName}
+                {isNativeHandoff() ? 'Opening' : 'Sending'} via {selectedWeapon} to {contact.firstName} {contact.lastName}
               </p>
+
+              {/* Show native handoff notice */}
+              {isNativeHandoff() && (
+                <div className="handoff-notice">
+                  <ExternalLink className="w-4 h-4" />
+                  <span>
+                    {selectedWeapon === 'email' && !gmailConnected && 'This will open your email app. Connect Gmail for direct sending.'}
+                    {selectedWeapon === 'text' && 'This will open your SMS app to send manually.'}
+                    {selectedWeapon === 'call' && 'This will open your phone dialer.'}
+                    {selectedWeapon === 'linkedin' && 'This will open LinkedIn. Message copied to clipboard.'}
+                  </span>
+                </div>
+              )}
+
+              {/* Gmail connected indicator */}
+              {selectedWeapon === 'email' && gmailConnected && (
+                <div className="gmail-connected-notice">
+                  <Check className="w-4 h-4" />
+                  <span>Gmail connected - email will be sent directly</span>
+                </div>
+              )}
 
               <div className="message-review">
                 {/* Show subject line for email */}
@@ -661,28 +780,94 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 {loading ? (
                   <>
                     <Loader className="w-5 h-5 animate-spin" />
-                    Sending...
+                    {isNativeHandoff() ? 'Opening...' : 'Sending...'}
                   </>
                 ) : (
                   <>
-                    <Send className="w-5 h-5" />
-                    Send Message
+                    {isNativeHandoff() ? <ExternalLink className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+                    {getSendButtonLabel()}
                   </>
                 )}
               </button>
             </div>
           )}
 
-          {/* === SUCCESS VIEW === */}
+          {/* === SUCCESS VIEW (HONEST RESULTS) === */}
           {activeView === 'success' && (
             <div className="drawer-view success-view">
-              <div className="success-icon">
-                <Check className="w-16 h-16" />
-              </div>
-              <h3 className="success-title">Message Sent!</h3>
-              <p className="success-description">
-                Your message to {contact.firstName} {contact.lastName} has been sent via {selectedWeapon}.
-              </p>
+              {/* REAL SEND SUCCESS */}
+              {sendResult?.result === SEND_RESULT.SENT && (
+                <>
+                  <div className="success-icon success-icon-sent">
+                    <Check className="w-16 h-16" />
+                  </div>
+                  <h3 className="success-title">Email Sent!</h3>
+                  <p className="success-description">
+                    Your email to {contact.firstName} {contact.lastName} has been sent via Gmail.
+                  </p>
+                  <p className="success-detail">
+                    Check your Gmail Sent folder to verify.
+                  </p>
+                </>
+              )}
+
+              {/* NATIVE APP OPENED */}
+              {sendResult?.result === SEND_RESULT.OPENED && (
+                <>
+                  <div className="success-icon success-icon-opened">
+                    <ExternalLink className="w-16 h-16" />
+                  </div>
+                  <h3 className="success-title">
+                    {selectedWeapon === 'email' && 'Email Draft Opened'}
+                    {selectedWeapon === 'text' && 'SMS App Opened'}
+                    {selectedWeapon === 'call' && 'Phone Dialer Opened'}
+                    {selectedWeapon === 'linkedin' && 'LinkedIn Opened'}
+                    {selectedWeapon === 'calendar' && 'Calendar Opened'}
+                  </h3>
+                  <p className="success-description">
+                    {sendResult.message}
+                  </p>
+                  <p className="success-detail">
+                    {selectedWeapon === 'email' && 'Complete the send in your email app.'}
+                    {selectedWeapon === 'text' && 'Complete the send in your SMS app.'}
+                    {selectedWeapon === 'call' && 'Complete the call on your phone.'}
+                    {selectedWeapon === 'linkedin' && 'Complete your message on LinkedIn.'}
+                    {selectedWeapon === 'calendar' && 'Save the event in your calendar.'}
+                  </p>
+                  {sendResult.fallbackReason && (
+                    <p className="fallback-reason">
+                      <AlertCircle className="w-4 h-4" />
+                      {sendResult.fallbackReason}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* FAILED */}
+              {sendResult?.result === SEND_RESULT.FAILED && (
+                <>
+                  <div className="success-icon success-icon-failed">
+                    <AlertCircle className="w-16 h-16" />
+                  </div>
+                  <h3 className="success-title error-title">Action Failed</h3>
+                  <p className="success-description error-description">
+                    {sendResult.error || 'Something went wrong. Please try again.'}
+                  </p>
+                </>
+              )}
+
+              {/* UNAVAILABLE */}
+              {sendResult?.result === SEND_RESULT.UNAVAILABLE && (
+                <>
+                  <div className="success-icon success-icon-unavailable">
+                    <AlertCircle className="w-16 h-16" />
+                  </div>
+                  <h3 className="success-title">Action Unavailable</h3>
+                  <p className="success-description">
+                    {sendResult.reason}
+                  </p>
+                </>
+              )}
 
               <div className="success-actions">
                 <button
@@ -692,9 +877,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                     setActiveView('main');
                   }}
                 >
-                  Send Another Message
+                  {sendResult?.result === SEND_RESULT.FAILED ? 'Try Again' : 'Send Another Message'}
                 </button>
-                {missions.length > 0 && (
+                {missions.length > 0 && sendResult?.result !== SEND_RESULT.FAILED && (
                   <button
                     className="btn-secondary"
                     onClick={() => setActiveView('add-mission')}

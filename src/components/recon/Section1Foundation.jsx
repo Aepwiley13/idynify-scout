@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import ReconTooltip from './ReconTooltip';
 import './ReconEnterprise.css';
 
 const SECTION_1_QUESTIONS = [
@@ -10,7 +11,8 @@ const SECTION_1_QUESTIONS = [
     question: "Company name",
     type: "text",
     required: true,
-    validation: { minLength: 2, maxLength: 500 }
+    validation: { minLength: 2, maxLength: 500 },
+    barryContext: "Identify your company in every context generation and conversation starter."
   },
   {
     id: "whatYouDo",
@@ -18,7 +20,8 @@ const SECTION_1_QUESTIONS = [
     helpText: "In plain English, what does your company do? (Imagine explaining to a friend)",
     type: "textarea",
     required: true,
-    validation: { minLength: 50, maxLength: 500 }
+    validation: { minLength: 50, maxLength: 500 },
+    barryContext: "Understand your business so context generation is relevant to your industry and offering — not generic."
   },
   {
     id: "industry",
@@ -36,7 +39,8 @@ const SECTION_1_QUESTIONS = [
       "Marketing / Advertising",
       "Real Estate",
       "Other"
-    ]
+    ],
+    barryContext: "Match prospects by industry relevance and tailor conversation starters to your sector."
   },
   {
     id: "stage",
@@ -49,14 +53,16 @@ const SECTION_1_QUESTIONS = [
       "Growth stage ($1M-$10M revenue)",
       "Established ($10M-$50M revenue)",
       "Enterprise ($50M+ revenue)"
-    ]
+    ],
+    barryContext: "Calibrate language and recommendations to your company's maturity level."
   },
   {
     id: "role",
     question: "Your role/title",
     type: "text",
     required: true,
-    validation: { minLength: 2, maxLength: 500 }
+    validation: { minLength: 2, maxLength: 500 },
+    barryContext: "Frame context from your perspective — what a VP Sales needs is different from what a founder needs."
   },
   {
     id: "mainProduct",
@@ -64,7 +70,8 @@ const SECTION_1_QUESTIONS = [
     helpText: "What is the ONE thing you sell that generates the most revenue?",
     type: "textarea",
     required: true,
-    validation: { minLength: 50, maxLength: 500 }
+    validation: { minLength: 50, maxLength: 500 },
+    barryContext: "Understand what you're selling so conversation starters subtly align with prospect needs, without being salesy."
   },
   {
     id: "problemSolved",
@@ -72,7 +79,8 @@ const SECTION_1_QUESTIONS = [
     helpText: "In your customers' words, what problem were they trying to solve when they found you?",
     type: "textarea",
     required: true,
-    validation: { minLength: 50, maxLength: 500 }
+    validation: { minLength: 50, maxLength: 500 },
+    barryContext: "Identify when a prospect's challenges overlap with the problems you solve — the core of relevance."
   },
   {
     id: "currentCustomers",
@@ -80,21 +88,24 @@ const SECTION_1_QUESTIONS = [
     helpText: "Describe your current customers. What do they have in common?",
     type: "textarea",
     required: true,
-    validation: { minLength: 100, maxLength: 500 }
+    validation: { minLength: 100, maxLength: 500 },
+    barryContext: "Assess whether new prospects look like your existing customer base — pattern matching for lead quality."
   },
   {
     id: "ninetyDayGoal",
     question: "What's your 90-day goal?",
     type: "textarea",
     required: false,
-    validation: { maxLength: 500 }
+    validation: { maxLength: 500 },
+    barryContext: "Prioritize context that's relevant to your current business objective, not just general intelligence."
   },
   {
     id: "biggestChallenge",
     question: "What's your biggest sales challenge right now?",
     type: "textarea",
     required: false,
-    validation: { maxLength: 500 }
+    validation: { maxLength: 500 },
+    barryContext: "Surface insights that directly address your current challenge when generating prospect context."
   }
 ];
 
@@ -320,6 +331,12 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
               <span className="recon-form-label">
                 {index + 1}. {question.question}
                 {question.required && <span className="recon-form-required">*</span>}
+                {question.barryContext && (
+                  <ReconTooltip
+                    text={question.helpText ? null : 'This field trains Barry\'s understanding of your business.'}
+                    barryUses={question.barryContext}
+                  />
+                )}
               </span>
               {question.helpText && (
                 <p className="recon-form-help">{question.helpText}</p>

@@ -7,7 +7,10 @@ import {
   AlertCircle,
   CheckCircle,
   Loader,
-  Target
+  Target,
+  AlertTriangle,
+  Brain,
+  ArrowRight
 } from 'lucide-react';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
@@ -15,6 +18,7 @@ import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import ContactHunterActivity from '../../components/hunter/ContactHunterActivity';
+import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -30,6 +34,8 @@ export default function ContactProfile() {
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
+  const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
+  const [staleDismissed, setStaleDismissed] = useState(false);
 
   useEffect(() => {
     loadContactProfile();
@@ -70,6 +76,9 @@ export default function ContactProfile() {
 
       // PHASE 2: Load contact notes
       setNotes(contactData.notes || '');
+
+      // Load RECON training status for stale intelligence warning
+      loadReconStatus(user.uid);
 
       setLoading(false);
     } catch (error) {
@@ -147,6 +156,24 @@ export default function ContactProfile() {
     } catch (error) {
       console.error('❌ Failed to save notes:', error);
       setSavingNotes(false);
+    }
+  }
+
+  async function loadReconStatus(userId) {
+    try {
+      const dashboardDoc = await getDoc(doc(db, 'dashboards', userId));
+      if (dashboardDoc.exists()) {
+        const data = dashboardDoc.data();
+        const recon = data.modules?.find(m => m.id === 'recon');
+        const sections = recon?.sections || [];
+        const completed = sections.filter(s => s.status === 'completed').length;
+        const total = sections.length || 10;
+        const progress = Math.round((completed / total) * 100);
+        setReconStatus({ progress, completed, total, loaded: true });
+      }
+    } catch (error) {
+      console.error('Error loading RECON status:', error);
+      setReconStatus({ progress: 0, loaded: true });
     }
   }
 
@@ -286,6 +313,7 @@ export default function ContactProfile() {
           <Target className="w-4 h-4" />
           <span>Engage with Hunter</span>
         </button>
+        <BarryKnowledgeButton variant="compact" />
       </div>
 
       {/* Success Banner */}
@@ -301,6 +329,37 @@ export default function ContactProfile() {
         <div className="enrich-error-banner">
           <AlertCircle className="w-5 h-5" />
           <span>{enrichError}</span>
+        </div>
+      )}
+
+      {/* Stale Intelligence Warning - Shows when RECON training is low */}
+      {reconStatus.loaded && reconStatus.progress < 40 && !staleDismissed && (
+        <div className="stale-intel-warning">
+          <div className="stale-intel-content">
+            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+            <div className="stale-intel-text">
+              <span className="stale-intel-title">Limited Intelligence</span>
+              <span className="stale-intel-desc">
+                Barry's training is only {reconStatus.progress}% complete. Context generation may be generic.
+              </span>
+            </div>
+          </div>
+          <div className="stale-intel-actions">
+            <button
+              className="stale-intel-train-btn"
+              onClick={() => navigate('/recon')}
+            >
+              <Brain className="w-4 h-4" />
+              <span>Train Barry</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+            <button
+              className="stale-intel-dismiss-btn"
+              onClick={() => setStaleDismissed(true)}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 

@@ -7,6 +7,7 @@ import WeaponsSection from './sections/WeaponsSection';
 import MissionsSection from './sections/MissionsSection';
 import ArsenalSection from './sections/ArsenalSection';
 import OutcomesSection from './sections/OutcomesSection';
+import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import './HunterWeaponRoom.css';
 
 /**
@@ -130,6 +131,7 @@ export default function HunterWeaponRoom() {
           </div>
 
           <div className="hunter-header-actions">
+            <BarryKnowledgeButton variant="compact" />
             {gmailConnected ? (
               <div className="gmail-status-badge">
                 <CheckCircle className="w-4 h-4" />

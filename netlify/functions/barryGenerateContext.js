@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { db } from './firebase-admin.js';
+import { compileReconForPrompt } from './utils/reconCompiler.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -56,6 +58,21 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified');
 
+    // ─── Fetch RECON training data ───
+    let reconContext = '';
+    try {
+      const dashboardDoc = await db.collection('dashboards').doc(userId).get();
+      if (dashboardDoc.exists) {
+        reconContext = compileReconForPrompt(dashboardDoc.data());
+        if (reconContext) {
+          console.log('🧠 RECON training data loaded and compiled');
+        }
+      }
+    } catch (reconError) {
+      // Non-fatal — Barry works without RECON, just less personalized
+      console.warn('⚠️ Could not load RECON data (non-fatal):', reconError.message);
+    }
+
     // Initialize Anthropic client
     const anthropic = new Anthropic({
       apiKey: claudeApiKey
@@ -83,11 +100,11 @@ export const handler = async (event) => {
       website: companyData.website || 'Not available'
     } : null;
 
-    // Build the prompt for Barry
+    // Build the prompt for Barry — now with RECON context
     const prompt = `You are Barry, a contextual intelligence guide helping a user prepare for a first conversation with another person.
 
 Your role is NOT sales enablement. Your role is human orientation through calm, grounded context.
-
+${reconContext}
 CONTACT INFORMATION:
 Name: ${contactSummary.name}
 Title: ${contactSummary.title}
@@ -108,11 +125,12 @@ Website: ${companyContext.website}
 
 YOUR TASK:
 Generate a contextual orientation layer to help the user feel calm, oriented, and confident before meeting this person.
+${reconContext ? '\nBecause the user has provided RECON training data, you should subtly incorporate awareness of their business context, ideal customer profile, and competitive landscape into your analysis. This means your conversation starters and role analysis should be more relevant to what the user actually does and sells. However, maintain the calm, grounded tone — do not turn this into a sales pitch.' : ''}
 
 CRITICAL GUARDRAILS (YOU MUST FOLLOW THESE):
 - NEVER assume pain, urgency, or buying intent
 - NEVER use sales language (pipeline, ROI, close, objection, etc.)
-- NEVER reference the user's product or offering
+- NEVER reference the user's product or offering directly in conversation starters
 - NEVER score, rank, or qualify this person
 - NEVER overclaim certainty
 - Use probabilistic language: "Often responsible for...", "Usually focused on...", "Commonly evaluated on..."
@@ -140,7 +158,9 @@ REQUIRED OUTPUT FORMAT (JSON):
     "Curiosity-based opening (genuine curiosity only)"
   ],
 
-  "calmReframe": "One grounding sentence to reduce pressure. Example tone: 'You don't need to impress here — curiosity is enough.'"
+  "calmReframe": "One grounding sentence to reduce pressure. Example tone: 'You don't need to impress here — curiosity is enough.'"${reconContext ? `,
+
+  "reconInsight": "One sentence noting how this contact relates to the user's business context (if RECON data is available). Example: 'This person operates in a segment you've identified as a target market.' If no relevant connection, say null."` : ''}
 }
 
 TONE REQUIREMENTS:
@@ -198,7 +218,8 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
       responseTime,
       metadata: {
         contactName: contact.name,
-        hasCompanyData: !!companyData
+        hasCompanyData: !!companyData,
+        hasReconData: !!reconContext
       }
     });
 
@@ -212,7 +233,8 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
         success: true,
         barryContext: {
           ...barryContext,
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          reconEnhanced: !!reconContext
         }
       })
     };

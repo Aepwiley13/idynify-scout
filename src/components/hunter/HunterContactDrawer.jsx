@@ -3,33 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
-  X, Target, Plus, Mail, MessageSquare, Phone, Edit2, Check,
-  ArrowLeft, ArrowRight, Sparkles, Linkedin, Calendar, Send, Loader,
-  UserPlus, CalendarCheck, RefreshCw, MessageCircle, PenTool
+  X, Target, Plus, Mail, MessageSquare, Phone, Check,
+  ArrowLeft, ArrowRight, Sparkles, Linkedin, Send, Loader, RefreshCw
 } from 'lucide-react';
 import './HunterContactDrawer.css';
 
 /**
- * HUNTER CONTACT DRAWER - Intent-Driven Engagement (v2)
+ * HUNTER CONTACT DRAWER - Intent-Driven Engagement (v3)
  *
- * Flow:
- * 1. Barry asks: "What do you want to do with [Name]?"
- * 2. User picks quick action (Introduce, Book meeting, Follow up, Re-engage, Custom)
- * 3. (Optional) Engagement Intent confirmation if needed
- * 4. Barry generates 3 message strategies
- * 5. User picks strategy → weapon → review → send
+ * CANONICAL HUNTER MODEL:
+ * 1. Barry asks: "What do you want to do with [FirstName]?"
+ * 2. User types their intent in FREE-FORM chat input (REQUIRED)
+ * 3. Barry takes over - pulls RECON data, barryContext, enrichment
+ * 4. Barry generates 3 REAL AI-powered message strategies
+ * 5. User REACTS - picks a strategy, refines if needed
+ * 6. User selects weapon (email/text/etc) and sends
  *
- * Philosophy: Barry leads, user reacts. Fewer questions > more intelligence.
+ * Philosophy: User leads with intent, Barry takes over with intelligence.
+ * NO fallback templates - AI only.
  */
-
-// Quick Actions - what user wants to accomplish
-const QUICK_ACTIONS = [
-  { id: 'introduce', label: 'Introduce myself', icon: UserPlus, inferredIntent: 'prospect' },
-  { id: 'meeting', label: 'Book a meeting', icon: CalendarCheck, inferredIntent: null },
-  { id: 'followup', label: 'Follow up', icon: MessageCircle, inferredIntent: 'warm' },
-  { id: 'reengage', label: 'Re-engage', icon: RefreshCw, inferredIntent: 'warm' },
-  { id: 'custom', label: 'Custom goal', icon: PenTool, inferredIntent: null }
-];
 
 // Engagement Intents - relationship context (not pipeline stages)
 const ENGAGEMENT_INTENTS = [
@@ -37,13 +29,6 @@ const ENGAGEMENT_INTENTS = [
   { id: 'warm', label: 'Warm / Existing', description: 'Someone I already know' },
   { id: 'customer', label: 'Customer', description: 'An existing customer' },
   { id: 'partner', label: 'Partner', description: 'A business partner or collaborator' }
-];
-
-// Message Strategy Labels
-const MESSAGE_STRATEGIES = [
-  { id: 'direct', label: 'Direct & Short', description: 'Gets to the point quickly' },
-  { id: 'warm', label: 'Warm & Personal', description: 'Builds connection first' },
-  { id: 'value', label: 'Value-Led', description: 'Leads with what you can offer' }
 ];
 
 export default function HunterContactDrawer({ contact, isOpen, onClose, onContactUpdate }) {
@@ -59,13 +44,15 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   const [loading, setLoading] = useState(false);
 
   // Engagement flow state
-  const [selectedAction, setSelectedAction] = useState(null);
+  const [userIntent, setUserIntent] = useState(''); // FREE-FORM user input (REQUIRED)
   const [engagementIntent, setEngagementIntent] = useState(contact?.engagementIntent || 'prospect');
   const [messageOptions, setMessageOptions] = useState([]);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
+  const [selectedMessage, setSelectedMessage] = useState(null); // Full message object with subject, body, reasoning
   const [selectedWeapon, setSelectedWeapon] = useState(null);
   const [message, setMessage] = useState('');
-  const [customGoal, setCustomGoal] = useState('');
+  const [subject, setSubject] = useState('');
+  const [generationError, setGenerationError] = useState(null);
 
   // Edit info state
   const [editedContact, setEditedContact] = useState(contact);
@@ -81,12 +68,14 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   }, [isOpen, contact]);
 
   function resetEngagementState() {
-    setSelectedAction(null);
+    setUserIntent('');
     setSelectedStrategy(null);
+    setSelectedMessage(null);
     setSelectedWeapon(null);
     setMessage('');
+    setSubject('');
     setMessageOptions([]);
-    setCustomGoal('');
+    setGenerationError(null);
   }
 
   async function loadData() {
@@ -114,29 +103,27 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     }
   }
 
-  // === QUICK ACTION SELECTION ===
+  // === USER INTENT SUBMISSION ===
 
-  function handleSelectAction(action) {
-    setSelectedAction(action);
+  function handleIntentSubmit() {
+    if (!userIntent.trim()) return;
 
-    // Infer intent if action implies it
-    if (action.inferredIntent) {
-      setEngagementIntent(action.inferredIntent);
-    }
-
-    // Decide next step
+    // Check if we need relationship context
     const hasExistingIntent = contact?.engagementIntent;
-    const needsIntentPrompt = !hasExistingIntent && !action.inferredIntent;
-
-    if (action.id === 'custom') {
-      // Custom goal needs more input
-      setActiveView('custom-goal');
-    } else if (needsIntentPrompt) {
-      // Need to ask about relationship
+    if (!hasExistingIntent) {
+      // Ask about relationship before generating
       setActiveView('intent');
     } else {
-      // Go straight to generating options
-      generateMessageOptions(action.id, action.inferredIntent || engagementIntent);
+      // Go straight to generating with existing intent
+      generateMessageOptions(userIntent, engagementIntent);
+    }
+  }
+
+  // Handle Enter key in intent input
+  function handleIntentKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleIntentSubmit();
     }
   }
 
@@ -147,12 +134,12 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     // Save intent to contact (lightweight, non-blocking)
     saveIntentToContact(intent.id);
     // Generate messages with selected intent
-    generateMessageOptions(selectedAction.id, intent.id);
+    generateMessageOptions(userIntent, intent.id);
   }
 
   function handleSkipIntent() {
     // Use default (prospect) and continue
-    generateMessageOptions(selectedAction.id, 'prospect');
+    generateMessageOptions(userIntent, 'prospect');
   }
 
   async function saveIntentToContact(intentId) {
@@ -170,30 +157,19 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     }
   }
 
-  // === CUSTOM GOAL ===
-
-  function handleCustomGoalSubmit() {
-    if (!customGoal.trim()) return;
-
-    const needsIntentPrompt = !contact?.engagementIntent;
-    if (needsIntentPrompt) {
-      setActiveView('intent');
-    } else {
-      generateMessageOptions('custom', engagementIntent);
-    }
-  }
-
   // === MESSAGE GENERATION ===
 
-  async function generateMessageOptions(actionId, intentId) {
+  async function generateMessageOptions(intentText, relationshipIntent) {
     setLoading(true);
+    setGenerationError(null);
     setActiveView('options');
 
     try {
       const user = auth.currentUser;
       const authToken = await user.getIdToken();
 
-      // Call AI to generate 3 message strategies
+      // Call Barry AI to generate 3 message strategies
+      // This pulls RECON data, barryContext, and enrichment from the backend
       const response = await fetch('/.netlify/functions/generate-engagement-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,81 +177,53 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           userId: user.uid,
           authToken,
           contactId: contact.id,
-          action: actionId,
-          intent: intentId,
-          customGoal: customGoal || null,
+          userIntent: intentText,           // FREE-FORM: What the user wants to do (PRIMARY DRIVER)
+          engagementIntent: relationshipIntent, // Relationship context: prospect, warm, customer, partner
           barryContext: contact.barryContext,
           contact: {
             firstName: contact.firstName,
             lastName: contact.lastName,
-            title: contact.title,
-            company: contact.company_name,
+            name: `${contact.firstName} ${contact.lastName}`.trim(),
+            title: contact.title || contact.current_position_title,
+            company_name: contact.company_name || contact.current_company_name,
+            company_industry: contact.company_industry || contact.industry,
+            seniority: contact.seniority,
             email: contact.email,
-            phone: contact.phone
+            phone: contact.phone || contact.phone_mobile,
+            linkedin_url: contact.linkedin_url
           }
         })
       });
 
-      if (!response.ok) throw new Error('Failed to generate messages');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate messages');
+      }
 
       const data = await response.json();
 
-      // Expect 3 message options with strategy labels
-      if (data.messages && data.messages.length > 0) {
+      // Expect 3 message options with strategy, label, subject, message, and reasoning
+      if (data.success && data.messages && data.messages.length >= 3) {
         setMessageOptions(data.messages);
       } else {
-        // Fallback: generate basic options
-        setMessageOptions(generateFallbackMessages(actionId, intentId));
+        throw new Error('Barry could not generate messages. Please try again.');
       }
     } catch (error) {
       console.error('Error generating messages:', error);
-      // Use fallback messages
-      setMessageOptions(generateFallbackMessages(actionId, intentId));
+      setGenerationError(error.message || 'Something went wrong. Please try again.');
+      // NO FALLBACK - AI only
     } finally {
       setLoading(false);
     }
-  }
-
-  function generateFallbackMessages(actionId, intentId) {
-    const firstName = contact.firstName || 'there';
-    const isWarm = intentId === 'warm' || intentId === 'customer' || intentId === 'partner';
-
-    const templates = {
-      introduce: [
-        { strategy: 'direct', message: `Hi ${firstName}, I wanted to reach out and introduce myself. Would love to connect.` },
-        { strategy: 'warm', message: `Hi ${firstName}, I've been meaning to reach out. Your work at ${contact.company_name || 'your company'} caught my attention, and I'd love to connect.` },
-        { strategy: 'value', message: `Hi ${firstName}, I help professionals like yourself with [your value prop]. Thought it might be worth a quick conversation.` }
-      ],
-      meeting: [
-        { strategy: 'direct', message: `Hi ${firstName}, do you have 15 minutes this week to connect?` },
-        { strategy: 'warm', message: `Hi ${firstName}, I'd love to catch up and hear what you're working on. Any time this week work for a quick call?` },
-        { strategy: 'value', message: `Hi ${firstName}, I have some ideas that might help with [their challenge]. Would you be open to a brief chat?` }
-      ],
-      followup: [
-        { strategy: 'direct', message: `Hi ${firstName}, just following up on my previous message. Let me know if you have any questions.` },
-        { strategy: 'warm', message: `Hi ${firstName}, wanted to circle back and see how things are going. Hope all is well!` },
-        { strategy: 'value', message: `Hi ${firstName}, I came across something that made me think of our conversation. Thought you might find it useful.` }
-      ],
-      reengage: [
-        { strategy: 'direct', message: `Hi ${firstName}, it's been a while! Wanted to reconnect and see if there's anything I can help with.` },
-        { strategy: 'warm', message: `Hi ${firstName}, I was thinking about you recently and wanted to reach out. How have you been?` },
-        { strategy: 'value', message: `Hi ${firstName}, a lot has changed since we last connected. I'd love to share some updates that might be relevant for you.` }
-      ],
-      custom: [
-        { strategy: 'direct', message: customGoal || `Hi ${firstName}, I wanted to reach out about something specific.` },
-        { strategy: 'warm', message: `Hi ${firstName}, ${customGoal || "I've been thinking about reaching out and finally decided to do it."}` },
-        { strategy: 'value', message: customGoal || `Hi ${firstName}, I have something that might be valuable for you.` }
-      ]
-    };
-
-    return templates[actionId] || templates.introduce;
   }
 
   // === STRATEGY & WEAPON SELECTION ===
 
   function handleSelectStrategy(option) {
     setSelectedStrategy(option.strategy);
+    setSelectedMessage(option);
     setMessage(option.message);
+    setSubject(option.subject || '');
     setActiveView('weapon');
   }
 
@@ -297,9 +245,10 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           type: `${selectedWeapon}_sent`,
           timestamp: new Date().toISOString(),
           message: message,
+          subject: subject || null,
           weapon: selectedWeapon,
-          action: selectedAction?.id,
-          intent: engagementIntent,
+          userIntent: userIntent,
+          engagementIntent: engagementIntent,
           strategy: selectedStrategy
         }),
         last_contacted: new Date().toISOString(),
@@ -406,10 +355,10 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
         {/* Content */}
         <div className="drawer-content">
 
-          {/* === MAIN VIEW: Barry's Question === */}
+          {/* === MAIN VIEW: Barry's Question + Chat Input === */}
           {activeView === 'main' && (
             <div className="drawer-main-view">
-              {/* Barry's Question - Single line, no extras */}
+              {/* Barry's Question - Single line */}
               <div className="barry-question-section">
                 <div className="barry-avatar">
                   <Sparkles className="w-5 h-5" />
@@ -417,19 +366,25 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 <p className="barry-question">What do you want to do with {firstName}?</p>
               </div>
 
-              {/* Quick Actions */}
-              <div className="quick-actions-grid">
-                {QUICK_ACTIONS.map(action => (
-                  <button
-                    key={action.id}
-                    className="quick-action-btn"
-                    onClick={() => handleSelectAction(action)}
-                  >
-                    <action.icon className="w-5 h-5" />
-                    <span>{action.label}</span>
-                    <ArrowRight className="w-4 h-4 action-arrow" />
-                  </button>
-                ))}
+              {/* FREE-FORM Chat Input - THIS IS THE PRIMARY INTERFACE */}
+              <div className="intent-input-section">
+                <textarea
+                  className="intent-input"
+                  value={userIntent}
+                  onChange={(e) => setUserIntent(e.target.value)}
+                  onKeyDown={handleIntentKeyDown}
+                  placeholder={`E.g., "I want to introduce myself and see if they need help with marketing automation" or "Follow up on our conversation at the conference last week"`}
+                  rows={3}
+                  autoFocus
+                />
+                <button
+                  className="btn-primary-hunter btn-submit-intent"
+                  onClick={handleIntentSubmit}
+                  disabled={!userIntent.trim()}
+                >
+                  <Send className="w-5 h-5" />
+                  Generate Messages
+                </button>
               </div>
 
               {/* Contact Info (Subtle) */}
@@ -474,40 +429,6 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
             </div>
           )}
 
-          {/* === CUSTOM GOAL INPUT === */}
-          {activeView === 'custom-goal' && (
-            <div className="drawer-view">
-              <button className="btn-back" onClick={() => setActiveView('main')}>
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </button>
-
-              <div className="barry-question-section">
-                <div className="barry-avatar">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <p className="barry-question">What would you like to accomplish?</p>
-              </div>
-
-              <textarea
-                className="custom-goal-input"
-                value={customGoal}
-                onChange={(e) => setCustomGoal(e.target.value)}
-                placeholder="E.g., Ask about their new product launch, reconnect after the conference..."
-                rows={3}
-              />
-
-              <button
-                className="btn-primary-hunter"
-                onClick={handleCustomGoalSubmit}
-                disabled={!customGoal.trim()}
-              >
-                <ArrowRight className="w-5 h-5" />
-                Continue
-              </button>
-            </div>
-          )}
-
           {/* === INTENT SELECTION (Lightweight, Skippable) === */}
           {activeView === 'intent' && (
             <div className="drawer-view">
@@ -542,10 +463,13 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
             </div>
           )}
 
-          {/* === MESSAGE OPTIONS (3 Strategies) === */}
+          {/* === MESSAGE OPTIONS (3 AI-Generated Strategies) === */}
           {activeView === 'options' && (
             <div className="drawer-view">
-              <button className="btn-back" onClick={() => setActiveView('main')}>
+              <button className="btn-back" onClick={() => {
+                setActiveView('main');
+                setGenerationError(null);
+              }}>
                 <ArrowLeft className="w-4 h-4" />
                 Back
               </button>
@@ -553,7 +477,20 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               {loading ? (
                 <div className="loading-state">
                   <Loader className="w-8 h-8 animate-spin" />
-                  <p>Barry is crafting your messages...</p>
+                  <p>Barry is analyzing and crafting your messages...</p>
+                  <span className="loading-hint">Using RECON data and contact intelligence</span>
+                </div>
+              ) : generationError ? (
+                <div className="error-state">
+                  <div className="error-icon">!</div>
+                  <p className="error-message">{generationError}</p>
+                  <button
+                    className="btn-primary-hunter"
+                    onClick={() => generateMessageOptions(userIntent, engagementIntent)}
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    Try Again
+                  </button>
                 </div>
               ) : (
                 <>
@@ -564,23 +501,32 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                     <p className="barry-question">Here are three approaches. Pick one.</p>
                   </div>
 
+                  {/* Show what user asked for */}
+                  <div className="user-intent-summary">
+                    <span className="intent-label-small">Your goal:</span>
+                    <span className="intent-text-small">{userIntent}</span>
+                  </div>
+
                   <div className="message-options-list">
-                    {messageOptions.map((option, index) => {
-                      const strategyInfo = MESSAGE_STRATEGIES.find(s => s.id === option.strategy) || MESSAGE_STRATEGIES[index];
-                      return (
-                        <button
-                          key={index}
-                          className="message-option-card"
-                          onClick={() => handleSelectStrategy(option)}
-                        >
-                          <div className="option-header">
-                            <span className="option-strategy-label">{strategyInfo?.label || option.strategy}</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </div>
-                          <p className="option-preview">{option.message}</p>
-                        </button>
-                      );
-                    })}
+                    {messageOptions.map((option, index) => (
+                      <button
+                        key={index}
+                        className="message-option-card"
+                        onClick={() => handleSelectStrategy(option)}
+                      >
+                        <div className="option-header">
+                          <span className="option-strategy-label">{option.label || option.strategy}</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </div>
+                        {option.subject && (
+                          <p className="option-subject">Subject: {option.subject}</p>
+                        )}
+                        <p className="option-preview">{option.message}</p>
+                        {option.reasoning && (
+                          <p className="option-reasoning">{option.reasoning}</p>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
@@ -597,8 +543,27 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
               <h3 className="view-title">How do you want to send this?</h3>
 
+              {/* Show reasoning for selected strategy */}
+              {selectedMessage?.reasoning && (
+                <div className="strategy-reasoning">
+                  <Sparkles className="w-4 h-4" />
+                  <span>{selectedMessage.reasoning}</span>
+                </div>
+              )}
+
               <div className="message-preview-box">
-                <p className="message-preview-label">Your message:</p>
+                {subject && (
+                  <>
+                    <p className="message-preview-label">Subject:</p>
+                    <input
+                      type="text"
+                      className="subject-input"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                    />
+                  </>
+                )}
+                <p className="message-preview-label">Message:</p>
                 <textarea
                   className="message-preview-text"
                   value={message}
@@ -662,6 +627,18 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               </p>
 
               <div className="message-review">
+                {/* Show subject line for email */}
+                {selectedWeapon === 'email' && subject && (
+                  <>
+                    <label>Subject</label>
+                    <input
+                      type="text"
+                      className="subject-input-review"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                    />
+                  </>
+                )}
                 <label>Your Message</label>
                 <textarea
                   className="message-textarea"

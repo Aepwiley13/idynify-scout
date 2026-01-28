@@ -320,12 +320,18 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* Custom Goal Input */
-.custom-goal-input {
+/* Intent Input Section - PRIMARY INTERFACE */
+.intent-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.intent-input {
   width: 100%;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.4);
   border-radius: 12px;
   color: white;
   font-size: 1rem;
@@ -335,14 +341,20 @@
   transition: all 0.2s;
 }
 
-.custom-goal-input:focus {
+.intent-input:focus {
   outline: none;
   border-color: #a855f7;
   background: rgba(168, 85, 247, 0.08);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
 }
 
-.custom-goal-input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+.intent-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.9rem;
+}
+
+.btn-submit-intent {
+  align-self: flex-end;
 }
 
 /* Message Options List */
@@ -397,11 +409,31 @@
   transform: translateX(0);
 }
 
+.option-subject {
+  font-size: 0.85rem;
+  color: rgba(168, 85, 247, 0.9);
+  margin: 0;
+  padding: 0.375rem 0.625rem;
+  background: rgba(168, 85, 247, 0.1);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
 .option-preview {
   font-size: 0.95rem;
   color: rgba(255, 255, 255, 0.85);
   line-height: 1.5;
   margin: 0;
+}
+
+.option-reasoning {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+  margin: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(168, 85, 247, 0.15);
+  font-style: italic;
 }
 
 /* Loading State */
@@ -423,6 +455,68 @@
   font-size: 1rem;
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
+}
+
+.loading-hint {
+  font-size: 0.85rem;
+  color: rgba(168, 85, 247, 0.7);
+  font-style: italic;
+}
+
+/* Error State */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.error-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(239, 68, 68, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+.error-message {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  max-width: 400px;
+}
+
+/* User Intent Summary */
+.user-intent-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  background: rgba(168, 85, 247, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #a855f7;
+}
+
+.intent-label-small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(168, 85, 247, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.intent-text-small {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
 }
 
 /* Legacy Contact Info Status (keep for backwards compatibility) */
@@ -895,6 +989,69 @@
   outline: none;
   border-color: #a855f7;
   background: rgba(168, 85, 247, 0.08);
+}
+
+/* Strategy Reasoning */
+.strategy-reasoning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  background: rgba(168, 85, 247, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #a855f7;
+}
+
+.strategy-reasoning svg {
+  color: #a855f7;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.strategy-reasoning span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* Subject Input */
+.subject-input {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  color: white;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s;
+  margin-bottom: 0.75rem;
+}
+
+.subject-input:focus {
+  outline: none;
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.subject-input-review {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+}
+
+.subject-input-review:focus {
+  outline: none;
+  border-color: #a855f7;
+  background: rgba(168, 85, 247, 0.1);
 }
 
 .btn-edit-inline {

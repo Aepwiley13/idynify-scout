@@ -936,12 +936,14 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Primary: Hunter */
+/* Primary: Hunter - always visible */
 .action-hunter {
   flex: 1;
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%) !important;
+  color: #ffffff !important;
   box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .action-hunter:hover {

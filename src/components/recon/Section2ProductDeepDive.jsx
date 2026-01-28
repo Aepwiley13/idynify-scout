@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
+import ReconTooltip from './ReconTooltip';
 import './ReconEnterprise.css';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 
@@ -11,7 +12,8 @@ const SECTION_2_QUESTIONS = [
     type: "text",
     required: true,
     validation: { minLength: 2, maxLength: 100 },
-    placeholder: "e.g., Acme Marketing Automation"
+    placeholder: "e.g., Acme Marketing Automation",
+    barryContext: "Barry uses your product name to personalize all outbound messaging and prospect research."
   },
   {
     id: "category",
@@ -26,7 +28,8 @@ const SECTION_2_QUESTIONS = [
       "Hybrid (product + services)",
       "Other"
     ],
-    helpText: "What type of product or service do you offer?"
+    helpText: "What type of product or service do you offer?",
+    barryContext: "Barry uses your product category to match you with the right prospect segments and tailor messaging frameworks."
   },
   {
     id: "coreFeatures",
@@ -36,7 +39,8 @@ const SECTION_2_QUESTIONS = [
     required: true,
     count: 5,
     validation: { minLength: 30, maxLength: 100 },
-    placeholder: "e.g., Email campaign builder with drag-and-drop interface"
+    placeholder: "e.g., Email campaign builder with drag-and-drop interface",
+    barryContext: "Barry maps your core features to prospect pain points to create highly relevant outreach."
   },
   {
     id: "differentiation",
@@ -45,7 +49,8 @@ const SECTION_2_QUESTIONS = [
     type: "textarea",
     required: true,
     validation: { minLength: 100, maxLength: 300 },
-    placeholder: "Describe your unique value proposition and competitive advantages..."
+    placeholder: "Describe your unique value proposition and competitive advantages...",
+    barryContext: "Barry uses your differentiators to craft competitive positioning in prospect conversations."
   },
   {
     id: "useCases",
@@ -66,7 +71,8 @@ const SECTION_2_QUESTIONS = [
       "Content distribution",
       "Sales enablement",
       "Other (specify)"
-    ]
+    ],
+    barryContext: "Barry matches your use cases to prospect scenarios to identify the highest-fit opportunities."
   },
   {
     id: "implementationTime",
@@ -80,7 +86,8 @@ const SECTION_2_QUESTIONS = [
       "1-4 weeks",
       "1-3 months",
       "3+ months"
-    ]
+    ],
+    barryContext: "Barry factors implementation time into prospect qualification and objection handling."
   },
   {
     id: "supportLevel",
@@ -94,7 +101,8 @@ const SECTION_2_QUESTIONS = [
       "Moderate (onboarding call)",
       "High (dedicated CSM, training)",
       "Very High (implementation team)"
-    ]
+    ],
+    barryContext: "Barry adjusts qualification criteria based on the support investment required for customer success."
   },
   {
     id: "pricingModel",
@@ -109,7 +117,8 @@ const SECTION_2_QUESTIONS = [
       "Enterprise/custom",
       "Other"
     ],
-    helpText: "How do you charge customers?"
+    helpText: "How do you charge customers?",
+    barryContext: "Barry uses your pricing model to qualify prospects by budget fit and tailor pricing conversations."
   },
   {
     id: "startingPrice",
@@ -118,7 +127,8 @@ const SECTION_2_QUESTIONS = [
     required: true,
     placeholder: "$299/month",
     validation: { pattern: /^\$[\d,]+/ },
-    helpText: "What's your entry-level price point?"
+    helpText: "What's your entry-level price point?",
+    barryContext: "Barry uses your price point to filter prospects by budget and calculate ROI messaging."
   },
   {
     id: "techStack",
@@ -127,7 +137,8 @@ const SECTION_2_QUESTIONS = [
     type: "textarea",
     required: true,
     validation: { minLength: 100, maxLength: 300 },
-    placeholder: "e.g., They typically use Salesforce for CRM, Marketo for marketing automation, Slack for team communication..."
+    placeholder: "e.g., They typically use Salesforce for CRM, Marketo for marketing automation, Slack for team communication...",
+    barryContext: "Barry identifies prospects using compatible tech stacks to prioritize high-fit opportunities."
   },
   {
     id: "integrations",

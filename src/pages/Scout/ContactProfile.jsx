@@ -15,6 +15,7 @@ import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import ContactHunterActivity from '../../components/hunter/ContactHunterActivity';
+import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -286,6 +287,7 @@ export default function ContactProfile() {
           <Target className="w-4 h-4" />
           <span>Engage with Hunter</span>
         </button>
+        <BarryKnowledgeButton variant="compact" />
       </div>
 
       {/* Success Banner */}

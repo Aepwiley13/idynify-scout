@@ -17,6 +17,7 @@ import {
   Mail,
   ArrowRight
 } from 'lucide-react';
+import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 
 const TRAINING_DIMENSIONS = [
   {
@@ -142,15 +143,11 @@ export default function BarryTraining() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Breadcrumbs */}
+      <ReconBreadcrumbs />
+
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => navigate('/recon')}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-purple-600 transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          Back to RECON
-        </button>
 
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-xl bg-purple-100 border-2 border-purple-200 flex items-center justify-center">

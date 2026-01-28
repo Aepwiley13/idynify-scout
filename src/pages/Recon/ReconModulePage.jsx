@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Brain, CheckCircle2, Circle, AlertCircle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Brain, CheckCircle2, Circle, AlertCircle, ChevronRight, Info } from 'lucide-react';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { initializeDashboard } from '../../utils/dashboardUtils';
 import SectionOutputModal from '../../components/recon/SectionOutputModal';
+import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 
 /**
  * Generic RECON Module Page — renders any module's sections
@@ -17,6 +18,10 @@ const MODULE_CONFIG = {
     description: 'Define your ideal customer profile — who they are, where they work, and what drives their decisions.',
     sections: [1, 2, 3, 4],
     color: 'purple',
+    guidance: {
+      why: 'This is the foundation of everything Barry does. Without ICP Intelligence, Barry treats every prospect the same — no qualification, no prioritization, no business awareness.',
+      what: 'You\'ll describe your business identity, product offering, target market firmographics, and ideal customer psychographics. Barry uses this to understand who you sell to and why.'
+    },
     feedsInto: [
       'Scout uses your ICP to score and rank every prospect',
       'Barry references your target market when generating contact context',
@@ -28,6 +33,10 @@ const MODULE_CONFIG = {
     description: 'Define your value proposition, messaging framework, and brand voice that Barry uses across all outreach.',
     sections: [9],
     color: 'blue',
+    guidance: {
+      why: 'Without your messaging framework, Hunter generates template-sounding messages and Barry\'s conversation starters lack your voice. This module gives Barry your actual positioning.',
+      what: 'You\'ll define your value proposition, key messaging pillars, tone of voice, and how you want to be perceived. Barry weaves this into every generated message and context.'
+    },
     feedsInto: [
       'Hunter generates messages using your actual value proposition',
       'Barry incorporates your voice and positioning in conversation starters',
@@ -39,6 +48,10 @@ const MODULE_CONFIG = {
     description: 'Map the pain points, motivations, and buying behaviors that define how your customers make decisions.',
     sections: [5, 6],
     color: 'amber',
+    guidance: {
+      why: 'Prospects don\'t buy because of features — they buy because of pain. Without this module, Barry can\'t anticipate concerns or speak to what actually drives purchase decisions.',
+      what: 'You\'ll map the pain points your customers experience, what motivates them to act, and the buying behaviors that indicate readiness. Barry uses this for objection handling and follow-up intelligence.'
+    },
     feedsInto: [
       'Barry can proactively address common objections in context generation',
       'Hunter follow-up sequences adapt based on likely objections',
@@ -50,6 +63,10 @@ const MODULE_CONFIG = {
     description: 'Map your competitive landscape so Barry knows how to position you against alternatives.',
     sections: [8],
     color: 'red',
+    guidance: {
+      why: 'If Barry doesn\'t know your competitors, he can\'t help you differentiate. Prospects are always evaluating alternatives — Barry needs to know the landscape to position you effectively.',
+      what: 'You\'ll identify your key competitors, how you differentiate, and what prospects typically compare you against. Barry uses this to sharpen messaging and filter out competitor-locked leads.'
+    },
     feedsInto: [
       'Barry positions your product against known alternatives',
       'Hunter differentiates messaging based on competitive context',
@@ -61,6 +78,10 @@ const MODULE_CONFIG = {
     description: 'Define the decision processes and behavioral triggers that indicate a prospect is ready to engage.',
     sections: [7, 10],
     color: 'emerald',
+    guidance: {
+      why: 'Timing matters as much as targeting. Without signal awareness, Barry can\'t distinguish a cold prospect from one actively evaluating solutions. This module teaches Barry when to prioritize.',
+      what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this for timing optimization and urgency detection.'
+    },
     feedsInto: [
       'Scout prioritizes leads showing real purchase intent signals',
       'Hunter optimizes outreach timing based on buyer readiness',
@@ -139,18 +160,15 @@ export default function ReconModulePage() {
 
   const colors = colorMap[config.color] || colorMap.purple;
 
+  const [guidanceOpen, setGuidanceOpen] = useState(false);
+
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Breadcrumbs */}
+      <ReconBreadcrumbs />
+
       {/* Header */}
       <div className="mb-6">
-        <button
-          onClick={() => navigate('/recon')}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-purple-600 transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          Back to RECON
-        </button>
-
         <div className="flex items-center gap-3 mb-2">
           <div className={`w-10 h-10 rounded-xl ${colors.bg} border-2 ${colors.border} flex items-center justify-center`}>
             <Brain className={`w-5 h-5 ${colors.icon}`} strokeWidth={2.5} />
@@ -162,6 +180,34 @@ export default function ReconModulePage() {
         </div>
         <p className="text-gray-600 text-sm leading-relaxed mt-2">{config.description}</p>
       </div>
+
+      {/* Guidance Banner — Progressive Disclosure */}
+      {config.guidance && (
+        <div className={`rounded-xl border-[1.5px] mb-6 transition-all ${
+          guidanceOpen ? `${colors.bg} ${colors.border} p-5` : 'border-gray-200 p-3'
+        }`}>
+          <button
+            onClick={() => setGuidanceOpen(!guidanceOpen)}
+            className="flex items-center gap-2 w-full text-left"
+            aria-expanded={guidanceOpen}
+          >
+            <Info size={16} className={guidanceOpen ? colors.icon : 'text-gray-400'} />
+            <span className={`text-xs font-semibold ${guidanceOpen ? colors.text : 'text-gray-500'}`}>
+              {guidanceOpen ? 'Why this module matters' : 'Why does this matter? (click to learn)'}
+            </span>
+          </button>
+          {guidanceOpen && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-gray-700 leading-relaxed">
+                <span className="font-semibold">Why:</span> {config.guidance.why}
+              </p>
+              <p className="text-xs text-gray-700 leading-relaxed">
+                <span className="font-semibold">What you'll do:</span> {config.guidance.what}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress */}
       <div className="bg-white rounded-xl border-[1.5px] border-gray-200 p-4 mb-6">

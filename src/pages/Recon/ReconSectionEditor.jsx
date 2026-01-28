@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Brain } from 'lucide-react';
 import { auth } from '../../firebase/config';
+import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../../utils/dashboardUtils';
 import Section1Foundation from '../../components/recon/Section1Foundation';
 import Section2ProductDeepDive from '../../components/recon/Section2ProductDeepDive';
@@ -147,6 +148,9 @@ export default function ReconSectionEditor() {
 
   return (
     <div className="max-w-[900px] mx-auto">
+      {/* Breadcrumbs */}
+      <ReconBreadcrumbs sectionTitle={section?.title} />
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">

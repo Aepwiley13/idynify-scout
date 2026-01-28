@@ -19,6 +19,7 @@ import {
   Users,
   Mail
 } from 'lucide-react';
+import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 
 // Map RECON sections to the new module structure
 const RECON_MODULES = [
@@ -193,6 +194,9 @@ export default function ReconOverview() {
 
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Breadcrumbs */}
+      <ReconBreadcrumbs />
+
       {/* Header Section */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">

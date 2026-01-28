@@ -57,7 +57,21 @@ const MainLayout = ({ children, user }) => {
     }
 
     if (pathname === '/hunter') return 'Hunter';
-    if (pathname.startsWith('/mission-control-v2/recon')) return 'Recon';
+    if (pathname.startsWith('/hunter/create-mission')) return 'Create Mission';
+    if (pathname.match(/^\/hunter\/mission\//)) return 'Mission Detail';
+
+    // RECON pages — new top-level pillar
+    if (pathname === '/recon') return 'RECON';
+    if (pathname === '/recon/icp-intelligence') return 'ICP Intelligence';
+    if (pathname === '/recon/messaging') return 'Messaging & Voice';
+    if (pathname === '/recon/objections') return 'Objections & Constraints';
+    if (pathname === '/recon/competitive-intel') return 'Competitive Intel';
+    if (pathname === '/recon/buying-signals') return 'Buying Signals';
+    if (pathname === '/recon/barry-training') return 'Barry Training';
+    if (pathname.match(/^\/recon\/section\//)) return 'RECON Section';
+
+    // Legacy RECON path
+    if (pathname.startsWith('/mission-control-v2/recon')) return 'RECON';
     if (pathname === '/admin') return 'Admin';
 
     return 'Idynify Scout';

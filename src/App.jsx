@@ -16,6 +16,12 @@ import MissionControlDashboard from './pages/MissionControlDashboard';
 import MissionControlDashboardV2 from './pages/MissionControlDashboardV2';
 import RECONModulePage from './pages/RECONModulePage';
 import RECONSectionPage from './pages/RECONSectionPage';
+
+// New RECON Platform Pages
+import ReconOverview from './pages/Recon/ReconOverview';
+import ReconModulePage from './pages/Recon/ReconModulePage';
+import ReconSectionEditor from './pages/Recon/ReconSectionEditor';
+import BarryTraining from './pages/Recon/BarryTraining';
 import Prospects from './pages/Prospects';
 import Questionnaire from './pages/Questionnaire';
 import UnifiedDashboard from './pages/UnifiedDashboard';
@@ -311,6 +317,41 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* RECON Platform — Top-Level Pillar */}
+        <Route
+          path="/recon"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <ReconOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/recon/barry-training"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <BarryTraining />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/recon/section/:sectionId"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <ReconSectionEditor />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/recon/:moduleId"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <ReconModulePage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Scout Module - NEW 4-Tab Structure */}
         <Route
           path="/scout"
@@ -450,8 +491,7 @@ function App() {
           element={<Navigate to="/scout" />}
         />
 
-        {/* Convenience redirects for email links */}
-        <Route path="/recon" element={<Navigate to="/mission-control-v2/recon" />} />
+        {/* Convenience redirects for email links - now /recon is a real route, no redirect needed */}
 
         {/* Protected Routes - OLD DASHBOARD REDIRECTS (Use V2 by default) */}
         <Route path="/mission-control" element={<Navigate to="/mission-control-v2" />} />

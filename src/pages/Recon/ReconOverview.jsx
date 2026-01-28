@@ -17,7 +17,9 @@ import {
   AlertCircle,
   TrendingUp,
   Users,
-  Mail
+  Mail,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 
@@ -77,6 +79,73 @@ const RECON_MODULES = [
     sectionNames: ['Decision Process', 'Behavioral & Timing Signals'],
     impactAreas: ['Scout lead prioritization', 'Hunter timing optimization', 'Barry urgency detection'],
     path: '/recon/buying-signals'
+  }
+];
+
+// Training dimensions for confidence heatmap
+const TRAINING_DIMENSIONS = [
+  {
+    id: 'identity',
+    label: 'Business Identity',
+    sections: [1, 2],
+    icon: '🏢',
+    description: 'Who you are, what you sell, what problem you solve',
+    criticalFor: ['All context generation', 'Brand voice'],
+    priority: 1
+  },
+  {
+    id: 'icp',
+    label: 'Ideal Customer Profile',
+    sections: [3, 4],
+    icon: '🎯',
+    description: 'Target market, firmographics, psychographics',
+    criticalFor: ['Lead scoring', 'Prospect matching'],
+    priority: 2
+  },
+  {
+    id: 'pain-points',
+    label: 'Pain & Motivations',
+    sections: [5, 6],
+    icon: '💡',
+    description: 'Customer pain points and buying triggers',
+    criticalFor: ['Message personalization', 'Objection handling'],
+    priority: 3
+  },
+  {
+    id: 'decisions',
+    label: 'Decision Process',
+    sections: [7],
+    icon: '🔄',
+    description: 'How customers evaluate and decide',
+    criticalFor: ['Follow-up timing', 'Multi-touch sequences'],
+    priority: 4
+  },
+  {
+    id: 'competitive',
+    label: 'Competitive Intel',
+    sections: [8],
+    icon: '⚔️',
+    description: 'Competitors and positioning',
+    criticalFor: ['Differentiation', 'Competitive positioning'],
+    priority: 5
+  },
+  {
+    id: 'messaging',
+    label: 'Messaging Framework',
+    sections: [9],
+    icon: '💬',
+    description: 'Value proposition and brand voice',
+    criticalFor: ['All outreach content', 'Conversation starters'],
+    priority: 6
+  },
+  {
+    id: 'signals',
+    label: 'Behavioral Signals',
+    sections: [10],
+    icon: '📊',
+    description: 'Timing indicators and buying signals',
+    criticalFor: ['Lead prioritization', 'Urgency detection'],
+    priority: 7
   }
 ];
 
@@ -178,6 +247,41 @@ export default function ReconOverview() {
     return colors[color] || colors.purple;
   };
 
+  // Get status for a training dimension
+  const getDimensionStatus = (dimension) => {
+    const dimSections = dimension.sections.map(id => sections.find(s => s.sectionId === id));
+    const completed = dimSections.filter(s => s?.status === 'completed').length;
+    const total = dimSections.length;
+    if (completed === total) return 'trained';
+    if (completed > 0) return 'partial';
+    return 'untrained';
+  };
+
+  // Find the best next dimension to train (by priority)
+  const getNextRecommendedDimension = () => {
+    const incomplete = TRAINING_DIMENSIONS
+      .filter(d => getDimensionStatus(d) !== 'trained')
+      .sort((a, b) => a.priority - b.priority);
+    return incomplete[0] || null;
+  };
+
+  // Map dimension to its parent module path
+  const getDimensionModulePath = (dimension) => {
+    const sectionToModule = {
+      1: '/recon/icp-intelligence',
+      2: '/recon/icp-intelligence',
+      3: '/recon/icp-intelligence',
+      4: '/recon/icp-intelligence',
+      5: '/recon/objections',
+      6: '/recon/objections',
+      7: '/recon/buying-signals',
+      8: '/recon/competitive-intel',
+      9: '/recon/messaging',
+      10: '/recon/buying-signals'
+    };
+    return sectionToModule[dimension.sections[0]] || '/recon';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -249,6 +353,129 @@ export default function ReconOverview() {
         )}
       </div>
 
+      {/* Confidence Heatmap & Train Next - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        {/* Confidence Heatmap */}
+        <div className="lg:col-span-2 bg-white rounded-xl border-[1.5px] border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600" />
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Barry's Knowledge Map</h2>
+            </div>
+            <div className="flex items-center gap-3 text-[10px] font-medium text-gray-500">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-emerald-500"></span> Trained
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-amber-400"></span> Partial
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-gray-200"></span> Untrained
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {TRAINING_DIMENSIONS.map((dimension) => {
+              const status = getDimensionStatus(dimension);
+              const isTrained = status === 'trained';
+              const isPartial = status === 'partial';
+
+              return (
+                <div
+                  key={dimension.id}
+                  onClick={() => navigate(getDimensionModulePath(dimension))}
+                  className={`relative cursor-pointer group transition-all rounded-lg p-3 text-center ${
+                    isTrained
+                      ? 'bg-emerald-100 border-2 border-emerald-300 hover:border-emerald-400'
+                      : isPartial
+                      ? 'bg-amber-100 border-2 border-amber-300 hover:border-amber-400'
+                      : 'bg-gray-100 border-2 border-gray-200 hover:border-purple-300'
+                  }`}
+                >
+                  <div className="text-xl mb-1">{dimension.icon}</div>
+                  <div className={`text-[10px] font-semibold leading-tight ${
+                    isTrained ? 'text-emerald-700' : isPartial ? 'text-amber-700' : 'text-gray-500'
+                  }`}>
+                    {dimension.label}
+                  </div>
+                  {/* Hover tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    <div className="bg-gray-900 text-white text-[10px] px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
+                      <p className="font-semibold mb-0.5">{dimension.description}</p>
+                      <p className="text-gray-400">
+                        {isTrained ? '✓ Fully trained' : isPartial ? '◐ Partially trained' : '○ Not started'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-3 text-center">
+            Click any dimension to train Barry in that area
+          </p>
+        </div>
+
+        {/* Train Next Recommendation */}
+        {(() => {
+          const nextDimension = getNextRecommendedDimension();
+          if (!nextDimension) return (
+            <div className="bg-emerald-50 rounded-xl border-[1.5px] border-emerald-200 p-5 flex flex-col items-center justify-center text-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-3" />
+              <h3 className="text-sm font-bold text-emerald-800 mb-1">Fully Trained!</h3>
+              <p className="text-xs text-emerald-600">Barry has complete knowledge of your business context.</p>
+            </div>
+          );
+
+          const status = getDimensionStatus(nextDimension);
+          const isPartial = status === 'partial';
+
+          return (
+            <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border-[1.5px] border-purple-200 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                {isPartial ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                ) : (
+                  <Target className="w-4 h-4 text-purple-600" />
+                )}
+                <h3 className="text-sm font-bold text-gray-900">
+                  {isPartial ? 'Continue Training' : 'Train Next'}
+                </h3>
+              </div>
+
+              <div className="bg-white rounded-lg border border-purple-200 p-3 mb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">{nextDimension.icon}</span>
+                  <span className="text-sm font-bold text-gray-900">{nextDimension.label}</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-2">{nextDimension.description}</p>
+                <div className="flex flex-wrap gap-1">
+                  {nextDimension.criticalFor.map((item) => (
+                    <span key={item} className="text-[10px] font-medium bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate(getDimensionModulePath(nextDimension))}
+                className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+              >
+                {isPartial ? 'Continue' : 'Start'} Training
+                <ArrowRight size={14} />
+              </button>
+
+              {isPartial && (
+                <p className="text-[10px] text-amber-600 mt-2 text-center font-medium">
+                  Incomplete training limits Barry's effectiveness
+                </p>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
       {/* RECON Modules Grid */}
       <div className="mb-8">
         <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Training Modules</h2>
@@ -258,15 +485,28 @@ export default function ReconOverview() {
             const progress = getModuleProgress(mod);
             const colors = getColorClasses(mod.color);
             const IconComponent = mod.icon;
+            // High priority modules that need alerts when incomplete
+            const isHighPriority = ['icp-intelligence', 'messaging'].includes(mod.id);
+            const needsAlert = isHighPriority && status !== 'complete';
 
             return (
               <div
                 key={mod.id}
                 onClick={() => navigate(mod.path)}
-                className={`bg-white rounded-xl border-[1.5px] ${
-                  status === 'complete' ? 'border-emerald-300' : 'border-gray-200 hover:border-purple-300'
+                className={`relative bg-white rounded-xl border-[1.5px] ${
+                  status === 'complete' ? 'border-emerald-300' :
+                  needsAlert ? 'border-amber-300' :
+                  'border-gray-200 hover:border-purple-300'
                 } p-5 cursor-pointer transition-all hover:shadow-md group`}
               >
+                {/* High Priority Alert Badge */}
+                {needsAlert && (
+                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                    <AlertTriangle size={10} />
+                    High Impact
+                  </div>
+                )}
+
                 {/* Module Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className={`w-9 h-9 rounded-lg ${colors.bg} border ${colors.border} flex items-center justify-center`}>

@@ -7,37 +7,37 @@ import {
   ChevronDown,
   ChevronUp,
   Database,
-  Brain,
+  Globe,
   Search,
   Shield,
-  Info,
-  ExternalLink,
-  XCircle
+  XCircle,
+  HardDrive
 } from 'lucide-react';
 import './EnrichmentPanel.css';
 
 /**
- * EnrichmentPanel - User-initiated enrichment with Barry AI
+ * EnrichmentPanel — User-initiated enrichment status & controls
  *
- * Shows:
- * - Enrich button (user-triggered)
- * - Real-time step progress
+ * NO AI. Shows deterministic results:
+ * - Found fields with source badges (Apollo / Google / Internal)
+ * - Missing fields
+ * - Confidence level (rule-based)
+ * - Enrichment step history
  * - Data provenance (what came from where)
- * - Barry's analysis summary
- * - Confidence indicator
- * - Missing data explanation
  */
 
 const SOURCE_LABELS = {
-  apollo_match: 'Apollo (Exact Match)',
+  internal_db: 'Internal DB',
+  apollo_match: 'Apollo (Exact)',
   apollo_search: 'Apollo (Search)',
-  barry_ai: 'Barry AI Analysis'
+  google_places: 'Google Places'
 };
 
 const SOURCE_ICONS = {
+  internal_db: HardDrive,
   apollo_match: Database,
   apollo_search: Search,
-  barry_ai: Brain
+  google_places: Globe
 };
 
 const FIELD_LABELS = {
@@ -53,13 +53,18 @@ const FIELD_LABELS = {
   photo_url: 'Photo',
   location: 'Location',
   employment_history: 'Work History',
-  education: 'Education'
+  education: 'Education',
+  company_name: 'Company Name',
+  company_phone: 'Company Phone',
+  company_website: 'Company Website',
+  company_address: 'Company Address',
+  google_maps_url: 'Google Maps'
 };
 
 const CONFIDENCE_CONFIG = {
-  high: { label: 'High Confidence', className: 'confidence-high', description: 'Data verified across sources' },
-  medium: { label: 'Medium Confidence', className: 'confidence-medium', description: 'Partial verification' },
-  low: { label: 'Low Confidence', className: 'confidence-low', description: 'Limited data available' }
+  high: { label: 'High', className: 'confidence-high' },
+  medium: { label: 'Medium', className: 'confidence-medium' },
+  low: { label: 'Low', className: 'confidence-low' }
 };
 
 export default function EnrichmentPanel({ contact, onEnrich, enriching, enrichResult }) {
@@ -69,15 +74,14 @@ export default function EnrichmentPanel({ contact, onEnrich, enriching, enrichRe
   // Check what's missing
   const missingFields = getMissingFields(contact);
   const hasBeenEnriched = !!contact.last_enriched_at;
-  const hasEnrichmentSteps = !!contact.enrichment_steps;
-  const analysis = enrichResult?.analysis || contact.enrichment_analysis;
+  const summary = enrichResult?.summary || contact.enrichment_summary;
   const provenance = enrichResult?.provenance || contact.enrichment_provenance || {};
   const steps = enrichResult?.steps || contact.enrichment_steps || [];
+  const confidence = summary?.confidence || null;
 
-  // Show enrichment status
   const isComplete = hasBeenEnriched && missingFields.length === 0;
-  const isPartial = hasBeenEnriched && missingFields.length > 0;
   const needsEnrichment = !hasBeenEnriched || missingFields.length > 0;
+  const fieldsFoundCount = summary?.fields_found?.length || Object.keys(provenance).length;
 
   return (
     <div className="enrichment-panel">
@@ -88,60 +92,60 @@ export default function EnrichmentPanel({ contact, onEnrich, enriching, enrichRe
           <div>
             <h3 className="enrichment-title">Data Enrichment</h3>
             <p className="enrichment-subtitle">
-              {enriching ? 'Barry is enriching this contact...' :
+              {enriching ? 'Enriching...' :
                isComplete ? 'All key fields populated' :
-               isPartial ? `${missingFields.length} field${missingFields.length > 1 ? 's' : ''} still missing` :
-               'Click to enrich with Barry AI'}
+               hasBeenEnriched ? `${missingFields.length} field${missingFields.length > 1 ? 's' : ''} still missing` :
+               'Not yet enriched'}
             </p>
           </div>
         </div>
         <div className="enrichment-header-right">
-          {/* Confidence badge */}
-          {analysis?.confidence && (
-            <span className={`confidence-badge ${CONFIDENCE_CONFIG[analysis.confidence]?.className || ''}`}>
+          {confidence && (
+            <span className={`confidence-badge ${CONFIDENCE_CONFIG[confidence]?.className || ''}`}>
               <Shield className="w-3.5 h-3.5" />
-              {CONFIDENCE_CONFIG[analysis.confidence]?.label || analysis.confidence}
+              {CONFIDENCE_CONFIG[confidence]?.label || confidence}
             </span>
           )}
           {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
         </div>
       </div>
 
-      {/* ── Enrichment Action ─── */}
+      {/* ── Enrich Button ─── */}
       {needsEnrichment && !enriching && (
         <div className="enrichment-action">
           <button
             className="enrich-barry-btn"
             onClick={(e) => { e.stopPropagation(); onEnrich(); }}
           >
-            <Brain className="w-5 h-5" />
-            <span>Enrich with Barry</span>
+            <Sparkles className="w-5 h-5" />
+            <span>Enrich Contact</span>
           </button>
           <p className="enrich-hint">
-            Barry will check Apollo and analyze available data to fill in missing fields.
+            Checks internal data, Apollo, and Google Places to fill missing fields.
           </p>
         </div>
       )}
 
-      {/* ── Live Progress (while enriching) ─── */}
+      {/* ── Re-enrich Button (when already enriched but has gaps) ─── */}
+      {hasBeenEnriched && !enriching && missingFields.length > 0 && (
+        <div className="enrichment-action">
+          <button
+            className="enrich-barry-btn"
+            onClick={(e) => { e.stopPropagation(); onEnrich(); }}
+          >
+            <Sparkles className="w-5 h-5" />
+            <span>Re-enrich</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Live Progress ─── */}
       {enriching && (
         <div className="enrichment-progress">
           <div className="progress-steps">
-            <EnrichmentStep
-              label="Checking Apollo database"
-              icon={Database}
-              status="running"
-            />
-            <EnrichmentStep
-              label="Searching supplemental sources"
-              icon={Search}
-              status="pending"
-            />
-            <EnrichmentStep
-              label="Barry analyzing results"
-              icon={Brain}
-              status="pending"
-            />
+            <EnrichmentStep label="Checking internal data" icon={HardDrive} status="running" />
+            <EnrichmentStep label="Apollo person lookup" icon={Database} status="pending" />
+            <EnrichmentStep label="Google Places fallback" icon={Globe} status="pending" />
           </div>
           <div className="progress-bar-container">
             <div className="progress-bar-fill progress-bar-animated" />
@@ -152,57 +156,40 @@ export default function EnrichmentPanel({ contact, onEnrich, enriching, enrichRe
       {/* ── Expanded Details ─── */}
       {expanded && !enriching && (
         <div className="enrichment-details">
-          {/* Barry's Analysis Summary */}
-          {analysis && (
-            <div className="analysis-section">
-              <div className="analysis-summary">
-                <Brain className="w-4 h-4 analysis-icon" />
-                <p>{analysis.summary}</p>
-              </div>
 
-              {/* What was found */}
-              {analysis.found && analysis.found.length > 0 && (
+          {/* Found / Missing Summary */}
+          {(fieldsFoundCount > 0 || missingFields.length > 0) && (
+            <div className="analysis-section">
+              {/* Found fields */}
+              {fieldsFoundCount > 0 && (
                 <div className="analysis-findings">
-                  <h4 className="findings-label">Found</h4>
+                  <h4 className="findings-label">Found ({fieldsFoundCount})</h4>
                   <ul className="findings-list">
-                    {analysis.found.map((item, i) => (
+                    {(summary?.fields_found || Object.keys(provenance)).map((field, i) => (
                       <li key={i} className="finding-item finding-success">
                         <CheckCircle className="w-3.5 h-3.5" />
-                        <span>{item}</span>
+                        <span>{FIELD_LABELS[field] || field}</span>
+                        {provenance[field] && (
+                          <span className="finding-source">{SOURCE_LABELS[provenance[field]] || provenance[field]}</span>
+                        )}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* What's missing */}
-              {analysis.notFound && analysis.notFound.length > 0 && (
+              {/* Missing fields */}
+              {missingFields.length > 0 && (
                 <div className="analysis-findings">
-                  <h4 className="findings-label">Not Found</h4>
+                  <h4 className="findings-label">Not Found ({missingFields.length})</h4>
                   <ul className="findings-list">
-                    {analysis.notFound.map((item, i) => (
+                    {missingFields.map((field, i) => (
                       <li key={i} className="finding-item finding-missing">
                         <XCircle className="w-3.5 h-3.5" />
-                        <span>{item}</span>
+                        <span>{FIELD_LABELS[field] || field}</span>
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-
-              {/* Confidence explanation */}
-              {analysis.confidenceReason && (
-                <div className="confidence-explanation">
-                  <Info className="w-3.5 h-3.5" />
-                  <span>{analysis.confidenceReason}</span>
-                </div>
-              )}
-
-              {/* Next step suggestion */}
-              {analysis.suggestion && (
-                <div className="suggestion-box">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{analysis.suggestion}</span>
                 </div>
               )}
             </div>
@@ -259,20 +246,6 @@ export default function EnrichmentPanel({ contact, onEnrich, enriching, enrichRe
             </div>
           )}
 
-          {/* Missing Fields Summary */}
-          {missingFields.length > 0 && (
-            <div className="missing-fields">
-              <h4 className="missing-label">Still Missing</h4>
-              <div className="missing-tags">
-                {missingFields.map(field => (
-                  <span key={field} className="missing-tag">
-                    {FIELD_LABELS[field] || field}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Last enriched timestamp */}
           {contact.last_enriched_at && (
             <div className="enrichment-timestamp">
@@ -296,7 +269,7 @@ function EnrichmentStep({ label, icon: Icon, status, fieldsFound, message }) {
     no_data: { className: 'step-nodata', indicator: <AlertCircle className="w-4 h-4" /> },
     no_match: { className: 'step-nodata', indicator: <AlertCircle className="w-4 h-4" /> },
     no_results: { className: 'step-nodata', indicator: <AlertCircle className="w-4 h-4" /> },
-    parse_error: { className: 'step-error', indicator: <AlertCircle className="w-4 h-4" /> },
+    skipped: { className: 'step-nodata', indicator: <AlertCircle className="w-4 h-4" /> },
     pending: { className: 'step-pending', indicator: <div className="step-dot" /> }
   };
 

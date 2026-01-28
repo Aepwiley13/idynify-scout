@@ -189,18 +189,18 @@ export default function ContactProfile() {
       const user = auth.currentUser;
       if (!user) throw new Error('Not authenticated');
 
-      // Barry enrichment works with any contact (LinkedIn URL, Apollo ID, or name+company)
+      // Enrichment works with any contact (LinkedIn URL, Apollo ID, or name+company)
       if (!contact.apollo_person_id && !contact.linkedin_url && !contact.name) {
         setEnrichError('This contact needs at least a name, LinkedIn URL, or Apollo ID to enrich.');
         setEnriching(false);
         return;
       }
 
-      console.log('🐻 Barry Enrichment starting for:', contact.name);
+      console.log('🔄 Enrichment starting for:', contact.name);
 
       const authToken = await user.getIdToken();
 
-      // Call barryEnrich - the orchestrated multi-source enrichment
+      // Call barryEnrich - orchestrated tool-based enrichment (no AI)
       const response = await fetch('/.netlify/functions/barryEnrich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,7 +228,7 @@ export default function ContactProfile() {
         throw new Error(result.error || 'Enrichment failed');
       }
 
-      console.log('✅ Barry Enrichment complete');
+      console.log('✅ Enrichment complete');
 
       // Store enrichment result for the UI panel
       setEnrichResult(result);
@@ -253,7 +253,7 @@ export default function ContactProfile() {
       setEnriching(false);
 
     } catch (err) {
-      console.error('Error in Barry Enrichment:', err);
+      console.error('Error in enrichment:', err);
       setEnrichError(err.message || 'Failed to enrich contact. Please try again.');
       setEnriching(false);
     }

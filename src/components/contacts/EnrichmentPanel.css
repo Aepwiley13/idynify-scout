@@ -313,38 +313,14 @@
 .finding-success svg { color: #34d399; }
 .finding-missing svg { color: #f87171; }
 
-.confidence-explanation {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  font-size: 0.78rem;
+.finding-source {
+  margin-left: auto;
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
   color: #8b8ba0;
-}
-
-.confidence-explanation svg {
-  flex-shrink: 0;
-  color: #6b6b80;
-}
-
-.suggestion-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: rgba(245, 158, 11, 0.08);
-  border-radius: 6px;
-  border-left: 3px solid #f59e0b;
-  font-size: 0.8rem;
-  color: #fbbf24;
-}
-
-.suggestion-box svg {
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ── Provenance ─── */

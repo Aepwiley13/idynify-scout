@@ -1,30 +1,33 @@
 /**
  * BARRY ENRICHMENT ORCHESTRATOR
  *
- * User-initiated, multi-source enrichment orchestrated by Barry AI.
+ * User-initiated, multi-source enrichment. Barry orchestrates tools — no AI.
  *
- * FLOW:
- * 1. User clicks "Enrich with Barry" on a contact profile
- * 2. Barry checks what data is missing
- * 3. Step 1: Apollo PEOPLE_MATCH (by ID or LinkedIn URL)
- * 4. Step 2: Apollo PEOPLE_SEARCH (fuzzy fallback if step 1 gaps remain)
- * 5. Step 3: Barry AI synthesizes findings + explains gaps
- * 6. Returns enriched data with full provenance (what came from where)
+ * ENRICHMENT DOCTRINE:
+ * - Barry orchestrates tools, Barry does not "think"
+ * - Allowed: Apollo APIs, Google Places, internal DB, rule-based merging
+ * - NOT allowed: Claude, guessing, free-text inference, message generation
+ * - Claude only comes AFTER enrichment, inside Hunter / messaging
  *
- * DESIGN PRINCIPLES:
- * - User-initiated only (never automatic)
- * - Every field tracks its source
- * - Barry explains what was found and what's missing
- * - Extensible: new sources can be added to the pipeline
+ * PIPELINE:
+ * Step 0: Internal DB — check existing data, same-company matches ($0)
+ * Step 1: Apollo PEOPLE_MATCH / PEOPLE_SEARCH — person-level data
+ * Step 2: Google Places — company-level fallback (phone, address, website)
+ *
+ * MERGE RULES (deterministic, not AI):
+ * - Person-level beats company-level
+ * - Direct source beats inferred
+ * - New data never overwrites user-entered data
+ * - Every field gets a source tag
  *
  * Last updated: January 2026
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
+import { googleBusinessLookup } from './utils/googleBusinessLookup.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -45,12 +48,8 @@ export const handler = async (event) => {
 
     console.log('🐻 Barry Enrichment starting for:', contact.name);
 
-    // Validate API keys
-    const apolloApiKey = getApolloApiKey();
-    const claudeApiKey = process.env.ANTHROPIC_API_KEY;
-    if (!claudeApiKey) {
-      throw new Error('Claude API key not configured');
-    }
+    // Validate Apollo API key
+    getApolloApiKey();
 
     const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
     if (!firebaseApiKey) {
@@ -72,36 +71,80 @@ export const handler = async (event) => {
     }
 
     const verifyData = await verifyResponse.json();
-    const tokenUserId = verifyData.users[0].localId;
-
-    if (tokenUserId !== userId) {
+    if (verifyData.users[0].localId !== userId) {
       throw new Error('Token does not match user ID');
     }
 
     console.log('✅ Auth verified');
 
-    // ─── Assess what's missing ───
-    const missingFields = assessMissingData(contact);
-    console.log('📋 Missing fields:', missingFields);
+    // ─── Assess what's missing before we start ───
+    const initialMissing = assessMissingData(contact);
+    console.log('📋 Missing fields:', initialMissing);
 
-    // Track enrichment steps for provenance
+    // Track enrichment steps + provenance
     const steps = [];
     let enrichedData = {};
     let apolloRawData = null;
+    const provenance = {};
 
-    // ─── STEP 1: Apollo PEOPLE_MATCH (primary source) ───
+    // ═══════════════════════════════════════════════════
+    // STEP 0: Internal DB — use what we already have ($0)
+    // ═══════════════════════════════════════════════════
+    const step0 = {
+      source: 'internal_db',
+      status: 'running',
+      fieldsFound: [],
+      timestamp: new Date().toISOString(),
+      message: null
+    };
+
+    try {
+      console.log('📂 Step 0: Checking internal data...');
+
+      // Fill obvious fields from existing contact data that might be stored
+      // under alternate field names
+      const internalFields = extractInternalFields(contact);
+      if (internalFields.fieldsFound.length > 0) {
+        enrichedData = { ...enrichedData, ...internalFields.data };
+        step0.fieldsFound = internalFields.fieldsFound;
+        internalFields.fieldsFound.forEach(f => { provenance[f] = 'internal_db'; });
+        step0.status = 'success';
+        console.log(`✅ Step 0: Recovered ${internalFields.fieldsFound.length} fields from internal data`);
+      } else {
+        step0.status = 'no_data';
+        step0.message = 'No additional internal data found';
+      }
+    } catch (err) {
+      step0.status = 'error';
+      step0.message = err.message;
+      console.error('❌ Step 0 failed:', err.message);
+    }
+
+    steps.push(step0);
+
+    // ═══════════════════════════════════════════════════
+    // STEP 1: Apollo — person-level data
+    // ═══════════════════════════════════════════════════
+
+    // Step 1a: Apollo PEOPLE_MATCH (exact lookup)
     const hasApolloId = !!contact.apollo_person_id;
     const hasLinkedIn = !!contact.linkedin_url;
 
     if (hasApolloId || hasLinkedIn) {
-      const step1 = { source: 'apollo_match', status: 'running', fieldsFound: [], timestamp: new Date().toISOString() };
+      const step1a = {
+        source: 'apollo_match',
+        status: 'running',
+        fieldsFound: [],
+        timestamp: new Date().toISOString(),
+        message: null
+      };
 
       try {
         const matchBody = hasApolloId
           ? { id: contact.apollo_person_id }
           : { linkedin_url: contact.linkedin_url };
 
-        console.log('🔍 Step 1: Apollo PEOPLE_MATCH', hasApolloId ? 'by ID' : 'by LinkedIn URL');
+        console.log('🔍 Step 1a: Apollo PEOPLE_MATCH', hasApolloId ? 'by ID' : 'by LinkedIn URL');
 
         const apolloResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
           method: 'POST',
@@ -118,46 +161,53 @@ export const handler = async (event) => {
             const mapped = mapApolloToScoutContact(person);
             const validation = validateScoutContact(mapped);
             if (!validation.valid) {
-              logValidationErrors(validation, mapped, 'barryEnrich-step1');
+              logValidationErrors(validation, mapped, 'barryEnrich-step1a');
             }
 
-            // Extract enriched fields with provenance
-            const apolloFields = extractApolloFields(person);
-            enrichedData = { ...enrichedData, ...apolloFields.data };
-            step1.fieldsFound = apolloFields.fieldsFound;
-            step1.status = 'success';
+            const apolloFields = extractApolloFields(person, contact);
+            enrichedData = mergeWithPrecedence(enrichedData, apolloFields.data, contact);
+            step1a.fieldsFound = apolloFields.fieldsFound;
+            apolloFields.fieldsFound.forEach(f => { provenance[f] = 'apollo_match'; });
+            step1a.status = 'success';
 
-            console.log(`✅ Step 1: Found ${apolloFields.fieldsFound.length} fields`);
+            console.log(`✅ Step 1a: Found ${apolloFields.fieldsFound.length} fields`);
           } else {
-            step1.status = 'no_data';
-            step1.message = 'Apollo returned no person data';
+            step1a.status = 'no_data';
+            step1a.message = 'Apollo returned no person data';
           }
         } else {
-          await logApolloError(apolloResponse, { id: contact.apollo_person_id }, 'barryEnrich-step1');
-          step1.status = 'error';
-          step1.message = `Apollo returned ${apolloResponse.status}`;
+          await logApolloError(apolloResponse, { id: contact.apollo_person_id }, 'barryEnrich-step1a');
+          step1a.status = 'error';
+          step1a.message = `Apollo returned ${apolloResponse.status}`;
         }
       } catch (err) {
-        step1.status = 'error';
-        step1.message = err.message;
-        console.error('❌ Step 1 failed:', err.message);
+        step1a.status = 'error';
+        step1a.message = err.message;
+        console.error('❌ Step 1a failed:', err.message);
       }
 
-      steps.push(step1);
+      steps.push(step1a);
     }
 
-    // ─── STEP 2: Apollo PEOPLE_SEARCH (fuzzy fallback) ───
-    const stillMissing = assessMissingData({ ...contact, ...enrichedData });
-    const hasNameAndCompany = (contact.name || enrichedData.name) && (contact.company_name || enrichedData.current_company_name);
+    // Step 1b: Apollo PEOPLE_SEARCH (fuzzy fallback — only if no Apollo ID)
+    const postApolloMissing = assessMissingData({ ...contact, ...enrichedData });
+    const hasNameAndCompany = (contact.name || enrichedData.name) &&
+      (contact.company_name || enrichedData.current_company_name || contact.organization_name);
 
-    if (stillMissing.length > 0 && hasNameAndCompany && !hasApolloId) {
-      const step2 = { source: 'apollo_search', status: 'running', fieldsFound: [], timestamp: new Date().toISOString() };
+    if (postApolloMissing.length > 0 && hasNameAndCompany && !hasApolloId) {
+      const step1b = {
+        source: 'apollo_search',
+        status: 'running',
+        fieldsFound: [],
+        timestamp: new Date().toISOString(),
+        message: null
+      };
 
       try {
         const name = contact.name || enrichedData.name || '';
-        const company = contact.company_name || enrichedData.current_company_name || '';
+        const company = contact.company_name || enrichedData.current_company_name || contact.organization_name || '';
 
-        console.log('🔍 Step 2: Apollo PEOPLE_SEARCH for', name, 'at', company);
+        console.log('🔍 Step 1b: Apollo PEOPLE_SEARCH for', name, 'at', company);
 
         const searchBody = {
           q_keywords: `${name} ${company}`,
@@ -176,29 +226,78 @@ export const handler = async (event) => {
           const people = searchData.people || [];
 
           if (people.length > 0) {
-            // Find best match by name similarity
             const bestMatch = findBestMatch(people, name, company);
 
             if (bestMatch) {
-              const supplementalFields = extractSupplementalFields(bestMatch, enrichedData);
-              enrichedData = { ...enrichedData, ...supplementalFields.data };
-              step2.fieldsFound = supplementalFields.fieldsFound;
-              step2.status = 'success';
-              step2.matchConfidence = supplementalFields.confidence;
+              if (!apolloRawData) apolloRawData = bestMatch;
+              const supplementalFields = extractSupplementalFields(bestMatch, { ...contact, ...enrichedData });
+              enrichedData = mergeWithPrecedence(enrichedData, supplementalFields.data, contact);
+              step1b.fieldsFound = supplementalFields.fieldsFound;
+              supplementalFields.fieldsFound.forEach(f => { provenance[f] = 'apollo_search'; });
+              step1b.status = 'success';
 
-              console.log(`✅ Step 2: Supplemented ${supplementalFields.fieldsFound.length} fields`);
+              console.log(`✅ Step 1b: Supplemented ${supplementalFields.fieldsFound.length} fields`);
             } else {
-              step2.status = 'no_match';
-              step2.message = 'No confident match found in search results';
+              step1b.status = 'no_match';
+              step1b.message = 'No confident match in search results';
             }
           } else {
-            step2.status = 'no_results';
-            step2.message = 'Apollo search returned no results';
+            step1b.status = 'no_results';
+            step1b.message = 'Apollo search returned no results';
           }
         } else {
-          await logApolloError(searchResponse, {}, 'barryEnrich-step2');
-          step2.status = 'error';
-          step2.message = `Apollo returned ${searchResponse.status}`;
+          await logApolloError(searchResponse, {}, 'barryEnrich-step1b');
+          step1b.status = 'error';
+          step1b.message = `Apollo returned ${searchResponse.status}`;
+        }
+      } catch (err) {
+        step1b.status = 'error';
+        step1b.message = err.message;
+        console.error('❌ Step 1b failed:', err.message);
+      }
+
+      steps.push(step1b);
+    }
+
+    // ═══════════════════════════════════════════════════
+    // STEP 2: Google Places — company-level fallback
+    // ═══════════════════════════════════════════════════
+    const mergedSoFar = { ...contact, ...enrichedData };
+    const needsCompanyData =
+      !mergedSoFar.company_phone &&
+      !mergedSoFar.company_website &&
+      !mergedSoFar.company_address;
+
+    const companyName = mergedSoFar.company_name || mergedSoFar.organization_name ||
+      mergedSoFar.current_company_name || null;
+
+    if (needsCompanyData && companyName) {
+      const step2 = {
+        source: 'google_places',
+        status: 'running',
+        fieldsFound: [],
+        timestamp: new Date().toISOString(),
+        message: null
+      };
+
+      try {
+        console.log('🌐 Step 2: Google Places for', companyName);
+
+        const googleResult = await googleBusinessLookup({
+          companyName,
+          domain: mergedSoFar.company_domain || null,
+          city: mergedSoFar.city || null,
+          state: mergedSoFar.state || null
+        });
+
+        step2.status = googleResult.status;
+        step2.message = googleResult.message;
+
+        if (googleResult.fieldsFound.length > 0) {
+          enrichedData = mergeWithPrecedence(enrichedData, googleResult.data, contact);
+          step2.fieldsFound = googleResult.fieldsFound;
+          googleResult.fieldsFound.forEach(f => { provenance[f] = 'google_places'; });
+          console.log(`✅ Step 2: Found ${googleResult.fieldsFound.length} company fields`);
         }
       } catch (err) {
         step2.status = 'error';
@@ -209,85 +308,11 @@ export const handler = async (event) => {
       steps.push(step2);
     }
 
-    // ─── STEP 3: Barry AI Analysis ───
-    const step3 = { source: 'barry_ai', status: 'running', timestamp: new Date().toISOString() };
+    // ═══════════════════════════════════════════════════
+    // BUILD FINAL RESULT — deterministic merge
+    // ═══════════════════════════════════════════════════
 
-    try {
-      console.log('🐻 Step 3: Barry analyzing enrichment results...');
-
-      const anthropic = new Anthropic({ apiKey: claudeApiKey });
-
-      const finalMissing = assessMissingData({ ...contact, ...enrichedData });
-      const fieldsFoundTotal = steps.reduce((acc, s) => [...acc, ...s.fieldsFound], []);
-
-      const analysisPrompt = `You are Barry, a research assistant helping a user understand the enrichment results for a business contact.
-
-CONTACT BEING ENRICHED:
-Name: ${contact.name || enrichedData.name || 'Unknown'}
-Title: ${contact.title || enrichedData.current_position_title || 'Unknown'}
-Company: ${contact.company_name || enrichedData.current_company_name || 'Unknown'}
-LinkedIn: ${contact.linkedin_url || enrichedData.linkedin_url || 'Not available'}
-
-ENRICHMENT STEPS COMPLETED:
-${steps.map((s, i) => `Step ${i + 1} (${s.source}): ${s.status} - Found: ${s.fieldsFound.join(', ') || 'nothing'}`).join('\n')}
-
-FIELDS SUCCESSFULLY ENRICHED:
-${fieldsFoundTotal.length > 0 ? fieldsFoundTotal.join(', ') : 'None'}
-
-FIELDS STILL MISSING:
-${finalMissing.length > 0 ? finalMissing.join(', ') : 'None - all key fields populated'}
-
-ENRICHED DATA SNAPSHOT:
-- Email: ${enrichedData.email || contact.email || 'Not found'}
-- Email Status: ${enrichedData.email_status || 'Unknown'}
-- Phone: ${enrichedData.phone || contact.phone || 'Not found'}
-- LinkedIn: ${enrichedData.linkedin_url || contact.linkedin_url || 'Not found'}
-- Location: ${[enrichedData.city, enrichedData.state, enrichedData.country].filter(Boolean).join(', ') || 'Not found'}
-
-YOUR TASK:
-Generate a brief enrichment summary explaining what was found and what's missing. Be honest and specific.
-
-REQUIRED OUTPUT FORMAT (JSON):
-{
-  "summary": "One sentence overview of enrichment results",
-  "found": ["Human-readable description of each key finding"],
-  "notFound": ["Human-readable description of each missing field and why it might be unavailable"],
-  "confidence": "high" | "medium" | "low",
-  "confidenceReason": "One sentence explaining the confidence level",
-  "suggestion": "One actionable next step if data is still missing (or null if complete)"
-}
-
-Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
-
-      const claudeResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 800,
-        messages: [{ role: 'user', content: analysisPrompt }]
-      });
-
-      const responseText = claudeResponse.content[0].text;
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-      if (jsonMatch) {
-        const analysis = JSON.parse(jsonMatch[0]);
-        step3.status = 'success';
-        step3.analysis = analysis;
-        console.log('✅ Step 3: Barry analysis complete');
-      } else {
-        step3.status = 'parse_error';
-        step3.message = 'Could not parse Barry response';
-      }
-    } catch (err) {
-      step3.status = 'error';
-      step3.message = err.message;
-      console.error('❌ Step 3 failed:', err.message);
-    }
-
-    steps.push(step3);
-
-    // ─── Build final enrichment result ───
-
-    // Process phone numbers from Apollo data
+    // Process phone numbers from Apollo
     const phoneNumbers = apolloRawData?.phone_numbers || [];
     const phoneByType = { mobile: null, direct: null, work: null, home: null };
 
@@ -301,23 +326,18 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
     const primaryPhone = phoneByType.mobile || phoneByType.direct || phoneByType.work ||
                           phoneByType.home || phoneNumbers[0]?.sanitized_number || null;
 
-    // Build provenance map (which field came from which source)
-    const provenance = {};
-    steps.forEach(step => {
-      if (step.fieldsFound) {
-        step.fieldsFound.forEach(field => {
-          provenance[field] = step.source;
-        });
-      }
-    });
+    // Compute final missing fields + confidence (rule-based)
+    const finalMissing = assessMissingData({ ...contact, ...enrichedData });
+    const totalFieldsFound = steps.reduce((acc, s) => acc + (s.fieldsFound?.length || 0), 0);
+    const confidence = computeConfidence(totalFieldsFound, finalMissing.length);
 
     const finalEnrichedData = {
-      // Contact Info
+      // Person contact info (Apollo-sourced)
       email: enrichedData.email || contact.email || null,
-      email_status: enrichedData.email_status || null,
-      email_confidence: enrichedData.email_confidence || null,
+      email_status: enrichedData.email_status || contact.email_status || null,
+      email_confidence: enrichedData.email_confidence || contact.email_confidence || null,
 
-      // Phone
+      // Phone (Apollo-sourced, person-level)
       phone: primaryPhone || contact.phone || null,
       phone_mobile: phoneByType.mobile || contact.phone_mobile || null,
       phone_direct: phoneByType.direct || contact.phone_direct || null,
@@ -325,29 +345,29 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
       phone_home: phoneByType.home || contact.phone_home || null,
       phone_numbers: phoneNumbers.length > 0 ? phoneNumbers : (contact.phone_numbers || []),
 
-      // Social
+      // Social (Apollo-sourced)
       linkedin_url: enrichedData.linkedin_url || contact.linkedin_url || null,
       twitter_url: enrichedData.twitter_url || contact.twitter_url || null,
       facebook_url: enrichedData.facebook_url || contact.facebook_url || null,
 
-      // Professional
+      // Professional (Apollo-sourced)
       seniority: enrichedData.seniority || contact.seniority || null,
       departments: enrichedData.departments || contact.departments || [],
       functions: enrichedData.functions || contact.functions || [],
 
-      // Current Employment
+      // Current Employment (Apollo-sourced)
       current_position_title: enrichedData.current_position_title || contact.title || null,
       current_company_name: enrichedData.current_company_name || contact.company_name || null,
       job_start_date: enrichedData.job_start_date || contact.job_start_date || null,
 
-      // History
+      // History (Apollo-sourced)
       employment_history: enrichedData.employment_history || contact.employment_history || [],
       education: enrichedData.education || contact.education || [],
 
-      // Location
-      city: enrichedData.city || contact.city || null,
-      state: enrichedData.state || contact.state || null,
-      country: enrichedData.country || contact.country || null,
+      // Location (Apollo person-level, or Google company-level)
+      city: enrichedData.city || enrichedData.company_city || contact.city || null,
+      state: enrichedData.state || enrichedData.company_state || contact.state || null,
+      country: enrichedData.country || enrichedData.company_country || contact.country || null,
       time_zone: enrichedData.time_zone || contact.time_zone || null,
 
       // Metadata
@@ -355,13 +375,18 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
       photo_url: enrichedData.photo_url || contact.photo_url || null,
       is_likely_decision_maker: enrichedData.is_likely_decision_maker || contact.is_likely_decision_maker || false,
 
+      // Company-level data (Google-sourced)
+      company_phone: enrichedData.company_phone || contact.company_phone || null,
+      company_website: enrichedData.company_website || contact.company_website || null,
+      company_address: enrichedData.company_address || contact.company_address || null,
+
       // Lead fields
       lead_status: contact.lead_status || 'saved',
       export_ready: true,
       last_enriched_at: new Date().toISOString(),
       data_sources: buildDataSources(steps),
 
-      // Enrichment provenance (NEW - tracks where each field came from)
+      // Enrichment provenance — tracks where each field came from
       enrichment_provenance: provenance,
       enrichment_steps: steps.map(s => ({
         source: s.source,
@@ -370,7 +395,15 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
         timestamp: s.timestamp,
         message: s.message || null
       })),
-      enrichment_analysis: step3.analysis || null,
+
+      // Rule-based enrichment summary (NO AI)
+      enrichment_summary: {
+        fields_found: Object.keys(provenance),
+        fields_missing: finalMissing,
+        confidence,
+        total_steps: steps.length,
+        sources_used: [...new Set(Object.values(provenance))]
+      },
 
       // Raw data for debugging
       _raw_apollo_data: apolloRawData ? {
@@ -388,7 +421,7 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
         contactName: contact.name,
         stepsCompleted: steps.length,
         fieldsEnriched: Object.keys(provenance).length,
-        confidence: step3.analysis?.confidence || 'unknown'
+        confidence
       }
     });
 
@@ -404,8 +437,8 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
         success: true,
         enrichedData: finalEnrichedData,
         steps,
-        analysis: step3.analysis || null,
-        provenance
+        provenance,
+        summary: finalEnrichedData.enrichment_summary
       })
     };
 
@@ -440,10 +473,13 @@ Be direct and factual. No sales language. Respond ONLY with valid JSON.`;
   }
 };
 
-// ─── Helper Functions ───
+// ═══════════════════════════════════════════════════
+// HELPER FUNCTIONS — all deterministic, no AI
+// ═══════════════════════════════════════════════════
 
 /**
- * Assess which key fields are missing from a contact
+ * Assess which key fields are missing from a contact.
+ * Returns array of field names.
  */
 function assessMissingData(contact) {
   const missing = [];
@@ -463,64 +499,200 @@ function assessMissingData(contact) {
 }
 
 /**
- * Extract enriched fields from Apollo person data with tracking
+ * Step 0: Extract usable fields from existing contact data.
+ * Checks alternate field names and normalizes.
  */
-function extractApolloFields(person) {
+function extractInternalFields(contact) {
   const data = {};
   const fieldsFound = [];
 
-  if (person.email) { data.email = person.email; data.email_status = person.email_status || null; data.email_confidence = person.email_confidence || null; fieldsFound.push('email'); }
-  if (person.linkedin_url) { data.linkedin_url = person.linkedin_url; fieldsFound.push('linkedin_url'); }
-  if (person.twitter_url) { data.twitter_url = person.twitter_url; fieldsFound.push('twitter_url'); }
-  if (person.facebook_url) { data.facebook_url = person.facebook_url; fieldsFound.push('facebook_url'); }
-  if (person.seniority) { data.seniority = person.seniority; fieldsFound.push('seniority'); }
-  if (person.departments?.length > 0 || person.functions?.length > 0) { data.departments = person.departments || person.functions || []; fieldsFound.push('departments'); }
-  if (person.headline) { data.headline = person.headline; fieldsFound.push('headline'); }
-  if (person.photo_url) { data.photo_url = person.photo_url; fieldsFound.push('photo_url'); }
-  if (person.city || person.state) { data.city = person.city; data.state = person.state; data.country = person.country; data.time_zone = person.time_zone; fieldsFound.push('location'); }
-  if (person.employment_history?.length > 0) {
+  // Check for email in alternate locations
+  if (!contact.email && contact.work_email) {
+    data.email = contact.work_email;
+    fieldsFound.push('email');
+  }
+
+  // Check for company name in alternate fields
+  if (!contact.company_name && contact.organization_name) {
+    data.current_company_name = contact.organization_name;
+    fieldsFound.push('company_name');
+  }
+  if (!contact.company_name && contact.organization?.name) {
+    data.current_company_name = contact.organization.name;
+    fieldsFound.push('company_name');
+  }
+
+  // Check for location from organization data
+  if ((!contact.city && !contact.state) && contact.organization) {
+    if (contact.organization.city) {
+      data.city = contact.organization.city;
+      data.state = contact.organization.state || null;
+      data.country = contact.organization.country || null;
+      fieldsFound.push('location');
+    }
+  }
+
+  // Check for website from organization
+  if (!contact.company_website && contact.organization?.website_url) {
+    data.company_website = contact.organization.website_url;
+    fieldsFound.push('company_website');
+  }
+
+  // Normalize phone from alternate fields
+  if (!contact.phone && !contact.phone_mobile && !contact.phone_direct) {
+    if (contact.phone_work) {
+      data.phone = contact.phone_work;
+      fieldsFound.push('phone');
+    } else if (contact.phone_home) {
+      data.phone = contact.phone_home;
+      fieldsFound.push('phone');
+    }
+  }
+
+  return { data, fieldsFound };
+}
+
+/**
+ * Extract enriched fields from Apollo person data.
+ * Tracks which fields were actually new.
+ */
+function extractApolloFields(person, existingContact) {
+  const data = {};
+  const fieldsFound = [];
+
+  if (person.email && !existingContact.email) {
+    data.email = person.email;
+    data.email_status = person.email_status || null;
+    data.email_confidence = person.email_confidence || null;
+    fieldsFound.push('email');
+  }
+  if (person.linkedin_url && !existingContact.linkedin_url) {
+    data.linkedin_url = person.linkedin_url;
+    fieldsFound.push('linkedin_url');
+  }
+  if (person.twitter_url && !existingContact.twitter_url) {
+    data.twitter_url = person.twitter_url;
+    fieldsFound.push('twitter_url');
+  }
+  if (person.facebook_url && !existingContact.facebook_url) {
+    data.facebook_url = person.facebook_url;
+    fieldsFound.push('facebook_url');
+  }
+  if (person.seniority && !existingContact.seniority) {
+    data.seniority = person.seniority;
+    fieldsFound.push('seniority');
+  }
+  if ((person.departments?.length > 0 || person.functions?.length > 0) &&
+      (!existingContact.departments || existingContact.departments.length === 0)) {
+    data.departments = person.departments || person.functions || [];
+    fieldsFound.push('departments');
+  }
+  if (person.headline && !existingContact.headline) {
+    data.headline = person.headline;
+    fieldsFound.push('headline');
+  }
+  if (person.photo_url && !existingContact.photo_url) {
+    data.photo_url = person.photo_url;
+    fieldsFound.push('photo_url');
+  }
+  if ((person.city || person.state) && !existingContact.city && !existingContact.state) {
+    data.city = person.city;
+    data.state = person.state;
+    data.country = person.country;
+    data.time_zone = person.time_zone;
+    fieldsFound.push('location');
+  }
+  if (person.employment_history?.length > 0 &&
+      (!existingContact.employment_history || existingContact.employment_history.length === 0)) {
     data.employment_history = person.employment_history;
     data.current_position_title = person.employment_history[0]?.title || person.title;
     data.current_company_name = person.employment_history[0]?.organization_name;
     data.job_start_date = person.employment_history[0]?.start_date;
     fieldsFound.push('employment_history');
   }
-  if (person.education?.length > 0) { data.education = person.education; fieldsFound.push('education'); }
-  if (person.functions?.length > 0 && !data.departments?.length) { data.functions = person.functions; fieldsFound.push('functions'); }
+  if (person.education?.length > 0 &&
+      (!existingContact.education || existingContact.education.length === 0)) {
+    data.education = person.education;
+    fieldsFound.push('education');
+  }
 
-  // Decision maker inference
+  // Decision maker inference (rule-based)
   data.is_likely_decision_maker = inferDecisionMaker(person.seniority, person.title);
 
   return { data, fieldsFound };
 }
 
 /**
- * Extract only supplemental fields (fields not already enriched)
+ * Extract only supplemental fields not already present.
  */
 function extractSupplementalFields(person, existingData) {
   const data = {};
   const fieldsFound = [];
-  let confidence = 'medium';
 
-  // Only fill gaps
-  if (!existingData.email && person.email) { data.email = person.email; data.email_status = person.email_status; fieldsFound.push('email'); }
-  if (!existingData.linkedin_url && person.linkedin_url) { data.linkedin_url = person.linkedin_url; fieldsFound.push('linkedin_url'); }
-  if (!existingData.seniority && person.seniority) { data.seniority = person.seniority; fieldsFound.push('seniority'); }
+  if (!existingData.email && person.email) {
+    data.email = person.email;
+    data.email_status = person.email_status;
+    fieldsFound.push('email');
+  }
+  if (!existingData.linkedin_url && person.linkedin_url) {
+    data.linkedin_url = person.linkedin_url;
+    fieldsFound.push('linkedin_url');
+  }
+  if (!existingData.seniority && person.seniority) {
+    data.seniority = person.seniority;
+    fieldsFound.push('seniority');
+  }
   if ((!existingData.city && !existingData.state) && (person.city || person.state)) {
-    data.city = person.city; data.state = person.state; data.country = person.country;
+    data.city = person.city;
+    data.state = person.state;
+    data.country = person.country;
     fieldsFound.push('location');
   }
-  if (!existingData.headline && person.headline) { data.headline = person.headline; fieldsFound.push('headline'); }
-  if (!existingData.photo_url && person.photo_url) { data.photo_url = person.photo_url; fieldsFound.push('photo_url'); }
+  if (!existingData.headline && person.headline) {
+    data.headline = person.headline;
+    fieldsFound.push('headline');
+  }
+  if (!existingData.photo_url && person.photo_url) {
+    data.photo_url = person.photo_url;
+    fieldsFound.push('photo_url');
+  }
 
-  if (fieldsFound.length === 0) confidence = 'low';
-  if (fieldsFound.length > 3) confidence = 'high';
-
-  return { data, fieldsFound, confidence };
+  return { data, fieldsFound };
 }
 
 /**
- * Find best matching person from search results
+ * Merge new data into enriched data, respecting precedence.
+ * User-entered data is never overwritten.
+ */
+function mergeWithPrecedence(enrichedData, newData, originalContact) {
+  const merged = { ...enrichedData };
+
+  for (const [key, value] of Object.entries(newData)) {
+    // Never overwrite user-entered data (from original contact)
+    const userEntered = originalContact[key];
+    if (userEntered && typeof userEntered === 'string' && userEntered.trim() !== '') {
+      continue;
+    }
+
+    // Never overwrite already-enriched data (person-level beats company-level)
+    if (merged[key] && typeof merged[key] === 'string' && merged[key].trim() !== '') {
+      continue;
+    }
+
+    // Arrays: only overwrite if empty
+    if (Array.isArray(merged[key]) && merged[key].length > 0) {
+      continue;
+    }
+
+    merged[key] = value;
+  }
+
+  return merged;
+}
+
+/**
+ * Find best matching person from search results.
+ * Score-based — name + company match required.
  */
 function findBestMatch(people, targetName, targetCompany) {
   const normalize = (s) => (s || '').toLowerCase().trim();
@@ -535,11 +707,9 @@ function findBestMatch(people, targetName, targetCompany) {
     const personName = normalize(person.name || `${person.first_name} ${person.last_name}`);
     const personCompany = normalize(person.organization_name || person.organization?.name || '');
 
-    // Name match
     if (personName === targetNameNorm) score += 3;
     else if (personName.includes(targetNameNorm) || targetNameNorm.includes(personName)) score += 1;
 
-    // Company match
     if (personCompany === targetCompanyNorm) score += 2;
     else if (personCompany.includes(targetCompanyNorm) || targetCompanyNorm.includes(personCompany)) score += 1;
 
@@ -549,26 +719,35 @@ function findBestMatch(people, targetName, targetCompany) {
     }
   }
 
-  // Only return if there's a reasonable match
   return bestScore >= 3 ? bestMatch : null;
 }
 
 /**
- * Build data_sources array from enrichment steps
+ * Compute confidence level — pure rules, no AI.
+ */
+function computeConfidence(fieldsFound, fieldsMissing) {
+  if (fieldsFound >= 6 && fieldsMissing <= 2) return 'high';
+  if (fieldsFound >= 3) return 'medium';
+  return 'low';
+}
+
+/**
+ * Build data_sources array from enrichment steps.
  */
 function buildDataSources(steps) {
   const sources = new Set();
   steps.forEach(step => {
     if (step.status === 'success' && step.fieldsFound?.length > 0) {
       if (step.source.startsWith('apollo')) sources.add('apollo');
-      if (step.source === 'barry_ai') sources.add('ai_analysis');
+      if (step.source === 'google_places') sources.add('google');
+      if (step.source === 'internal_db') sources.add('internal');
     }
   });
   return Array.from(sources);
 }
 
 /**
- * Infer if contact is likely a decision maker
+ * Infer decision maker status — rule-based.
  */
 function inferDecisionMaker(seniority, title) {
   if (!seniority && !title) return false;

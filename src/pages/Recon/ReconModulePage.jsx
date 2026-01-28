@@ -1,11 +1,100 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Brain, CheckCircle2, Circle, AlertCircle, ChevronRight, Info } from 'lucide-react';
+import { ArrowLeft, Brain, CheckCircle2, Circle, AlertCircle, ChevronRight, Info, Sparkles, Lightbulb, Trophy } from 'lucide-react';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { initializeDashboard } from '../../utils/dashboardUtils';
 import SectionOutputModal from '../../components/recon/SectionOutputModal';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
+
+// Contextual tips based on module completion state
+const CONTEXTUAL_TIPS = {
+  'icp-intelligence': {
+    notStarted: {
+      icon: Lightbulb,
+      title: 'Getting Started Tip',
+      content: 'Start with Section 1 (Business Foundation). This gives Barry the context he needs to understand everything else you tell him.'
+    },
+    inProgress: {
+      icon: Sparkles,
+      title: 'Keep Going!',
+      content: 'You\'re building Barry\'s core understanding of your business. Each section you complete makes Scout\'s lead scoring more accurate.'
+    },
+    completed: {
+      icon: Trophy,
+      title: 'Module Complete!',
+      content: 'Barry now has a strong foundation. He can match prospects against your ICP and generate business-aware context. Consider completing Messaging next for maximum impact.'
+    }
+  },
+  'messaging': {
+    notStarted: {
+      icon: Lightbulb,
+      title: 'Why Start Here?',
+      content: 'Your messaging framework transforms Barry\'s output. Without it, generated content sounds generic. With it, every message reflects your actual voice and positioning.'
+    },
+    inProgress: {
+      icon: Sparkles,
+      title: 'You\'re Shaping Barry\'s Voice',
+      content: 'The value proposition and tone you define here will appear in Hunter messages and Barry\'s conversation starters. Be specific — Barry takes direction literally.'
+    },
+    completed: {
+      icon: Trophy,
+      title: 'Messaging Trained!',
+      content: 'Barry now writes like you. Hunter messages will use your value prop, and conversation starters reflect your brand voice. Major upgrade unlocked.'
+    }
+  },
+  'objections': {
+    notStarted: {
+      icon: Lightbulb,
+      title: 'Pain is Power',
+      content: 'The pain points you describe here become Barry\'s secret weapon. He\'ll identify when prospects are experiencing problems you solve and address objections before they surface.'
+    },
+    inProgress: {
+      icon: Sparkles,
+      title: 'Teaching Barry Empathy',
+      content: 'The buying behaviors and motivations you\'re defining help Barry understand the "why" behind prospect actions. This makes follow-up sequences dramatically more effective.'
+    },
+    completed: {
+      icon: Trophy,
+      title: 'Objection Handling Unlocked!',
+      content: 'Barry can now anticipate concerns and speak to what actually drives purchase decisions. Your Hunter follow-ups just got a lot smarter.'
+    }
+  },
+  'competitive-intel': {
+    notStarted: {
+      icon: Lightbulb,
+      title: 'Know Your Battlefield',
+      content: 'Prospects are always comparing you to alternatives. Teach Barry the competitive landscape so he can position you effectively and filter out competitor-locked leads.'
+    },
+    inProgress: {
+      icon: Sparkles,
+      title: 'Building Competitive Awareness',
+      content: 'The differentiation points you define will appear in Hunter messaging. Barry will also flag prospects who mention competitor keywords in their profiles.'
+    },
+    completed: {
+      icon: Trophy,
+      title: 'Competitive Intel Active!',
+      content: 'Barry now knows how to position you against alternatives. Scout will deprioritize competitor-locked leads, and Hunter messaging will differentiate effectively.'
+    }
+  },
+  'buying-signals': {
+    notStarted: {
+      icon: Lightbulb,
+      title: 'Timing is Everything',
+      content: 'The signals you define here teach Barry when to prioritize. A prospect showing buying signals is worth 10x a cold lead — but only if Barry knows what to look for.'
+    },
+    inProgress: {
+      icon: Sparkles,
+      title: 'Calibrating Barry\'s Radar',
+      content: 'The decision process and behavioral triggers you\'re mapping will help Barry detect urgency. Scout will surface high-intent leads faster.'
+    },
+    completed: {
+      icon: Trophy,
+      title: 'Signal Detection Online!',
+      content: 'Barry now recognizes when prospects are ready to buy. Scout will prioritize high-intent leads, and Hunter timing will adapt to buyer readiness. Full system upgrade complete.'
+    }
+  }
+};
 
 /**
  * Generic RECON Module Page — renders any module's sections
@@ -222,6 +311,38 @@ export default function ReconModulePage() {
           />
         </div>
       </div>
+
+      {/* Contextual Tip */}
+      {(() => {
+        const moduleTips = CONTEXTUAL_TIPS[moduleId];
+        if (!moduleTips) return null;
+
+        const tipState = progressPercent === 100 ? 'completed' : progressPercent > 0 ? 'inProgress' : 'notStarted';
+        const tip = moduleTips[tipState];
+        if (!tip) return null;
+
+        const TipIcon = tip.icon;
+        const tipColors = {
+          notStarted: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-500', text: 'text-blue-700', title: 'text-blue-800' },
+          inProgress: { bg: 'bg-purple-50', border: 'border-purple-200', icon: 'text-purple-500', text: 'text-purple-700', title: 'text-purple-800' },
+          completed: { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', title: 'text-emerald-800' }
+        };
+        const tc = tipColors[tipState];
+
+        return (
+          <div className={`${tc.bg} rounded-xl border-[1.5px] ${tc.border} p-4 mb-6`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0`}>
+                <TipIcon className={`w-4 h-4 ${tc.icon}`} />
+              </div>
+              <div>
+                <h4 className={`text-sm font-bold ${tc.title} mb-1`}>{tip.title}</h4>
+                <p className={`text-xs ${tc.text} leading-relaxed`}>{tip.content}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sections */}
       <div className="space-y-3 mb-8">

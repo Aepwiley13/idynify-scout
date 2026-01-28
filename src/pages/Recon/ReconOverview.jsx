@@ -22,6 +22,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
+import ImpactPreviewPanel from '../../components/recon/ImpactPreviewPanel';
 
 // Map RECON sections to the new module structure
 const RECON_MODULES = [
@@ -593,6 +594,16 @@ export default function ReconOverview() {
             );
           })}
         </div>
+      </div>
+
+      {/* Impact Preview Panel */}
+      <div className="mb-8">
+        <ImpactPreviewPanel
+          reconProgress={overallProgress}
+          trainedDimensions={TRAINING_DIMENSIONS
+            .filter(d => getDimensionStatus(d) === 'trained')
+            .map(d => d.id)}
+        />
       </div>
 
       {/* Confidence Explanation */}

@@ -16,7 +16,6 @@ import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
-import EnrichmentPanel from '../../components/contacts/EnrichmentPanel';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import ContactHunterActivity from '../../components/hunter/ContactHunterActivity';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
@@ -32,12 +31,9 @@ export default function ContactProfile() {
   const [enrichError, setEnrichError] = useState(null);
   const [barryContext, setBarryContext] = useState(null);
   const [generatingContext, setGeneratingContext] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
   const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
   const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
   const [staleDismissed, setStaleDismissed] = useState(false);
-  const [enrichResult, setEnrichResult] = useState(null);
 
   useEffect(() => {
     loadContactProfile();
@@ -75,9 +71,6 @@ export default function ContactProfile() {
         console.log('🐻 No Barry context found, generating...');
         generateBarryContext(contactData, user);
       }
-
-      // PHASE 2: Load contact notes
-      setNotes(contactData.notes || '');
 
       // Load RECON training status for stale intelligence warning
       loadReconStatus(user.uid);
@@ -144,23 +137,6 @@ export default function ContactProfile() {
     setContact(updatedContact);
   }
 
-  async function handleSaveNotes() {
-    try {
-      setSavingNotes(true);
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
-      await updateDoc(contactRef, { notes });
-
-      console.log('✅ Notes saved');
-      setSavingNotes(false);
-    } catch (error) {
-      console.error('❌ Failed to save notes:', error);
-      setSavingNotes(false);
-    }
-  }
-
   async function loadReconStatus(userId) {
     try {
       const dashboardDoc = await getDoc(doc(db, 'dashboards', userId));
@@ -184,7 +160,6 @@ export default function ContactProfile() {
       setEnriching(true);
       setEnrichError(null);
       setEnrichSuccess(false);
-      setEnrichResult(null);
 
       const user = auth.currentUser;
       if (!user) throw new Error('Not authenticated');
@@ -229,9 +204,6 @@ export default function ContactProfile() {
       }
 
       console.log('✅ Enrichment complete');
-
-      // Store enrichment result for the UI panel
-      setEnrichResult(result);
 
       // Update contact in Firestore with enriched data
       const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
@@ -297,22 +269,20 @@ export default function ContactProfile() {
           <ArrowLeft className="w-4 h-4" />
           <span>Back to All Leads</span>
         </button>
-        {contact.apollo_person_id && (
-          <button
-            className="btn-enrich-nav"
-            onClick={handleEnrichContact}
-            disabled={enriching}
-          >
-            {enriching ? (
-              <>
-                <Loader className="w-4 h-4 spinner" />
-                <span>Enriching...</span>
-              </>
-            ) : (
-              <span>Enrich Contact</span>
-            )}
-          </button>
-        )}
+        <button
+          className="btn-enrich-nav"
+          onClick={handleEnrichContact}
+          disabled={enriching}
+        >
+          {enriching ? (
+            <>
+              <Loader className="w-4 h-4 spinner" />
+              <span>Enriching...</span>
+            </>
+          ) : (
+            <span>Enrich Contact</span>
+          )}
+        </button>
         {/* Hunter engage button - opens in-context drawer */}
         <button
           className="btn-hunter-engage"
@@ -328,7 +298,7 @@ export default function ContactProfile() {
       {enrichSuccess && (
         <div className="enrich-success-banner">
           <CheckCircle className="w-5 h-5" />
-          <span>Contact enriched successfully! Email and phone updated.</span>
+          <span>Contact enriched successfully.</span>
         </div>
       )}
 
@@ -376,15 +346,7 @@ export default function ContactProfile() {
         {/* 1. IDENTITY CARD - TOP */}
         <IdentityCard contact={contact} />
 
-        {/* 2. ENRICHMENT PANEL - USER-INITIATED BARRY ENRICHMENT */}
-        <EnrichmentPanel
-          contact={contact}
-          onEnrich={handleEnrichContact}
-          enriching={enriching}
-          enrichResult={enrichResult}
-        />
-
-        {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
+        {/* 2. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (
           <MeetSection barryContext={barryContext} contact={contact} />
         ) : generatingContext ? (
@@ -394,34 +356,13 @@ export default function ContactProfile() {
           </div>
         ) : null}
 
-        {/* 4. ACTIONS - BELOW BARRY */}
+        {/* 3. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 5. NOTES SECTION (PHASE 2) */}
-        <div className="contact-notes-section">
-          <div className="notes-header">
-            <h3>Notes</h3>
-            <button
-              className="btn-save-notes"
-              onClick={handleSaveNotes}
-              disabled={savingNotes}
-            >
-              {savingNotes ? 'Saving...' : 'Save Notes'}
-            </button>
-          </div>
-          <textarea
-            className="notes-textarea"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add notes about this contact... (e.g., conversation highlights, next steps, preferences)"
-            rows={6}
-          />
-        </div>
-
-        {/* 6. HUNTER ACTIVITY - Shows missions and engagement */}
+        {/* 4. HUNTER ACTIVITY - Shows missions and engagement */}
         <ContactHunterActivity contactId={contact.id} />
 
-        {/* 7. VIEW DETAILS DRAWER - BOTTOM */}
+        {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
 

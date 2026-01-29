@@ -1,0 +1,438 @@
+/* ── EnrichmentPanel ─────────────────────────────────── */
+
+.enrichment-panel {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.enrichment-panel:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Header ─── */
+
+.enrichment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.enrichment-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.enrichment-icon {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.enrichment-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f0f0f5;
+  margin: 0;
+}
+
+.enrichment-subtitle {
+  font-size: 0.8rem;
+  color: #8b8ba0;
+  margin: 2px 0 0;
+}
+
+.enrichment-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8b8ba0;
+}
+
+/* ── Confidence Badge ─── */
+
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.confidence-high {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.confidence-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.confidence-low {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ── Enrich Action ─── */
+
+.enrichment-action {
+  padding: 0 20px 16px;
+}
+
+.enrich-barry-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.enrich-barry-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+}
+
+.enrich-barry-btn:active {
+  transform: translateY(0);
+}
+
+.enrich-hint {
+  font-size: 0.75rem;
+  color: #6b6b80;
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* ── Progress ─── */
+
+.enrichment-progress {
+  padding: 0 20px 16px;
+}
+
+.progress-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.progress-bar-container {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  border-radius: 100px;
+  width: 60%;
+  transition: width 0.3s ease;
+}
+
+.progress-bar-animated {
+  animation: progress-pulse 2s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% { width: 30%; opacity: 0.7; }
+  50% { width: 80%; opacity: 1; }
+}
+
+/* ── Enrichment Step ─── */
+
+.enrichment-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.step-indicator {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #d0d0e0;
+}
+
+.step-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.step-field-tag {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #a78bfa;
+}
+
+.step-message {
+  font-size: 0.75rem;
+  color: #8b8ba0;
+  margin: 4px 0 0;
+}
+
+/* Step states */
+.step-running .step-indicator { color: #a78bfa; }
+.step-success .step-indicator { color: #34d399; }
+.step-error .step-indicator { color: #f87171; }
+.step-nodata .step-indicator { color: #fbbf24; }
+.step-pending .step-indicator { color: #4b4b60; }
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Details Section ─── */
+
+.enrichment-details {
+  padding: 0 20px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Analysis */
+
+.analysis-section {
+  padding-top: 16px;
+}
+
+.analysis-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(124, 58, 237, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #7c3aed;
+}
+
+.analysis-icon {
+  color: #a78bfa;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.analysis-summary p {
+  font-size: 0.85rem;
+  color: #d0d0e0;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.analysis-findings {
+  margin-top: 12px;
+}
+
+.findings-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8b8ba0;
+  margin: 0 0 6px;
+}
+
+.findings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.finding-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #c0c0d0;
+  line-height: 1.4;
+}
+
+.finding-item svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.finding-success svg { color: #34d399; }
+.finding-missing svg { color: #f87171; }
+
+.finding-source {
+  margin-left: auto;
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #8b8ba0;
+  white-space: nowrap;
+}
+
+/* ── Provenance ─── */
+
+.provenance-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.provenance-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #8b8ba0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.provenance-toggle:hover {
+  color: #d0d0e0;
+}
+
+.provenance-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provenance-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.provenance-field {
+  font-size: 0.78rem;
+  color: #d0d0e0;
+  font-weight: 500;
+}
+
+.provenance-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: #8b8ba0;
+}
+
+/* ── Steps History ─── */
+
+.steps-history {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.steps-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8b8ba0;
+  margin: 0 0 8px;
+}
+
+/* ── Missing Fields ─── */
+
+.missing-fields {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.missing-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8b8ba0;
+  margin: 0 0 8px;
+}
+
+.missing-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.missing-tag {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+/* ── Timestamp ─── */
+
+.enrichment-timestamp {
+  margin-top: 12px;
+  font-size: 0.72rem;
+  color: #5b5b70;
+  text-align: right;
+}

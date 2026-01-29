@@ -206,6 +206,54 @@ export const getPath = {
  */
 
 // ============================================================================
+// CONTACT ENRICHMENT PROVENANCE - Schema Documentation (Barry Enrichment)
+// ============================================================================
+
+/**
+ * Contact Enrichment Provenance Fields
+ * Stored in users/{userId}/contacts/{contactId} document
+ *
+ * Added by barryEnrich function when user triggers enrichment.
+ * All enrichment is tool-based (no AI). Barry orchestrates, not "thinks".
+ *
+ * Pipeline:
+ *   Step 0: Internal DB (free — checks alternate field names)
+ *   Step 1: Apollo PEOPLE_MATCH / PEOPLE_SEARCH (person-level data)
+ *   Step 2: Google Places (company-level fallback: phone, address, website)
+ *
+ * Fields:
+ * {
+ *   enrichment_provenance: {         // Maps field name -> source
+ *     email: 'apollo_match',
+ *     linkedin_url: 'apollo_match',
+ *     company_phone: 'google_places',
+ *     seniority: 'apollo_search',
+ *     // ... each enriched field maps to its data source
+ *   },
+ *   enrichment_steps: [              // Ordered list of enrichment steps
+ *     {
+ *       source: 'internal_db' | 'apollo_match' | 'apollo_search' | 'google_places',
+ *       status: 'success' | 'error' | 'no_data' | 'no_match' | 'no_results' | 'skipped',
+ *       fieldsFound: string[],       // e.g., ['email', 'phone', 'location']
+ *       timestamp: string,           // ISO timestamp
+ *       message: string | null       // Error or status message
+ *     }
+ *   ],
+ *   enrichment_summary: {            // Rule-based summary (NO AI)
+ *     fields_found: string[],        // Field names that were enriched
+ *     fields_missing: string[],      // Field names still missing
+ *     confidence: 'high' | 'medium' | 'low',  // Rule-based: high=6+ found & <=2 missing
+ *     total_steps: number,           // How many pipeline steps ran
+ *     sources_used: string[]         // e.g., ['apollo', 'google', 'internal']
+ *   },
+ *   // Company-level fields (from Google Places):
+ *   company_phone: string | null,
+ *   company_website: string | null,
+ *   company_address: string | null
+ * }
+ */
+
+// ============================================================================
 // SECTION 2: PRODUCT/SERVICE DEEP DIVE - Schema Documentation
 // ============================================================================
 

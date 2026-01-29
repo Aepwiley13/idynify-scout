@@ -150,4 +150,4 @@ function formatKey(key) {
     .trim();
 }
 
-module.exports = { compileReconForPrompt };
+export { compileReconForPrompt };

@@ -680,12 +680,10 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 <button
                   className="weapon-btn"
                   onClick={() => handleSelectWeapon('text')}
-                  disabled={!hasPhone}
                 >
                   <MessageSquare className="w-6 h-6" />
                   <span>Text</span>
-                  {!hasPhone && <span className="weapon-disabled">No phone</span>}
-                  {hasPhone && <span className="weapon-badge-alt">Opens App</span>}
+                  <span className="weapon-badge-alt">Opens App</span>
                 </button>
                 <button
                   className="weapon-btn"

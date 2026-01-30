@@ -24,7 +24,12 @@ export default function AddContactModal({ onClose, onContactAdded }) {
 
   const handleViewLeads = () => {
     onClose();
-    navigate('/scout/all-leads');
+    // Single contact: go directly to their profile
+    if (addedContacts.length === 1 && addedContacts[0]?.id) {
+      navigate(`/scout/contact/${addedContacts[0].id}`);
+    } else {
+      navigate('/scout/all-leads');
+    }
   };
 
   const handleAddMore = () => {
@@ -203,7 +208,7 @@ export default function AddContactModal({ onClose, onContactAdded }) {
                   className="flex-1 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all shadow-md flex items-center justify-center gap-2"
                 >
                   <Eye className="w-5 h-5" />
-                  View in Leads
+                  {addedContacts.length === 1 ? 'Go to Lead' : 'View in Leads'}
                 </button>
                 <button
                   onClick={handleAddMore}

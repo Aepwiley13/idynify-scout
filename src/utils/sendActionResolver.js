@@ -80,10 +80,7 @@ export async function resolveSendMethod(channel, userId, contact) {
       return { method: 'native', fallbackReason: 'Gmail not connected' };
 
     case CHANNELS.TEXT:
-      if (!contact.phone) {
-        return { method: 'disabled', reason: 'No phone number' };
-      }
-      // No real SMS integration yet - always use native
+      // Always allow text - opens native SMS app even without a saved phone number
       return { method: 'native' };
 
     case CHANNELS.CALL:
@@ -174,15 +171,18 @@ export function openNativeEmail({ contact, subject, body }) {
  * OPTION B: Open native SMS app
  */
 export function openNativeSMS({ contact, body }) {
-  const phone = contact.phone || contact.phone_mobile;
-  // Use body parameter (works on iOS). On Android, may need to adjust
-  const smsUrl = `sms:${encodeURIComponent(phone)}?body=${encodeURIComponent(body || '')}`;
+  const phone = contact.phone || contact.phone_mobile || '';
+  // Build SMS link - if no phone number, opens SMS app with blank "To" field
+  const recipient = phone ? encodeURIComponent(phone) : '';
+  const smsUrl = `sms:${recipient}?body=${encodeURIComponent(body || '')}`;
 
   window.location.href = smsUrl;
 
   return {
     result: SEND_RESULT.OPENED,
-    message: 'Text message opened in your SMS app'
+    message: phone
+      ? 'Text message opened in your SMS app'
+      : 'SMS app opened — add the recipient and send'
   };
 }
 

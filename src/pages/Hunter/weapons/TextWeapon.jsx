@@ -53,7 +53,7 @@ export default function TextWeapon({ onBack }) {
           id: doc.id,
           ...doc.data()
         }))
-        .filter(contact => contact.phone); // Only contacts with phone numbers
+        .filter(contact => contact.firstName || contact.lastName); // All contacts with a name
 
       setAllContacts(contactsList);
     } catch (error) {
@@ -189,9 +189,9 @@ export default function TextWeapon({ onBack }) {
           <div className="hunter-empty-icon">
             <Users className="w-10 h-10 text-purple-400" />
           </div>
-          <h3 className="hunter-empty-title">No Contacts with Phone Numbers</h3>
+          <h3 className="hunter-empty-title">No Contacts Found</h3>
           <p className="hunter-empty-text">
-            Add phone numbers to your contacts in Scout before sending text messages.
+            Add contacts in Scout to start sending text messages.
           </p>
           <button className="btn-primary-hunter" onClick={() => navigate('/scout')}>
             Go to Scout
@@ -291,7 +291,7 @@ export default function TextWeapon({ onBack }) {
                 <div className="contact-info">
                   <div className="contact-name">{contact.firstName} {contact.lastName}</div>
                   <div className="contact-meta">
-                    {contact.phone}
+                    {contact.phone || 'No phone saved'}
                     {contact.title && ` • ${contact.title}`}
                     {contact.company_name && ` • ${contact.company_name}`}
                   </div>

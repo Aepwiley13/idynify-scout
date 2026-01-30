@@ -52,10 +52,12 @@ export async function fetchAllUsers(userId, authToken, options = {}) {
 
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
     body: JSON.stringify({
       userId,
-      authToken,
       ...options // Include limit and cursor if provided (for future pagination)
     })
   });
@@ -87,10 +89,12 @@ export async function fetchApiLogs(userId, authToken, filters = {}) {
 
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`
+    },
     body: JSON.stringify({
       userId,
-      authToken,
       filters
     })
   });

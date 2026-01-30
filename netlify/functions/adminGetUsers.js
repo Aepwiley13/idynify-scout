@@ -31,7 +31,7 @@ export const handler = async (event) => {
   // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': 'https://idynify.com',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
@@ -51,7 +51,18 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken } = JSON.parse(event.body);
+    // Extract auth token from Authorization header (fallback: request body)
+    const authHeader = event.headers?.authorization || event.headers?.Authorization;
+    let authToken = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      authToken = authHeader.slice(7);
+    }
+    const body = JSON.parse(event.body || '{}');
+    const userId = body.userId;
+    // Fallback: also check body for authToken (backward compatibility)
+    if (!authToken && body.authToken) {
+      authToken = body.authToken;
+    }
 
     if (!userId || !authToken) {
       return {

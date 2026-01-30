@@ -11,6 +11,7 @@
 
 import { admin } from './firebase-admin.js';
 import { checkAdminAccess } from './utils/adminAuth.js';
+import { extractAuthToken } from './utils/extractAuthToken.js';
 import { createImpersonationSession } from './utils/impersonation.js';
 import { logAuditEvent, getIpAddress, getUserAgent, AUDIT_ACTIONS } from './utils/auditLog.js';
 
@@ -38,8 +39,10 @@ export const handler = async (event) => {
   }
 
   try {
-    // Parse request body
-    const { authToken, targetUserId, reason } = JSON.parse(event.body);
+    // Extract auth token from Authorization header (fallback: request body)
+    const authToken = extractAuthToken(event);
+    // Parse remaining body parameters
+    const { targetUserId, reason } = JSON.parse(event.body || '{}');
 
     // Verify auth token
     if (!authToken) {

@@ -2281,3 +2281,87 @@
     height: 360px;
   }
 }
+
+/* ========================================
+   ARCHIVE / RESTORE UI
+   ======================================== */
+
+/* Archive action row below header */
+.company-archive-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.company-archive-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.company-archive-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.company-archive-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Archived banner */
+.company-archive-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.archive-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.company-restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.company-restore-btn:hover {
+  background: #059669;
+}
+
+.company-restore-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

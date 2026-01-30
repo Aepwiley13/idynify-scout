@@ -8,6 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import Homepage from './pages/Homepage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
 import GettingStarted from './pages/GettingStarted';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
@@ -122,9 +123,10 @@ function App() {
         const response = await fetch('/.netlify/functions/adminGetImpersonationSession', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
           },
-          body: JSON.stringify({ authToken })
+          body: JSON.stringify({})
         });
 
         if (response.ok) {
@@ -231,6 +233,7 @@ function App() {
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
+        <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/mission-control-v2" />} />
 
         {/* Getting Started (Auth Required) */}
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
@@ -443,7 +446,14 @@ function App() {
         />
 
         {/* Admin Routes */}
-        <Route path="/admin-ping-test" element={<AdminPingTest />} />
+        <Route
+          path="/admin-ping-test"
+          element={
+            <ProtectedAdminRoute>
+              <AdminPingTest />
+            </ProtectedAdminRoute>
+          }
+        />
         <Route
           path="/admin"
           element={

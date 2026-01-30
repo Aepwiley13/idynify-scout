@@ -10,6 +10,7 @@
 
 import { admin } from './firebase-admin.js';
 import { checkAdminAccess } from './utils/adminAuth.js';
+import { extractAuthToken } from './utils/extractAuthToken.js';
 import { getActiveImpersonationSession, endImpersonationSession } from './utils/impersonation.js';
 import { logAuditEvent, getIpAddress, getUserAgent, AUDIT_ACTIONS } from './utils/auditLog.js';
 
@@ -37,8 +38,8 @@ export const handler = async (event) => {
   }
 
   try {
-    // Parse request body
-    const { authToken } = JSON.parse(event.body);
+    // Extract auth token from Authorization header (fallback: request body)
+    const authToken = extractAuthToken(event);
 
     // Verify auth token
     if (!authToken) {

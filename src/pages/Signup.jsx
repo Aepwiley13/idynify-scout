@@ -88,7 +88,23 @@ export default function Signup() {
       // Redirect to checkout with tier parameter
       navigate(`/checkout?tier=${tier}`);
     } catch (error) {
-      setError(error.message);
+      // Map Firebase error codes to user-friendly messages
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setError('An account with this email already exists.');
+          break;
+        case 'auth/invalid-email':
+          setError('Please enter a valid email address.');
+          break;
+        case 'auth/weak-password':
+          setError('Password is too weak. Please use at least 6 characters.');
+          break;
+        case 'auth/too-many-requests':
+          setError('Too many attempts. Please try again later.');
+          break;
+        default:
+          setError('Failed to create account. Please try again.');
+      }
     }
   };
 

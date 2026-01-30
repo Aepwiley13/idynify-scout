@@ -122,6 +122,134 @@
 }
 
 /* ========================================
+   TABS: ACTIVE / ARCHIVED
+   ======================================== */
+.companies-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0;
+}
+
+.companies-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.companies-tab:hover {
+  color: #374151;
+}
+
+.companies-tab.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+/* Archived info banner */
+.archived-info-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.25rem;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: #92400e;
+  font-weight: 500;
+}
+
+/* Archived badge on card */
+.archived-badge {
+  position: absolute;
+  top: 1.25rem;
+  left: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: #6b7280;
+  color: #ffffff;
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Archived card styling */
+.saved-company-card.archived {
+  opacity: 0.75;
+  border-color: #d1d5db;
+}
+
+.saved-company-card.archived:hover {
+  opacity: 1;
+}
+
+/* Card actions row */
+.saved-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.saved-card-actions .saved-view-details-btn {
+  flex: 1;
+}
+
+/* Archive button on card */
+.saved-archive-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-archive-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* Restore button on card */
+.saved-restore-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-restore-btn:hover {
+  border-color: #10b981;
+  color: #10b981;
+  background: #ecfdf5;
+}
+
+/* ========================================
    SEARCH SECTION
    ======================================== */
 .search-section {

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp, Archive, RotateCcw } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
 
@@ -24,6 +24,7 @@ export default function CompanyDetail() {
   const [showKeywords, setShowKeywords] = useState(false);
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingDecisionMakers, setSavingDecisionMakers] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     loadCompanyData();
@@ -500,6 +501,66 @@ export default function CompanyDetail() {
     }
   }
 
+  // Archive this company
+  async function handleArchiveCompany() {
+    const confirmed = window.confirm(
+      `Archive ${company?.name}? This will move it out of your active pipeline. You can restore it later from the Archived tab.`
+    );
+    if (!confirmed) return;
+
+    setArchiving(true);
+    try {
+      const userId = auth.currentUser.uid;
+      const companyRef = doc(db, 'users', userId, 'companies', companyId);
+
+      await updateDoc(companyRef, {
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+        activity_log: arrayUnion({
+          type: 'status_changed',
+          from: 'accepted',
+          to: 'archived',
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      // Navigate back to saved companies
+      navigate('/scout', { state: { activeTab: 'saved-companies' } });
+    } catch (error) {
+      console.error('Failed to archive company:', error);
+      alert('Failed to archive company. Please try again.');
+      setArchiving(false);
+    }
+  }
+
+  // Restore this company from archive
+  async function handleRestoreCompany() {
+    setArchiving(true);
+    try {
+      const userId = auth.currentUser.uid;
+      const companyRef = doc(db, 'users', userId, 'companies', companyId);
+
+      await updateDoc(companyRef, {
+        status: 'accepted',
+        archived_at: null,
+        activity_log: arrayUnion({
+          type: 'status_changed',
+          from: 'archived',
+          to: 'accepted',
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      // Reload company data to reflect new status
+      setCompany(prev => ({ ...prev, status: 'accepted' }));
+      setArchiving(false);
+    } catch (error) {
+      console.error('Failed to restore company:', error);
+      alert('Failed to restore company. Please try again.');
+      setArchiving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="company-detail-loading">
@@ -554,6 +615,35 @@ export default function CompanyDetail() {
               <p className="company-industry">{company.industry || 'Industry not specified'}</p>
             </div>
           </div>
+
+          {/* Archive / Restore Banner */}
+          {company.status === 'archived' ? (
+            <div className="company-archive-banner restored">
+              <div className="archive-banner-text">
+                <Archive className="w-4 h-4" />
+                <span>This company is archived</span>
+              </div>
+              <button
+                className="company-restore-btn"
+                onClick={handleRestoreCompany}
+                disabled={archiving}
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{archiving ? 'Restoring...' : 'Restore to Active'}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="company-archive-action">
+              <button
+                className="company-archive-btn"
+                onClick={handleArchiveCompany}
+                disabled={archiving}
+              >
+                <Archive className="w-4 h-4" />
+                <span>{archiving ? 'Archiving...' : 'Archive Company'}</span>
+              </button>
+            </div>
+          )}
 
           {/* Stats Grid - Matching SavedCompanies */}
           <div className="company-stats-grid">

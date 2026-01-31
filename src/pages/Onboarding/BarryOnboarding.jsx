@@ -62,12 +62,19 @@ export default function BarryOnboarding() {
         const data = profileDoc.data();
         if (data.industries && data.industries.length > 0) {
           setExistingICP(data);
-          setBarryMessage(`I see you already have an ICP set up. Let me quickly confirm it so I can do my best work.\n\nCurrently targeting: ${data.industries.join(', ')}${data.companySizes?.length ? ` (${data.companySizes.join(', ')} employees)` : ''}${data.isNationwide ? ' nationwide' : data.locations?.length ? ` in ${data.locations.slice(0, 3).join(', ')}${data.locations.length > 3 ? '...' : ''}` : ''}\n\nIs this still accurate, or would you like to refine it?`);
+          // Build return greeting with lookalike info if present
+          const lookalikePart = data.lookalikeSeed?.name
+            ? `\n\nUsing ${data.lookalikeSeed.name} as your lookalike seed to find similar companies.`
+            : '';
+          const strategyPart = data.searchStrategy === 'lookalike'
+            ? ' (lookalike strategy)'
+            : '';
+          setBarryMessage(`Welcome back. Your current hunt targets: ${data.industries.join(', ')}${strategyPart}${data.companySizes?.length ? ` (${data.companySizes.join(', ')} employees)` : ''}${data.isNationwide ? ' nationwide' : data.locations?.length ? ` in ${data.locations.slice(0, 3).join(', ')}${data.locations.length > 3 ? '...' : ''}` : ''}${lookalikePart}\n\nIs this still accurate, or should we refine your targets?`);
         } else {
-          setBarryMessage("I'm Barry. I replace complex setup by learning how you sell — once — and applying it everywhere.\n\nLet's start with one question: Who do you sell to?");
+          setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
         }
       } else {
-        setBarryMessage("I'm Barry. I replace complex setup by learning how you sell — once — and applying it everywhere.\n\nLet's start with one question: Who do you sell to?");
+        setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
       }
 
       // Check for existing conversation
@@ -95,7 +102,7 @@ export default function BarryOnboarding() {
       console.error('Error checking existing ICP:', error);
       setLoading(false);
       setStep('asking');
-      setBarryMessage("I'm Barry. I replace complex setup by learning how you sell — once — and applying it everywhere.\n\nLet's start with one question: Who do you sell to?");
+      setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
     }
   }
 
@@ -192,7 +199,7 @@ export default function BarryOnboarding() {
     } catch (error) {
       console.error('Error processing input:', error);
       // Barry-voiced error - preserve trust even when AI fails
-      const barryErrorMsg = "I'm having trouble processing that right now.\n\nYou can try again, or configure your ICP manually in Settings — I'll pick it up from there.";
+      const barryErrorMsg = "Hit a snag processing that.\n\nTry again, or set your targets manually in Settings — I'll track them from there.";
       const errorHistory = [
         ...newHistory,
         { role: 'barry', content: barryErrorMsg, timestamp: new Date().toISOString() }
@@ -274,8 +281,8 @@ export default function BarryOnboarding() {
 
       // Add final Barry message - personalized based on strategy
       const finalMessage = extractedICP.lookalikeSeed?.name
-        ? `Got it. I'll prioritize companies similar to ${extractedICP.lookalikeSeed.name}. You can always refine this later from your settings.`
-        : "Got it. I'll use this to find companies that match your ICP. You can always refine this later from your settings.";
+        ? `Locked in. I'll hunt for companies similar to ${extractedICP.lookalikeSeed.name}. You can refine your targets anytime in Settings.`
+        : "Locked in. Scout will surface your targets daily, and Hunter will craft outreach that lands. Refine anytime in Settings.";
       const finalHistory = [
         ...conversationHistory,
         {
@@ -302,7 +309,7 @@ export default function BarryOnboarding() {
 
   function handleRefine() {
     setStep('asking');
-    setBarryMessage("No problem. Tell me more about who you're targeting.");
+    setBarryMessage("No problem. Tell me more about who you're hunting.");
   }
 
   if (loading) {
@@ -414,7 +421,7 @@ export default function BarryOnboarding() {
               onChange={(e) => setUserInput(e.target.value)}
               placeholder={
                 conversationHistory.length === 0
-                  ? "e.g., Marketing agencies in California with 50-200 employees"
+                  ? "e.g., Marketing agencies in California, 50-200 employees"
                   : "Type your response..."
               }
               className="barry-input"

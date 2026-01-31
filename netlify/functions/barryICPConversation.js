@@ -227,9 +227,9 @@ function checkForUnrelatedInput(input, conversationHistory = []) {
   if (!input || typeof input !== 'string') {
     return {
       understood: null,
-      mappingExplanation: "I didn't catch that. Let's focus on who you sell to.",
+      mappingExplanation: "I didn't catch that. Let's lock in your targets.",
       needsClarification: true,
-      followUpQuestion: "Can you describe the types of companies you're targeting? For example: industry, company size, or location.",
+      followUpQuestion: "Describe who you're hunting. Industry, company size, location — any of those help.",
       followUpType: "industry",
       confidenceScore: 0,
       isAmbiguous: true,
@@ -244,9 +244,9 @@ function checkForUnrelatedInput(input, conversationHistory = []) {
   if (trimmed.length === 0 || emojiOnlyRegex.test(trimmed)) {
     return {
       understood: null,
-      mappingExplanation: "I'm here to help define who you sell to so I can power Scout and Hunter effectively.",
+      mappingExplanation: "I power Scout and Hunter by knowing who you're after.",
       needsClarification: true,
-      followUpQuestion: "Let's stay focused on your ideal customer. Can you describe the types of companies you sell to?",
+      followUpQuestion: "Let's stay on target. What types of companies are you hunting?",
       followUpType: "industry",
       confidenceScore: 0,
       isAmbiguous: true,
@@ -285,9 +285,9 @@ function checkForUnrelatedInput(input, conversationHistory = []) {
     if (pattern.test(trimmed)) {
       return {
         understood: null,
-        mappingExplanation: "I'm here to help define who you sell to so I can power Scout and Hunter effectively.",
+        mappingExplanation: "I power Scout and Hunter by knowing who you're after.",
         needsClarification: true,
-        followUpQuestion: "Let's stay focused on your ideal customer. Can you describe the types of companies you sell to? For example: 'Marketing agencies in California' or 'SaaS companies with 50-200 employees'.",
+        followUpQuestion: "Let's stay on target. What companies are you hunting? For example: 'Marketing agencies in California' or 'SaaS companies, 50-200 employees'.",
         followUpType: "industry",
         confidenceScore: 0,
         isAmbiguous: true,
@@ -301,9 +301,9 @@ function checkForUnrelatedInput(input, conversationHistory = []) {
   if (trimmed.length < 3 && !looksLikeCompanyName && !/^[1-3]$/.test(trimmed)) {
     return {
       understood: null,
-      mappingExplanation: "I need a bit more detail to understand your target market.",
+      mappingExplanation: "Need more to lock in your targets.",
       needsClarification: true,
-      followUpQuestion: "Can you describe the types of companies you sell to? Include details like industry, company size, or geographic focus.",
+      followUpQuestion: "Describe who you're hunting — industry, company size, or geography all help me dial in your ICP.",
       followUpType: "industry",
       confidenceScore: 0,
       isAmbiguous: true,

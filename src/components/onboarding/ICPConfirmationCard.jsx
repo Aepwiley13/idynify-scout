@@ -1,4 +1,4 @@
-import { Building2, Users, MapPin, Briefcase, Check, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Building2, Users, MapPin, Briefcase, Check, RefreshCw, AlertTriangle, Target, Tag } from 'lucide-react';
 import './ICPConfirmationCard.css';
 
 export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
@@ -6,6 +6,9 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
   const hasSizes = icp?.companySizes && icp.companySizes.length > 0;
   const hasLocations = icp?.locations && (icp.locations === 'nationwide' || icp.locations.length > 0);
   const hasTitles = icp?.targetTitles && icp.targetTitles.length > 0;
+  const hasLookalike = icp?.lookalikeSeed?.name;
+  const hasKeywords = icp?.companyKeywords && icp.companyKeywords.length > 0;
+  const searchStrategy = icp?.searchStrategy || 'industry_only';
 
   const locationDisplay = icp?.locations === 'nationwide'
     ? 'Nationwide (All US)'
@@ -19,6 +22,13 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
 
   // Determine confidence level for styling
   const confidenceLevel = isLowConfidence ? 'low' : isMediumConfidence ? 'medium' : 'high';
+
+  // Determine strategy badge text
+  const strategyDisplay = searchStrategy === 'lookalike'
+    ? 'Lookalike'
+    : searchStrategy === 'hybrid'
+      ? 'Hybrid'
+      : 'Industry';
 
   return (
     <div className={`icp-confirmation-card ${isLowConfidence ? 'low-confidence' : ''}`}>
@@ -40,13 +50,38 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
       {/* Header */}
       <div className="card-header">
         <h3>Here's what I understood</h3>
-        <div className={`confidence-badge confidence-${confidenceLevel}`}>
-          {confidencePercent}% confident
+        <div className="header-badges">
+          {hasLookalike && (
+            <div className="strategy-badge strategy-lookalike">
+              Strategy: {strategyDisplay}
+            </div>
+          )}
+          <div className={`confidence-badge confidence-${confidenceLevel}`}>
+            {confidencePercent}% confident
+          </div>
         </div>
       </div>
 
       {/* ICP Details */}
       <div className="icp-details">
+        {/* Lookalike Seed (NEW - shown first when present) */}
+        {hasLookalike && (
+          <div className="detail-row lookalike-row">
+            <div className="detail-icon">
+              <Target className="w-4 h-4" />
+            </div>
+            <div className="detail-content">
+              <span className="detail-label">Based on Company</span>
+              <span className="detail-value detail-value-highlight">
+                {icp.lookalikeSeed.name}
+              </span>
+              <span className="detail-subtext">
+                Finding similar companies in your target market
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Industries */}
         <div className={`detail-row ${hasIndustries ? '' : 'missing'}`}>
           <div className="detail-icon">
@@ -59,6 +94,21 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
             </span>
           </div>
         </div>
+
+        {/* Company Keywords (if present) */}
+        {hasKeywords && (
+          <div className="detail-row">
+            <div className="detail-icon">
+              <Tag className="w-4 h-4" />
+            </div>
+            <div className="detail-content">
+              <span className="detail-label">Company Type</span>
+              <span className="detail-value">
+                {icp.companyKeywords.join(', ')}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Company Size */}
         <div className={`detail-row ${hasSizes ? '' : 'optional'}`}>
@@ -101,7 +151,10 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
       {/* Barry's Note */}
       <div className="barry-note">
         <p>
-          I'll use this to find companies that match your ICP. You can always refine this later from your settings.
+          {hasLookalike
+            ? `I'll prioritize companies similar to ${icp.lookalikeSeed.name}. This gets you real ${hasKeywords ? icp.companyKeywords[0] + 's' : 'matches'}, not just any ${hasIndustries ? icp.industries[0].toLowerCase() : 'industry'} company.`
+            : "I'll use this to find companies that match your ICP. You can always refine this later from your settings."
+          }
         </p>
       </div>
 

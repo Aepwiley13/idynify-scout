@@ -23,12 +23,31 @@
   color: #5b21b6;
 }
 
-.confidence-badge {
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.confidence-badge,
+.strategy-badge {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.25rem 0.625rem;
   border-radius: 9999px;
   border: 1px solid;
+}
+
+.strategy-badge {
+  color: #7c3aed;
+  background: white;
+  border-color: #c4b5fd;
+}
+
+.strategy-badge.strategy-lookalike {
+  color: #0891b2;
+  background: #ecfeff;
+  border-color: #67e8f9;
 }
 
 /* Confidence level styling */
@@ -112,6 +131,32 @@
 
 .detail-row.optional .detail-value {
   color: #9ca3af;
+  font-style: italic;
+}
+
+/* Lookalike row - highlighted styling */
+.detail-row.lookalike-row {
+  background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);
+  margin: -0.75rem -1.25rem 0.5rem -1.25rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1.5px solid #67e8f9;
+}
+
+.detail-row.lookalike-row .detail-icon {
+  background: #0891b2;
+  color: white;
+}
+
+.detail-value-highlight {
+  color: #0e7490 !important;
+  font-weight: 600 !important;
+}
+
+.detail-subtext {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
   font-style: italic;
 }
 

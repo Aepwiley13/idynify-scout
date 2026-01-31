@@ -66,6 +66,9 @@ import CreateCampaign from './pages/Hunter/CreateCampaign';
 import CampaignDetail from './pages/Hunter/CampaignDetail';
 import CreateMission from './pages/Hunter/CreateMission';
 
+// Barry Onboarding
+import BarryOnboarding from './pages/Onboarding/BarryOnboarding';
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -242,6 +245,9 @@ function App() {
         <Route path="/checkout" element={<ProtectedRoute requirePayment={false}><CheckoutPage /></ProtectedRoute>} />
         <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
+
+        {/* Barry ICP Onboarding - First touchpoint after payment */}
+        <Route path="/onboarding/barry" element={<ProtectedRoute><BarryOnboarding /></ProtectedRoute>} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />

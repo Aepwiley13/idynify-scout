@@ -4,6 +4,7 @@ import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
 import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound, Ban, CheckCircle } from 'lucide-react';
 import UserContacts from '../../components/UserContacts';
+import BarryConversationsView from '../../components/admin/BarryConversationsView';
 import './UserDetail.css';
 
 export default function UserDetail() {
@@ -605,6 +606,9 @@ export default function UserDetail() {
           )}
         </div>
       </div>
+
+      {/* Barry Conversations */}
+      <BarryConversationsView userId={uid} userEmail={user.email} />
 
       {/* User Contacts */}
       <UserContacts userId={uid} userEmail={user.email} />

@@ -5,7 +5,7 @@ import { calculateICPScore } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp } from 'lucide-react';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare } from 'lucide-react';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
 
@@ -300,6 +300,57 @@ export default function ICPSettings() {
           <p className="page-subtitle">Define and refine your Ideal Customer Profile criteria</p>
         </div>
       </div>
+
+      {/* Managed by Barry Banner */}
+      {profile?.managedByBarry && (
+        <div className="barry-managed-banner">
+          <div className="barry-managed-content">
+            <div className="barry-icon">
+              <Brain className="w-5 h-5" />
+            </div>
+            <div className="barry-text">
+              <p className="barry-title">Managed by Barry</p>
+              <p className="barry-subtitle">
+                Your ICP was configured by Barry. Barry will begin refining this over time as you use Scout and Hunter.
+              </p>
+              <p className="barry-subtitle barry-override-note">
+                Changes made here will override Barry's settings.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/onboarding/barry')}
+              className="edit-with-barry-btn"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Edit with Barry</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit with Barry CTA (when not managed by Barry) */}
+      {!profile?.managedByBarry && (
+        <div className="barry-cta-banner">
+          <div className="barry-cta-content">
+            <div className="barry-icon">
+              <Brain className="w-5 h-5" />
+            </div>
+            <div className="barry-text">
+              <p className="barry-title">Want Barry to help?</p>
+              <p className="barry-subtitle">
+                Let Barry guide you through defining your ICP conversationally.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/onboarding/barry')}
+              className="use-barry-btn"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Talk to Barry</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="summary-cards">

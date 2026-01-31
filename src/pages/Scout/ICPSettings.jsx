@@ -311,7 +311,10 @@ export default function ICPSettings() {
             <div className="barry-text">
               <p className="barry-title">Managed by Barry</p>
               <p className="barry-subtitle">
-                Your ICP was configured by Barry. Changes made here will override Barry's settings.
+                Your ICP was configured by Barry. Barry will begin refining this over time as you use Scout and Hunter.
+              </p>
+              <p className="barry-subtitle barry-override-note">
+                Changes made here will override Barry's settings.
               </p>
             </div>
             <button

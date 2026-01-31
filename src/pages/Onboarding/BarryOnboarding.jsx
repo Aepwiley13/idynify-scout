@@ -64,10 +64,10 @@ export default function BarryOnboarding() {
           setExistingICP(data);
           setBarryMessage(`I see you already have an ICP set up. Let me quickly confirm it so I can do my best work.\n\nCurrently targeting: ${data.industries.join(', ')}${data.companySizes?.length ? ` (${data.companySizes.join(', ')} employees)` : ''}${data.isNationwide ? ' nationwide' : data.locations?.length ? ` in ${data.locations.slice(0, 3).join(', ')}${data.locations.length > 3 ? '...' : ''}` : ''}\n\nIs this still accurate, or would you like to refine it?`);
         } else {
-          setBarryMessage("Let's get you set up. Who do you sell to?");
+          setBarryMessage("I'm Barry. I replace complex setup by learning how you sell — once — and applying it everywhere.\n\nLet's start with one question: Who do you sell to?");
         }
       } else {
-        setBarryMessage("Let's get you set up. Who do you sell to?");
+        setBarryMessage("I'm Barry. I replace complex setup by learning how you sell — once — and applying it everywhere.\n\nLet's start with one question: Who do you sell to?");
       }
 
       // Check for existing conversation
@@ -95,7 +95,7 @@ export default function BarryOnboarding() {
       console.error('Error checking existing ICP:', error);
       setLoading(false);
       setStep('asking');
-      setBarryMessage("Let's get you set up. Who do you sell to?");
+      setBarryMessage("I'm Barry. I replace complex setup by learning how you sell — once — and applying it everywhere.\n\nLet's start with one question: Who do you sell to?");
     }
   }
 
@@ -191,9 +191,14 @@ export default function BarryOnboarding() {
 
     } catch (error) {
       console.error('Error processing input:', error);
-      setError('Something went wrong. Please try again.');
-      // Remove the user message if there was an error
-      setConversationHistory(conversationHistory);
+      // Barry-voiced error - preserve trust even when AI fails
+      const barryErrorMsg = "I'm having trouble processing that right now.\n\nYou can try again, or configure your ICP manually in Settings — I'll pick it up from there.";
+      const errorHistory = [
+        ...newHistory,
+        { role: 'barry', content: barryErrorMsg, timestamp: new Date().toISOString() }
+      ];
+      setConversationHistory(errorHistory);
+      setBarryMessage(barryErrorMsg);
     } finally {
       setIsProcessing(false);
     }

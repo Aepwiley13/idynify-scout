@@ -185,6 +185,7 @@ export default function ReconModulePage() {
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState([]);
   const [viewingSection, setViewingSection] = useState(null);
+  const [guidanceOpen, setGuidanceOpen] = useState(false);
 
   const config = MODULE_CONFIG[moduleId];
 
@@ -248,8 +249,6 @@ export default function ReconModulePage() {
   };
 
   const colors = colorMap[config.color] || colorMap.purple;
-
-  const [guidanceOpen, setGuidanceOpen] = useState(false);
 
   return (
     <div className="max-w-4xl mx-auto">

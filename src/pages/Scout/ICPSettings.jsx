@@ -313,6 +313,12 @@ export default function ICPSettings() {
               <p className="barry-subtitle">
                 Your ICP was configured by Barry. Barry will begin refining this over time as you use Scout and Hunter.
               </p>
+              {/* Show lookalike strategy info if present */}
+              {profile.lookalikeSeed?.name && (
+                <p className="barry-subtitle barry-lookalike-info">
+                  Search strategy: Finding companies similar to <strong>{profile.lookalikeSeed.name}</strong>
+                </p>
+              )}
               <p className="barry-subtitle barry-override-note">
                 Changes made here will override Barry's settings.
               </p>

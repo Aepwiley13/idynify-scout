@@ -172,8 +172,58 @@ const US_STATES = [
   "West Virginia", "Wisconsin", "Wyoming"
 ];
 
-// HARDENING: Detect clearly unrelated input before calling Claude
-function checkForUnrelatedInput(input) {
+// Industries where lookalike disambiguation is critical
+const BROAD_INDUSTRIES = [
+  "Marketing and Advertising",    // agencies vs platforms vs media
+  "Computer Software",            // SaaS vs enterprise vs dev tools
+  "Information Technology and Services",
+  "Financial Services",           // banks vs fintech vs advisors
+  "Management Consulting",        // big 4 vs boutique vs freelance
+  "Internet",                     // everything
+  "Design",                       // agencies vs freelance vs product
+  "Media Production",             // studios vs agencies vs freelance
+  "Public Relations and Communications"
+];
+
+// Triggers that suggest user wants a specific company TYPE within a broad industry
+const SPECIFICITY_TRIGGERS = [
+  "agency", "agencies",
+  "startup", "startups",
+  "saas", "platform", "platforms",
+  "boutique", "enterprise",
+  "firm", "firms",
+  "studio", "studios",
+  "consultancy", "consultancies",
+  "vendor", "vendors",
+  "provider", "providers"
+];
+
+// Example companies for broad industries (used as suggestions)
+const EXAMPLE_COMPANIES = {
+  "Marketing and Advertising": [
+    { name: "Disruptive Advertising", type: "paid media agency" },
+    { name: "WebFX", type: "full-service digital agency" },
+    { name: "KlientBoost", type: "PPC/CRO agency" }
+  ],
+  "Computer Software": [
+    { name: "Slack", type: "SaaS collaboration" },
+    { name: "Salesforce", type: "enterprise CRM" },
+    { name: "Notion", type: "productivity SaaS" }
+  ],
+  "Management Consulting": [
+    { name: "Bain & Company", type: "strategy consulting" },
+    { name: "Slalom", type: "business & tech consulting" },
+    { name: "Point B", type: "boutique consulting" }
+  ],
+  "Financial Services": [
+    { name: "Stripe", type: "fintech/payments" },
+    { name: "Wealthfront", type: "robo-advisor" },
+    { name: "Marcus by Goldman Sachs", type: "consumer banking" }
+  ]
+};
+
+// Detect clearly unrelated input before calling Claude
+function checkForUnrelatedInput(input, conversationHistory = []) {
   if (!input || typeof input !== 'string') {
     return {
       understood: null,
@@ -202,6 +252,19 @@ function checkForUnrelatedInput(input) {
       isAmbiguous: true,
       ambiguityDetails: "Input was empty or contained only emojis."
     };
+  }
+
+  // FIXED: Allow numbered selections (1, 2, 3) when Barry offered options
+  const lastBarryMessage = conversationHistory
+    .filter(h => h.role === 'barry')
+    .slice(-1)[0]?.content || '';
+
+  const barryOfferedOptions = /\b[1-3]\.\s/.test(lastBarryMessage) ||
+                              /option\s*[1-3]/i.test(lastBarryMessage);
+
+  if (barryOfferedOptions && /^[1-3]$/.test(trimmed)) {
+    // User is selecting from Barry's numbered options - allow it
+    return null;
   }
 
   // Check for clearly unrelated questions/topics
@@ -233,8 +296,9 @@ function checkForUnrelatedInput(input) {
     }
   }
 
-  // Check for very short input that's likely not meaningful (less than 3 chars)
-  if (trimmed.length < 3) {
+  // Check for very short input (but allow company names which can be short)
+  const looksLikeCompanyName = /^[A-Z]/.test(trimmed) || trimmed.includes('.com') || trimmed.includes('.io');
+  if (trimmed.length < 3 && !looksLikeCompanyName && !/^[1-3]$/.test(trimmed)) {
     return {
       understood: null,
       mappingExplanation: "I need a bit more detail to understand your target market.",
@@ -251,6 +315,58 @@ function checkForUnrelatedInput(input) {
   return null;
 }
 
+// Check if user input indicates a specific company type within a broad industry
+function detectNeedsLookalike(userInput, industries) {
+  const inputLower = userInput.toLowerCase();
+
+  // Check if any mapped industry is broad
+  const hasBroadIndustry = industries?.some(ind => BROAD_INDUSTRIES.includes(ind));
+
+  // Check if user used specificity triggers
+  const hasSpecificityTrigger = SPECIFICITY_TRIGGERS.some(trigger =>
+    inputLower.includes(trigger)
+  );
+
+  return hasBroadIndustry && hasSpecificityTrigger;
+}
+
+// Extract company type keywords from user input
+function extractCompanyKeywords(userInput) {
+  const inputLower = userInput.toLowerCase();
+  const keywords = [];
+
+  for (const trigger of SPECIFICITY_TRIGGERS) {
+    if (inputLower.includes(trigger)) {
+      // Normalize to singular form
+      const normalized = trigger.replace(/ies$/, 'y').replace(/s$/, '');
+      if (!keywords.includes(normalized) && !keywords.includes(trigger)) {
+        keywords.push(trigger.replace(/ies$/, 'y').replace(/s$/, ''));
+      }
+    }
+  }
+
+  // Also extract descriptive phrases
+  const descriptivePatterns = [
+    /digital marketing/i,
+    /paid media/i,
+    /full.?service/i,
+    /b2b/i,
+    /b2c/i,
+    /enterprise/i,
+    /smb/i,
+    /small business/i
+  ];
+
+  for (const pattern of descriptivePatterns) {
+    const match = inputLower.match(pattern);
+    if (match && !keywords.includes(match[0])) {
+      keywords.push(match[0]);
+    }
+  }
+
+  return keywords;
+}
+
 export const handler = async (event) => {
   const startTime = Date.now();
 
@@ -262,7 +378,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, action, userInput, currentStep, conversationHistory, existingICP } = JSON.parse(event.body);
+    const { userId, authToken, action, userInput, currentStep, conversationHistory, existingICP, pendingICP } = JSON.parse(event.body);
 
     if (!userId || !authToken) {
       throw new Error('Missing required parameters');
@@ -309,7 +425,7 @@ export const handler = async (event) => {
 
     // HARDENING: Check for unrelated input before calling Claude
     if (action === 'process_initial_input' || action === 'process_followup') {
-      const redirectResponse = checkForUnrelatedInput(userInput);
+      const redirectResponse = checkForUnrelatedInput(userInput, conversationHistory || []);
       if (redirectResponse) {
         return {
           statusCode: 200,
@@ -333,7 +449,10 @@ export const handler = async (event) => {
         result = await processInitialInput(anthropic, userInput, existingICP);
         break;
       case 'process_followup':
-        result = await processFollowup(anthropic, userInput, currentStep, conversationHistory);
+        result = await processFollowup(anthropic, userInput, currentStep, conversationHistory, pendingICP);
+        break;
+      case 'process_example_company':
+        result = await processExampleCompany(anthropic, userInput, conversationHistory, pendingICP);
         break;
       case 'generate_summary':
         result = await generateSummary(anthropic, conversationHistory);
@@ -395,17 +514,28 @@ export const handler = async (event) => {
 async function processInitialInput(anthropic, userInput, existingICP) {
   const hasExistingICP = existingICP && existingICP.industries && existingICP.industries.length > 0;
 
-  const prompt = `You are Barry, the intelligence layer for Idynify Scout. Your job is to understand who the user sells to and map it to our system.
+  // Extract keywords from user input for later use
+  const companyKeywords = extractCompanyKeywords(userInput);
 
-You are NOT a chatbot. You are a senior sales ops partner - calm, direct, confident.
+  const prompt = `You are Barry, the intelligence layer for Idynify Scout. Your job is to understand who the user sells to and create the BEST possible search strategy.
 
-AVAILABLE INDUSTRIES (you MUST map to one or more of these exactly):
+You are NOT a chatbot. You are a senior sales ops partner - calm, direct, strategic.
+
+CRITICAL INSIGHT: Some industries are too broad to search effectively by industry alone. When a user says something specific like "marketing agencies" or "SaaS startups", you need to use a LOOKALIKE strategy - finding companies similar to an example company they provide.
+
+BROAD INDUSTRIES (require lookalike for specific targeting):
+${BROAD_INDUSTRIES.join(', ')}
+
+SPECIFICITY TRIGGERS (words that indicate user wants a specific company TYPE):
+${SPECIFICITY_TRIGGERS.join(', ')}
+
+AVAILABLE INDUSTRIES:
 ${INDUSTRY_NAMES}
 
 AVAILABLE COMPANY SIZES:
 ${COMPANY_SIZE_OPTIONS.join(', ')}
 
-US STATES (for location):
+US STATES:
 ${US_STATES.join(', ')}
 
 ${hasExistingICP ? `
@@ -414,39 +544,44 @@ EXISTING ICP (user has already configured):
 - Company Sizes: ${existingICP.companySizes?.join(', ') || 'None'}
 - Locations: ${existingICP.isNationwide ? 'Nationwide' : existingICP.locations?.join(', ') || 'None'}
 - Target Titles: ${existingICP.targetTitles?.join(', ') || 'None'}
-
-Since the user already has an ICP, acknowledge it and ask if they want to confirm or refine it.
+- Lookalike Seed: ${existingICP.lookalikeSeed?.name || 'None'}
 ` : ''}
 
 USER INPUT: "${userInput}"
 
 YOUR TASK:
-1. Extract what you can understand from the user's input
-2. Map their description to EXACT industry names from the list above (be specific - if they say "marketing agencies", use "Marketing and Advertising")
-3. Identify any ambiguity that needs clarification
-4. Decide if you need follow-up questions
+1. Map their description to an industry
+2. Detect if they need lookalike disambiguation (broad industry + specific company type)
+3. If they DO need lookalike: ask for an example company they consider ideal
+4. If they DON'T need lookalike: proceed with standard ICP questions
 
-IMPORTANT RULES:
-- If the input is ambiguous (e.g., "marketing agencies" could be broad), ask for clarification
-- If you can't map to an industry, ask for clarification
-- Maximum 3 follow-up questions total across the conversation
-- Be direct, not verbose
-- Show what you understood, then ask what's unclear
+CRITICAL RULES:
+- If industry is broad AND user used a specificity trigger (agency, startup, saas, etc.), you MUST ask for an example company
+- When asking for an example, explain WHY: "Marketing & Advertising includes agencies, platforms, and media companies. To get you actual agencies, give me one company you consider ideal — I'll find similar ones."
+- Offer example suggestions from the EXAMPLE_COMPANIES list for that industry
+- Maximum 3 follow-up questions total
+- Be direct, strategic, outcome-oriented
+
+EXAMPLE_COMPANIES for suggestions:
+${JSON.stringify(EXAMPLE_COMPANIES, null, 2)}
 
 RESPOND IN JSON:
 {
   "understood": {
     "industries": ["exact industry names from the list"],
-    "companySizes": ["exact sizes from the list"] or null if not mentioned,
-    "locations": ["state names"] or "nationwide" or null if not mentioned,
-    "targetTitles": ["job titles"] or null if not mentioned,
+    "companySizes": ["exact sizes from the list"] or null,
+    "locations": ["state names"] or "nationwide" or null,
+    "targetTitles": ["job titles"] or null,
+    "companyKeywords": ["agency", "saas", etc.] - extracted company type keywords,
     "rawInput": "what the user said"
   },
-  "mappingExplanation": "I mapped 'X' to 'Y' because...",
+  "mappingExplanation": "Your explanation of what you understood",
+  "needsLookalike": true/false - CRITICAL: true if broad industry + specificity trigger,
+  "lookalikeSuggestions": ["Company 1", "Company 2", "Company 3"] or null - suggestions if asking for lookalike,
   "needsClarification": true/false,
-  "clarificationReason": "why you need more info" or null,
-  "followUpQuestion": "your specific question" or null,
-  "followUpType": "industry" | "size" | "location" | "titles" | null,
+  "followUpQuestion": "your question" or null,
+  "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | null,
+  "searchStrategy": "lookalike" | "industry_only" | "hybrid",
   "confidenceScore": 0.0 to 1.0,
   "isAmbiguous": true/false,
   "ambiguityDetails": "what's ambiguous" or null
@@ -466,6 +601,13 @@ RESPOND IN JSON:
   }
 
   const barryResponse = JSON.parse(jsonMatch[0]);
+
+  // Add extracted keywords if Claude didn't include them
+  if (!barryResponse.understood?.companyKeywords || barryResponse.understood.companyKeywords.length === 0) {
+    if (barryResponse.understood) {
+      barryResponse.understood.companyKeywords = companyKeywords;
+    }
+  }
 
   // Validate industries against our list
   if (barryResponse.understood?.industries) {
@@ -491,16 +633,37 @@ RESPOND IN JSON:
     );
   }
 
+  // Determine next step based on whether we need lookalike
+  let nextStep = 'clarifying';
+  if (barryResponse.needsLookalike) {
+    nextStep = 'awaiting_example';
+  } else if (!barryResponse.needsClarification) {
+    nextStep = 'confirming';
+  }
+
   return {
     barryResponse,
-    step: barryResponse.needsClarification ? 'clarifying' : 'confirming'
+    step: nextStep
   };
 }
 
-async function processFollowup(anthropic, userInput, currentStep, conversationHistory) {
+async function processFollowup(anthropic, userInput, currentStep, conversationHistory, pendingICP) {
   const historyContext = conversationHistory.map(h =>
     `${h.role === 'barry' ? 'Barry' : 'User'}: ${h.content}`
   ).join('\n');
+
+  // Check if this is an example company response
+  const lastBarryMessage = conversationHistory
+    .filter(h => h.role === 'barry')
+    .slice(-1)[0]?.content || '';
+
+  const wasAskingForExample = lastBarryMessage.toLowerCase().includes('example') &&
+                              (lastBarryMessage.toLowerCase().includes('company') ||
+                               lastBarryMessage.toLowerCase().includes('ideal'));
+
+  if (wasAskingForExample || currentStep === 'awaiting_example') {
+    return processExampleCompany(anthropic, userInput, conversationHistory, pendingICP);
+  }
 
   const prompt = `You are Barry, the intelligence layer for Idynify Scout.
 
@@ -508,6 +671,9 @@ CONVERSATION SO FAR:
 ${historyContext}
 
 USER'S NEW INPUT: "${userInput}"
+
+PENDING ICP STATE:
+${JSON.stringify(pendingICP || {}, null, 2)}
 
 AVAILABLE INDUSTRIES:
 ${INDUSTRY_NAMES}
@@ -518,17 +684,16 @@ ${COMPANY_SIZE_OPTIONS.join(', ')}
 US STATES:
 ${US_STATES.join(', ')}
 
+BROAD INDUSTRIES (require lookalike):
+${BROAD_INDUSTRIES.join(', ')}
+
 CURRENT STEP: ${currentStep}
 
 YOUR TASK:
 1. Incorporate the user's new information
-2. Update your understanding
-3. Decide if you have enough info or need ONE more clarification (max 3 total follow-ups)
-
-RULES:
-- Be direct and concise
-- If you have enough info for a reasonable ICP, move to confirmation
-- Don't over-question - good enough is good enough
+2. If user is selecting from numbered options (1, 2, 3), apply that selection
+3. Decide if you need more info or are ready to confirm
+4. If industry is broad and you haven't asked for an example company yet, do so now
 
 RESPOND IN JSON:
 {
@@ -536,12 +701,17 @@ RESPOND IN JSON:
     "industries": ["exact industry names"],
     "companySizes": ["exact sizes"] or null,
     "locations": ["states"] or "nationwide" or null,
-    "targetTitles": ["titles"] or null
+    "targetTitles": ["titles"] or null,
+    "companyKeywords": ["agency", etc.] or null,
+    "lookalikeSeed": { "name": "Company Name" } or null
   },
-  "mappingExplanation": "explanation of your mapping",
+  "mappingExplanation": "explanation",
+  "needsLookalike": true/false,
+  "lookalikeSuggestions": ["Company 1", "Company 2"] or null,
   "needsMoreInfo": true/false,
   "followUpQuestion": "question" or null,
-  "followUpType": "industry" | "size" | "location" | "titles" | null,
+  "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | null,
+  "searchStrategy": "lookalike" | "industry_only" | "hybrid",
   "confidenceScore": 0.0 to 1.0,
   "readyToConfirm": true/false
 }`;
@@ -557,6 +727,104 @@ RESPOND IN JSON:
 
   if (!jsonMatch) {
     throw new Error('Failed to parse Barry followup response');
+  }
+
+  const barryResponse = JSON.parse(jsonMatch[0]);
+
+  // Validate industries
+  if (barryResponse.understood?.industries) {
+    barryResponse.understood.industries = barryResponse.understood.industries.filter(ind =>
+      APOLLO_INDUSTRIES.some(ai => ai.name.toLowerCase() === ind.toLowerCase())
+    ).map(ind => {
+      const match = APOLLO_INDUSTRIES.find(ai => ai.name.toLowerCase() === ind.toLowerCase());
+      return match ? match.name : ind;
+    });
+  }
+
+  // Validate company sizes
+  if (barryResponse.understood?.companySizes) {
+    barryResponse.understood.companySizes = barryResponse.understood.companySizes.filter(size =>
+      COMPANY_SIZE_OPTIONS.includes(size)
+    );
+  }
+
+  // Validate locations
+  if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
+    barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
+      US_STATES.includes(loc) || loc.toLowerCase() === 'nationwide'
+    );
+  }
+
+  // Determine next step
+  let nextStep = 'clarifying';
+  if (barryResponse.needsLookalike && !barryResponse.understood?.lookalikeSeed) {
+    nextStep = 'awaiting_example';
+  } else if (barryResponse.readyToConfirm) {
+    nextStep = 'confirming';
+  }
+
+  return {
+    barryResponse,
+    step: nextStep
+  };
+}
+
+async function processExampleCompany(anthropic, userInput, conversationHistory, pendingICP) {
+  const historyContext = conversationHistory.map(h =>
+    `${h.role === 'barry' ? 'Barry' : 'User'}: ${h.content}`
+  ).join('\n');
+
+  const prompt = `You are Barry, the intelligence layer for Idynify Scout.
+
+The user was asked for an example company to use as a lookalike seed.
+
+CONVERSATION SO FAR:
+${historyContext}
+
+USER'S RESPONSE: "${userInput}"
+
+PENDING ICP:
+${JSON.stringify(pendingICP || {}, null, 2)}
+
+YOUR TASK:
+1. Extract the company name from the user's response
+2. Confirm you'll use it as the lookalike seed
+3. Ask for remaining ICP details if needed (size, location, titles)
+4. Explain the strategy: "I'll prioritize companies similar to [Company] within [Industry]. This gets you real [type], not just any [industry] company."
+
+RESPOND IN JSON:
+{
+  "understood": {
+    "industries": ["exact industry names"],
+    "companySizes": ["exact sizes"] or null,
+    "locations": ["states"] or "nationwide" or null,
+    "targetTitles": ["titles"] or null,
+    "companyKeywords": ["agency", etc.] or null,
+    "lookalikeSeed": {
+      "name": "Company Name the user provided",
+      "domain": "companyname.com" (if you can infer it, otherwise null)
+    }
+  },
+  "mappingExplanation": "Your strategic explanation of how you'll use this",
+  "needsMoreInfo": true/false,
+  "followUpQuestion": "question about size/location/titles" or null,
+  "followUpType": "size" | "location" | "titles" | null,
+  "searchStrategy": "lookalike",
+  "confidenceScore": 0.0 to 1.0,
+  "readyToConfirm": true/false
+}`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 1500,
+    messages: [{ role: 'user', content: prompt }]
+  });
+
+  const responseText = response.content[0].text;
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+  if (!jsonMatch) {
+    throw new Error('Failed to parse Barry example company response');
   }
 
   const barryResponse = JSON.parse(jsonMatch[0]);
@@ -604,13 +872,15 @@ ${historyContext}
 Generate a summary that:
 1. Is 2-3 sentences, natural language
 2. Explains WHO the user is targeting
-3. Can be used to explain the ICP to the user for confirmation
+3. Explains the STRATEGY (lookalike vs industry-only)
+4. Can be used to explain the ICP to the user for confirmation
 
 RESPOND IN JSON:
 {
-  "summary": "Your 2-3 sentence summary",
+  "summary": "Your 2-3 sentence summary including the search strategy",
   "bulletPoints": [
     "Industry: X",
+    "Based on: [Company Name] (if using lookalike)" or "Industry filter only",
     "Size: Y",
     "Location: Z",
     "Contacts: A"

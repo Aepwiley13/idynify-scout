@@ -489,16 +489,34 @@ function buildApolloQuery(companyProfile) {
     per_page: 50
   };
 
-  // FIXED: Use keyword search instead of industry tag IDs
-  // Industry tag IDs don't work - Apollo ignores them
-  // Keyword search is more reliable
+  // Build keyword tags combining industries and company keywords
+  const keywordTags = [];
+
+  // Add industries as keywords
   if (companyProfile.industries && companyProfile.industries.length > 0) {
-    // Convert industry names to lowercase keywords for search
-    query.q_organization_keyword_tags = companyProfile.industries.map(i => i.toLowerCase());
+    keywordTags.push(...companyProfile.industries.map(i => i.toLowerCase()));
     console.log(`🏭 Industries selected: ${companyProfile.industries.join(', ')}`);
-    console.log(`🏭 Using keyword search: ${query.q_organization_keyword_tags.join(', ')}`);
   } else {
     console.log('⚠️  No industries selected!');
+  }
+
+  // Add company keywords (e.g., "agency", "startup", "saas") - THIS IS THE KEY IMPROVEMENT
+  if (companyProfile.companyKeywords && companyProfile.companyKeywords.length > 0) {
+    keywordTags.push(...companyProfile.companyKeywords.map(k => k.toLowerCase()));
+    console.log(`🏷️  Company keywords added: ${companyProfile.companyKeywords.join(', ')}`);
+  }
+
+  // Add lookalike seed company name as a keyword (helps find similar companies)
+  if (companyProfile.lookalikeSeed?.name) {
+    // Don't add the actual company name, but log that we have a seed
+    console.log(`🎯 Lookalike seed: ${companyProfile.lookalikeSeed.name}`);
+    console.log(`🎯 Strategy: ${companyProfile.searchStrategy || 'industry_only'}`);
+  }
+
+  // Apply keyword tags if we have any
+  if (keywordTags.length > 0) {
+    query.q_organization_keyword_tags = keywordTags;
+    console.log(`🔍 Combined keywords for search: ${keywordTags.join(', ')}`);
   }
 
   // Map company sizes to Apollo format (comma-separated strings)

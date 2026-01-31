@@ -234,7 +234,7 @@ export default function BarryOnboarding() {
     try {
       const user = auth.currentUser;
 
-      // Prepare ICP profile
+      // Prepare ICP profile with lookalike strategy support
       const icpProfile = {
         industries: extractedICP.industries || [],
         companySizes: extractedICP.companySizes || [],
@@ -243,6 +243,11 @@ export default function BarryOnboarding() {
         locations: extractedICP.locations === 'nationwide' ? [] : (extractedICP.locations || []),
         isNationwide: extractedICP.locations === 'nationwide',
         targetTitles: extractedICP.targetTitles || [],
+        // NEW: Lookalike strategy fields
+        searchStrategy: extractedICP.searchStrategy || 'industry_only',
+        lookalikeSeed: extractedICP.lookalikeSeed || null,
+        companyKeywords: extractedICP.companyKeywords || [],
+        // Standard fields
         scoringWeights: DEFAULT_WEIGHTS,
         updatedAt: new Date().toISOString(),
         source: 'barry_onboarding',
@@ -267,12 +272,15 @@ export default function BarryOnboarding() {
         { merge: true }
       );
 
-      // Add final Barry message
+      // Add final Barry message - personalized based on strategy
+      const finalMessage = extractedICP.lookalikeSeed?.name
+        ? `Got it. I'll prioritize companies similar to ${extractedICP.lookalikeSeed.name}. You can always refine this later from your settings.`
+        : "Got it. I'll use this to find companies that match your ICP. You can always refine this later from your settings.";
       const finalHistory = [
         ...conversationHistory,
         {
           role: 'barry',
-          content: "Got it. I'll use this to find companies that match your ICP. You can always refine this later from your settings.",
+          content: finalMessage,
           timestamp: new Date().toISOString()
         }
       ];

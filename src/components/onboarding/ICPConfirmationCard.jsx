@@ -1,4 +1,4 @@
-import { Building2, Users, MapPin, Briefcase, Check, RefreshCw } from 'lucide-react';
+import { Building2, Users, MapPin, Briefcase, Check, RefreshCw, AlertTriangle } from 'lucide-react';
 import './ICPConfirmationCard.css';
 
 export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
@@ -14,13 +14,33 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
       : 'Not specified';
 
   const confidencePercent = Math.round((icp?.confidenceScore || 0.8) * 100);
+  const isLowConfidence = confidencePercent < 60;
+  const isMediumConfidence = confidencePercent >= 60 && confidencePercent < 80;
+
+  // Determine confidence level for styling
+  const confidenceLevel = isLowConfidence ? 'low' : isMediumConfidence ? 'medium' : 'high';
 
   return (
-    <div className="icp-confirmation-card">
+    <div className={`icp-confirmation-card ${isLowConfidence ? 'low-confidence' : ''}`}>
+      {/* Low Confidence Warning */}
+      {isLowConfidence && (
+        <div className="confidence-warning">
+          <AlertTriangle className="w-4 h-4" />
+          <div className="warning-content">
+            <p className="warning-title">I may be missing context</p>
+            <p className="warning-text">
+              {!hasIndustries
+                ? "I couldn't identify a specific industry from your description. Consider refining to help me find better matches."
+                : "Some details were unclear. You may want to refine your description for better results."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="card-header">
         <h3>Here's what I understood</h3>
-        <div className="confidence-badge">
+        <div className={`confidence-badge confidence-${confidenceLevel}`}>
           {confidencePercent}% confident
         </div>
       </div>

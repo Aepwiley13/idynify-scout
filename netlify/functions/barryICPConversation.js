@@ -172,6 +172,85 @@ const US_STATES = [
   "West Virginia", "Wisconsin", "Wyoming"
 ];
 
+// HARDENING: Detect clearly unrelated input before calling Claude
+function checkForUnrelatedInput(input) {
+  if (!input || typeof input !== 'string') {
+    return {
+      understood: null,
+      mappingExplanation: "I didn't catch that. Let's focus on who you sell to.",
+      needsClarification: true,
+      followUpQuestion: "Can you describe the types of companies you're targeting? For example: industry, company size, or location.",
+      followUpType: "industry",
+      confidenceScore: 0,
+      isAmbiguous: true,
+      ambiguityDetails: "Empty or invalid input received."
+    };
+  }
+
+  const trimmed = input.trim();
+
+  // Check for empty or emoji-only input
+  const emojiOnlyRegex = /^[\p{Emoji}\s]+$/u;
+  if (trimmed.length === 0 || emojiOnlyRegex.test(trimmed)) {
+    return {
+      understood: null,
+      mappingExplanation: "I'm here to help define who you sell to so I can power Scout and Hunter effectively.",
+      needsClarification: true,
+      followUpQuestion: "Let's stay focused on your ideal customer. Can you describe the types of companies you sell to?",
+      followUpType: "industry",
+      confidenceScore: 0,
+      isAmbiguous: true,
+      ambiguityDetails: "Input was empty or contained only emojis."
+    };
+  }
+
+  // Check for clearly unrelated questions/topics
+  const unrelatedPatterns = [
+    /^(what('?s| is) the weather|weather forecast|how('?s| is) the weather)/i,
+    /^(tell me a joke|make me laugh|say something funny)/i,
+    /^(how do i use|how does .* work|what is scout|what is hunter|what is recon|help me with)/i,
+    /^(hi|hello|hey|yo|sup)[\s!?.]*$/i,
+    /^(thanks|thank you|thx|ty)[\s!?.]*$/i,
+    /^(bye|goodbye|see you|later)[\s!?.]*$/i,
+    /^(what time|what date|current time|current date)/i,
+    /^(who are you|what are you|are you ai|are you a bot)/i,
+    /^(can you|could you|would you) (help|assist|tell|explain|show)/i,
+    /\b(stock price|crypto|bitcoin|weather|news|sports score)\b/i
+  ];
+
+  for (const pattern of unrelatedPatterns) {
+    if (pattern.test(trimmed)) {
+      return {
+        understood: null,
+        mappingExplanation: "I'm here to help define who you sell to so I can power Scout and Hunter effectively.",
+        needsClarification: true,
+        followUpQuestion: "Let's stay focused on your ideal customer. Can you describe the types of companies you sell to? For example: 'Marketing agencies in California' or 'SaaS companies with 50-200 employees'.",
+        followUpType: "industry",
+        confidenceScore: 0,
+        isAmbiguous: true,
+        ambiguityDetails: "Input appears unrelated to ICP definition."
+      };
+    }
+  }
+
+  // Check for very short input that's likely not meaningful (less than 3 chars)
+  if (trimmed.length < 3) {
+    return {
+      understood: null,
+      mappingExplanation: "I need a bit more detail to understand your target market.",
+      needsClarification: true,
+      followUpQuestion: "Can you describe the types of companies you sell to? Include details like industry, company size, or geographic focus.",
+      followUpType: "industry",
+      confidenceScore: 0,
+      isAmbiguous: true,
+      ambiguityDetails: "Input too short to extract ICP information."
+    };
+  }
+
+  // Input seems related - proceed to Claude
+  return null;
+}
+
 export const handler = async (event) => {
   const startTime = Date.now();
 
@@ -227,6 +306,25 @@ export const handler = async (event) => {
     const anthropic = new Anthropic({
       apiKey: claudeApiKey
     });
+
+    // HARDENING: Check for unrelated input before calling Claude
+    if (action === 'process_initial_input' || action === 'process_followup') {
+      const redirectResponse = checkForUnrelatedInput(userInput);
+      if (redirectResponse) {
+        return {
+          statusCode: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: JSON.stringify({
+            success: true,
+            barryResponse: redirectResponse,
+            step: 'clarifying'
+          })
+        };
+      }
+    }
 
     let result;
 

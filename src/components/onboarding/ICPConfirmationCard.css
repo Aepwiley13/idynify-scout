@@ -26,11 +26,67 @@
 .confidence-badge {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6d28d9;
-  background: white;
   padding: 0.25rem 0.625rem;
   border-radius: 9999px;
-  border: 1px solid #c4b5fd;
+  border: 1px solid;
+}
+
+/* Confidence level styling */
+.confidence-badge.confidence-high {
+  color: #059669;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.confidence-badge.confidence-medium {
+  color: #d97706;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.confidence-badge.confidence-low {
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* Low confidence warning banner */
+.confidence-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-bottom: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.confidence-warning svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.warning-text {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #a16207;
+  line-height: 1.4;
+}
+
+/* Low confidence card styling */
+.icp-confirmation-card.low-confidence {
+  border-color: #f59e0b;
 }
 
 /* ICP Details */

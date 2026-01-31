@@ -10,7 +10,7 @@ export default function CheckoutSuccessPage() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigate('/onboarding/company-profile');
+          navigate('/onboarding/barry');
           return 0;
         }
         return prev - 1;
@@ -87,18 +87,18 @@ export default function CheckoutSuccessPage() {
           </div>
 
           {/* Redirect Message */}
-          <div className="bg-cyan-500/20 border border-cyan-500/30 rounded-xl p-6 mb-8">
-            <p className="text-cyan-300 font-mono">
-              Redirecting to setup in <span className="text-2xl font-bold">{countdown}</span> seconds...
+          <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-6 mb-8">
+            <p className="text-purple-300 font-mono">
+              Connecting you to Barry in <span className="text-2xl font-bold">{countdown}</span> seconds...
             </p>
           </div>
 
           {/* Manual Button */}
           <button
-            onClick={() => navigate('/onboarding/company-profile')}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-lg font-mono"
+            onClick={() => navigate('/onboarding/barry')}
+            className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-purple-500/50 text-lg font-mono"
           >
-            🎯 START SETUP NOW
+            🧠 MEET BARRY NOW
           </button>
         </div>
       </div>

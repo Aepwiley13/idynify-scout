@@ -943,3 +943,116 @@
     padding: 0.375rem 0.625rem;
   }
 }
+
+/* ========================================
+   BARRY MANAGED BANNER
+   ======================================== */
+.barry-managed-banner,
+.barry-cta-banner {
+  margin-bottom: 1.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.barry-managed-banner {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border: 1.5px solid #c4b5fd;
+}
+
+.barry-cta-banner {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  border: 1.5px dashed #d8b4fe;
+}
+
+.barry-managed-content,
+.barry-cta-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.barry-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.barry-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.barry-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.barry-subtitle {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8125rem;
+  color: #7c3aed;
+  line-height: 1.4;
+}
+
+.edit-with-barry-btn,
+.use-barry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  flex-shrink: 0;
+}
+
+.edit-with-barry-btn {
+  background: white;
+  color: #6d28d9;
+  border: 1.5px solid #c4b5fd;
+}
+
+.edit-with-barry-btn:hover {
+  background: #f5f3ff;
+  border-color: #a78bfa;
+}
+
+.use-barry-btn {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: white;
+}
+
+.use-barry-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+@media (max-width: 768px) {
+  .barry-managed-content,
+  .barry-cta-content {
+    flex-wrap: wrap;
+  }
+
+  .barry-text {
+    flex-basis: calc(100% - 56px);
+  }
+
+  .edit-with-barry-btn,
+  .use-barry-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+}

@@ -103,7 +103,7 @@ export default function DailyLeads() {
 
     // Check daily swipe limit (only for interested/right swipes)
     if (direction === 'right' && dailySwipeCount >= DAILY_SWIPE_LIMIT && lastSwipeDate === today) {
-      alert('✅ Daily limit reached! Moving you to Saved Companies to select contacts from your interested companies.');
+      alert('Daily hunt limit reached. Time to engage with your catches — select contacts and start outreach.');
       // Redirect to Scout with Saved Companies tab active
       navigate('/scout', { replace: true, state: { activeTab: 'saved-companies' } });
       return;
@@ -268,21 +268,51 @@ export default function DailyLeads() {
     );
   }
 
+  // Calculate next refresh time for user-friendly display
+  const getNextRefreshInfo = () => {
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    const hour = now.getUTCHours();
+
+    // Refresh happens at 9am UTC Monday-Friday
+    let daysUntilRefresh = 0;
+    if (dayOfWeek === 0) daysUntilRefresh = 1; // Sunday -> Monday
+    else if (dayOfWeek === 6) daysUntilRefresh = 2; // Saturday -> Monday
+    else if (dayOfWeek === 5 && hour >= 9) daysUntilRefresh = 3; // Friday after 9am -> Monday
+    else if (hour >= 9) daysUntilRefresh = 1; // After 9am -> next weekday
+
+    if (daysUntilRefresh === 0) {
+      return 'New targets arriving at 9am UTC (4am ET)';
+    } else if (daysUntilRefresh === 1) {
+      return 'New targets arriving tomorrow at 9am UTC';
+    } else {
+      return `New targets arriving Monday at 9am UTC`;
+    }
+  };
+
   if (companies.length === 0) {
     return (
       <div className="empty-daily-leads">
         <div className="empty-icon">
           <Target className="w-16 h-16 text-gray-400" />
         </div>
-        <h2>All Leads Reviewed</h2>
-        <p>You've reviewed all available companies for today. Excellent work!</p>
-        <p className="empty-hint">Fresh leads arrive Monday-Friday, or update your ICP Settings for more matches.</p>
-        <button
-          onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
-          className="refresh-btn"
-        >
-          Update ICP Settings
-        </button>
+        <h2>Hunt Complete</h2>
+        <p>You've reviewed all available targets. Your saved companies are ready for outreach.</p>
+        <p className="empty-hint">{getNextRefreshInfo()}</p>
+        <div className="empty-actions">
+          <button
+            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+            className="primary-btn"
+          >
+            View Saved Companies
+          </button>
+          <button
+            onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
+            className="secondary-btn"
+          >
+            Refine Targets
+          </button>
+        </div>
       </div>
     );
   }
@@ -293,8 +323,8 @@ export default function DailyLeads() {
     <div className="daily-leads">
       {/* Discovery Header - Swipe App Style */}
       <div className="discovery-header">
-        <h1 className="discovery-title">Your Daily Matches</h1>
-        <p className="discovery-subtitle">AI-curated companies aligned with your goals</p>
+        <h1 className="discovery-title">Today's Targets</h1>
+        <p className="discovery-subtitle">AI-curated prospects matching your ICP</p>
       </div>
 
       {/* Compact Filters Button - Top Right */}
@@ -379,10 +409,10 @@ export default function DailyLeads() {
       <div className="swipe-microcopy">
         <div className="microcopy-item reject-hint">
           <span className="microcopy-icon">👈</span>
-          <span className="microcopy-text">Improves future matches</span>
+          <span className="microcopy-text">Sharpens your targeting</span>
         </div>
         <div className="microcopy-item accept-hint">
-          <span className="microcopy-text">Builds your pipeline</span>
+          <span className="microcopy-text">Add to your hunt list</span>
           <span className="microcopy-icon">👉</span>
         </div>
       </div>
@@ -400,15 +430,15 @@ export default function DailyLeads() {
         {showSessionOverview && (
           <div className="session-stats">
             <div className="session-stat">
-              <div className="stat-label">Remaining</div>
+              <div className="stat-label">Targets Left</div>
               <div className="stat-value">{remainingLeads}</div>
             </div>
             <div className="session-stat primary">
-              <div className="stat-label">Matched Today</div>
+              <div className="stat-label">Today's Catches</div>
               <div className="stat-value">{dailySwipeCount} <span className="stat-max">/ {DAILY_SWIPE_LIMIT}</span></div>
             </div>
             <div className="session-stat">
-              <div className="stat-label">Total Accepted</div>
+              <div className="stat-label">Total Hunt List</div>
               <div className="stat-value">{totalAcceptedCompanies}</div>
             </div>
           </div>

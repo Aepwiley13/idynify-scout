@@ -4,7 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import CompanyCard from '../../components/scout/CompanyCard';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
-import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown, CheckCircle, RotateCcw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown, CheckCircle, RotateCcw, RefreshCw, Loader } from 'lucide-react';
 import './DailyLeads.css';
 
 export default function DailyLeads() {
@@ -25,6 +25,8 @@ export default function DailyLeads() {
   const [lastSwipe, setLastSwipe] = useState(null); // Track last swipe for undo
   const [showUndo, setShowUndo] = useState(false);
   const [showSessionOverview, setShowSessionOverview] = useState(false); // Collapsible session stats
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
 
   const DAILY_SWIPE_LIMIT = 25; // 25 interested companies per day
 
@@ -92,6 +94,70 @@ export default function DailyLeads() {
     } catch (error) {
       console.error('Error loading daily leads:', error);
       setLoading(false);
+    }
+  };
+
+  // Manual refresh - triggers search-companies immediately
+  const handleManualRefresh = async () => {
+    const user = auth.currentUser;
+    if (!user || isRefreshing) return;
+
+    setIsRefreshing(true);
+    setRefreshMessage('Barry is finding new targets...');
+
+    try {
+      const authToken = await user.getIdToken();
+
+      // Get user's ICP profile
+      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+      const profileDoc = await getDoc(profileRef);
+
+      if (!profileDoc.exists()) {
+        setRefreshMessage('Set up your ICP first to find targets.');
+        setIsRefreshing(false);
+        return;
+      }
+
+      const companyProfile = profileDoc.data();
+
+      // Call search-companies to refresh the queue
+      const response = await fetch('/.netlify/functions/search-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.companiesAdded > 0) {
+          setRefreshMessage(`Found ${data.companiesAdded} new targets.`);
+          // Reload the leads after a short delay
+          setTimeout(() => {
+            setRefreshMessage('');
+            loadTodayLeads();
+          }, 1500);
+        } else if (data.currentQueueSize > 0) {
+          setRefreshMessage('Queue is already full. Review your current targets.');
+          setTimeout(() => setRefreshMessage(''), 3000);
+        } else {
+          setRefreshMessage('No new matches found. Try refining your ICP.');
+          setTimeout(() => setRefreshMessage(''), 3000);
+        }
+      } else {
+        setRefreshMessage(data.error || 'Refresh failed. Try again.');
+        setTimeout(() => setRefreshMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error refreshing leads:', error);
+      setRefreshMessage('Refresh failed. Try again.');
+      setTimeout(() => setRefreshMessage(''), 3000);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -298,21 +364,50 @@ export default function DailyLeads() {
         </div>
         <h2>Hunt Complete</h2>
         <p>You've reviewed all available targets. Your saved companies are ready for outreach.</p>
-        <p className="empty-hint">{getNextRefreshInfo()}</p>
+
+        {/* Refresh status message */}
+        {refreshMessage && (
+          <div className="refresh-status">
+            {isRefreshing && <Loader className="w-4 h-4 animate-spin" />}
+            <span>{refreshMessage}</span>
+          </div>
+        )}
+
+        {!refreshMessage && (
+          <p className="empty-hint">{getNextRefreshInfo()}</p>
+        )}
+
         <div className="empty-actions">
           <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="primary-btn refresh-btn"
+          >
+            {isRefreshing ? (
+              <>
+                <Loader className="w-4 h-4 animate-spin" />
+                <span>Finding targets...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                <span>Refresh Leads Now</span>
+              </>
+            )}
+          </button>
+          <button
             onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-            className="primary-btn"
+            className="secondary-btn"
           >
             View Saved Companies
           </button>
-          <button
-            onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
-            className="secondary-btn"
-          >
-            Refine Targets
-          </button>
         </div>
+        <button
+          onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
+          className="tertiary-btn"
+        >
+          Refine Targets
+        </button>
       </div>
     );
   }

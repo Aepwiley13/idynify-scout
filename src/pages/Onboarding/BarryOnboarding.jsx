@@ -14,6 +14,57 @@ const DEFAULT_WEIGHTS = {
   revenue: 10
 };
 
+/**
+ * Build authoritative return greeting for Barry (Phase 2 + 3 requirement)
+ * Deterministic template - no Claude involved
+ */
+function buildReturnGreeting(icpData) {
+  // Build the "what Barry is doing" statement
+  const strategyLine = icpData.lookalikeSeed?.name
+    ? `I'm actively finding companies similar to ${icpData.lookalikeSeed.name}`
+    : `I'm actively finding ${icpData.industries?.[0] || 'target'} companies`;
+
+  // Build size/location context
+  const sizeContext = icpData.companySizes?.length
+    ? ` — ${icpData.companySizes[0]} employees`
+    : '';
+
+  const locationContext = icpData.isNationwide
+    ? ' nationwide'
+    : icpData.locations?.length
+      ? ` in ${icpData.locations.slice(0, 2).join(' and ')}${icpData.locations.length > 2 ? ' and more' : ''}`
+      : '';
+
+  // Strategy explanation for lookalike
+  const strategyExplanation = icpData.lookalikeSeed?.name
+    ? `\n\nThis prioritizes real ${icpData.companyKeywords?.[0] || 'companies'} like ${icpData.lookalikeSeed.name}, not just broad ${icpData.industries?.[0] || 'industry'} matches.`
+    : '';
+
+  // Build context summary (Phase 3 requirement)
+  const summaryLines = [
+    `• Strategy: ${icpData.searchStrategy === 'lookalike' ? `Lookalike (${icpData.lookalikeSeed?.name})` : 'Industry filter'}`,
+    `• Industry: ${icpData.industries?.join(', ') || 'Not set'}`,
+    icpData.companySizes?.length ? `• Size: ${icpData.companySizes.join(', ')} employees` : null,
+    icpData.isNationwide ? '• Location: Nationwide' : icpData.locations?.length ? `• Location: ${icpData.locations.join(', ')}` : null
+  ].filter(Boolean);
+
+  const contextSummary = `\n\nHere's what I'm working with:\n${summaryLines.join('\n')}`;
+
+  // Weekend-aware refresh timing
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+  const refreshNote = isWeekend
+    ? `\n\nAutomatic refresh resumes Monday. You can refresh leads manually anytime in Scout.`
+    : '';
+
+  // Final action prompt - declarative, not asking permission
+  const actionPrompt = `\n\nWant to adjust anything, or should I keep going?`;
+
+  return `${strategyLine}${sizeContext}${locationContext}.${strategyExplanation}${contextSummary}${refreshNote}${actionPrompt}`;
+}
+
 export default function BarryOnboarding() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -62,14 +113,9 @@ export default function BarryOnboarding() {
         const data = profileDoc.data();
         if (data.industries && data.industries.length > 0) {
           setExistingICP(data);
-          // Build return greeting with lookalike info if present
-          const lookalikePart = data.lookalikeSeed?.name
-            ? `\n\nUsing ${data.lookalikeSeed.name} as your lookalike seed to find similar companies.`
-            : '';
-          const strategyPart = data.searchStrategy === 'lookalike'
-            ? ' (lookalike strategy)'
-            : '';
-          setBarryMessage(`Welcome back. Your current hunt targets: ${data.industries.join(', ')}${strategyPart}${data.companySizes?.length ? ` (${data.companySizes.join(', ')} employees)` : ''}${data.isNationwide ? ' nationwide' : data.locations?.length ? ` in ${data.locations.slice(0, 3).join(', ')}${data.locations.length > 3 ? '...' : ''}` : ''}${lookalikePart}\n\nIs this still accurate, or should we refine your targets?`);
+          // Build authoritative return greeting (Phase 2 requirement)
+          const returnGreeting = buildReturnGreeting(data);
+          setBarryMessage(returnGreeting);
         } else {
           setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
         }
@@ -279,10 +325,33 @@ export default function BarryOnboarding() {
         { merge: true }
       );
 
-      // Add final Barry message - personalized based on strategy
-      const finalMessage = extractedICP.lookalikeSeed?.name
-        ? `Locked in. I'll hunt for companies similar to ${extractedICP.lookalikeSeed.name}. You can refine your targets anytime in Settings.`
-        : "Locked in. Scout will surface your targets daily, and Hunter will craft outreach that lands. Refine anytime in Settings.";
+      // Trigger immediate lead search in the background
+      const authToken = await user.getIdToken();
+      fetch('/.netlify/functions/search-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: icpProfile
+        })
+      }).catch(err => console.error('Background search failed:', err));
+
+      // Build Barry's "work in progress" message
+      const strategyContext = extractedICP.lookalikeSeed?.name
+        ? `companies similar to ${extractedICP.lookalikeSeed.name}`
+        : `${extractedICP.industries?.[0] || 'your target'} companies`;
+
+      const locationContext = extractedICP.locations === 'nationwide' || !extractedICP.locations?.length
+        ? 'nationwide'
+        : `in ${extractedICP.locations.slice(0, 2).join(' and ')}`;
+
+      const sizeContext = extractedICP.companySizes?.length
+        ? ` (${extractedICP.companySizes[0]} employees)`
+        : '';
+
+      const finalMessage = `I'm finding ${strategyContext}${sizeContext} ${locationContext}.\n\nNew targets will appear in Scout shortly. You can also refresh leads manually anytime.`;
+
       const finalHistory = [
         ...conversationHistory,
         {
@@ -295,8 +364,8 @@ export default function BarryOnboarding() {
 
       // Navigate to Scout after a brief delay
       setTimeout(() => {
-        navigate('/scout');
-      }, 2000);
+        navigate('/scout/daily-leads');
+      }, 2500);
 
     } catch (error) {
       console.error('Error saving ICP:', error);

@@ -99,7 +99,6 @@ export default function AllLeads() {
   // Selection & interaction
   const [selectedContact, setSelectedContact] = useState(null);
   const [hunterContact, setHunterContact] = useState(null);
-  const [autoEnrichMode, setAutoEnrichMode] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [menuOpenFor, setMenuOpenFor] = useState(null);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(null);
@@ -206,7 +205,6 @@ export default function AllLeads() {
       prev.map(c => c.id === updatedContact.id ? { ...c, ...updatedContact } : c)
     );
     setSelectedContact(null);
-    setAutoEnrichMode(false);
   }
 
   // ── Selection ────────────────────────────────────────
@@ -232,15 +230,8 @@ export default function AllLeads() {
     navigate(`/hunter/create?contactIds=${contactIds.join(',')}`);
   }
 
-  function handleEnrichFromCard(contact, e) {
-    e.stopPropagation();
-    setSelectedContact(contact);
-    setAutoEnrichMode(true);
-  }
-
   function handleCardClick(contact) {
     setSelectedContact(contact);
-    setAutoEnrichMode(false);
   }
 
   function exportToCSV(contactsToExport) {
@@ -858,10 +849,9 @@ export default function AllLeads() {
       {selectedContact && (
         <ContactSnapshot
           contact={selectedContact}
-          onClose={() => { setSelectedContact(null); setAutoEnrichMode(false); }}
+          onClose={() => setSelectedContact(null)}
           onUpdate={handleContactUpdate}
           context="leads"
-          autoEnrich={autoEnrichMode}
         />
       )}
 

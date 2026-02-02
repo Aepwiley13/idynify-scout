@@ -1,3 +1,9 @@
+/**
+ * @deprecated This modal-based Scout+ component has been replaced by the
+ * dedicated page at src/pages/Scout/ScoutPlus.jsx (route: /scout-plus).
+ * This file is retained temporarily for reference and should be removed
+ * in a future cleanup pass.
+ */
 import { useState } from 'react';
 import { X, UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

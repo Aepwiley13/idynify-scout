@@ -752,12 +752,6 @@ export default function AllLeads() {
                   <div className="info-row info-row-missing">
                     <Mail className="w-4 h-4 info-icon" />
                     <span className="missing-label">No email found</span>
-                    <button
-                      className="enrich-inline-btn"
-                      onClick={(e) => handleEnrichFromCard(contact, e)}
-                    >
-                      <Sparkles className="w-3 h-3" /> Enrich
-                    </button>
                   </div>
                 )}
 
@@ -804,17 +798,6 @@ export default function AllLeads() {
                   <Target className="w-5 h-5" />
                   <span>Engage</span>
                 </button>
-
-                {!hasEmail && (
-                  /* Enrich button if no email */
-                  <button
-                    className="action-btn action-enrich-secondary"
-                    onClick={(e) => handleEnrichFromCard(contact, e)}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Enrich</span>
-                  </button>
-                )}
 
                 {/* Secondary: LinkedIn */}
                 {contact.linkedin_url && (

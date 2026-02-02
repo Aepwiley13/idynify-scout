@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft } from 'lucide-react';
+import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2 } from 'lucide-react';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
 import BusinessCardCapture from '../../components/scout/BusinessCardCapture';
@@ -9,28 +9,34 @@ import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 export default function ScoutPlus() {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'success'
-  const [addedContacts, setAddedContacts] = useState([]);
+  const [addedItems, setAddedItems] = useState([]);
+  const [lastUploadType, setLastUploadType] = useState(null); // 'leads' or 'companies'
 
   const handleBack = () => {
     setCurrentView('menu');
   };
 
-  const handleContactAdded = (contacts) => {
-    setAddedContacts(contacts);
+  const handleContactAdded = (items) => {
+    setAddedItems(items);
+    // Detect upload type from the _uploadType flag set by CSVUpload
+    const isCompanyUpload = items.length > 0 && items[0]?._uploadType === 'companies';
+    setLastUploadType(isCompanyUpload ? 'companies' : 'leads');
     setCurrentView('success');
   };
 
-  const handleViewLeads = () => {
-    // Single contact: go directly to their profile
-    if (addedContacts.length === 1 && addedContacts[0]?.id) {
-      navigate(`/scout/contact/${addedContacts[0].id}`);
+  const handleViewResults = () => {
+    if (lastUploadType === 'companies') {
+      navigate('/scout', { state: { activeTab: 'saved-companies' } });
+    } else if (addedItems.length === 1 && addedItems[0]?.id) {
+      navigate(`/scout/contact/${addedItems[0].id}`);
     } else {
       navigate('/scout', { state: { activeTab: 'all-leads' } });
     }
   };
 
   const handleAddMore = () => {
-    setAddedContacts([]);
+    setAddedItems([]);
+    setLastUploadType(null);
     setCurrentView('menu');
   };
 
@@ -56,7 +62,7 @@ export default function ScoutPlus() {
             {currentView === 'csv' && 'Upload CSV'}
             {currentView === 'business-card' && 'Scan Business Card'}
             {currentView === 'linkedin-link' && 'LinkedIn Link'}
-            {currentView === 'success' && 'Contact Added Successfully!'}
+            {currentView === 'success' && (lastUploadType === 'companies' ? 'Companies Added Successfully!' : 'Contact Added Successfully!')}
           </h2>
         </div>
       </div>
@@ -166,28 +172,42 @@ export default function ScoutPlus() {
 
             {/* Success Message */}
             <h3 className="text-xl font-bold text-gray-900 mb-2">
-              {addedContacts.length === 1 ? 'Contact Added!' : `${addedContacts.length} Contacts Added!`}
+              {lastUploadType === 'companies'
+                ? (addedItems.length === 1 ? 'Company Added!' : `${addedItems.length} Companies Added!`)
+                : (addedItems.length === 1 ? 'Contact Added!' : `${addedItems.length} Contacts Added!`)}
             </h3>
             <p className="text-gray-600 mb-8">
-              {addedContacts.length === 1
-                ? 'Your contact has been saved to your leads.'
-                : 'Your contacts have been saved to your leads.'}
+              {lastUploadType === 'companies'
+                ? (addedItems.length === 1
+                    ? 'Your company has been saved to Saved Companies.'
+                    : 'Your companies have been saved to Saved Companies.')
+                : (addedItems.length === 1
+                    ? 'Your contact has been saved to your leads.'
+                    : 'Your contacts have been saved to your leads.')}
             </p>
 
-            {/* Contact Summary */}
+            {/* Item Summary */}
             <div className="mb-8 bg-gray-50 rounded-xl p-4 text-left max-h-48 overflow-y-auto">
-              {addedContacts.map((contact, index) => (
+              {addedItems.map((item, index) => (
                 <div
                   key={index}
                   className="flex items-center gap-3 py-2 border-b border-gray-200 last:border-0"
                 >
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">
-                    {contact.name ? contact.name.charAt(0).toUpperCase() : '?'}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                    lastUploadType === 'companies'
+                      ? 'bg-cyan-100 text-cyan-600'
+                      : 'bg-blue-100 text-blue-600'
+                  }`}>
+                    {lastUploadType === 'companies'
+                      ? <Building2 className="w-5 h-5" />
+                      : (item.name ? item.name.charAt(0).toUpperCase() : '?')}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{contact.name}</p>
+                    <p className="font-semibold text-gray-900 truncate">{item.name}</p>
                     <p className="text-sm text-gray-600 truncate">
-                      {contact.title || 'No title'} {contact.company && `• ${contact.company}`}
+                      {lastUploadType === 'companies'
+                        ? (item.industry || item.website_url || 'Company')
+                        : (<>{item.title || 'No title'} {item.company && `\u2022 ${item.company}`}</>)}
                     </p>
                   </div>
                 </div>
@@ -197,11 +217,13 @@ export default function ScoutPlus() {
             {/* Action Buttons */}
             <div className="flex gap-3">
               <button
-                onClick={handleViewLeads}
+                onClick={handleViewResults}
                 className="flex-1 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all shadow-md flex items-center justify-center gap-2"
               >
                 <Eye className="w-5 h-5" />
-                {addedContacts.length === 1 ? 'Go to Lead' : 'View in Leads'}
+                {lastUploadType === 'companies'
+                  ? 'View Saved Companies'
+                  : (addedItems.length === 1 ? 'Go to Lead' : 'View in Leads')}
               </button>
               <button
                 onClick={handleAddMore}

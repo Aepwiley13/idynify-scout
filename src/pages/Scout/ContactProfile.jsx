@@ -10,7 +10,9 @@ import {
   Target,
   AlertTriangle,
   Brain,
-  ArrowRight
+  ArrowRight,
+  Linkedin,
+  Link2
 } from 'lucide-react';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
@@ -34,6 +36,9 @@ export default function ContactProfile() {
   const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
   const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
   const [staleDismissed, setStaleDismissed] = useState(false);
+  const [needsManualLinkedIn, setNeedsManualLinkedIn] = useState(false);
+  const [manualLinkedInUrl, setManualLinkedInUrl] = useState('');
+  const [enrichmentSummary, setEnrichmentSummary] = useState(null);
 
   useEffect(() => {
     loadContactProfile();
@@ -205,6 +210,18 @@ export default function ContactProfile() {
 
       console.log('✅ Enrichment complete');
 
+      // Check if manual LinkedIn input is needed
+      const summary = result.enrichedData?.enrichment_summary || result.summary;
+      setEnrichmentSummary(summary);
+
+      if (summary?.needs_manual_linkedin) {
+        console.log('⚠️ Enrichment needs manual LinkedIn URL');
+        setNeedsManualLinkedIn(true);
+        setEnriching(false);
+        // Don't save yet - wait for user to provide LinkedIn URL
+        return;
+      }
+
       // Update contact in Firestore with enriched data
       const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
       await updateDoc(contactRef, {
@@ -220,6 +237,7 @@ export default function ContactProfile() {
       console.log('🐻 Regenerating Barry context after enrichment...');
       generateBarryContext(updatedContact, user);
 
+      setNeedsManualLinkedIn(false);
       setEnrichSuccess(true);
       setTimeout(() => setEnrichSuccess(false), 5000);
       setEnriching(false);
@@ -229,6 +247,99 @@ export default function ContactProfile() {
       setEnrichError(err.message || 'Failed to enrich contact. Please try again.');
       setEnriching(false);
     }
+  }
+
+  // Handle manual LinkedIn URL submission and retry enrichment
+  async function handleManualLinkedInSubmit() {
+    if (!manualLinkedInUrl.trim()) {
+      setEnrichError('Please enter a LinkedIn URL');
+      return;
+    }
+
+    // Validate LinkedIn URL format
+    if (!manualLinkedInUrl.includes('linkedin.com/in/')) {
+      setEnrichError('Please enter a valid LinkedIn profile URL (e.g., https://linkedin.com/in/username)');
+      return;
+    }
+
+    try {
+      setEnriching(true);
+      setEnrichError(null);
+      setNeedsManualLinkedIn(false);
+
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      // First, save the LinkedIn URL to the contact
+      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+      await updateDoc(contactRef, {
+        linkedin_url: manualLinkedInUrl.trim()
+      });
+
+      // Update local state with LinkedIn URL
+      const contactWithLinkedIn = { ...contact, linkedin_url: manualLinkedInUrl.trim() };
+      setContact(contactWithLinkedIn);
+
+      console.log('🔄 Re-running enrichment with manual LinkedIn URL...');
+
+      const authToken = await user.getIdToken();
+
+      // Re-run enrichment with the LinkedIn URL
+      const response = await fetch('/.netlify/functions/barryEnrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: authToken,
+          contact: {
+            ...contactWithLinkedIn,
+            linkedin_url: manualLinkedInUrl.trim()
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Enrichment request failed');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Enrichment failed');
+      }
+
+      console.log('✅ Enrichment with LinkedIn URL complete');
+
+      // Update contact in Firestore with enriched data
+      await updateDoc(contactRef, {
+        ...result.enrichedData,
+        last_enriched_at: new Date().toISOString()
+      });
+
+      // Update local state
+      const updatedContact = { ...contactWithLinkedIn, ...result.enrichedData };
+      setContact(updatedContact);
+
+      // Regenerate Barry context
+      generateBarryContext(updatedContact, user);
+
+      setManualLinkedInUrl('');
+      setEnrichmentSummary(null);
+      setEnrichSuccess(true);
+      setTimeout(() => setEnrichSuccess(false), 5000);
+      setEnriching(false);
+
+    } catch (err) {
+      console.error('Error in manual LinkedIn enrichment:', err);
+      setEnrichError(err.message || 'Failed to enrich contact. Please try again.');
+      setEnriching(false);
+    }
+  }
+
+  function handleCancelManualLinkedIn() {
+    setNeedsManualLinkedIn(false);
+    setManualLinkedInUrl('');
+    setEnrichmentSummary(null);
   }
 
 
@@ -307,6 +418,68 @@ export default function ContactProfile() {
         <div className="enrich-error-banner">
           <AlertCircle className="w-5 h-5" />
           <span>{enrichError}</span>
+        </div>
+      )}
+
+      {/* Manual LinkedIn URL Input - Shows when enrichment couldn't find LinkedIn */}
+      {needsManualLinkedIn && (
+        <div className="manual-linkedin-banner">
+          <div className="manual-linkedin-header">
+            <Linkedin className="w-5 h-5 text-blue-600" />
+            <div className="manual-linkedin-text">
+              <span className="manual-linkedin-title">LinkedIn Profile Not Found</span>
+              <span className="manual-linkedin-desc">
+                Barry couldn't automatically find a LinkedIn profile for this contact.
+                Paste the LinkedIn URL below to continue enrichment.
+              </span>
+            </div>
+          </div>
+          <div className="manual-linkedin-input-row">
+            <div className="manual-linkedin-input-wrapper">
+              <Link2 className="w-4 h-4 text-gray-400" />
+              <input
+                type="url"
+                placeholder="https://linkedin.com/in/username"
+                value={manualLinkedInUrl}
+                onChange={(e) => setManualLinkedInUrl(e.target.value)}
+                className="manual-linkedin-input"
+                disabled={enriching}
+              />
+            </div>
+            <button
+              className="manual-linkedin-submit-btn"
+              onClick={handleManualLinkedInSubmit}
+              disabled={enriching || !manualLinkedInUrl.trim()}
+            >
+              {enriching ? (
+                <Loader className="w-4 h-4 spinner" />
+              ) : (
+                <>
+                  <span>Enrich with LinkedIn</span>
+                </>
+              )}
+            </button>
+            <button
+              className="manual-linkedin-cancel-btn"
+              onClick={handleCancelManualLinkedIn}
+              disabled={enriching}
+            >
+              Skip
+            </button>
+          </div>
+          {enrichmentSummary && (
+            <div className="manual-linkedin-details">
+              <span className="detail-label">What Barry tried:</span>
+              <ul className="detail-list">
+                {enrichmentSummary.sources_used?.map((source, i) => (
+                  <li key={i}>{source} search</li>
+                ))}
+                {enrichmentSummary.sources_used?.length === 0 && (
+                  <li>Apollo search (no match found)</li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 

@@ -37,6 +37,7 @@ import ScoutMain from './pages/Scout/ScoutMain';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
+import ScoutPlus from './pages/Scout/ScoutPlus';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
@@ -367,6 +368,16 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <ScoutMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Scout+ Dedicated Page */}
+        <Route
+          path="/scout-plus"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <ScoutPlus />
             </ProtectedRoute>
           }
         />

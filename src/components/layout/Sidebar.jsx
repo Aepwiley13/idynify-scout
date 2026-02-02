@@ -129,8 +129,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     {
       icon: UserPlus,
       label: 'Scout+',
-      path: '/scout',
-      state: { activeTab: 'scout-plus' }
+      path: '/scout-plus'
     },
     {
       icon: Building2,

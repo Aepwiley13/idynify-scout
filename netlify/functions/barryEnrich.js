@@ -191,8 +191,9 @@ export const handler = async (event) => {
 
     // Step 1b: Apollo PEOPLE_SEARCH (fuzzy fallback — only if no Apollo ID)
     const postApolloMissing = assessMissingData({ ...contact, ...enrichedData });
+    // Check for company in all possible field names (company_name, company, organization_name)
     const hasNameAndCompany = (contact.name || enrichedData.name) &&
-      (contact.company_name || enrichedData.current_company_name || contact.organization_name);
+      (contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name);
 
     if (postApolloMissing.length > 0 && hasNameAndCompany && !hasApolloId) {
       const step1b = {
@@ -205,7 +206,8 @@ export const handler = async (event) => {
 
       try {
         const name = contact.name || enrichedData.name || '';
-        const company = contact.company_name || enrichedData.current_company_name || contact.organization_name || '';
+        // Check for company in all possible field names (CSV uses "company", others use "company_name")
+        const company = contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name || '';
 
         console.log('🔍 Step 1b: Apollo PEOPLE_SEARCH for', name, 'at', company);
 
@@ -356,8 +358,12 @@ export const handler = async (event) => {
       functions: enrichedData.functions || contact.functions || [],
 
       // Current Employment (Apollo-sourced)
+      // Primary fields - these are what the UI reads
+      title: enrichedData.current_position_title || enrichedData.title || contact.title || null,
+      company_name: enrichedData.current_company_name || enrichedData.company_name || contact.company_name || contact.company || null,
+      // Legacy Apollo-style fields - kept for backward compatibility
       current_position_title: enrichedData.current_position_title || contact.title || null,
-      current_company_name: enrichedData.current_company_name || contact.company_name || null,
+      current_company_name: enrichedData.current_company_name || contact.company_name || contact.company || null,
       job_start_date: enrichedData.job_start_date || contact.job_start_date || null,
 
       // History (Apollo-sourced)
@@ -513,11 +519,16 @@ function extractInternalFields(contact) {
   }
 
   // Check for company name in alternate fields
-  if (!contact.company_name && contact.organization_name) {
+  // CSV uploads use "company", other sources use "company_name" or "organization_name"
+  if (!contact.company_name && contact.company) {
+    data.current_company_name = contact.company;
+    fieldsFound.push('company_name');
+  }
+  if (!contact.company_name && !contact.company && contact.organization_name) {
     data.current_company_name = contact.organization_name;
     fieldsFound.push('company_name');
   }
-  if (!contact.company_name && contact.organization?.name) {
+  if (!contact.company_name && !contact.company && contact.organization?.name) {
     data.current_company_name = contact.organization.name;
     fieldsFound.push('company_name');
   }

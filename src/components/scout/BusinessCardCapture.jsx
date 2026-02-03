@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc, doc, setDoc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
+import { startBackgroundEnrichment, assessEnrichmentViability } from '../../utils/contactEnrichment';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const [image, setImage] = useState(null);
@@ -179,7 +180,21 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         await updateCompanyContactCount(companyId, user.uid);
       }
 
-      onContactAdded([{ id: docRef.id, ...contactData }]);
+      const savedContact = { id: docRef.id, ...contactData };
+
+      // Assess enrichment viability and start background enrichment
+      const viability = assessEnrichmentViability(savedContact);
+      savedContact._enrichmentViability = viability;
+
+      // Start background enrichment (non-blocking)
+      startBackgroundEnrichment(
+        [savedContact],
+        (results) => {
+          console.log('Business card contact enrichment complete:', results);
+        }
+      );
+
+      onContactAdded([savedContact]);
 
     } catch (error) {
       console.error('Error saving business card contact:', error);

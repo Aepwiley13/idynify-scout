@@ -10,8 +10,11 @@ import {
   Target,
   AlertTriangle,
   Brain,
-  ArrowRight
+  ArrowRight,
+  Linkedin,
+  Sparkles
 } from 'lucide-react';
+import { enrichWithLinkedIn } from '../../utils/contactEnrichment';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
@@ -34,6 +37,12 @@ export default function ContactProfile() {
   const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
   const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
   const [staleDismissed, setStaleDismissed] = useState(false);
+
+  // LinkedIn URL entry state
+  const [showLinkedInEntry, setShowLinkedInEntry] = useState(false);
+  const [linkedInUrl, setLinkedInUrl] = useState('');
+  const [linkedInSaving, setLinkedInSaving] = useState(false);
+  const [linkedInError, setLinkedInError] = useState(null);
 
   useEffect(() => {
     loadContactProfile();
@@ -231,6 +240,55 @@ export default function ContactProfile() {
     }
   }
 
+  // Handle LinkedIn URL submission
+  async function handleLinkedInSubmit() {
+    if (!linkedInUrl || !linkedInUrl.includes('linkedin.com')) {
+      setLinkedInError('Please enter a valid LinkedIn URL');
+      return;
+    }
+
+    setLinkedInSaving(true);
+    setLinkedInError(null);
+
+    try {
+      const result = await enrichWithLinkedIn(contact.id, linkedInUrl);
+
+      if (result.success) {
+        // Reload contact to get enriched data
+        const user = auth.currentUser;
+        if (user) {
+          const contactDoc = await getDoc(doc(db, 'users', user.uid, 'contacts', contact.id));
+          if (contactDoc.exists()) {
+            const updatedContact = { id: contactDoc.id, ...contactDoc.data() };
+            setContact(updatedContact);
+
+            // Regenerate Barry context with new data
+            generateBarryContext(updatedContact, user);
+          }
+        }
+
+        setShowLinkedInEntry(false);
+        setLinkedInUrl('');
+        setEnrichSuccess(true);
+        setTimeout(() => setEnrichSuccess(false), 5000);
+      } else {
+        setLinkedInError(result.error || 'Enrichment failed');
+      }
+    } catch (err) {
+      setLinkedInError(err.message || 'Failed to enrich. Please try again.');
+    } finally {
+      setLinkedInSaving(false);
+    }
+  }
+
+  // Check if contact needs LinkedIn URL
+  const needsLinkedIn = contact && !contact.linkedin_url && (
+    contact.enrichment_status === 'failed' ||
+    contact.enrichment_status === 'needs_info' ||
+    contact.enrichment_status === 'user_added' ||
+    contact.enrichment_status === 'partial' ||
+    !contact.enrichment_status
+  );
 
   if (loading) {
     return (
@@ -307,6 +365,166 @@ export default function ContactProfile() {
         <div className="enrich-error-banner">
           <AlertCircle className="w-5 h-5" />
           <span>{enrichError}</span>
+        </div>
+      )}
+
+      {/* Missing LinkedIn URL Banner */}
+      {needsLinkedIn && !showLinkedInEntry && (
+        <div className="missing-linkedin-banner" style={{
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          border: '1px solid #fcd34d'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#f59e0b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Linkedin className="w-5 h-5" style={{ color: 'white' }} />
+            </div>
+            <div>
+              <p style={{ fontWeight: 600, color: '#92400e', margin: 0 }}>Missing LinkedIn URL</p>
+              <p style={{ fontSize: '0.875rem', color: '#a16207', margin: 0 }}>
+                Add their LinkedIn to find email, phone, and more
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowLinkedInEntry(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              background: '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Sparkles className="w-4 h-4" />
+            Add LinkedIn
+          </button>
+        </div>
+      )}
+
+      {/* LinkedIn URL Entry Form */}
+      {showLinkedInEntry && (
+        <div className="linkedin-entry-form" style={{
+          background: '#f0f9ff',
+          borderRadius: '12px',
+          padding: '20px',
+          margin: '0 0 16px 0',
+          border: '1px solid #bae6fd'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: '#0ea5e9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Linkedin className="w-5 h-5" style={{ color: 'white' }} />
+            </div>
+            <div>
+              <p style={{ fontWeight: 600, color: '#0c4a6e', margin: 0 }}>Add LinkedIn URL</p>
+              <p style={{ fontSize: '0.875rem', color: '#0369a1', margin: 0 }}>
+                Paste their LinkedIn profile URL to enrich this contact
+              </p>
+            </div>
+          </div>
+
+          <input
+            type="url"
+            value={linkedInUrl}
+            onChange={(e) => { setLinkedInUrl(e.target.value); setLinkedInError(null); }}
+            placeholder="https://linkedin.com/in/..."
+            disabled={linkedInSaving}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: linkedInError ? '2px solid #ef4444' : '1px solid #cbd5e1',
+              fontSize: '1rem',
+              marginBottom: '8px',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+          />
+
+          {linkedInError && (
+            <p style={{ color: '#dc2626', fontSize: '0.875rem', margin: '0 0 8px 0' }}>
+              {linkedInError}
+            </p>
+          )}
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleLinkedInSubmit}
+              disabled={linkedInSaving}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 20px',
+                background: '#0ea5e9',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: linkedInSaving ? 'not-allowed' : 'pointer',
+                opacity: linkedInSaving ? 0.7 : 1
+              }}
+            >
+              {linkedInSaving ? (
+                <>
+                  <Loader className="w-4 h-4" style={{ animation: 'spin 1s linear infinite' }} />
+                  Enriching...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Enrich Contact
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => { setShowLinkedInEntry(false); setLinkedInUrl(''); setLinkedInError(null); }}
+              disabled={linkedInSaving}
+              style={{
+                padding: '12px 20px',
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

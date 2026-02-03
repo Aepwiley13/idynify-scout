@@ -1,23 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { Send, Smartphone, Sparkles, Brain } from 'lucide-react';
+import { Send, Smartphone } from 'lucide-react';
 import { downloadVCard } from '../../utils/vcard';
 import './QuickActions.css';
 
-export default function QuickActions({ contact, onEnrich, onHunter }) {
+export default function QuickActions({ contact, onHunter }) {
   const navigate = useNavigate();
-
-  // Check if contact needs enrichment
-  function isContactNotEnriched() {
-    const hasWorkEmail = !!(contact.work_email || contact.email);
-    const hasPhone = !!(contact.phone || contact.phone_mobile || contact.phone_direct || contact.phone_work);
-    const hasLinkedIn = !!contact.linkedin_url;
-    const hasCompany = !!(contact.company_name || contact.company);
-
-    return !hasWorkEmail || !hasPhone || !hasLinkedIn || !hasCompany;
-  }
-
-  const needsEnrichment = isContactNotEnriched();
-  const hasBeenEnriched = !!contact.last_enriched_at;
 
   return (
     <div className="quick-actions-bar">
@@ -43,16 +30,6 @@ export default function QuickActions({ contact, onEnrich, onHunter }) {
         <Smartphone className="w-5 h-5" />
         <span>Save to Phone</span>
       </button>
-      {onEnrich && (
-        <button
-          className={`action-button ${needsEnrichment ? 'action-button-enrich' : 'action-button-enrich-subtle'}`}
-          onClick={onEnrich}
-          title={needsEnrichment ? 'Enrich with Barry' : 'Re-enrich with Barry'}
-        >
-          <Brain className="w-5 h-5" />
-          <span>{needsEnrichment ? 'Enrich' : 'Re-enrich'}</span>
-        </button>
-      )}
     </div>
   );
 }

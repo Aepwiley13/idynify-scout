@@ -99,7 +99,6 @@ export default function AllLeads() {
   // Selection & interaction
   const [selectedContact, setSelectedContact] = useState(null);
   const [hunterContact, setHunterContact] = useState(null);
-  const [autoEnrichMode, setAutoEnrichMode] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [menuOpenFor, setMenuOpenFor] = useState(null);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(null);
@@ -206,7 +205,6 @@ export default function AllLeads() {
       prev.map(c => c.id === updatedContact.id ? { ...c, ...updatedContact } : c)
     );
     setSelectedContact(null);
-    setAutoEnrichMode(false);
   }
 
   // ── Selection ────────────────────────────────────────
@@ -232,15 +230,8 @@ export default function AllLeads() {
     navigate(`/hunter/create?contactIds=${contactIds.join(',')}`);
   }
 
-  function handleEnrichFromCard(contact, e) {
-    e.stopPropagation();
-    setSelectedContact(contact);
-    setAutoEnrichMode(true);
-  }
-
   function handleCardClick(contact) {
     setSelectedContact(contact);
-    setAutoEnrichMode(false);
   }
 
   function exportToCSV(contactsToExport) {
@@ -754,7 +745,10 @@ export default function AllLeads() {
                     <span className="missing-label">No email found</span>
                     <button
                       className="enrich-inline-btn"
-                      onClick={(e) => handleEnrichFromCard(contact, e)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/scout/contact/${contact.id}`);
+                      }}
                     >
                       <Sparkles className="w-3 h-3" /> Enrich
                     </button>
@@ -805,11 +799,14 @@ export default function AllLeads() {
                   <span>Engage</span>
                 </button>
 
+                {/* Enrich button if no email */}
                 {!hasEmail && (
-                  /* Enrich button if no email */
                   <button
                     className="action-btn action-enrich-secondary"
-                    onClick={(e) => handleEnrichFromCard(contact, e)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/scout/contact/${contact.id}`);
+                    }}
                   >
                     <Sparkles className="w-4 h-4" />
                     <span>Enrich</span>
@@ -875,10 +872,9 @@ export default function AllLeads() {
       {selectedContact && (
         <ContactSnapshot
           contact={selectedContact}
-          onClose={() => { setSelectedContact(null); setAutoEnrichMode(false); }}
+          onClose={() => setSelectedContact(null)}
           onUpdate={handleContactUpdate}
           context="leads"
-          autoEnrich={autoEnrichMode}
         />
       )}
 

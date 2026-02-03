@@ -20,8 +20,9 @@ const GOOGLE_SEARCH_API = 'https://www.googleapis.com/customsearch/v1';
  * @returns {Object} - { success, linkedinUrl, confidence, searchQuery, message }
  */
 export async function searchLinkedInProfile({ name, company, title, emailDomain }) {
-  const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
-  const searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
+  // Use existing Google Search API keys (avoid adding new env vars that exceed Lambda limit)
+  const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY || process.env.GOOGLE_SEARCH_API_KEY;
+  const searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID || process.env.GOOGLE_SEARCH_ENGINE_ID;
 
   if (!apiKey || !searchEngineId) {
     console.log('⚠️ Google Custom Search API not configured - skipping LinkedIn search');

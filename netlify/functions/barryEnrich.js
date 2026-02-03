@@ -28,6 +28,7 @@ import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apo
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { googleBusinessLookup } from './utils/googleBusinessLookup.js';
+import { searchLinkedInProfile, extractEmailDomain } from './utils/linkedinSearch.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -191,8 +192,9 @@ export const handler = async (event) => {
 
     // Step 1b: Apollo PEOPLE_SEARCH (fuzzy fallback — only if no Apollo ID)
     const postApolloMissing = assessMissingData({ ...contact, ...enrichedData });
+    // Check for company in all possible field names (company_name, company, organization_name)
     const hasNameAndCompany = (contact.name || enrichedData.name) &&
-      (contact.company_name || enrichedData.current_company_name || contact.organization_name);
+      (contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name);
 
     if (postApolloMissing.length > 0 && hasNameAndCompany && !hasApolloId) {
       const step1b = {
@@ -205,7 +207,8 @@ export const handler = async (event) => {
 
       try {
         const name = contact.name || enrichedData.name || '';
-        const company = contact.company_name || enrichedData.current_company_name || contact.organization_name || '';
+        // Check for company in all possible field names (CSV uses "company", others use "company_name")
+        const company = contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name || '';
 
         console.log('🔍 Step 1b: Apollo PEOPLE_SEARCH for', name, 'at', company);
 
@@ -257,6 +260,95 @@ export const handler = async (event) => {
       }
 
       steps.push(step1b);
+    }
+
+    // ═══════════════════════════════════════════════════
+    // STEP 1c: LinkedIn Search Fallback — if Apollo failed
+    // ═══════════════════════════════════════════════════
+    const postApolloData = { ...contact, ...enrichedData };
+    const hasLinkedInUrl = !!(postApolloData.linkedin_url || enrichedData.linkedin_url);
+
+    // Only run LinkedIn search if Apollo didn't find a LinkedIn URL
+    if (!hasLinkedInUrl) {
+      const step1c = {
+        source: 'linkedin_search',
+        status: 'running',
+        fieldsFound: [],
+        timestamp: new Date().toISOString(),
+        message: null
+      };
+
+      try {
+        const searchName = contact.name || enrichedData.name || '';
+        const searchCompany = contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name || '';
+        const searchTitle = contact.title || enrichedData.current_position_title || '';
+        const emailDomain = extractEmailDomain(contact.email || contact.work_email || '');
+
+        console.log('🔍 Step 1c: LinkedIn Search fallback for', searchName);
+
+        const linkedinResult = await searchLinkedInProfile({
+          name: searchName,
+          company: searchCompany,
+          title: searchTitle,
+          emailDomain
+        });
+
+        if (linkedinResult.success && linkedinResult.linkedinUrl) {
+          enrichedData.linkedin_url = linkedinResult.linkedinUrl;
+          step1c.fieldsFound = ['linkedin_url'];
+          step1c.status = 'success';
+          step1c.message = linkedinResult.message;
+          provenance.linkedin_url = 'linkedin_search';
+
+          console.log(`✅ Step 1c: Found LinkedIn profile: ${linkedinResult.linkedinUrl}`);
+
+          // Now that we have LinkedIn URL, try Apollo PEOPLE_MATCH again
+          if (linkedinResult.linkedinUrl && linkedinResult.confidence !== 'low') {
+            console.log('🔄 Re-running Apollo with discovered LinkedIn URL...');
+
+            try {
+              const reMatchResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
+                method: 'POST',
+                headers: getApolloHeaders(),
+                body: JSON.stringify({ linkedin_url: linkedinResult.linkedinUrl })
+              });
+
+              if (reMatchResponse.ok) {
+                const reMatchData = await reMatchResponse.json();
+                const person = reMatchData.person;
+
+                if (person) {
+                  console.log('✅ Apollo re-match successful with LinkedIn URL');
+                  apolloRawData = person;
+
+                  const apolloFields = extractApolloFields(person, { ...contact, ...enrichedData });
+                  enrichedData = mergeWithPrecedence(enrichedData, apolloFields.data, contact);
+
+                  // Update provenance for newly found fields
+                  apolloFields.fieldsFound.forEach(f => {
+                    if (!provenance[f]) provenance[f] = 'apollo_match';
+                  });
+
+                  step1c.fieldsFound = [...new Set([...step1c.fieldsFound, ...apolloFields.fieldsFound])];
+                  step1c.message = `LinkedIn found, Apollo enriched ${apolloFields.fieldsFound.length} additional fields`;
+                }
+              }
+            } catch (reMatchErr) {
+              console.error('Apollo re-match failed:', reMatchErr.message);
+            }
+          }
+        } else {
+          step1c.status = linkedinResult.message?.includes('not configured') ? 'skipped' : 'no_match';
+          step1c.message = linkedinResult.message;
+          console.log(`⚠️ Step 1c: ${linkedinResult.message}`);
+        }
+      } catch (err) {
+        step1c.status = 'error';
+        step1c.message = err.message;
+        console.error('❌ Step 1c failed:', err.message);
+      }
+
+      steps.push(step1c);
     }
 
     // ═══════════════════════════════════════════════════
@@ -356,8 +448,12 @@ export const handler = async (event) => {
       functions: enrichedData.functions || contact.functions || [],
 
       // Current Employment (Apollo-sourced)
+      // Primary fields - these are what the UI reads
+      title: enrichedData.current_position_title || enrichedData.title || contact.title || null,
+      company_name: enrichedData.current_company_name || enrichedData.company_name || contact.company_name || contact.company || null,
+      // Legacy Apollo-style fields - kept for backward compatibility
       current_position_title: enrichedData.current_position_title || contact.title || null,
-      current_company_name: enrichedData.current_company_name || contact.company_name || null,
+      current_company_name: enrichedData.current_company_name || contact.company_name || contact.company || null,
       job_start_date: enrichedData.job_start_date || contact.job_start_date || null,
 
       // History (Apollo-sourced)
@@ -402,7 +498,12 @@ export const handler = async (event) => {
         fields_missing: finalMissing,
         confidence,
         total_steps: steps.length,
-        sources_used: [...new Set(Object.values(provenance))]
+        sources_used: [...new Set(Object.values(provenance))],
+        // Flag to indicate if manual LinkedIn URL input is needed
+        needs_manual_linkedin: !enrichedData.linkedin_url && !contact.linkedin_url,
+        // Enrichment quality assessment
+        enrichment_quality: Object.keys(provenance).length >= 5 ? 'complete' :
+                           Object.keys(provenance).length >= 2 ? 'partial' : 'minimal'
       },
 
       // Raw data for debugging
@@ -513,11 +614,16 @@ function extractInternalFields(contact) {
   }
 
   // Check for company name in alternate fields
-  if (!contact.company_name && contact.organization_name) {
+  // CSV uploads use "company", other sources use "company_name" or "organization_name"
+  if (!contact.company_name && contact.company) {
+    data.current_company_name = contact.company;
+    fieldsFound.push('company_name');
+  }
+  if (!contact.company_name && !contact.company && contact.organization_name) {
     data.current_company_name = contact.organization_name;
     fieldsFound.push('company_name');
   }
-  if (!contact.company_name && contact.organization?.name) {
+  if (!contact.company_name && !contact.company && contact.organization?.name) {
     data.current_company_name = contact.organization.name;
     fieldsFound.push('company_name');
   }
@@ -741,6 +847,7 @@ function buildDataSources(steps) {
       if (step.source.startsWith('apollo')) sources.add('apollo');
       if (step.source === 'google_places') sources.add('google');
       if (step.source === 'internal_db') sources.add('internal');
+      if (step.source === 'linkedin_search') sources.add('linkedin');
     }
   });
   return Array.from(sources);

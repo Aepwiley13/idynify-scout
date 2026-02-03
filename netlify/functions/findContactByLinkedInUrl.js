@@ -74,8 +74,10 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified');
 
     // Call Apollo Person Match API with LinkedIn URL as exact identifier
+    // Note: api_key must be in body (not just headers) when matching by linkedin_url
     const matchBody = {
-      linkedin_url: linkedin_url
+      linkedin_url: linkedin_url,
+      api_key: apolloApiKey
     };
 
     console.log('📋 Calling Apollo PEOPLE_MATCH with LinkedIn URL');

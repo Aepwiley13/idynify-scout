@@ -12,8 +12,9 @@ import {
   Brain,
   ArrowRight,
   Linkedin,
-  Link2
+  Sparkles
 } from 'lucide-react';
+import { enrichWithLinkedIn } from '../../utils/contactEnrichment';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
@@ -39,6 +40,12 @@ export default function ContactProfile() {
   const [needsManualLinkedIn, setNeedsManualLinkedIn] = useState(false);
   const [manualLinkedInUrl, setManualLinkedInUrl] = useState('');
   const [enrichmentSummary, setEnrichmentSummary] = useState(null);
+
+  // LinkedIn URL entry state
+  const [showLinkedInEntry, setShowLinkedInEntry] = useState(false);
+  const [linkedInUrl, setLinkedInUrl] = useState('');
+  const [linkedInSaving, setLinkedInSaving] = useState(false);
+  const [linkedInError, setLinkedInError] = useState(null);
 
   useEffect(() => {
     loadContactProfile();

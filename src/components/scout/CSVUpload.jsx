@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, writeBatch, doc } from 'firebase/firestore';
 import { Upload, AlertTriangle, CheckCircle, Users, Building2 } from 'lucide-react';
+import { startBackgroundEnrichment, assessEnrichmentViability } from '../../utils/contactEnrichment';
 
 export default function CSVUpload({ onContactsAdded, onCancel }) {
   const [uploadType, setUploadType] = useState(null); // 'leads' or 'companies'
@@ -300,8 +301,30 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
       const label = uploadType === 'companies' ? 'companies' : 'contacts';
       console.log(`${addedItems.length} ${label} uploaded from CSV`);
 
-      // Notify parent
-      onContactsAdded(addedItems);
+      // For lead uploads, assess enrichment viability and start background enrichment
+      if (uploadType === 'leads') {
+        const enrichmentInfo = addedItems.map(item => ({
+          ...item,
+          _enrichmentViability: assessEnrichmentViability(item)
+        }));
+
+        // Start background enrichment (non-blocking)
+        startBackgroundEnrichment(
+          addedItems,
+          (results) => {
+            console.log('CSV enrichment complete:', results);
+          },
+          (progress) => {
+            console.log(`Enriching ${progress.current}/${progress.total}: ${progress.contact}`);
+          }
+        );
+
+        // Notify parent with enrichment info
+        onContactsAdded(enrichmentInfo);
+      } else {
+        // Company uploads - notify parent directly
+        onContactsAdded(addedItems);
+      }
 
     } catch (error) {
       console.error('Error uploading CSV:', error);

@@ -82,9 +82,13 @@ export const handler = async (event) => {
 
     console.log('📋 Calling Apollo PEOPLE_MATCH with LinkedIn URL');
 
+    // Use simple headers when api_key is in body (don't duplicate auth in header)
     const apolloResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
       method: 'POST',
-      headers: getApolloHeaders(),
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
       body: JSON.stringify(matchBody)
     });
 

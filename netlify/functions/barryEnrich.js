@@ -28,7 +28,7 @@ import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apo
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { googleBusinessLookup } from './utils/googleBusinessLookup.js';
-import { searchLinkedInProfile, extractEmailDomain } from './utils/linkedinSearch.js';
+import { searchLinkedInProfile, searchLinkedInPhoto, extractEmailDomain } from './utils/linkedinSearch.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -300,6 +300,14 @@ export const handler = async (event) => {
           step1c.message = linkedinResult.message;
           provenance.linkedin_url = 'linkedin_search';
 
+          // Also capture photo from Google's indexed LinkedIn data
+          if (linkedinResult.photoUrl && !contact.photo_url && !enrichedData.photo_url) {
+            enrichedData.photo_url = linkedinResult.photoUrl;
+            step1c.fieldsFound.push('photo_url');
+            provenance.photo_url = 'linkedin_search';
+            console.log(`📷 Step 1c: Found photo from LinkedIn: ${linkedinResult.photoUrl}`);
+          }
+
           console.log(`✅ Step 1c: Found LinkedIn profile: ${linkedinResult.linkedinUrl}`);
 
           // Now that we have LinkedIn URL, try Apollo PEOPLE_MATCH again
@@ -349,6 +357,51 @@ export const handler = async (event) => {
       }
 
       steps.push(step1c);
+    }
+
+    // ═══════════════════════════════════════════════════
+    // STEP 1d: LinkedIn Photo Search — if we have LinkedIn URL but no photo
+    // ═══════════════════════════════════════════════════
+    const currentLinkedInUrl = enrichedData.linkedin_url || contact.linkedin_url;
+    const currentPhotoUrl = enrichedData.photo_url || contact.photo_url;
+
+    if (currentLinkedInUrl && !currentPhotoUrl) {
+      const step1d = {
+        source: 'linkedin_photo_search',
+        status: 'running',
+        fieldsFound: [],
+        timestamp: new Date().toISOString(),
+        message: null
+      };
+
+      try {
+        console.log('📷 Step 1d: Searching for LinkedIn photo via Google...');
+
+        const photoResult = await searchLinkedInPhoto({
+          linkedinUrl: currentLinkedInUrl,
+          name: contact.name || enrichedData.name || ''
+        });
+
+        if (photoResult.success && photoResult.photoUrl) {
+          enrichedData.photo_url = photoResult.photoUrl;
+          step1d.fieldsFound = ['photo_url'];
+          step1d.status = 'success';
+          step1d.message = photoResult.message;
+          provenance.photo_url = 'linkedin_photo_search';
+
+          console.log(`✅ Step 1d: Found photo: ${photoResult.photoUrl}`);
+        } else {
+          step1d.status = 'no_data';
+          step1d.message = photoResult.message;
+          console.log(`⚠️ Step 1d: ${photoResult.message}`);
+        }
+      } catch (err) {
+        step1d.status = 'error';
+        step1d.message = err.message;
+        console.error('❌ Step 1d failed:', err.message);
+      }
+
+      steps.push(step1d);
     }
 
     // ═══════════════════════════════════════════════════
@@ -848,6 +901,7 @@ function buildDataSources(steps) {
       if (step.source === 'google_places') sources.add('google');
       if (step.source === 'internal_db') sources.add('internal');
       if (step.source === 'linkedin_search') sources.add('linkedin');
+      if (step.source === 'linkedin_photo_search') sources.add('linkedin');
     }
   });
   return Array.from(sources);

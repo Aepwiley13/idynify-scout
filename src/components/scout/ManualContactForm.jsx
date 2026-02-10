@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc } from 'firebase/firestore';
 import { UserPlus } from 'lucide-react';
+import { startBackgroundEnrichment, assessEnrichmentViability } from '../../utils/contactEnrichment';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [formData, setFormData] = useState({
@@ -81,8 +82,22 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
       console.log('✅ Manual contact added:', docRef.id);
 
+      const savedContact = { id: docRef.id, ...contactData };
+
+      // Assess enrichment viability and start background enrichment
+      const viability = assessEnrichmentViability(savedContact);
+      savedContact._enrichmentViability = viability;
+
+      // Start background enrichment (non-blocking)
+      startBackgroundEnrichment(
+        [savedContact],
+        (results) => {
+          console.log('Manual contact enrichment complete:', results);
+        }
+      );
+
       // Notify parent
-      onContactAdded([{ id: docRef.id, ...contactData }]);
+      onContactAdded([savedContact]);
 
     } catch (error) {
       console.error('Error adding manual contact:', error);

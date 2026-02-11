@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { User, RefreshCw, Loader } from 'lucide-react';
 import './IdentityCard.css';
 
@@ -21,11 +22,13 @@ export default function IdentityCard({
   photoRefreshLoading,
   photoRefreshError
 }) {
+  const [imgBroken, setImgBroken] = useState(false);
+
   const hasLinkedIn = !!contact.linkedin_url;
-  const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url);
+  const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
   const hasCustomUpload = !!contact.photo_source && contact.photo_source === 'user_upload';
 
-  // Show refresh button when: LinkedIn URL exists AND (no photo or placeholder) AND no custom upload AND not currently loading
+  // Show refresh button when: LinkedIn URL exists AND (no photo, placeholder, or broken image) AND no custom upload AND not currently loading
   const showRefreshButton = hasLinkedIn && !hasRealPhoto && !hasCustomUpload && !photoRefreshLoading;
   const showSpinner = photoRefreshLoading;
 
@@ -33,8 +36,12 @@ export default function IdentityCard({
     <div className="identity-card">
       <div className="identity-photo-wrapper">
         <div className="identity-photo">
-          {contact.photo_url && !isPlaceholderPhoto(contact.photo_url) ? (
-            <img src={contact.photo_url} alt={contact.name} />
+          {contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken ? (
+            <img
+              src={contact.photo_url}
+              alt={contact.name}
+              onError={() => setImgBroken(true)}
+            />
           ) : (
             <div className="photo-fallback">
               <User className="w-8 h-8" />

@@ -579,6 +579,7 @@ export default function ContactProfile() {
       <div className="contact-profile-container">
         {/* 1. IDENTITY CARD - TOP */}
         <IdentityCard
+          key={contact.photo_url || 'no-photo'}
           contact={contact}
           onRefreshPhoto={handleRefreshPhoto}
           photoRefreshLoading={photoRefreshLoading}

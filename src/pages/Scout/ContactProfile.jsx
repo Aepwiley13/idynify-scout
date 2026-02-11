@@ -39,6 +39,8 @@ export default function ContactProfile() {
   const [needsManualLinkedIn, setNeedsManualLinkedIn] = useState(false);
   const [manualLinkedInUrl, setManualLinkedInUrl] = useState('');
   const [enrichmentSummary, setEnrichmentSummary] = useState(null);
+  const [photoRefreshLoading, setPhotoRefreshLoading] = useState(false);
+  const [photoRefreshError, setPhotoRefreshError] = useState(null);
 
   useEffect(() => {
     loadContactProfile();
@@ -336,6 +338,65 @@ export default function ContactProfile() {
     }
   }
 
+  async function handleRefreshPhoto() {
+    if (!contact?.linkedin_url || photoRefreshLoading) return;
+
+    try {
+      setPhotoRefreshLoading(true);
+      setPhotoRefreshError(null);
+
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const authToken = await user.getIdToken();
+
+      const response = await fetch('/.netlify/functions/retryLinkedInPhoto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          contactId: contact.id,
+          linkedinUrl: contact.linkedin_url,
+          contactName: contact.name || ''
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.status === 429) {
+        setPhotoRefreshError('Retry limit exceeded. Please try again later.');
+        setPhotoRefreshLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Photo refresh failed');
+      }
+
+      if (result.success && result.photo_url) {
+        // Update Firestore
+        const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+        await updateDoc(contactRef, { photo_url: result.photo_url });
+
+        // Update local state immediately — no page refresh needed
+        setContact(prev => ({ ...prev, photo_url: result.photo_url }));
+        console.log('✅ Photo refreshed successfully');
+      } else {
+        setPhotoRefreshError(result.message || 'Photo unavailable. Try again.');
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setPhotoRefreshError(null), 5000);
+      }
+
+      setPhotoRefreshLoading(false);
+    } catch (err) {
+      console.error('Error refreshing photo:', err);
+      setPhotoRefreshError('Photo unavailable. Try again.');
+      setTimeout(() => setPhotoRefreshError(null), 5000);
+      setPhotoRefreshLoading(false);
+    }
+  }
+
   function handleCancelManualLinkedIn() {
     setNeedsManualLinkedIn(false);
     setManualLinkedInUrl('');
@@ -517,7 +578,12 @@ export default function ContactProfile() {
       {/* "Meet [FirstName]" Structure */}
       <div className="contact-profile-container">
         {/* 1. IDENTITY CARD - TOP */}
-        <IdentityCard contact={contact} />
+        <IdentityCard
+          contact={contact}
+          onRefreshPhoto={handleRefreshPhoto}
+          photoRefreshLoading={photoRefreshLoading}
+          photoRefreshError={photoRefreshError}
+        />
 
         {/* 2. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (

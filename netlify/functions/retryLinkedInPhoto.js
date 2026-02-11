@@ -8,7 +8,7 @@
  * then fetch the photo. Saves both linkedin_url and photo_url if discovered.
  *
  * Strategies (in order):
- *   0. Direct LinkedIn fetch — fetch public profile page, extract og:image
+ *   0. Apollo PEOPLE_MATCH — re-enrich via Apollo to get fresh photo_url
  *   1. searchLinkedInPhoto — targeted Google search for LinkedIn profile photo
  *   2. searchLinkedInProfile — broader Google search with multiple strategies
  *   3. Google Image Search — image-specific search for LinkedIn profile
@@ -21,10 +21,10 @@
 
 import { logApiUsage } from './utils/logApiUsage.js';
 import { searchLinkedInPhoto, searchLinkedInProfile } from './utils/linkedinSearch.js';
+import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
 
 const MAX_RETRIES_PER_HOUR = 3;
 const PHOTO_VALIDATE_TIMEOUT = 5000;
-const LINKEDIN_FETCH_TIMEOUT = 8000;
 
 // ── Helpers ──
 
@@ -62,65 +62,48 @@ async function isPhotoUrlReachable(url) {
 }
 
 /**
- * Fetch LinkedIn public profile page and extract og:image.
- * This gets the CURRENT CDN URL — bypasses Google's stale cache.
+ * Fetch photo from Apollo PEOPLE_MATCH API.
+ * Apollo is already working (per logs) — use it to get a fresh photo_url.
  */
-async function fetchLinkedInProfilePhoto(linkedinUrl) {
+async function fetchApolloPhoto({ linkedinUrl, name, company }) {
   try {
-    const usernameMatch = linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
-    if (!usernameMatch) {
-      return { success: false, photoUrl: null, message: 'Could not extract LinkedIn username' };
-    }
-    const profileUrl = `https://www.linkedin.com/in/${usernameMatch[1]}/`;
-    console.log(`📷 Direct LinkedIn fetch: ${profileUrl}`);
+    const matchBody = linkedinUrl
+      ? { linkedin_url: linkedinUrl }
+      : { name, organization_name: company };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), LINKEDIN_FETCH_TIMEOUT);
+    console.log(`📷 Apollo photo fetch: ${linkedinUrl || name}`);
 
-    const response = await fetch(profileUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      signal: controller.signal,
-      redirect: 'follow'
+    const response = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
+      method: 'POST',
+      headers: getApolloHeaders(),
+      body: JSON.stringify(matchBody)
     });
-    clearTimeout(timeout);
 
     if (!response.ok) {
-      return { success: false, photoUrl: null, message: `LinkedIn returned ${response.status}` };
+      return { success: false, photoUrl: null, message: `Apollo returned ${response.status}` };
     }
 
-    const html = await response.text();
+    const data = await response.json();
+    const person = data.person;
 
-    // Try multiple patterns to find the photo URL in the HTML
-    const patterns = [
-      // og:image (primary — used for link previews)
-      /< *meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /< *meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
-      // twitter:image
-      /< *meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
-      /< *meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
-      // Direct LinkedIn CDN displayphoto URLs in HTML/JSON
-      /["'](https:\/\/media\.licdn\.com\/dms\/image\/[^"'\s]*displayphoto[^"'\s]*)["']/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        let photoUrl = match[1].replace(/&amp;/g, '&');
-        if (!isPlaceholderUrl(photoUrl) && photoUrl.startsWith('http')) {
-          console.log(`✅ Direct LinkedIn photo: ${photoUrl}`);
-          return { success: true, photoUrl, message: 'Photo found via direct LinkedIn fetch' };
-        }
-      }
+    if (person && person.photo_url) {
+      console.log(`✅ Apollo returned photo: ${person.photo_url}`);
+      return {
+        success: true,
+        photoUrl: person.photo_url,
+        linkedinUrl: person.linkedin_url || null,
+        message: 'Photo found via Apollo'
+      };
     }
 
-    return { success: false, photoUrl: null, message: 'No photo found in LinkedIn profile page' };
+    return {
+      success: false,
+      photoUrl: null,
+      linkedinUrl: person?.linkedin_url || null,
+      message: person ? 'Apollo person found but no photo_url' : 'No person found in Apollo'
+    };
   } catch (err) {
-    return { success: false, photoUrl: null, message: `LinkedIn fetch error: ${err.message}` };
+    return { success: false, photoUrl: null, message: `Apollo error: ${err.message}` };
   }
 }
 
@@ -262,22 +245,40 @@ export const handler = async (event) => {
       triedUrls.add(currentPhotoUrl);
     }
 
-    // Strategy 0: Direct LinkedIn profile page fetch (gets current CDN URL)
-    if (resolvedLinkedInUrl) {
-      console.log(`📷 Strategy 0: Direct LinkedIn fetch`);
-      const directResult = await fetchLinkedInProfilePhoto(resolvedLinkedInUrl);
+    // Strategy 0: Apollo PEOPLE_MATCH (re-enrich to get fresh photo_url)
+    if (resolvedLinkedInUrl || contactName) {
+      console.log(`📷 Strategy 0: Apollo PEOPLE_MATCH`);
+      try {
+        const apolloResult = await fetchApolloPhoto({
+          linkedinUrl: resolvedLinkedInUrl,
+          name: contactName,
+          company: companyName
+        });
 
-      if (directResult.success && directResult.photoUrl && !triedUrls.has(directResult.photoUrl)) {
-        const isReachable = await isPhotoUrlReachable(directResult.photoUrl);
-        if (isReachable) {
-          validPhotoUrl = directResult.photoUrl;
-          searchSource = 'linkedin_direct_fetch';
-        } else {
-          console.log(`⚠️ Strategy 0 URL failed validation`);
-          triedUrls.add(directResult.photoUrl);
+        // If Apollo also found a LinkedIn URL we didn't have, capture it
+        if (!resolvedLinkedInUrl && apolloResult.linkedinUrl) {
+          resolvedLinkedInUrl = apolloResult.linkedinUrl;
+          discoveredLinkedIn = true;
+          console.log(`✅ Apollo also discovered LinkedIn: ${resolvedLinkedInUrl}`);
         }
-      } else {
-        console.log(`⚠️ Strategy 0: ${directResult.message}`);
+
+        if (apolloResult.success && apolloResult.photoUrl && !triedUrls.has(apolloResult.photoUrl)) {
+          const isReachable = await isPhotoUrlReachable(apolloResult.photoUrl);
+          if (isReachable) {
+            validPhotoUrl = apolloResult.photoUrl;
+            searchSource = 'apollo_match';
+          } else {
+            console.log(`⚠️ Strategy 0: Apollo URL failed HEAD validation`);
+            triedUrls.add(apolloResult.photoUrl);
+          }
+        } else if (apolloResult.photoUrl) {
+          console.log(`⚠️ Strategy 0: Apollo URL already tried or same as current`);
+          triedUrls.add(apolloResult.photoUrl);
+        } else {
+          console.log(`⚠️ Strategy 0: ${apolloResult.message}`);
+        }
+      } catch (err) {
+        console.error(`Strategy 0 (Apollo) failed:`, err.message);
       }
     }
 
@@ -324,18 +325,22 @@ export const handler = async (event) => {
         resolvedLinkedInUrl = profileResult.linkedinUrl;
         discoveredLinkedIn = true;
 
-        // Now try Strategy 0 with the newly discovered URL
+        // Now try Apollo with the newly discovered LinkedIn URL
         if (!validPhotoUrl) {
-          console.log(`📷 Strategy 0 (retry): Direct fetch with newly discovered URL`);
-          const directResult = await fetchLinkedInProfilePhoto(resolvedLinkedInUrl);
-          if (directResult.success && directResult.photoUrl && !triedUrls.has(directResult.photoUrl)) {
-            const isReachable = await isPhotoUrlReachable(directResult.photoUrl);
-            if (isReachable) {
-              validPhotoUrl = directResult.photoUrl;
-              searchSource = 'linkedin_direct_fetch';
-            } else {
-              triedUrls.add(directResult.photoUrl);
+          console.log(`📷 Strategy 0 (retry): Apollo with newly discovered LinkedIn URL`);
+          try {
+            const apolloRetry = await fetchApolloPhoto({ linkedinUrl: resolvedLinkedInUrl });
+            if (apolloRetry.success && apolloRetry.photoUrl && !triedUrls.has(apolloRetry.photoUrl)) {
+              const isReachable = await isPhotoUrlReachable(apolloRetry.photoUrl);
+              if (isReachable) {
+                validPhotoUrl = apolloRetry.photoUrl;
+                searchSource = 'apollo_match';
+              } else {
+                triedUrls.add(apolloRetry.photoUrl);
+              }
             }
+          } catch (err) {
+            console.error('Apollo retry failed:', err.message);
           }
         }
       }

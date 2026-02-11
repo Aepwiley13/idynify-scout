@@ -339,7 +339,10 @@ export default function ContactProfile() {
   }
 
   async function handleRefreshPhoto() {
-    if (!contact?.linkedin_url || photoRefreshLoading) return;
+    if (photoRefreshLoading) return;
+
+    // Need linkedin_url OR name+company to search
+    if (!contact?.linkedin_url && !contact?.name) return;
 
     try {
       setPhotoRefreshLoading(true);
@@ -357,7 +360,7 @@ export default function ContactProfile() {
           userId: user.uid,
           authToken,
           contactId: contact.id,
-          linkedinUrl: contact.linkedin_url,
+          linkedinUrl: contact.linkedin_url || null,
           contactName: contact.name || '',
           currentPhotoUrl: contact.photo_url || null,
           companyName: contact.company_name || '',
@@ -378,16 +381,25 @@ export default function ContactProfile() {
       }
 
       if (result.success && result.photo_url) {
-        // Update Firestore
         const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
-        await updateDoc(contactRef, { photo_url: result.photo_url });
+        const updateData = { photo_url: result.photo_url };
+
+        // If backend discovered a LinkedIn URL, save that too
+        if (result.linkedin_url && !contact.linkedin_url) {
+          updateData.linkedin_url = result.linkedin_url;
+        }
+
+        await updateDoc(contactRef, updateData);
 
         // Update local state immediately — no page refresh needed
-        setContact(prev => ({ ...prev, photo_url: result.photo_url }));
+        setContact(prev => ({
+          ...prev,
+          photo_url: result.photo_url,
+          ...(result.linkedin_url && !prev.linkedin_url ? { linkedin_url: result.linkedin_url } : {})
+        }));
         console.log('✅ Photo refreshed successfully');
       } else {
         setPhotoRefreshError(result.message || 'Photo unavailable. Try again.');
-        // Auto-clear error after 5 seconds
         setTimeout(() => setPhotoRefreshError(null), 5000);
       }
 

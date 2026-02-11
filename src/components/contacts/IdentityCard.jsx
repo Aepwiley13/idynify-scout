@@ -25,11 +25,17 @@ export default function IdentityCard({
   const [imgBroken, setImgBroken] = useState(false);
 
   const hasLinkedIn = !!contact.linkedin_url;
+  const hasNameAndCompany = !!contact.name && !!contact.company_name;
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
   const hasCustomUpload = !!contact.photo_source && contact.photo_source === 'user_upload';
 
-  // Show refresh button when: LinkedIn URL exists AND (no photo, placeholder, or broken image) AND no custom upload AND not currently loading
-  const showRefreshButton = hasLinkedIn && !hasRealPhoto && !hasCustomUpload && !photoRefreshLoading;
+  // Show refresh button when:
+  //   - Photo is missing/broken/placeholder
+  //   - AND we have enough data to search (linkedin_url OR name+company)
+  //   - AND no custom user-uploaded photo
+  //   - AND not currently loading
+  const canSearch = hasLinkedIn || hasNameAndCompany;
+  const showRefreshButton = canSearch && !hasRealPhoto && !hasCustomUpload && !photoRefreshLoading;
   const showSpinner = photoRefreshLoading;
 
   return (

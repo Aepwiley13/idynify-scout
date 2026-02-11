@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import CompanyCard from '../../components/scout/CompanyCard';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import { TrendingUp, TrendingDown, Target, Users, Filter, ChevronDown, CheckCircle, RotateCcw, RefreshCw, Loader } from 'lucide-react';
@@ -216,6 +216,75 @@ export default function DailyLeads() {
       });
       setShowUndo(true);
 
+      // Fetch ICP profile once (used for both title auto-set and preferences check)
+      const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+      const icpProfileDoc = await getDoc(icpProfileRef);
+      const targetTitles = icpProfileDoc.exists() ? icpProfileDoc.data().targetTitles || [] : [];
+
+      // Phase 1: Auto-set selected_titles on company from ICP targetTitles
+      if (direction === 'right' && targetTitles.length > 0) {
+        const formattedTitles = targetTitles.map((title, index) => ({
+          title,
+          rank: index + 1,
+          score: 100 - (index * 10)
+        }));
+
+        await updateDoc(companyRef, {
+          selected_titles: formattedTitles,
+          titles_updated_at: new Date().toISOString(),
+          titles_source: 'icp_auto'
+        });
+
+        console.log('✅ Auto-set selected_titles from ICP targetTitles');
+
+        // Phase 2: Background contact search (non-blocking)
+        if (company.apollo_organization_id) {
+          const authToken = await user.getIdToken();
+
+          fetch('/.netlify/functions/searchPeople', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.uid,
+              authToken,
+              organizationId: company.apollo_organization_id,
+              titles: targetTitles,
+              maxResults: 3
+            })
+          })
+          .then(res => res.json())
+          .then(async (result) => {
+            if (result.success && result.people?.length > 0) {
+              for (const person of result.people) {
+                const contactId = `${company.id}_${person.id}`;
+                const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
+                await setDoc(contactRef, {
+                  ...person,
+                  company_id: company.id,
+                  company_name: company.name,
+                  lead_owner: user.uid,
+                  status: 'suggested',
+                  source: 'icp_auto_discovery',
+                  discovered_at: new Date().toISOString()
+                });
+              }
+
+              const companyUpdateRef = doc(db, 'users', user.uid, 'companies', company.id);
+              await updateDoc(companyUpdateRef, {
+                auto_contact_status: 'completed',
+                auto_contact_count: result.people.length,
+                auto_contact_searched_at: new Date().toISOString()
+              });
+
+              console.log(`✅ Background search found ${result.people.length} contacts for ${company.name}`);
+            }
+          })
+          .catch(err => {
+            console.error('Background contact search failed:', err);
+          });
+        }
+      }
+
       // If accepted and haven't seen title setup modal yet, check for ICP defaults
       if (direction === 'right' && !hasSeenTitleSetup) {
         // Check if user already has title preferences
@@ -223,21 +292,16 @@ export default function DailyLeads() {
         const titlePrefsDoc = await getDoc(titlePrefsRef);
 
         if (!titlePrefsDoc.exists()) {
-          // No existing preferences - check if ICP has target titles
-          const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-          const icpProfileDoc = await getDoc(icpProfileRef);
-
-          if (icpProfileDoc.exists() && icpProfileDoc.data().targetTitles && icpProfileDoc.data().targetTitles.length > 0) {
+          if (targetTitles.length > 0) {
             // Auto-populate from ICP target titles
-            const targetTitles = icpProfileDoc.data().targetTitles;
-            const formattedTitles = targetTitles.map((title, index) => ({
+            const formattedPrefs = targetTitles.map((title, index) => ({
               title,
-              priority: 50, // default priority
+              priority: 50,
               order: index
             }));
 
             await setDoc(titlePrefsRef, {
-              titles: formattedTitles,
+              titles: formattedPrefs,
               updatedAt: new Date().toISOString()
             });
 
@@ -299,6 +363,27 @@ export default function DailyLeads() {
         setDailySwipeCount(lastSwipe.previousSwipeCount);
         // Decrement total accepted companies count for real-time UI update
         setTotalAcceptedCompanies(totalAcceptedCompanies - 1);
+
+        // Clean up auto-set titles and auto-discovered contacts
+        await updateDoc(companyRef, {
+          selected_titles: null,
+          titles_updated_at: null,
+          titles_source: null,
+          auto_contact_status: null,
+          auto_contact_count: null,
+          auto_contact_searched_at: null
+        });
+
+        // Delete auto-discovered contacts for this company
+        const autoContactsQuery = query(
+          collection(db, 'users', user.uid, 'contacts'),
+          where('company_id', '==', lastSwipe.company.id),
+          where('source', '==', 'icp_auto_discovery')
+        );
+        const autoContactDocs = await getDocs(autoContactsQuery);
+        for (const contactDoc of autoContactDocs.docs) {
+          await deleteDoc(contactDoc.ref);
+        }
       }
 
       // Go back to the previous company

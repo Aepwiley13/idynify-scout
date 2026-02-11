@@ -14,7 +14,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, organizationId, titles } = JSON.parse(event.body);
+    const { userId, authToken, organizationId, titles, maxResults } = JSON.parse(event.body);
 
     if (!userId || !authToken || !organizationId || !titles) {
       throw new Error('Missing required parameters');
@@ -56,11 +56,12 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified');
 
     // Step 1: Search Apollo API for contact candidates
+    const limit = maxResults || 10;
     const searchBody = {
       organization_ids: [organizationId],
       person_titles: titles,
       page: 1,
-      per_page: 10
+      per_page: limit
     };
 
     const apolloResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_SEARCH, {
@@ -75,7 +76,7 @@ export const handler = async (event) => {
     }
 
     const apolloData = await apolloResponse.json();
-    const candidates = (apolloData.people || []).slice(0, 10);
+    const candidates = (apolloData.people || []).slice(0, limit);
 
     console.log('✅ Found contact candidates:', candidates.length);
 

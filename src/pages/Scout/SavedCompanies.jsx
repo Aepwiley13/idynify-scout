@@ -247,7 +247,7 @@ export default function SavedCompanies() {
       console.log('Found accepted companies:', companiesSnapshot.size);
       console.log('Found archived companies:', archivedSnapshot.size);
 
-      // Helper to enrich company docs with contact counts
+      // Helper to enrich company docs with contact counts (excludes suggested)
       async function enrichWithContactCounts(snapshot) {
         return Promise.all(
           snapshot.docs.map(async (companyDoc) => {
@@ -258,9 +258,12 @@ export default function SavedCompanies() {
                 where('company_id', '==', company.id)
               );
               const contactsSnapshot = await getDocs(contactsQuery);
-              return { ...company, contact_count: contactsSnapshot.size };
+              // Exclude 'suggested' contacts from count — only count approved/active ones
+              const approvedCount = contactsSnapshot.docs.filter(d => d.data().status !== 'suggested').length;
+              const suggestedCount = contactsSnapshot.size - approvedCount;
+              return { ...company, contact_count: approvedCount, suggested_contact_count: suggestedCount };
             } catch {
-              return { ...company, contact_count: 0 };
+              return { ...company, contact_count: 0, suggested_contact_count: 0 };
             }
           })
         );

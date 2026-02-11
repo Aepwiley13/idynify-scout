@@ -25,6 +25,9 @@ export default function CompanyDetail() {
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingDecisionMakers, setSavingDecisionMakers] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [suggestedContacts, setSuggestedContacts] = useState([]);
+  const [selectedSuggestedIds, setSelectedSuggestedIds] = useState(new Set());
+  const [approvingSuggested, setApprovingSuggested] = useState(false);
 
   useEffect(() => {
     loadCompanyData();
@@ -73,7 +76,7 @@ export default function CompanyDetail() {
     }
   }
 
-  // Load approved contacts for this company
+  // Load approved and suggested contacts for this company
   async function loadApprovedContacts() {
     try {
       const userId = auth.currentUser.uid;
@@ -84,13 +87,17 @@ export default function CompanyDetail() {
       );
 
       const snapshot = await getDocs(contactsQuery);
-      const contactsList = snapshot.docs.map(doc => ({
+      const allContacts = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
 
-      setApprovedContacts(contactsList);
-      console.log('✅ Loaded approved contacts:', contactsList.length);
+      const approved = allContacts.filter(c => c.status !== 'suggested');
+      const suggested = allContacts.filter(c => c.status === 'suggested');
+
+      setApprovedContacts(approved);
+      setSuggestedContacts(suggested);
+      console.log('✅ Loaded contacts:', approved.length, 'approved,', suggested.length, 'suggested');
     } catch (error) {
       console.error('❌ Failed to load approved contacts:', error);
     }
@@ -498,6 +505,63 @@ export default function CompanyDetail() {
       console.error('Error saving decision makers:', err);
       setSavingDecisionMakers(false);
       alert('Failed to save contacts. Please try again.');
+    }
+  }
+
+  // Toggle suggested contact selection
+  function handleToggleSuggested(contactId) {
+    setSelectedSuggestedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contactId)) {
+        newSet.delete(contactId);
+      } else {
+        newSet.add(contactId);
+      }
+      return newSet;
+    });
+  }
+
+  // Approve selected suggested contacts
+  async function handleApproveSuggestedContacts() {
+    if (selectedSuggestedIds.size === 0) return;
+
+    setApprovingSuggested(true);
+
+    try {
+      const userId = auth.currentUser.uid;
+      const toApprove = suggestedContacts.filter(c => selectedSuggestedIds.has(c.id));
+
+      for (const contact of toApprove) {
+        // Update status from 'suggested' to 'pending_enrichment'
+        await updateDoc(doc(db, 'users', userId, 'contacts', contact.id), {
+          status: 'pending_enrichment',
+          approved_at: new Date().toISOString()
+        });
+
+        // Trigger enrichment
+        const apolloPersonId = contact.apollo_person_id || contact.id.split('_').pop();
+        await enrichContact(userId, apolloPersonId);
+      }
+
+      // Update company contact count
+      const companyRef = doc(db, 'users', userId, 'companies', companyId);
+      const companyDoc = await getDoc(companyRef);
+      const currentContactCount = companyDoc.data()?.contact_count || 0;
+
+      await updateDoc(companyRef, {
+        contact_count: currentContactCount + toApprove.length
+      });
+
+      console.log(`✅ Approved ${toApprove.length} suggested contacts`);
+
+      // Reload contacts and clear selection
+      await loadApprovedContacts();
+      setSelectedSuggestedIds(new Set());
+    } catch (error) {
+      console.error('❌ Failed to approve suggested contacts:', error);
+      alert('Failed to approve contacts. Please try again.');
+    } finally {
+      setApprovingSuggested(false);
     }
   }
 
@@ -912,6 +976,97 @@ export default function CompanyDetail() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Suggested Contacts Section (auto-discovered from ICP) */}
+        {suggestedContacts.length > 0 && (
+          <div className="saved-contacts-section">
+            <div className="section-header-main">
+              <h3 className="section-title-main">
+                <Target className="w-6 h-6" />
+                <span>Suggested Contacts ({suggestedContacts.length})</span>
+              </h3>
+              <p className="section-subtitle-main">Auto-discovered from your ICP titles</p>
+            </div>
+
+            <div className="decision-makers-grid">
+              {suggestedContacts.map(contact => {
+                const backgroundImage = contact.photo_url || '/barry.png';
+                const isSelected = selectedSuggestedIds.has(contact.id);
+                const leadershipBadge = getLeadershipBadge(contact);
+
+                return (
+                  <div key={contact.id} className="decision-maker-card-container">
+                    <div
+                      className={`decision-maker-card-photo ${isSelected ? 'selected' : ''}`}
+                      style={{ backgroundImage: `url(${backgroundImage})` }}
+                      onClick={() => handleToggleSuggested(contact.id)}
+                    >
+                      {/* Leadership Badge - Top Left */}
+                      {leadershipBadge && (
+                        <div className={`leadership-badge ${leadershipBadge.class}`}>
+                          <Award className="w-3 h-3" />
+                          <span>{leadershipBadge.letter}</span>
+                        </div>
+                      )}
+
+                      {/* Selection Checkbox - Top Right */}
+                      <div className="decision-maker-select-indicator">
+                        <div className={`checkbox ${isSelected ? 'checked' : ''}`}>
+                          {isSelected && <CheckCircle className="w-5 h-5" />}
+                        </div>
+                      </div>
+
+                      {/* Gradient Overlay with Text */}
+                      <div className="card-gradient-overlay">
+                        <div className="card-text-overlay">
+                          <p className="card-name">{contact.name || 'Unknown'}</p>
+                          <p className="card-title">{contact.title || 'Title not available'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* LinkedIn Button - Below Card */}
+                    {contact.linkedin_url && (
+                      <button
+                        className="card-linkedin-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(contact.linkedin_url, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        <Linkedin className="w-4 h-4" />
+                        <span>View LinkedIn</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Approve Selected Button */}
+            {selectedSuggestedIds.size > 0 && (
+              <div className="decision-makers-actions">
+                <button
+                  className="btn-add-selected-dm"
+                  onClick={handleApproveSuggestedContacts}
+                  disabled={approvingSuggested}
+                >
+                  {approvingSuggested ? (
+                    <>
+                      <div className="loading-spinner-small"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-5 h-5" />
+                      <span>Add {selectedSuggestedIds.size} to Leads</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

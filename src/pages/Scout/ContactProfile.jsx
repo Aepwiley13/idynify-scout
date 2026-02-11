@@ -358,7 +358,10 @@ export default function ContactProfile() {
           authToken,
           contactId: contact.id,
           linkedinUrl: contact.linkedin_url,
-          contactName: contact.name || ''
+          contactName: contact.name || '',
+          currentPhotoUrl: contact.photo_url || null,
+          companyName: contact.company_name || '',
+          title: contact.title || ''
         })
       });
 

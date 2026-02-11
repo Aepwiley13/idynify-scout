@@ -10,6 +10,12 @@
   margin-bottom: 32px;
 }
 
+/* Photo wrapper - positions refresh button relative to avatar */
+.identity-photo-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
 /* Photo - circular, clean */
 .identity-photo {
   width: 80px;
@@ -18,6 +24,58 @@
   overflow: hidden;
   flex-shrink: 0;
   background: #f9fafb;
+}
+
+/* Refresh Photo Button - small icon adjacent to avatar */
+.refresh-photo-btn {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  padding: 0;
+}
+
+.refresh-photo-btn:hover {
+  background: #f0f9ff;
+  border-color: #3b82f6;
+  color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  transform: scale(1.1);
+}
+
+.refresh-photo-btn.refreshing {
+  background: #f0f9ff;
+  border-color: #93c5fd;
+  color: #3b82f6;
+  cursor: not-allowed;
+}
+
+.refresh-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes refreshSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Inline error message for photo refresh failure */
+.photo-refresh-error {
+  font-size: 12px;
+  font-weight: 500;
+  color: #dc2626;
+  margin: 2px 0 0 0;
+  line-height: 1.3;
 }
 
 .identity-photo img {
@@ -80,6 +138,11 @@
   .identity-photo {
     width: 64px;
     height: 64px;
+  }
+
+  .refresh-photo-btn {
+    width: 24px;
+    height: 24px;
   }
 
   .identity-name {

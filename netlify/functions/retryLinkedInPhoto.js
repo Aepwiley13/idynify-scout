@@ -5,6 +5,8 @@
  * Scoped strictly to photo — does NOT re-run full enrichment pipeline.
  *
  * Strategies (in order):
+ *   0. Direct LinkedIn fetch — fetch the public profile page and extract og:image
+ *      (This gets the CURRENT CDN URL, not Google's stale cache)
  *   1. searchLinkedInPhoto — targeted Google search for LinkedIn profile photo
  *   2. searchLinkedInProfile — broader Google search with multiple strategies
  *   3. Google Image Search — image-specific search for LinkedIn profile
@@ -22,11 +24,11 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { searchLinkedInPhoto, searchLinkedInProfile } from './utils/linkedinSearch.js';
 
 const MAX_RETRIES_PER_HOUR = 3;
-const PHOTO_VALIDATE_TIMEOUT = 5000; // 5s timeout for HEAD request
+const PHOTO_VALIDATE_TIMEOUT = 5000;
+const LINKEDIN_FETCH_TIMEOUT = 8000;
 
 /**
  * Validate a photo URL is actually reachable (not 404, not expired CDN).
- * Returns true if the URL responds with 2xx status.
  */
 async function isPhotoUrlReachable(url) {
   try {
@@ -42,12 +44,10 @@ async function isPhotoUrlReachable(url) {
     clearTimeout(timeout);
 
     if (response.ok) {
-      // Verify it's actually an image content type
       const contentType = response.headers.get('content-type') || '';
       if (contentType.startsWith('image/')) {
         return true;
       }
-      // Some CDNs don't return content-type on HEAD — accept 2xx anyway
       return response.status >= 200 && response.status < 300;
     }
 
@@ -56,6 +56,121 @@ async function isPhotoUrlReachable(url) {
   } catch (err) {
     console.log(`⚠️ Photo URL validation error: ${err.message} for ${url}`);
     return false;
+  }
+}
+
+// Known placeholder patterns to reject
+const PLACEHOLDER_PATTERNS = [
+  'ghost-person', 'ghost_person', 'default-avatar', 'no-photo',
+  'placeholder', '/static.licdn.com/sc/h/', 'data:image'
+];
+
+function isPlaceholderUrl(url) {
+  if (!url) return true;
+  const lower = url.toLowerCase();
+  return PLACEHOLDER_PATTERNS.some(p => lower.includes(p));
+}
+
+/**
+ * Strategy 0: Fetch LinkedIn profile page directly and extract og:image.
+ *
+ * LinkedIn public profiles expose an og:image meta tag with the CURRENT
+ * CDN URL for the profile photo. This is the same URL that appears when
+ * you share a LinkedIn profile on Slack/Twitter/etc.
+ *
+ * This bypasses Google's stale cache entirely.
+ */
+async function fetchLinkedInProfilePhoto(linkedinUrl) {
+  try {
+    // Normalize URL to public profile format
+    const usernameMatch = linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
+    if (!usernameMatch) {
+      return { success: false, photoUrl: null, message: 'Could not extract LinkedIn username' };
+    }
+    const profileUrl = `https://www.linkedin.com/in/${usernameMatch[1]}/`;
+
+    console.log(`📷 Direct LinkedIn fetch: ${profileUrl}`);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), LINKEDIN_FETCH_TIMEOUT);
+
+    const response = await fetch(profileUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: controller.signal,
+      redirect: 'follow'
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.log(`⚠️ LinkedIn profile fetch returned ${response.status}`);
+      return { success: false, photoUrl: null, message: `LinkedIn returned ${response.status}` };
+    }
+
+    const html = await response.text();
+
+    // Extract og:image meta tag — this has the current photo URL
+    // LinkedIn uses: <meta property="og:image" content="https://media.licdn.com/dms/image/..."/>
+    const ogImagePatterns = [
+      /< *meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /< *meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    ];
+
+    let ogImageUrl = null;
+    for (const pattern of ogImagePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        ogImageUrl = match[1];
+        break;
+      }
+    }
+
+    if (!ogImageUrl) {
+      console.log(`⚠️ No og:image found in LinkedIn profile HTML`);
+
+      // Fallback: try to find image URL in the HTML directly
+      // LinkedIn sometimes embeds the photo URL in JSON-LD or other meta tags
+      const imagePatterns = [
+        /["'](https:\/\/media\.licdn\.com\/dms\/image\/[^"'\s]+displayphoto[^"'\s]+)["']/i,
+        /< *meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+        /< *meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i,
+        /< *img[^>]+class=["'][^"']*profile[^"']*["'][^>]+src=["'](https:\/\/media\.licdn\.com[^"']+)["']/i,
+      ];
+
+      for (const pattern of imagePatterns) {
+        const match = html.match(pattern);
+        if (match && match[1]) {
+          ogImageUrl = match[1];
+          console.log(`📷 Found photo via fallback pattern: ${ogImageUrl}`);
+          break;
+        }
+      }
+    }
+
+    if (!ogImageUrl) {
+      return { success: false, photoUrl: null, message: 'No photo URL found in LinkedIn profile page' };
+    }
+
+    // Decode HTML entities in URL
+    ogImageUrl = ogImageUrl.replace(/&amp;/g, '&');
+
+    // Check it's not a placeholder
+    if (isPlaceholderUrl(ogImageUrl)) {
+      console.log(`⚠️ LinkedIn og:image is a placeholder: ${ogImageUrl}`);
+      return { success: false, photoUrl: null, message: 'LinkedIn profile has placeholder photo' };
+    }
+
+    console.log(`✅ Direct LinkedIn photo URL: ${ogImageUrl}`);
+    return { success: true, photoUrl: ogImageUrl, message: 'Photo found via direct LinkedIn fetch' };
+
+  } catch (err) {
+    console.log(`⚠️ Direct LinkedIn fetch failed: ${err.message}`);
+    return { success: false, photoUrl: null, message: `LinkedIn fetch error: ${err.message}` };
   }
 }
 
@@ -85,7 +200,6 @@ export const handler = async (event) => {
       };
     }
 
-    // Validate LinkedIn URL format
     if (!linkedinUrl.includes('linkedin.com/in/')) {
       return {
         statusCode: 400,
@@ -132,7 +246,7 @@ export const handler = async (event) => {
       console.log(`📷 Current broken photo URL: ${currentPhotoUrl}`);
     }
 
-    // ─── Rate Limiting: max 3 retries per lead per hour ───
+    // ─── Rate Limiting ───
     const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'idynify-scout-dev';
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
@@ -145,7 +259,6 @@ export const handler = async (event) => {
     if (contactResponse.ok) {
       const contactDoc = await contactResponse.json();
       const fields = contactDoc.fields || {};
-
       photoRetryCount = parseInt(fields.photo_retry_count?.integerValue || '0');
       photoRetryWindowStart = fields.photo_retry_window_start?.stringValue || null;
     }
@@ -155,11 +268,10 @@ export const handler = async (event) => {
 
     if (photoRetryWindowStart) {
       const windowStart = new Date(photoRetryWindowStart);
-
       if (windowStart > oneHourAgo) {
         if (photoRetryCount >= MAX_RETRIES_PER_HOUR) {
           const resetTime = new Date(windowStart.getTime() + 60 * 60 * 1000);
-          console.log(`⚠️ Rate limit exceeded for contact ${contactId} (${photoRetryCount}/${MAX_RETRIES_PER_HOUR})`);
+          console.log(`⚠️ Rate limit exceeded for contact ${contactId}`);
 
           await logApiUsage(userId, 'retryLinkedInPhoto', 'rate_limited', {
             responseTime: Date.now() - startTime,
@@ -168,10 +280,7 @@ export const handler = async (event) => {
 
           return {
             statusCode: 429,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
-            },
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({
               success: false,
               error: 'Retry limit exceeded. Please try again later.',
@@ -192,35 +301,49 @@ export const handler = async (event) => {
     let searchSource = null;
     const triedUrls = new Set();
 
-    // Always skip the current broken URL
     if (currentPhotoUrl) {
       triedUrls.add(currentPhotoUrl);
     }
 
-    // Strategy 1: Targeted LinkedIn photo search
-    console.log(`📷 Strategy 1: searchLinkedInPhoto for ${linkedinUrl}`);
-    const photoResult = await searchLinkedInPhoto({
-      linkedinUrl,
-      name: contactName || ''
-    });
+    // ── Strategy 0: Direct LinkedIn profile page fetch (BEST — gets current CDN URL) ──
+    console.log(`📷 Strategy 0: Direct LinkedIn profile fetch`);
+    const directResult = await fetchLinkedInProfilePhoto(linkedinUrl);
 
-    if (photoResult.success && photoResult.photoUrl && !triedUrls.has(photoResult.photoUrl)) {
-      console.log(`📷 Candidate URL from Strategy 1: ${photoResult.photoUrl}`);
-      const isReachable = await isPhotoUrlReachable(photoResult.photoUrl);
+    if (directResult.success && directResult.photoUrl && !triedUrls.has(directResult.photoUrl)) {
+      console.log(`📷 Candidate URL from Strategy 0: ${directResult.photoUrl}`);
+      const isReachable = await isPhotoUrlReachable(directResult.photoUrl);
       if (isReachable) {
-        validPhotoUrl = photoResult.photoUrl;
-        searchSource = 'linkedin_photo_search';
+        validPhotoUrl = directResult.photoUrl;
+        searchSource = 'linkedin_direct_fetch';
       } else {
-        console.log(`⚠️ Strategy 1 URL failed validation (404/unreachable)`);
-        triedUrls.add(photoResult.photoUrl);
+        console.log(`⚠️ Strategy 0 URL failed HEAD validation`);
+        triedUrls.add(directResult.photoUrl);
       }
-    } else if (photoResult.photoUrl && triedUrls.has(photoResult.photoUrl)) {
-      console.log(`⚠️ Strategy 1 returned same broken URL — skipping`);
+    } else if (directResult.photoUrl && triedUrls.has(directResult.photoUrl)) {
+      console.log(`⚠️ Strategy 0 returned same broken URL — skipping`);
+    } else {
+      console.log(`⚠️ Strategy 0: ${directResult.message}`);
     }
 
-    // Strategy 2: Broader profile search (different query strategies)
+    // ── Strategy 1: Targeted LinkedIn photo search (Google) ──
+    if (!validPhotoUrl) {
+      console.log(`📷 Strategy 1: searchLinkedInPhoto`);
+      const photoResult = await searchLinkedInPhoto({ linkedinUrl, name: contactName || '' });
+
+      if (photoResult.success && photoResult.photoUrl && !triedUrls.has(photoResult.photoUrl)) {
+        const isReachable = await isPhotoUrlReachable(photoResult.photoUrl);
+        if (isReachable) {
+          validPhotoUrl = photoResult.photoUrl;
+          searchSource = 'linkedin_photo_search';
+        } else {
+          triedUrls.add(photoResult.photoUrl);
+        }
+      }
+    }
+
+    // ── Strategy 2: Broader profile search (Google, multiple query strategies) ──
     if (!validPhotoUrl && contactName) {
-      console.log(`📷 Strategy 2: searchLinkedInProfile for ${contactName}`);
+      console.log(`📷 Strategy 2: searchLinkedInProfile`);
       const profileResult = await searchLinkedInProfile({
         name: contactName,
         company: companyName || '',
@@ -228,31 +351,26 @@ export const handler = async (event) => {
       });
 
       if (profileResult.success && profileResult.photoUrl && !triedUrls.has(profileResult.photoUrl)) {
-        console.log(`📷 Candidate URL from Strategy 2: ${profileResult.photoUrl}`);
         const isReachable = await isPhotoUrlReachable(profileResult.photoUrl);
         if (isReachable) {
           validPhotoUrl = profileResult.photoUrl;
           searchSource = 'linkedin_profile_search';
         } else {
-          console.log(`⚠️ Strategy 2 URL failed validation (404/unreachable)`);
           triedUrls.add(profileResult.photoUrl);
         }
-      } else if (profileResult.photoUrl && triedUrls.has(profileResult.photoUrl)) {
-        console.log(`⚠️ Strategy 2 returned already-tried URL — skipping`);
       }
     }
 
-    // Strategy 3: Google Image Search for LinkedIn profile photo
+    // ── Strategy 3: Google Image Search ──
     if (!validPhotoUrl) {
       const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY || process.env.GOOGLE_SEARCH_API_KEY;
       const searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID || process.env.GOOGLE_SEARCH_ENGINE_ID;
 
       if (apiKey && searchEngineId) {
-        console.log(`📷 Strategy 3: Google Image Search for ${contactName || linkedinUrl}`);
+        console.log(`📷 Strategy 3: Google Image Search`);
 
         const usernameMatch = linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
         const username = usernameMatch ? usernameMatch[1] : null;
-
         const imageQuery = contactName
           ? `"${contactName}" linkedin profile photo`
           : `linkedin.com/in/${username || ''} profile photo`;
@@ -269,26 +387,11 @@ export const handler = async (event) => {
 
           if (imgResponse.ok) {
             const imgData = await imgResponse.json();
-            const imgItems = imgData.items || [];
-
-            for (const imgItem of imgItems) {
+            for (const imgItem of (imgData.items || [])) {
               const imgUrl = imgItem.link || '';
+              if (!imgUrl.startsWith('http') || triedUrls.has(imgUrl) || isPlaceholderUrl(imgUrl)) continue;
 
-              // Skip non-image URLs, placeholder patterns, and already-tried URLs
-              if (!imgUrl.startsWith('http') || triedUrls.has(imgUrl)) continue;
-
-              // Skip known LinkedIn placeholders
-              const lower = imgUrl.toLowerCase();
-              if (lower.includes('ghost-person') || lower.includes('ghost_person') ||
-                  lower.includes('default-avatar') || lower.includes('no-photo') ||
-                  lower.includes('placeholder') || lower.includes('/static.licdn.com/sc/h/') ||
-                  lower.includes('data:image')) {
-                continue;
-              }
-
-              // Prefer LinkedIn CDN images
               if (imgUrl.includes('media.licdn.com') || imgUrl.includes('linkedin.com')) {
-                console.log(`📷 Candidate URL from Strategy 3: ${imgUrl}`);
                 const isReachable = await isPhotoUrlReachable(imgUrl);
                 if (isReachable) {
                   validPhotoUrl = imgUrl;
@@ -301,7 +404,7 @@ export const handler = async (event) => {
             }
           }
         } catch (err) {
-          console.error('Strategy 3 (Google Image Search) failed:', err.message);
+          console.error('Strategy 3 failed:', err.message);
         }
       }
     }
@@ -331,31 +434,17 @@ export const handler = async (event) => {
 
       await logApiUsage(userId, 'retryLinkedInPhoto', 'success', {
         responseTime: Date.now() - startTime,
-        metadata: {
-          contactId,
-          contactName: contactName || 'unknown',
-          retryAttempt: newRetryCount,
-          photoUrl: validPhotoUrl,
-          source: searchSource,
-          strategiesTried: triedUrls.size
-        }
+        metadata: { contactId, contactName: contactName || 'unknown', retryAttempt: newRetryCount, photoUrl: validPhotoUrl, source: searchSource }
       });
     } else {
       console.log(`⚠️ No valid photo found after all strategies. Tried ${triedUrls.size} URLs.`);
 
       await logApiUsage(userId, 'retryLinkedInPhoto', 'not_found', {
         responseTime: Date.now() - startTime,
-        metadata: {
-          contactId,
-          contactName: contactName || 'unknown',
-          retryAttempt: newRetryCount,
-          failureReason: 'all_urls_broken_or_not_found',
-          urlsTried: triedUrls.size
-        }
+        metadata: { contactId, contactName: contactName || 'unknown', retryAttempt: newRetryCount, failureReason: 'all_urls_broken_or_not_found', urlsTried: triedUrls.size }
       });
     }
 
-    // Write to Firestore
     await fetch(`${retryDocUrl}?${updateMask}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -367,10 +456,7 @@ export const handler = async (event) => {
     if (validPhotoUrl) {
       return {
         statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
           success: true,
           photo_url: validPhotoUrl,
@@ -382,10 +468,7 @@ export const handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       body: JSON.stringify({
         success: false,
         photo_url: null,
@@ -413,10 +496,7 @@ export const handler = async (event) => {
 
     return {
       statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       body: JSON.stringify({
         success: false,
         error: error.message,

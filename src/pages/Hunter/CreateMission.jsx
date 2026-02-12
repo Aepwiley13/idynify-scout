@@ -4,6 +4,7 @@ import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, Users, Sparkles, Rocket, CheckCircle, Edit2, Trash2 } from 'lucide-react';
 import { getAllGoals, createMissionFromTemplate } from '../../utils/missionTemplates';
+import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import './CreateMission.css';
 
 /**
@@ -129,6 +130,23 @@ export default function CreateMission() {
 
       // Save to Firestore
       const docRef = await addDoc(collection(db, 'users', user.uid, 'missions'), finalMission);
+
+      // Log timeline event: mission_assigned for each contact
+      const missionDisplayName = missionName || missionData.name;
+      selectedContactIds.forEach(contactId => {
+        logTimelineEvent({
+          userId: user.uid,
+          contactId,
+          type: 'mission_assigned',
+          actor: ACTORS.USER,
+          preview: missionDisplayName,
+          metadata: {
+            missionId: docRef.id,
+            missionName: missionDisplayName,
+            goalName: selectedGoal?.name || null
+          }
+        });
+      });
 
       // Navigate to mission detail
       navigate(`/hunter/mission/${docRef.id}`);

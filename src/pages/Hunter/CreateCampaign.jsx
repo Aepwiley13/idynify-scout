@@ -5,6 +5,7 @@ import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Mail, Users, Sparkles, Loader, AlertCircle, CheckCircle, ChevronRight } from 'lucide-react';
 import MissionSetup from '../../components/hunter/MissionSetup';
 import TemplateLibrary from '../../components/hunter/TemplateLibrary';
+import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 
 export default function CreateCampaign() {
   const navigate = useNavigate();
@@ -144,6 +145,21 @@ export default function CreateCampaign() {
       };
 
       const docRef = await addDoc(collection(db, 'users', user.uid, 'campaigns'), campaignData);
+
+      // Log timeline event: campaign_assigned for each contact
+      contacts.forEach(c => {
+        logTimelineEvent({
+          userId: user.uid,
+          contactId: c.contactId,
+          type: 'campaign_assigned',
+          actor: ACTORS.USER,
+          preview: campaignName,
+          metadata: {
+            campaignId: docRef.id,
+            campaignName
+          }
+        });
+      });
 
       // Navigate to campaign detail
       navigate(`/hunter/campaign/${docRef.id}`);

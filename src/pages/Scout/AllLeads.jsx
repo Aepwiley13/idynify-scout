@@ -11,6 +11,7 @@ import {
 import ContactSnapshot from '../../components/contacts/ContactSnapshot';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import { downloadVCard } from '../../utils/vcard';
+import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import './AllLeads.css';
 
 // ── Helpers ──────────────────────────────────────────────
@@ -145,6 +146,11 @@ export default function AllLeads() {
     try {
       const user = auth.currentUser;
       if (!user) return;
+
+      // Get current status before updating
+      const currentContact = contacts.find(c => c.id === contactId);
+      const previousStatus = getLeadStatus(currentContact);
+
       const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
       await updateDoc(contactRef, {
         lead_status: newStatus,
@@ -156,6 +162,20 @@ export default function AllLeads() {
           details: `Lead status changed to ${newStatus}`
         })
       });
+
+      // Log timeline event: lead_status_changed
+      logTimelineEvent({
+        userId: user.uid,
+        contactId,
+        type: 'lead_status_changed',
+        actor: ACTORS.USER,
+        preview: `${previousStatus} → ${newStatus}`,
+        metadata: {
+          statusFrom: previousStatus,
+          statusTo: newStatus
+        }
+      });
+
       setContacts(prev => prev.map(c =>
         c.id === contactId ? { ...c, lead_status: newStatus } : c
       ));
@@ -187,6 +207,25 @@ export default function AllLeads() {
         });
       });
       await Promise.all(promises);
+
+      // Log timeline event: lead_status_changed for each contact in bulk
+      selectedContactIds.forEach(contactId => {
+        const currentContact = contacts.find(c => c.id === contactId);
+        const previousStatus = getLeadStatus(currentContact);
+        logTimelineEvent({
+          userId: user.uid,
+          contactId,
+          type: 'lead_status_changed',
+          actor: ACTORS.USER,
+          preview: `${previousStatus} → ${newStatus}`,
+          metadata: {
+            statusFrom: previousStatus,
+            statusTo: newStatus,
+            bulkAction: true
+          }
+        });
+      });
+
       setContacts(prev => prev.map(c =>
         selectedContactIds.includes(c.id) ? { ...c, lead_status: newStatus } : c
       ));

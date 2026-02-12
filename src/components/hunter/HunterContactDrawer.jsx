@@ -15,6 +15,7 @@ import {
   SEND_RESULT,
   getActionLabels
 } from '../../utils/sendActionResolver';
+import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import './HunterContactDrawer.css';
 
 /**
@@ -242,6 +243,23 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       // Expect 3 message options with strategy, label, subject, message, and reasoning
       if (data.success && data.messages && data.messages.length >= 3) {
         setMessageOptions(data.messages);
+
+        // Log timeline event: message_generated
+        const user2 = auth.currentUser;
+        if (user2) {
+          logTimelineEvent({
+            userId: user2.uid,
+            contactId: contact.id,
+            type: 'message_generated',
+            actor: ACTORS.BARRY,
+            preview: intentText ? intentText.substring(0, 120) : null,
+            metadata: {
+              strategyCount: data.messages.length,
+              strategies: data.messages.map(m => m.strategy),
+              engagementIntent: relationshipIntent || null
+            }
+          });
+        }
       } else {
         throw new Error('Barry could not generate messages. Please try again.');
       }
@@ -382,6 +400,20 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
         contacts: updatedContacts,
         updatedAt: new Date().toISOString()
+      });
+
+      // Log timeline event: mission_assigned
+      logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.id,
+        type: 'mission_assigned',
+        actor: ACTORS.USER,
+        preview: mission.name || mission.goalName || 'Mission',
+        metadata: {
+          missionId,
+          missionName: mission.name || null,
+          goalName: mission.goalName || null
+        }
       });
 
       alert(`${contact.firstName} added to mission!`);

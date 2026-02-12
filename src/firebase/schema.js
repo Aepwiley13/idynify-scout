@@ -24,6 +24,8 @@
 //   └── quotas/ (subcollection)
 //       ├── daily_enrichments (document)
 //       └── weekly_enrichments (document)
+//   ├── contacts/{contactId} (subcollection)
+//   │   └── timeline/{eventId} (subcollection - engagement timeline events)
 
 export const COLLECTION_PATHS = {
   users: 'users',
@@ -42,7 +44,8 @@ export const COLLECTION_PATHS = {
   events: 'events',
   quotas: 'quotas',
   dailyEnrichments: 'quotas/daily_enrichments',
-  weeklyEnrichments: 'quotas/weekly_enrichments'
+  weeklyEnrichments: 'quotas/weekly_enrichments',
+  timeline: 'timeline'
 };
 
 // Helper functions to get document/collection paths
@@ -61,7 +64,9 @@ export const getPath = {
   userEvent: (userId, eventId) => `users/${userId}/events/${eventId}`,
   userQuotas: (userId) => `users/${userId}/quotas`,
   userDailyEnrichments: (userId) => `users/${userId}/quotas/daily_enrichments`,
-  userWeeklyEnrichments: (userId) => `users/${userId}/quotas/weekly_enrichments`
+  userWeeklyEnrichments: (userId) => `users/${userId}/quotas/weekly_enrichments`,
+  contactTimeline: (userId, contactId) => `users/${userId}/contacts/${contactId}/timeline`,
+  contactTimelineEvent: (userId, contactId, eventId) => `users/${userId}/contacts/${contactId}/timeline/${eventId}`
 };
 
 // ============================================================================
@@ -327,5 +332,59 @@ export const getPath = {
  *     editHistory: any[]
  *   },
  *   generatedAt: Timestamp
+ * }
+ */
+
+// ============================================================================
+// CONTACT ENGAGEMENT TIMELINE - Schema Documentation
+// ============================================================================
+
+/**
+ * Timeline Event
+ * Stored in users/{userId}/contacts/{contactId}/timeline/{eventId}
+ *
+ * Structured engagement event log. Subcollection design for:
+ * - Queryable by timestamp (reverse chronological)
+ * - Queryable by type
+ * - Paginated
+ * - Expandable without document size limits
+ *
+ * Does NOT replace or modify the legacy activity_log array.
+ *
+ * Schema:
+ * {
+ *   type: 'message_generated' | 'message_sent' | 'mission_assigned' |
+ *         'campaign_assigned' | 'lead_status_changed',
+ *   actor: 'user' | 'barry' | 'system',
+ *   createdAt: Timestamp,
+ *   preview: string | undefined,    // Short preview snippet (subject, intent, status transition)
+ *   metadata: {                     // Type-specific structured data
+ *     // message_generated:
+ *     strategyCount?: number,
+ *     strategies?: string[],
+ *     engagementIntent?: string,
+ *
+ *     // message_sent:
+ *     channel?: string,             // email, text, call, linkedin, calendar
+ *     method?: string,              // real, native
+ *     sendResult?: string,          // sent, opened, prepared, failed
+ *     engagementIntent?: string,
+ *     strategy?: string,
+ *     gmailMessageId?: string,
+ *
+ *     // mission_assigned:
+ *     missionId?: string,
+ *     missionName?: string,
+ *     goalName?: string,
+ *
+ *     // campaign_assigned:
+ *     campaignId?: string,
+ *     campaignName?: string,
+ *
+ *     // lead_status_changed:
+ *     statusFrom?: string,
+ *     statusTo?: string,
+ *     bulkAction?: boolean
+ *   }
  * }
  */

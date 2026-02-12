@@ -19,7 +19,7 @@ import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
-import ContactHunterActivity from '../../components/hunter/ContactHunterActivity';
+import EngagementTimeline from '../../components/contacts/EngagementTimeline';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import './ContactProfile.css';
 
@@ -614,8 +614,8 @@ export default function ContactProfile() {
         {/* 3. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 4. HUNTER ACTIVITY - Shows missions and engagement */}
-        <ContactHunterActivity contactId={contact.id} />
+        {/* 4. ENGAGEMENT TIMELINE - Unified chronological engagement log */}
+        <EngagementTimeline contactId={contact.id} />
 
         {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />

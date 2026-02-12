@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc, doc, setDoc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
+import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const [image, setImage] = useState(null);
@@ -159,6 +160,8 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
         // Scout metadata
         lead_status: 'saved',
+        contact_status: CONTACT_STATUSES.NEW,
+        contact_status_updated_at: new Date().toISOString(),
         export_ready: true,
         saved_at: new Date().toISOString(),
         addedAt: new Date().toISOString(),

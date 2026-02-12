@@ -5,6 +5,7 @@ import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, Users, Sparkles, Rocket, CheckCircle, Edit2, Trash2 } from 'lucide-react';
 import { getAllGoals, createMissionFromTemplate } from '../../utils/missionTemplates';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
 import './CreateMission.css';
 
 /**
@@ -145,6 +146,13 @@ export default function CreateMission() {
             missionName: missionDisplayName,
             goalName: selectedGoal?.name || null
           }
+        });
+
+        // State Machine: Mission assigned → Active Mission
+        updateContactStatus({
+          userId: user.uid,
+          contactId,
+          trigger: STATUS_TRIGGERS.MISSION_ASSIGNED
         });
       });
 

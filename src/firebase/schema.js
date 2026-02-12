@@ -211,6 +211,41 @@ export const getPath = {
  */
 
 // ============================================================================
+// CONTACT STATE MACHINE - Schema Documentation (Step 2)
+// ============================================================================
+
+/**
+ * Contact Status (System-Controlled State Machine)
+ * Stored in users/{userId}/contacts/{contactId} document
+ *
+ * Separate from lead_status (pipeline stage). This field tracks
+ * behavioral momentum — auto-updated by user actions.
+ *
+ * Fields:
+ * {
+ *   contact_status: 'New' | 'Engaged' | 'In Campaign' | 'Active Mission' |
+ *                   'Awaiting Reply' | 'Mission Complete' | 'Dormant',
+ *   contact_status_updated_at: string (ISO timestamp)
+ * }
+ *
+ * Default for legacy contacts (no contact_status field): 'New'
+ *
+ * Auto-Update Rules:
+ *   Contact created        → 'New'
+ *   Engage clicked         → 'Engaged'
+ *   Campaign assigned      → 'In Campaign'
+ *   Mission assigned       → 'Active Mission'
+ *   Message sent           → 'Awaiting Reply'
+ *   Manual complete action → 'Mission Complete'
+ *   (Dormant reserved for future inactivity detection)
+ *
+ * Transitions only advance forward in priority unless the trigger
+ * is MESSAGE_SENT or MANUAL_COMPLETE (which always apply).
+ *
+ * See: src/utils/contactStateMachine.js
+ */
+
+// ============================================================================
 // CONTACT ENRICHMENT PROVENANCE - Schema Documentation (Barry Enrichment)
 // ============================================================================
 
@@ -354,7 +389,7 @@ export const getPath = {
  * Schema:
  * {
  *   type: 'message_generated' | 'message_sent' | 'mission_assigned' |
- *         'campaign_assigned' | 'lead_status_changed',
+ *         'campaign_assigned' | 'lead_status_changed' | 'contact_status_changed',
  *   actor: 'user' | 'barry' | 'system',
  *   createdAt: Timestamp,
  *   preview: string | undefined,    // Short preview snippet (subject, intent, status transition)
@@ -384,7 +419,12 @@ export const getPath = {
  *     // lead_status_changed:
  *     statusFrom?: string,
  *     statusTo?: string,
- *     bulkAction?: boolean
+ *     bulkAction?: boolean,
+ *
+ *     // contact_status_changed:
+ *     // statusFrom?: string,
+ *     // statusTo?: string,
+ *     trigger?: string             // e.g. 'engage_clicked', 'message_sent'
  *   }
  * }
  */

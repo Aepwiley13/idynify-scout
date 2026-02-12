@@ -15,6 +15,7 @@
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { logTimelineEvent, ACTORS } from './timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS } from './contactStateMachine';
 
 // Result types for clear UX messaging
 export const SEND_RESULT = {
@@ -388,6 +389,15 @@ export async function executeSendAction({
       ...(sendResult.gmailMessageId && { gmailMessageId: sendResult.gmailMessageId })
     }
   });
+
+  // State Machine: Message sent → Awaiting Reply (only on successful send/handoff)
+  if (sendResult.result === SEND_RESULT.SENT || sendResult.result === SEND_RESULT.OPENED) {
+    updateContactStatus({
+      userId,
+      contactId: contact.id,
+      trigger: STATUS_TRIGGERS.MESSAGE_SENT
+    });
+  }
 
   return {
     ...sendResult,

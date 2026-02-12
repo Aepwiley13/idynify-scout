@@ -21,6 +21,7 @@ import DetailDrawer from '../../components/contacts/DetailDrawer';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import EngagementTimeline from '../../components/contacts/EngagementTimeline';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
+import { getContactStatus } from '../../utils/contactStateMachine';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -600,6 +601,13 @@ export default function ContactProfile() {
           photoRefreshLoading={photoRefreshLoading}
           photoRefreshError={photoRefreshError}
         />
+
+        {/* Contact Status Badge (State Machine) */}
+        <div className="contact-status-row">
+          <span className={`contact-status-badge contact-status-${getContactStatus(contact).toLowerCase().replace(/\s+/g, '-')}`}>
+            {getContactStatus(contact)}
+          </span>
+        </div>
 
         {/* 2. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (

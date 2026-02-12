@@ -16,6 +16,7 @@ import {
   getActionLabels
 } from '../../utils/sendActionResolver';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import './HunterContactDrawer.css';
 
 /**
@@ -81,6 +82,17 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       resetEngagementState();
       // Load existing intent from contact
       setEngagementIntent(contact?.engagementIntent || 'prospect');
+
+      // State Machine: Engage clicked → Engaged
+      const user = auth.currentUser;
+      if (user && contact?.id) {
+        updateContactStatus({
+          userId: user.uid,
+          contactId: contact.id,
+          trigger: STATUS_TRIGGERS.ENGAGE_CLICKED,
+          currentStatus: getContactStatus(contact)
+        });
+      }
     }
   }, [isOpen, contact]);
 
@@ -414,6 +426,14 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           missionName: mission.name || null,
           goalName: mission.goalName || null
         }
+      });
+
+      // State Machine: Mission assigned → Active Mission
+      updateContactStatus({
+        userId: user.uid,
+        contactId: contact.id,
+        trigger: STATUS_TRIGGERS.MISSION_ASSIGNED,
+        currentStatus: getContactStatus(contact)
       });
 
       alert(`${contact.firstName} added to mission!`);

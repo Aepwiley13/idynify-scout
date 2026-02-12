@@ -8,7 +8,8 @@ import {
   Target,
   Megaphone,
   ArrowRightLeft,
-  Loader
+  Loader,
+  GitBranch
 } from 'lucide-react';
 import './EngagementTimeline.css';
 
@@ -57,6 +58,13 @@ const EVENT_CONFIG = {
     color: '#6366f1',
     bgColor: 'rgba(99, 102, 241, 0.1)',
     actorLabel: null
+  },
+  contact_status_changed: {
+    icon: GitBranch,
+    label: 'Contact Status',
+    color: '#8b5cf6',
+    bgColor: 'rgba(139, 92, 246, 0.1)',
+    actorLabel: 'System'
   }
 };
 

@@ -7,12 +7,13 @@
  * This is the single entry point for all timeline event creation.
  * It does NOT touch the legacy activity_log array.
  *
- * Event Types (Step 1 scope):
- *   - message_generated    (Barry returns strategies)
- *   - message_sent         (Gmail confirmed or native handoff)
- *   - mission_assigned     (Contact added to a mission)
- *   - campaign_assigned    (Contact added to a campaign)
- *   - lead_status_changed  (Lead status updated)
+ * Event Types:
+ *   - message_generated       (Barry returns strategies)
+ *   - message_sent            (Gmail confirmed or native handoff)
+ *   - mission_assigned        (Contact added to a mission)
+ *   - campaign_assigned       (Contact added to a campaign)
+ *   - lead_status_changed     (Lead status updated)
+ *   - contact_status_changed  (Contact state machine transition)
  */
 
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
@@ -24,7 +25,8 @@ const TIMELINE_EVENT_TYPES = [
   'message_sent',
   'mission_assigned',
   'campaign_assigned',
-  'lead_status_changed'
+  'lead_status_changed',
+  'contact_status_changed'
 ];
 
 // Actor types

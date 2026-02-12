@@ -2,24 +2,34 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { ArrowLeft, Target, Users, Sparkles, Rocket, CheckCircle, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Target, Users, Sparkles, Rocket, CheckCircle, Edit2, Trash2, Crosshair, Clock, Zap, ArrowRight, Loader2 } from 'lucide-react';
 import { getAllGoals, createMissionFromTemplate } from '../../utils/missionTemplates';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
+import {
+  OUTCOME_GOALS,
+  ENGAGEMENT_STYLES,
+  MISSION_TIMEFRAMES,
+  NEXT_STEP_TYPES,
+  getLabelById,
+  getDescriptionById
+} from '../../constants/structuredFields';
 import './CreateMission.css';
 
 /**
- * CREATE MISSION WIZARD
+ * CREATE MISSION WIZARD (Step 4 Update)
  *
  * Intent-driven mission builder for Hunter.
- * Philosophy: User declares goal → Barry proposes orchestration → User approves → Autopilot
+ * Philosophy: User declares goal → Defines strategy → Barry proposes orchestration → User approves → Autopilot
  *
  * Steps:
  * 1. Choose Goal (book meetings, warm conversations, re-engage)
- * 2. Review Barry's Orchestration (sequence of touchpoints)
- * 3. Edit Messages (optional tweaks to each step)
- * 4. Select Contacts (who to add to mission)
+ * 2. Define Mission Strategy (outcome_goal, engagement_style, timeframe, next_step_type)
+ * 3. Review Barry's Orchestration + Micro-Sequence
+ * 4. Select Contacts
  * 5. Launch Mission (name it and put on autopilot)
+ *
+ * Guardrail: All micro-sequence steps are approval-gated. Nothing sends without user confirmation.
  */
 
 export default function CreateMission() {
@@ -32,6 +42,17 @@ export default function CreateMission() {
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [missionName, setMissionName] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Step 4: Mission strategy fields
+  const [outcomeGoal, setOutcomeGoal] = useState(null);
+  const [engagementStyle, setEngagementStyle] = useState(null);
+  const [timeframe, setTimeframe] = useState(null);
+  const [nextStepType, setNextStepType] = useState(null);
+
+  // Step 4: Micro-sequence from Barry
+  const [microSequence, setMicroSequence] = useState(null);
+  const [sequenceLoading, setSequenceLoading] = useState(false);
+  const [sequenceError, setSequenceError] = useState(null);
 
   const goals = getAllGoals();
 
@@ -65,13 +86,74 @@ export default function CreateMission() {
 
   function handleSelectGoal(goal) {
     setSelectedGoal(goal);
+    setCurrentStep(2);
+  }
 
-    // Generate initial mission structure from template
-    const mission = createMissionFromTemplate(goal.id, goal.defaultName);
+  // Step 4: Generate mission with strategy fields and request micro-sequence
+  async function handleStrategyComplete() {
+    const missionFields = {
+      outcome_goal: outcomeGoal,
+      engagement_style: engagementStyle,
+      timeframe: timeframe,
+      next_step_type: nextStepType
+    };
+
+    // Create mission from template with structured fields
+    const mission = createMissionFromTemplate(
+      selectedGoal.id,
+      selectedGoal.defaultName,
+      [],
+      missionFields
+    );
     setMissionData(mission);
     setMissionName(mission.name);
 
-    setCurrentStep(2);
+    // Move to orchestration review
+    setCurrentStep(3);
+
+    // Generate micro-sequence from Barry
+    await generateMicroSequence(missionFields);
+  }
+
+  async function generateMicroSequence(missionFields) {
+    setSequenceLoading(true);
+    setSequenceError(null);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.getIdToken();
+
+      const response = await fetch('/.netlify/functions/barryGenerateMissionSequence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: token,
+          missionFields,
+          contacts: selectedContactIds.length > 0
+            ? allContacts.filter(c => selectedContactIds.includes(c.id))
+            : []
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate sequence');
+      }
+
+      const data = await response.json();
+      if (data.success && data.microSequence) {
+        setMicroSequence(data.microSequence);
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Error generating micro-sequence:', error);
+      setSequenceError('Barry could not generate a sequence right now. You can continue without one.');
+    } finally {
+      setSequenceLoading(false);
+    }
   }
 
   function handleToggleStep(stepIndex) {
@@ -109,11 +191,17 @@ export default function CreateMission() {
       // Get selected contacts with full data
       const selectedContacts = allContacts.filter(c => selectedContactIds.includes(c.id));
 
-      // Create final mission data
+      // Create final mission data with structured fields
       const finalMission = {
         ...missionData,
         name: missionName || missionData.name,
         userId: user.uid,
+        // Step 4: Ensure structured fields are persisted
+        outcome_goal: outcomeGoal,
+        engagement_style: engagementStyle,
+        timeframe: timeframe,
+        next_step_type: nextStepType,
+        microSequence: microSequence || null,
         contacts: selectedContacts.map(contact => ({
           contactId: contact.id,
           name: `${contact.firstName} ${contact.lastName}`,
@@ -144,7 +232,11 @@ export default function CreateMission() {
           metadata: {
             missionId: docRef.id,
             missionName: missionDisplayName,
-            goalName: selectedGoal?.name || null
+            goalName: selectedGoal?.name || null,
+            outcomeGoal: outcomeGoal,
+            engagementStyle: engagementStyle,
+            timeframe: timeframe,
+            nextStepType: nextStepType
           }
         });
 
@@ -166,9 +258,18 @@ export default function CreateMission() {
     }
   }
 
+  const allStrategyFieldsSet = outcomeGoal && engagementStyle && timeframe && nextStepType;
   const canProceedToStep3 = missionData && missionData.steps.some(s => s.enabled);
-  const canProceedToStep4 = canProceedToStep3; // Can skip message editing
   const canLaunch = selectedContactIds.length > 0 && missionName.trim() !== '';
+
+  // Channel icon mapping for micro-sequence display
+  const channelIcons = {
+    email: '✉️',
+    text: '💬',
+    phone: '📞',
+    linkedin: '🔗',
+    calendar: '📅'
+  };
 
   return (
     <div className="create-mission">
@@ -219,17 +320,204 @@ export default function CreateMission() {
         </div>
       )}
 
-      {/* Step 2: Review Orchestration */}
-      {currentStep === 2 && missionData && (
+      {/* Step 2: Define Mission Strategy (NEW — Step 4) */}
+      {currentStep === 2 && (
+        <div className="mission-step">
+          <div className="step-header">
+            <Crosshair className="w-8 h-8 text-purple-400" />
+            <h1 className="step-title">Define Your Mission Strategy</h1>
+            <p className="step-description">
+              Set the parameters so Barry can plan an intentional sequence, not just a single message
+            </p>
+          </div>
+
+          <div className="strategy-fields">
+            {/* Outcome Goal */}
+            <div className="strategy-field-group">
+              <h3 className="strategy-field-label">
+                <Target className="w-5 h-5" />
+                Outcome Goal
+              </h3>
+              <p className="strategy-field-hint">What is this mission trying to achieve?</p>
+              <div className="strategy-options">
+                {OUTCOME_GOALS.map(option => (
+                  <button
+                    key={option.id}
+                    className={`strategy-option ${outcomeGoal === option.id ? 'selected' : ''}`}
+                    onClick={() => setOutcomeGoal(option.id)}
+                  >
+                    <span className="strategy-option-label">{option.label}</span>
+                    <span className="strategy-option-desc">{option.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Engagement Style */}
+            <div className="strategy-field-group">
+              <h3 className="strategy-field-label">
+                <Zap className="w-5 h-5" />
+                Engagement Style
+              </h3>
+              <p className="strategy-field-hint">How much attention does this deserve?</p>
+              <div className="strategy-options strategy-options-row">
+                {ENGAGEMENT_STYLES.map(option => (
+                  <button
+                    key={option.id}
+                    className={`strategy-option strategy-option-wide ${engagementStyle === option.id ? 'selected' : ''}`}
+                    onClick={() => setEngagementStyle(option.id)}
+                  >
+                    <span className="strategy-option-label">{option.label}</span>
+                    <span className="strategy-option-desc">{option.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Timeframe */}
+            <div className="strategy-field-group">
+              <h3 className="strategy-field-label">
+                <Clock className="w-5 h-5" />
+                Timeframe
+              </h3>
+              <p className="strategy-field-hint">How urgent is this mission?</p>
+              <div className="strategy-options strategy-options-row">
+                {MISSION_TIMEFRAMES.map(option => (
+                  <button
+                    key={option.id}
+                    className={`strategy-option strategy-option-wide ${timeframe === option.id ? 'selected' : ''}`}
+                    onClick={() => setTimeframe(option.id)}
+                  >
+                    <span className="strategy-option-label">{option.label}</span>
+                    <span className="strategy-option-desc">{option.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Next Step Type */}
+            <div className="strategy-field-group">
+              <h3 className="strategy-field-label">
+                <ArrowRight className="w-5 h-5" />
+                Next Step Type
+              </h3>
+              <p className="strategy-field-hint">What type of action should Barry plan toward first?</p>
+              <div className="strategy-options">
+                {NEXT_STEP_TYPES.map(option => (
+                  <button
+                    key={option.id}
+                    className={`strategy-option ${nextStepType === option.id ? 'selected' : ''}`}
+                    onClick={() => setNextStepType(option.id)}
+                  >
+                    <span className="strategy-option-label">{option.label}</span>
+                    <span className="strategy-option-desc">{option.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="step-actions">
+            <button className="btn-secondary" onClick={() => setCurrentStep(1)}>
+              ← Back
+            </button>
+            <button
+              className="btn-primary-hunter"
+              onClick={handleStrategyComplete}
+              disabled={!allStrategyFieldsSet}
+            >
+              Next: Review Orchestration →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Review Orchestration + Micro-Sequence */}
+      {currentStep === 3 && missionData && (
         <div className="mission-step">
           <div className="step-header">
             <Sparkles className="w-8 h-8 text-purple-400" />
             <h1 className="step-title">Barry's Proposed Orchestration</h1>
             <p className="step-description">
-              Review the sequence below. You can toggle steps on/off or remove them.
+              Review the template sequence and Barry's suggested micro-sequence below.
             </p>
           </div>
 
+          {/* Mission Strategy Summary */}
+          <div className="strategy-summary">
+            <div className="strategy-summary-item">
+              <span className="strategy-summary-label">Goal</span>
+              <span className="strategy-summary-value">{getLabelById(OUTCOME_GOALS, outcomeGoal)}</span>
+            </div>
+            <div className="strategy-summary-item">
+              <span className="strategy-summary-label">Style</span>
+              <span className="strategy-summary-value">{getLabelById(ENGAGEMENT_STYLES, engagementStyle)}</span>
+            </div>
+            <div className="strategy-summary-item">
+              <span className="strategy-summary-label">Timeframe</span>
+              <span className="strategy-summary-value">{getLabelById(MISSION_TIMEFRAMES, timeframe)}</span>
+            </div>
+            <div className="strategy-summary-item">
+              <span className="strategy-summary-label">First Action</span>
+              <span className="strategy-summary-value">{getLabelById(NEXT_STEP_TYPES, nextStepType)}</span>
+            </div>
+          </div>
+
+          {/* Barry's Micro-Sequence */}
+          <div className="micro-sequence-section">
+            <h3 className="micro-sequence-title">
+              <Sparkles className="w-5 h-5 text-purple-400" />
+              Barry's Suggested Sequence
+            </h3>
+
+            {sequenceLoading && (
+              <div className="micro-sequence-loading">
+                <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+                <span>Barry is planning your sequence...</span>
+              </div>
+            )}
+
+            {sequenceError && (
+              <div className="micro-sequence-error">
+                <p>{sequenceError}</p>
+              </div>
+            )}
+
+            {microSequence && !sequenceLoading && (
+              <div className="micro-sequence-content">
+                <p className="micro-sequence-rationale">{microSequence.sequenceRationale}</p>
+
+                <div className="micro-sequence-steps">
+                  {microSequence.steps.map((step, index) => (
+                    <div key={index} className="micro-step">
+                      <div className="micro-step-header">
+                        <div className="micro-step-number">{step.stepNumber}</div>
+                        <div className="micro-step-timing">{step.timing}</div>
+                        <div className="micro-step-channel">
+                          {channelIcons[step.channel] || '📨'} {step.channel}
+                        </div>
+                      </div>
+                      <div className="micro-step-body">
+                        <p className="micro-step-action">{step.action}</p>
+                        <p className="micro-step-purpose">{step.purpose}</p>
+                      </div>
+                      <div className="micro-step-approval">
+                        <CheckCircle className="w-4 h-4" />
+                        Requires your approval
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="micro-sequence-outcome">
+                  <strong>Expected Outcome:</strong> {microSequence.expectedOutcome}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Template Orchestration Timeline */}
+          <div className="orchestration-section-label">Template Touchpoints</div>
           <div className="orchestration-timeline">
             {missionData.steps.map((step, index) => (
               <div
@@ -281,37 +569,13 @@ export default function CreateMission() {
           </div>
 
           <div className="step-actions">
-            <button className="btn-secondary" onClick={() => setCurrentStep(1)}>
-              ← Back
-            </button>
-            <button
-              className="btn-primary-hunter"
-              onClick={() => setCurrentStep(4)} // Skip step 3 (message editing) for MVP
-              disabled={!canProceedToStep3}
-            >
-              Next: Select Contacts →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Edit Messages (Placeholder - skip for MVP) */}
-      {currentStep === 3 && (
-        <div className="mission-step">
-          <div className="step-header">
-            <Edit2 className="w-8 h-8 text-purple-400" />
-            <h1 className="step-title">Edit Messages</h1>
-            <p className="step-description">Coming soon: AI-powered message generation</p>
-          </div>
-
-          <div className="step-actions">
             <button className="btn-secondary" onClick={() => setCurrentStep(2)}>
               ← Back
             </button>
             <button
               className="btn-primary-hunter"
               onClick={() => setCurrentStep(4)}
-              disabled={!canProceedToStep4}
+              disabled={!canProceedToStep3}
             >
               Next: Select Contacts →
             </button>
@@ -367,7 +631,7 @@ export default function CreateMission() {
           )}
 
           <div className="step-actions">
-            <button className="btn-secondary" onClick={() => setCurrentStep(2)}>
+            <button className="btn-secondary" onClick={() => setCurrentStep(3)}>
               ← Back
             </button>
             <button
@@ -398,6 +662,22 @@ export default function CreateMission() {
                 <span className="summary-value">{selectedGoal?.name}</span>
               </div>
               <div className="summary-row">
+                <span className="summary-label">Outcome:</span>
+                <span className="summary-value">{getLabelById(OUTCOME_GOALS, outcomeGoal)}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Style:</span>
+                <span className="summary-value">{getLabelById(ENGAGEMENT_STYLES, engagementStyle)}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">Timeframe:</span>
+                <span className="summary-value">{getLabelById(MISSION_TIMEFRAMES, timeframe)}</span>
+              </div>
+              <div className="summary-row">
+                <span className="summary-label">First Action:</span>
+                <span className="summary-value">{getLabelById(NEXT_STEP_TYPES, nextStepType)}</span>
+              </div>
+              <div className="summary-row">
                 <span className="summary-label">Touchpoints:</span>
                 <span className="summary-value">
                   {missionData.steps.filter(s => s.enabled).length} active steps
@@ -407,6 +687,14 @@ export default function CreateMission() {
                 <span className="summary-label">Contacts:</span>
                 <span className="summary-value">{selectedContactIds.length} people</span>
               </div>
+              {microSequence && (
+                <div className="summary-row">
+                  <span className="summary-label">Sequence:</span>
+                  <span className="summary-value">
+                    {microSequence.steps.length}-step micro-sequence (approval-gated)
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="mission-name-input">

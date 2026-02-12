@@ -323,6 +323,67 @@ export const getPath = {
  */
 
 // ============================================================================
+// MISSION STRUCTURED FIELDS - Schema Documentation (Step 4)
+// ============================================================================
+
+/**
+ * Mission Structured Strategy Fields
+ * Stored in users/{userId}/missions/{missionId} document
+ *
+ * Step 4 converts Missions from labels into structured strategy units.
+ * Every Mission must have four required fields so Barry can generate
+ * contextually appropriate micro-sequences, not just single messages.
+ *
+ * Fields:
+ * {
+ *   outcome_goal: 'schedule_meeting' | 'secure_commitment' | 'rebuild_relationship' |
+ *                 'get_introduction' | 'gather_feedback' | 'ask_for_referral' | 'close_deal',
+ *     // schedule_meeting = get a meeting on the calendar
+ *     // secure_commitment = get a verbal or written yes
+ *     // rebuild_relationship = re-establish trust after going dark
+ *     // get_introduction = ask for a warm intro to someone else
+ *     // gather_feedback = collect input, opinions, or validation
+ *     // ask_for_referral = request a referral to a potential customer or partner
+ *     // close_deal = drive to a signed agreement or purchase
+ *
+ *   engagement_style: 'light_touch' | 'moderate' | 'high_touch',
+ *     // light_touch = minimal effort, low frequency
+ *     // moderate = consistent follow-up over weeks
+ *     // high_touch = white glove, frequent personal engagement
+ *
+ *   timeframe: 'this_week' | 'this_month' | 'this_quarter' | 'no_deadline',
+ *     // this_week = urgent, within 7 days
+ *     // this_month = active, within 30 days
+ *     // this_quarter = strategic, within 90 days
+ *     // no_deadline = ongoing, no time pressure
+ *
+ *   next_step_type: 'send_message' | 'book_call' | 'request_meeting' |
+ *                   'send_resource' | 'make_introduction' | 'follow_up'
+ *     // send_message = draft and send an email or text
+ *     // book_call = schedule a phone or video call
+ *     // request_meeting = propose an in-person or virtual meeting
+ *     // send_resource = share a document, link, or asset
+ *     // make_introduction = connect two people via intro
+ *     // follow_up = check in after a previous interaction
+ * }
+ *
+ * How Barry uses these fields:
+ *   outcome_goal → aligns CTA and end-state of the sequence
+ *   engagement_style → adjusts tone, frequency, and depth
+ *   timeframe → calibrates urgency and spacing between steps
+ *   next_step_type → determines the logical first action in the sequence
+ *
+ * Barry generates a suggested micro-sequence (2-3 steps) based on these fields.
+ * Every step remains approval-based — nothing sends without user confirmation.
+ *
+ * GUARDRAIL: Mission fields are tactical execution parameters.
+ * They do NOT override Campaign-level strategic fields (objective_type,
+ * time_horizon, strategic_priority). Both layers coexist.
+ *
+ * See: src/constants/structuredFields.js
+ */
+
+// ============================================================================
 // CONTACT ENRICHMENT PROVENANCE - Schema Documentation (Barry Enrichment)
 // ============================================================================
 

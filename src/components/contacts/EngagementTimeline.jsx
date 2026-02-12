@@ -9,7 +9,12 @@ import {
   Megaphone,
   ArrowRightLeft,
   Loader,
-  GitBranch
+  GitBranch,
+  ListChecks,
+  CheckCircle,
+  PlayCircle,
+  SkipForward,
+  Flag
 } from 'lucide-react';
 import './EngagementTimeline.css';
 
@@ -64,6 +69,42 @@ const EVENT_CONFIG = {
     label: 'Contact Status',
     color: '#8b5cf6',
     bgColor: 'rgba(139, 92, 246, 0.1)',
+    actorLabel: 'System'
+  },
+  // Step 5: Sequence events
+  sequence_step_proposed: {
+    icon: ListChecks,
+    label: 'Step Proposed',
+    color: '#a855f7',
+    bgColor: 'rgba(168, 85, 247, 0.1)',
+    actorLabel: 'Barry'
+  },
+  sequence_step_approved: {
+    icon: CheckCircle,
+    label: 'Step Approved',
+    color: '#3b82f6',
+    bgColor: 'rgba(59, 130, 246, 0.1)',
+    actorLabel: null
+  },
+  sequence_step_sent: {
+    icon: PlayCircle,
+    label: 'Step Sent',
+    color: '#10b981',
+    bgColor: 'rgba(16, 185, 129, 0.1)',
+    actorLabel: null
+  },
+  sequence_step_skipped: {
+    icon: SkipForward,
+    label: 'Step Skipped',
+    color: '#94a3b8',
+    bgColor: 'rgba(148, 163, 184, 0.1)',
+    actorLabel: null
+  },
+  sequence_completed: {
+    icon: Flag,
+    label: 'Sequence Complete',
+    color: '#10b981',
+    bgColor: 'rgba(16, 185, 129, 0.1)',
     actorLabel: 'System'
   }
 };
@@ -136,6 +177,16 @@ function getPreviewText(event) {
       return meta.statusFrom && meta.statusTo
         ? `${meta.statusFrom} → ${meta.statusTo}`
         : null;
+    // Step 5: Sequence events
+    case 'sequence_step_proposed':
+    case 'sequence_step_approved':
+    case 'sequence_step_sent':
+    case 'sequence_step_skipped':
+      return meta.stepIndex != null
+        ? `Step ${meta.stepIndex + 1}${meta.stepType ? ` — ${meta.stepType}` : ''}`
+        : null;
+    case 'sequence_completed':
+      return 'All steps finished';
     default:
       return null;
   }

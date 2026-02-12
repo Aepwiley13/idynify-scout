@@ -17,6 +17,8 @@ import {
 } from '../../utils/sendActionResolver';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
+import { getSequencePlan } from '../../utils/sequenceEngine';
+import SequencePanel from './SequencePanel';
 import './HunterContactDrawer.css';
 
 /**
@@ -560,6 +562,20 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   <span className="missions-label">In {contactMissions.length} active mission{contactMissions.length > 1 ? 's' : ''}</span>
                 </div>
               )}
+
+              {/* Step 5: Sequence Panel — shown for missions with active sequences */}
+              {contactMissions
+                .filter(m => getSequencePlan(m) !== null)
+                .map(m => (
+                  <SequencePanel
+                    key={m.id}
+                    contact={contact}
+                    mission={m}
+                    missionId={m.id}
+                    onStepSent={() => loadData()}
+                  />
+                ))
+              }
 
               {/* Add to Mission (if missions exist) */}
               {missions.length > 0 && (

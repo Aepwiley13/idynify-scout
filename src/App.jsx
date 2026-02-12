@@ -66,6 +66,7 @@ import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
 import CreateCampaign from './pages/Hunter/CreateCampaign';
 import CampaignDetail from './pages/Hunter/CampaignDetail';
 import CreateMission from './pages/Hunter/CreateMission';
+import MissionDetail from './pages/Hunter/MissionDetail';
 
 // Barry Onboarding
 import BarryOnboarding from './pages/Onboarding/BarryOnboarding';
@@ -431,7 +432,7 @@ function App() {
           path="/hunter/mission/:missionId"
           element={
             <ProtectedRoute withLayout={true}>
-              <CampaignDetail />
+              <MissionDetail />
             </ProtectedRoute>
           }
         />

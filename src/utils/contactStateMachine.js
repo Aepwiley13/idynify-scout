@@ -13,6 +13,7 @@
  *   In Campaign     — Contact assigned to a campaign
  *   Active Mission  — Contact assigned to a mission
  *   Awaiting Reply  — Message sent, waiting for response
+ *   In Conversation — Contact replied positively, dialogue active (Step 5)
  *   Mission Complete — User manually marked complete
  *   Dormant         — Reserved for future inactivity detection
  *
@@ -22,6 +23,8 @@
  *   Campaign assigned      → In Campaign
  *   Mission assigned       → Active Mission
  *   Message sent           → Awaiting Reply
+ *   Positive reply         → In Conversation (Step 5)
+ *   Sequence completed     → Mission Complete (Step 5)
  *   Manual complete action → Mission Complete
  */
 
@@ -37,6 +40,7 @@ export const CONTACT_STATUSES = {
   IN_CAMPAIGN: 'In Campaign',
   ACTIVE_MISSION: 'Active Mission',
   AWAITING_REPLY: 'Awaiting Reply',
+  IN_CONVERSATION: 'In Conversation',
   MISSION_COMPLETE: 'Mission Complete',
   DORMANT: 'Dormant'
 };
@@ -52,6 +56,8 @@ export const STATUS_TRIGGERS = {
   CAMPAIGN_ASSIGNED: 'campaign_assigned',
   MISSION_ASSIGNED: 'mission_assigned',
   MESSAGE_SENT: 'message_sent',
+  POSITIVE_REPLY: 'positive_reply',
+  SEQUENCE_COMPLETE: 'sequence_complete',
   MANUAL_COMPLETE: 'manual_complete'
 };
 
@@ -62,6 +68,8 @@ const TRANSITION_MAP = {
   [STATUS_TRIGGERS.CAMPAIGN_ASSIGNED]: CONTACT_STATUSES.IN_CAMPAIGN,
   [STATUS_TRIGGERS.MISSION_ASSIGNED]: CONTACT_STATUSES.ACTIVE_MISSION,
   [STATUS_TRIGGERS.MESSAGE_SENT]: CONTACT_STATUSES.AWAITING_REPLY,
+  [STATUS_TRIGGERS.POSITIVE_REPLY]: CONTACT_STATUSES.IN_CONVERSATION,
+  [STATUS_TRIGGERS.SEQUENCE_COMPLETE]: CONTACT_STATUSES.MISSION_COMPLETE,
   [STATUS_TRIGGERS.MANUAL_COMPLETE]: CONTACT_STATUSES.MISSION_COMPLETE
 };
 
@@ -73,7 +81,8 @@ const STATUS_PRIORITY = {
   [CONTACT_STATUSES.IN_CAMPAIGN]: 2,
   [CONTACT_STATUSES.ACTIVE_MISSION]: 3,
   [CONTACT_STATUSES.AWAITING_REPLY]: 4,
-  [CONTACT_STATUSES.MISSION_COMPLETE]: 5,
+  [CONTACT_STATUSES.IN_CONVERSATION]: 5,
+  [CONTACT_STATUSES.MISSION_COMPLETE]: 6,
   [CONTACT_STATUSES.DORMANT]: 0 // Reserved — does not participate in priority
 };
 
@@ -89,9 +98,11 @@ export function resolveTransition(currentStatus, trigger) {
   const targetStatus = TRANSITION_MAP[trigger];
   if (!targetStatus) return null;
 
-  // These triggers always apply
+  // These triggers always apply regardless of current status
   const alwaysApplyTriggers = [
     STATUS_TRIGGERS.MESSAGE_SENT,
+    STATUS_TRIGGERS.POSITIVE_REPLY,
+    STATUS_TRIGGERS.SEQUENCE_COMPLETE,
     STATUS_TRIGGERS.MANUAL_COMPLETE
   ];
 

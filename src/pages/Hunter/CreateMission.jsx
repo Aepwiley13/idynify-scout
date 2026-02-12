@@ -43,6 +43,9 @@ export default function CreateMission() {
   const [missionName, setMissionName] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Step 6: Campaign association (optional)
+  const [campaignId, setCampaignId] = useState(null);
+
   // Step 4: Mission strategy fields
   const [outcomeGoal, setOutcomeGoal] = useState(null);
   const [engagementStyle, setEngagementStyle] = useState(null);
@@ -65,7 +68,13 @@ export default function CreateMission() {
     if (contactId) {
       setSelectedContactIds([contactId]);
     }
-  }, [location.search]);
+
+    // Step 6: Accept campaignId from URL params or location state
+    const campaignIdParam = params.get('campaignId') || location.state?.campaignId;
+    if (campaignIdParam) {
+      setCampaignId(campaignIdParam);
+    }
+  }, [location.search, location.state]);
 
   async function loadContacts() {
     try {
@@ -210,10 +219,15 @@ export default function CreateMission() {
           totalSteps: microSequence.steps?.length || 0,
           generatedAt: microSequence.generatedAt || new Date().toISOString()
         } : null,
+        // Step 6: Campaign association (for dashboard cross-referencing)
+        campaignId: campaignId || null,
         // Step 5: Initialize per-contact sequence state
+        // Step 6: Denormalize firstName/lastName for dashboard rendering
         contacts: selectedContacts.map(contact => ({
           contactId: contact.id,
-          name: `${contact.firstName} ${contact.lastName}`,
+          name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+          firstName: contact.firstName || null,
+          lastName: contact.lastName || null,
           email: contact.email || null,
           phone: contact.phone || null,
           currentStepIndex: 0,

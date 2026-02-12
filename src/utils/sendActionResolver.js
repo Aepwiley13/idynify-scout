@@ -14,6 +14,7 @@
 
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
+import { logTimelineEvent, ACTORS } from './timelineLogger';
 
 // Result types for clear UX messaging
 export const SEND_RESULT = {
@@ -354,7 +355,7 @@ export async function executeSendAction({
       };
   }
 
-  // Log the activity
+  // Log the activity (legacy activity_log array — untouched)
   await logActivity({
     userId,
     contactId: contact.id,
@@ -367,6 +368,23 @@ export async function executeSendAction({
       userIntent,
       engagementIntent,
       strategy,
+      ...(sendResult.gmailMessageId && { gmailMessageId: sendResult.gmailMessageId })
+    }
+  });
+
+  // Log timeline event: message_sent
+  logTimelineEvent({
+    userId,
+    contactId: contact.id,
+    type: 'message_sent',
+    actor: ACTORS.USER,
+    preview: subject || (body ? body.substring(0, 120) : null),
+    metadata: {
+      channel,
+      method: resolution.method,
+      sendResult: sendResult.result,
+      engagementIntent: engagementIntent || null,
+      strategy: strategy || null,
       ...(sendResult.gmailMessageId && { gmailMessageId: sendResult.gmailMessageId })
     }
   });

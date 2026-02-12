@@ -219,6 +219,13 @@ BARRY'S EXISTING ANALYSIS OF THIS CONTACT:
 `;
     }
 
+    // Structured context fields (Step 3)
+    const structuredContext = {
+      relationship_type: fullContact.relationship_type || null,
+      warmth_level: fullContact.warmth_level || null,
+      strategic_value: fullContact.strategic_value || null
+    };
+
     // Map engagement intent to tone guidance
     const intentToneMap = {
       prospect: 'This is a NEW contact - be professional, establish credibility, spark curiosity without being pushy',
@@ -256,6 +263,19 @@ CONTACT INFORMATION:
 
 RELATIONSHIP CONTEXT:
 ${toneGuidance}
+${structuredContext.relationship_type || structuredContext.warmth_level || structuredContext.strategic_value ? `
+STRATEGIC CLASSIFICATION (user-set):
+${structuredContext.relationship_type ? `- Relationship Type: ${structuredContext.relationship_type}` : ''}
+${structuredContext.warmth_level ? `- Warmth Level: ${structuredContext.warmth_level}` : ''}
+${structuredContext.strategic_value ? `- Strategic Value: ${structuredContext.strategic_value}` : ''}
+
+Calibrate messaging accordingly:
+- Cold contacts: Zero familiarity, no assumptions about shared context
+- Warm contacts: Can reference shared context, more conversational
+- Hot contacts: Precision matters, be specific and relevant
+- High-value contacts: Extra care on tone, subject lines, and personalization
+- Delegate contacts: Orient around the decision-maker they represent
+` : ''}
 ${barryContextString}
 ${reconContext}
 

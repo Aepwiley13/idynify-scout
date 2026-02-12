@@ -91,6 +91,18 @@ export const handler = async (event) => {
       tenure: contact.job_start_date || 'Unknown'
     };
 
+    // Structured context fields (Step 3)
+    // These are strategic classification fields — separate from engagementIntent.
+    // relationship_type: How the user structurally classifies this contact for planning.
+    // warmth_level: Current temperature of the relationship.
+    // strategic_value: How important this contact is to current goals.
+    const structuredContext = {
+      relationship_type: contact.relationship_type || null,
+      warmth_level: contact.warmth_level || null,
+      strategic_value: contact.strategic_value || null,
+      engagement_intent: contact.engagementIntent || null
+    };
+
     // Prepare company context (if available)
     const companyContext = companyData ? {
       name: companyData.name || contact.company_name,
@@ -114,7 +126,20 @@ Seniority: ${contactSummary.seniority}
 Department: ${contactSummary.department}
 Location: ${contactSummary.location}
 LinkedIn: ${contactSummary.linkedin}
+${structuredContext.relationship_type || structuredContext.warmth_level || structuredContext.strategic_value ? `
+STRATEGIC CONTEXT (user-classified):
+${structuredContext.relationship_type ? `Relationship Type: ${structuredContext.relationship_type} (Prospect = net new, Known = existing relationship, Partner = collaborator, Delegate = gatekeeper or proxy)` : ''}
+${structuredContext.warmth_level ? `Warmth Level: ${structuredContext.warmth_level} (Cold = no prior interaction, Warm = some prior contact, Hot = active conversation)` : ''}
+${structuredContext.strategic_value ? `Strategic Value: ${structuredContext.strategic_value} (Low / Medium / High — how important this contact is to the user's current goals)` : ''}
+${structuredContext.engagement_intent ? `Engagement Intent: ${structuredContext.engagement_intent} (prospect / warm / customer / partner — relationship context for messaging)` : ''}
 
+Use these classifications to calibrate tone, depth, and framing:
+- Cold + Prospect → minimal assumptions, maximum curiosity, zero familiarity
+- Warm + Known → reference shared context, be conversational
+- Hot + High value → precision matters, be sharp and relevant
+- Delegate → orient around the person they represent, not just them
+If fields are missing, do not guess — work with what is available.
+` : ''}
 ${companyContext ? `COMPANY CONTEXT:
 Company: ${companyContext.name}
 Industry: ${companyContext.industry}

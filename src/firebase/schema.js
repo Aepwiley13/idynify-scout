@@ -246,6 +246,83 @@ export const getPath = {
  */
 
 // ============================================================================
+// STRUCTURED CONTEXT FIELDS - Schema Documentation (Step 3)
+// ============================================================================
+
+/**
+ * Contact Structured Context Fields
+ * Stored in users/{userId}/contacts/{contactId} document
+ *
+ * Strategic classification fields that feed Barry's prompt.
+ * These are SEPARATE from engagementIntent (Hunter messaging flow).
+ *
+ * engagementIntent answers: "What kind of relationship do I have right now?"
+ *   → Used in Hunter flow for immediate message tone calibration
+ *   → Values: prospect | warm | customer | partner
+ *
+ * These fields answer: "How do I structurally classify this contact for planning?"
+ *   → Used across Barry context generation and engagement intelligence
+ *
+ * Fields:
+ * {
+ *   relationship_type: 'prospect' | 'known' | 'partner' | 'delegate',
+ *     // prospect = net new contact, no prior relationship
+ *     // known = existing relationship, met before, have context
+ *     // partner = business partner, collaborator, or referral source
+ *     // delegate = gatekeeper, referral, or proxy for a decision-maker
+ *
+ *   warmth_level: 'cold' | 'warm' | 'hot',
+ *     // cold = no prior interaction, first touch
+ *     // warm = some prior interaction or mutual connection
+ *     // hot = active conversation or strong existing rapport
+ *
+ *   strategic_value: 'low' | 'medium' | 'high'
+ *     // low = low strategic importance to current goals
+ *     // medium = moderate strategic importance
+ *     // high = high strategic importance, priority contact
+ * }
+ *
+ * GUARDRAIL: Do NOT collapse relationship_type into engagementIntent.
+ * A customer you're upselling vs one you're checking in on have the
+ * same relationship_type but different engagementIntent.
+ *
+ * See: src/constants/structuredFields.js
+ */
+
+/**
+ * Campaign/Mission Structured Context Fields
+ * Stored in users/{userId}/missions/{missionId} document
+ *
+ * Strategic classification at the campaign container level.
+ * Individual tactics (schedule meeting, send email) belong at the Mission step level.
+ *
+ * Fields:
+ * {
+ *   objective_type: 'acquire' | 'activate' | 'expand' | 'retain' | 'influence' | 'partner',
+ *     // acquire = new relationship or deal
+ *     // activate = move someone from passive to engaged
+ *     // expand = upsell, deepen, or grow existing relationship
+ *     // retain = renew, maintain, or prevent churn
+ *     // influence = political, advisory, or strategic alignment
+ *     // partner = referral, collaboration, or co-creation
+ *
+ *   time_horizon: 'immediate' | 'near_term' | 'long_term' | 'ongoing',
+ *     // immediate = 0-30 days
+ *     // near_term = 1-3 months
+ *     // long_term = 3+ months
+ *     // ongoing = no defined end
+ *
+ *   strategic_priority: 'low' | 'medium' | 'high' | 'critical'
+ *     // low = handle when capacity allows
+ *     // medium = standard priority
+ *     // high = active focus
+ *     // critical = requires immediate attention
+ * }
+ *
+ * See: src/constants/structuredFields.js
+ */
+
+// ============================================================================
 // CONTACT ENRICHMENT PROVENANCE - Schema Documentation (Barry Enrichment)
 // ============================================================================
 
@@ -385,6 +462,8 @@ export const getPath = {
  * - Expandable without document size limits
  *
  * Does NOT replace or modify the legacy activity_log array.
+ * Note: ActivityHistory component (which reads activity_log) was deprecated in Step 3.
+ * EngagementTimeline is the sole engagement display surface.
  *
  * Schema:
  * {

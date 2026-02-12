@@ -1,3 +1,21 @@
+/**
+ * @deprecated — Step 3 (Feb 2026)
+ *
+ * This component is DEPRECATED. Do not import or use.
+ *
+ * Replaced by: EngagementTimeline (src/components/contacts/EngagementTimeline.jsx)
+ *
+ * ActivityHistory reads from the legacy contact.activity_log array.
+ * EngagementTimeline reads from the structured timeline subcollection:
+ *   users/{userId}/contacts/{contactId}/timeline
+ *
+ * This file is retained temporarily for reference only.
+ * Safe to delete once confirmed no other surfaces depend on it.
+ *
+ * Known former consumers:
+ *   - DetailDrawer.jsx (removed in Step 3)
+ */
+
 import React from 'react';
 import {
   Clock,

@@ -5,6 +5,8 @@ import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'fireb
 import { signOut } from 'firebase/auth';
 import { isUserAdmin } from '../utils/adminAuth';
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
+import { generateDashboardRecommendations, dismissRecommendation } from '../utils/recommendationEngine';
+import BarryRecommendationCard from '../components/hunter/BarryRecommendationCard';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
@@ -17,6 +19,8 @@ export default function MissionControlDashboardV2() {
     scoutContacts: 0,
     reconCompletion: 0
   });
+  const [recommendations, setRecommendations] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
 
   useEffect(() => {
     loadDashboardStats();
@@ -79,9 +83,44 @@ export default function MissionControlDashboardV2() {
       });
 
       setLoading(false);
+
+      // Load Barry's proactive recommendations (non-blocking)
+      loadRecommendations(userId);
     } catch (error) {
       console.error('❌ Error loading dashboard stats:', error);
       setLoading(false);
+    }
+  };
+
+  const loadRecommendations = async (userId) => {
+    try {
+      setRecommendationsLoading(true);
+      const recs = await generateDashboardRecommendations(userId);
+      setRecommendations(recs);
+    } catch (error) {
+      console.error('[Dashboard] Failed to load recommendations:', error);
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
+  const handleDismissRecommendation = async (recommendationId, reason) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const success = await dismissRecommendation(user.uid, recommendationId, reason);
+    if (success) {
+      setRecommendations(prev => prev.filter(r => r.id !== recommendationId));
+    }
+  };
+
+  const handleRecommendationAction = (recommendation) => {
+    // Route to the appropriate surface based on action type
+    if (recommendation.contactId) {
+      navigate(`/scout/contact/${recommendation.contactId}`);
+    } else if (recommendation.missionId) {
+      navigate(`/hunter/mission/${recommendation.missionId}`);
+    } else if (recommendation.campaignId) {
+      navigate('/hunter');
     }
   };
 
@@ -228,6 +267,45 @@ export default function MissionControlDashboardV2() {
             Start with <span className="text-cyan-400 font-semibold">SCOUT</span> to find companies that match your ideal customer profile, or use <span className="text-purple-400 font-semibold">RECON</span> to train Barry for better results.
           </p>
         </section>
+
+        {/* NEEDS ATTENTION — Barry's Proactive Intelligence (Step 7) */}
+        {(recommendations.length > 0 || recommendationsLoading) && (
+          <section className="mb-16">
+            <div className="flex items-center justify-center gap-3 mb-8">
+              <div className="h-px w-24 bg-gradient-to-r from-transparent to-amber-500"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🐻</span>
+                <h3 className="text-2xl font-mono text-white">Needs Attention</h3>
+              </div>
+              <div className="h-px w-24 bg-gradient-to-l from-transparent to-amber-500"></div>
+            </div>
+
+            <p className="text-center text-gray-500 text-sm font-mono mb-6">
+              Barry noticed some things that need your attention
+            </p>
+
+            {recommendationsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-3 text-gray-500">
+                  <span className="text-2xl animate-pulse">🐻</span>
+                  <span className="font-mono text-sm animate-pulse">Barry is analyzing your contacts...</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 max-w-3xl mx-auto">
+                {recommendations.map(rec => (
+                  <BarryRecommendationCard
+                    key={rec.id}
+                    recommendation={rec}
+                    onAction={handleRecommendationAction}
+                    onDismiss={handleDismissRecommendation}
+                    showCategory={true}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* MODULES */}
         <section>

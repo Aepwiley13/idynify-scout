@@ -29,7 +29,8 @@ export const WARMTH_LEVELS = [
 export const STRATEGIC_VALUES = [
   { id: 'low', label: 'Low', description: 'Low strategic importance to current goals' },
   { id: 'medium', label: 'Medium', description: 'Moderate strategic importance' },
-  { id: 'high', label: 'High', description: 'High strategic importance — priority contact' }
+  { id: 'high', label: 'High', description: 'High strategic importance — priority contact' },
+  { id: 'critical', label: 'Critical', description: 'Top priority — requires immediate attention and active engagement' }
 ];
 
 // ── Campaign Structured Fields ──────────────────────────

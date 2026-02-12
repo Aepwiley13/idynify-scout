@@ -18,6 +18,8 @@ import {
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import { getSequencePlan } from '../../utils/sequenceEngine';
+import { generateContactRecommendations, dismissRecommendation } from '../../utils/recommendationEngine';
+import BarryRecommendationCard from './BarryRecommendationCard';
 import SequencePanel from './SequencePanel';
 import './HunterContactDrawer.css';
 
@@ -76,6 +78,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   // Send result tracking (for honest UX)
   const [sendResult, setSendResult] = useState(null); // { result, message, method }
+
+  // Barry proactive recommendations (Step 7)
+  const [drawerRecommendations, setDrawerRecommendations] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -150,8 +155,29 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
       // Check Gmail connection status
       checkGmailStatus();
+
+      // Load Barry's proactive recommendations (Step 7, non-blocking)
+      loadDrawerRecommendations(user.uid, contact.id);
     } catch (error) {
       console.error('Error loading data:', error);
+    }
+  }
+
+  async function loadDrawerRecommendations(userId, contactId) {
+    try {
+      const recs = await generateContactRecommendations(userId, contactId);
+      setDrawerRecommendations(recs);
+    } catch (error) {
+      console.error('[HunterContactDrawer] Failed to load recommendations:', error);
+    }
+  }
+
+  async function handleDrawerDismissRecommendation(recommendationId, reason) {
+    const user = auth.currentUser;
+    if (!user) return;
+    const success = await dismissRecommendation(user.uid, recommendationId, reason);
+    if (success) {
+      setDrawerRecommendations(prev => prev.filter(r => r.id !== recommendationId));
     }
   }
 
@@ -505,6 +531,26 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           {/* === MAIN VIEW: Barry's Question + Chat Input === */}
           {activeView === 'main' && (
             <div className="drawer-main-view">
+              {/* Step 7: Barry's Pre-Engagement Recommendation */}
+              {drawerRecommendations.length > 0 && (
+                <div className="drawer-barry-recommendation">
+                  <div className="drawer-barry-rec-header">
+                    <span className="text-sm">🐻</span>
+                    <span className="drawer-barry-rec-label">Before you engage — here's what Barry noticed</span>
+                  </div>
+                  {drawerRecommendations.slice(0, 2).map(rec => (
+                    <BarryRecommendationCard
+                      key={rec.id}
+                      recommendation={rec}
+                      onAction={() => {}}
+                      onDismiss={handleDrawerDismissRecommendation}
+                      compact={true}
+                      showCategory={false}
+                    />
+                  ))}
+                </div>
+              )}
+
               {/* Barry's Question - Single line */}
               <div className="barry-question-section">
                 <div className="barry-avatar">

@@ -8,12 +8,19 @@
  * It does NOT touch the legacy activity_log array.
  *
  * Event Types:
- *   - message_generated       (Barry returns strategies)
- *   - message_sent            (Gmail confirmed or native handoff)
- *   - mission_assigned        (Contact added to a mission)
- *   - campaign_assigned       (Contact added to a campaign)
- *   - lead_status_changed     (Lead status updated)
- *   - contact_status_changed  (Contact state machine transition)
+ *   - message_generated        (Barry returns strategies)
+ *   - message_sent             (Gmail confirmed or native handoff)
+ *   - mission_assigned         (Contact added to a mission)
+ *   - campaign_assigned        (Contact added to a campaign)
+ *   - lead_status_changed      (Lead status updated)
+ *   - contact_status_changed   (Contact state machine transition)
+ *
+ * Step 5 — Sequence Event Types:
+ *   - sequence_step_proposed   (Barry proposes a sequence step for approval)
+ *   - sequence_step_approved   (User approved a sequence step)
+ *   - sequence_step_sent       (Approved step was executed/sent)
+ *   - sequence_step_skipped    (User skipped a sequence step)
+ *   - sequence_completed       (All steps in sequence finished)
  */
 
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
@@ -26,7 +33,13 @@ const TIMELINE_EVENT_TYPES = [
   'mission_assigned',
   'campaign_assigned',
   'lead_status_changed',
-  'contact_status_changed'
+  'contact_status_changed',
+  // Step 5: Sequence events
+  'sequence_step_proposed',
+  'sequence_step_approved',
+  'sequence_step_sent',
+  'sequence_step_skipped',
+  'sequence_completed'
 ];
 
 // Actor types

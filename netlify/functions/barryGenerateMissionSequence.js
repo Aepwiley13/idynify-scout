@@ -4,10 +4,18 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 
 /**
- * BARRY MISSION SEQUENCE GENERATOR (Step 4)
+ * BARRY MISSION SEQUENCE GENERATOR (Step 4 → Step 5 Upgrade)
  *
- * Generates a micro-sequence (2-3 approval-gated steps) based on
- * structured mission fields and contact context.
+ * Generates a 2-4 step engagement sequence plan based on structured
+ * mission fields and contact context.
+ *
+ * Step 5 changes:
+ *   - Expanded from 2-3 to 2-4 steps
+ *   - Added stepType field (message, follow_up, call, resource, introduction)
+ *   - Added suggestedTiming with day offsets for scheduling logic
+ *   - Added reasoning per step (why Barry is suggesting this step)
+ *   - Content is NOT generated here — content is generated just-in-time
+ *     via barryGenerateSequenceStep when user approves each step
  *
  * Inputs:
  *   - Mission fields: outcome_goal, engagement_style, timeframe, next_step_type
@@ -15,9 +23,10 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
  *   - RECON training data (if available)
  *
  * Output:
- *   - A 2-3 step micro-sequence with rationale
- *   - Each step: action, channel, description, timing
- *   - All steps are suggestions — user must approve each one
+ *   - A 2-4 step sequence plan with rationale
+ *   - Each step: stepType, channel, action, purpose, reasoning, timing
+ *   - All steps are suggestions — user must approve each one individually
+ *   - Actual message content generated later (just-in-time)
  */
 
 export const handler = async (event) => {
@@ -148,10 +157,12 @@ ${contactSummaries.join('\n')}${contacts.length > 5 ? `\n  ... and ${contacts.le
       apiKey: claudeApiKey
     });
 
-    // ─── Build the prompt ───
-    const prompt = `You are Barry, a strategic engagement planner. You help users plan intentional engagement sequences — not isolated messages.
+    // ─── Build the prompt (Step 5 upgrade) ───
+    const prompt = `You are Barry, a strategic engagement planner. You help users plan intentional, multi-step engagement sequences — not isolated messages.
 
-You are given structured mission parameters and optional contact context. Your job is to generate a micro-sequence: a 2-3 step plan that moves toward the stated outcome goal.
+You are given structured mission parameters and optional contact context. Your job is to generate a sequence plan: a 2-4 step engagement path that moves toward the stated outcome goal. Each step builds on the previous one.
+
+IMPORTANT: You are generating a PLAN, not content. Actual message content will be generated later for each step individually, using the latest context including what happened in previous steps. Do NOT write actual message text.
 ${reconContext}
 MISSION PARAMETERS:
 - Outcome Goal: ${goalLabels[outcome_goal] || outcome_goal}
@@ -160,33 +171,39 @@ MISSION PARAMETERS:
 - Next Step Type: ${nextStepLabels[next_step_type] || next_step_type}
 ${contactContextBlock}
 YOUR TASK:
-Generate a micro-sequence of 2-3 steps that logically progresses toward the outcome goal.
+Generate a sequence plan of 2-4 steps that logically progresses toward the outcome goal.
 
 RULES:
 1. Step 1 must align with the next_step_type (${nextStepLabels[next_step_type] || next_step_type})
 2. Each subsequent step escalates appropriately based on engagement_style
 3. Timing between steps must respect the timeframe:
-   - This Week: steps 1-2 days apart
-   - This Month: steps 3-7 days apart
-   - This Quarter: steps 1-3 weeks apart
-   - No Deadline: steps 1-2 weeks apart
-4. Light Touch sequences should be shorter and less aggressive
-5. High-Touch sequences should include more personal/direct channels
-6. Each step must have a clear purpose that builds toward the outcome
-7. All steps are SUGGESTIONS — the user approves each one individually
-8. Do NOT write actual message content — describe what each step should accomplish
-9. Be specific about channel (email, text, phone, linkedin) and action type
+   - This Week: steps 1-2 days apart, 2-3 steps total
+   - This Month: steps 3-7 days apart, 3-4 steps total
+   - This Quarter: steps 1-3 weeks apart, 3-4 steps total
+   - No Deadline: steps 1-2 weeks apart, 2-3 steps total
+4. Light Touch = fewer steps (2-3), softer channels, longer spacing
+5. High-Touch = more steps (3-4), personal/direct channels, tighter spacing
+6. Moderate = balanced (2-4 steps depending on timeframe)
+7. Each step must have a clear purpose that builds toward the outcome
+8. All steps are SUGGESTIONS — the user approves each one individually
+9. Do NOT write actual message content — describe what each step should accomplish
+10. Be specific about channel (email, text, phone, linkedin) and step type
+11. Include a reasoning field explaining WHY this step makes strategic sense at this point in the sequence
+12. stepType must be one of: message, follow_up, call, resource, introduction
 
 REQUIRED OUTPUT FORMAT (JSON):
 {
-  "sequenceRationale": "One sentence explaining why this sequence makes sense for the given parameters",
+  "sequenceRationale": "One sentence explaining why this sequence structure makes sense for the given parameters",
   "steps": [
     {
       "stepNumber": 1,
+      "stepType": "message|follow_up|call|resource|introduction",
       "action": "Brief action description (e.g., 'Send personalized email introducing value proposition')",
       "channel": "email|text|phone|linkedin|calendar",
       "purpose": "What this step accomplishes toward the outcome goal",
-      "timing": "When this should happen relative to mission start (e.g., 'Day 1', 'Day 3')",
+      "reasoning": "Why Barry recommends this specific step at this point in the sequence",
+      "suggestedTiming": "Day 0|Day 3|Day 7|etc",
+      "suggestedDayOffset": 0,
       "approvalRequired": true
     }
   ],
@@ -195,12 +212,12 @@ REQUIRED OUTPUT FORMAT (JSON):
 
 TONE: Strategic but practical. No fluff. No sales jargon. Focus on intent and progression.
 
-Generate the micro-sequence now. Respond ONLY with valid JSON.`;
+Generate the sequence plan now. Respond ONLY with valid JSON.`;
 
     // Call Claude API
     const claudeResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1200,
+      max_tokens: 1800,
       messages: [
         {
           role: 'user',
@@ -227,11 +244,24 @@ Generate the micro-sequence now. Respond ONLY with valid JSON.`;
         throw new Error('Invalid sequence structure');
       }
 
-      // Ensure all steps have approvalRequired: true (guardrail)
-      microSequence.steps = microSequence.steps.map(step => ({
+      // Guardrails: enforce approval gate and normalize step structure
+      const validStepTypes = ['message', 'follow_up', 'call', 'resource', 'introduction'];
+      microSequence.steps = microSequence.steps.map((step, idx) => ({
         ...step,
-        approvalRequired: true
+        stepNumber: idx + 1,
+        stepType: validStepTypes.includes(step.stepType) ? step.stepType : 'message',
+        suggestedDayOffset: typeof step.suggestedDayOffset === 'number' ? step.suggestedDayOffset : idx * 3,
+        reasoning: step.reasoning || step.purpose || '',
+        approvalRequired: true  // GUARDRAIL: always true, no exceptions
       }));
+
+      // Enforce 2-4 step limit
+      if (microSequence.steps.length < 2) {
+        throw new Error('Sequence must have at least 2 steps');
+      }
+      if (microSequence.steps.length > 4) {
+        microSequence.steps = microSequence.steps.slice(0, 4);
+      }
 
     } catch (parseError) {
       console.error('Error parsing Barry sequence response:', parseError);
@@ -253,6 +283,15 @@ Generate the micro-sequence now. Respond ONLY with valid JSON.`;
       }
     });
 
+    // Build the sequence plan object (Step 5 format)
+    const sequencePlan = {
+      ...microSequence,
+      totalSteps: microSequence.steps.length,
+      generatedAt: new Date().toISOString(),
+      reconEnhanced: !!reconContext,
+      missionFields: { outcome_goal, engagement_style, timeframe, next_step_type }
+    };
+
     return {
       statusCode: 200,
       headers: {
@@ -261,12 +300,9 @@ Generate the micro-sequence now. Respond ONLY with valid JSON.`;
       },
       body: JSON.stringify({
         success: true,
-        microSequence: {
-          ...microSequence,
-          generatedAt: new Date().toISOString(),
-          reconEnhanced: !!reconContext,
-          missionFields: { outcome_goal, engagement_style, timeframe, next_step_type }
-        }
+        microSequence: sequencePlan,
+        // Step 5: Also return as 'sequence' for new consumers
+        sequence: sequencePlan
       })
     };
 

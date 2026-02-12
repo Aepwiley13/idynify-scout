@@ -202,6 +202,15 @@ export default function CreateMission() {
         timeframe: timeframe,
         next_step_type: nextStepType,
         microSequence: microSequence || null,
+        // Step 5: Store sequence plan for SequenceEngine consumption
+        sequence: microSequence ? {
+          steps: microSequence.steps,
+          sequenceRationale: microSequence.sequenceRationale,
+          expectedOutcome: microSequence.expectedOutcome,
+          totalSteps: microSequence.steps?.length || 0,
+          generatedAt: microSequence.generatedAt || new Date().toISOString()
+        } : null,
+        // Step 5: Initialize per-contact sequence state
         contacts: selectedContacts.map(contact => ({
           contactId: contact.id,
           name: `${contact.firstName} ${contact.lastName}`,
@@ -210,7 +219,11 @@ export default function CreateMission() {
           currentStepIndex: 0,
           lastTouchDate: null,
           status: 'active',
-          outcomes: []
+          outcomes: [],
+          // Step 5: Sequence state fields
+          sequenceStatus: microSequence ? 'active' : 'pending',
+          stepHistory: [],
+          lastOutcome: null
         })),
         status: 'autopilot',
         createdAt: new Date().toISOString(),

@@ -6,6 +6,7 @@ import { ArrowLeft, Mail, Users, Sparkles, Loader, AlertCircle, CheckCircle, Che
 import MissionSetup from '../../components/hunter/MissionSetup';
 import TemplateLibrary from '../../components/hunter/TemplateLibrary';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
 
 export default function CreateCampaign() {
   const navigate = useNavigate();
@@ -158,6 +159,13 @@ export default function CreateCampaign() {
             campaignId: docRef.id,
             campaignName
           }
+        });
+
+        // State Machine: Campaign assigned → In Campaign
+        updateContactStatus({
+          userId: user.uid,
+          contactId: c.contactId,
+          trigger: STATUS_TRIGGERS.CAMPAIGN_ASSIGNED
         });
       });
 

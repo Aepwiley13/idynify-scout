@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, ExternalLink } from 'lucide-react';
+import { getContactStatus } from '../../utils/contactStateMachine';
 import HeroHeader from './HeroHeader';
 import QuickActions from './QuickActions';
 import ContactInfo from './ContactInfo';
@@ -61,6 +62,13 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
 
         {/* Hero Header */}
         <HeroHeader contact={contact} size="compact" />
+
+        {/* Contact Status Badge */}
+        <div style={{ padding: '0.5rem 1rem 0', display: 'flex', justifyContent: 'center' }}>
+          <span className={`contact-status-badge contact-status-${getContactStatus(contact).toLowerCase().replace(/\s+/g, '-')}`}>
+            {getContactStatus(contact)}
+          </span>
+        </div>
 
         {/* Content */}
         <div ref={contentRef} className={`contact-snapshot-content ${hasScroll ? 'has-scroll' : ''}`}>

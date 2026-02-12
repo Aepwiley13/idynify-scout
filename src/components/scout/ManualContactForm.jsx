@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc } from 'firebase/firestore';
 import { UserPlus } from 'lucide-react';
+import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [formData, setFormData] = useState({
@@ -67,6 +68,8 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
         // Scout metadata
         lead_status: 'saved',
+        contact_status: CONTACT_STATUSES.NEW,
+        contact_status_updated_at: new Date().toISOString(),
         export_ready: true,
         addedAt: new Date().toISOString(),
 

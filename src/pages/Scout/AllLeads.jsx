@@ -6,12 +6,13 @@ import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Smartphone, MoreVertical,
   Archive, Sparkles, Send, CheckCircle, Zap,
-  RefreshCcw, RotateCcw, Target
+  RefreshCcw, RotateCcw, Target, Flag
 } from 'lucide-react';
 import ContactSnapshot from '../../components/contacts/ContactSnapshot';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import { downloadVCard } from '../../utils/vcard';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS, getContactStatus, CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import './AllLeads.css';
 
 // ── Helpers ──────────────────────────────────────────────
@@ -234,6 +235,31 @@ export default function AllLeads() {
       console.error('Failed to bulk update status:', error);
     } finally {
       setStatusUpdateLoading(null);
+    }
+  }
+
+  // ── Contact Status (State Machine) ─────────────────
+
+  async function handleMarkComplete(contactId) {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const contact = contacts.find(c => c.id === contactId);
+      await updateContactStatus({
+        userId: user.uid,
+        contactId,
+        trigger: STATUS_TRIGGERS.MANUAL_COMPLETE,
+        currentStatus: getContactStatus(contact)
+      });
+
+      // Update local state
+      setContacts(prev => prev.map(c =>
+        c.id === contactId ? { ...c, contact_status: CONTACT_STATUSES.MISSION_COMPLETE } : c
+      ));
+      setMenuOpenFor(null);
+    } catch (error) {
+      console.error('Failed to mark complete:', error);
     }
   }
 
@@ -726,6 +752,15 @@ export default function AllLeads() {
                         >
                           <Smartphone className="w-4 h-4" /> Save vCard
                         </button>
+                        {getContactStatus(contact) !== CONTACT_STATUSES.MISSION_COMPLETE && (
+                          <button
+                            className="menu-item"
+                            onClick={() => handleMarkComplete(contact.id)}
+                            disabled={isUpdating}
+                          >
+                            <Flag className="w-4 h-4" /> Mark Complete
+                          </button>
+                        )}
                         <div className="menu-divider" />
                         {currentStatus === 'archived' ? (
                           <button
@@ -753,9 +788,14 @@ export default function AllLeads() {
                 <div className="card-gradient-overlay">
                   <p className="card-name">{contact.name || 'Unknown'}</p>
                   <p className="card-title">{contact.title || 'Title not available'}</p>
-                  {company?.name && (
-                    <span className="card-company-badge">{company.name}</span>
-                  )}
+                  <div className="card-badges-row">
+                    {company?.name && (
+                      <span className="card-company-badge">{company.name}</span>
+                    )}
+                    <span className={`contact-status-badge contact-status-${getContactStatus(contact).toLowerCase().replace(/\s+/g, '-')}`}>
+                      {getContactStatus(contact)}
+                    </span>
+                  </div>
                 </div>
               </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   Clock,
@@ -151,35 +151,32 @@ export default function EngagementTimeline({ contactId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadTimeline();
-  }, [contactId]);
+    const user = auth.currentUser;
+    if (!user || !contactId) {
+      setLoading(false);
+      return;
+    }
 
-  async function loadTimeline() {
-    try {
-      const user = auth.currentUser;
-      if (!user || !contactId) {
-        setLoading(false);
-        return;
-      }
+    const timelineRef = collection(
+      db, 'users', user.uid, 'contacts', contactId, 'timeline'
+    );
+    const q = query(timelineRef, orderBy('createdAt', 'desc'), limit(50));
 
-      const timelineRef = collection(
-        db, 'users', user.uid, 'contacts', contactId, 'timeline'
-      );
-      const q = query(timelineRef, orderBy('createdAt', 'desc'), limit(50));
-      const snapshot = await getDocs(q);
-
+    // Real-time listener — timeline updates instantly when events are written
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const timelineEvents = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-
       setEvents(timelineEvents);
       setLoading(false);
-    } catch (error) {
-      console.error('[Timeline] Failed to load:', error);
+    }, (error) => {
+      console.error('[Timeline] Listener error:', error);
       setLoading(false);
-    }
-  }
+    });
+
+    return () => unsubscribe();
+  }, [contactId]);
 
   if (loading) {
     return (

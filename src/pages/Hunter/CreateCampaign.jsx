@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Mail, Users, Sparkles, Loader, AlertCircle, CheckCircle, ChevronRight } from 'lucide-react';
 import MissionSetup from '../../components/hunter/MissionSetup';
@@ -167,6 +167,12 @@ export default function CreateCampaign() {
           contactId: c.contactId,
           trigger: STATUS_TRIGGERS.CAMPAIGN_ASSIGNED
         });
+
+        // Step 7: Denormalize campaignId onto contact document for read-time recommendation queries
+        updateDoc(doc(db, 'users', user.uid, 'contacts', c.contactId), {
+          campaignId: docRef.id,
+          campaignName: campaignName
+        }).catch(err => console.error('[CreateCampaign] Failed to denormalize campaignId:', err));
       });
 
       // Navigate to campaign detail

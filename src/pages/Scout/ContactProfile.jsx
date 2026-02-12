@@ -22,6 +22,7 @@ import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import EngagementTimeline from '../../components/contacts/EngagementTimeline';
 import StructuredFields from '../../components/contacts/StructuredFields';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
+import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import './ContactProfile.css';
 
@@ -609,6 +610,17 @@ export default function ContactProfile() {
             {getContactStatus(contact)}
           </span>
         </div>
+
+        {/* Barry Insight Panel — Step 7 proactive recommendations */}
+        <BarryInsightPanel
+          contactId={contact.id}
+          onAction={(rec) => {
+            // If recommendation suggests engaging, open the Hunter drawer
+            if (['re_engage', 'start_mission', 'approve_next_step', 'switch_channel', 'accelerate_sequence'].includes(rec.action.type)) {
+              setHunterDrawerOpen(true);
+            }
+          }}
+        />
 
         {/* 2. STRUCTURED CONTEXT — Strategic classification */}
         <StructuredFields contact={contact} onUpdate={handleContactUpdate} />

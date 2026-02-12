@@ -20,6 +20,7 @@ import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import EngagementTimeline from '../../components/contacts/EngagementTimeline';
+import StructuredFields from '../../components/contacts/StructuredFields';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import './ContactProfile.css';
@@ -609,7 +610,10 @@ export default function ContactProfile() {
           </span>
         </div>
 
-        {/* 2. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
+        {/* 2. STRUCTURED CONTEXT — Strategic classification */}
+        <StructuredFields contact={contact} onUpdate={handleContactUpdate} />
+
+        {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (
           <MeetSection barryContext={barryContext} contact={contact} />
         ) : generatingContext ? (
@@ -619,13 +623,13 @@ export default function ContactProfile() {
           </div>
         ) : null}
 
-        {/* 3. ACTIONS - BELOW BARRY */}
+        {/* 4. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 4. ENGAGEMENT TIMELINE - Unified chronological engagement log */}
+        {/* 5. ENGAGEMENT TIMELINE - Unified chronological engagement log */}
         <EngagementTimeline contactId={contact.id} />
 
-        {/* 5. VIEW DETAILS DRAWER - BOTTOM */}
+        {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
 

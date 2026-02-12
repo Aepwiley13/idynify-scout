@@ -1,0 +1,108 @@
+/* ============================================
+   STRUCTURED FIELDS
+   Strategic context classification for contacts.
+   Light theme — matches ContactProfile.
+   ============================================ */
+
+.structured-fields {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+/* Header */
+.structured-fields-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.structured-fields-header svg {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.sf-saving-indicator {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #9ca3af;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Grid layout */
+.structured-fields-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Individual field */
+.sf-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sf-field-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4b5563;
+  min-width: 6.5rem;
+  flex-shrink: 0;
+}
+
+/* Option buttons row */
+.sf-options {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.sf-option-btn {
+  padding: 0.3125rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.sf-option-btn:hover {
+  color: #374151;
+  border-color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.sf-option-btn.sf-option-active {
+  color: #4338ca;
+  background: #eef2ff;
+  border-color: #818cf8;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .sf-field {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+
+  .sf-field-label {
+    min-width: unset;
+  }
+}

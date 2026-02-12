@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Mail, Phone, Linkedin, MapPin, Building2, Calendar } from 'lucide-react';
 import StickyNotes from './StickyNotes';
-import ActivityHistory from './ActivityHistory';
 import './DetailDrawer.css';
 
 export default function DetailDrawer({ contact, onUpdate }) {
@@ -112,11 +111,6 @@ export default function DetailDrawer({ contact, onUpdate }) {
           {/* Sticky Notes */}
           <div className="drawer-section">
             <StickyNotes contact={contact} onUpdate={onUpdate} />
-          </div>
-
-          {/* Activity History */}
-          <div className="drawer-section">
-            <ActivityHistory contact={contact} />
           </div>
 
           {/* Metadata */}

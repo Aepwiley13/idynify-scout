@@ -21,7 +21,8 @@ import {
   Mail,
   Package,
   BarChart3,
-  Zap
+  Zap,
+  LayoutDashboard
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -159,12 +160,18 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const hunterItems = [
     {
+      icon: LayoutDashboard,
+      label: 'Dashboard',
+      sublabel: 'Operational View',
+      path: '/hunter',
+      state: { activeTab: 'dashboard' },
+      isPrimary: true
+    },
+    {
       icon: Crosshair,
       label: 'Missions',
-      sublabel: 'Active Campaigns',
       path: '/hunter',
-      state: { activeTab: 'missions' },
-      isPrimary: true
+      state: { activeTab: 'missions' }
     },
     {
       icon: Mail,

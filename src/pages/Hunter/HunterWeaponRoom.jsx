@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Target, Crosshair, Archive, BarChart3, ArrowLeft, CheckCircle, Mail } from 'lucide-react';
+import { Target, Crosshair, Archive, BarChart3, ArrowLeft, CheckCircle, Mail, LayoutDashboard } from 'lucide-react';
+import DashboardSection from './sections/DashboardSection';
 import WeaponsSection from './sections/WeaponsSection';
 import MissionsSection from './sections/MissionsSection';
 import ArsenalSection from './sections/ArsenalSection';
@@ -17,6 +18,7 @@ import './HunterWeaponRoom.css';
  * Philosophy: User stays in Hunter, navigates between sections
  *
  * Sections:
+ * - Dashboard: Operational clarity layer (Step 6 — default landing)
  * - Weapons: Build messages by type (Email/LinkedIn/Text/Event)
  * - Missions: Active campaigns
  * - Arsenal: Templates library
@@ -25,12 +27,23 @@ import './HunterWeaponRoom.css';
 
 export default function HunterWeaponRoom() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('missions'); // Default to missions tab
+  const location = useLocation();
+
+  // Support tab switching from Sidebar via location.state
+  const initialTab = location.state?.activeTab || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab); // Default to dashboard tab (Step 6)
   const [missions, setMissions] = useState([]);
   const [campaigns, setCampaigns] = useState([]); // Keep old campaigns for backward compatibility
   const [loading, setLoading] = useState(true);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState('');
+
+  // Sync tab with Sidebar navigation (location.state may change without unmount)
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state?.activeTab]);
 
   useEffect(() => {
     loadData();
@@ -153,6 +166,14 @@ export default function HunterWeaponRoom() {
       {/* Tab Navigation */}
       <div className="hunter-tabs">
         <button
+          className={`hunter-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <LayoutDashboard className="w-4 h-4" />
+          <span>Dashboard</span>
+        </button>
+
+        <button
           className={`hunter-tab ${activeTab === 'weapons' ? 'active' : ''}`}
           onClick={() => setActiveTab('weapons')}
         >
@@ -206,6 +227,7 @@ export default function HunterWeaponRoom() {
           </div>
         )}
 
+        {activeTab === 'dashboard' && <DashboardSection missions={missions} campaigns={campaigns} />}
         {activeTab === 'weapons' && <WeaponsSection />}
         {activeTab === 'missions' && <MissionsSection missions={missions} loading={false} />}
         {activeTab === 'arsenal' && <ArsenalSection />}

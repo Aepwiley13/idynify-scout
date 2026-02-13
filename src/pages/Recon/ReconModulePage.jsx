@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { initializeDashboard } from '../../utils/dashboardUtils';
 import SectionOutputModal from '../../components/recon/SectionOutputModal';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
+import './ReconModulePage.css';
 
 // Contextual tips based on module completion state
 const CONTEXTUAL_TIPS = {
@@ -228,10 +229,12 @@ export default function ReconModulePage() {
 
   if (!config) return null;
 
+  // Finding 9: Scout spinner loading state replaces pulsing text
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="text-purple-600 text-lg font-semibold animate-pulse">Loading module...</div>
+      <div className="recon-module-loading">
+        <div className="loading-spinner" />
+        <p className="loading-text">Loading module...</p>
       </div>
     );
   }
@@ -239,58 +242,47 @@ export default function ReconModulePage() {
   const completedCount = sections.filter(s => s.status === 'completed').length;
   const totalCount = sections.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  const colorMap = {
-    purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', fill: 'bg-purple-600', icon: 'text-purple-600', light: 'bg-purple-100' },
-    blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', fill: 'bg-blue-600', icon: 'text-blue-600', light: 'bg-blue-100' },
-    amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', fill: 'bg-amber-500', icon: 'text-amber-600', light: 'bg-amber-100' },
-    red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', fill: 'bg-red-600', icon: 'text-red-600', light: 'bg-red-100' },
-    emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', fill: 'bg-emerald-600', icon: 'text-emerald-600', light: 'bg-emerald-100' }
-  };
-
-  const colors = colorMap[config.color] || colorMap.purple;
+  const color = config.color;
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="recon-module-page">
       {/* Breadcrumbs */}
       <ReconBreadcrumbs />
 
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className={`w-10 h-10 rounded-xl ${colors.bg} border-2 ${colors.border} flex items-center justify-center`}>
-            <Brain className={`w-5 h-5 ${colors.icon}`} strokeWidth={2.5} />
+      <div className="recon-module-page-header">
+        <div className="recon-module-page-header-row">
+          <div className={`recon-module-page-icon ${color}`}>
+            <Brain />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
-            <p className="text-sm text-gray-500">{completedCount}/{totalCount} sections complete</p>
+            <h1 className="recon-module-page-title">{config.title}</h1>
+            <p className="recon-module-page-count">{completedCount}/{totalCount} sections complete</p>
           </div>
         </div>
-        <p className="text-gray-600 text-sm leading-relaxed mt-2">{config.description}</p>
+        <p className="recon-module-page-desc">{config.description}</p>
       </div>
 
       {/* Guidance Banner — Progressive Disclosure */}
       {config.guidance && (
-        <div className={`rounded-xl border-[1.5px] mb-6 transition-all ${
-          guidanceOpen ? `${colors.bg} ${colors.border} p-5` : 'border-gray-200 p-3'
-        }`}>
+        <div className={`recon-guidance-banner ${guidanceOpen ? `expanded ${color}` : 'collapsed'}`}>
           <button
             onClick={() => setGuidanceOpen(!guidanceOpen)}
-            className="flex items-center gap-2 w-full text-left"
+            className="recon-guidance-toggle"
             aria-expanded={guidanceOpen}
           >
-            <Info size={16} className={guidanceOpen ? colors.icon : 'text-gray-400'} />
-            <span className={`text-xs font-semibold ${guidanceOpen ? colors.text : 'text-gray-500'}`}>
+            <Info className={guidanceOpen ? color : 'collapsed'} />
+            <span className={`recon-guidance-toggle-text ${guidanceOpen ? color : 'collapsed'}`}>
               {guidanceOpen ? 'Why this module matters' : 'Why does this matter? (click to learn)'}
             </span>
           </button>
           {guidanceOpen && (
-            <div className="mt-3 space-y-2">
-              <p className="text-xs text-gray-700 leading-relaxed">
-                <span className="font-semibold">Why:</span> {config.guidance.why}
+            <div className="recon-guidance-body">
+              <p>
+                <span>Why:</span> {config.guidance.why}
               </p>
-              <p className="text-xs text-gray-700 leading-relaxed">
-                <span className="font-semibold">What you'll do:</span> {config.guidance.what}
+              <p>
+                <span>What you'll do:</span> {config.guidance.what}
               </p>
             </div>
           )}
@@ -298,14 +290,14 @@ export default function ReconModulePage() {
       )}
 
       {/* Progress */}
-      <div className="bg-white rounded-xl border-[1.5px] border-gray-200 p-4 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Module Progress</span>
-          <span className={`text-sm font-bold ${colors.text}`}>{progressPercent}%</span>
+      <div className="recon-module-progress-card">
+        <div className="recon-module-progress-header">
+          <span className="recon-module-progress-label">Module Progress</span>
+          <span className={`recon-module-progress-value ${color}`}>{progressPercent}%</span>
         </div>
-        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="recon-module-progress-bar">
           <div
-            className={`h-full ${progressPercent === 100 ? 'bg-emerald-500' : colors.fill} rounded-full transition-all duration-500`}
+            className={`recon-module-progress-bar-fill ${progressPercent === 100 ? 'complete' : color}`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -321,22 +313,16 @@ export default function ReconModulePage() {
         if (!tip) return null;
 
         const TipIcon = tip.icon;
-        const tipColors = {
-          notStarted: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-500', text: 'text-blue-700', title: 'text-blue-800' },
-          inProgress: { bg: 'bg-purple-50', border: 'border-purple-200', icon: 'text-purple-500', text: 'text-purple-700', title: 'text-purple-800' },
-          completed: { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', title: 'text-emerald-800' }
-        };
-        const tc = tipColors[tipState];
 
         return (
-          <div className={`${tc.bg} rounded-xl border-[1.5px] ${tc.border} p-4 mb-6`}>
-            <div className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0`}>
-                <TipIcon className={`w-4 h-4 ${tc.icon}`} />
+          <div className={`recon-contextual-tip ${tipState}`}>
+            <div className="recon-tip-content">
+              <div className="recon-tip-icon">
+                <TipIcon className={tipState} />
               </div>
               <div>
-                <h4 className={`text-sm font-bold ${tc.title} mb-1`}>{tip.title}</h4>
-                <p className={`text-xs ${tc.text} leading-relaxed`}>{tip.content}</p>
+                <h4 className={`recon-tip-title ${tipState}`}>{tip.title}</h4>
+                <p className={`recon-tip-text ${tipState}`}>{tip.content}</p>
               </div>
             </div>
           </div>
@@ -344,7 +330,7 @@ export default function ReconModulePage() {
       })()}
 
       {/* Sections */}
-      <div className="space-y-3 mb-8">
+      <div className="recon-sections-list">
         {sections.map((section) => {
           const isComplete = section.status === 'completed';
           const isInProgress = section.status === 'in_progress';
@@ -352,66 +338,62 @@ export default function ReconModulePage() {
           return (
             <div
               key={section.sectionId}
-              className={`bg-white rounded-xl border-[1.5px] ${
-                isComplete ? 'border-emerald-200' : 'border-gray-200'
-              } p-5 transition-all hover:shadow-md`}
+              className={`recon-section-card ${isComplete ? 'complete' : ''}`}
             >
-              <div className="flex items-start gap-4">
+              <div className="recon-section-card-content">
                 {/* Status Icon */}
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  isComplete ? 'bg-emerald-100 border border-emerald-200' :
-                  isInProgress ? `${colors.light} border ${colors.border}` :
-                  'bg-gray-100 border border-gray-200'
+                <div className={`recon-section-status-icon ${
+                  isComplete ? 'complete' :
+                  isInProgress ? `in-progress ${color}` :
+                  'not-started'
                 }`}>
                   {isComplete ? (
-                    <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />
+                    <CheckCircle2 />
                   ) : isInProgress ? (
-                    <Circle className={`w-4.5 h-4.5 ${colors.icon}`} />
+                    <Circle />
                   ) : (
-                    <AlertCircle className="w-4.5 h-4.5 text-gray-400" />
+                    <AlertCircle />
                   )}
                 </div>
 
                 {/* Section Info */}
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-base font-bold text-gray-900">{section.title}</h3>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                      isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      isInProgress ? `${colors.bg} ${colors.text} ${colors.border}` :
-                      'bg-gray-50 text-gray-500 border-gray-200'
+                <div className="recon-section-info">
+                  <div className="recon-section-info-header">
+                    <h3 className="recon-section-name">{section.title}</h3>
+                    <span className={`recon-section-status-badge ${
+                      isComplete ? 'complete' :
+                      isInProgress ? `in-progress ${color}` :
+                      'not-started'
                     }`}>
                       {isComplete ? 'Complete' : isInProgress ? 'In Progress' : 'Not Started'}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-3">{section.description}</p>
+                  <p className="recon-section-description">{section.description}</p>
 
-                  <div className="flex items-center gap-2">
+                  <div className="recon-section-actions">
                     <button
                       onClick={() => navigate(`/recon/section/${section.sectionId}`)}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                        isComplete
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                          : isInProgress
-                          ? `${colors.bg} ${colors.text} border ${colors.border} hover:opacity-90`
-                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                      className={`recon-section-btn ${
+                        isComplete ? 'complete' :
+                        isInProgress ? `in-progress ${color}` :
+                        'not-started'
                       }`}
                     >
                       {isComplete ? 'Edit Section' : isInProgress ? 'Continue' : 'Start Section'}
-                      <ChevronRight size={14} />
+                      <ChevronRight />
                     </button>
 
                     {isComplete && (
                       <button
                         onClick={() => setViewingSection(section)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-all"
+                        className="recon-section-view-btn"
                       >
                         View Output
                       </button>
                     )}
 
                     {section.estimatedTime && (
-                      <span className="text-[10px] text-gray-400 ml-2">{section.estimatedTime}</span>
+                      <span className="recon-section-time">{section.estimatedTime}</span>
                     )}
                   </div>
                 </div>
@@ -422,15 +404,15 @@ export default function ReconModulePage() {
       </div>
 
       {/* How This Module Feeds the Platform */}
-      <div className="bg-white rounded-xl border-[1.5px] border-gray-200 p-5 mb-8">
-        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">
+      <div className="recon-feeds-into">
+        <h3>
           What This Module Trains
         </h3>
-        <div className="space-y-2">
+        <div className="recon-feeds-into-list">
           {config.feedsInto.map((impact, idx) => (
-            <div key={idx} className="flex items-start gap-2">
-              <ChevronRight className={`w-3.5 h-3.5 ${colors.icon} mt-0.5 flex-shrink-0`} />
-              <p className="text-xs text-gray-600 leading-relaxed">{impact}</p>
+            <div key={idx} className="recon-feeds-into-item">
+              <ChevronRight className={color} />
+              <p>{impact}</p>
             </div>
           ))}
         </div>

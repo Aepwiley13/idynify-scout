@@ -1,0 +1,727 @@
+/* ========================================
+   RECON MODULE PAGE — CSS Module
+   Migrated from Tailwind inline classes (Finding 8)
+   Visual output must match exactly — structural refactor only
+   ======================================== */
+
+/* ── Main Container ────────────────────── */
+.recon-module-page {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ── Header ────────────────────────────── */
+.recon-module-page-header {
+  margin-bottom: 1.5rem;
+}
+
+.recon-module-page-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.recon-module-page-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  border: 2px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recon-module-page-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 2.5;
+}
+
+/* Icon color variants */
+.recon-module-page-icon.purple {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+}
+
+.recon-module-page-icon.purple svg {
+  color: #9333ea;
+}
+
+.recon-module-page-icon.blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.recon-module-page-icon.blue svg {
+  color: #2563eb;
+}
+
+.recon-module-page-icon.amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.recon-module-page-icon.amber svg {
+  color: #d97706;
+}
+
+.recon-module-page-icon.red {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.recon-module-page-icon.red svg {
+  color: #dc2626;
+}
+
+.recon-module-page-icon.emerald {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.recon-module-page-icon.emerald svg {
+  color: #059669;
+}
+
+.recon-module-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.recon-module-page-count {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.recon-module-page-desc {
+  color: #4b5563;
+  font-size: 0.875rem;
+  line-height: 1.625;
+  margin-top: 0.5rem;
+}
+
+/* ── Guidance Banner ───────────────────── */
+.recon-guidance-banner {
+  border-radius: 0.75rem;
+  border: 1.5px solid;
+  margin-bottom: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.recon-guidance-banner.collapsed {
+  border-color: #e5e7eb;
+  padding: 0.75rem;
+}
+
+.recon-guidance-banner.expanded {
+  padding: 1.25rem;
+}
+
+.recon-guidance-banner.expanded.purple {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+}
+
+.recon-guidance-banner.expanded.blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.recon-guidance-banner.expanded.amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.recon-guidance-banner.expanded.red {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.recon-guidance-banner.expanded.emerald {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.recon-guidance-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.recon-guidance-toggle svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.recon-guidance-toggle svg.collapsed {
+  color: #9ca3af;
+}
+
+.recon-guidance-toggle-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.recon-guidance-toggle-text.collapsed {
+  color: #6b7280;
+}
+
+/* Color variants for guidance toggle text */
+.recon-guidance-toggle svg.purple {
+  color: #9333ea;
+}
+
+.recon-guidance-toggle-text.purple {
+  color: #7c3aed;
+}
+
+.recon-guidance-toggle svg.blue {
+  color: #2563eb;
+}
+
+.recon-guidance-toggle-text.blue {
+  color: #2563eb;
+}
+
+.recon-guidance-toggle svg.amber {
+  color: #d97706;
+}
+
+.recon-guidance-toggle-text.amber {
+  color: #b45309;
+}
+
+.recon-guidance-toggle svg.red {
+  color: #dc2626;
+}
+
+.recon-guidance-toggle-text.red {
+  color: #dc2626;
+}
+
+.recon-guidance-toggle svg.emerald {
+  color: #059669;
+}
+
+.recon-guidance-toggle-text.emerald {
+  color: #047857;
+}
+
+.recon-guidance-body {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recon-guidance-body p {
+  font-size: 0.75rem;
+  color: #374151;
+  line-height: 1.625;
+  margin: 0;
+}
+
+.recon-guidance-body p span {
+  font-weight: 600;
+}
+
+/* ── Module Progress ───────────────────── */
+.recon-module-progress-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.recon-module-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.recon-module-progress-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recon-module-progress-value {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.recon-module-progress-value.purple { color: #7c3aed; }
+.recon-module-progress-value.blue { color: #2563eb; }
+.recon-module-progress-value.amber { color: #b45309; }
+.recon-module-progress-value.red { color: #dc2626; }
+.recon-module-progress-value.emerald { color: #047857; }
+
+.recon-module-progress-bar {
+  width: 100%;
+  height: 0.5rem;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.recon-module-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.recon-module-progress-bar-fill.complete { background: #10b981; }
+.recon-module-progress-bar-fill.purple { background: #9333ea; }
+.recon-module-progress-bar-fill.blue { background: #2563eb; }
+.recon-module-progress-bar-fill.amber { background: #f59e0b; }
+.recon-module-progress-bar-fill.red { background: #dc2626; }
+.recon-module-progress-bar-fill.emerald { background: #059669; }
+
+/* ── Contextual Tip ────────────────────── */
+.recon-contextual-tip {
+  border-radius: 0.75rem;
+  border: 1.5px solid;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.recon-contextual-tip.notStarted {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.recon-contextual-tip.inProgress {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+}
+
+.recon-contextual-tip.completed {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.recon-tip-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.recon-tip-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recon-tip-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.recon-tip-icon svg.notStarted { color: #3b82f6; }
+.recon-tip-icon svg.inProgress { color: #a855f7; }
+.recon-tip-icon svg.completed { color: #10b981; }
+
+.recon-tip-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+}
+
+.recon-tip-title.notStarted { color: #1e40af; }
+.recon-tip-title.inProgress { color: #6b21a8; }
+.recon-tip-title.completed { color: #065f46; }
+
+.recon-tip-text {
+  font-size: 0.75rem;
+  line-height: 1.625;
+  margin: 0;
+}
+
+.recon-tip-text.notStarted { color: #1d4ed8; }
+.recon-tip-text.inProgress { color: #7c3aed; }
+.recon-tip-text.completed { color: #047857; }
+
+/* ── Section Cards ─────────────────────── */
+.recon-sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.recon-section-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.recon-section-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.recon-section-card.complete {
+  border-color: #a7f3d0;
+}
+
+.recon-section-card-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.recon-section-status-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recon-section-status-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.recon-section-status-icon.complete {
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+}
+
+.recon-section-status-icon.complete svg {
+  color: #059669;
+}
+
+.recon-section-status-icon.in-progress {
+  border: 1px solid;
+}
+
+/* In-progress color variants */
+.recon-section-status-icon.in-progress.purple {
+  background: #f3e8ff;
+  border-color: #e9d5ff;
+}
+
+.recon-section-status-icon.in-progress.purple svg {
+  color: #9333ea;
+}
+
+.recon-section-status-icon.in-progress.blue {
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.recon-section-status-icon.in-progress.blue svg {
+  color: #2563eb;
+}
+
+.recon-section-status-icon.in-progress.amber {
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.recon-section-status-icon.in-progress.amber svg {
+  color: #d97706;
+}
+
+.recon-section-status-icon.in-progress.red {
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.recon-section-status-icon.in-progress.red svg {
+  color: #dc2626;
+}
+
+.recon-section-status-icon.in-progress.emerald {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+
+.recon-section-status-icon.in-progress.emerald svg {
+  color: #059669;
+}
+
+.recon-section-status-icon.not-started {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.recon-section-status-icon.not-started svg {
+  color: #9ca3af;
+}
+
+.recon-section-info {
+  flex: 1;
+}
+
+.recon-section-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.recon-section-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.recon-section-status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.recon-section-status-badge.complete {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.recon-section-status-badge.in-progress.purple {
+  background: #faf5ff;
+  color: #7c3aed;
+  border-color: #e9d5ff;
+}
+
+.recon-section-status-badge.in-progress.blue {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.recon-section-status-badge.in-progress.amber {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.recon-section-status-badge.in-progress.red {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.recon-section-status-badge.in-progress.emerald {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.recon-section-status-badge.not-started {
+  background: #f9fafb;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.recon-section-description {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 0.75rem 0;
+}
+
+.recon-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recon-section-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: 1px solid;
+  cursor: pointer;
+}
+
+.recon-section-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.recon-section-btn.complete {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.recon-section-btn.complete:hover {
+  background: #d1fae5;
+}
+
+.recon-section-btn.in-progress.purple {
+  background: #faf5ff;
+  color: #7c3aed;
+  border-color: #e9d5ff;
+}
+
+.recon-section-btn.in-progress.purple:hover {
+  opacity: 0.9;
+}
+
+.recon-section-btn.in-progress.blue {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.recon-section-btn.in-progress.amber {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.recon-section-btn.in-progress.red {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.recon-section-btn.in-progress.emerald {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.recon-section-btn.not-started {
+  background: #9333ea;
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.recon-section-btn.not-started:hover {
+  background: #7c3aed;
+}
+
+.recon-section-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #faf5ff;
+  color: #7c3aed;
+  border: 1px solid #e9d5ff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recon-section-view-btn:hover {
+  background: #f3e8ff;
+}
+
+.recon-section-time {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  margin-left: 0.5rem;
+}
+
+/* ── Feeds Into Section ────────────────── */
+.recon-feeds-into {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.recon-feeds-into h3 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.75rem 0;
+}
+
+.recon-feeds-into-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recon-feeds-into-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.recon-feeds-into-item svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.recon-feeds-into-item p {
+  font-size: 0.75rem;
+  color: #4b5563;
+  line-height: 1.625;
+  margin: 0;
+}
+
+/* ── Loading State (Scout pattern) ─────── */
+.recon-module-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1.5rem;
+  background: #ffffff;
+}
+
+.recon-module-loading .loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #9333ea;
+  border-radius: 50%;
+  animation: recon-module-spin 1s linear infinite;
+}
+
+@keyframes recon-module-spin {
+  to { transform: rotate(360deg); }
+}
+
+.recon-module-loading .loading-text {
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 500;
+}

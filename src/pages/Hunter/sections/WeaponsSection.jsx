@@ -111,9 +111,9 @@ export default function WeaponsSection() {
         </button>
         <div className="hunter-empty-state">
           <div className="hunter-empty-icon">
-            <Zap className="w-10 h-10 text-purple-400" />
+            <Zap className="w-10 h-10" style={{ color: '#a78bfa' }} />
           </div>
-          <h3 className="hunter-empty-title">Coming Soon</h3>
+          <h2 className="hunter-empty-title">Coming Soon</h2>
           <p className="hunter-empty-text">
             This weapon is under development. Stay tuned!
           </p>

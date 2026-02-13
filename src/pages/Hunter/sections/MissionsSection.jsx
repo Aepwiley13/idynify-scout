@@ -36,6 +36,7 @@ export default function MissionsSection({ missions, loading }) {
     return (
       <div className="hunter-loading">
         <div className="hunter-loading-spinner"></div>
+        <p className="hunter-loading-text">Loading missions...</p>
       </div>
     );
   }
@@ -44,9 +45,9 @@ export default function MissionsSection({ missions, loading }) {
     return (
       <div className="hunter-empty-state">
         <div className="hunter-empty-icon">
-          <Target className="w-10 h-10 text-purple-400" />
+          <Target className="w-10 h-10" style={{ color: '#a78bfa' }} />
         </div>
-        <h3 className="hunter-empty-title">No Active Missions</h3>
+        <h2 className="hunter-empty-title">No Active Missions</h2>
         <p className="hunter-empty-text">
           Create your first intent-driven mission. Tell Barry your goal, and he'll orchestrate the rest.
         </p>

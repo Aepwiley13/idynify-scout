@@ -1,0 +1,379 @@
+/* ========================================
+   BARRY TRAINING — CSS Module
+   Migrated from Tailwind inline classes (Finding 8)
+   Visual output must match exactly — structural refactor only
+   ======================================== */
+
+/* ── Main Container ────────────────────── */
+.barry-training {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ── Header ────────────────────────────── */
+.barry-training-header {
+  margin-bottom: 1.5rem;
+}
+
+.barry-training-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.barry-training-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: #f3e8ff;
+  border: 2px solid #e9d5ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.barry-training-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #9333ea;
+  stroke-width: 2.5;
+}
+
+.barry-training-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.barry-training-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ── Overall Status Card ───────────────── */
+.barry-training-status {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.barry-training-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.barry-training-stat {
+  text-align: center;
+}
+
+.barry-training-stat.bordered {
+  border-left: 1px solid #f3f4f6;
+  border-right: 1px solid #f3f4f6;
+}
+
+.barry-training-stat-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0 0 0.25rem 0;
+}
+
+.barry-training-stat-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.barry-training-stat-value.purple {
+  color: #9333ea;
+}
+
+.barry-training-stat-value.dark {
+  color: #111827;
+}
+
+.barry-training-stat-value.emerald {
+  color: #059669;
+}
+
+.barry-training-stat-value.amber {
+  color: #d97706;
+}
+
+.barry-training-stat-value.red {
+  color: #ef4444;
+}
+
+.barry-training-progress-bar {
+  width: 100%;
+  height: 0.625rem;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.barry-training-progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, #a855f7, #7c3aed);
+  border-radius: 999px;
+  transition: width 0.7s ease;
+}
+
+/* ── Training Dimensions Section ───────── */
+.barry-training-dimensions {
+  margin-bottom: 2rem;
+}
+
+.barry-training-section-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem 0;
+}
+
+.barry-training-dimensions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── Dimension Card ────────────────────── */
+.barry-dimension-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+}
+
+.barry-dimension-card.trained {
+  border-color: #a7f3d0;
+}
+
+.barry-dimension-card.partial {
+  border-color: #fde68a;
+}
+
+.barry-dimension-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.barry-dimension-status-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.barry-dimension-status-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.barry-dimension-status-icon.trained {
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+}
+
+.barry-dimension-status-icon.trained svg {
+  color: #059669;
+}
+
+.barry-dimension-status-icon.partial {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+}
+
+.barry-dimension-status-icon.partial svg {
+  color: #f59e0b;
+}
+
+.barry-dimension-status-icon.untrained {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.barry-dimension-status-icon.untrained svg {
+  color: #9ca3af;
+}
+
+.barry-dimension-info {
+  flex: 1;
+}
+
+.barry-dimension-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.barry-dimension-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.barry-dimension-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.barry-dimension-badge.trained {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.barry-dimension-badge.partial {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.barry-dimension-badge.untrained {
+  background: #f9fafb;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.barry-dimension-description {
+  font-size: 0.75rem;
+  color: #4b5563;
+  margin: 0 0 0.5rem 0;
+}
+
+.barry-dimension-impact {
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.barry-dimension-impact span {
+  font-weight: 600;
+}
+
+.barry-dimension-impact.trained {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.barry-dimension-impact.partial {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.barry-dimension-impact.untrained {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* ── What Barry Can Do Section ─────────── */
+.barry-capabilities {
+  background: #faf5ff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e9d5ff;
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.barry-capabilities h3 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #581c87;
+  margin: 0 0 0.75rem 0;
+}
+
+.barry-capabilities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.barry-capability-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.barry-capability-item svg {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.barry-capability-item svg.success {
+  color: #059669;
+}
+
+.barry-capability-item svg.info {
+  color: #a855f7;
+}
+
+.barry-capability-item p {
+  font-size: 0.75rem;
+  color: #581c87;
+  margin: 0;
+}
+
+.barry-capabilities-divider {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e9d5ff;
+}
+
+.barry-capabilities-remaining p {
+  font-size: 0.75rem;
+  color: #7c3aed;
+  margin: 0;
+}
+
+/* ── Loading State (Scout pattern) ─────── */
+.barry-training-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1.5rem;
+  background: #ffffff;
+}
+
+.barry-training-loading .loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #9333ea;
+  border-radius: 50%;
+  animation: barry-spin 1s linear infinite;
+}
+
+@keyframes barry-spin {
+  to { transform: rotate(360deg); }
+}
+
+.barry-training-loading .loading-text {
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 500;
+}

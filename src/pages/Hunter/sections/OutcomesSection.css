@@ -22,9 +22,11 @@
   transition: all 0.2s ease;
 }
 
+/* Finding 3: Solid hover border, matching Scout pattern */
 .outcome-metric-card:hover {
-  border-color: rgba(139, 92, 246, 0.4);
+  border-color: #8b5cf6;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
 }
 
 .metric-icon {

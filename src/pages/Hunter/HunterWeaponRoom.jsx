@@ -116,6 +116,7 @@ export default function HunterWeaponRoom() {
       <div className="hunter-weapon-room">
         <div className="hunter-loading">
           <div className="hunter-loading-spinner"></div>
+          <p className="hunter-loading-text">Loading Hunter...</p>
         </div>
       </div>
     );

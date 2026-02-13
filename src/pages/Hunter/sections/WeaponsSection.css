@@ -43,10 +43,11 @@
   opacity: 1;
 }
 
+/* Finding 3: Solid hover border and Scout-aligned transform */
 .weapon-card:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(139, 92, 246, 0.12);
+  border-color: #8b5cf6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
 }
 
 .weapon-card.weapon-disabled {

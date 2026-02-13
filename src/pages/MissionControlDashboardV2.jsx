@@ -372,6 +372,48 @@ export default function MissionControlDashboardV2() {
               </button>
             </div>
 
+            {/* HUNTER - Active */}
+            <div
+              onClick={() => navigate('/hunter')}
+              className="bg-gradient-to-br from-pink-900/30 via-purple-900/30 to-pink-800/30 backdrop-blur-xl rounded-2xl p-6 border-2 border-pink-500/30 relative overflow-hidden cursor-pointer hover:scale-105 transition-all duration-300 hover:border-pink-400/50 group"
+            >
+              {/* Active Badge */}
+              <div className="absolute top-4 right-4">
+                <span className="inline-block text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full font-mono font-semibold animate-pulse">
+                  ACTIVE
+                </span>
+              </div>
+
+              {/* Hunter Icon - Crosshair */}
+              <div className="relative mb-4 h-32 flex items-center justify-center">
+                <div className="relative">
+                  {/* Crosshair */}
+                  <div className="relative w-24 h-24 rounded-full border-4 border-pink-400 flex items-center justify-center group-hover:border-pink-300 transition-colors">
+                    <div className="w-1 h-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
+                    <div className="h-1 w-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
+                    <div className="w-8 h-8 rounded-full border-2 border-pink-400 group-hover:border-pink-300 transition-colors"></div>
+                    <div className="w-2 h-2 rounded-full bg-pink-400 group-hover:bg-pink-300 transition-colors animate-pulse"></div>
+                  </div>
+                  {/* Targeting marks */}
+                  <div className="absolute top-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute bottom-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute left-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                  <div className="absolute right-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
+                </div>
+              </div>
+
+              <h4 className="font-mono text-2xl mb-3 text-white font-bold">HUNTER</h4>
+
+              <p className="text-sm text-pink-200/80 mt-4 mb-8">
+                Automated outreach campaigns
+              </p>
+
+              {/* Action Button */}
+              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-mono text-sm font-bold hover:from-pink-600 hover:to-purple-700 transition-all shadow-lg">
+                Launch Hunter →
+              </button>
+            </div>
+
             {/* RECON - Active (Optional) */}
             <div
               onClick={() => navigate('/mission-control-v2/recon')}
@@ -436,48 +478,6 @@ export default function MissionControlDashboardV2() {
 
               <button className="relative w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 text-white font-mono text-sm font-bold transition-all shadow-lg shadow-purple-500/50">
                 Train AI →
-              </button>
-            </div>
-
-            {/* HUNTER - Active */}
-            <div
-              onClick={() => navigate('/hunter')}
-              className="bg-gradient-to-br from-pink-900/30 via-purple-900/30 to-pink-800/30 backdrop-blur-xl rounded-2xl p-6 border-2 border-pink-500/30 relative overflow-hidden cursor-pointer hover:scale-105 transition-all duration-300 hover:border-pink-400/50 group"
-            >
-              {/* Active Badge */}
-              <div className="absolute top-4 right-4">
-                <span className="inline-block text-xs bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full font-mono font-semibold animate-pulse">
-                  ACTIVE
-                </span>
-              </div>
-
-              {/* Hunter Icon - Crosshair */}
-              <div className="relative mb-4 h-32 flex items-center justify-center">
-                <div className="relative">
-                  {/* Crosshair */}
-                  <div className="relative w-24 h-24 rounded-full border-4 border-pink-400 flex items-center justify-center group-hover:border-pink-300 transition-colors">
-                    <div className="w-1 h-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
-                    <div className="h-1 w-full bg-pink-400 absolute group-hover:bg-pink-300 transition-colors"></div>
-                    <div className="w-8 h-8 rounded-full border-2 border-pink-400 group-hover:border-pink-300 transition-colors"></div>
-                    <div className="w-2 h-2 rounded-full bg-pink-400 group-hover:bg-pink-300 transition-colors animate-pulse"></div>
-                  </div>
-                  {/* Targeting marks */}
-                  <div className="absolute top-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
-                  <div className="absolute bottom-0 left-1/2 w-px h-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
-                  <div className="absolute left-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
-                  <div className="absolute right-0 top-1/2 h-px w-4 bg-pink-400 group-hover:bg-pink-300 transition-colors"></div>
-                </div>
-              </div>
-
-              <h4 className="font-mono text-2xl mb-3 text-white font-bold">HUNTER</h4>
-
-              <p className="text-sm text-pink-200/80 mt-4 mb-8">
-                Automated outreach campaigns
-              </p>
-
-              {/* Action Button */}
-              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-mono text-sm font-bold hover:from-pink-600 hover:to-purple-700 transition-all shadow-lg">
-                Launch Hunter →
               </button>
             </div>
 

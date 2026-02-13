@@ -11,7 +11,7 @@
   justify-content: space-between;
   margin-bottom: 3rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+  border-bottom: 1.5px solid #e5e7eb;
 }
 
 .weapon-progress {
@@ -24,14 +24,14 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(71, 85, 105, 0.3);
-  border: 2px solid rgba(71, 85, 105, 0.5);
+  background: #f3f4f6;
+  border: 2px solid #d1d5db;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.875rem;
   font-weight: 700;
-  color: #64748b;
+  color: #9ca3af;
   transition: all 0.3s ease;
 }
 
@@ -45,7 +45,7 @@
 .progress-line {
   width: 40px;
   height: 2px;
-  background: rgba(71, 85, 105, 0.3);
+  background: #e5e7eb;
   transition: all 0.3s ease;
 }
 
@@ -67,13 +67,13 @@
 .step-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: white;
+  color: #111827;
   margin: 0 0 0.75rem 0;
 }
 
 .step-description {
   font-size: 1rem;
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0;
 }
 
@@ -83,15 +83,15 @@
   justify-content: center;
   margin-top: 3rem;
   padding-top: 2rem;
-  border-top: 1px solid rgba(71, 85, 105, 0.3);
+  border-top: 1.5px solid #e5e7eb;
 }
 
 .btn-secondary {
   padding: 0.875rem 1.5rem;
-  background: rgba(71, 85, 105, 0.3);
-  border: 1px solid rgba(71, 85, 105, 0.5);
+  background: #f3f4f6;
+  border: 1.5px solid #e5e7eb;
   border-radius: 10px;
-  color: #cbd5e1;
+  color: #374151;
   font-size: 0.9375rem;
   font-weight: 700;
   cursor: pointer;
@@ -99,8 +99,8 @@
 }
 
 .btn-secondary:hover {
-  background: rgba(71, 85, 105, 0.5);
-  color: white;
+  background: #e5e7eb;
+  color: #111827;
 }
 
 /* Email Type Selection */
@@ -113,8 +113,8 @@
 
 .email-type-card {
   padding: 2rem;
-  background: rgba(30, 41, 59, 0.5);
-  border: 2px solid rgba(71, 85, 105, 0.5);
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
   border-radius: 16px;
   text-align: center;
   cursor: pointer;
@@ -122,14 +122,14 @@
 }
 
 .email-type-card:hover {
-  border-color: rgba(139, 92, 246, 0.6);
+  border-color: rgba(139, 92, 246, 0.5);
   transform: translateY(-4px);
 }
 
 .email-type-card.selected {
   border-color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.15);
-  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.2);
+  background: rgba(139, 92, 246, 0.06);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.12);
 }
 
 .email-type-icon {
@@ -140,13 +140,13 @@
 .email-type-card h3 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0 0 0.5rem 0;
 }
 
 .email-type-card p {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0;
 }
 
@@ -154,8 +154,8 @@
 .contacts-list {
   max-height: 400px;
   overflow-y: auto;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid rgba(71, 85, 105, 0.3);
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
   border-radius: 12px;
   padding: 0.5rem;
 }
@@ -165,8 +165,8 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  background: rgba(30, 41, 59, 0.3);
-  border: 2px solid transparent;
+  background: #ffffff;
+  border: 1.5px solid transparent;
   border-radius: 10px;
   margin-bottom: 0.5rem;
   cursor: pointer;
@@ -174,12 +174,12 @@
 }
 
 .contact-item:hover {
-  background: rgba(30, 41, 59, 0.6);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: #f3f4f6;
+  border-color: rgba(139, 92, 246, 0.25);
 }
 
 .contact-item.selected {
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.06);
   border-color: #8b5cf6;
 }
 
@@ -196,13 +196,13 @@
 .contact-name {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
   margin-bottom: 0.25rem;
 }
 
 .contact-meta {
   font-size: 0.8125rem;
-  color: #94a3b8;
+  color: #6b7280;
 }
 
 /* Build Method */
@@ -213,8 +213,8 @@
 
 .build-method-option {
   padding: 2rem;
-  background: rgba(30, 41, 59, 0.5);
-  border: 2px solid rgba(71, 85, 105, 0.5);
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
   border-radius: 16px;
 }
 
@@ -229,13 +229,13 @@
 .build-method-header h3 {
   font-size: 1.125rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0;
 }
 
 .build-method-option > p {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0 0 1.5rem 0;
 }
 
@@ -249,13 +249,13 @@
 .divider-line {
   flex: 1;
   height: 1px;
-  background: rgba(71, 85, 105, 0.3);
+  background: #e5e7eb;
 }
 
 .divider-text {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #64748b;
+  color: #9ca3af;
 }
 
 .campaign-name-input {
@@ -266,17 +266,17 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #374151;
   margin-bottom: 0.5rem;
 }
 
 .form-input {
   width: 100%;
   padding: 0.75rem;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  color: white;
+  color: #111827;
   font-size: 0.9375rem;
   transition: all 0.2s ease;
 }
@@ -322,15 +322,15 @@
 
 .message-review-card {
   padding: 1.5rem;
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid rgba(71, 85, 105, 0.5);
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
   border-radius: 12px;
 }
 
 .message-review-header {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+  border-bottom: 1.5px solid #e5e7eb;
 }
 
 .message-contact {
@@ -342,12 +342,12 @@
 .message-contact-name {
   font-size: 1rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
 }
 
 .message-contact-email {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #6b7280;
 }
 
 .message-review-fields {
@@ -364,16 +364,16 @@
 .form-group label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #cbd5e1;
+  color: #374151;
 }
 
 .form-textarea {
   width: 100%;
   padding: 0.75rem;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  color: white;
+  color: #111827;
   font-size: 0.9375rem;
   font-family: monospace;
   line-height: 1.6;

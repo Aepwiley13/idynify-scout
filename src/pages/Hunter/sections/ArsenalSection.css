@@ -5,8 +5,8 @@
 }
 
 .arsenal-content {
-  background: rgba(30, 41, 59, 0.3);
-  border: 1px solid rgba(71, 85, 105, 0.3);
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
   border-radius: 16px;
   padding: 2rem;
 }

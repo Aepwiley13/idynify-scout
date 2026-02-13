@@ -283,7 +283,7 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
 
         {campaignSummaries.length === 0 ? (
           <div className="dashboard-empty">
-            <Target className="w-8 h-8" style={{ color: '#475569' }} />
+            <Target className="w-8 h-8" style={{ color: '#9ca3af' }} />
             <p>No campaigns yet. Create a campaign to organize your missions.</p>
           </div>
         ) : (
@@ -428,7 +428,7 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
           {/* Empty state when all groups are empty */}
           {Object.values(filteredStatusGroups).every(g => g.length === 0) && (
             <div className="dashboard-empty">
-              <Target className="w-8 h-8" style={{ color: '#475569' }} />
+              <Target className="w-8 h-8" style={{ color: '#9ca3af' }} />
               <p>No contacts match the current filter.</p>
             </div>
           )}
@@ -446,7 +446,7 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
 
         {recentlyCompleted.length === 0 ? (
           <div className="dashboard-empty">
-            <CheckCircle className="w-8 h-8" style={{ color: '#475569' }} />
+            <CheckCircle className="w-8 h-8" style={{ color: '#9ca3af' }} />
             <p>No missions completed in the last 30 days.</p>
           </div>
         ) : (

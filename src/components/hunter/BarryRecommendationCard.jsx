@@ -196,7 +196,7 @@ function DismissOverlay({ onDismiss, onCancel, dismissing }) {
             key={reason.id}
             onClick={() => onDismiss(reason.id)}
             disabled={dismissing}
-            className="text-xs text-gray-300 hover:text-white py-2 px-3 rounded-lg border border-gray-700 hover:border-gray-500 transition-colors font-mono disabled:opacity-50"
+            className="text-xs text-gray-500 hover:text-gray-900 py-2 px-3 rounded-lg border border-gray-200 hover:border-gray-400 transition-colors font-mono disabled:opacity-50"
           >
             {reason.label}
           </button>

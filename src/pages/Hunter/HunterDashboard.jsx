@@ -82,14 +82,14 @@ export default function HunterDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-cyan-400 text-xl font-mono">Loading Hunter...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Success Toast */}
       {showSuccessToast && (
         <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
@@ -99,13 +99,13 @@ export default function HunterDashboard() {
       )}
 
       {/* Header */}
-      <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-gray-200 bg-gray-50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/mission-control-v2')}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-gray-500 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -115,7 +115,7 @@ export default function HunterDashboard() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold">Hunter</h1>
-                  <p className="text-sm text-slate-400">Outreach Execution</p>
+                  <p className="text-sm text-gray-500">Outreach Execution</p>
                 </div>
               </div>
             </div>
@@ -143,7 +143,7 @@ export default function HunterDashboard() {
                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-all ${
                   gmailConnected
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 shadow-lg'
-                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
                 <Plus className="w-5 h-5" />
@@ -165,7 +165,7 @@ export default function HunterDashboard() {
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-bold mb-2">Connect Gmail to Start Sending</h3>
-                <p className="text-slate-300 mb-4">
+                <p className="text-gray-700 mb-4">
                   Hunter sends emails directly from your Gmail account. Connect your Gmail to create campaigns and send personalized outreach.
                 </p>
                 <button
@@ -184,12 +184,12 @@ export default function HunterDashboard() {
           <h2 className="text-xl font-bold mb-4">Campaigns</h2>
 
           {campaigns.length === 0 ? (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-slate-500" />
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-bold mb-2">No campaigns yet</h3>
-              <p className="text-slate-400 mb-6">
+              <p className="text-gray-500 mb-6">
                 {gmailConnected
                   ? "Create your first campaign to start outreach!"
                   : "Connect Gmail to create your first campaign"
@@ -209,16 +209,16 @@ export default function HunterDashboard() {
               {campaigns.map(campaign => {
                 const stats = getCampaignStats(campaign);
                 const statusColor = {
-                  draft: 'text-slate-400 bg-slate-700/50',
+                  draft: 'text-gray-500 bg-gray-100',
                   in_progress: 'text-blue-400 bg-blue-500/20',
                   completed: 'text-green-400 bg-green-500/20'
-                }[campaign.status] || 'text-slate-400 bg-slate-700/50';
+                }[campaign.status] || 'text-gray-500 bg-gray-100';
 
                 return (
                   <div
                     key={campaign.id}
                     onClick={() => navigate(`/hunter/campaign/${campaign.id}`)}
-                    className="bg-slate-800/50 border border-slate-700 hover:border-slate-600 rounded-xl p-6 cursor-pointer transition-all hover:bg-slate-800/70"
+                    className="bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-xl p-6 cursor-pointer transition-all hover:bg-gray-100"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -235,7 +235,7 @@ export default function HunterDashboard() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-6 text-sm text-slate-400">
+                        <div className="flex items-center gap-6 text-sm text-gray-500">
                           <span className="flex items-center gap-2">
                             <Mail className="w-4 h-4" />
                             {stats.total} contacts
@@ -245,13 +245,13 @@ export default function HunterDashboard() {
                             {stats.sent} sent
                           </span>
                           <span className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-slate-400" />
+                            <Clock className="w-4 h-4 text-gray-500" />
                             {stats.pending} pending
                           </span>
                         </div>
                       </div>
 
-                      <div className="text-right text-sm text-slate-500">
+                      <div className="text-right text-sm text-gray-400">
                         {new Date(campaign.createdAt).toLocaleDateString()}
                       </div>
                     </div>

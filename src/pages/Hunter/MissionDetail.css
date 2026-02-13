@@ -4,7 +4,7 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-  color: white;
+  color: #111827;
 }
 
 .mission-detail-loading,
@@ -14,7 +14,7 @@
   align-items: center;
   gap: 1rem;
   padding: 4rem 2rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   text-align: center;
 }
 
@@ -31,14 +31,14 @@
   padding: 0.5rem 0;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  color: #6b7280;
   font-size: 0.85rem;
   cursor: pointer;
   margin-bottom: 1rem;
 }
 
 .btn-back-mission:hover {
-  color: rgba(255, 255, 255, 0.8);
+  color: #111827;
 }
 
 .mission-detail-title-section {
@@ -51,7 +51,7 @@
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
-  color: white;
+  color: #111827;
 }
 
 .mission-detail-status {
@@ -59,8 +59,8 @@
   font-weight: 500;
   padding: 0.125rem 0.5rem;
   border-radius: 100px;
-  background: rgba(168, 85, 247, 0.15);
-  color: rgba(168, 85, 247, 0.9);
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
   text-transform: capitalize;
 }
 
@@ -69,8 +69,8 @@
 .mission-strategy-card,
 .mission-sequence-card,
 .mission-contacts-card {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(168, 85, 247, 0.15);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 12px;
   padding: 1.25rem;
   margin-bottom: 1.25rem;
@@ -84,7 +84,7 @@
   gap: 0.5rem;
   font-size: 1rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   margin: 0 0 1rem;
 }
 
@@ -105,14 +105,14 @@
 .strategy-label {
   font-size: 0.7rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .strategy-value {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #374151;
   font-weight: 500;
 }
 
@@ -120,7 +120,7 @@
 
 .sequence-rationale {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   margin: 0 0 1rem;
   line-height: 1.4;
   font-style: italic;
@@ -149,7 +149,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.1);
   color: #a855f7;
   font-size: 0.7rem;
   font-weight: 700;
@@ -157,7 +157,7 @@
 }
 
 .plan-step-icon {
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   flex-shrink: 0;
 }
 
@@ -170,13 +170,13 @@
 
 .plan-step-action {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #374151;
   font-weight: 500;
 }
 
 .plan-step-meta {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   text-transform: capitalize;
 }
 
@@ -184,7 +184,7 @@
 
 .contacts-empty {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   padding: 1rem 0;
 }
 
@@ -199,8 +199,8 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
-  background: rgba(15, 23, 42, 0.4);
-  border: 1px solid rgba(148, 163, 184, 0.08);
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
   border-radius: 8px;
 }
 
@@ -215,7 +215,7 @@
 .contact-progress-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -223,7 +223,7 @@
 
 .contact-progress-email {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -259,7 +259,7 @@
 
 .contact-last-outcome {
   font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
 }
 
 .contact-progress-action {
@@ -275,7 +275,7 @@
 
 .action-hint-outcome {
   background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  color: #d97706;
 }
 
 .action-hint-ready {
@@ -294,7 +294,7 @@
   border: 1px solid rgba(168, 85, 247, 0.1);
   border-radius: 10px;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #374151;
   line-height: 1.4;
 }
 

@@ -6,7 +6,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -16,8 +16,8 @@
 }
 
 .hunter-contact-drawer {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #ffffff !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 16px;
   width: 90%;
   max-width: 600px;
@@ -25,7 +25,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.3s ease;
 }
 
@@ -55,8 +55,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
-  background: rgba(168, 85, 247, 0.05);
+  border-bottom: 1.5px solid rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 .drawer-title-section {
@@ -68,30 +68,30 @@
 .drawer-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0;
 }
 
 .drawer-subtitle {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   margin: 0;
 }
 
 .btn-close-drawer {
   background: transparent;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
   padding: 0.5rem;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   transition: all 0.2s;
 }
 
 .btn-close-drawer:hover {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
-  color: white;
+  color: #111827;
 }
 
 /* Content */
@@ -136,7 +136,7 @@
 .barry-question {
   font-size: 1.125rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
   margin: 0;
   padding-top: 0.5rem;
   line-height: 1.4;
@@ -154,10 +154,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 12px;
-  color: white;
+  color: #111827;
   cursor: pointer;
   font-size: 1rem;
   font-weight: 500;
@@ -178,7 +178,7 @@
 }
 
 .quick-action-btn:hover {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateX(4px);
 }
@@ -194,7 +194,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: #f9fafb;
   border-radius: 8px;
   margin-top: 0.5rem;
 }
@@ -204,7 +204,7 @@
   align-items: center;
   gap: 0.625rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
 }
 
 .info-row-subtle svg {
@@ -216,7 +216,7 @@
   margin-left: auto;
   padding: 0.25rem 0.625rem;
   background: transparent;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 4px;
   color: #a855f7;
   font-size: 0.75rem;
@@ -226,7 +226,7 @@
 }
 
 .btn-add-subtle:hover {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
 }
 
@@ -261,7 +261,7 @@
 }
 
 .btn-add-mission-subtle:hover {
-  background: rgba(168, 85, 247, 0.08);
+  background: rgba(168, 85, 247, 0.06);
   border-color: #a855f7;
   color: #a855f7;
 }
@@ -278,8 +278,8 @@
   flex-direction: column;
   gap: 0.25rem;
   padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 12px;
   cursor: pointer;
   text-align: left;
@@ -287,7 +287,7 @@
 }
 
 .intent-option-btn:hover {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateX(4px);
 }
@@ -295,12 +295,12 @@
 .intent-label {
   font-size: 1rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
 }
 
 .intent-description {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
 }
 
 /* Skip Button */
@@ -309,7 +309,7 @@
   padding: 0.625rem 1.25rem;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -317,7 +317,7 @@
 }
 
 .btn-skip:hover {
-  color: rgba(255, 255, 255, 0.8);
+  color: #6b7280;
 }
 
 /* Intent Input Section - PRIMARY INTERFACE */
@@ -330,10 +330,10 @@
 .intent-input {
   width: 100%;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(168, 85, 247, 0.4);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.4);
   border-radius: 12px;
-  color: white;
+  color: #111827;
   font-size: 1rem;
   line-height: 1.5;
   font-family: inherit;
@@ -344,12 +344,12 @@
 .intent-input:focus {
   outline: none;
   border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.08);
+  background: rgba(168, 85, 247, 0.04);
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
 }
 
 .intent-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   font-size: 0.9rem;
 }
 
@@ -369,8 +369,8 @@
   flex-direction: column;
   gap: 0.625rem;
   padding: 1.125rem 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 12px;
   cursor: pointer;
   text-align: left;
@@ -378,7 +378,7 @@
 }
 
 .message-option-card:hover {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateX(4px);
 }
@@ -414,21 +414,21 @@
   color: rgba(168, 85, 247, 0.9);
   margin: 0;
   padding: 0.375rem 0.625rem;
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-radius: 4px;
   font-weight: 500;
 }
 
 .option-preview {
   font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #111827;
   line-height: 1.5;
   margin: 0;
 }
 
 .option-reasoning {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   line-height: 1.4;
   margin: 0;
   padding-top: 0.5rem;
@@ -453,7 +453,7 @@
 
 .loading-state p {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   margin: 0;
 }
 
@@ -477,7 +477,7 @@
 .error-icon {
   width: 48px;
   height: 48px;
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -489,7 +489,7 @@
 
 .error-message {
   font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: #6b7280;
   margin: 0;
   max-width: 400px;
 }
@@ -500,7 +500,7 @@
   flex-direction: column;
   gap: 0.375rem;
   padding: 0.75rem 1rem;
-  background: rgba(168, 85, 247, 0.08);
+  background: rgba(168, 85, 247, 0.06);
   border-radius: 8px;
   border-left: 3px solid #a855f7;
 }
@@ -515,14 +515,14 @@
 
 .intent-text-small {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   line-height: 1.4;
 }
 
 /* Legacy Contact Info Status (keep for backwards compatibility) */
 .contact-info-status {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
   padding: 1rem;
   display: flex;
@@ -534,7 +534,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: #6b7280;
   font-size: 0.9rem;
 }
 
@@ -549,8 +549,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.375rem 0.75rem;
-  background: rgba(168, 85, 247, 0.1);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.08);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 6px;
   color: #a855f7;
   font-size: 0.85rem;
@@ -561,7 +561,7 @@
 
 .btn-add-info:hover,
 .btn-edit-info:hover {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.15);
   border-color: #a855f7;
 }
 
@@ -575,7 +575,7 @@
 .section-title {
   font-size: 1rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
   margin: 0;
 }
 
@@ -587,8 +587,8 @@
 }
 
 .mission-item {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
   padding: 1rem;
   display: flex;
@@ -605,13 +605,13 @@
 .mission-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
 }
 
 .mission-goal {
   font-size: 0.8rem;
   color: #a855f7;
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
 }
@@ -621,7 +621,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
 }
 
 .mission-item-status svg {
@@ -659,13 +659,13 @@
 }
 
 .action-btn.secondary {
-  background: rgba(168, 85, 247, 0.1);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.08);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   color: #a855f7;
 }
 
 .action-btn.secondary:hover {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.15);
   border-color: #a855f7;
 }
 
@@ -681,7 +681,7 @@
   align-self: flex-start;
   padding: 0.5rem 1rem;
   background: transparent;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
   color: #a855f7;
   cursor: pointer;
@@ -691,27 +691,27 @@
 }
 
 .btn-back:hover {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
 }
 
 .view-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0;
 }
 
 .view-description {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   margin: 0;
 }
 
 /* Mission Select Items */
 .mission-select-item {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
   padding: 1rem;
   cursor: pointer;
@@ -722,7 +722,7 @@
 }
 
 .mission-select-item:hover {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateX(4px);
 }
@@ -737,7 +737,7 @@
   display: flex;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
 }
 
 /* Edit Form */
@@ -756,15 +756,15 @@
 .form-group label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
 }
 
 .form-input {
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: white;
+  color: #111827;
   font-size: 1rem;
   transition: all 0.2s;
 }
@@ -772,11 +772,11 @@
 .form-input:focus {
   outline: none;
   border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 .form-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: #9ca3af;
 }
 
 .btn-primary-hunter {
@@ -818,10 +818,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
-  color: white;
+  color: #111827;
   cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
@@ -829,7 +829,7 @@
 }
 
 .quick-message-btn:hover:not(:disabled) {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateX(4px);
 }
@@ -867,10 +867,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: rgba(168, 85, 247, 0.08);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.06);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 10px;
-  color: white;
+  color: #111827;
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 500;
@@ -884,7 +884,7 @@
 }
 
 .suggestion-button:hover {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.1);
   border-color: #a855f7;
   transform: translateX(4px);
 }
@@ -896,14 +896,14 @@
 .barry-fallback {
   padding: 1.5rem;
   text-align: center;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
 }
 
 .barry-thinking {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   font-style: italic;
 }
 
@@ -921,10 +921,10 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1.5rem 1rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 12px;
-  color: white;
+  color: #111827;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
@@ -937,7 +937,7 @@
 }
 
 .weapon-btn:hover:not(:disabled) {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateY(-2px);
 }
@@ -949,7 +949,7 @@
 
 .weapon-disabled {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   font-weight: 500;
 }
 
@@ -959,25 +959,25 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
 }
 
 .message-preview-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
+  color: #6b7280;
   margin: 0;
 }
 
 .message-preview-text {
   width: 100%;
   padding: 0.875rem;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: white;
+  color: #111827;
   font-size: 0.95rem;
   line-height: 1.6;
   font-family: inherit;
@@ -988,7 +988,7 @@
 .message-preview-text:focus {
   outline: none;
   border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.08);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 /* Strategy Reasoning */
@@ -997,7 +997,7 @@
   align-items: flex-start;
   gap: 0.625rem;
   padding: 0.75rem 1rem;
-  background: rgba(168, 85, 247, 0.08);
+  background: rgba(168, 85, 247, 0.06);
   border-radius: 8px;
   border-left: 3px solid #a855f7;
 }
@@ -1010,7 +1010,7 @@
 
 .strategy-reasoning span {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: #6b7280;
   line-height: 1.4;
   font-style: italic;
 }
@@ -1019,10 +1019,10 @@
 .subject-input {
   width: 100%;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: white;
+  color: #111827;
   font-size: 0.95rem;
   font-family: inherit;
   transition: all 0.2s;
@@ -1032,16 +1032,16 @@
 .subject-input:focus {
   outline: none;
   border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.08);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 .subject-input-review {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: white;
+  color: #111827;
   font-size: 1rem;
   font-family: inherit;
   transition: all 0.2s;
@@ -1051,7 +1051,7 @@
 .subject-input-review:focus {
   outline: none;
   border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.06);
 }
 
 .btn-edit-inline {
@@ -1061,7 +1061,7 @@
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   background: transparent;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 6px;
   color: #a855f7;
   font-size: 0.85rem;
@@ -1071,7 +1071,7 @@
 }
 
 .btn-edit-inline:hover {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
 }
 
@@ -1085,16 +1085,16 @@
 .message-review label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
 }
 
 .message-textarea {
   width: 100%;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: #ffffff;
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 10px;
-  color: white;
+  color: #111827;
   font-size: 1rem;
   line-height: 1.6;
   font-family: inherit;
@@ -1105,12 +1105,12 @@
 .message-textarea:focus {
   outline: none;
   border-color: #a855f7;
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 .character-count {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   text-align: right;
 }
 
@@ -1131,15 +1131,15 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1.5rem 1rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .goal-card-drawer:hover {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
   transform: translateY(-2px);
 }
@@ -1151,7 +1151,7 @@
 .goal-name-drawer {
   font-size: 0.95rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
   text-align: center;
 }
 
@@ -1165,7 +1165,7 @@
 .message-input-section label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: white;
+  color: #111827;
 }
 
 /* Suggestions Fallback */
@@ -1174,24 +1174,24 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(168, 85, 247, 0.15);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 10px;
 }
 
 .suggestions-label {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #6b7280;
   font-weight: 600;
   margin: 0;
 }
 
 .suggestion-chip {
   padding: 0.75rem 1rem;
-  background: rgba(168, 85, 247, 0.08);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.06);
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
@@ -1199,7 +1199,7 @@
 }
 
 .suggestion-chip:hover {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.1);
   border-color: #a855f7;
 }
 
@@ -1216,7 +1216,7 @@
 .success-icon {
   width: 80px;
   height: 80px;
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1242,13 +1242,13 @@
 .success-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0;
 }
 
 .success-description {
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #6b7280;
   margin: 0;
   max-width: 400px;
 }
@@ -1267,8 +1267,8 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 0.875rem 1.5rem;
-  background: rgba(168, 85, 247, 0.1);
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.08);
+  border: 1.5px solid rgba(168, 85, 247, 0.3);
   color: #a855f7;
   border-radius: 8px;
   cursor: pointer;
@@ -1278,7 +1278,7 @@
 }
 
 .btn-secondary:hover {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.15);
   border-color: #a855f7;
   transform: translateY(-1px);
 }
@@ -1290,7 +1290,7 @@
   font-size: 0.65rem;
   font-weight: 700;
   color: #10b981;
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(16, 185, 129, 0.1);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
   text-transform: uppercase;
@@ -1300,8 +1300,8 @@
 .weapon-badge-alt {
   font-size: 0.65rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.05);
+  color: #9ca3af;
+  background: #f3f4f6;
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
 }
@@ -1312,8 +1312,8 @@
   align-items: flex-start;
   gap: 0.625rem;
   padding: 0.75rem 1rem;
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1.5px solid rgba(251, 191, 36, 0.3);
   border-radius: 8px;
   margin-bottom: 0.5rem;
 }
@@ -1326,7 +1326,7 @@
 
 .handoff-notice span {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   line-height: 1.4;
 }
 
@@ -1336,8 +1336,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+  border: 1.5px solid rgba(16, 185, 129, 0.3);
   border-radius: 8px;
   margin-bottom: 0.5rem;
 }
@@ -1349,12 +1349,12 @@
 
 .gmail-connected-notice span {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
 }
 
 /* Success Icon Variants */
 .success-icon-sent {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .success-icon-sent svg {
@@ -1362,7 +1362,7 @@
 }
 
 .success-icon-opened {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .success-icon-opened svg {
@@ -1370,7 +1370,7 @@
 }
 
 .success-icon-failed {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .success-icon-failed svg {
@@ -1378,7 +1378,7 @@
 }
 
 .success-icon-unavailable {
-  background: rgba(156, 163, 175, 0.2);
+  background: rgba(156, 163, 175, 0.1);
 }
 
 .success-icon-unavailable svg {
@@ -1388,7 +1388,7 @@
 /* Success Detail Text */
 .success-detail {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   margin: 0;
   font-style: italic;
 }
@@ -1402,7 +1402,7 @@
   color: rgba(251, 191, 36, 0.9);
   margin: 0;
   padding: 0.5rem 0.75rem;
-  background: rgba(251, 191, 36, 0.1);
+  background: rgba(251, 191, 36, 0.08);
   border-radius: 6px;
 }
 
@@ -1457,7 +1457,7 @@
   gap: 8px;
   padding: 12px;
   background: rgba(6, 182, 212, 0.05);
-  border: 1px solid rgba(6, 182, 212, 0.2);
+  border: 1.5px solid rgba(6, 182, 212, 0.2);
   border-radius: 12px;
 }
 

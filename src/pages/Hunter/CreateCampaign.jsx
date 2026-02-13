@@ -221,11 +221,11 @@ export default function CreateCampaign() {
 
   if (!gmailConnected && error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center">
-        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 max-w-md">
+      <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 max-w-md">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-center mb-2">Gmail Not Connected</h2>
-          <p className="text-slate-400 text-center mb-6">{error}</p>
+          <p className="text-gray-500 text-center mb-6">{error}</p>
           <button
             onClick={() => navigate('/hunter')}
             className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg font-bold transition-colors"
@@ -238,15 +238,15 @@ export default function CreateCampaign() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
-      <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-gray-200 bg-gray-50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/hunter')}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-gray-500 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -255,23 +255,23 @@ export default function CreateCampaign() {
 
             {/* Step Indicator */}
             <div className="flex items-center gap-2 text-sm">
-              <div className={`px-3 py-1 rounded-full ${step >= 1 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
+              <div className={`px-3 py-1 rounded-full ${step >= 1 ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-200 text-gray-400'}`}>
                 1. Details
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-              <div className={`px-3 py-1 rounded-full ${step >= 2 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <div className={`px-3 py-1 rounded-full ${step >= 2 ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-200 text-gray-400'}`}>
                 2. Mission
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-              <div className={`px-3 py-1 rounded-full ${step >= 3 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <div className={`px-3 py-1 rounded-full ${step >= 3 ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-200 text-gray-400'}`}>
                 3. Contacts
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-              <div className={`px-3 py-1 rounded-full ${step >= 4 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <div className={`px-3 py-1 rounded-full ${step >= 4 ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-200 text-gray-400'}`}>
                 4. Generate
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-              <div className={`px-3 py-1 rounded-full ${step >= 5 ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-500'}`}>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <div className={`px-3 py-1 rounded-full ${step >= 5 ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-200 text-gray-400'}`}>
                 5. Review
               </div>
             </div>
@@ -290,7 +290,7 @@ export default function CreateCampaign() {
 
         {/* Step 1: Campaign Details */}
         {step === 1 && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8">
             <h2 className="text-2xl font-bold mb-6">Campaign Details</h2>
 
             <div className="space-y-6">
@@ -301,7 +301,7 @@ export default function CreateCampaign() {
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
                   placeholder="e.g., Q1 Enterprise Outreach"
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
                 />
               </div>
 
@@ -310,8 +310,8 @@ export default function CreateCampaign() {
                 disabled={!campaignName.trim()}
                 className={`w-full px-6 py-3 rounded-lg font-bold transition-all ${
                   campaignName.trim()
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
-                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
                 Next: Mission Setup
@@ -333,7 +333,7 @@ export default function CreateCampaign() {
           <div className="mt-6 flex gap-4 max-w-5xl mx-auto">
             <button
               onClick={() => setStep(1)}
-              className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
+              className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-100 rounded-lg font-bold transition-colors"
             >
               Back
             </button>
@@ -342,8 +342,8 @@ export default function CreateCampaign() {
               disabled={!engagementIntent}
               className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
                 engagementIntent
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
               Next: Select Contacts
@@ -353,9 +353,9 @@ export default function CreateCampaign() {
 
         {/* Step 3: Select Contacts */}
         {step === 3 && (
-          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8">
             <h2 className="text-2xl font-bold mb-2">Select Contacts</h2>
-            <p className="text-slate-400 mb-6">{selectedContactIds.length} contacts selected</p>
+            <p className="text-gray-500 mb-6">{selectedContactIds.length} contacts selected</p>
 
             {selectedContactIds.length > 25 && (
               <div className="mb-6 bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 flex items-center gap-3">
@@ -372,7 +372,7 @@ export default function CreateCampaign() {
                   className={`p-4 border rounded-lg cursor-pointer transition-all ${
                     selectedContactIds.includes(contact.id)
                       ? 'bg-purple-500/20 border-purple-500/50'
-                      : 'bg-slate-900/50 border-slate-700 hover:border-slate-600'
+                      : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -384,7 +384,7 @@ export default function CreateCampaign() {
                     />
                     <div className="flex-1">
                       <div className="font-medium">{contact.name}</div>
-                      <div className="text-sm text-slate-400">
+                      <div className="text-sm text-gray-500">
                         {contact.title && `${contact.title} • `}
                         {contact.company_name}
                         {contact.email && ` • ${contact.email}`}
@@ -398,7 +398,7 @@ export default function CreateCampaign() {
             <div className="flex gap-4">
               <button
                 onClick={() => setStep(2)}
-                className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
+                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-100 rounded-lg font-bold transition-colors"
               >
                 Back
               </button>
@@ -407,8 +407,8 @@ export default function CreateCampaign() {
                 disabled={selectedContactIds.length === 0}
                 className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
                   selectedContactIds.length > 0
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700'
-                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
                 Next: Generate Messages
@@ -428,39 +428,39 @@ export default function CreateCampaign() {
 
             {/* OR divider */}
             <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-slate-700"></div>
-              <span className="text-sm text-slate-500">OR</span>
-              <div className="flex-1 h-px bg-slate-700"></div>
+              <div className="flex-1 h-px bg-gray-200"></div>
+              <span className="text-sm text-gray-400">OR</span>
+              <div className="flex-1 h-px bg-gray-200"></div>
             </div>
 
             {/* AI Generation */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 text-center">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center">
               <h2 className="text-2xl font-bold mb-6">Generate Personalized Messages</h2>
 
               <div className="mb-8">
                 <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="w-8 h-8 text-purple-400" />
                 </div>
-                <p className="text-slate-300 mb-2">Ready to generate {selectedContactIds.length} personalized emails</p>
-                <p className="text-sm text-slate-400">Using AI + RECON intelligence</p>
+                <p className="text-gray-700 mb-2">Ready to generate {selectedContactIds.length} personalized emails</p>
+                <p className="text-sm text-gray-500">Using AI + RECON intelligence</p>
               </div>
 
               {loading ? (
                 <div>
                   <Loader className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-4" />
-                  <p className="text-slate-400">Generating personalized messages...</p>
+                  <p className="text-gray-500">Generating personalized messages...</p>
                 </div>
               ) : (
                 <div className="flex gap-4">
                   <button
                     onClick={() => setStep(3)}
-                    className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
+                    className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-100 rounded-lg font-bold transition-colors"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleGenerateMessages}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg font-bold transition-all flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
                   >
                     <Sparkles className="w-5 h-5" />
                     Generate Messages
@@ -474,11 +474,11 @@ export default function CreateCampaign() {
         {/* Step 5: Review & Edit Messages */}
         {step === 5 && (
           <div>
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 mb-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold mb-2">Review Messages</h2>
-                  <p className="text-slate-400">Edit any message before saving</p>
+                  <p className="text-gray-500">Edit any message before saving</p>
                 </div>
                 {reconUsed && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-lg">
@@ -491,14 +491,14 @@ export default function CreateCampaign() {
 
             <div className="space-y-6 mb-6">
               {messages.map((message, index) => (
-                <div key={index} className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+                <div key={index} className="bg-gray-50 border border-gray-200 rounded-xl p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
                       <Mail className="w-5 h-5 text-purple-400" />
                     </div>
                     <div>
                       <div className="font-medium">{message.contactName}</div>
-                      <div className="text-sm text-slate-400">{message.contactEmail}</div>
+                      <div className="text-sm text-gray-500">{message.contactEmail}</div>
                     </div>
                   </div>
 
@@ -509,7 +509,7 @@ export default function CreateCampaign() {
                         type="text"
                         value={message.subject}
                         onChange={(e) => updateMessage(index, 'subject', e.target.value)}
-                        className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
                       />
                     </div>
 
@@ -519,9 +519,9 @@ export default function CreateCampaign() {
                         value={message.body}
                         onChange={(e) => updateMessage(index, 'body', e.target.value)}
                         rows={8}
-                        className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
                       />
-                      <div className="text-xs text-slate-500 mt-1">{message.body.length} characters</div>
+                      <div className="text-xs text-gray-400 mt-1">{message.body.length} characters</div>
                     </div>
                   </div>
                 </div>
@@ -531,14 +531,14 @@ export default function CreateCampaign() {
             <div className="flex gap-4">
               <button
                 onClick={() => setStep(4)}
-                className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-colors"
+                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-100 rounded-lg font-bold transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleSaveCampaign}
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg font-bold transition-all flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>

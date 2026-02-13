@@ -146,9 +146,9 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
 
       {filteredTemplates.length === 0 ? (
         <div className="template-library-empty">
-          <FileText className="w-12 h-12 text-slate-600 mb-3" />
-          <p className="text-slate-400">No templates yet</p>
-          <p className="text-sm text-slate-500">Create your first template to speed up campaign creation</p>
+          <FileText className="w-12 h-12 text-gray-400 mb-3" />
+          <p className="text-gray-500">No templates yet</p>
+          <p className="text-sm text-gray-400">Create your first template to speed up campaign creation</p>
         </div>
       ) : (
         <div className="template-library-grid">

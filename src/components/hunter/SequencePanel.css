@@ -2,7 +2,7 @@
 
 .sequence-panel {
   margin-top: 1rem;
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
   background: rgba(168, 85, 247, 0.03);
   overflow: hidden;
@@ -13,14 +13,14 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
-  background: rgba(168, 85, 247, 0.05);
+  border-bottom: 1.5px solid rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 .sequence-panel-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   flex: 1;
 }
 
@@ -61,34 +61,34 @@
 }
 
 .progress-step-dot.upcoming {
-  background: rgba(148, 163, 184, 0.15);
+  background: rgba(148, 163, 184, 0.1);
   color: rgba(148, 163, 184, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
 }
 
 .progress-step-dot.current {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.12);
   color: #a855f7;
   border: 2px solid rgba(168, 85, 247, 0.6);
-  box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.2);
 }
 
 .progress-step-dot.approved {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.1);
   color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  border: 1.5px solid rgba(59, 130, 246, 0.4);
 }
 
 .progress-step-dot.sent {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.1);
   color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
 }
 
 .progress-step-dot.skipped {
-  background: rgba(148, 163, 184, 0.1);
+  background: rgba(148, 163, 184, 0.08);
   color: rgba(148, 163, 184, 0.4);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
 }
 
 .progress-step-connector {
@@ -110,7 +110,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: #6b7280;
   font-size: 0.875rem;
 }
 
@@ -129,13 +129,13 @@
 
 .step-approval-barry-text {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: #6b7280;
   line-height: 1.4;
 }
 
 .step-card {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(168, 85, 247, 0.15);
+  background: #f9fafb;
+  border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 10px;
   padding: 1rem;
   margin-bottom: 0.75rem;
@@ -173,12 +173,12 @@
 }
 
 .step-badge-type {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.08);
   color: rgba(168, 85, 247, 0.9);
 }
 
 .step-badge-channel {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.08);
   color: rgba(59, 130, 246, 0.9);
 }
 
@@ -187,21 +187,21 @@
   align-items: center;
   gap: 0.25rem;
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: #9ca3af;
   margin-left: auto;
 }
 
 .step-card-action {
   font-size: 0.9rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: #111827;
   margin: 0 0 0.375rem;
   line-height: 1.4;
 }
 
 .step-card-purpose {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   margin: 0 0 0.5rem;
   line-height: 1.4;
 }
@@ -222,8 +222,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
   border-radius: 8px;
   color: #ef4444;
   font-size: 0.8rem;
@@ -240,18 +240,18 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1.5px solid #e5e7eb;
   border-radius: 8px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-skip-step:hover {
-  border-color: rgba(148, 163, 184, 0.4);
-  color: rgba(255, 255, 255, 0.7);
+  border-color: #d1d5db;
+  color: #6b7280;
 }
 
 .btn-skip-step:disabled {
@@ -306,13 +306,13 @@
 .outcome-prompt-question {
   font-size: 0.9rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: #111827;
   margin: 0 0 0.25rem;
 }
 
 .outcome-prompt-context {
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   margin: 0;
 }
 
@@ -321,7 +321,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   font-size: 0.85rem;
 }
 
@@ -336,10 +336,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  border: 1.5px solid #e5e7eb;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.5);
-  color: rgba(255, 255, 255, 0.8);
+  background: #f9fafb;
+  color: #6b7280;
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -348,7 +348,7 @@
 
 .outcome-option-btn:hover {
   border-color: rgba(168, 85, 247, 0.3);
-  background: rgba(168, 85, 247, 0.05);
+  background: rgba(168, 85, 247, 0.04);
 }
 
 .outcome-option-emoji {
@@ -380,7 +380,7 @@
 
 .content-tone-note {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   margin: 0 0 0.375rem;
   font-style: italic;
 }
@@ -400,7 +400,7 @@
   display: block;
   font-size: 0.7rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: #9ca3af;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.375rem;
@@ -409,10 +409,10 @@
 .content-subject-input {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.8);
-  color: white;
+  background: #ffffff;
+  color: #111827;
   font-size: 0.85rem;
   outline: none;
   box-sizing: border-box;
@@ -425,10 +425,10 @@
 .content-body-textarea {
   width: 100%;
   padding: 0.625rem 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.8);
-  color: white;
+  background: #ffffff;
+  color: #111827;
   font-size: 0.85rem;
   line-height: 1.5;
   resize: vertical;
@@ -452,18 +452,18 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1.5px solid #e5e7eb;
   border-radius: 8px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6b7280;
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-secondary-seq:hover {
-  border-color: rgba(148, 163, 184, 0.4);
-  color: rgba(255, 255, 255, 0.8);
+  border-color: #d1d5db;
+  color: #111827;
 }
 
 .btn-primary-seq {

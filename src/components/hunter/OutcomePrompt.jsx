@@ -24,7 +24,7 @@ const OUTCOME_OPTIONS = [
     id: STEP_OUTCOMES.NO_REPLY,
     label: STEP_OUTCOME_LABELS[STEP_OUTCOMES.NO_REPLY],
     emoji: '...',
-    color: '#94a3b8'
+    color: '#9ca3af'
   },
   {
     id: STEP_OUTCOMES.REPLIED_POSITIVE,

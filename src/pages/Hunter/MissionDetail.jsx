@@ -57,7 +57,7 @@ const STEP_TYPE_ICONS = {
 };
 
 const STATUS_STYLES = {
-  pending: { color: '#94a3b8', label: 'Pending' },
+  pending: { color: '#9ca3af', label: 'Pending' },
   active: { color: '#3b82f6', label: 'Active' },
   awaiting_outcome: { color: '#f59e0b', label: 'Awaiting Outcome' },
   completed: { color: '#10b981', label: 'Completed' }

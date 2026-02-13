@@ -13,8 +13,8 @@ export default function SectionOutputModal({ section, onClose }) {
   const rawAnswers = data.rawAnswers || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm p-4">
-      <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-gray-300/30 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+      <div className="bg-white border-2 border-gray-200 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
         <div className="bg-white/60 border-b border-gray-300/30 p-4 flex items-center justify-between">
           <div>

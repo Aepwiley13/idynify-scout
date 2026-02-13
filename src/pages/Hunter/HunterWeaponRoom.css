@@ -2,13 +2,13 @@
 
 .hunter-weapon-room {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  background: #ffffff;
 }
 
 /* Header */
 .hunter-header {
-  border-bottom: 1px solid rgba(71, 85, 105, 0.5);
-  background: rgba(15, 23, 42, 0.8);
+  border-bottom: 1.5px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
@@ -44,14 +44,14 @@
 .hunter-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: white;
+  color: #111827;
   margin: 0 0 0.25rem 0;
   letter-spacing: -0.02em;
 }
 
 .hunter-subtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0;
   font-weight: 500;
 }
@@ -67,8 +67,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
   border-radius: 10px;
   font-size: 0.875rem;
   color: #10b981;
@@ -81,8 +81,8 @@
   padding: 0 2rem;
   display: flex;
   gap: 0.5rem;
-  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
-  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1.5px solid #e5e7eb;
+  background: #ffffff;
 }
 
 .hunter-tab {
@@ -93,7 +93,7 @@
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
@@ -102,14 +102,14 @@
 }
 
 .hunter-tab:hover {
-  color: white;
-  background: rgba(139, 92, 246, 0.1);
+  color: #111827;
+  background: rgba(139, 92, 246, 0.06);
 }
 
 .hunter-tab.active {
-  color: white;
+  color: #111827;
   border-bottom-color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.08);
 }
 
 .hunter-tab-badge {
@@ -119,16 +119,16 @@
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  background: rgba(139, 92, 246, 0.3);
+  background: rgba(139, 92, 246, 0.15);
   border-radius: 10px;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #c4b5fd;
+  color: #8b5cf6;
 }
 
 .hunter-tab.active .hunter-tab-badge {
-  background: rgba(139, 92, 246, 0.5);
-  color: white;
+  background: rgba(139, 92, 246, 0.2);
+  color: #7c3aed;
 }
 
 /* Content Area */
@@ -149,13 +149,13 @@
 .section-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0;
 }
 
 .section-description {
   font-size: 0.9375rem;
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0.5rem 0 0 0;
 }
 
@@ -167,8 +167,8 @@
   justify-content: center;
   padding: 4rem 2rem;
   text-align: center;
-  background: rgba(30, 41, 59, 0.3);
-  border: 2px dashed rgba(71, 85, 105, 0.5);
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
   border-radius: 16px;
 }
 
@@ -176,7 +176,7 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -186,13 +186,13 @@
 .hunter-empty-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0 0 0.75rem 0;
 }
 
 .hunter-empty-text {
   font-size: 0.9375rem;
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0 0 2rem 0;
   max-width: 400px;
 }
@@ -296,8 +296,8 @@
 .gmail-notice {
   margin-bottom: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
-  border: 2px solid rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border: 1.5px solid rgba(59, 130, 246, 0.2);
   border-radius: 16px;
 }
 
@@ -308,7 +308,7 @@
 }
 
 .gmail-notice-content > svg {
-  color: #60a5fa;
+  color: #3b82f6;
   flex-shrink: 0;
 }
 
@@ -319,13 +319,13 @@
 .gmail-notice-content h3 {
   font-size: 1.125rem;
   font-weight: 700;
-  color: white;
+  color: #111827;
   margin: 0 0 0.375rem 0;
 }
 
 .gmail-notice-content p {
   font-size: 0.875rem;
-  color: #cbd5e1;
+  color: #6b7280;
   margin: 0;
 }
 

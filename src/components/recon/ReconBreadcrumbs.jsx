@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
+import './ReconBreadcrumbs.css';
 
 /**
  * Dynamic breadcrumbs for all RECON pages.
@@ -102,38 +103,32 @@ export default function ReconBreadcrumbs({ sectionTitle }) {
   }
 
   return (
-    <nav
-      className="flex items-center gap-1 text-xs mb-4"
-      aria-label="Breadcrumb"
-    >
+    <nav className="recon-breadcrumbs" aria-label="Breadcrumb">
       {crumbs.map((crumb, index) => {
         const isLast = index === crumbs.length - 1;
         const IconComponent = crumb.icon;
 
         return (
-          <span key={crumb.path + index} className="flex items-center gap-1">
+          <span key={crumb.path + index} className="recon-breadcrumb-item">
             {index > 0 && (
               <ChevronRight
                 size={12}
-                className="text-gray-300 flex-shrink-0"
+                className="recon-breadcrumb-separator"
                 aria-hidden="true"
               />
             )}
             {isLast ? (
-              <span
-                className="font-semibold text-gray-900"
-                aria-current="page"
-              >
-                {IconComponent && <IconComponent size={12} className="inline mr-1 text-gray-400" />}
+              <span className="recon-breadcrumb-current" aria-current="page">
+                {IconComponent && <IconComponent size={12} className="recon-breadcrumb-icon" />}
                 {crumb.label}
               </span>
             ) : (
               <button
                 onClick={() => navigate(crumb.path)}
-                className="text-gray-500 hover:text-purple-600 transition-colors font-medium"
+                className="recon-breadcrumb-link"
                 tabIndex={0}
               >
-                {IconComponent && <IconComponent size={12} className="inline mr-1" />}
+                {IconComponent && <IconComponent size={12} className="recon-breadcrumb-icon" />}
                 {crumb.label}
               </button>
             )}

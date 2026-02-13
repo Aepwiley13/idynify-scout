@@ -82,11 +82,11 @@ export default function MissionsSection({ missions, loading }) {
         {missions.map(mission => {
           const stats = getMissionStats(mission);
           const statusColor = {
-            draft: 'text-gray-500 bg-gray-100',
-            autopilot: 'text-green-400 bg-green-500/20',
-            paused: 'text-yellow-400 bg-yellow-500/20',
-            completed: 'text-blue-400 bg-blue-500/20'
-          }[mission.status] || 'text-gray-500 bg-gray-100';
+            draft: 'status-draft',
+            autopilot: 'status-autopilot',
+            paused: 'status-paused',
+            completed: 'status-completed'
+          }[mission.status] || 'status-draft';
 
           const statusLabel = {
             draft: 'Draft',

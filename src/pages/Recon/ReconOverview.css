@@ -4,62 +4,39 @@
    Visual output must match exactly — structural refactor only
    ======================================== */
 
-/* ── Main Container ────────────────────── */
+/* ── Main Container — Finding 22: 1400px for overview pages ── */
 .recon-overview {
-  max-width: 80rem;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
-/* ── Header ────────────────────────────── */
+/* ── Header — Finding 10: Scout's centered enterprise-header ── */
 .recon-overview-header {
   margin-bottom: 2rem;
-}
-
-.recon-header-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
-.recon-header-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  background: #f3e8ff;
-  border: 2px solid #e9d5ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.recon-header-icon svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  color: #9333ea;
-  stroke-width: 2.5;
+  text-align: center;
 }
 
 .recon-page-title {
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #111827;
-  margin: 0;
+  margin: 0 0 0.375rem 0;
   line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .recon-page-subtitle {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: #6b7280;
   font-weight: 500;
-  margin: 0;
+  margin: 0 0 0.75rem 0;
 }
 
 .recon-description {
   color: #4b5563;
-  margin-top: 0.75rem;
+  margin: 0 auto;
   max-width: 42rem;
   font-size: 0.875rem;
   line-height: 1.625;
@@ -471,25 +448,28 @@
   border-radius: 0.25rem;
 }
 
+/* Finding 21: CTA aligned to gradient button pattern */
 .recon-train-next-btn {
   width: 100%;
-  padding: 0.625rem;
-  background: #9333ea;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
   color: #ffffff;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 700;
-  border-radius: 0.5rem;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.375rem;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
 }
 
 .recon-train-next-btn:hover {
-  background: #7c3aed;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(147, 51, 234, 0.4);
 }
 
 .recon-train-next-btn svg {
@@ -548,8 +528,11 @@
   transition: all 0.2s ease;
 }
 
+/* Finding 13: Hover aligned to Scout's card pattern */
 .recon-module-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #9333ea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.1);
 }
 
 .recon-module-card.complete {

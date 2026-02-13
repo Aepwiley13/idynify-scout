@@ -31,37 +31,25 @@ export default function SectionOutputModal({ section, onClose }) {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white/40 border-b border-gray-300/20 px-6 flex gap-2">
+        {/* Tabs — Aligned to Scout's .status-tab pattern */}
+        <div className="modal-tabs">
           <button
             onClick={() => setActiveTab('summary')}
-            className={`px-6 py-3 font-bold transition-all ${
-              activeTab === 'summary'
-                ? 'text-blue-600 border-b-2 border-gray-300'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
+            className={`modal-tab ${activeTab === 'summary' ? 'active' : ''}`}
           >
-            📊 EXECUTIVE SUMMARY
+            Executive Summary
           </button>
           <button
             onClick={() => setActiveTab('raw')}
-            className={`px-6 py-3 font-bold transition-all ${
-              activeTab === 'raw'
-                ? 'text-blue-600 border-b-2 border-gray-300'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
+            className={`modal-tab ${activeTab === 'raw' ? 'active' : ''}`}
           >
-            📝 YOUR ANSWERS
+            Your Answers
           </button>
           <button
             onClick={() => setActiveTab('json')}
-            className={`px-6 py-3 font-bold transition-all ${
-              activeTab === 'json'
-                ? 'text-blue-600 border-b-2 border-gray-300'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
+            className={`modal-tab ${activeTab === 'json' ? 'active' : ''}`}
           >
-            🔧 RAW DATA
+            Raw Data
           </button>
         </div>
 

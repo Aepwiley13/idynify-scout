@@ -1,0 +1,54 @@
+/* ========================================
+   RECON BREADCRUMBS — Finding 11
+   Intentional exception: Recon's 4-level hierarchy
+   requires wayfinding that sidebar alone cannot provide.
+   Styled with Scout tokens. Not replicated in Scout or Hunter.
+   ======================================== */
+
+.recon-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  margin-bottom: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.recon-breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.recon-breadcrumb-separator {
+  color: #d1d5db;
+  flex-shrink: 0;
+}
+
+.recon-breadcrumb-current {
+  font-weight: 600;
+  color: #111827;
+}
+
+.recon-breadcrumb-link {
+  color: #6b7280;
+  font-weight: 500;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.recon-breadcrumb-link:hover {
+  color: #9333ea;
+}
+
+.recon-breadcrumb-icon {
+  display: inline;
+  margin-right: 0.25rem;
+  color: #9ca3af;
+  vertical-align: middle;
+}

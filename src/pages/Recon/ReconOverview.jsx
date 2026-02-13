@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import ImpactPreviewPanel from '../../components/recon/ImpactPreviewPanel';
+import './ReconOverview.css';
 
 // Map RECON sections to the new module structure
 const RECON_MODULES = [
@@ -235,19 +236,6 @@ export default function ReconOverview() {
     return { completed, total: moduleSections.length };
   };
 
-  const getColorClasses = (color) => {
-    const colors = {
-      purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', icon: 'text-purple-600', fill: 'bg-purple-600', badge: 'bg-purple-100 text-purple-700 border-purple-200' },
-      blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: 'text-blue-600', fill: 'bg-blue-600', badge: 'bg-blue-100 text-blue-700 border-blue-200' },
-      amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', icon: 'text-amber-600', fill: 'bg-amber-500', badge: 'bg-amber-100 text-amber-700 border-amber-200' },
-      red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: 'text-red-600', fill: 'bg-red-600', badge: 'bg-red-100 text-red-700 border-red-200' },
-      emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: 'text-emerald-600', fill: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-      cyan: { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', icon: 'text-cyan-600', fill: 'bg-cyan-600', badge: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
-      pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', icon: 'text-pink-600', fill: 'bg-pink-600', badge: 'bg-pink-100 text-pink-700 border-pink-200' }
-    };
-    return colors[color] || colors.purple;
-  };
-
   // Get status for a training dimension
   const getDimensionStatus = (dimension) => {
     const dimSections = dimension.sections.map(id => sections.find(s => s.sectionId === id));
@@ -283,10 +271,12 @@ export default function ReconOverview() {
     return sectionToModule[dimension.sections[0]] || '/recon';
   };
 
+  // Finding 9: Scout spinner loading state replaces pulsing text
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="text-purple-600 text-lg font-semibold animate-pulse">Loading RECON...</div>
+      <div className="recon-loading">
+        <div className="loading-spinner" />
+        <p className="loading-text">Loading RECON...</p>
       </div>
     );
   }
@@ -295,87 +285,87 @@ export default function ReconOverview() {
   const completedSections = sections.filter(s => s.status === 'completed').length;
   const overallProgress = totalSections > 0 ? Math.round((completedSections / totalSections) * 100) : 0;
   const barryConfidence = overallProgress >= 80 ? 'High' : overallProgress >= 40 ? 'Medium' : 'Low';
-  const barryConfidenceColor = overallProgress >= 80 ? 'text-emerald-600' : overallProgress >= 40 ? 'text-amber-600' : 'text-red-500';
+  const barryConfidenceColorClass = overallProgress >= 80 ? 'emerald' : overallProgress >= 40 ? 'amber' : 'red';
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="recon-overview">
       {/* Breadcrumbs */}
       <ReconBreadcrumbs />
 
       {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-purple-100 border-2 border-purple-200 flex items-center justify-center">
-            <Brain className="w-5 h-5 text-purple-600" strokeWidth={2.5} />
+      <div className="recon-overview-header">
+        <div className="recon-header-row">
+          <div className="recon-header-icon">
+            <Brain />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">RECON</h1>
-            <p className="text-sm text-gray-500 font-medium">Barry's Training Intelligence</p>
+            <h1 className="recon-page-title">RECON</h1>
+            <p className="recon-page-subtitle">Barry's Training Intelligence</p>
           </div>
         </div>
-        <p className="text-gray-600 mt-3 max-w-2xl text-sm leading-relaxed">
+        <p className="recon-description">
           RECON is how you train Barry. Every module you complete gives Barry deeper context about your business,
           customers, and market — making Scout smarter, Hunter sharper, and every interaction more relevant.
         </p>
       </div>
 
-      {/* Training Status Bar */}
-      <div className="bg-white rounded-xl border-[1.5px] border-gray-200 p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Activity className="w-5 h-5 text-purple-600" />
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Training Status</h2>
+      {/* Finding 12: KPI cards matching Scout's .kpi-card pattern */}
+      <div className="recon-training-status">
+        <div className="recon-training-status-header">
+          <div className="recon-training-status-label">
+            <Activity />
+            <h2>Training Status</h2>
           </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-gray-500 font-medium">Overall</p>
-              <p className="text-xl font-bold text-purple-600">{overallProgress}%</p>
+          <div className="recon-training-stats">
+            <div className="recon-training-stat">
+              <p className="recon-training-stat-label">Overall</p>
+              <p className="recon-training-stat-value purple">{overallProgress}%</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 font-medium">Barry Confidence</p>
-              <p className={`text-xl font-bold ${barryConfidenceColor}`}>{barryConfidence}</p>
+            <div className="recon-training-stat">
+              <p className="recon-training-stat-label">Barry Confidence</p>
+              <p className={`recon-training-stat-value ${barryConfidenceColorClass}`}>{barryConfidence}</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 font-medium">Sections</p>
-              <p className="text-xl font-bold text-gray-900">{completedSections}/{totalSections}</p>
+            <div className="recon-training-stat">
+              <p className="recon-training-stat-label">Sections</p>
+              <p className="recon-training-stat-value dark">{completedSections}/{totalSections}</p>
             </div>
           </div>
         </div>
-        <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="recon-progress-bar">
           <div
-            className="h-full bg-gradient-to-r from-purple-500 to-violet-600 rounded-full transition-all duration-700 ease-out"
+            className="recon-progress-fill"
             style={{ width: `${overallProgress}%` }}
           />
         </div>
         {overallProgress < 100 && (
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="recon-progress-hint">
             Complete more modules to increase Barry's confidence and improve results across Scout and Hunter.
           </p>
         )}
       </div>
 
       {/* Confidence Heatmap & Train Next - Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div className="recon-heatmap-grid">
         {/* Confidence Heatmap */}
-        <div className="lg:col-span-2 bg-white rounded-xl border-[1.5px] border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Barry's Knowledge Map</h2>
+        <div className="recon-heatmap-card">
+          <div className="recon-heatmap-header">
+            <div className="recon-heatmap-title">
+              <Sparkles />
+              <h2>Barry's Knowledge Map</h2>
             </div>
-            <div className="flex items-center gap-3 text-[10px] font-medium text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-emerald-500"></span> Trained
+            <div className="recon-heatmap-legend">
+              <span className="recon-legend-item">
+                <span className="recon-legend-dot trained"></span> Trained
               </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-amber-400"></span> Partial
+              <span className="recon-legend-item">
+                <span className="recon-legend-dot partial"></span> Partial
               </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded bg-gray-200"></span> Untrained
+              <span className="recon-legend-item">
+                <span className="recon-legend-dot untrained"></span> Untrained
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="recon-heatmap-tiles">
             {TRAINING_DIMENSIONS.map((dimension) => {
               const status = getDimensionStatus(dimension);
               const isTrained = status === 'trained';
@@ -385,25 +375,17 @@ export default function ReconOverview() {
                 <div
                   key={dimension.id}
                   onClick={() => navigate(getDimensionModulePath(dimension))}
-                  className={`relative cursor-pointer group transition-all rounded-lg p-3 text-center ${
-                    isTrained
-                      ? 'bg-emerald-100 border-2 border-emerald-300 hover:border-emerald-400'
-                      : isPartial
-                      ? 'bg-amber-100 border-2 border-amber-300 hover:border-amber-400'
-                      : 'bg-gray-100 border-2 border-gray-200 hover:border-purple-300'
-                  }`}
+                  className={`recon-heatmap-tile ${status}`}
                 >
-                  <div className="text-xl mb-1">{dimension.icon}</div>
-                  <div className={`text-[10px] font-semibold leading-tight ${
-                    isTrained ? 'text-emerald-700' : isPartial ? 'text-amber-700' : 'text-gray-500'
-                  }`}>
+                  <div className="recon-heatmap-tile-emoji">{dimension.icon}</div>
+                  <div className={`recon-heatmap-tile-label ${status}`}>
                     {dimension.label}
                   </div>
                   {/* Hover tooltip */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                    <div className="bg-gray-900 text-white text-[10px] px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
-                      <p className="font-semibold mb-0.5">{dimension.description}</p>
-                      <p className="text-gray-400">
+                  <div className="recon-heatmap-tooltip">
+                    <div className="recon-heatmap-tooltip-content">
+                      <p className="recon-heatmap-tooltip-title">{dimension.description}</p>
+                      <p className="recon-heatmap-tooltip-status">
                         {isTrained ? '✓ Fully trained' : isPartial ? '◐ Partially trained' : '○ Not started'}
                       </p>
                     </div>
@@ -412,7 +394,7 @@ export default function ReconOverview() {
               );
             })}
           </div>
-          <p className="text-[10px] text-gray-400 mt-3 text-center">
+          <p className="recon-heatmap-footer">
             Click any dimension to train Barry in that area
           </p>
         </div>
@@ -421,10 +403,10 @@ export default function ReconOverview() {
         {(() => {
           const nextDimension = getNextRecommendedDimension();
           if (!nextDimension) return (
-            <div className="bg-emerald-50 rounded-xl border-[1.5px] border-emerald-200 p-5 flex flex-col items-center justify-center text-center">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-3" />
-              <h3 className="text-sm font-bold text-emerald-800 mb-1">Fully Trained!</h3>
-              <p className="text-xs text-emerald-600">Barry has complete knowledge of your business context.</p>
+            <div className="recon-train-next-complete">
+              <CheckCircle2 />
+              <h3>Fully Trained!</h3>
+              <p>Barry has complete knowledge of your business context.</p>
             </div>
           );
 
@@ -432,27 +414,27 @@ export default function ReconOverview() {
           const isPartial = status === 'partial';
 
           return (
-            <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border-[1.5px] border-purple-200 p-5">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="recon-train-next">
+              <div className="recon-train-next-header">
                 {isPartial ? (
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  <AlertTriangle className="amber" />
                 ) : (
-                  <Target className="w-4 h-4 text-purple-600" />
+                  <Target className="purple" />
                 )}
-                <h3 className="text-sm font-bold text-gray-900">
+                <h3>
                   {isPartial ? 'Continue Training' : 'Train Next'}
                 </h3>
               </div>
 
-              <div className="bg-white rounded-lg border border-purple-200 p-3 mb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">{nextDimension.icon}</span>
-                  <span className="text-sm font-bold text-gray-900">{nextDimension.label}</span>
+              <div className="recon-train-next-inner">
+                <div className="recon-train-next-dimension-row">
+                  <span className="recon-train-next-dimension-emoji">{nextDimension.icon}</span>
+                  <span className="recon-train-next-dimension-name">{nextDimension.label}</span>
                 </div>
-                <p className="text-xs text-gray-500 mb-2">{nextDimension.description}</p>
-                <div className="flex flex-wrap gap-1">
+                <p className="recon-train-next-dimension-desc">{nextDimension.description}</p>
+                <div className="recon-train-next-tags">
                   {nextDimension.criticalFor.map((item) => (
-                    <span key={item} className="text-[10px] font-medium bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                    <span key={item} className="recon-train-next-tag">
                       {item}
                     </span>
                   ))}
@@ -461,14 +443,14 @@ export default function ReconOverview() {
 
               <button
                 onClick={() => navigate(getDimensionModulePath(nextDimension))}
-                className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                className="recon-train-next-btn"
               >
                 {isPartial ? 'Continue' : 'Start'} Training
-                <ArrowRight size={14} />
+                <ArrowRight />
               </button>
 
               {isPartial && (
-                <p className="text-[10px] text-amber-600 mt-2 text-center font-medium">
+                <p className="recon-train-next-warning">
                   Incomplete training limits Barry's effectiveness
                 </p>
               )}
@@ -478,13 +460,12 @@ export default function ReconOverview() {
       </div>
 
       {/* RECON Modules Grid */}
-      <div className="mb-8">
-        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Training Modules</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="recon-modules-section">
+        <h2 className="recon-section-title">Training Modules</h2>
+        <div className="recon-modules-grid">
           {RECON_MODULES.map((mod) => {
             const status = getModuleStatus(mod);
             const progress = getModuleProgress(mod);
-            const colors = getColorClasses(mod.color);
             const IconComponent = mod.icon;
             // High priority modules that need alerts when incomplete
             const isHighPriority = ['icp-intelligence', 'messaging'].includes(mod.id);
@@ -494,69 +475,68 @@ export default function ReconOverview() {
               <div
                 key={mod.id}
                 onClick={() => navigate(mod.path)}
-                className={`relative bg-white rounded-xl border-[1.5px] ${
-                  status === 'complete' ? 'border-emerald-300' :
-                  needsAlert ? 'border-amber-300' :
-                  'border-gray-200 hover:border-purple-300'
-                } p-5 cursor-pointer transition-all hover:shadow-md group`}
+                className={`recon-module-card ${
+                  status === 'complete' ? 'complete' :
+                  needsAlert ? 'alert' : ''
+                }`}
               >
                 {/* High Priority Alert Badge */}
                 {needsAlert && (
-                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                    <AlertTriangle size={10} />
+                  <div className="recon-module-alert-badge">
+                    <AlertTriangle />
                     High Impact
                   </div>
                 )}
 
                 {/* Module Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`w-9 h-9 rounded-lg ${colors.bg} border ${colors.border} flex items-center justify-center`}>
-                    <IconComponent className={`w-4.5 h-4.5 ${colors.icon}`} strokeWidth={2} />
+                <div className="recon-module-header">
+                  <div className={`recon-module-icon ${mod.color}`}>
+                    <IconComponent />
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div>
                     {status === 'complete' ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <CheckCircle2 size={12} /> Complete
+                      <span className="recon-module-status-badge complete">
+                        <CheckCircle2 /> Complete
                       </span>
                     ) : status === 'in-progress' ? (
-                      <span className={`inline-flex items-center gap-1 text-xs font-semibold ${colors.badge} px-2 py-0.5 rounded-full border`}>
-                        <Circle size={12} /> {progress.completed}/{progress.total}
+                      <span className={`recon-module-status-badge in-progress ${mod.color}`}>
+                        <Circle /> {progress.completed}/{progress.total}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200">
-                        <AlertCircle size={12} /> Not started
+                      <span className="recon-module-status-badge not-started">
+                        <AlertCircle /> Not started
                       </span>
                     )}
                   </div>
                 </div>
 
                 {/* Module Info */}
-                <h3 className="text-base font-bold text-gray-900 mb-1">{mod.title}</h3>
-                <p className="text-xs text-gray-500 mb-3 leading-relaxed">{mod.description}</p>
+                <h3 className="recon-module-title">{mod.title}</h3>
+                <p className="recon-module-description">{mod.description}</p>
 
                 {/* Progress Bar */}
-                <div className="mb-3">
-                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="recon-module-progress">
+                  <div className="recon-module-progress-track">
                     <div
-                      className={`h-full ${status === 'complete' ? 'bg-emerald-500' : colors.fill} rounded-full transition-all duration-500`}
+                      className={`recon-module-progress-fill ${status === 'complete' ? 'complete' : mod.color}`}
                       style={{ width: `${(progress.completed / progress.total) * 100}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Impact Areas */}
-                <div className="flex flex-wrap gap-1.5">
+                <div className="recon-module-tags">
                   {mod.impactAreas.map((area) => (
-                    <span key={area} className="text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                    <span key={area} className="recon-module-tag">
                       {area}
                     </span>
                   ))}
                 </div>
 
                 {/* CTA */}
-                <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="recon-module-cta">
                   <span>{status === 'complete' ? 'Review' : status === 'in-progress' ? 'Continue' : 'Start'} module</span>
-                  <ArrowRight size={12} />
+                  <ArrowRight />
                 </div>
               </div>
             );
@@ -565,28 +545,27 @@ export default function ReconOverview() {
       </div>
 
       {/* Platform Impact Section */}
-      <div className="mb-8">
-        <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">
+      <div className="recon-impact-section">
+        <h2 className="recon-section-title">
           How RECON Improves Everything
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="recon-impact-grid">
           {PLATFORM_IMPACTS.map((impact) => {
-            const colors = getColorClasses(impact.color);
             const IconComponent = impact.icon;
 
             return (
-              <div key={impact.system} className={`bg-white rounded-xl border-[1.5px] border-gray-200 p-5`}>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className={`w-8 h-8 rounded-lg ${colors.bg} border ${colors.border} flex items-center justify-center`}>
-                    <IconComponent className={`w-4 h-4 ${colors.icon}`} strokeWidth={2} />
+              <div key={impact.system} className="recon-impact-card">
+                <div className="recon-impact-card-header">
+                  <div className={`recon-impact-icon ${impact.color}`}>
+                    <IconComponent />
                   </div>
-                  <h3 className="text-sm font-bold text-gray-900">{impact.system}</h3>
+                  <h3>{impact.system}</h3>
                 </div>
-                <div className="space-y-3">
+                <div className="recon-impact-list">
                   {impact.impacts.map((item, idx) => (
-                    <div key={idx} className="text-xs">
-                      <span className={`font-semibold ${colors.text}`}>{item.source}:</span>
-                      <p className="text-gray-600 mt-0.5 leading-relaxed">{item.effect}</p>
+                    <div key={idx} className="recon-impact-item">
+                      <span className={`recon-impact-item-source ${impact.color}`}>{item.source}:</span>
+                      <p className="recon-impact-item-effect">{item.effect}</p>
                     </div>
                   ))}
                 </div>
@@ -597,7 +576,7 @@ export default function ReconOverview() {
       </div>
 
       {/* Impact Preview Panel */}
-      <div className="mb-8">
+      <div className="recon-preview-section">
         <ImpactPreviewPanel
           reconProgress={overallProgress}
           trainedDimensions={TRAINING_DIMENSIONS
@@ -608,14 +587,14 @@ export default function ReconOverview() {
 
       {/* Confidence Explanation */}
       {overallProgress < 100 && (
-        <div className="bg-purple-50 rounded-xl border-[1.5px] border-purple-200 p-5 mb-8">
-          <div className="flex items-start gap-3">
-            <Brain className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+        <div className="recon-confidence-banner">
+          <div className="recon-confidence-content">
+            <Brain />
             <div>
-              <h3 className="text-sm font-bold text-purple-900 mb-1">
+              <h3 className="recon-confidence-title">
                 Barry's confidence is currently {barryConfidence.toLowerCase()}
               </h3>
-              <p className="text-xs text-purple-700 leading-relaxed">
+              <p className="recon-confidence-text">
                 {overallProgress < 40
                   ? 'Barry is operating with limited context. He can generate basic contact intelligence, but cannot personalize based on your business, product, or ideal customer. Complete more RECON modules to unlock deeper intelligence.'
                   : overallProgress < 80

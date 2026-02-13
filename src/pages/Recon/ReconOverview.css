@@ -1,0 +1,994 @@
+/* ========================================
+   RECON OVERVIEW — CSS Module
+   Migrated from Tailwind inline classes (Finding 8)
+   Visual output must match exactly — structural refactor only
+   ======================================== */
+
+/* ── Main Container ────────────────────── */
+.recon-overview {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ── Header ────────────────────────────── */
+.recon-overview-header {
+  margin-bottom: 2rem;
+}
+
+.recon-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.recon-header-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: #f3e8ff;
+  border: 2px solid #e9d5ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recon-header-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #9333ea;
+  stroke-width: 2.5;
+}
+
+.recon-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.recon-page-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0;
+}
+
+.recon-description {
+  color: #4b5563;
+  margin-top: 0.75rem;
+  max-width: 42rem;
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+
+/* ── Training Status Bar ───────────────── */
+.recon-training-status {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.recon-training-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.recon-training-status-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.recon-training-status-label svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #9333ea;
+}
+
+.recon-training-status-label h2 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.recon-training-stats {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.recon-training-stat {
+  text-align: right;
+}
+
+.recon-training-stat-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0;
+}
+
+.recon-training-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.recon-training-stat-value.purple {
+  color: #9333ea;
+}
+
+.recon-training-stat-value.emerald {
+  color: #059669;
+}
+
+.recon-training-stat-value.amber {
+  color: #d97706;
+}
+
+.recon-training-stat-value.red {
+  color: #ef4444;
+}
+
+.recon-training-stat-value.dark {
+  color: #111827;
+}
+
+/* ── Progress Bar ──────────────────────── */
+.recon-progress-bar {
+  width: 100%;
+  height: 0.625rem;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.recon-progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, #a855f7, #7c3aed);
+  border-radius: 999px;
+  transition: width 0.7s ease-out;
+}
+
+.recon-progress-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+}
+
+/* ── Side-by-Side Layout ───────────────── */
+.recon-heatmap-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .recon-heatmap-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+/* ── Confidence Heatmap ────────────────── */
+.recon-heatmap-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+}
+
+.recon-heatmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.recon-heatmap-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recon-heatmap-title svg {
+  width: 1rem;
+  height: 1rem;
+  color: #9333ea;
+}
+
+.recon-heatmap-title h2 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.recon-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.recon-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.recon-legend-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 0.25rem;
+}
+
+.recon-legend-dot.trained {
+  background: #10b981;
+}
+
+.recon-legend-dot.partial {
+  background: #fbbf24;
+}
+
+.recon-legend-dot.untrained {
+  background: #e5e7eb;
+}
+
+.recon-heatmap-tiles {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+
+.recon-heatmap-tile {
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.recon-heatmap-tile.trained {
+  background: #d1fae5;
+  border: 2px solid #6ee7b7;
+}
+
+.recon-heatmap-tile.trained:hover {
+  border-color: #34d399;
+}
+
+.recon-heatmap-tile.partial {
+  background: #fef3c7;
+  border: 2px solid #fcd34d;
+}
+
+.recon-heatmap-tile.partial:hover {
+  border-color: #fbbf24;
+}
+
+.recon-heatmap-tile.untrained {
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+}
+
+.recon-heatmap-tile.untrained:hover {
+  border-color: #d8b4fe;
+}
+
+.recon-heatmap-tile-emoji {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.recon-heatmap-tile-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.recon-heatmap-tile-label.trained {
+  color: #047857;
+}
+
+.recon-heatmap-tile-label.partial {
+  color: #b45309;
+}
+
+.recon-heatmap-tile-label.untrained {
+  color: #6b7280;
+}
+
+/* Heatmap Tooltip */
+.recon-heatmap-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.recon-heatmap-tile:hover .recon-heatmap-tooltip {
+  opacity: 1;
+}
+
+.recon-heatmap-tooltip-content {
+  background: #111827;
+  color: #ffffff;
+  font-size: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+.recon-heatmap-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 0.125rem;
+}
+
+.recon-heatmap-tooltip-status {
+  color: #9ca3af;
+}
+
+.recon-heatmap-footer {
+  font-size: 0.625rem;
+  color: #9ca3af;
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+/* ── Train Next Card ───────────────────── */
+.recon-train-next {
+  background: linear-gradient(to bottom right, #faf5ff, #ede9fe);
+  border-radius: 0.75rem;
+  border: 1.5px solid #e9d5ff;
+  padding: 1.25rem;
+}
+
+.recon-train-next-complete {
+  background: #ecfdf5;
+  border-radius: 0.75rem;
+  border: 1.5px solid #a7f3d0;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.recon-train-next-complete svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #10b981;
+  margin-bottom: 0.75rem;
+}
+
+.recon-train-next-complete h3 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #065f46;
+  margin: 0 0 0.25rem 0;
+}
+
+.recon-train-next-complete p {
+  font-size: 0.75rem;
+  color: #059669;
+  margin: 0;
+}
+
+.recon-train-next-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.recon-train-next-header svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.recon-train-next-header svg.purple {
+  color: #9333ea;
+}
+
+.recon-train-next-header svg.amber {
+  color: #f59e0b;
+}
+
+.recon-train-next-header h3 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.recon-train-next-inner {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  border: 1px solid #e9d5ff;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.recon-train-next-dimension-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.recon-train-next-dimension-emoji {
+  font-size: 1.25rem;
+}
+
+.recon-train-next-dimension-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.recon-train-next-dimension-desc {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+
+.recon-train-next-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.recon-train-next-tag {
+  font-size: 0.625rem;
+  font-weight: 500;
+  background: #f3e8ff;
+  color: #7c3aed;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.recon-train-next-btn {
+  width: 100%;
+  padding: 0.625rem;
+  background: #9333ea;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+}
+
+.recon-train-next-btn:hover {
+  background: #7c3aed;
+}
+
+.recon-train-next-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.recon-train-next-warning {
+  font-size: 0.625rem;
+  color: #d97706;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* ── Modules Grid ──────────────────────── */
+.recon-modules-section {
+  margin-bottom: 2rem;
+}
+
+.recon-section-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem 0;
+}
+
+.recon-modules-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .recon-modules-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .recon-modules-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── Module Card ───────────────────────── */
+.recon-module-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recon-module-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.recon-module-card.complete {
+  border-color: #86efac;
+}
+
+.recon-module-card.alert {
+  border-color: #fcd34d;
+}
+
+.recon-module-card:hover:not(.complete):not(.alert) {
+  border-color: #d8b4fe;
+}
+
+.recon-module-alert-badge {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.recon-module-alert-badge svg {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+.recon-module-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.recon-module-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recon-module-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  stroke-width: 2;
+}
+
+/* Module icon color variants */
+.recon-module-icon.purple {
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+}
+
+.recon-module-icon.purple svg {
+  color: #9333ea;
+}
+
+.recon-module-icon.blue {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.recon-module-icon.blue svg {
+  color: #2563eb;
+}
+
+.recon-module-icon.amber {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.recon-module-icon.amber svg {
+  color: #d97706;
+}
+
+.recon-module-icon.red {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.recon-module-icon.red svg {
+  color: #dc2626;
+}
+
+.recon-module-icon.emerald {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.recon-module-icon.emerald svg {
+  color: #059669;
+}
+
+/* Module status badges */
+.recon-module-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.recon-module-status-badge svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.recon-module-status-badge.complete {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.recon-module-status-badge.in-progress.purple {
+  background: #f3e8ff;
+  color: #7c3aed;
+  border-color: #e9d5ff;
+}
+
+.recon-module-status-badge.in-progress.blue {
+  background: #dbeafe;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.recon-module-status-badge.in-progress.amber {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.recon-module-status-badge.in-progress.red {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.recon-module-status-badge.in-progress.emerald {
+  background: #d1fae5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.recon-module-status-badge.not-started {
+  background: #f9fafb;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+.recon-module-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+}
+
+.recon-module-description {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.625;
+}
+
+/* Module progress bar */
+.recon-module-progress {
+  margin-bottom: 0.75rem;
+}
+
+.recon-module-progress-track {
+  width: 100%;
+  height: 0.375rem;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.recon-module-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.recon-module-progress-fill.complete {
+  background: #10b981;
+}
+
+.recon-module-progress-fill.purple {
+  background: #9333ea;
+}
+
+.recon-module-progress-fill.blue {
+  background: #2563eb;
+}
+
+.recon-module-progress-fill.amber {
+  background: #f59e0b;
+}
+
+.recon-module-progress-fill.red {
+  background: #dc2626;
+}
+
+.recon-module-progress-fill.emerald {
+  background: #059669;
+}
+
+/* Module impact tags */
+.recon-module-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.recon-module-tag {
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f9fafb;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px solid #f3f4f6;
+}
+
+/* Module hover CTA */
+.recon-module-cta {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9333ea;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.recon-module-cta svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.recon-module-card:hover .recon-module-cta {
+  opacity: 1;
+}
+
+/* ── Platform Impact Section ───────────── */
+.recon-impact-section {
+  margin-bottom: 2rem;
+}
+
+.recon-impact-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .recon-impact-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.recon-impact-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  padding: 1.25rem;
+}
+
+.recon-impact-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.recon-impact-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recon-impact-icon svg {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2;
+}
+
+/* Impact icon color variants */
+.recon-impact-icon.cyan {
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+}
+
+.recon-impact-icon.cyan svg {
+  color: #0891b2;
+}
+
+.recon-impact-icon.pink {
+  background: #fdf2f8;
+  border: 1px solid #fbcfe8;
+}
+
+.recon-impact-icon.pink svg {
+  color: #db2777;
+}
+
+.recon-impact-icon.purple {
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+}
+
+.recon-impact-icon.purple svg {
+  color: #9333ea;
+}
+
+.recon-impact-card-header h3 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.recon-impact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recon-impact-item {
+  font-size: 0.75rem;
+}
+
+.recon-impact-item-source {
+  font-weight: 600;
+}
+
+.recon-impact-item-source.cyan {
+  color: #0e7490;
+}
+
+.recon-impact-item-source.pink {
+  color: #be185d;
+}
+
+.recon-impact-item-source.purple {
+  color: #7c3aed;
+}
+
+.recon-impact-item-effect {
+  color: #4b5563;
+  margin-top: 0.125rem;
+  line-height: 1.625;
+}
+
+/* ── Impact Preview Panel wrapper ──────── */
+.recon-preview-section {
+  margin-bottom: 2rem;
+}
+
+/* ── Confidence Explanation ─────────────── */
+.recon-confidence-banner {
+  background: #faf5ff;
+  border-radius: 0.75rem;
+  border: 1.5px solid #e9d5ff;
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.recon-confidence-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.recon-confidence-content > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #9333ea;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.recon-confidence-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #581c87;
+  margin: 0 0 0.25rem 0;
+}
+
+.recon-confidence-text {
+  font-size: 0.75rem;
+  color: #7c3aed;
+  line-height: 1.625;
+  margin: 0;
+}
+
+/* ── Loading State (Scout pattern) ─────── */
+.recon-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1.5rem;
+  background: #ffffff;
+}
+
+.recon-loading .loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #9333ea;
+  border-radius: 50%;
+  animation: recon-spin 1s linear infinite;
+}
+
+@keyframes recon-spin {
+  to { transform: rotate(360deg); }
+}
+
+.recon-loading .loading-text {
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 500;
+}

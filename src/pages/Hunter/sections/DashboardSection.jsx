@@ -176,23 +176,43 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
 
   return (
     <div className="dashboard-section">
-      {/* Quick Stats Bar */}
+      {/* Quick Stats Bar — Finding 17: Scout .kpi-card pattern */}
       <div className="dashboard-stats-bar">
         <div className="dashboard-stat">
-          <span className="dashboard-stat-value">{attentionItems.length}</span>
-          <span className="dashboard-stat-label">Needs Attention</span>
+          <div className="dashboard-stat-icon">
+            <AlertCircle />
+          </div>
+          <div className="dashboard-stat-content">
+            <div className="dashboard-stat-label">Needs Attention</div>
+            <div className="dashboard-stat-value">{attentionItems.length}</div>
+          </div>
         </div>
         <div className="dashboard-stat">
-          <span className="dashboard-stat-value">{activeMissions.length}</span>
-          <span className="dashboard-stat-label">Active Missions</span>
+          <div className="dashboard-stat-icon">
+            <Zap />
+          </div>
+          <div className="dashboard-stat-content">
+            <div className="dashboard-stat-label">Active Missions</div>
+            <div className="dashboard-stat-value">{activeMissions.length}</div>
+          </div>
         </div>
         <div className="dashboard-stat">
-          <span className="dashboard-stat-value">{totalActiveContacts}</span>
-          <span className="dashboard-stat-label">Contacts in Play</span>
+          <div className="dashboard-stat-icon">
+            <Users />
+          </div>
+          <div className="dashboard-stat-content">
+            <div className="dashboard-stat-label">Contacts in Play</div>
+            <div className="dashboard-stat-value">{totalActiveContacts}</div>
+          </div>
         </div>
         <div className="dashboard-stat">
-          <span className="dashboard-stat-value">{recentlyCompleted.length}</span>
-          <span className="dashboard-stat-label">Completed (30d)</span>
+          <div className="dashboard-stat-icon">
+            <CheckCircle />
+          </div>
+          <div className="dashboard-stat-content">
+            <div className="dashboard-stat-label">Completed (30d)</div>
+            <div className="dashboard-stat-value">{recentlyCompleted.length}</div>
+          </div>
         </div>
       </div>
 

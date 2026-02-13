@@ -53,9 +53,9 @@ export default function OutcomesSection({ campaigns }) {
     return (
       <div className="hunter-empty-state">
         <div className="hunter-empty-icon">
-          <BarChart3 className="w-10 h-10 text-purple-400" />
+          <BarChart3 className="w-10 h-10" style={{ color: '#a78bfa' }} />
         </div>
-        <h3 className="hunter-empty-title">No Data Yet</h3>
+        <h2 className="hunter-empty-title">No Data Yet</h2>
         <p className="hunter-empty-text">
           Launch campaigns and track outcomes to see analytics here
         </p>

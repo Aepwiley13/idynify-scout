@@ -18,11 +18,12 @@
   transition: all 0.2s ease;
 }
 
+/* Finding 3: Solid hover border, matching Scout pattern */
 .mission-card:hover {
-  border-color: rgba(139, 92, 246, 0.5);
+  border-color: #8b5cf6;
   background: #f9fafb;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.1);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
 }
 
 .mission-card-header {

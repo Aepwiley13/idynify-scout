@@ -116,23 +116,6 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       isPrimary: true
     },
     {
-      icon: Search,
-      label: 'Company Search',
-      path: '/scout',
-      state: { activeTab: 'company-search' }
-    },
-    {
-      icon: Users,
-      label: 'Contact Search',
-      path: '/scout',
-      state: { activeTab: 'contact-search' }
-    },
-    {
-      icon: UserPlus,
-      label: 'Scout+',
-      path: '/scout-plus'
-    },
-    {
       icon: Building2,
       label: 'Saved Companies',
       path: '/scout',
@@ -143,6 +126,23 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       label: 'All Leads',
       path: '/scout',
       state: { activeTab: 'all-leads' }
+    },
+    {
+      icon: UserPlus,
+      label: 'Scout+',
+      path: '/scout-plus'
+    },
+    {
+      icon: Search,
+      label: 'Company Search',
+      path: '/scout',
+      state: { activeTab: 'company-search' }
+    },
+    {
+      icon: Users,
+      label: 'Contact Search',
+      path: '/scout',
+      state: { activeTab: 'contact-search' }
     },
     {
       icon: TrendingUp,

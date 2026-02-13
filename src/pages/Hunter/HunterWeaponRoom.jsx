@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Target, Crosshair, Archive, BarChart3, ArrowLeft, CheckCircle, Mail, LayoutDashboard } from 'lucide-react';
+import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard } from 'lucide-react';
 import DashboardSection from './sections/DashboardSection';
 import WeaponsSection from './sections/WeaponsSection';
 import MissionsSection from './sections/MissionsSection';
 import ArsenalSection from './sections/ArsenalSection';
 import OutcomesSection from './sections/OutcomesSection';
-import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import './HunterWeaponRoom.css';
 
 /**
@@ -124,47 +123,13 @@ export default function HunterWeaponRoom() {
 
   return (
     <div className="hunter-weapon-room">
-      {/* Header */}
-      <div className="hunter-header">
-        <div className="hunter-header-content">
-          <div className="hunter-title-section">
-            <button
-              onClick={() => navigate('/mission-control-v2')}
-              className="btn-back-weapon"
-              style={{ marginRight: '1rem' }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="hunter-icon">
-              <Target className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="hunter-title">Hunter Weapon Room</h1>
-              <p className="hunter-subtitle">Tactical Outreach Execution</p>
-            </div>
-          </div>
-
-          <div className="hunter-header-actions">
-            <BarryKnowledgeButton variant="compact" />
-            {gmailConnected ? (
-              <div className="gmail-status-badge">
-                <CheckCircle className="w-4 h-4" />
-                <span>{gmailEmail}</span>
-              </div>
-            ) : (
-              <button
-                onClick={handleConnectGmail}
-                className="btn-primary-hunter"
-              >
-                <Mail className="w-4 h-4" />
-                Connect Gmail
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Header — Finding 7: Scout's centered enterprise-header */}
+      <div className="enterprise-header">
+        <h1 className="page-title">Hunter</h1>
+        <p className="page-subtitle">Tactical Outreach Execution</p>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — Finding 6: Scout's .status-tab pattern */}
       <div className="hunter-tabs">
         <button
           className={`hunter-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -212,8 +177,14 @@ export default function HunterWeaponRoom() {
 
       {/* Content */}
       <div className="hunter-content">
-        {/* Gmail Connection Notice */}
-        {!gmailConnected && activeTab === 'weapons' && (
+        {/* Gmail Status — Finding 7: Relocated from header to Weapons tab context */}
+        {activeTab === 'weapons' && gmailConnected && (
+          <div className="gmail-status-inline">
+            <CheckCircle className="w-4 h-4" />
+            <span>{gmailEmail} connected</span>
+          </div>
+        )}
+        {activeTab === 'weapons' && !gmailConnected && (
           <div className="gmail-notice">
             <div className="gmail-notice-content">
               <Mail className="w-6 h-6" />

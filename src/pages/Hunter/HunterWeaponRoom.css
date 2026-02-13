@@ -5,129 +5,99 @@
   background: #ffffff;
 }
 
-/* Header */
-.hunter-header {
-  border-bottom: 1.5px solid #e5e7eb;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.hunter-header-content {
+/* Header — Finding 7: Aligned to Scout's centered enterprise-header */
+.enterprise-header {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 1.5rem 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  padding: 2rem 2rem 0;
+  text-align: center;
 }
 
-.hunter-title-section {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.hunter-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
-}
-
-.hunter-title {
-  font-size: 1.75rem;
-  font-weight: 800;
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
   color: #111827;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.375rem 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
 
-.hunter-subtitle {
-  font-size: 0.875rem;
+.page-subtitle {
+  font-size: 1rem;
   color: #6b7280;
   margin: 0;
   font-weight: 500;
 }
 
-.hunter-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.gmail-status-badge {
+/* Gmail Status — Relocated from header to Weapons tab context */
+.gmail-status-inline {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: #ecfdf5;
+  border: 1.5px solid #a7f3d0;
   border-radius: 10px;
   font-size: 0.875rem;
-  color: #10b981;
+  font-weight: 600;
+  color: #059669;
+  margin-bottom: 1.5rem;
 }
 
-/* Tab Navigation */
+/* Tab Navigation — Finding 6: Aligned to Scout's .status-tab pattern */
 .hunter-tabs {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 2rem;
   display: flex;
-  gap: 0.5rem;
-  border-bottom: 1.5px solid #e5e7eb;
-  background: #ffffff;
+  gap: 0.25rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0;
 }
 
 .hunter-tab {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
   color: #6b7280;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 .hunter-tab:hover {
-  color: #111827;
-  background: rgba(139, 92, 246, 0.06);
+  color: #374151;
+  border-bottom-color: #d1d5db;
 }
 
 .hunter-tab.active {
-  color: #111827;
+  color: #8b5cf6;
   border-bottom-color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.08);
 }
 
 .hunter-tab-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  background: rgba(139, 92, 246, 0.15);
-  border-radius: 10px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 0.5rem;
+  background: #f3f4f6;
+  border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #8b5cf6;
+  color: #6b7280;
 }
 
 .hunter-tab.active .hunter-tab-badge {
-  background: rgba(139, 92, 246, 0.2);
+  background: #ede9fe;
   color: #7c3aed;
 }
 
@@ -258,10 +228,6 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .hunter-header-content {
-    padding: 1rem 1.5rem;
-  }
-
   .hunter-tabs {
     padding: 0 1.5rem;
     overflow-x: auto;
@@ -273,24 +239,28 @@
   }
 
   .hunter-tab {
-    padding: 0.875rem 1.25rem;
     white-space: nowrap;
   }
 }
 
-@media (max-width: 640px) {
-  .hunter-title {
+@media (max-width: 768px) {
+  .enterprise-header {
+    padding: 1.5rem 1rem 0;
+  }
+
+  .page-title {
     font-size: 1.5rem;
   }
 
-  .hunter-subtitle {
-    font-size: 0.8125rem;
+  .hunter-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .hunter-header-actions {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.75rem;
+  .hunter-tab {
+    white-space: nowrap;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
   }
 }
 

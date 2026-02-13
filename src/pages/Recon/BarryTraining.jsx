@@ -150,17 +150,10 @@ export default function BarryTraining() {
       {/* Breadcrumbs */}
       <ReconBreadcrumbs />
 
-      {/* Header */}
+      {/* Header — Finding 10: Scout's centered enterprise-header */}
       <div className="barry-training-header">
-        <div className="barry-training-header-row">
-          <div className="barry-training-icon">
-            <Brain />
-          </div>
-          <div>
-            <h1 className="barry-training-title">Barry Training Status</h1>
-            <p className="barry-training-subtitle">What Barry knows and what he's missing</p>
-          </div>
-        </div>
+        <h1 className="barry-training-title">Barry Training Status</h1>
+        <p className="barry-training-subtitle">What Barry knows and what he's missing</p>
       </div>
 
       {/* Finding 12: KPI stats aligned to Scout's grid pattern */}

@@ -249,17 +249,10 @@ export default function ReconModulePage() {
       {/* Breadcrumbs */}
       <ReconBreadcrumbs />
 
-      {/* Header */}
+      {/* Header — Finding 10: Scout's centered enterprise-header */}
       <div className="recon-module-page-header">
-        <div className="recon-module-page-header-row">
-          <div className={`recon-module-page-icon ${color}`}>
-            <Brain />
-          </div>
-          <div>
-            <h1 className="recon-module-page-title">{config.title}</h1>
-            <p className="recon-module-page-count">{completedCount}/{totalCount} sections complete</p>
-          </div>
-        </div>
+        <h1 className="recon-module-page-title">{config.title}</h1>
+        <p className="recon-module-page-count">{completedCount}/{totalCount} sections complete</p>
         <p className="recon-module-page-desc">{config.description}</p>
       </div>
 

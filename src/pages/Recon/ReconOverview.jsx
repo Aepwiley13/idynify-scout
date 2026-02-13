@@ -292,17 +292,10 @@ export default function ReconOverview() {
       {/* Breadcrumbs */}
       <ReconBreadcrumbs />
 
-      {/* Header Section */}
+      {/* Header — Finding 10: Scout's centered enterprise-header */}
       <div className="recon-overview-header">
-        <div className="recon-header-row">
-          <div className="recon-header-icon">
-            <Brain />
-          </div>
-          <div>
-            <h1 className="recon-page-title">RECON</h1>
-            <p className="recon-page-subtitle">Barry's Training Intelligence</p>
-          </div>
-        </div>
+        <h1 className="recon-page-title">RECON</h1>
+        <p className="recon-page-subtitle">Barry's Training Intelligence</p>
         <p className="recon-description">
           RECON is how you train Barry. Every module you complete gives Barry deeper context about your business,
           customers, and market — making Scout smarter, Hunter sharper, and every interaction more relevant.

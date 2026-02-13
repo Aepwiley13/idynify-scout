@@ -273,9 +273,9 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
       {/* Navigation Pillars */}
       <nav className="sidebar-nav">
-        {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
         {renderPillar('scout', 'SCOUT', Search, 'pillar-cyan', scoutItems)}
         {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-pink', hunterItems)}
+        {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
       </nav>
 
       {/* Collapse Toggle */}

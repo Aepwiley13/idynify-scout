@@ -123,7 +123,8 @@ export default function ScoutGame() {
 
       for (const company of companies) {
         // Find contacts associated with this company
-        const contactQuery = query(contactsRef, where('company_name', '==', company.name));
+        // DailyLeads.jsx:263 stores company_id on auto-discovered contacts
+        const contactQuery = query(contactsRef, where('company_id', '==', company.id));
         const contactSnap = await getDocs(contactQuery);
         const contacts = contactSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -186,17 +187,18 @@ export default function ScoutGame() {
   };
 
   const handleEngage = (card) => {
-    const cached = prefetch.getMessages(card.id);
-    if (!cached?.messages) {
-      // Messages not ready — stay on card, they'll load
-      return;
-    }
     setEngageCard(card);
     setGamePhase('engage');
 
-    // Auto-select default weapon
-    const defaultWeapon = getDefaultWeapon(card.contact, gmailConnected);
-    if (defaultWeapon) setSelectedWeapon(defaultWeapon);
+    // Pre-select message and weapon if messages are ready
+    const cached = prefetch.getMessages(card.id);
+    if (cached?.messages) {
+      // Auto-select default weapon
+      const defaultWeapon = getDefaultWeapon(card.contact, gmailConnected);
+      if (defaultWeapon) setSelectedWeapon(defaultWeapon);
+    }
+    // If messages aren't ready, the engage phase will show a loading state
+    // and the user can select once they arrive
   };
 
   const handleSelectStrategy = (idx) => {
@@ -393,41 +395,70 @@ export default function ScoutGame() {
       )}
 
       {/* Phase: Engage (message selection + weapon selection) */}
-      {gamePhase === 'engage' && engageCard && (
-        <div className="scout-game-engage">
-          <button className="scout-game-back-btn" onClick={() => { resetEngageState(); setGamePhase('playing'); }}>
-            <ArrowLeft className="w-4 h-4" />
-            Back to cards
-          </button>
+      {gamePhase === 'engage' && engageCard && (() => {
+        const cached = prefetch.getMessages(engageCard.id);
+        const messagesReady = cached?.messages && cached.messages.length > 0;
+        const hasError = cached?.error;
 
-          <div className="scout-game-engage-contact">
-            <h3>{engageCard.contact?.firstName} {engageCard.contact?.lastName}</h3>
-            <p>{engageCard.contact?.title} at {engageCard.company?.name}</p>
+        return (
+          <div className="scout-game-engage">
+            <button className="scout-game-back-btn" onClick={() => { resetEngageState(); setGamePhase('playing'); }}>
+              <ArrowLeft className="w-4 h-4" />
+              Back to cards
+            </button>
+
+            <div className="scout-game-engage-contact">
+              <h3>{engageCard.contact?.firstName} {engageCard.contact?.lastName}</h3>
+              <p>{engageCard.contact?.title} at {engageCard.company?.name}</p>
+            </div>
+
+            {/* Messages loading */}
+            {!messagesReady && !hasError && (
+              <div className="game-card-loading">
+                <Loader className="w-5 h-5 spin" />
+                <span>Barry is preparing messages...</span>
+              </div>
+            )}
+
+            {/* Error state — Edge Case 1 & 7 */}
+            {hasError && (
+              <div className="game-card-error">
+                <span>{cached.error}</span>
+                <button className="game-card-retry-btn" onClick={() => prefetch.retryCard(engageCard.id)}>
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Messages ready */}
+            {messagesReady && (
+              <>
+                <GameMessageSelector
+                  messages={cached.messages}
+                  selectedStrategy={selectedStrategyIdx}
+                  onSelect={handleSelectStrategy}
+                />
+
+                <GameWeaponSelector
+                  contact={engageCard.contact}
+                  selectedWeapon={selectedWeapon}
+                  onSelect={setSelectedWeapon}
+                  gmailConnected={gmailConnected}
+                />
+
+                {/* Proceed to review */}
+                <button
+                  className="scout-game-review-btn"
+                  onClick={handleGoToReview}
+                  disabled={selectedStrategyIdx === null || !selectedWeapon}
+                >
+                  Review & Send
+                </button>
+              </>
+            )}
           </div>
-
-          <GameMessageSelector
-            messages={prefetch.getMessages(engageCard.id)?.messages}
-            selectedStrategy={selectedStrategyIdx}
-            onSelect={handleSelectStrategy}
-          />
-
-          <GameWeaponSelector
-            contact={engageCard.contact}
-            selectedWeapon={selectedWeapon}
-            onSelect={setSelectedWeapon}
-            gmailConnected={gmailConnected}
-          />
-
-          {/* Proceed to review */}
-          <button
-            className="scout-game-review-btn"
-            onClick={handleGoToReview}
-            disabled={selectedStrategyIdx === null || !selectedWeapon}
-          >
-            Review & Send
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Phase: Review + Send */}
       {gamePhase === 'review' && engageCard && (

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { auth } from '../firebase/config';
+import { logTimelineEvent, ACTORS } from '../utils/timelineLogger';
 import { buildAutoIntent, buildContactPayload, getEngagementIntent, GAME_CONSTANTS } from '../utils/buildAutoIntent';
 
 /**
@@ -64,6 +65,22 @@ export default function useGamePrefetch(cards, sessionMode) {
       const data = await response.json();
 
       if (data.success && data.messages && data.messages.length >= 3) {
+        // G8 parity: log message_generated timeline event, mirrors HunterContactDrawer.jsx:290-301
+        if (card.contact?.id) {
+          logTimelineEvent({
+            userId: user.uid,
+            contactId: card.contact.id,
+            type: 'message_generated',
+            actor: ACTORS.BARRY,
+            preview: intent.substring(0, 120),
+            metadata: {
+              strategyCount: data.messages.length,
+              strategies: data.messages.map(m => m.strategy),
+              engagementIntent,
+              source: 'scout_game_prefetch'
+            }
+          }).catch(() => {}); // Non-blocking — don't fail prefetch on log error
+        }
         return { cardId: card.id, messages: data.messages, error: null };
       }
 

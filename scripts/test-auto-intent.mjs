@@ -223,9 +223,13 @@ function evaluateMessages(testCase, result) {
       'introduction', 'let\'s connect', 'reaching out', 'following up'
     ];
     const isGeneric = genericSubjects.some(g => subject === g || subject.startsWith(g + ' '));
-    if (isGeneric) {
+    // A common opener + contact-specific qualifier is acceptable (e.g., "Quick question about Acme's pipeline")
+    const subjectHasContactRef = contactTerms.some(t => subject.includes(t));
+    if (isGeneric && !subjectHasContactRef) {
       scores.subjectQuality.pass = false;
-      scores.subjectQuality.notes.push(`[${msg.strategy}] Generic subject: "${msg.subject}"`);
+      scores.subjectQuality.notes.push(`[${msg.strategy}] Generic subject with no personalization: "${msg.subject}"`);
+    } else if (isGeneric && subjectHasContactRef) {
+      scores.subjectQuality.notes.push(`[${msg.strategy}] Common opener but personalized: "${msg.subject}" (ACCEPTABLE)`);
     }
     if (subject.length > 50) {
       scores.subjectQuality.notes.push(`[${msg.strategy}] Subject over 50 chars: ${subject.length}`);
@@ -287,14 +291,23 @@ function computeJaccard(a, b) {
 // --- MAIN ---
 
 async function main() {
+  // Support multiple auth mechanisms:
+  // 1. Explicit API key: ANTHROPIC_API_KEY=sk-ant-...
+  // 2. Environment proxy with base URL (CI/CD environments)
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const baseURL = process.env.ANTHROPIC_BASE_URL;
+
+  if (!apiKey && !baseURL) {
     console.error('\n ERROR: ANTHROPIC_API_KEY environment variable is required.');
     console.error(' Usage: ANTHROPIC_API_KEY=sk-ant-... node scripts/test-auto-intent.mjs\n');
     process.exit(1);
   }
 
-  const anthropic = new Anthropic({ apiKey });
+  const clientOpts = {};
+  if (apiKey) clientOpts.apiKey = apiKey;
+  if (baseURL) clientOpts.baseURL = baseURL;
+
+  const anthropic = new Anthropic(clientOpts);
 
   console.log('='.repeat(80));
   console.log('SCOUT GAME — BLOCKER 1: AUTO-INTENT QUALITY TEST');

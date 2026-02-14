@@ -1,19 +1,23 @@
-# SCOUT GAME — COMPLETE DISCOVERY DOCUMENT v2.1
+# SCOUT GAME — COMPLETE DISCOVERY DOCUMENT v2.2
 ## All 12 Sections Answered | All 3 Blockers Resolved Inline
 
-**Date:** 2026-02-13
+**Date:** 2026-02-14
 **Status:** GATE 2 COMPLETE — Ready for lead sign-off (Gate 3)
 
 ---
 
 ## SECTION 0 — RESPONDENT ACCOUNTABILITY
 
-| Role | Name | Date |
-|------|------|------|
-| Product Owner | _______________ | ______ |
-| Backend Lead | _______________ | ______ |
-| Frontend Lead | _______________ | ______ |
-| QA Lead | _______________ | ______ |
+**Instructions:** Review your assigned sections (see CTO gate message). Confirm (a) behavior accuracy, (b) caveats are complete, (c) guardrail confirmations are correct. If you have a correction, annotate the specific section inline. Sign below.
+
+| Role | Name | Date | Sections Reviewed | Sign-off |
+|------|------|------|-------------------|----------|
+| Product Owner | _______________ | ______ | 1, 4, 5, 6, 12 | [ ] Approved / [ ] Approved with annotations |
+| Backend Lead | _______________ | ______ | 1, 3, 5, 7, 9, 11 + G1, G2, G8 | [ ] Approved / [ ] Approved with annotations |
+| Frontend Lead | _______________ | ______ | 2, 8, 9, 10 + G3, G4, G6, G7, G9 | [ ] Approved / [ ] Approved with annotations |
+| QA Lead | _______________ | ______ | 5, 7, 10, 11 + G9 validation plan | [ ] Approved / [ ] Approved with annotations |
+
+**CTO decision on Section 6C (status: 'deferred'):** APPROVED as G1 compliant — new status value on existing field using existing pattern. If any lead disagrees, annotate Section 6C before signing.
 
 All answers below are derived from direct source code inspection. File paths and line numbers are provided as evidence for every claim.
 
@@ -511,13 +515,46 @@ Implementation: `SESSION_GOAL = 15` and `SESSION_WINDOW_MINUTES = 30` as fronten
 
 ## APPENDIX A — TEST CASE RESULTS
 
-*Pending: Backend lead to run 3 test cases from BLOCKER-1-RESOLUTION.md and append results here.*
+### How to Run
+
+A standalone test harness is provided at `scripts/test-auto-intent.mjs`. It replicates the exact prompt construction from `generate-engagement-message.js` (lines 249-335), bypasses Firebase auth/Firestore, and calls Claude directly with test data.
+
+```bash
+# Install dependencies (if not already installed)
+npm install
+
+# Run with your Anthropic API key
+ANTHROPIC_API_KEY=sk-ant-... node scripts/test-auto-intent.mjs
+```
+
+The script:
+1. Runs all 3 test cases against Claude Sonnet 4.5 (same model as production)
+2. Evaluates each result against the 4 criteria programmatically
+3. Outputs a formatted summary table for this appendix
+4. Writes machine-readable results to `docs/scout-game/test-case-results.json`
+
+### Evaluation Criteria
+
+1. **Contact-specific references** — Are all 3 messages specific to the contact (name, title, company referenced)?
+2. **Subject line quality** — Do subject lines avoid generic templates? Are they under 50 chars?
+3. **Strategy differentiation** — Is there meaningful differentiation between the 3 strategies (Jaccard similarity < 0.6)?
+4. **Send-ready quality** — Would you be comfortable if a user sent this to a real prospect? No buzzwords, no generic phrases.
+
+### Results
+
+*Backend lead: paste the summary table output from the test harness here.*
 
 | Test Case | Intent Type | Expected Quality | Actual Quality | Pass/Fail |
 |-----------|-------------|-----------------|----------------|-----------|
 | 1. Auto-constructed (full fields) | System-built | Comparable to manual | _______ | _______ |
 | 2. Auto-constructed (minimal) | System-built (degraded) | Acceptable | _______ | _______ |
 | 3. User-written (baseline) | Manual free-form | Baseline | _______ | _______ |
+
+### Decision Matrix
+
+- **Test 1 PASS:** C+D Hybrid confirmed. Proceed to Gate 3.
+- **Test 1 Borderline:** Default to Option C (auto-intent with one-tap override). Still G1 compliant.
+- **Test 1 FAIL:** Tag CTO immediately. Do not proceed.
 
 ---
 
@@ -542,15 +579,25 @@ Implementation: `SESSION_GOAL = 15` and `SESSION_WINDOW_MINUTES = 30` as fronten
 
 ---
 
-## GATE 2 STATUS: COMPLETE
+## GATE STATUS
 
-This document contains:
+### Gate 2: COMPLETE
 - [x] All 12 sections answered with codebase evidence
 - [x] Every answer includes: confirmed behavior, file + line reference, caveats, clear YES/NO/YES-WITH-CAVEAT
 - [x] Blocker 1 resolved inline (auto-intent, C+D Hybrid approved)
 - [x] Blocker 2 resolved inline (localStorage + React state, no backend writes)
 - [x] Blocker 3 resolved inline (derived metrics from existing timeline events, display-only)
-- [ ] Test case results (pending backend lead — Appendix A)
-- [ ] Four leads signed off (pending — Section 0)
+- [x] Test harness built and ready (`scripts/test-auto-intent.mjs`)
 
-**Next gate:** Lead sign-off (Gate 3) → Generate all 4 deliverables (Gate 4)
+### Gate 3: IN PROGRESS
+- [ ] Test case results filled in (backend lead runs `scripts/test-auto-intent.mjs` — Appendix A)
+- [ ] Product Owner sign-off (Section 0)
+- [ ] Backend Lead sign-off (Section 0)
+- [ ] Frontend Lead sign-off (Section 0)
+- [ ] QA Lead sign-off (Section 0)
+
+### Gate 4: BLOCKED ON GATE 3
+- [ ] Generate Deliverable 1 — Engineering Build Prompt
+- [ ] Generate Deliverable 2 — Frontend Component Registry
+- [ ] Generate Deliverable 3 — QA Parity Checklist
+- [ ] Generate Deliverable 4 — Performance Benchmark Targets

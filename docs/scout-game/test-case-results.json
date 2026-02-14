@@ -1,0 +1,115 @@
+{
+  "runDate": "2026-02-14T04:52:19.277Z",
+  "model": "claude-opus-4-6",
+  "note": "Generated via Claude model processing identical production prompts. Same model family as production target (claude-sonnet-4-5).",
+  "results": [
+    {
+      "id": 1,
+      "name": "Auto-constructed intent (full fields)",
+      "intentType": "System-built",
+      "expectedQuality": "Comparable to manual",
+      "allPass": true,
+      "criteria": {
+        "contactSpecific": true,
+        "subjectQuality": true,
+        "strategyDiff": true,
+        "sendReady": true
+      },
+      "messages": [
+        {
+          "strategy": "direct",
+          "label": "Direct & Short",
+          "subject": "Quick question about Acme's sales pipeline",
+          "message": "Hi Sarah,\n\nI'll keep this short — I work with SaaS sales leaders who are dealing with pipeline visibility and conversion challenges, and Acme Corp caught my attention.\n\nAs VP of Sales, you're likely juggling forecast accuracy, rep productivity, and pipeline velocity all at once. I have a few ideas that might be relevant to what you're navigating right now.\n\nWould you be open to a 20-minute conversation this week or next to see if there's a fit?",
+          "reasoning": "Why this approach works for Sarah: As a VP of Sales, she's busy and likely receives dozens of outreach emails daily. A direct, no-fluff message respects her time and signals confidence."
+        },
+        {
+          "strategy": "warm",
+          "label": "Warm & Personal",
+          "subject": "Fellow SaaS pipeline nerd here",
+          "message": "Hi Sarah,\n\nI came across your profile while researching SaaS sales leaders who are scaling teams in competitive markets — and your trajectory at Acme Corp stood out.\n\nI spend most of my time talking with VPs of Sales about the messy reality of pipeline management — the stuff that doesn't show up neatly in a dashboard. Things like deals stalling mid-funnel, inconsistent qualification, and the gap between what reps report and what actually closes.\n\nI'd love to hear how you're thinking about these challenges at Acme. No pitch, just a genuine conversation. Would you be up for a brief intro call sometime in the next couple of weeks?",
+          "reasoning": "Why this approach works for Sarah: This approach builds rapport by showing genuine curiosity about her work rather than leading with a product or solution."
+        },
+        {
+          "strategy": "value",
+          "label": "Value-Led",
+          "subject": "A pattern I'm seeing in SaaS pipelines",
+          "message": "Hi Sarah,\n\nI've been working closely with several SaaS sales orgs this quarter, and there's a pattern worth flagging: teams that grew quickly in 2024-2025 are now finding that their pipeline processes didn't scale with them. The result is longer sales cycles, less accurate forecasts, and a lot of internal friction between sales and ops.\n\nGiven Acme Corp's position in the SaaS space, I'd imagine some of this resonates — or at least sparks a \"we solved that differently\" reaction. Either way, I think there's a useful conversation here.\n\nWould you have 20 minutes in the next week or two to compare notes? I'm happy to share what's working for other teams at your stage.",
+          "reasoning": "Why this approach works for Sarah: Leading with a market-level insight positions you as someone who understands her world, not just someone selling something."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Auto-constructed intent (minimal fields)",
+      "intentType": "System-built (degraded)",
+      "expectedQuality": "Acceptable",
+      "allPass": true,
+      "criteria": {
+        "contactSpecific": true,
+        "subjectQuality": true,
+        "strategyDiff": true,
+        "sendReady": true
+      },
+      "messages": [
+        {
+          "strategy": "direct",
+          "label": "Direct & Short",
+          "subject": "Quick question for you, Sarah",
+          "message": "Hi Sarah,\n\nI'll keep this short because I know VPs of Sales at companies like Acme Corp don't have time for long emails from people they don't know yet.\n\nI work with sales leaders who are looking to sharpen how their teams identify and close high-value accounts. I have a few ideas that might be relevant to what you're building at Acme Corp.\n\nWould you be open to a 15-minute conversation this week or next to see if there's a fit?",
+          "reasoning": "Why this approach works for Sarah: As a VP of Sales, she likely values directness and efficiency."
+        },
+        {
+          "strategy": "warm",
+          "label": "Warm & Personal",
+          "subject": "Fellow sales person to sales leader",
+          "message": "Hi Sarah,\n\nI've been following Acme Corp's growth and wanted to reach out directly to you. Leading a sales org is one of those roles where everyone has opinions but few people actually understand the day-to-day pressure of hitting targets while building a team at the same time.\n\nI spend most of my time working alongside VPs of Sales who are navigating exactly that balance, and I'd genuinely enjoy hearing how you're thinking about the road ahead at Acme Corp.\n\nNo pitch — just a conversation. Would you be up for a brief call sometime in the next couple of weeks?",
+          "reasoning": "Why this approach works for Sarah: This approach leads with empathy and peer-level respect rather than a sales angle."
+        },
+        {
+          "strategy": "value",
+          "label": "Value-Led",
+          "subject": "A pattern I'm seeing with sales teams",
+          "message": "Hi Sarah,\n\nI've been talking with a number of sales leaders recently, and a pattern keeps coming up: teams are generating more pipeline than ever but conversion rates on mid-funnel deals are slipping. The common thread seems to be a gap between how reps qualify and how buyers actually make decisions now.\n\nI put together a few observations on what's working for the teams that are bucking that trend, and I think some of it could be directly useful for your team at Acme Corp.\n\nWould it be worth 15 minutes to share what I'm seeing and get your take on it? I'd value your perspective as someone running sales at this level.",
+          "reasoning": "Why this approach works for Sarah: Leading with a concrete, relevant insight positions the sender as someone worth talking to."
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "User-written intent (baseline)",
+      "intentType": "Manual free-form",
+      "expectedQuality": "Baseline",
+      "allPass": true,
+      "criteria": {
+        "contactSpecific": true,
+        "subjectQuality": true,
+        "strategyDiff": true,
+        "sendReady": true
+      },
+      "messages": [
+        {
+          "strategy": "direct",
+          "label": "Direct & Short",
+          "subject": "Quick question about Acme's sales cycle",
+          "message": "Hi Sarah,\n\nI'll keep this short — I work with SaaS sales teams that are looking to tighten up their deal cycles, and Acme Corp keeps coming up as a company doing interesting things in the space.\n\nWould you be open to a 15-minute chat to swap notes on what's working for closing deals faster right now? No pitch, just a conversation.\n\nEither way, appreciate your time.",
+          "reasoning": "Why this approach works for Sarah: As a VP of Sales, she's likely drowning in long-winded pitches. A direct, respectful message that gets to the point fast signals you value her time."
+        },
+        {
+          "strategy": "warm",
+          "label": "Warm & Personal",
+          "subject": "Fellow SaaS sales nerd here",
+          "message": "Hi Sarah,\n\nI've been following some of what Acme Corp is doing in the SaaS space, and as someone who spends most of my days deep in sales team challenges, I couldn't help but reach out.\n\nLeading sales at a growing SaaS company is no small thing — I imagine the pressure to keep shortening deal cycles while maintaining quality is constant. That's actually the exact problem I spend my time helping teams solve.\n\nWould love to grab a virtual coffee sometime and hear how things are going on your end. No agenda, just a good conversation between two people who think about this stuff way too much.",
+          "reasoning": "Why this approach works for Sarah: This builds rapport by acknowledging the difficulty of her role without being patronizing."
+        },
+        {
+          "strategy": "value",
+          "label": "Value-Led",
+          "subject": "A pattern I'm seeing in SaaS sales",
+          "message": "Hi Sarah,\n\nI've been working with a number of SaaS sales teams lately, and there's a pattern that keeps showing up — the teams closing deals fastest aren't necessarily the ones with the best product or the biggest pipeline. They're the ones who've rethought how they handle the middle of the funnel.\n\nGiven your role leading sales at Acme Corp, I thought this might resonate. I'd love to share what I've been seeing and hear whether it matches your experience.\n\nWould a quick 15-minute call be worth it to you this week or next?",
+          "reasoning": "Why this approach works for Sarah: Leading with an insight creates curiosity without giving everything away."
+        }
+      ]
+    }
+  ]
+}

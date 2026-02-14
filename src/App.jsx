@@ -38,6 +38,7 @@ import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
 import ScoutPlus from './pages/Scout/ScoutPlus';
+import ScoutGame from './pages/Scout/ScoutGame';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminPingTest from './pages/Admin/AdminPingTest';
@@ -379,6 +380,16 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <ScoutPlus />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Scout Game Mode */}
+        <Route
+          path="/scout/game"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <ScoutGame />
             </ProtectedRoute>
           }
         />

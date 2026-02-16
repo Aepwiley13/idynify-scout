@@ -4,19 +4,19 @@ import { buildAutoIntent } from '../../utils/buildAutoIntent';
 import GameIntentChip from './GameIntentChip';
 
 /**
- * GameCard — Individual game card displaying company + contact + pre-loaded messages.
+ * GameCard — Individual game card displaying CONTACT as primary entity.
  *
- * Layout (top to bottom):
- *   1. Company name + ICP score badge
- *   2. Contact name + title
+ * PIVOTED LAYOUT (contact-centric, top to bottom):
+ *   1. Contact photo (if available) + name + title
+ *   2. Company name
  *   3. Intent chip (tappable for override)
  *   4. Message preview area (loading / error / 3 strategies)
  *   5. Defer button (secondary action)
  *
- * Fallbacks per discovery Section 2B and G3:
- *   - Missing title: "Contact at {company}"
- *   - Missing industry: omit industry line
- *   - Missing score: hide badge
+ * Fallbacks:
+ *   - Missing name: use firstName + lastName, then "Contact"
+ *   - Missing title: omit title line
+ *   - Missing company: "Unknown Company"
  *   - No messages (loading): show spinner
  *   - No messages (error): show retry
  */
@@ -31,13 +31,13 @@ export default function GameCard({
   const { company, contact } = card;
   const [intentOverride, setIntentOverride] = useState(null);
 
-  const companyName = company?.name || contact?.company_name || 'Unknown Company';
-  const contactName = contact
-    ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Contact'
-    : null;
+  const companyName = company?.name || contact?.company_name || contact?.current_company_name || 'Unknown Company';
+  const contactName = contact?.name
+    || `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim()
+    || 'Unknown Contact';
   const contactTitle = contact?.title || contact?.current_position_title || null;
-  const industry = company?.industry || contact?.company_industry || null;
-  const fitScore = company?.fit_score || null;
+  const industry = company?.industry || contact?.company_industry || contact?.industry || null;
+  const photoUrl = contact?.photo_url || null;
   const autoIntent = buildAutoIntent(contact || {}, company || {}, sessionMode);
   const displayIntent = intentOverride || autoIntent;
 
@@ -53,8 +53,8 @@ export default function GameCard({
     return (
       <div className="game-card game-card-bg">
         <div className="game-card-header">
-          <Building2 className="w-4 h-4" />
-          <span className="game-card-company">{companyName}</span>
+          <User className="w-4 h-4" />
+          <span className="game-card-company">{contactName}</span>
         </div>
       </div>
     );
@@ -62,33 +62,29 @@ export default function GameCard({
 
   return (
     <div className="game-card">
-      {/* Header: Company + Score */}
-      <div className="game-card-header">
-        <div className="game-card-company-row">
-          <Building2 className="w-4 h-4" />
-          <span className="game-card-company">{companyName}</span>
-          {industry && <span className="game-card-industry">{industry}</span>}
-        </div>
-        {fitScore !== null && (
-          <span className={`game-card-score ${fitScore >= 80 ? 'score-high' : fitScore >= 60 ? 'score-mid' : 'score-low'}`}>
-            {fitScore}
-          </span>
+      {/* Contact — Primary entity */}
+      <div className="game-card-contact-hero">
+        {photoUrl ? (
+          <img src={photoUrl} alt={contactName} className="game-card-photo" />
+        ) : (
+          <div className="game-card-photo-placeholder">
+            <User className="w-6 h-6" />
+          </div>
         )}
-      </div>
-
-      {/* Contact info */}
-      {contact && (
-        <div className="game-card-contact">
-          <User className="w-4 h-4" />
+        <div className="game-card-contact-info">
           <span className="game-card-contact-name">{contactName}</span>
           {contactTitle && (
-            <>
-              <Briefcase className="w-3 h-3" />
-              <span className="game-card-contact-title">{contactTitle}</span>
-            </>
+            <span className="game-card-contact-title">{contactTitle}</span>
           )}
         </div>
-      )}
+      </div>
+
+      {/* Company info */}
+      <div className="game-card-company-row">
+        <Building2 className="w-4 h-4" />
+        <span className="game-card-company">{companyName}</span>
+        {industry && <span className="game-card-industry">{industry}</span>}
+      </div>
 
       {/* Intent chip */}
       <GameIntentChip

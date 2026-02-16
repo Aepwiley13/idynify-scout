@@ -24,6 +24,7 @@ import StructuredFields from '../../components/contacts/StructuredFields';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
+import GameBucketSelector from '../../components/contacts/GameBucketSelector';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -624,6 +625,9 @@ export default function ContactProfile() {
 
         {/* 2. STRUCTURED CONTEXT — Strategic classification */}
         <StructuredFields contact={contact} onUpdate={handleContactUpdate} />
+
+        {/* 2b. GAME BUCKET — Assign contact to a game session bucket */}
+        <GameBucketSelector contact={contact} onUpdate={handleContactUpdate} />
 
         {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (

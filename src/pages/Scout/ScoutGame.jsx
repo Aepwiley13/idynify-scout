@@ -1,14 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import {
   executeSendAction,
   checkGmailConnection,
   CHANNELS,
   SEND_RESULT
 } from '../../utils/sendActionResolver';
-import { buildAutoIntent, getEngagementIntent, buildContactPayload, GAME_CONSTANTS } from '../../utils/buildAutoIntent';
+import {
+  buildAutoIntent,
+  getEngagementIntent,
+  buildContactPayload,
+  GAME_CONSTANTS,
+  bucketToSessionMode
+} from '../../utils/buildAutoIntent';
 import useScoutGameSession from '../../hooks/useScoutGameSession';
 import useGameTimer from '../../hooks/useGameTimer';
 import useGamePrefetch from '../../hooks/useGamePrefetch';
@@ -23,14 +29,15 @@ import { Loader, ArrowLeft } from 'lucide-react';
 import './ScoutGame.css';
 
 /**
- * SCOUT GAME — Main Page Component
+ * SCOUT GAME — Main Page Component (PIVOTED)
  *
- * Gamified, time-boxed engagement workflow. Additive UI layer (G6) on top
- * of the existing Scout/Hunter system. Zero backend changes (G1).
+ * Data source: All Leads contacts filtered by game_bucket.
+ * Cards are individual CONTACTS, not companies.
+ * Bucket selection replaces abstract mode selection.
  *
  * Flow:
- *   1. Session start → user picks mode (one tap)
- *   2. Card stack loads → auto-intent + Barry prefetch
+ *   1. Session start → user picks a bucket with live contact counts
+ *   2. Card stack loads contacts from selected bucket
  *   3. Per card: view messages → pick strategy → pick channel → review → send
  *   4. Session summary on exit
  *
@@ -42,9 +49,12 @@ export default function ScoutGame() {
   // Game phase: start → playing → engage → review → summary
   const [gamePhase, setGamePhase] = useState('start');
 
-  // Card data
+  // Card data — now individual contacts, not companies
   const [cards, setCards] = useState([]);
   const [loadingCards, setLoadingCards] = useState(false);
+
+  // Selected bucket for current session
+  const [selectedBucket, setSelectedBucket] = useState(null);
 
   // Engagement flow state (per-card, ephemeral)
   const [engageCard, setEngageCard] = useState(null);
@@ -82,7 +92,12 @@ export default function ScoutGame() {
     if (restored) {
       timer.restore();
       setGamePhase('playing');
-      loadCards();
+      // Restore bucket from localStorage
+      const storedBucket = localStorage.getItem('scout_game_bucket');
+      if (storedBucket) {
+        setSelectedBucket(storedBucket);
+        loadCards(storedBucket);
+      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -100,44 +115,55 @@ export default function ScoutGame() {
     }
   }, [session.cardIndex, session.isActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load pending companies + their contacts — mirrors DailyLeads.jsx:56-67
-  const loadCards = useCallback(async () => {
+  /**
+   * Load contacts from the selected bucket.
+   * NEW DATA SOURCE: contacts where game_bucket == selectedBucket
+   * Filtered client-side: exclude contacts with message_sent event
+   * Ordered by: created_at desc (newest saved leads first)
+   */
+  const loadCards = useCallback(async (bucketId) => {
     const user = auth.currentUser;
     if (!user) return;
 
     setLoadingCards(true);
     try {
-      // Load pending companies sorted by fit_score
-      const companiesRef = collection(db, 'users', user.uid, 'companies');
-      const q = query(companiesRef, where('status', '==', 'pending'));
-      const snapshot = await getDocs(q);
-
-      const companies = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0))
-        .slice(0, GAME_CONSTANTS.DAILY_CARD_LIMIT);
-
-      // Load contacts for each company
       const contactsRef = collection(db, 'users', user.uid, 'contacts');
-      const cardData = [];
+      const snapshot = await getDocs(contactsRef);
 
-      for (const company of companies) {
-        // Find contacts associated with this company
-        // DailyLeads.jsx:263 stores company_id on auto-discovered contacts
-        const contactQuery = query(contactsRef, where('company_id', '==', company.id));
-        const contactSnap = await getDocs(contactQuery);
-        const contacts = contactSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allContacts = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => c.game_bucket === bucketId);
 
-        // Use the first contact (highest relevance) or create a minimal card
-        const primaryContact = contacts[0] || null;
+      // Filter out engaged contacts (those with message_sent in activity_log)
+      const readyContacts = allContacts.filter(c => {
+        if (!c.activity_log || c.activity_log.length === 0) return true;
+        return !c.activity_log.some(e =>
+          e.type === 'message_sent' || e.type === 'email_sent'
+        );
+      });
 
-        cardData.push({
-          id: company.id,
-          company,
-          contact: primaryContact,
-          contacts
-        });
-      }
+      // Order by created_at desc (newest saved leads first)
+      readyContacts.sort((a, b) => {
+        const dateA = a.saved_at || a.addedAt || a.created_at || '';
+        const dateB = b.saved_at || b.addedAt || b.created_at || '';
+        return String(dateB).localeCompare(String(dateA));
+      });
+
+      // Limit to DAILY_CARD_LIMIT
+      const limited = readyContacts.slice(0, GAME_CONSTANTS.DAILY_CARD_LIMIT);
+
+      // Build card data — cards are now contacts, not companies
+      // Each card needs: id, contact, company (optional lookup data)
+      const cardData = limited.map(contact => ({
+        id: contact.id,
+        contact,
+        company: {
+          name: contact.company_name || contact.current_company_name || '',
+          industry: contact.company_industry || contact.industry || '',
+          id: contact.company_id || null
+        },
+        contacts: [contact]
+      }));
 
       setCards(cardData);
     } catch (err) {
@@ -149,11 +175,14 @@ export default function ScoutGame() {
 
   // === SESSION LIFECYCLE ===
 
-  const handleSelectMode = async (mode) => {
-    session.startSession(mode);
+  const handleSelectBucket = async (bucketId) => {
+    const sessionMode = bucketToSessionMode(bucketId);
+    setSelectedBucket(bucketId);
+    localStorage.setItem('scout_game_bucket', bucketId);
+    session.startSession(sessionMode);
     timer.start();
     setGamePhase('playing');
-    await loadCards();
+    await loadCards(bucketId);
   };
 
   const handleEndSession = () => {
@@ -165,6 +194,8 @@ export default function ScoutGame() {
 
   const handleNewSession = () => {
     session.clearSession();
+    localStorage.removeItem('scout_game_bucket');
+    setSelectedBucket(null);
     setCards([]);
     setGamePhase('start');
     resetEngageState();
@@ -172,6 +203,7 @@ export default function ScoutGame() {
 
   const handleExit = () => {
     session.clearSession();
+    localStorage.removeItem('scout_game_bucket');
     navigate('/scout');
   };
 
@@ -197,8 +229,6 @@ export default function ScoutGame() {
       const defaultWeapon = getDefaultWeapon(card.contact, gmailConnected);
       if (defaultWeapon) setSelectedWeapon(defaultWeapon);
     }
-    // If messages aren't ready, the engage phase will show a loading state
-    // and the user can select once they arrive
   };
 
   const handleSelectStrategy = (idx) => {
@@ -280,31 +310,46 @@ export default function ScoutGame() {
       }
     } catch (err) {
       console.error('Error sending message:', err);
-      // Show error but don't crash — user can retry
       setSendLoading(false);
     }
   };
 
   // === SKIP / DEFER ===
 
-  // G7: Skip = existing reject. updateDoc status: 'rejected' — identical to DailyLeads.jsx:184
+  /**
+   * SKIP — Soft defer. Moves contact to end of in-memory queue.
+   * Does NOT reject or write any permanent status change.
+   * Increments skip_count on the contact for analytics.
+   */
   const handleSkip = async (card) => {
     const user = auth.currentUser;
     if (!user) return;
 
     try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', card.company.id);
-      await updateDoc(companyRef, {
-        status: 'rejected',
-        swipedAt: new Date().toISOString(),
-        swipeDirection: 'left'
+      // Increment skip_count on contact (lightweight, non-blocking)
+      if (card.contact?.id) {
+        const contactRef = doc(db, 'users', user.uid, 'contacts', card.contact.id);
+        updateDoc(contactRef, {
+          skip_count: (card.contact.skip_count || 0) + 1
+        }).catch(() => {}); // Non-blocking
+      }
+
+      // Move card to end of in-memory array (soft defer)
+      setCards(prev => {
+        const newCards = [...prev];
+        const currentIdx = session.cardIndex;
+        if (currentIdx < newCards.length) {
+          const [skipped] = newCards.splice(currentIdx, 1);
+          newCards.push(skipped);
+        }
+        return newCards;
       });
 
       session.recordSkip();
-      session.advanceCard();
       cardOpenedAt.current = Date.now();
 
-      if (session.cardIndex + 1 >= cards.length) {
+      // Check if we've cycled through all cards
+      if (session.cardIndex >= cards.length - 1) {
         handleEndSession();
       }
     } catch (err) {
@@ -312,27 +357,14 @@ export default function ScoutGame() {
     }
   };
 
-  // Defer: set status: 'deferred' — new value on existing field (CTO approved, G1 compliant)
+  // Defer: save for later — unchanged behavior
   const handleDefer = async (card) => {
-    const user = auth.currentUser;
-    if (!user) return;
+    session.recordDefer();
+    session.advanceCard();
+    cardOpenedAt.current = Date.now();
 
-    try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', card.company.id);
-      await updateDoc(companyRef, {
-        status: 'deferred',
-        deferredAt: new Date().toISOString()
-      });
-
-      session.recordDefer();
-      session.advanceCard();
-      cardOpenedAt.current = Date.now();
-
-      if (session.cardIndex + 1 >= cards.length) {
-        handleEndSession();
-      }
-    } catch (err) {
-      console.error('Error deferring card:', err);
+    if (session.cardIndex + 1 >= cards.length) {
+      handleEndSession();
     }
   };
 
@@ -368,9 +400,9 @@ export default function ScoutGame() {
         />
       )}
 
-      {/* Phase: Start */}
+      {/* Phase: Start — Live bucket cards */}
       {gamePhase === 'start' && (
-        <GameSessionStart onSelectMode={handleSelectMode} />
+        <GameSessionStart onSelectBucket={handleSelectBucket} />
       )}
 
       {/* Phase: Playing (card stack) */}
@@ -408,7 +440,7 @@ export default function ScoutGame() {
             </button>
 
             <div className="scout-game-engage-contact">
-              <h3>{engageCard.contact?.firstName} {engageCard.contact?.lastName}</h3>
+              <h3>{engageCard.contact?.name || `${engageCard.contact?.firstName || ''} ${engageCard.contact?.lastName || ''}`.trim() || 'Contact'}</h3>
               <p>{engageCard.contact?.title} at {engageCard.company?.name}</p>
             </div>
 

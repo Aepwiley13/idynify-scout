@@ -1317,3 +1317,93 @@
     gap: 0.5rem;
   }
 }
+
+/* ── Bucket Badge on Contact Card ─────── */
+.card-bucket-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid;
+  border-radius: 1rem;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+
+/* ── Bulk Bucket Assignment ───────────── */
+.bulk-bucket-wrapper {
+  position: relative;
+}
+
+.bulk-btn.bulk-bucket {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: #7c3aed;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bulk-btn.bulk-bucket:hover {
+  background: #6d28d9;
+}
+
+.bucket-popover {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  z-index: 50;
+  overflow: hidden;
+}
+
+.bucket-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.625rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: #374151;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.bucket-popover-item:hover {
+  background: #f3f4f6;
+}
+
+.bucket-popover-emoji {
+  font-size: 1rem;
+}
+
+.bucket-popover-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0.25rem 0;
+}
+
+.bucket-popover-item.bucket-popover-remove {
+  color: #6b7280;
+}
+
+.bucket-popover-item.bucket-popover-remove:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}

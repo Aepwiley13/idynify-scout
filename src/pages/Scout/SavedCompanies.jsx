@@ -272,8 +272,15 @@ export default function SavedCompanies() {
       const companiesList = await enrichWithContactCounts(companiesSnapshot);
       const archivedList = await enrichWithContactCounts(archivedSnapshot);
 
-      setCompanies(companiesList);
-      setArchivedCompanies(archivedList);
+      // Sort newest first (by saved/created date)
+      const sortNewest = (list) => list.sort((a, b) => {
+        const dateA = a.saved_at || a.created_at || a.swipedAt || '';
+        const dateB = b.saved_at || b.created_at || b.swipedAt || '';
+        return String(dateB).localeCompare(String(dateA));
+      });
+
+      setCompanies(sortNewest(companiesList));
+      setArchivedCompanies(sortNewest(archivedList));
       setLoading(false);
     } catch (error) {
       console.error('Failed to load saved companies:', error);

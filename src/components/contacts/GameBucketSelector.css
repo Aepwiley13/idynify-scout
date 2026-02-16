@@ -1,0 +1,82 @@
+/* ============================================
+   GAME BUCKET SELECTOR
+   Assign contacts to game session buckets.
+   Matches StructuredFields visual style.
+   ============================================ */
+
+.game-bucket-selector {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.gbs-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gbs-header svg {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.gbs-saving {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #9ca3af;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.gbs-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.gbs-option {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: white;
+  border: 1.5px solid #d1d5db;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.gbs-option:hover {
+  color: #374151;
+  border-color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.gbs-option.gbs-option-active {
+  background: #f0f0ff;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .gbs-options {
+    flex-direction: column;
+  }
+
+  .gbs-option {
+    justify-content: center;
+  }
+}

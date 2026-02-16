@@ -21,6 +21,7 @@ import { getSequencePlan } from '../../utils/sequenceEngine';
 import { generateContactRecommendations, dismissRecommendation } from '../../utils/recommendationEngine';
 import BarryRecommendationCard from './BarryRecommendationCard';
 import SequencePanel from './SequencePanel';
+import LearningToast from '../LearningToast';
 import './HunterContactDrawer.css';
 
 /**
@@ -81,6 +82,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   // Barry proactive recommendations (Step 7)
   const [drawerRecommendations, setDrawerRecommendations] = useState([]);
+
+  // Toast notification state (replaces native alert())
+  const [toastMessage, setToastMessage] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -464,12 +468,13 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
         currentStatus: getContactStatus(contact)
       });
 
-      alert(`${contact.firstName} added to mission!`);
+      const contactDisplayName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Contact';
+      setToastMessage(`${contactDisplayName} added to mission!`);
       loadData();
       setActiveView('main');
     } catch (error) {
       console.error('Error adding to mission:', error);
-      alert('Failed to add to mission. Please try again.');
+      setToastMessage('Failed to add to mission. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -488,11 +493,11 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       });
 
       onContactUpdate(editedContact);
-      alert('Contact info updated!');
+      setToastMessage('Contact info updated!');
       setActiveView('main');
     } catch (error) {
       console.error('Error updating contact:', error);
-      alert('Failed to update contact. Please try again.');
+      setToastMessage('Failed to update contact. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -509,6 +514,13 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   return (
     <div className="hunter-contact-drawer-overlay" onClick={onClose}>
       <div className="hunter-contact-drawer" onClick={(e) => e.stopPropagation()}>
+        {/* Toast notification */}
+        {toastMessage && (
+          <LearningToast
+            message={toastMessage}
+            onDismiss={() => setToastMessage(null)}
+          />
+        )}
         {/* Header */}
         <div className="drawer-header">
           <div className="drawer-title-section">

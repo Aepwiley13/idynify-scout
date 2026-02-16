@@ -163,6 +163,64 @@
   text-align: center;
 }
 
+.game-mode-count {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.game-mode-card-empty {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.game-mode-card-empty:active {
+  border-color: var(--border-color, #3f3f46);
+}
+
+.game-mode-empty-cta {
+  font-size: 11px;
+  color: var(--text-tertiary, #71717a);
+}
+
+.game-start-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.game-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.game-empty-text {
+  font-size: 15px;
+  color: var(--text-secondary, #a1a1aa);
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+.game-empty-cta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--color-accent, #8b5cf6);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 48px;
+}
+
 /* === Card Stack === */
 .game-card-stack {
   position: relative;
@@ -237,6 +295,40 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* Contact hero — primary entity display */
+.game-card-contact-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.game-card-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.game-card-photo-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-tertiary, #27272a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #a1a1aa);
+  flex-shrink: 0;
+}
+
+.game-card-contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .game-card-bg {

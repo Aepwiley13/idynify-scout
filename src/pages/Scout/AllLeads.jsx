@@ -13,6 +13,7 @@ import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import { downloadVCard } from '../../utils/vcard';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus, CONTACT_STATUSES } from '../../utils/contactStateMachine';
+import { GAME_BUCKET_LIST, GAME_BUCKETS } from '../../utils/buildAutoIntent';
 import './AllLeads.css';
 
 // ── Helpers ──────────────────────────────────────────────
@@ -93,7 +94,7 @@ export default function AllLeads() {
 
   // Filters & sort
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('readiness');
+  const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [statusFilter, setStatusFilter] = useState('active');
   const [dataFilter, setDataFilter] = useState(null);
@@ -104,20 +105,22 @@ export default function AllLeads() {
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [menuOpenFor, setMenuOpenFor] = useState(null);
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(null);
+  const [bucketPopoverOpen, setBucketPopoverOpen] = useState(false);
 
   // ── Data Loading ─────────────────────────────────────
 
   useEffect(() => { loadAllContacts(); }, []);
 
-  // Close three-dot menu on outside click
+  // Close three-dot menu and bucket popover on outside click
   useEffect(() => {
-    if (!menuOpenFor) return;
+    if (!menuOpenFor && !bucketPopoverOpen) return;
     function handleClick(e) {
-      if (!e.target.closest('.card-menu')) setMenuOpenFor(null);
+      if (menuOpenFor && !e.target.closest('.card-menu')) setMenuOpenFor(null);
+      if (bucketPopoverOpen && !e.target.closest('.bulk-bucket-wrapper')) setBucketPopoverOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpenFor]);
+  }, [menuOpenFor, bucketPopoverOpen]);
 
   async function loadAllContacts() {
     try {
@@ -233,6 +236,62 @@ export default function AllLeads() {
       setSelectedContactIds([]);
     } catch (error) {
       console.error('Failed to bulk update status:', error);
+    } finally {
+      setStatusUpdateLoading(null);
+    }
+  }
+
+  // ── Bulk Bucket Assignment ─────────────────────────
+
+  async function handleBulkBucketAssign(bucketId) {
+    if (selectedContactIds.length === 0) return;
+    setBucketPopoverOpen(false);
+    setStatusUpdateLoading('bulk');
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const promises = selectedContactIds.map(id => {
+        const ref = doc(db, 'users', user.uid, 'contacts', id);
+        return updateDoc(ref, {
+          game_bucket: bucketId,
+          updated_at: new Date().toISOString()
+        });
+      });
+      await Promise.all(promises);
+
+      setContacts(prev => prev.map(c =>
+        selectedContactIds.includes(c.id) ? { ...c, game_bucket: bucketId } : c
+      ));
+      setSelectedContactIds([]);
+    } catch (error) {
+      console.error('Failed to bulk assign bucket:', error);
+    } finally {
+      setStatusUpdateLoading(null);
+    }
+  }
+
+  async function handleBulkBucketRemove() {
+    if (selectedContactIds.length === 0) return;
+    setBucketPopoverOpen(false);
+    setStatusUpdateLoading('bulk');
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const promises = selectedContactIds.map(id => {
+        const ref = doc(db, 'users', user.uid, 'contacts', id);
+        return updateDoc(ref, {
+          game_bucket: null,
+          updated_at: new Date().toISOString()
+        });
+      });
+      await Promise.all(promises);
+
+      setContacts(prev => prev.map(c =>
+        selectedContactIds.includes(c.id) ? { ...c, game_bucket: null } : c
+      ));
+      setSelectedContactIds([]);
+    } catch (error) {
+      console.error('Failed to remove bucket assignment:', error);
     } finally {
       setStatusUpdateLoading(null);
     }
@@ -384,7 +443,9 @@ export default function AllLeads() {
     } else if (sortBy === 'company') {
       cmp = (companies[a.company_id]?.name || '').localeCompare(companies[b.company_id]?.name || '');
     } else if (sortBy === 'date') {
-      cmp = (a.addedAt || 0) - (b.addedAt || 0);
+      const dateA = a.saved_at || a.addedAt || a.created_at || '';
+      const dateB = b.saved_at || b.addedAt || b.created_at || '';
+      cmp = String(dateA).localeCompare(String(dateB));
     } else if (sortBy === 'email-quality') {
       const order = { 'verified': 3, 'likely': 2, 'unverified': 1 };
       cmp = (order[a.email_status] || 0) - (order[b.email_status] || 0);
@@ -640,6 +701,39 @@ export default function AllLeads() {
                 {statusUpdateLoading === 'bulk' ? 'Archiving...' : 'Archive'}
               </button>
             )}
+            {/* Bucket Assignment Popover */}
+            <div className="bulk-bucket-wrapper">
+              <button
+                className="bulk-btn bulk-bucket"
+                onClick={() => setBucketPopoverOpen(!bucketPopoverOpen)}
+                disabled={statusUpdateLoading === 'bulk'}
+              >
+                <Zap className="w-4 h-4" />
+                Assign Bucket
+              </button>
+              {bucketPopoverOpen && (
+                <div className="bucket-popover">
+                  {GAME_BUCKET_LIST.map(bucket => (
+                    <button
+                      key={bucket.id}
+                      className="bucket-popover-item"
+                      onClick={() => handleBulkBucketAssign(bucket.id)}
+                    >
+                      <span className="bucket-popover-emoji">{bucket.emoji}</span>
+                      <span>{bucket.label}</span>
+                    </button>
+                  ))}
+                  <div className="bucket-popover-divider" />
+                  <button
+                    className="bucket-popover-item bucket-popover-remove"
+                    onClick={handleBulkBucketRemove}
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Remove from Bucket</span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               className="bulk-btn bulk-export"
               onClick={() => {
@@ -795,6 +889,14 @@ export default function AllLeads() {
                     <span className={`contact-status-badge contact-status-${getContactStatus(contact).toLowerCase().replace(/\s+/g, '-')}`}>
                       {getContactStatus(contact)}
                     </span>
+                    {contact.game_bucket && GAME_BUCKETS[contact.game_bucket] && (
+                      <span
+                        className="card-bucket-badge"
+                        style={{ borderColor: GAME_BUCKETS[contact.game_bucket].color, color: GAME_BUCKETS[contact.game_bucket].color }}
+                      >
+                        {GAME_BUCKETS[contact.game_bucket].emoji} {GAME_BUCKETS[contact.game_bucket].label}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

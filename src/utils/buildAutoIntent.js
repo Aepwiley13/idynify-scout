@@ -69,6 +69,58 @@ export const SESSION_MODES = {
 
 export const SESSION_MODE_LIST = Object.values(SESSION_MODES);
 
+/**
+ * Game buckets — user-assigned contact categories that map directly to session modes.
+ * Bucket values stored on contact.game_bucket field.
+ * Each bucket maps 1:1 to a SESSION_MODES key for auto-intent construction.
+ */
+export const GAME_BUCKETS = {
+  build_pipeline: {
+    id: 'build_pipeline',
+    label: 'Build Pipeline',
+    icon: 'Target',
+    emoji: '\uD83C\uDFAF',
+    sessionMode: 'direct_pipeline',
+    color: '#8b5cf6'
+  },
+  warm_outreach: {
+    id: 'warm_outreach',
+    label: 'Warm Outreach',
+    icon: 'Users',
+    emoji: '\uD83E\uDD1D',
+    sessionMode: 'warm_outreach',
+    color: '#22c55e'
+  },
+  re_engage: {
+    id: 're_engage',
+    label: 'Re-Engage',
+    icon: 'RefreshCw',
+    emoji: '\uD83D\uDD01',
+    sessionMode: 're_engagement',
+    color: '#f59e0b'
+  },
+  introductions: {
+    id: 'introductions',
+    label: 'Introductions',
+    icon: 'UserPlus',
+    emoji: '\uD83D\uDC4B',
+    sessionMode: 'new_introductions',
+    color: '#3b82f6'
+  }
+};
+
+export const GAME_BUCKET_LIST = Object.values(GAME_BUCKETS);
+
+/**
+ * Map a game_bucket value to the corresponding session mode ID.
+ * Used when starting a game session from a bucket selection.
+ * @param {string} bucketId - One of the GAME_BUCKETS keys
+ * @returns {string} SESSION_MODES key
+ */
+export function bucketToSessionMode(bucketId) {
+  return GAME_BUCKETS[bucketId]?.sessionMode || 'direct_pipeline';
+}
+
 /** Game constants */
 export const GAME_CONSTANTS = {
   SESSION_GOAL: 15,

@@ -108,13 +108,6 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const scoutItems = [
     {
-      icon: Zap,
-      label: 'Game Mode',
-      sublabel: '15 in 30',
-      path: '/scout/game',
-      isPrimary: true
-    },
-    {
       icon: Star,
       label: 'Daily Leads',
       sublabel: 'Review Queue',
@@ -162,6 +155,13 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       label: 'ICP Settings',
       path: '/scout',
       state: { activeTab: 'icp-settings' }
+    },
+    {
+      icon: Zap,
+      label: 'Game Mode',
+      sublabel: '15 in 30',
+      path: '/scout/game',
+      isPrimary: true
     }
   ];
 

@@ -158,7 +158,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     },
     {
       icon: Zap,
-      label: 'Game Mode',
+      label: 'Game Mode - Beta',
       sublabel: '15 in 30',
       path: '/scout/game',
       isPrimary: true

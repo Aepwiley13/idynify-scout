@@ -200,6 +200,7 @@ export default function ReconModulePage() {
   }, [moduleId]);
 
   const loadSections = async () => {
+    setLoading(true);
     setLoadError(null);
     try {
       const user = auth.currentUser;

@@ -62,9 +62,11 @@ export default function ReconSectionEditor() {
   }, [sectionId]);
 
   const loadSection = async () => {
+    let navigatedAway = false;
     try {
       const user = auth.currentUser;
       if (!user) {
+        navigatedAway = true;
         navigate('/login');
         return;
       }
@@ -72,12 +74,14 @@ export default function ReconSectionEditor() {
       const sectionData = await getSectionData(user.uid, 'recon', sectionNum);
 
       if (!sectionData) {
-        navigate(`/recon/${parentModule || ''}`);
+        navigatedAway = true;
+        navigate(`/recon/${parentModule || 'icp-intelligence'}`);
         return;
       }
 
       if (!sectionData.unlocked) {
-        navigate(`/recon/${parentModule || ''}`);
+        navigatedAway = true;
+        navigate(`/recon/${parentModule || 'icp-intelligence'}`);
         return;
       }
 
@@ -90,7 +94,12 @@ export default function ReconSectionEditor() {
     } catch (error) {
       console.error('Error loading section:', error);
     } finally {
-      setLoading(false);
+      // Only clear the loading state if we're staying on this page.
+      // If navigate() was called, keep loading=true so there's no
+      // blank/error flash while React Router processes the redirect.
+      if (!navigatedAway) {
+        setLoading(false);
+      }
     }
   };
 
@@ -129,7 +138,7 @@ export default function ReconSectionEditor() {
 
       // Delay navigation to allow toast to be seen
       setTimeout(() => {
-        navigate(`/recon/${parentModule || ''}`);
+        navigate(parentModule ? `/recon/${parentModule}` : '/recon');
       }, 2000);
     } catch (error) {
       console.error('Error completing section:', error);
@@ -139,7 +148,7 @@ export default function ReconSectionEditor() {
   };
 
   const navigateBack = () => {
-    navigate(`/recon/${parentModule || ''}`);
+    navigate(parentModule ? `/recon/${parentModule}` : '/recon');
   };
 
   if (loading) {

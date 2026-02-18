@@ -23,6 +23,7 @@ import ReconOverview from './pages/Recon/ReconOverview';
 import ReconModulePage from './pages/Recon/ReconModulePage';
 import ReconSectionEditor from './pages/Recon/ReconSectionEditor';
 import BarryTraining from './pages/Recon/BarryTraining';
+import ReconErrorBoundary from './components/recon/ReconErrorBoundary';
 import Prospects from './pages/Prospects';
 import Questionnaire from './pages/Questionnaire';
 import UnifiedDashboard from './pages/UnifiedDashboard';
@@ -335,7 +336,9 @@ function App() {
           path="/recon"
           element={
             <ProtectedRoute withLayout={true}>
-              <ReconOverview />
+              <ReconErrorBoundary>
+                <ReconOverview />
+              </ReconErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -343,7 +346,9 @@ function App() {
           path="/recon/barry-training"
           element={
             <ProtectedRoute withLayout={true}>
-              <BarryTraining />
+              <ReconErrorBoundary>
+                <BarryTraining />
+              </ReconErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -351,7 +356,9 @@ function App() {
           path="/recon/section/:sectionId"
           element={
             <ProtectedRoute withLayout={true}>
-              <ReconSectionEditor />
+              <ReconErrorBoundary>
+                <ReconSectionEditor />
+              </ReconErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -359,7 +366,9 @@ function App() {
           path="/recon/:moduleId"
           element={
             <ProtectedRoute withLayout={true}>
-              <ReconModulePage />
+              <ReconErrorBoundary>
+                <ReconModulePage />
+              </ReconErrorBoundary>
             </ProtectedRoute>
           }
         />

@@ -187,6 +187,7 @@ export default function ReconModulePage() {
   const [sections, setSections] = useState([]);
   const [viewingSection, setViewingSection] = useState(null);
   const [guidanceOpen, setGuidanceOpen] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   const config = MODULE_CONFIG[moduleId];
 
@@ -199,6 +200,8 @@ export default function ReconModulePage() {
   }, [moduleId]);
 
   const loadSections = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -222,19 +225,34 @@ export default function ReconModulePage() {
       }
     } catch (error) {
       console.error('Error loading module sections:', error);
+      setLoadError(error.message || 'Failed to load module sections.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!config) return null;
-
-  // Finding 9: Scout spinner loading state replaces pulsing text
-  if (loading) {
+  // Show spinner while loading OR while config is invalid (redirect pending in useEffect)
+  if (loading || !config) {
     return (
       <div className="recon-module-loading">
         <div className="loading-spinner" />
         <p className="loading-text">Loading module...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="recon-module-loading">
+        <p className="loading-text" style={{ color: 'var(--color-red-600, #dc2626)' }}>
+          {loadError}
+        </p>
+        <button
+          onClick={loadSections}
+          style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+        >
+          Retry
+        </button>
       </div>
     );
   }

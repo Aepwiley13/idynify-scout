@@ -1175,3 +1175,155 @@
     justify-content: center;
   }
 }
+
+/* ========================================
+   MODE TOGGLE — Companies | People
+   ======================================== */
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  background: #f3f4f6;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 4px;
+  margin-top: 1rem;
+}
+
+.mode-toggle-btn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mode-toggle-btn.active {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.mode-toggle-btn:not(.active):hover {
+  color: #374151;
+}
+
+@media (max-width: 768px) {
+  .mode-toggle {
+    margin-top: 0.75rem;
+  }
+
+  .mode-toggle-btn {
+    padding: 0.4375rem 1rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* ========================================
+   PERSON CARD — Photo + Barry Validation
+   ======================================== */
+.person-photo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.person-photo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.person-photo-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+}
+
+.barry-validation-text {
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 0.375rem 0.75rem;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.4;
+}
+
+.person-title-text {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #4b5563;
+  text-align: center;
+  margin: -0.5rem 0 1rem 0;
+}
+
+/* Skip for Today button — subtle, below action buttons */
+.person-skip-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.person-skip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  border-radius: 6px;
+}
+
+.person-skip-btn:hover {
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+/* People Mode loading (inside the mode section, not full-screen) */
+.people-mode-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  gap: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .person-photo {
+    width: 72px;
+    height: 72px;
+  }
+
+  .person-photo-placeholder {
+    width: 72px;
+    height: 72px;
+  }
+
+  .person-title-text {
+    font-size: 0.9375rem;
+  }
+}

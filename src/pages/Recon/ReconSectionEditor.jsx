@@ -75,13 +75,13 @@ export default function ReconSectionEditor() {
 
       if (!sectionData) {
         navigatedAway = true;
-        navigate(`/recon/${parentModule || 'icp-intelligence'}`);
+        navigate(parentModule ? `/recon/${parentModule}` : '/recon');
         return;
       }
 
       if (!sectionData.unlocked) {
         navigatedAway = true;
-        navigate(`/recon/${parentModule || 'icp-intelligence'}`);
+        navigate(parentModule ? `/recon/${parentModule}` : '/recon');
         return;
       }
 

@@ -49,6 +49,7 @@ import EmailInsights from './pages/Admin/EmailInsights';
 import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
+import CrispChat from './components/CrispChat';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
@@ -235,6 +236,7 @@ function App() {
           onEndSession={handleEndImpersonation}
         />
       )}
+      {user && <CrispChat user={user} />}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />

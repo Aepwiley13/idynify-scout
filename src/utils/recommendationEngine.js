@@ -207,7 +207,7 @@ async function deriveStalledEngagementAlerts(userId, dismissals) {
         const recId = generateRecommendationId(RECOMMENDATION_TYPES.STALLED_AWAITING_REPLY, contact.id);
         if (isDismissed(recId, dismissals)) continue;
 
-        const contactName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+        const contactName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
         const isCritical = contact.strategic_value === 'critical';
         const isHigh = contact.strategic_value === 'high';
 
@@ -341,7 +341,7 @@ async function deriveHighValueContactAlerts(userId, dismissals) {
     const highValueSnap = await getDocs(highValueQuery);
     for (const contactDoc of highValueSnap.docs) {
       const contact = { id: contactDoc.id, ...contactDoc.data() };
-      const contactName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+      const contactName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
       const isCritical = contact.strategic_value === 'critical';
       const status = contact.contact_status || 'New';
 
@@ -417,7 +417,7 @@ async function deriveHighValueContactAlerts(userId, dismissals) {
         const recId = generateRecommendationId(RECOMMENDATION_TYPES.HIGH_VALUE_NO_ENGAGEMENT, contact.id);
         if (isDismissed(recId, dismissals)) continue;
 
-        const contactName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+        const contactName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
         const isCritical = contact.strategic_value === 'critical';
 
         recommendations.push(buildRecommendation({
@@ -725,12 +725,20 @@ async function deriveStrategicGapAlerts(userId, dismissals) {
 // ── Main Entry Points ───────────────────────────────────
 
 /**
- * Load user's recommendation dismissals.
+ * Load user's recommendation dismissals within the suppression window.
+ * Filters to only the last DISMISSAL_SUPPRESSION days to avoid unbounded reads.
  */
 async function loadDismissals(userId) {
   try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - THRESHOLDS.DISMISSAL_SUPPRESSION);
+    const cutoffStr = cutoff.toISOString();
+
     const dismissalsSnap = await getDocs(
-      collection(db, 'users', userId, 'recommendation_dismissals')
+      query(
+        collection(db, 'users', userId, 'recommendation_dismissals'),
+        where('dismissedAt', '>=', cutoffStr)
+      )
     );
     return dismissalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (error) {
@@ -786,7 +794,7 @@ export async function generateContactRecommendations(userId, contactId) {
     const contactSnap = await getDoc(doc(db, 'users', userId, 'contacts', contactId));
     if (!contactSnap.exists()) return [];
     const contact = { id: contactSnap.id, ...contactSnap.data() };
-    const contactName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
+    const contactName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
     const isCritical = contact.strategic_value === 'critical';
     const isHighValue = contact.strategic_value === 'high' || isCritical;
 

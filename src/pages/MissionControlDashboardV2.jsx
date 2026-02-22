@@ -7,10 +7,12 @@ import { isUserAdmin } from '../utils/adminAuth';
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
 import { generateDashboardRecommendations, dismissRecommendation } from '../utils/recommendationEngine';
 import BarryRecommendationCard from '../components/hunter/BarryRecommendationCard';
+import BarryChatPanel from '../components/dashboard/BarryChatPanel';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasCompletedICP, setHasCompletedICP] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -35,6 +37,7 @@ export default function MissionControlDashboardV2() {
       }
 
       const userId = user.uid;
+      setUserId(userId);
 
       // Check if user is admin
       const adminStatus = await isUserAdmin(userId);
@@ -258,15 +261,8 @@ export default function MissionControlDashboardV2() {
 
       {/* MAIN */}
       <main className="max-w-7xl mx-auto px-6 py-16 relative z-10">
-        {/* WELCOME - Centered */}
-        <section className="text-center mb-16">
-          <h2 className="text-4xl font-bold font-mono mb-4 text-white">
-            Your Next Steps
-          </h2>
-          <p className="text-gray-300 text-lg max-w-2xl mx-auto leading-relaxed">
-            Start with <span className="text-cyan-400 font-semibold">SCOUT</span> to find companies that match your ideal customer profile, or use <span className="text-purple-400 font-semibold">RECON</span> to train Barry for better results.
-          </p>
-        </section>
+        {/* BARRY CHAT PANEL — Mission Co-pilot (replaces static "Your Next Steps") */}
+        {userId && <BarryChatPanel userId={userId} />}
 
         {/* NEEDS ATTENTION — Barry's Proactive Intelligence (Step 7) */}
         {(recommendations.length > 0 || recommendationsLoading) && (

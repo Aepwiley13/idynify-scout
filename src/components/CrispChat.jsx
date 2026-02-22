@@ -4,7 +4,8 @@ import { useLocation } from 'react-router-dom';
 const CRISP_WEBSITE_ID = import.meta.env.VITE_CRISP_WEBSITE_ID;
 
 // Routes where the chat widget must not appear
-const EXCLUDED_PATHS = ['/', '/login', '/signup', '/forgot-password'];
+// Barry owns Mission Control — Crisp must not appear there
+const EXCLUDED_PATHS = ['/', '/login', '/signup', '/forgot-password', '/mission-control-v2'];
 
 const CrispChat = ({ user }) => {
   const location = useLocation();

@@ -292,7 +292,22 @@ async function deriveStalledEngagementAlerts(userId, dismissals) {
           const recId = generateRecommendationId(RECOMMENDATION_TYPES.STALLED_OUTCOME_NOT_RECORDED, `${mission.id}_${contact.contactId}`);
           if (isDismissed(recId, dismissals)) continue;
 
-          const contactName = contact.name || 'a contact';
+          let contactName = contact.name || null;
+          if (!contactName && contact.contactId) {
+            try {
+              const cSnap = await getDoc(doc(db, 'users', userId, 'contacts', contact.contactId));
+              if (cSnap.exists()) {
+                const cd = cSnap.data();
+                contactName = cd.name || `${cd.first_name || ''} ${cd.last_name || ''}`.trim() || 'Unknown';
+              } else {
+                contactName = 'Unknown';
+              }
+            } catch {
+              contactName = 'Unknown';
+            }
+          } else if (!contactName) {
+            contactName = 'Unknown';
+          }
 
           recommendations.push(buildRecommendation({
             id: recId,
@@ -472,7 +487,23 @@ async function deriveMissionMomentumRecommendations(userId, dismissals) {
         if (contact.sequenceStatus === 'completed') continue;
 
         const history = contact.stepHistory || [];
-        const contactName = contact.name || 'a contact';
+
+        let contactName = contact.name || null;
+        if (!contactName && contact.contactId) {
+          try {
+            const cSnap = await getDoc(doc(db, 'users', userId, 'contacts', contact.contactId));
+            if (cSnap.exists()) {
+              const cd = cSnap.data();
+              contactName = cd.name || `${cd.first_name || ''} ${cd.last_name || ''}`.trim() || 'Unknown';
+            } else {
+              contactName = 'Unknown';
+            }
+          } catch {
+            contactName = 'Unknown';
+          }
+        } else if (!contactName) {
+          contactName = 'Unknown';
+        }
 
         // 3a. Two consecutive no-reply outcomes → suggest channel switch
         const lastTwoOutcomes = history

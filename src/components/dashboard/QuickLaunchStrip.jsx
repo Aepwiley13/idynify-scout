@@ -83,35 +83,38 @@ export default function QuickLaunchStrip({ stats = {} }) {
 
   return (
     <section className="mb-12">
-      {/* Section Label */}
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <div className="h-px w-20 bg-gradient-to-r from-transparent to-cyan-500/50"></div>
-        <span className="text-xs font-mono text-cyan-400/70 tracking-widest uppercase">Quick Launch</span>
-        <div className="h-px w-20 bg-gradient-to-l from-transparent to-cyan-500/50"></div>
-      </div>
+      {/* Constrained to match Barry panel width */}
+      <div className="max-w-4xl mx-auto">
+        {/* Section Label */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="h-px w-20 bg-gradient-to-r from-transparent to-cyan-500/50"></div>
+          <span className="text-xs font-mono text-cyan-400/70 tracking-widest uppercase">Quick Launch</span>
+          <div className="h-px w-20 bg-gradient-to-l from-transparent to-cyan-500/50"></div>
+        </div>
 
-      {/* Scroll container — horizontal snap on mobile, grid on desktop */}
-      <div
-        className="
-          flex gap-4
-          overflow-x-auto pb-3
-          snap-x snap-mandatory
-          scroll-smooth
-          md:grid md:grid-cols-4
-          md:overflow-x-visible md:pb-0
-          [&::-webkit-scrollbar]:hidden
-          [-ms-overflow-style:none]
-          [scrollbar-width:none]
-        "
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        {cards.map((card) =>
-          card.active ? (
-            <ActiveCard key={card.id} card={card} onClick={() => navigate(card.route)} />
-          ) : (
-            <LockedCard key={card.id} card={card} />
-          )
-        )}
+        {/* Scroll container — horizontal snap on mobile, 2×2 grid on desktop */}
+        <div
+          className="
+            flex gap-4
+            overflow-x-auto pb-3
+            snap-x snap-mandatory
+            scroll-smooth
+            md:grid md:grid-cols-2
+            md:overflow-x-visible md:pb-0
+            [&::-webkit-scrollbar]:hidden
+            [-ms-overflow-style:none]
+            [scrollbar-width:none]
+          "
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {cards.map((card) =>
+            card.active ? (
+              <ActiveCard key={card.id} card={card} onClick={() => navigate(card.route)} />
+            ) : (
+              <LockedCard key={card.id} card={card} />
+            )
+          )}
+        </div>
       </div>
     </section>
   );
@@ -132,6 +135,7 @@ function ActiveCard({ card, onClick }) {
         flex-shrink-0 w-[72vw] sm:w-[56vw] md:w-auto
         snap-start
         bg-black/50 backdrop-blur-xl rounded-2xl p-5
+        md:min-h-[200px]
         border-2 ${card.glowClass}
         hover:scale-[1.02] active:scale-[0.98]
         transition-all duration-200
@@ -181,6 +185,7 @@ function LockedCard({ card }) {
         flex-shrink-0 w-[72vw] sm:w-[56vw] md:w-auto
         snap-start
         bg-black/30 backdrop-blur-xl rounded-2xl p-5
+        md:min-h-[200px]
         border-2 ${card.glowClass}
         opacity-50 cursor-not-allowed
         relative overflow-hidden

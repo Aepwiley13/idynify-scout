@@ -4,7 +4,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, Building2, Users, TrendingUp, Settings, UserPlus, Search } from 'lucide-react';
 import SavedCompanies from './SavedCompanies';
-import TotalMarket from './TotalMarket';
+import MissionControl from './MissionControl';
 import ICPSettings from './ICPSettings';
 import DailyLeads from './DailyLeads';
 import AllLeads from './AllLeads';
@@ -61,7 +61,7 @@ export default function ScoutMain() {
         {activeTab === 'daily-leads' && <DailyLeads />}
         {activeTab === 'saved-companies' && <SavedCompanies />}
         {activeTab === 'all-leads' && <AllLeads />}
-        {activeTab === 'total-market' && <TotalMarket />}
+        {activeTab === 'total-market' && <MissionControl />}
         {activeTab === 'icp-settings' && <ICPSettings />}
       </div>
 

@@ -8,6 +8,7 @@ import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils'
 import { generateDashboardRecommendations, dismissRecommendation } from '../utils/recommendationEngine';
 import BarryRecommendationCard from '../components/hunter/BarryRecommendationCard';
 import BarryChatPanel from '../components/dashboard/BarryChatPanel';
+import QuickLaunchStrip from '../components/dashboard/QuickLaunchStrip';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
@@ -19,7 +20,8 @@ export default function MissionControlDashboardV2() {
   const [stats, setStats] = useState({
     scoutCompanies: 0,
     scoutContacts: 0,
-    reconCompletion: 0
+    reconCompletion: 0,
+    hunterMissions: 0
   });
   const [recommendations, setRecommendations] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
@@ -65,6 +67,15 @@ export default function MissionControlDashboardV2() {
       const reconModule = dashboardState?.modules?.find(m => m.id === 'recon');
       const reconCompletion = reconModule?.progressPercentage || 0;
 
+      // Count active Hunter missions (status: 'autopilot' or 'draft')
+      const missionsSnapshot = await getDocs(
+        collection(db, 'users', userId, 'missions')
+      );
+      const hunterMissions = missionsSnapshot.docs.filter(d => {
+        const s = d.data().status;
+        return s === 'autopilot' || s === 'draft';
+      }).length;
+
       // Check if user has completed ICP settings
       const icpDoc = await getDoc(doc(db, 'users', userId, 'icp', 'settings'));
       const hasICP = icpDoc.exists() && icpDoc.data().industry;
@@ -82,7 +93,8 @@ export default function MissionControlDashboardV2() {
       setStats({
         scoutCompanies: companiesSnapshot.size,
         scoutContacts: contactsSnapshot.size,
-        reconCompletion
+        reconCompletion,
+        hunterMissions
       });
 
       setLoading(false);
@@ -261,10 +273,13 @@ export default function MissionControlDashboardV2() {
 
       {/* MAIN */}
       <main className="max-w-7xl mx-auto px-6 py-16 relative z-10">
-        {/* BARRY CHAT PANEL — Mission Co-pilot (replaces static "Your Next Steps") */}
+        {/* BARRY CHAT PANEL — Mission Co-pilot */}
         {userId && <BarryChatPanel userId={userId} />}
 
-        {/* NEEDS ATTENTION — Barry's Proactive Intelligence (Step 7) */}
+        {/* QUICK LAUNCH STRIP — Zone 3: One-tap module access */}
+        <QuickLaunchStrip stats={stats} />
+
+        {/* NEEDS ATTENTION — Barry's Proactive Intelligence */}
         {(recommendations.length > 0 || recommendationsLoading) && (
           <section className="mb-16">
             <div className="flex items-center justify-center gap-3 mb-8">
@@ -616,6 +631,14 @@ export default function MissionControlDashboardV2() {
         @keyframes brainPulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.05); }
+        }
+        @keyframes qlBounce {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
+        }
+        @keyframes qlBrainPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
         }
         .grayscale {
           filter: grayscale(100%);

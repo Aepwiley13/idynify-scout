@@ -9,7 +9,6 @@ import ICPSettings from './ICPSettings';
 import DailyLeads from './DailyLeads';
 import AllLeads from './AllLeads';
 import CompanySearch from './CompanySearch';
-import ContactSearch from './ContactSearch';
 import './ScoutMain.css';
 
 export default function ScoutMain() {
@@ -17,14 +16,21 @@ export default function ScoutMain() {
   const location = useLocation();
 
   // Check if redirected with specific tab state
-  const initialTab = location.state?.activeTab || 'daily-leads';
+  // contact-search has been removed — redirect to company-search
+  const rawInitialTab = location.state?.activeTab || 'daily-leads';
+  const initialTab = rawInitialTab === 'contact-search' ? 'company-search' : rawInitialTab;
   const [activeTab, setActiveTab] = useState(initialTab);
   const [contactCount, setContactCount] = useState(0);
 
   // Update active tab when location state changes (e.g., when navigating from Daily Leads)
+  // contact-search has been removed — silently redirect to company-search
   useEffect(() => {
     if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
+      if (location.state.activeTab === 'contact-search') {
+        navigate('/scout', { state: { activeTab: 'company-search' }, replace: true });
+      } else {
+        setActiveTab(location.state.activeTab);
+      }
     }
   }, [location.state?.activeTab]);
 
@@ -52,7 +58,6 @@ export default function ScoutMain() {
       {/* Tab Content - Navigation now handled by sidebar */}
       <div className="tab-content">
         {activeTab === 'company-search' && <CompanySearch />}
-        {activeTab === 'contact-search' && <ContactSearch />}
         {activeTab === 'daily-leads' && <DailyLeads />}
         {activeTab === 'saved-companies' && <SavedCompanies />}
         {activeTab === 'all-leads' && <AllLeads />}

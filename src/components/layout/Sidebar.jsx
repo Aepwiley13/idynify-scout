@@ -139,12 +139,6 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       state: { activeTab: 'company-search' }
     },
     {
-      icon: Users,
-      label: 'Contact Search',
-      path: '/scout',
-      state: { activeTab: 'contact-search' }
-    },
-    {
       icon: TrendingUp,
       label: 'Total Market',
       path: '/scout',

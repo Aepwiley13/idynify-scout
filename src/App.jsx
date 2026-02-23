@@ -405,6 +405,12 @@ function App() {
           }
         />
 
+        {/* Redirect removed Contact Search URL to Company Search */}
+        <Route
+          path="/scout/contact-search"
+          element={<Navigate to="/scout" state={{ activeTab: 'company-search' }} replace />}
+        />
+
         {/* Scout Sub-Routes */}
         <Route
           path="/scout/company/:companyId"

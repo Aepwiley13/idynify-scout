@@ -100,6 +100,17 @@
   max-width: 240px;
 }
 
+/* Sub-state C: Barry is still analyzing — subtle shimmer on sublabel */
+.peb-sublabel-analyzing {
+  animation: peb-shimmer 2s ease-in-out infinite;
+  color: #9ca3af;
+}
+
+@keyframes peb-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Stats */
 
 .peb-stats {

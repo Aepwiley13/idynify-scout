@@ -21,6 +21,11 @@
  *   - sequence_step_sent       (Approved step was executed/sent)
  *   - sequence_step_skipped    (User skipped a sequence step)
  *   - sequence_completed       (All steps in sequence finished)
+ *
+ * Operation People First — Next Best Step Events:
+ *   - next_step_queued         (Barry proposes a next step; user confirms timing)
+ *   - next_step_completed      (User marks the queued next step as done)
+ *   - next_step_dismissed      (User dismisses Barry's next step proposal)
  */
 
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
@@ -39,7 +44,11 @@ const TIMELINE_EVENT_TYPES = [
   'sequence_step_approved',
   'sequence_step_sent',
   'sequence_step_skipped',
-  'sequence_completed'
+  'sequence_completed',
+  // Operation People First: Next Best Step events
+  'next_step_queued',
+  'next_step_completed',
+  'next_step_dismissed'
 ];
 
 // Actor types
@@ -81,6 +90,11 @@ export async function logTimelineEvent({ userId, contactId, type, actor, preview
     const event = {
       type,
       actor,
+      // Write both fields during migration period.
+      // 'timestamp' is the canonical read field (used by all query orderBy calls).
+      // 'createdAt' kept for backward compatibility with pre-sprint documents.
+      // Squad Alpha: remove 'createdAt' once all legacy docs are backfilled.
+      timestamp: Timestamp.now(),
       createdAt: Timestamp.now(),
       ...(preview ? { preview } : {}),
       ...(metadata ? { metadata } : {})

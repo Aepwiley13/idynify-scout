@@ -25,16 +25,55 @@ import './PersistentEngageBar.css';
 
 // ── Engagement state derived from timeline ───────────────
 
+// Zero-state sub-state derivation.
+// Returns the right sublabel and CTA text based on whether Barry has context.
+// See src/schemas/engagementSchema.js ZERO_STATE_BEHAVIOR for the full spec.
+function getZeroStateConfig(contact) {
+  const barryContext = contact?.barryContext;
+  const firstName = contact?.firstName || contact?.name?.split(' ')[0] || 'this contact';
+
+  if (barryContext?.suggestedFirstMove) {
+    // Sub-state A: Barry has a specific suggestion
+    const suggestion = barryContext.suggestedFirstMove.length > 80
+      ? barryContext.suggestedFirstMove.slice(0, 77) + '...'
+      : barryContext.suggestedFirstMove;
+    return {
+      sublabel: suggestion,
+      cta: "Start with Barry's Suggestion",
+      ctaColor: '#7c3aed',
+      analyzing: false
+    };
+  }
+
+  if (barryContext) {
+    // Sub-state B: Barry has context but no specific suggestion yet
+    return {
+      sublabel: `Barry knows who ${firstName} is — ready when you are`,
+      cta: 'Start Engagement',
+      ctaColor: '#7c3aed',
+      analyzing: false
+    };
+  }
+
+  // Sub-state C: Barry is still generating context
+  return {
+    sublabel: 'Barry is analyzing this contact...',
+    cta: 'Start Engagement',
+    ctaColor: '#9ca3af',
+    analyzing: true
+  };
+}
+
 const ENGAGE_STATES = {
   not_started: {
     label: 'Not Started',
-    sublabel: 'Barry is ready to engage',
+    sublabel: 'Barry is ready to engage', // overridden at render time by getZeroStateConfig()
     color: '#6b7280',
     bgColor: 'rgba(107, 114, 128, 0.08)',
     borderColor: 'rgba(107, 114, 128, 0.2)',
     icon: Target,
-    cta: 'Start Engagement',
-    ctaColor: '#7c3aed'
+    cta: 'Start Engagement',             // overridden at render time by getZeroStateConfig()
+    ctaColor: '#7c3aed'                  // overridden at render time by getZeroStateConfig()
   },
   in_progress: {
     label: 'In Progress',
@@ -209,7 +248,20 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
     }
   }
 
-  const config = ENGAGE_STATES[engageState] || ENGAGE_STATES.not_started;
+  const baseConfig = ENGAGE_STATES[engageState] || ENGAGE_STATES.not_started;
+
+  // For not_started, apply zero-state sub-state logic (A/B/C).
+  // All other states use baseConfig directly.
+  const zeroState = engageState === 'not_started' ? getZeroStateConfig(contact) : null;
+  const config = zeroState
+    ? {
+        ...baseConfig,
+        sublabel: zeroState.sublabel,
+        cta: zeroState.cta,
+        ctaColor: zeroState.ctaColor
+      }
+    : baseConfig;
+
   const StateIcon = config.icon;
   const firstName = contact?.firstName || contact?.name?.split(' ')[0] || 'this contact';
   const lastActivity = formatLastActivity(lastEvents);
@@ -257,7 +309,9 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
           </div>
           <div className="peb-status-text">
             <span className="peb-status-label">{config.label}</span>
-            <span className="peb-status-sublabel">{config.sublabel}</span>
+            <span className={`peb-status-sublabel ${zeroState?.analyzing ? 'peb-sublabel-analyzing' : ''}`}>
+              {config.sublabel}
+            </span>
           </div>
         </div>
 

@@ -25,6 +25,9 @@ import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import GameBucketSelector from '../../components/contacts/GameBucketSelector';
+import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
+import NextBestStep from '../../components/contacts/NextBestStep';
+import BrigadeSelector from '../../components/contacts/BrigadeSelector';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
@@ -458,7 +461,7 @@ export default function ContactProfile() {
           onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to All Leads</span>
+          <span>Back to People</span>
         </button>
         <button
           className="btn-enrich-nav"
@@ -473,14 +476,6 @@ export default function ContactProfile() {
           ) : (
             <span>Enrich Contact</span>
           )}
-        </button>
-        {/* Hunter engage button - opens in-context drawer */}
-        <button
-          className="btn-hunter-engage"
-          onClick={() => setHunterDrawerOpen(true)}
-        >
-          <Target className="w-4 h-4" />
-          <span>Engage with Hunter</span>
         </button>
         <BarryKnowledgeButton variant="compact" />
       </div>
@@ -612,22 +607,28 @@ export default function ContactProfile() {
           </span>
         </div>
 
+        {/* PERSISTENT ENGAGE BAR — Always visible, always resumable.
+            This is not a pop-up. It is a permanent engagement state. */}
+        <PersistentEngageBar
+          contact={contact}
+          onEngageClick={() => setHunterDrawerOpen(true)}
+        />
+
         {/* Barry Insight Panel — Step 7 proactive recommendations */}
         <BarryInsightPanel
           contactId={contact.id}
           onAction={(rec) => {
-            // If recommendation suggests engaging, open the Hunter drawer
             if (['re_engage', 'start_mission', 'approve_next_step', 'switch_channel', 'accelerate_sequence'].includes(rec.action.type)) {
               setHunterDrawerOpen(true);
             }
           }}
         />
 
-        {/* 2. STRUCTURED CONTEXT — Strategic classification */}
-        <StructuredFields contact={contact} onUpdate={handleContactUpdate} />
+        {/* 2. BRIGADE — Strategic relationship classification (replaces Game Bucket) */}
+        <BrigadeSelector contact={contact} onUpdate={handleContactUpdate} />
 
-        {/* 2b. GAME BUCKET — Assign contact to a game session bucket */}
-        <GameBucketSelector contact={contact} onUpdate={handleContactUpdate} />
+        {/* 2b. STRUCTURED CONTEXT — Detailed classification */}
+        <StructuredFields contact={contact} onUpdate={handleContactUpdate} />
 
         {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (
@@ -644,6 +645,16 @@ export default function ContactProfile() {
 
         {/* 5. ENGAGEMENT TIMELINE - Unified chronological engagement log */}
         <EngagementTimeline contactId={contact.id} />
+
+        {/* NEXT BEST STEP — Replaces Missions. Barry proposes. User confirms.
+            Relationships compound instead of resetting. */}
+        <NextBestStep
+          contact={contact}
+          onEngageClick={() => setHunterDrawerOpen(true)}
+          onStepConfirmed={(step) => {
+            console.log('[ContactProfile] Next step confirmed:', step);
+          }}
+        />
 
         {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />

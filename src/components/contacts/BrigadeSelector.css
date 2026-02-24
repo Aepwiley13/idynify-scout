@@ -1,0 +1,186 @@
+/* ═══════════════════════════════════════════════════════
+   BRIGADE SELECTOR
+   Operation People First — Brigade Intelligence.
+   Brigades are behavioral contracts, not organizational tags.
+═══════════════════════════════════════════════════════ */
+
+.brigade-selector {
+  background: #ffffff;
+  border: 1.5px solid #f0f0ee;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Header ── */
+
+.brs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brs-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brs-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.brs-saving {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.brs-info-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 5px;
+  transition: all 0.15s ease;
+}
+
+.brs-info-btn:hover {
+  color: #6b7280;
+  background: rgba(107, 114, 128, 0.06);
+}
+
+/* ── Info panel ── */
+
+.brs-info-panel {
+  background: rgba(107, 114, 128, 0.04);
+  border: 1px solid rgba(107, 114, 128, 0.12);
+  border-radius: 9px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: brs-fade 0.2s ease;
+}
+
+@keyframes brs-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.brs-info-text {
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.brs-current-behavior {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brs-behavior-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.brs-behavior-text {
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Options ── */
+
+.brs-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.brs-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(107, 114, 128, 0.18);
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.brs-option:hover {
+  border-color: rgba(107, 114, 128, 0.35);
+  background: rgba(107, 114, 128, 0.04);
+}
+
+.brs-option-active {
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.brs-option-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.brs-option-label {
+  white-space: nowrap;
+}
+
+.brs-option-active-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  border: 1.5px solid #ffffff;
+}
+
+/* ── Active Brigade Detail ── */
+
+.brs-active-detail {
+  border: 1.5px solid;
+  border-radius: 9px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brs-active-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.brs-active-desc {
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.4;
+}

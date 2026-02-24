@@ -1,0 +1,368 @@
+/* ═══════════════════════════════════════════════════════
+   NEXT BEST STEP
+   Operation People First — Missions are dead.
+   Replaced by contextual, individual-level recommendations
+   that emerge naturally from real engagement history.
+═══════════════════════════════════════════════════════ */
+
+.nbs-container {
+  background: var(--nbs-bg, rgba(124, 58, 237, 0.06));
+  border: 1.5px solid var(--nbs-border, rgba(124, 58, 237, 0.2));
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+/* ── Header ── */
+
+.nbs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nbs-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nbs-barry-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.nbs-header-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.nbs-dismiss-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(107, 114, 128, 0.15);
+  background: transparent;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nbs-dismiss-btn:hover {
+  background: rgba(107, 114, 128, 0.06);
+  color: #6b7280;
+}
+
+.nbs-overdue-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ── Proposal Body ── */
+
+.nbs-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nbs-proposal-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nbs-type-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1.5px solid var(--nbs-border, rgba(124, 58, 237, 0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nbs-type-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--nbs-color, #7c3aed);
+}
+
+.nbs-type-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nbs-color, #7c3aed);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nbs-proposal-message {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.nbs-proposal-suggestion {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin: 0;
+  font-weight: 400;
+}
+
+/* ── Timing Selector ── */
+
+.nbs-timing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nbs-timing-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.nbs-timing-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.nbs-timing-btn {
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(107, 114, 128, 0.2);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nbs-timing-btn:hover {
+  border-color: var(--nbs-color, #7c3aed);
+  color: var(--nbs-color, #7c3aed);
+}
+
+.nbs-timing-active {
+  border-color: var(--nbs-color, #7c3aed) !important;
+  background: var(--nbs-bg, rgba(124, 58, 237, 0.08)) !important;
+  color: var(--nbs-color, #7c3aed) !important;
+  font-weight: 600;
+}
+
+/* ── Actions ── */
+
+.nbs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nbs-act-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  white-space: nowrap;
+}
+
+.nbs-act-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nbs-act-primary {
+  background: var(--nbs-color, #7c3aed);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.nbs-act-primary:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.nbs-act-secondary {
+  background: rgba(255, 255, 255, 0.9);
+  color: #374151;
+  border: 1.5px solid rgba(107, 114, 128, 0.2);
+}
+
+.nbs-act-secondary:hover {
+  background: #ffffff;
+  border-color: rgba(107, 114, 128, 0.35);
+}
+
+.nbs-act-dismiss {
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid transparent;
+}
+
+.nbs-act-dismiss:hover {
+  color: #6b7280;
+  background: rgba(107, 114, 128, 0.05);
+}
+
+.nbs-act-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* ── Active Step ── */
+
+.nbs-active {
+  border-color: var(--nbs-border);
+}
+
+.nbs-active-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.nbs-active-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--nbs-bg, rgba(124, 58, 237, 0.08));
+  border: 1.5px solid var(--nbs-border, rgba(124, 58, 237, 0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nbs-active-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--nbs-color, #7c3aed);
+}
+
+.nbs-active-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nbs-active-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--nbs-color, #7c3aed);
+}
+
+.nbs-active-preview {
+  font-size: 13.5px;
+  color: #374151;
+  line-height: 1.45;
+  margin: 0;
+  font-weight: 400;
+}
+
+.nbs-active-due {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.nbs-due-overdue {
+  color: #ef4444;
+}
+
+.nbs-active-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Confirmed State ── */
+
+.nbs-confirmed {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.nbs-confirmed-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nbs-confirmed-icon {
+  width: 20px;
+  height: 20px;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.nbs-confirmed-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.nbs-confirmed-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #059669;
+}
+
+.nbs-confirmed-sub {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+/* ── Spinner ── */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.nbs-spin {
+  animation: spin 0.8s linear infinite;
+}

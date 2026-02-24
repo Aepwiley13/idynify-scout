@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { getScoreBreakdown } from '../../utils/icpScoring';
 import './MissionControl.css';
 
 const ICP_SCORE_THRESHOLD = 70;
@@ -28,6 +29,64 @@ function getDotColor(company) {
   if (score >= 70) return '#00FF88';
   if (score >= 40) return '#FFD700';
   return '#5A6A7A';
+}
+
+function getScoreColor(score) {
+  if (score >= 70) return '#00FF88';
+  if (score >= 40) return '#FFD700';
+  return '#FF4466';
+}
+
+function getClassification(score) {
+  if (score >= 70) return 'HIGH VALUE TARGET';
+  if (score >= 40) return 'MONITOR';
+  return 'LOW PRIORITY';
+}
+
+function getStatusLabel(status) {
+  if (!status || status === 'not_reviewed') return 'NOT REVIEWED';
+  if (status === 'accepted' || status === 'interested') return 'INTERESTED';
+  if (status === 'rejected' || status === 'archived') return 'ARCHIVED';
+  return status.toUpperCase().replace(/_/g, ' ');
+}
+
+function getStatusClass(status) {
+  if (status === 'accepted' || status === 'interested') return 'interested';
+  if (status === 'rejected' || status === 'archived') return 'archived';
+  return 'not-reviewed';
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '';
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
+  return date.toLocaleDateString();
+}
+
+// Ranking algorithm: Score = (fit_score × 0.5) + (has_signals × 30) + (status_weight × 20)
+function getRankScore(company) {
+  const fitScore = company.fit_score || 0;
+  const hasSignals =
+    (company.signals && company.signals.length > 0) ||
+    company.status === 'accepted'
+      ? 1
+      : 0;
+  const statusWeight =
+    company.status === 'accepted' || company.status === 'interested'
+      ? 1
+      : company.status === 'rejected' || company.status === 'archived'
+      ? 0
+      : 0.5;
+  return fitScore * 0.5 + hasSignals * 30 + statusWeight * 20;
+}
+
+function rankCompanies(companiesArr) {
+  return [...companiesArr]
+    .map((c) => ({ ...c, rankScore: getRankScore(c) }))
+    .sort((a, b) => b.rankScore - a.rankScore);
 }
 
 // Count-up hook for animated numbers
@@ -59,6 +118,12 @@ export default function MissionControl() {
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [statsReady, setStatsReady] = useState(false);
 
+  // Phase 2 state
+  const [barryBriefings, setBarryBriefings] = useState({});
+  const [barryLoading, setBarryLoading] = useState(false);
+  const [activeMissionTab, setActiveMissionTab] = useState('ready');
+  const [collapsedSections, setCollapsedSections] = useState({});
+
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const animFrameRef = useRef(null);
@@ -66,6 +131,7 @@ export default function MissionControl() {
   const sweepAngleRef = useRef(0);
   const activeFilterRef = useRef('all');
   const lastTimeRef = useRef(0);
+  const dossierRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -74,6 +140,51 @@ export default function MissionControl() {
   useEffect(() => {
     activeFilterRef.current = activeFilter;
   }, [activeFilter]);
+
+  // ESC key closes dossier
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setSelectedTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Fetch Barry's briefing when a target is selected (cached per session)
+  useEffect(() => {
+    if (!selectedTarget) return;
+    const id = selectedTarget.id;
+    if (barryBriefings[id]) return; // already cached
+
+    async function fetchBriefing() {
+      setBarryLoading(true);
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const authToken = await user.getIdToken();
+        const resp = await fetch('/.netlify/functions/barryDossierBriefing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            authToken,
+            userId: user.uid,
+            company: selectedTarget,
+            icpProfile,
+          }),
+        });
+        const data = await resp.json();
+        if (data.briefing) {
+          setBarryBriefings((prev) => ({ ...prev, [id]: data.briefing }));
+        }
+      } catch (err) {
+        console.error('Barry briefing error:', err);
+      } finally {
+        setBarryLoading(false);
+      }
+    }
+
+    fetchBriefing();
+  }, [selectedTarget?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     try {
@@ -100,6 +211,16 @@ export default function MissionControl() {
       console.error('Failed to load mission control data:', error);
       setLoading(false);
     }
+  }
+
+  function openDossier(company) {
+    setSelectedTarget(company);
+    // Reset section collapse state for fresh dossier
+    setCollapsedSections({});
+  }
+
+  function toggleSection(key) {
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   // ── Derived Data ──────────────────────────────────────────────────────────
@@ -151,6 +272,19 @@ export default function MissionControl() {
   const tamCount = useCountUp(tam.length, 1400, statsReady);
   const samCount = useCountUp(sam.length, 1400, statsReady);
   const somCount = useCountUp(som.length, 1400, statsReady);
+
+  // ── Mission Target Ranking ─────────────────────────────────────────────────
+  const ranked = rankCompanies(companies);
+  const missionReady = ranked.slice(0, 10);
+  const warming = ranked.slice(10, 35);
+  const longRange = ranked.slice(35);
+
+  const activeBucket =
+    activeMissionTab === 'ready'
+      ? missionReady
+      : activeMissionTab === 'warming'
+      ? warming
+      : longRange;
 
   // ── Radar Dot Generation ──────────────────────────────────────────────────
   function generateDots(companiesArr, canvasW, canvasH) {
@@ -275,14 +409,12 @@ export default function MissionControl() {
       ];
 
       rings.forEach((ring) => {
-        // Main ring arc
         ctx.beginPath();
         ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(${ring.rgb},${ring.opacity})`;
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Tick marks on ring
         for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
           const inner = ring.r - 4;
           const outer = ring.r + 4;
@@ -294,7 +426,6 @@ export default function MissionControl() {
           ctx.stroke();
         }
 
-        // Ring label
         ctx.fillStyle = `rgba(${ring.rgb},0.45)`;
         ctx.font = '9px "Courier New", monospace';
         ctx.textAlign = 'left';
@@ -317,7 +448,6 @@ export default function MissionControl() {
       ctx.fillStyle = sweepGrad;
       ctx.fill();
 
-      // Sweep line
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(maxR, 0);
@@ -342,7 +472,6 @@ export default function MissionControl() {
           else alpha = 0.35;
         }
 
-        // Sweep proximity flare
         let dotAngle = dot.dotAngle % (Math.PI * 2);
         if (dotAngle < 0) dotAngle += Math.PI * 2;
         let angleDiff = Math.abs(dotAngle - sweepAngleRef.current);
@@ -354,14 +483,12 @@ export default function MissionControl() {
         let glowSize = 0;
         let glowColor = dot.color;
 
-        // Pulse for SOM dots
         if (dot.hasSignal && dot.category === 'som' && !sweepHit) {
           const pulse = 0.82 + Math.sin(timestamp * 0.002 + idx * 1.3) * 0.18;
           size = dot.dotSize * pulse;
           glowSize = 8;
         }
 
-        // Flare when sweep hits a high-intent dot
         if (sweepHit && dot.hasSignal) {
           size = dot.dotSize * 2.2;
           fillColor = '#FFFFFF';
@@ -453,7 +580,393 @@ export default function MissionControl() {
       return Math.sqrt(dx * dx + dy * dy) <= Math.max(dot.dotSize + 7, 10);
     });
 
-    setSelectedTarget(hit || null);
+    if (hit) {
+      openDossier(hit);
+    } else {
+      setSelectedTarget(null);
+    }
+  }
+
+  // ── ICP Breakdown ─────────────────────────────────────────────────────────
+  function buildBreakdownRows(company, profile) {
+    if (!profile) return [];
+    const breakdown = getScoreBreakdown(company, profile);
+    const rows = [
+      {
+        label: 'Industry match',
+        matched: breakdown.industry.match === 100,
+        partial: breakdown.industry.match === 50,
+      },
+      {
+        label: 'Revenue range match',
+        matched: breakdown.revenue.match === 100,
+        partial: breakdown.revenue.match === 50,
+      },
+      {
+        label: 'Company size match',
+        matched: breakdown.employeeSize.match === 100,
+        partial: breakdown.employeeSize.match === 50,
+      },
+      {
+        label: profile.isNationwide ? 'Nationwide territory' : 'Location match',
+        matched: breakdown.location.match === 100,
+        partial: breakdown.location.match === 50,
+      },
+    ];
+    const matched = rows.filter((r) => r.matched).length;
+    const partial = rows.filter((r) => r.partial).length;
+    const total = rows.length;
+    let summary;
+    if (matched === total) summary = `Perfect fit — all ${total} ICP criteria matched`;
+    else if (matched >= 3) summary = `Strong fit — ${matched} of ${total} ICP criteria matched`;
+    else if (matched >= 2 || partial > 0) summary = `Partial fit — ${matched} of ${total} criteria matched${partial > 0 ? `, ${partial} partial` : ''}`;
+    else summary = `Weak fit — only ${matched} of ${total} ICP criteria matched`;
+    return { rows, summary };
+  }
+
+  // ── Dossier Panel ─────────────────────────────────────────────────────────
+  function renderDossier() {
+    if (!selectedTarget) return null;
+    const t = selectedTarget;
+    const score = t.fit_score || 0;
+    const scoreColor = getScoreColor(score);
+    const classification = getClassification(score);
+    const statusLabel = getStatusLabel(t.status);
+    const statusClass = getStatusClass(t.status);
+    const briefing = barryBriefings[t.id];
+    const breakdown = icpProfile ? buildBreakdownRows(t, icpProfile) : null;
+    const signals = t.signals || [];
+    const hasActiveSignals =
+      signals.length > 0 ||
+      t.status === 'accepted' ||
+      (t.fit_score && t.fit_score >= ICP_SCORE_THRESHOLD);
+
+    // Circular gauge: SVG arc
+    const radius = 32;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (score / 100) * circumference;
+
+    return (
+      <div className="mc-dossier" ref={dossierRef}>
+        {/* Header */}
+        <div className="mc-dossier-head">
+          <span className="mc-dossier-eyebrow">TARGET DOSSIER</span>
+          <button
+            className="mc-dossier-close"
+            onClick={() => setSelectedTarget(null)}
+            title="Close (ESC)"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mc-dossier-body">
+          {/* Company name + status badge */}
+          <div className="mc-dossier-company-header">
+            <span className={`mc-dossier-status-badge ${statusClass}`}>
+              {statusLabel}
+            </span>
+            <div className="mc-dossier-name">{(t.name || 'UNKNOWN').toUpperCase()}</div>
+            {(t.industry || t.revenue) && (
+              <div className="mc-dossier-subtitle">
+                {[t.industry, t.revenue].filter(Boolean).join(' · ')}
+              </div>
+            )}
+          </div>
+
+          {/* Score gauge + classification */}
+          <div className="mc-dossier-gauge-row">
+            <div className="mc-dossier-gauge">
+              <svg width="84" height="84" viewBox="0 0 84 84">
+                <circle
+                  cx="42" cy="42" r={radius}
+                  fill="none"
+                  stroke="rgba(0,212,255,0.12)"
+                  strokeWidth="5"
+                />
+                <circle
+                  cx="42" cy="42" r={radius}
+                  fill="none"
+                  stroke={scoreColor}
+                  strokeWidth="5"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  strokeLinecap="round"
+                  transform="rotate(-90 42 42)"
+                  style={{ filter: `drop-shadow(0 0 6px ${scoreColor})` }}
+                />
+                <text
+                  x="42" y="38"
+                  textAnchor="middle"
+                  fill={scoreColor}
+                  fontSize="17"
+                  fontWeight="700"
+                  fontFamily="Courier New, monospace"
+                >
+                  {score}
+                </text>
+                <text
+                  x="42" y="52"
+                  textAnchor="middle"
+                  fill="rgba(200,216,232,0.45)"
+                  fontSize="8"
+                  fontFamily="Courier New, monospace"
+                >
+                  ICP FIT
+                </text>
+              </svg>
+            </div>
+            <div className="mc-dossier-classification">
+              <div className="mc-dossier-class-label">CLASSIFICATION</div>
+              <div className="mc-dossier-class-value" style={{ color: scoreColor }}>
+                {classification}
+              </div>
+              <div className="mc-dossier-class-sub">
+                {score >= 70
+                  ? 'Strong match across ICP criteria'
+                  : score >= 40
+                  ? 'Partial match — worth monitoring'
+                  : 'Low match — nurture only'}
+              </div>
+            </div>
+          </div>
+
+          {/* FIRMOGRAPHIC INTEL */}
+          <div className="mc-dossier-section">
+            <button
+              className="mc-dossier-section-header"
+              onClick={() => toggleSection('firmographic')}
+            >
+              <span className="mc-dossier-section-toggle">
+                {collapsedSections.firmographic ? '▶' : '▼'}
+              </span>
+              FIRMOGRAPHIC INTEL
+            </button>
+            {!collapsedSections.firmographic && (
+              <div className="mc-dossier-section-body">
+                {t.industry && (
+                  <div className="mc-dossier-row">
+                    <span className="mc-dossier-key">INDUSTRY</span>
+                    <span className="mc-dossier-val">{t.industry}</span>
+                  </div>
+                )}
+                {t.revenue && (
+                  <div className="mc-dossier-row">
+                    <span className="mc-dossier-key">REVENUE</span>
+                    <span className="mc-dossier-val">{t.revenue}</span>
+                  </div>
+                )}
+                {(t.employee_count || t.company_size) && (
+                  <div className="mc-dossier-row">
+                    <span className="mc-dossier-key">SIZE</span>
+                    <span className="mc-dossier-val">{t.employee_count || t.company_size}</span>
+                  </div>
+                )}
+                {t.founded_year && (
+                  <div className="mc-dossier-row">
+                    <span className="mc-dossier-key">FOUNDED</span>
+                    <span className="mc-dossier-val">{t.founded_year}</span>
+                  </div>
+                )}
+                {(t.state || t.location) && (
+                  <div className="mc-dossier-row">
+                    <span className="mc-dossier-key">LOCATION</span>
+                    <span className="mc-dossier-val">{t.state || t.location}</span>
+                  </div>
+                )}
+                {t.website && (
+                  <div className="mc-dossier-row">
+                    <span className="mc-dossier-key">WEBSITE</span>
+                    <a
+                      href={t.website.startsWith('http') ? t.website : `https://${t.website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mc-dossier-link"
+                    >
+                      {t.website.replace(/^https?:\/\//, '')} ↗
+                    </a>
+                  </div>
+                )}
+                {!t.industry && !t.revenue && !t.employee_count && !t.company_size && !t.state && !t.location && (
+                  <div className="mc-dossier-empty">No firmographic data on file</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* FIT SCORE BREAKDOWN */}
+          <div className="mc-dossier-section">
+            <button
+              className="mc-dossier-section-header"
+              onClick={() => toggleSection('breakdown')}
+            >
+              <span className="mc-dossier-section-toggle">
+                {collapsedSections.breakdown ? '▶' : '▼'}
+              </span>
+              FIT SCORE BREAKDOWN
+            </button>
+            {!collapsedSections.breakdown && (
+              <div className="mc-dossier-section-body">
+                {breakdown ? (
+                  <>
+                    {breakdown.rows.map((row, i) => (
+                      <div key={i} className="mc-dossier-breakdown-row">
+                        <span className={`mc-dossier-criterion-icon ${row.matched ? 'matched' : row.partial ? 'partial' : 'missed'}`}>
+                          {row.matched ? '✓' : row.partial ? '~' : '✗'}
+                        </span>
+                        <span className="mc-dossier-criterion-label">{row.label}</span>
+                      </div>
+                    ))}
+                    <div className="mc-dossier-breakdown-summary">{breakdown.summary}</div>
+                  </>
+                ) : (
+                  <div className="mc-dossier-empty">ICP profile not configured</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* BUYING SIGNALS */}
+          <div className="mc-dossier-section">
+            <button
+              className="mc-dossier-section-header"
+              onClick={() => toggleSection('signals')}
+            >
+              <span className="mc-dossier-section-toggle">
+                {collapsedSections.signals ? '▶' : '▼'}
+              </span>
+              BUYING SIGNALS
+              {hasActiveSignals && (
+                <span className="mc-dossier-signal-dot" />
+              )}
+            </button>
+            {!collapsedSections.signals && (
+              <div className="mc-dossier-section-body">
+                {signals.length > 0 ? (
+                  signals.map((sig, i) => (
+                    <div key={i} className="mc-dossier-signal-row">
+                      <span className="mc-dossier-signal-pulse" />
+                      <div className="mc-dossier-signal-content">
+                        <div className="mc-dossier-signal-type">{sig.type || 'SIGNAL'}</div>
+                        <div className="mc-dossier-signal-desc">{sig.description || sig.desc || ''}</div>
+                        {sig.timestamp && (
+                          <div className="mc-dossier-signal-time">{formatTimestamp(sig.timestamp)}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : t.status === 'accepted' ? (
+                  <div className="mc-dossier-signal-row">
+                    <span className="mc-dossier-signal-pulse" />
+                    <div className="mc-dossier-signal-content">
+                      <div className="mc-dossier-signal-type">QUALIFIED</div>
+                      <div className="mc-dossier-signal-desc">Manually marked as interested target</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mc-dossier-empty">
+                    No active signals detected — Barry is monitoring
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* BARRY'S ASSESSMENT */}
+          <div className="mc-dossier-section">
+            <button
+              className="mc-dossier-section-header"
+              onClick={() => toggleSection('barry')}
+            >
+              <span className="mc-dossier-section-toggle">
+                {collapsedSections.barry ? '▶' : '▼'}
+              </span>
+              BARRY'S ASSESSMENT
+            </button>
+            {!collapsedSections.barry && (
+              <div className="mc-dossier-section-body">
+                {barryLoading && !briefing ? (
+                  <div className="mc-dossier-barry-loading">
+                    <div className="mc-dossier-spinner" />
+                    <span>BARRY ANALYZING...</span>
+                  </div>
+                ) : briefing ? (
+                  <p className="mc-dossier-barry-text">{briefing}</p>
+                ) : (
+                  <div className="mc-dossier-empty">Analysis unavailable</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ACTION CONSOLE */}
+          <div className="mc-dossier-footer">
+            <div className="mc-dossier-footer-label">ACTION CONSOLE</div>
+            <div className="mc-dossier-actions">
+              {[
+                { label: 'INITIATE CONTACT', icon: '◈' },
+                { label: 'ASSIGN TO MISSION', icon: '◎' },
+                { label: 'DEPRIORITIZE', icon: '◇' },
+              ].map((btn) => (
+                <div key={btn.label} className="mc-dossier-action-wrap">
+                  <button
+                    className="mc-dossier-action-btn"
+                    title="Coming in Phase 3"
+                  >
+                    <span className="mc-dossier-action-icon">{btn.icon}</span>
+                    {btn.label}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mission Target Card ───────────────────────────────────────────────────
+  function renderMissionCard(company, rank) {
+    const score = company.fit_score || 0;
+    const scoreColor = getScoreColor(score);
+    const hasActiveSignals =
+      (company.signals && company.signals.length > 0) ||
+      company.status === 'accepted' ||
+      (company.fit_score && company.fit_score >= ICP_SCORE_THRESHOLD);
+    const statusLabel = getStatusLabel(company.status);
+    const statusClass = getStatusClass(company.status);
+
+    return (
+      <div key={company.id} className="mc-mission-card">
+        <div className="mc-mission-card-rank">#{rank}</div>
+        <div className="mc-mission-card-left">
+          <div className="mc-mission-card-name">{company.name || 'Unknown'}</div>
+          <div className="mc-mission-card-meta">
+            {[company.industry, company.revenue].filter(Boolean).join(' · ') || 'No data'}
+          </div>
+        </div>
+        <div className="mc-mission-card-center">
+          <div className="mc-mission-card-score" style={{ color: scoreColor, borderColor: scoreColor }}>
+            {score}
+          </div>
+          <div className={`mc-mission-card-signal ${hasActiveSignals ? 'active' : 'monitoring'}`}>
+            <span className="mc-mission-card-signal-dot" />
+            {hasActiveSignals ? 'ACTIVE SIGNALS' : 'MONITORING'}
+          </div>
+        </div>
+        <div className="mc-mission-card-right">
+          <button
+            className="mc-mission-card-btn"
+            onClick={() => openDossier(company)}
+          >
+            PULL DOSSIER →
+          </button>
+          <span className={`mc-mission-card-status ${statusClass}`}>
+            {statusLabel}
+          </span>
+        </div>
+      </div>
+    );
   }
 
   // ── Loading State ─────────────────────────────────────────────────────────
@@ -612,58 +1125,70 @@ export default function MissionControl() {
           </div>
         )}
 
-        {/* Target Dossier (Phase 2 placeholder) */}
-        {selectedTarget && (
-          <div className="mc-dossier">
-            <div className="mc-dossier-head">
-              <span className="mc-dossier-eyebrow">TARGET DOSSIER</span>
-              <button
-                className="mc-dossier-close"
-                onClick={() => setSelectedTarget(null)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mc-dossier-body">
-              <div className="mc-dossier-name">{selectedTarget.name}</div>
-              <div className="mc-dossier-loading">
-                <div className="mc-dossier-spinner" />
-                Target Intel Loading...
-              </div>
-              <div className="mc-dossier-meta">
-                {selectedTarget.industry && (
-                  <div className="mc-dossier-row">
-                    <span className="mc-dossier-key">INDUSTRY</span>
-                    <span>{selectedTarget.industry}</span>
-                  </div>
-                )}
-                {selectedTarget.revenue && (
-                  <div className="mc-dossier-row">
-                    <span className="mc-dossier-key">REVENUE</span>
-                    <span>{selectedTarget.revenue}</span>
-                  </div>
-                )}
-                {selectedTarget.fit_score != null && (
-                  <div className="mc-dossier-row">
-                    <span className="mc-dossier-key">ICP SCORE</span>
-                    <span style={{ color: selectedTarget.color }}>
-                      {selectedTarget.fit_score}
-                    </span>
-                  </div>
-                )}
-                {selectedTarget.status && (
-                  <div className="mc-dossier-row">
-                    <span className="mc-dossier-key">STATUS</span>
-                    <span>{selectedTarget.status}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Full Target Dossier */}
+        {renderDossier()}
       </div>
 
-      {/* ── SECTION 4: INTELLIGENCE TICKER ───────────────────────────── */}
+      {/* ── SECTION 4: MISSION-READY TARGET LIST ─────────────────────── */}
+      {companies.length > 0 && (
+        <div className="mc-mission-list">
+          <div className="mc-mission-list-header">
+            <div className="mc-mission-list-title">TODAY'S MISSION TARGETS</div>
+            <div className="mc-mission-list-sub">
+              Ranked by Barry — Fit × Signals × Recency
+            </div>
+          </div>
+
+          {/* Tab selector */}
+          <div className="mc-mission-tabs">
+            <button
+              className={`mc-mission-tab${activeMissionTab === 'ready' ? ' active' : ''}`}
+              onClick={() => setActiveMissionTab('ready')}
+            >
+              <span className="mc-mission-tab-dot ready" />
+              MISSION READY
+              <span className="mc-mission-tab-count">{missionReady.length}</span>
+            </button>
+            <button
+              className={`mc-mission-tab${activeMissionTab === 'warming' ? ' active' : ''}`}
+              onClick={() => setActiveMissionTab('warming')}
+            >
+              <span className="mc-mission-tab-dot warming" />
+              WARMING
+              <span className="mc-mission-tab-count">{warming.length}</span>
+            </button>
+            <button
+              className={`mc-mission-tab${activeMissionTab === 'long-range' ? ' active' : ''}`}
+              onClick={() => setActiveMissionTab('long-range')}
+            >
+              <span className="mc-mission-tab-dot long-range" />
+              LONG RANGE
+              <span className="mc-mission-tab-count">{longRange.length}</span>
+            </button>
+          </div>
+
+          {/* Cards */}
+          <div className="mc-mission-cards">
+            {activeBucket.length > 0 ? (
+              activeBucket.map((company, i) => {
+                const rankBase =
+                  activeMissionTab === 'ready'
+                    ? 0
+                    : activeMissionTab === 'warming'
+                    ? 10
+                    : 35;
+                return renderMissionCard(company, rankBase + i + 1);
+              })
+            ) : (
+              <div className="mc-mission-empty">
+                No targets in this bucket yet
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── SECTION 5: INTELLIGENCE TICKER ───────────────────────────── */}
       <div className="mc-ticker">
         <div className="mc-ticker-label">◈ INTEL FEED</div>
         <div className="mc-ticker-track">

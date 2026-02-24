@@ -686,3 +686,216 @@ export const getPath = {
  *   }
  * }
  */
+
+// ============================================================================
+// OPERATION PEOPLE FIRST — Schema Documentation (Team Alpha)
+// ============================================================================
+
+/**
+ * Brigade System
+ * Behavioral contracts that drive Barry's strategy for a person.
+ * Defined in: src/data/brigadeSystem.js
+ *
+ * Brigade IDs:
+ *   Lead brigades:    hot_prospect | warm_prospect | cold_prospect | nurture | stalled
+ *   Network brigades: customer_active | customer_past | partner_referral | partner_strategic |
+ *                     network_close | network_casual
+ *
+ * Stored on the contact document:
+ * {
+ *   brigade: string,              // Current brigade ID
+ *   brigade_updated_at: string,   // ISO timestamp of last brigade change
+ *   brigade_history: [            // Immutable log — every change recorded
+ *     {
+ *       from: string,
+ *       to: string,
+ *       reason: string,
+ *       trigger: string,
+ *       transitioned_at: string
+ *     }
+ *   ]
+ * }
+ *
+ * Brigade transitions:
+ * - Barry suggests, user confirms. Never auto-applied.
+ * - Full brigade log in subcollection: users/{userId}/contacts/{contactId}/brigade_log
+ */
+
+/**
+ * Person Type (Universal People View Lenses)
+ * Stored on contact document as person_type.
+ *
+ * Values:
+ *   lead           — Anyone actively worked toward a business outcome
+ *   customer       — Current paying or engaged customer
+ *   partner        — Collaborator, referral source, or strategic alliance
+ *   network        — Part of the relationship ecosystem
+ *   past_customer  — Former customer — high referral/re-engagement potential
+ *
+ * person_type drives:
+ *   - Which workspace lens shows this person (Leads, Customers, Partners, etc.)
+ *   - Barry's default tone and strategy
+ *   - The available brigade options
+ *   - The contact_status trigger on type change
+ */
+
+/**
+ * Engage Module State (Persistent)
+ * The Engage module is permanent — not a pop-up. Lives at top of every profile.
+ * Stored on contact document as engage_state.
+ *
+ * {
+ *   status: 'never_engaged' | 'in_progress' | 'awaiting_reply' | 'paused',
+ *   last_session_at: string,          // ISO timestamp
+ *   current_goal: string | null,      // What Barry is working toward
+ *   preferred_channel: string | null, // Last or preferred channel
+ *   channel_blocked: string | null,   // Currently blocked channel
+ *   last_barry_session: {
+ *     summary: string,
+ *     outcome: string,
+ *     next_step: string | null,
+ *     sessionId: string
+ *   } | null
+ * }
+ */
+
+/**
+ * Barry Memory (Per-Contact)
+ * Persistent context Barry reads before every session.
+ * Stored on contact document as barry_memory.
+ *
+ * {
+ *   who_they_are: string | null,
+ *   current_goal: string | null,
+ *   relationship_summary: string | null,     // Running log of what has happened
+ *   what_has_been_tried: string[],
+ *   what_has_worked: string[],
+ *   what_has_not_worked: string[],
+ *   tone_preference: string | null,          // Inferred from history
+ *   channel_preference: string | null,       // Inferred from what works
+ *   last_updated_at: string | null,
+ *   known_facts: string[],                   // Explicit facts, human-readable
+ *   context_by_session: { [sessionId]: string } // Session ID → summary
+ * }
+ *
+ * Barry Session Records (richer than timeline events):
+ *   Subcollection: users/{userId}/contacts/{contactId}/barry_sessions/{sessionId}
+ *   Contains ALL generated messages (all 4 types, selected or not).
+ *   No context is ever lost.
+ */
+
+/**
+ * Next Best Step (Replaces Missions)
+ * Single contextual action Barry proposes at session end.
+ * Stored on contact document as next_best_step.
+ *
+ * {
+ *   id: string,
+ *   type: 'follow_up' | 'channel_switch' | 'referral_ask' | 'intro_offer' |
+ *         'check_in' | 'close' | 'nurture_touch' | 'record_outcome',
+ *   action: string,              // Human-readable action
+ *   reasoning: string,           // Why Barry suggests this
+ *   due_at: string,              // ISO timestamp — when to take this action
+ *   proposed_at: string,
+ *   status: 'pending' | 'confirmed' | 'completed' | 'dismissed',
+ *   user_confirmed: boolean,
+ *   confirmed_at: string | null,
+ *   metadata: Object             // Type-specific data
+ * }
+ *
+ * NBS History (immutable):
+ *   Array on contact document: next_best_step_history[]
+ *   Subcollection: users/{userId}/contacts/{contactId}/nbs_history
+ *
+ * NBS Queue (user-level):
+ *   Collection: users/{userId}/nbs_queue
+ *   Used for Barry's morning briefing ("You have 3 follow-ups due today").
+ */
+
+/**
+ * Referral Data (Per-Contact)
+ * Stored on contact document as referral_data.
+ *
+ * {
+ *   is_referral_source: boolean,
+ *   referrals_sent: number,
+ *   referrals_converted: number,
+ *   last_referral_at: string | null,
+ *   is_referral_target: boolean,
+ *   referred_by_ids: string[],
+ *   has_referred_ids: string[],
+ *   referral_quality: 'low' | 'medium' | 'high' | null,
+ *   network_segment: string | null
+ * }
+ *
+ * Referral Records:
+ *   Collection: users/{userId}/referrals/{referralId}
+ *   Contains full referral lifecycle: pending → contacted → converted | not_converted
+ */
+
+/**
+ * Engagement Summary (Per-Contact, Denormalized)
+ * Fast read — no subcollection query needed for profile display.
+ * Stored on contact document as engagement_summary.
+ *
+ * {
+ *   total_sessions: number,
+ *   total_messages_generated: number,
+ *   total_messages_sent: number,
+ *   total_attempts: number,
+ *   replies_received: number,
+ *   positive_replies: number,
+ *   first_contact_at: string | null,
+ *   last_contact_at: string | null,
+ *   last_message_channel: string | null,
+ *   last_outcome: 'no_reply' | 'replied_positive' | 'replied_negative' | 'bounced' | null,
+ *   consecutive_no_replies: number,
+ *   channel_history: {
+ *     [channel]: { attempts: number, replies: number }
+ *   }
+ * }
+ */
+
+/**
+ * User-Level Barry Memory
+ * Global preferences Barry learns across ALL contacts.
+ * Stored at: users/{userId}/barry_memory (document)
+ *
+ * {
+ *   preferred_tone: string | null,
+ *   preferred_channel: string | null,
+ *   tone_usage: { [tone]: number },
+ *   channel_usage: { [channel]: number },
+ *   channel_reply_rates: { [channel]: { attempts: number, replies: number } },
+ *   total_sessions: number,
+ *   last_session_at: string | null,
+ *   last_updated_at: string | null
+ * }
+ */
+
+// ── New Firestore Path Additions ─────────────────────────
+
+export const PEOPLE_FIRST_PATHS = {
+  // Person document (existing contacts collection — same path, extended fields)
+  person: (userId, contactId) => `users/${userId}/contacts/${contactId}`,
+
+  // Barry sessions for a contact (full session records)
+  barrySessions: (userId, contactId) => `users/${userId}/contacts/${contactId}/barry_sessions`,
+  barrySession: (userId, contactId, sessionId) => `users/${userId}/contacts/${contactId}/barry_sessions/${sessionId}`,
+
+  // NBS history (immutable log)
+  nbsHistory: (userId, contactId) => `users/${userId}/contacts/${contactId}/nbs_history`,
+
+  // Brigade transition log (immutable)
+  brigadeLog: (userId, contactId) => `users/${userId}/contacts/${contactId}/brigade_log`,
+
+  // User-level Barry memory
+  userBarryMemory: (userId) => `users/${userId}/barry_memory`,
+
+  // Referral records
+  referrals: (userId) => `users/${userId}/referrals`,
+  referral: (userId, referralId) => `users/${userId}/referrals/${referralId}`,
+
+  // NBS queue (for morning briefing and notifications)
+  nbsQueue: (userId) => `users/${userId}/nbs_queue`
+};

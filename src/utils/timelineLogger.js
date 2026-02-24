@@ -31,6 +31,12 @@
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
+// DUAL-WRITE NOTE (Operation People First):
+// All new timeline documents write BOTH createdAt and timestamp.
+// This ensures backward-compatible reads (createdAt) and ordered queries (timestamp).
+// Historical documents with only createdAt must be backfilled via:
+//   src/scripts/backfillTimelineTimestamp.js
+
 // Allowed event types — enforced at write time
 const TIMELINE_EVENT_TYPES = [
   'message_generated',
@@ -89,6 +95,8 @@ export async function logTimelineEvent({ userId, contactId, type, actor, preview
   try {
     const timelineRef = collection(db, 'users', userId, 'contacts', contactId, 'timeline');
 
+    // Dual-write: createdAt (legacy reads) + timestamp (ordered queries)
+    const now = Timestamp.now();
     const event = {
       type,
       actor,

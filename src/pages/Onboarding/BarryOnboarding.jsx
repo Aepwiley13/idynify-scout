@@ -77,6 +77,7 @@ export default function BarryOnboarding() {
   const [barryMessage, setBarryMessage] = useState('');
   const [followUpCount, setFollowUpCount] = useState(0);
   const [error, setError] = useState(null);
+  const [savedICP, setSavedICP] = useState(null); // populated when step === 'saving'
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -90,9 +91,12 @@ export default function BarryOnboarding() {
   }, [conversationHistory]);
 
   useEffect(() => {
-    // Focus input when step changes to asking or clarifying
     if ((step === 'asking' || step === 'clarifying') && inputRef.current) {
       inputRef.current.focus();
+    }
+    // Scroll to bottom when confirmation card or saving screen appears
+    if (step === 'confirming' || step === 'saving') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [step]);
 
@@ -123,15 +127,19 @@ export default function BarryOnboarding() {
         setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
       }
 
-      // Check for existing conversation
+      // Check for existing in-progress conversation
       const conversationDoc = await getDoc(
         doc(db, 'users', user.uid, 'barryConversations', 'icp')
       );
 
+      let conversationRestored = false;
+
       if (conversationDoc.exists()) {
         const data = conversationDoc.data();
+        console.log('[Barry] barryConversations/icp doc found. status:', data.status, 'messages:', data.messages?.length);
         if (data.status === 'in_progress' && data.messages?.length > 0) {
-          // Resume conversation
+          // Resume conversation — restore all state BEFORE calling setLoading(false)
+          conversationRestored = true;
           setConversationHistory(data.messages);
           setExtractedICP(data.extractedICP || null);
           setFollowUpCount(data.followUpCount || 0);
@@ -139,11 +147,19 @@ export default function BarryOnboarding() {
           if (data.extractedICP) {
             setBarryMessage('Welcome back. Let me show you where we left off.');
           }
+          console.log('[Barry] Conversation restored. step:', data.currentStep, 'messages:', data.messages.length);
+        } else {
+          console.log('[Barry] Conversation doc exists but not resumable. status:', data.status);
         }
+      } else {
+        console.log('[Barry] No barryConversations/icp doc found for this user.');
       }
 
       setLoading(false);
-      setStep('asking');
+      // Only default to 'asking' if no prior conversation was restored
+      if (!conversationRestored) {
+        setStep('asking');
+      }
     } catch (error) {
       console.error('Error checking existing ICP:', error);
       setLoading(false);
@@ -184,7 +200,10 @@ export default function BarryOnboarding() {
           userInput: input,
           currentStep: step,
           conversationHistory: newHistory,
-          existingICP
+          existingICP,
+          // Send current accumulated ICP state so backend enforcement checks
+          // (hasPendingTitles, etc.) can see what was extracted in prior turns
+          pendingICP: extractedICP
         })
       });
 
@@ -308,6 +327,9 @@ export default function BarryOnboarding() {
         managedByBarry: true
       };
 
+      // Show confirmation screen before redirect
+      setSavedICP(icpProfile);
+
       // Save to companyProfile/current
       await setDoc(
         doc(db, 'users', user.uid, 'companyProfile', 'current'),
@@ -362,9 +384,9 @@ export default function BarryOnboarding() {
       ];
       setConversationHistory(finalHistory);
 
-      // Navigate to Scout after a brief delay
+      // Navigate to Scout Daily Leads after a brief delay
       setTimeout(() => {
-        navigate('/scout/daily-leads');
+        navigate('/scout', { state: { activeTab: 'daily-leads' } });
       }, 2500);
 
     } catch (error) {
@@ -394,17 +416,6 @@ export default function BarryOnboarding() {
 
   return (
     <div className="barry-onboarding">
-      {/* Header */}
-      <div className="barry-header">
-        <div className="barry-avatar">
-          <Brain className="w-6 h-6 text-purple-600" />
-        </div>
-        <div className="barry-header-text">
-          <h1>Barry</h1>
-          <p>ICP Intelligence</p>
-        </div>
-      </div>
-
       {/* Conversation Area */}
       <div className="barry-conversation">
         {/* Initial Barry Message */}
@@ -459,12 +470,60 @@ export default function BarryOnboarding() {
           </div>
         )}
 
-        {/* Saving State */}
-        {step === 'saving' && (
-          <div className="saving-section">
-            <div className="saving-content">
-              <RefreshCw className="w-6 h-6 text-purple-600 animate-spin" />
-              <p>Saving your ICP...</p>
+        {/* Save Confirmation Screen */}
+        {step === 'saving' && savedICP && (
+          <div className="save-confirmation-screen">
+            <div className="save-confirmation-card">
+              <div className="save-confirmation-header">
+                <div className="save-check-icon">
+                  <Check className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="save-confirmation-title">ICP Saved</h2>
+                  <p className="save-confirmation-subtitle">Barry is now searching for your targets</p>
+                </div>
+              </div>
+
+              <div className="save-confirmation-summary">
+                {savedICP.lookalikeSeed?.name && (
+                  <div className="save-summary-row save-summary-highlight">
+                    <span className="save-summary-label">Search anchor</span>
+                    <span className="save-summary-value">{savedICP.lookalikeSeed.name}</span>
+                  </div>
+                )}
+                {savedICP.industries?.length > 0 && (
+                  <div className="save-summary-row">
+                    <span className="save-summary-label">Industries</span>
+                    <span className="save-summary-value">{savedICP.industries.slice(0, 3).join(', ')}{savedICP.industries.length > 3 ? ` +${savedICP.industries.length - 3} more` : ''}</span>
+                  </div>
+                )}
+                {savedICP.companySizes?.length > 0 && (
+                  <div className="save-summary-row">
+                    <span className="save-summary-label">Company size</span>
+                    <span className="save-summary-value">{savedICP.companySizes.join(', ')} employees</span>
+                  </div>
+                )}
+                <div className="save-summary-row">
+                  <span className="save-summary-label">Location</span>
+                  <span className="save-summary-value">
+                    {savedICP.isNationwide ? 'Nationwide' : savedICP.locations?.slice(0, 3).join(', ') || 'Nationwide'}
+                    {!savedICP.isNationwide && savedICP.locations?.length > 3 ? ` +${savedICP.locations.length - 3} more` : ''}
+                  </span>
+                </div>
+                {savedICP.targetTitles?.length > 0 && (
+                  <div className="save-summary-row">
+                    <span className="save-summary-label">Target contacts</span>
+                    <span className="save-summary-value">{savedICP.targetTitles.slice(0, 4).join(', ')}{savedICP.targetTitles.length > 4 ? ` +${savedICP.targetTitles.length - 4} more` : ''}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="save-searching-indicator">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Finding companies matching your ICP...</span>
+              </div>
+
+              <p className="save-redirect-note">Taking you to Daily Leads in a moment</p>
             </div>
           </div>
         )}

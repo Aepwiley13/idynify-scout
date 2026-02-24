@@ -2,6 +2,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
+import { expandTitlesWithSynonyms } from './utils/titleSynonyms.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -57,9 +58,16 @@ export const handler = async (event) => {
 
     // Step 1: Search Apollo API for contact candidates
     const limit = maxResults || 10;
+
+    // Expand titles with synonyms to improve Apollo match coverage.
+    // e.g. 'CEO' → ['CEO', 'Chief Executive Officer', 'Chief Executive', 'Co-CEO']
+    const expandedTitles = expandTitlesWithSynonyms(titles);
+    console.log('📋 Target titles (original):', titles);
+    console.log('📋 Target titles (expanded):', expandedTitles);
+
     const searchBody = {
       organization_ids: [organizationId],
-      person_titles: titles,
+      person_titles: expandedTitles,
       page: 1,
       per_page: limit
     };

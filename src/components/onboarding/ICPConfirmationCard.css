@@ -251,9 +251,40 @@
   color: white;
 }
 
-.confirm-btn:hover {
+.confirm-btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.confirm-btn-disabled,
+.confirm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Required field inline messages */
+.required-field-message {
+  display: block;
+  font-size: 0.75rem;
+  color: #dc2626;
+  margin-top: 0.375rem;
+  line-height: 1.4;
+}
+
+.detail-row.required-missing {
+  opacity: 1;
+}
+
+.detail-row.required-missing .detail-icon {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.detail-row.required-missing .detail-value {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 /* Responsive */

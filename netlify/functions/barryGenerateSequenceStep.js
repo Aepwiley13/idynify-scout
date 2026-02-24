@@ -283,8 +283,10 @@ Respond ONLY with valid JSON.`;
         channel: stepPlan.channel,
         outcome_goal: missionFields.outcome_goal,
         previousOutcome: previousOutcome || null,
-        hasReconData: !!reconContext,
-        hasHistory: (stepHistory?.length || 0) > 0
+        reconPresent: !!reconContext,
+        hasHistory: (stepHistory?.length || 0) > 0,
+        inputTokens: claudeResponse.usage?.input_tokens,
+        outputTokens: claudeResponse.usage?.output_tokens
       }
     });
 

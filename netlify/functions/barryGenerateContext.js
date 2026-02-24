@@ -244,7 +244,9 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
       metadata: {
         contactName: contact.name,
         hasCompanyData: !!companyData,
-        hasReconData: !!reconContext
+        reconPresent: !!reconContext,
+        inputTokens: claudeResponse.usage?.input_tokens,
+        outputTokens: claudeResponse.usage?.output_tokens
       }
     });
 

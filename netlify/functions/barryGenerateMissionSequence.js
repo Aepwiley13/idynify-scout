@@ -278,8 +278,10 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
         timeframe,
         next_step_type,
         contactCount: contacts?.length || 0,
-        hasReconData: !!reconContext,
-        stepsGenerated: microSequence.steps.length
+        reconPresent: !!reconContext,
+        stepsGenerated: microSequence.steps.length,
+        inputTokens: claudeResponse.usage?.input_tokens,
+        outputTokens: claudeResponse.usage?.output_tokens
       }
     });
 

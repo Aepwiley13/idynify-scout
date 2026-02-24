@@ -386,7 +386,7 @@ export const handler = async (event) => {
       const responseTime = Date.now() - startTime;
       await logApiUsage(userId, 'barryMissionChat', 'success', {
         responseTime,
-        metadata: { mode: currentMode, type: 'opening_brief', reconEnhanced: !!reconContext }
+        metadata: { mode: currentMode, type: 'opening_brief', reconPresent: !!reconContext, inputTokens: claudeResponse.usage?.input_tokens, outputTokens: claudeResponse.usage?.output_tokens }
       });
 
       return {
@@ -453,7 +453,9 @@ export const handler = async (event) => {
           mode: currentMode,
           type: 'conversation',
           messageCount: updatedHistory.length,
-          reconEnhanced: !!reconContext
+          reconPresent: !!reconContext,
+          inputTokens: claudeResponse.usage?.input_tokens,
+          outputTokens: claudeResponse.usage?.output_tokens
         }
       });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
@@ -18,8 +18,8 @@ import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
 import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
-import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import EngagementTimeline from '../../components/contacts/EngagementTimeline';
+import InlineEngagementSection from '../../components/contacts/InlineEngagementSection';
 import StructuredFields from '../../components/contacts/StructuredFields';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
@@ -40,8 +40,8 @@ export default function ContactProfile() {
   const [enrichError, setEnrichError] = useState(null);
   const [barryContext, setBarryContext] = useState(null);
   const [generatingContext, setGeneratingContext] = useState(false);
-  const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
   const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
+  const engagementSectionRef = useRef(null);
   const [staleDismissed, setStaleDismissed] = useState(false);
   const [needsManualLinkedIn, setNeedsManualLinkedIn] = useState(false);
   const [manualLinkedInUrl, setManualLinkedInUrl] = useState('');
@@ -149,6 +149,22 @@ export default function ContactProfile() {
 
   function handleContactUpdate(updatedContact) {
     setContact(updatedContact);
+  }
+
+  function triggerInlineEngagement() {
+    // Scroll the inline engagement section into view, then trigger the flow
+    const el = document.getElementById('engagement-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Small delay to let scroll settle before expanding
+      setTimeout(() => {
+        if (engagementSectionRef.current?.triggerFlow) {
+          engagementSectionRef.current.triggerFlow();
+        }
+      }, 350);
+    } else if (engagementSectionRef.current?.triggerFlow) {
+      engagementSectionRef.current.triggerFlow();
+    }
   }
 
   async function loadReconStatus(userId) {
@@ -608,10 +624,10 @@ export default function ContactProfile() {
         </div>
 
         {/* PERSISTENT ENGAGE BAR — Always visible, always resumable.
-            This is not a pop-up. It is a permanent engagement state. */}
+            Clicking scrolls to + triggers the inline Engagement section. */}
         <PersistentEngageBar
           contact={contact}
-          onEngageClick={() => setHunterDrawerOpen(true)}
+          onEngageClick={triggerInlineEngagement}
         />
 
         {/* Barry Insight Panel — Step 7 proactive recommendations */}
@@ -619,7 +635,7 @@ export default function ContactProfile() {
           contactId={contact.id}
           onAction={(rec) => {
             if (['re_engage', 'start_mission', 'approve_next_step', 'switch_channel', 'accelerate_sequence'].includes(rec.action.type)) {
-              setHunterDrawerOpen(true);
+              triggerInlineEngagement();
             }
           }}
         />
@@ -643,14 +659,22 @@ export default function ContactProfile() {
         {/* 4. ACTIONS - BELOW BARRY */}
         <RecessiveActions contact={contact} />
 
-        {/* 5. ENGAGEMENT TIMELINE - Unified chronological engagement log */}
+        {/* 5. INLINE ENGAGEMENT SECTION — Persistent inline flow + history.
+            No modal. No overlay. Fills in-place below Strategic Context. */}
+        <InlineEngagementSection
+          ref={engagementSectionRef}
+          contact={contact}
+          onContactUpdate={handleContactUpdate}
+        />
+
+        {/* 5b. ENGAGEMENT TIMELINE - Full chronological event log */}
         <EngagementTimeline contactId={contact.id} />
 
         {/* NEXT BEST STEP — Replaces Missions. Barry proposes. User confirms.
             Relationships compound instead of resetting. */}
         <NextBestStep
           contact={contact}
-          onEngageClick={() => setHunterDrawerOpen(true)}
+          onEngageClick={triggerInlineEngagement}
           onStepConfirmed={(step) => {
             console.log('[ContactProfile] Next step confirmed:', step);
           }}
@@ -659,14 +683,6 @@ export default function ContactProfile() {
         {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
-
-      {/* Hunter Contact Drawer - In-context engagement */}
-      <HunterContactDrawer
-        contact={contact}
-        isOpen={hunterDrawerOpen}
-        onClose={() => setHunterDrawerOpen(false)}
-        onContactUpdate={handleContactUpdate}
-      />
     </div>
   );
 }

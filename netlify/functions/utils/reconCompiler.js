@@ -45,8 +45,8 @@ function compileReconForPrompt(dashboardData) {
   const s2 = getCompleted(sections, 2);
   if (s2) {
     parts.push('PRODUCT DETAILS:');
-    Object.entries(s2).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s2)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -55,8 +55,8 @@ function compileReconForPrompt(dashboardData) {
   const s3 = getCompleted(sections, 3);
   if (s3) {
     parts.push('TARGET MARKET:');
-    Object.entries(s3).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s3)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -65,8 +65,8 @@ function compileReconForPrompt(dashboardData) {
   const s4 = getCompleted(sections, 4);
   if (s4) {
     parts.push('IDEAL CUSTOMER PSYCHOGRAPHICS:');
-    Object.entries(s4).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s4)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -75,8 +75,8 @@ function compileReconForPrompt(dashboardData) {
   const s5 = getCompleted(sections, 5);
   if (s5) {
     parts.push('CUSTOMER PAIN POINTS:');
-    Object.entries(s5).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s5)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -85,8 +85,8 @@ function compileReconForPrompt(dashboardData) {
   const s6 = getCompleted(sections, 6);
   if (s6) {
     parts.push('BUYING BEHAVIOR & TRIGGERS:');
-    Object.entries(s6).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s6)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -95,8 +95,8 @@ function compileReconForPrompt(dashboardData) {
   const s7 = getCompleted(sections, 7);
   if (s7) {
     parts.push('DECISION PROCESS:');
-    Object.entries(s7).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s7)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -105,8 +105,8 @@ function compileReconForPrompt(dashboardData) {
   const s8 = getCompleted(sections, 8);
   if (s8) {
     parts.push('COMPETITIVE LANDSCAPE:');
-    Object.entries(s8).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s8)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -115,8 +115,8 @@ function compileReconForPrompt(dashboardData) {
   const s9 = getCompleted(sections, 9);
   if (s9) {
     parts.push('MESSAGING & VALUE PROPOSITION:');
-    Object.entries(s9).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s9)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -125,8 +125,8 @@ function compileReconForPrompt(dashboardData) {
   const s10 = getCompleted(sections, 10);
   if (s10) {
     parts.push('BEHAVIORAL SIGNALS:');
-    Object.entries(s10).forEach(([key, val]) => {
-      if (val && typeof val === 'string') parts.push(`- ${formatKey(key)}: ${val}`);
+    Object.entries(sanitizeReconSection(s10)).forEach(([key, val]) => {
+      parts.push(`- ${formatKey(key)}: ${val}`);
     });
     parts.push('');
   }
@@ -135,6 +135,34 @@ function compileReconForPrompt(dashboardData) {
   parts.push('--- END RECON DATA ---\n');
 
   return parts.join('\n');
+}
+
+/**
+ * Sanitize a section data object for prompt compilation.
+ * Coerces arrays to comma-joined strings, trims string values,
+ * and strips null/undefined/empty entries before Object.entries
+ * is called. Prevents blank prompt lines and silently-dropped arrays.
+ * @param {Object} data - Raw section data from Firestore
+ * @returns {Object} Clean object — only non-empty string values
+ */
+function sanitizeReconSection(data) {
+  if (!data || typeof data !== 'object') return {};
+  const result = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val === null || val === undefined) continue;
+    let coerced;
+    if (Array.isArray(val)) {
+      coerced = val.filter(Boolean).join(', ');
+    } else if (typeof val === 'string') {
+      coerced = val.trim();
+    } else if (typeof val === 'number' || typeof val === 'boolean') {
+      coerced = String(val);
+    } else {
+      continue; // skip nested objects
+    }
+    if (coerced) result[key] = coerced;
+  }
+  return result;
 }
 
 function getCompleted(sections, sectionId) {

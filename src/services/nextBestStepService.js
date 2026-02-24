@@ -257,10 +257,15 @@ export async function saveNextBestStep(userId, contactId, nbsProposal) {
       });
     }
 
-    // Write new NBS to contact
+    // Write new NBS to contact.
+    // next_step_due is the flat field Beta's PersistentEngageBar reads for the morning
+    // briefing pull-back check — written at the top level of the contact document
+    // so it can be queried directly without loading the nested next_best_step object.
     await updateDoc(contactRef, {
       next_best_step: nbsProposal,
       next_best_step_history: history,
+      next_step_due: nbsProposal.due_at,      // Flat field — queryable, readable by briefing
+      next_step_type: nbsProposal.type,        // Flat field — readable without nested access
       updatedAt: now
     });
 
@@ -275,11 +280,11 @@ export async function saveNextBestStep(userId, contactId, nbsProposal) {
       created_at: now
     });
 
-    // Log timeline event
+    // Log timeline event — canonical type is 'next_step_queued' (integration check #3)
     await logTimelineEvent({
       userId,
       contactId,
-      type: 'next_best_step_proposed',
+      type: 'next_step_queued',              // Canonical name — matches Beta's UI check
       actor: 'barry',
       preview: nbsProposal.action,
       metadata: {
@@ -325,15 +330,20 @@ export async function confirmNextBestStep(userId, contactId, editedAction, edite
       due_at: editedDueAt || nbs.due_at
     };
 
-    await updateDoc(contactRef, {
+    // Keep next_step_due in sync if user edited the due date
+    const updates = {
       next_best_step: confirmedNbs,
       updatedAt: now
-    });
+    };
+    if (editedDueAt) {
+      updates.next_step_due = editedDueAt;
+    }
+    await updateDoc(contactRef, updates);
 
     await logTimelineEvent({
       userId,
       contactId,
-      type: 'next_best_step_confirmed',
+      type: 'next_step_confirmed',           // Canonical type
       actor: 'user',
       preview: confirmedNbs.action,
       metadata: {
@@ -380,13 +390,15 @@ export async function completeNextBestStep(userId, contactId, completionNote) {
     await updateDoc(contactRef, {
       next_best_step: null,             // Clear the current NBS — Barry will propose a new one
       next_best_step_history: history,
+      next_step_due: null,              // Clear flat field — no active step
+      next_step_type: null,
       updatedAt: now
     });
 
     await logTimelineEvent({
       userId,
       contactId,
-      type: 'next_best_step_completed',
+      type: 'next_step_completed',      // Canonical type
       actor: 'user',
       preview: nbs.action,
       metadata: {
@@ -432,13 +444,15 @@ export async function dismissNextBestStep(userId, contactId, reason) {
     await updateDoc(contactRef, {
       next_best_step: null,
       next_best_step_history: history,
+      next_step_due: null,              // Clear flat field
+      next_step_type: null,
       updatedAt: now
     });
 
     await logTimelineEvent({
       userId,
       contactId,
-      type: 'next_best_step_dismissed',
+      type: 'next_step_dismissed',      // Canonical type
       actor: 'user',
       preview: nbs.action,
       metadata: {

@@ -82,10 +82,16 @@ const ALL_TIMELINE_EVENT_TYPES = [
   'channel_pivot_started',
 
   // Next Best Step Events
-  'next_best_step_proposed',
-  'next_best_step_confirmed',
-  'next_best_step_completed',
-  'next_best_step_dismissed',
+  // Canonical name used by integration checks and Beta's UI: next_step_queued
+  // next_best_step_proposed is kept as an alias for backward compatibility
+  'next_step_queued',             // Canonical: NBS proposed by Barry and saved to queue
+  'next_step_confirmed',          // Canonical: User confirmed the NBS
+  'next_step_completed',          // Canonical: User took the action
+  'next_step_dismissed',          // Canonical: User dismissed without acting
+  'next_best_step_proposed',      // Legacy alias → maps to next_step_queued
+  'next_best_step_confirmed',     // Legacy alias → maps to next_step_confirmed
+  'next_best_step_completed',     // Legacy alias → maps to next_step_completed
+  'next_best_step_dismissed',     // Legacy alias → maps to next_step_dismissed
 
   // Brigade Events
   'brigade_assigned',
@@ -142,10 +148,16 @@ export async function logTimelineEvent({ userId, contactId, type, actor, preview
   try {
     const timelineRef = collection(db, 'users', userId, 'contacts', contactId, 'timeline');
 
+    // DUAL-WRITE: Both createdAt (legacy reads) and timestamp (ordered queries).
+    // This matches Beta's PersistentEngageBar which queries by timestamp.
+    // Historical docs missing timestamp are backfilled by:
+    //   src/scripts/backfillTimelineTimestamp.js
+    const now = Timestamp.now();
     const event = {
       type,
       actor,
-      createdAt: Timestamp.now(),
+      createdAt: now,
+      timestamp: now,             // Required for orderBy('timestamp') queries
       ...(preview ? { preview } : {}),
       ...(metadata ? { metadata } : {})
     };

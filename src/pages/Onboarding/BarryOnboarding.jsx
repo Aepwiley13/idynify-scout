@@ -91,9 +91,12 @@ export default function BarryOnboarding() {
   }, [conversationHistory]);
 
   useEffect(() => {
-    // Focus input when step changes to asking or clarifying
     if ((step === 'asking' || step === 'clarifying') && inputRef.current) {
       inputRef.current.focus();
+    }
+    // Scroll to bottom when confirmation card or saving screen appears
+    if (step === 'confirming' || step === 'saving') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [step]);
 
@@ -197,7 +200,10 @@ export default function BarryOnboarding() {
           userInput: input,
           currentStep: step,
           conversationHistory: newHistory,
-          existingICP
+          existingICP,
+          // Send current accumulated ICP state so backend enforcement checks
+          // (hasPendingTitles, etc.) can see what was extracted in prior turns
+          pendingICP: extractedICP
         })
       });
 

@@ -172,7 +172,7 @@ export default function ICPSettings() {
         throw new Error(data.error || 'Failed to refresh results');
       }
 
-      setRefreshResult({ count: data.companiesFound || 0 });
+      setRefreshResult({ count: data.companiesAdded || 0 });
       setTimeout(() => setRefreshResult(null), 6000);
       setRefreshing(false);
     } catch (error) {
@@ -306,7 +306,7 @@ export default function ICPSettings() {
           {refreshResult && !refreshResult.error && (
             <span className="header-refresh-success">
               <CheckCircle className="w-4 h-4" />
-              {refreshResult.count > 0 ? `${refreshResult.count} new companies queued` : 'Queue is full — check Daily Leads'}
+              {refreshResult.count > 0 ? `${refreshResult.count} new companies added to Daily Leads` : 'Queue is full — review current targets'}
             </span>
           )}
           {refreshResult?.error && (

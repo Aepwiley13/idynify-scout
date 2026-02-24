@@ -253,7 +253,7 @@ function App() {
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* Barry ICP Onboarding - First touchpoint after payment */}
-        <Route path="/onboarding/barry" element={<ProtectedRoute><BarryOnboarding /></ProtectedRoute>} />
+        <Route path="/onboarding/barry" element={<ProtectedRoute withLayout={true}><BarryOnboarding /></ProtectedRoute>} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />
@@ -403,6 +403,12 @@ function App() {
               <ScoutGame />
             </ProtectedRoute>
           }
+        />
+
+        {/* Redirect /scout/daily-leads → /scout with correct tab state */}
+        <Route
+          path="/scout/daily-leads"
+          element={<Navigate to="/scout" state={{ activeTab: 'daily-leads' }} replace />}
         />
 
         {/* Redirect removed Contact Search URL to Company Search */}

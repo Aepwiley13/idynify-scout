@@ -16,6 +16,7 @@ export default function ICPSettings() {
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [refreshResult, setRefreshResult] = useState(null); // { count: number } | null
 
   // Search states for dropdowns
   const [industrySearch, setIndustrySearch] = useState('');
@@ -150,6 +151,7 @@ export default function ICPSettings() {
   async function handleRefreshResults() {
     try {
       setRefreshing(true);
+      setRefreshResult(null);
 
       const user = auth.currentUser;
       const authToken = await user.getIdToken();
@@ -166,16 +168,17 @@ export default function ICPSettings() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        alert(`Success! Found ${data.companiesFound} new companies. Check the Daily Leads tab!`);
-      } else {
+      if (!response.ok) {
         throw new Error(data.error || 'Failed to refresh results');
       }
 
+      setRefreshResult({ count: data.companiesFound || 0 });
+      setTimeout(() => setRefreshResult(null), 6000);
       setRefreshing(false);
     } catch (error) {
       console.error('Failed to refresh:', error);
-      alert(`Failed to refresh results: ${error.message}`);
+      setRefreshResult({ error: error.message });
+      setTimeout(() => setRefreshResult(null), 6000);
       setRefreshing(false);
     }
   }
@@ -298,6 +301,25 @@ export default function ICPSettings() {
         <div className="header-content">
           <h1 className="page-title">ICP Settings</h1>
           <p className="page-subtitle">Define and refine your Ideal Customer Profile criteria</p>
+        </div>
+        <div className="header-actions">
+          {refreshResult && !refreshResult.error && (
+            <span className="header-refresh-success">
+              <CheckCircle className="w-4 h-4" />
+              {refreshResult.count > 0 ? `${refreshResult.count} new companies queued` : 'Queue is full — check Daily Leads'}
+            </span>
+          )}
+          {refreshResult?.error && (
+            <span className="header-refresh-error">Refresh failed — try again</span>
+          )}
+          <button
+            onClick={handleRefreshResults}
+            disabled={refreshing || saving || !profile}
+            className="header-refresh-btn"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'spinning' : ''}`} />
+            <span>{refreshing ? 'Searching...' : 'Refresh Results'}</span>
+          </button>
         </div>
       </div>
 

@@ -6,6 +6,9 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
   const hasSizes = icp?.companySizes && icp.companySizes.length > 0;
   const hasLocations = icp?.locations && (icp.locations === 'nationwide' || icp.locations.length > 0);
   const hasTitles = icp?.targetTitles && icp.targetTitles.length > 0;
+
+  // Gate: both industries AND targetTitles are required before confirming
+  const canConfirm = hasIndustries && hasTitles;
   const hasLookalike = icp?.lookalikeSeed?.name;
   const hasKeywords = icp?.companyKeywords && icp.companyKeywords.length > 0;
   const searchStrategy = icp?.searchStrategy || 'industry_only';
@@ -83,7 +86,7 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
         )}
 
         {/* Industries */}
-        <div className={`detail-row ${hasIndustries ? '' : 'missing'}`}>
+        <div className={`detail-row ${hasIndustries ? '' : 'missing required-missing'}`}>
           <div className="detail-icon">
             <Building2 className="w-4 h-4" />
           </div>
@@ -92,6 +95,11 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
             <span className="detail-value">
               {hasIndustries ? icp.industries.join(', ') : 'Not specified'}
             </span>
+            {!hasIndustries && (
+              <span className="required-field-message">
+                Barry needs at least one industry to find the right companies.
+              </span>
+            )}
           </div>
         </div>
 
@@ -135,15 +143,20 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
         </div>
 
         {/* Target Titles */}
-        <div className={`detail-row ${hasTitles ? '' : 'optional'}`}>
+        <div className={`detail-row ${hasTitles ? '' : 'required-missing'}`}>
           <div className="detail-icon">
             <Briefcase className="w-4 h-4" />
           </div>
           <div className="detail-content">
             <span className="detail-label">Target Contacts</span>
             <span className="detail-value">
-              {hasTitles ? icp.targetTitles.join(', ') : 'Any role'}
+              {hasTitles ? icp.targetTitles.join(', ') : 'Not specified'}
             </span>
+            {!hasTitles && (
+              <span className="required-field-message">
+                Tell Barry who to find — add at least one job title or role.
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -164,7 +177,12 @@ export default function ICPConfirmationCard({ icp, onConfirm, onRefine }) {
           <RefreshCw className="w-4 h-4" />
           <span>Refine</span>
         </button>
-        <button onClick={onConfirm} className="confirm-btn">
+        <button
+          onClick={canConfirm ? onConfirm : undefined}
+          disabled={!canConfirm}
+          className={`confirm-btn ${!canConfirm ? 'confirm-btn-disabled' : ''}`}
+          title={!canConfirm ? 'Add required fields to continue' : undefined}
+        >
           <Check className="w-4 h-4" />
           <span>Looks Good</span>
         </button>

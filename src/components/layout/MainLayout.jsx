@@ -28,6 +28,10 @@ const MainLayout = ({ children, user }) => {
       return 'Mission Control';
     }
 
+    if (pathname === '/onboarding/barry') {
+      return 'ICP Setup — Barry';
+    }
+
     // Company Profile page - focused view
     if (pathname.match(/^\/scout\/company\/[^/]+$/)) {
       return 'Company Profile';

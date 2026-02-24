@@ -517,11 +517,36 @@ async function processInitialInput(anthropic, userInput, existingICP) {
   // Extract keywords from user input for later use
   const companyKeywords = extractCompanyKeywords(userInput);
 
-  const prompt = `You are Barry, the intelligence layer for Idynify Scout. Your job is to understand who the user sells to and create the BEST possible search strategy.
+  const prompt = `You are Barry, the AI sales intelligence assistant for Idynify. Help the user define their Ideal Customer Profile through a focused conversational interview. You are building a targeting profile that drives real company and contact search results.
 
-You are NOT a chatbot. You are a senior sales ops partner - calm, direct, strategic.
+REQUIRED FIELDS — never confirm ICP until all 6 are populated:
+1. industries         — must match Apollo industry list exactly
+2. companySizes       — employee ranges
+3. locations          — US states, or confirm nationwide
+4. companyKeywords    — stage/type signals (saas, startup, series A, etc.)
+5. lookalikeSeed      — at least 1 real company as a search anchor
+6. targetTitles       — REQUIRED. You must ask for and confirm this.
+                        NEVER set needsClarification:false if targetTitles
+                        is empty or null. No exceptions.
 
-CRITICAL INSIGHT: Some industries are too broad to search effectively by industry alone. When a user says something specific like "marketing agencies" or "SaaS startups", you need to use a LOOKALIKE strategy - finding companies similar to an example company they provide.
+HARD RULES:
+- If the user has not mentioned who they want to reach, ask: "Who should I be finding at these companies? What titles or roles are you going after?" — ask this once, clearly.
+- If the user gives a vague industry (e.g. "software", "tech"), ask for 1-2 real example companies before proceeding.
+- Parse natural language generously. Example: "Utah founders raising money" maps to:
+    industries = Computer Software
+    locations = Utah
+    companySizes = 1-10, 11-20, 21-50
+    companyKeywords = seed stage, Series A, fundraising
+    targetTitles = Founder, CEO, Co-Founder
+- If user says "keep what I have but add X" — preserve ALL existing fields and only modify the one they specified.
+- Ask ONE clarifying question per turn. Never stack questions.
+- Re-entry sessions: open by referencing the user's existing ICP. Example: "You're currently targeting [summary]. Want to refine anything, or should I keep searching?"
+- After each user message, briefly reflect what you understood and what is still missing — 2 sentences max.
+
+CONFIDENCE SCORING:
+  95%+   all 6 fields confirmed including lookalike
+  80-94% missing lookalike only, everything else confirmed
+  < 80%  titles or location not confirmed — no summary card
 
 BROAD INDUSTRIES (require lookalike for specific targeting):
 ${BROAD_INDUSTRIES.join(', ')}
@@ -549,23 +574,11 @@ EXISTING ICP (user has already configured):
 
 USER INPUT: "${userInput}"
 
-YOUR TASK:
-1. Map their description to an industry
-2. Detect if they need lookalike disambiguation (broad industry + specific company type)
-3. If they DO need lookalike: ask for an example company they consider ideal
-4. If they DON'T need lookalike: proceed with standard ICP questions
-
-CRITICAL RULES:
-- If industry is broad AND user used a specificity trigger (agency, startup, saas, etc.), you MUST ask for an example company
-- When asking for an example, explain WHY: "Marketing & Advertising includes agencies, platforms, and media companies. To get you actual agencies, give me one company you consider ideal — I'll find similar ones."
-- Offer example suggestions from the EXAMPLE_COMPANIES list for that industry
-- Maximum 3 follow-up questions total
-- Be direct, strategic, outcome-oriented
-
 EXAMPLE_COMPANIES for suggestions:
 ${JSON.stringify(EXAMPLE_COMPANIES, null, 2)}
 
-RESPOND IN JSON:
+OUTPUT: Respond only with valid JSON matching the schema below. No text outside the JSON object.
+
 {
   "understood": {
     "industries": ["exact industry names from the list"],
@@ -633,6 +646,14 @@ RESPOND IN JSON:
     );
   }
 
+  // Backend enforcement: targetTitles is required — never allow confirming without them
+  const hasExtractedTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
+  if (!hasExtractedTitles && !barryResponse.needsClarification) {
+    barryResponse.needsClarification = true;
+    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
+    barryResponse.followUpType = barryResponse.followUpType || 'titles';
+  }
+
   // Determine next step based on whether we need lookalike
   let nextStep = 'clarifying';
   if (barryResponse.needsLookalike) {
@@ -665,7 +686,33 @@ async function processFollowup(anthropic, userInput, currentStep, conversationHi
     return processExampleCompany(anthropic, userInput, conversationHistory, pendingICP);
   }
 
-  const prompt = `You are Barry, the intelligence layer for Idynify Scout.
+  const prompt = `You are Barry, the AI sales intelligence assistant for Idynify. You are mid-conversation helping the user refine their Ideal Customer Profile.
+
+REQUIRED FIELDS — never set readyToConfirm:true until all 6 are populated:
+1. industries         — must match Apollo industry list exactly
+2. companySizes       — employee ranges
+3. locations          — US states, or confirm nationwide
+4. companyKeywords    — stage/type signals (saas, startup, series A, etc.)
+5. lookalikeSeed      — at least 1 real company as a search anchor
+6. targetTitles       — REQUIRED. NEVER set readyToConfirm:true if targetTitles is empty or null. No exceptions.
+
+HARD RULES:
+- If the user has not mentioned who they want to reach, ask: "Who should I be finding at these companies? What titles or roles are you going after?" — ask this once, clearly.
+- If the user gives a vague industry (e.g. "software", "tech"), ask for 1-2 real example companies before proceeding.
+- Parse natural language generously. Example: "Utah founders raising money" maps to:
+    industries = Computer Software
+    locations = Utah
+    companySizes = 1-10, 11-20, 21-50
+    companyKeywords = seed stage, Series A, fundraising
+    targetTitles = Founder, CEO, Co-Founder
+- If user says "keep what I have but add X" — preserve ALL existing fields and only modify the one they specified.
+- Ask ONE clarifying question per turn. Never stack questions.
+- After each user message, briefly reflect what you understood and what is still missing — 2 sentences max.
+
+CONFIDENCE SCORING:
+  95%+   all 6 fields confirmed including lookalike
+  80-94% missing lookalike only, everything else confirmed
+  < 80%  titles or location not confirmed — no summary card
 
 CONVERSATION SO FAR:
 ${historyContext}
@@ -689,13 +736,8 @@ ${BROAD_INDUSTRIES.join(', ')}
 
 CURRENT STEP: ${currentStep}
 
-YOUR TASK:
-1. Incorporate the user's new information
-2. If user is selecting from numbered options (1, 2, 3), apply that selection
-3. Decide if you need more info or are ready to confirm
-4. If industry is broad and you haven't asked for an example company yet, do so now
+OUTPUT: Respond only with valid JSON matching the schema below. No text outside the JSON object.
 
-RESPOND IN JSON:
 {
   "understood": {
     "industries": ["exact industry names"],
@@ -755,6 +797,17 @@ RESPOND IN JSON:
     );
   }
 
+  // Backend enforcement: targetTitles is required — never allow confirming without them
+  const hasFollowupTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
+  // Also check pending ICP in case titles were set in an earlier turn
+  const hasPendingTitles = pendingICP?.targetTitles && pendingICP.targetTitles.length > 0;
+  if (!hasFollowupTitles && !hasPendingTitles && barryResponse.readyToConfirm) {
+    barryResponse.readyToConfirm = false;
+    barryResponse.needsMoreInfo = true;
+    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
+    barryResponse.followUpType = barryResponse.followUpType || 'titles';
+  }
+
   // Determine next step
   let nextStep = 'clarifying';
   if (barryResponse.needsLookalike && !barryResponse.understood?.lookalikeSeed) {
@@ -774,9 +827,27 @@ async function processExampleCompany(anthropic, userInput, conversationHistory, 
     `${h.role === 'barry' ? 'Barry' : 'User'}: ${h.content}`
   ).join('\n');
 
-  const prompt = `You are Barry, the intelligence layer for Idynify Scout.
+  const prompt = `You are Barry, the AI sales intelligence assistant for Idynify. The user has just provided an example company to use as a lookalike search anchor.
 
-The user was asked for an example company to use as a lookalike seed.
+REQUIRED FIELDS — never set readyToConfirm:true until all 6 are populated:
+1. industries         — must match Apollo industry list exactly
+2. companySizes       — employee ranges
+3. locations          — US states, or confirm nationwide
+4. companyKeywords    — stage/type signals
+5. lookalikeSeed      — the company the user just named (required for this step)
+6. targetTitles       — REQUIRED. NEVER set readyToConfirm:true if targetTitles is empty or null. No exceptions.
+
+HARD RULES:
+- Extract the company name from the user's response and confirm it as the lookalike seed.
+- Explain the strategy: "I'll prioritize companies similar to [Company] within [Industry]. This gets you real [type], not just any [industry] company."
+- If targetTitles are not yet confirmed, ask: "Who should I be finding at these companies? What titles or roles are you going after?"
+- Ask ONE clarifying question per turn. Never stack questions.
+- Parse natural language generously for any size/location/title signals in the user's message.
+
+CONFIDENCE SCORING:
+  95%+   all 6 fields confirmed including lookalike
+  80-94% missing lookalike only, everything else confirmed
+  < 80%  titles or location not confirmed — no summary card
 
 CONVERSATION SO FAR:
 ${historyContext}
@@ -786,13 +857,8 @@ USER'S RESPONSE: "${userInput}"
 PENDING ICP:
 ${JSON.stringify(pendingICP || {}, null, 2)}
 
-YOUR TASK:
-1. Extract the company name from the user's response
-2. Confirm you'll use it as the lookalike seed
-3. Ask for remaining ICP details if needed (size, location, titles)
-4. Explain the strategy: "I'll prioritize companies similar to [Company] within [Industry]. This gets you real [type], not just any [industry] company."
+OUTPUT: Respond only with valid JSON matching the schema below. No text outside the JSON object.
 
-RESPOND IN JSON:
 {
   "understood": {
     "industries": ["exact industry names"],
@@ -851,6 +917,16 @@ RESPOND IN JSON:
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
       US_STATES.includes(loc) || loc.toLowerCase() === 'nationwide'
     );
+  }
+
+  // Backend enforcement: targetTitles is required — never allow confirming without them
+  const hasExampleTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
+  const hasPendingExTitles = pendingICP?.targetTitles && pendingICP.targetTitles.length > 0;
+  if (!hasExampleTitles && !hasPendingExTitles && barryResponse.readyToConfirm) {
+    barryResponse.readyToConfirm = false;
+    barryResponse.needsMoreInfo = true;
+    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
+    barryResponse.followUpType = barryResponse.followUpType || 'titles';
   }
 
   return {

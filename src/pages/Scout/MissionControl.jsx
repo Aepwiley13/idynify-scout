@@ -19,17 +19,23 @@ function seededRandom(seed) {
 function getCategory(company) {
   if (
     company.status === 'accepted' ||
-    (company.fit_score && company.fit_score >= ICP_SCORE_THRESHOLD)
+    (company.fit_score != null && company.fit_score >= ICP_SCORE_THRESHOLD)
   ) {
     return 'som';
-  } else if (company.status !== 'rejected' && company.status !== 'deprioritized') {
+  } else if (
+    company.status !== 'rejected' &&
+    company.status !== 'deprioritized' &&
+    company.status !== 'archived' &&
+    company.status !== 'people_mode_archived'
+  ) {
     return 'sam';
   }
   return 'tam';
 }
 
 function getDotColor(company) {
-  const score = company.fit_score || 0;
+  // Fallback to 50 (moderate fit) when fit_score is absent so dots render visibly
+  const score = company.fit_score != null ? company.fit_score : 50;
   if (score >= 70) return '#00FF88';
   if (score >= 40) return '#FFD700';
   return '#5A6A7A';
@@ -205,6 +211,15 @@ export default function MissionControl() {
       const profile = profileDoc.exists() ? profileDoc.data() : null;
       setIcpProfile(profile);
       const allCompanies = companiesSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // DEBUG — report exact Firebase field names so we can verify alignment
+      if (allCompanies.length > 0) {
+        console.log('[MissionControl] Raw Firebase company (first):', allCompanies[0]);
+        console.log('[MissionControl] Field names found:', Object.keys(allCompanies[0]));
+        console.log('[MissionControl] status samples:', allCompanies.slice(0, 5).map((c) => c.status));
+        console.log('[MissionControl] fit_score samples:', allCompanies.slice(0, 5).map((c) => c.fit_score));
+      }
+
       setCompanies(allCompanies);
       setLoading(false);
       setTimeout(() => setStatsReady(true), 200);
@@ -274,11 +289,19 @@ export default function MissionControl() {
 
   // ── Derived Data ──────────────────────────────────────────────────────────
   const tam = companies;
-  const sam = companies.filter((c) => c.status !== 'rejected' && c.status !== 'deprioritized');
+  // SAM: exclude rejected, deprioritized, and archived (soft-rejected) companies
+  const sam = companies.filter(
+    (c) =>
+      c.status !== 'rejected' &&
+      c.status !== 'deprioritized' &&
+      c.status !== 'archived' &&
+      c.status !== 'people_mode_archived'
+  );
+  // SOM: accepted status OR confirmed fit_score >= threshold (use != null to handle missing field)
   const som = companies.filter(
     (c) =>
       c.status === 'accepted' ||
-      (c.fit_score && c.fit_score >= ICP_SCORE_THRESHOLD)
+      (c.fit_score != null && c.fit_score >= ICP_SCORE_THRESHOLD)
   );
 
   const signalPct = tam.length > 0 ? (som.length / tam.length) * 100 : 0;
@@ -343,7 +366,7 @@ export default function MissionControl() {
       const color = getDotColor(company);
       const hasSignal =
         company.status === 'accepted' ||
-        (company.fit_score && company.fit_score >= ICP_SCORE_THRESHOLD);
+        (company.fit_score != null && company.fit_score >= ICP_SCORE_THRESHOLD);
 
       return { ...company, x, y, dotAngle: angle, dotR: r, category, color, dotSize, hasSignal };
     });

@@ -48,7 +48,9 @@ const TIMELINE_EVENT_TYPES = [
   // Operation People First: Next Best Step events
   'next_step_queued',
   'next_step_completed',
-  'next_step_dismissed'
+  'next_step_dismissed',
+  // Operation People First: Brigade System events
+  'brigade_changed'
 ];
 
 // Actor types

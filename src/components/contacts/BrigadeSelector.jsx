@@ -14,8 +14,8 @@
  */
 
 import { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../../firebase/config';
+import { auth } from '../../firebase/config';
+import { onBrigadeChange } from '../../utils/brigadeSystem';
 import {
   Target, UserCheck, Handshake, Gift, Network,
   Archive, ChevronDown, ChevronUp, Info
@@ -114,24 +114,22 @@ export default function BrigadeSelector({ contact, onUpdate }) {
 
     // Toggle off if already selected
     const newValue = contact.brigade === brigadeId ? null : brigadeId;
-    const updatedContact = { ...contact, brigade: newValue };
-    onUpdate(updatedContact);
+
+    // Optimistic update — brigadeSystem will write Firestore + timeline
+    onUpdate({ ...contact, brigade: newValue });
 
     try {
       setSaving(true);
-      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
-      await updateDoc(contactRef, {
-        brigade: newValue,
-        // Also sync relationship_type for Barry's engagement logic
-        relationship_type: newValue === 'leads' ? 'prospect'
-          : newValue === 'partners' ? 'partner'
-          : newValue === 'network' || newValue === 'customers' || newValue === 'referrals' || newValue === 'past_customers' ? 'known'
-          : null,
-        updated_at: new Date().toISOString()
+      await onBrigadeChange({
+        userId: user.uid,
+        contactId: contact.id,
+        fromBrigade: contact.brigade || null,
+        toBrigade: newValue,
+        contactName: contact.name || contact.firstName || null
       });
     } catch (error) {
       console.error('[BrigadeSelector] Error saving brigade:', error);
-      onUpdate(contact); // revert
+      onUpdate(contact); // revert optimistic update
     } finally {
       setSaving(false);
     }

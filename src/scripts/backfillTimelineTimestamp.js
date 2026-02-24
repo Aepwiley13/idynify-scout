@@ -18,20 +18,35 @@
  *   - Read-only detection first: --dry-run flag logs what WOULD be updated without writing
  *   - Only writes documents that are missing `timestamp`
  *   - Writes `timestamp = createdAt` — never modifies `createdAt`
- *   - Batched writes (500 max per batch, Firestore limit)
+ *   - Batched writes (499 max per batch, Firestore limit)
  *   - Progress logged to console at each batch
  *   - Safe to re-run: idempotent (skips docs that already have `timestamp`)
  *
+ * CREDENTIAL PRIORITY (checked in order):
+ *   1. FIREBASE_SERVICE_ACCOUNT_PATH  — path to service account JSON file
+ *   2. GOOGLE_APPLICATION_CREDENTIALS — same, standard GCP env var name
+ *   3. FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY + FIREBASE_PROJECT_ID
+ *      — inline env vars (used in Netlify and local .env)
+ *   4. Application Default Credentials — works in GCP/Cloud Run/Cloud Functions
+ *
+ * LOCAL SETUP (add to .env or export before running):
+ *   FIREBASE_PROJECT_ID=your_project_id
+ *   FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your_project.iam.gserviceaccount.com
+ *   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+ *
  * USAGE:
- *   node src/scripts/backfillTimelineTimestamp.js
+ *   # Load .env then run (requires dotenv: npm install -g dotenv-cli)
+ *   dotenv -- node src/scripts/backfillTimelineTimestamp.js --dry-run
+ *   dotenv -- node src/scripts/backfillTimelineTimestamp.js --user-id=abc123
+ *   dotenv -- node src/scripts/backfillTimelineTimestamp.js --user-id=abc123 --verify
+ *   dotenv -- node src/scripts/backfillTimelineTimestamp.js
+ *   dotenv -- node src/scripts/backfillTimelineTimestamp.js --verify
+ *
+ *   # OR export vars manually:
+ *   export FIREBASE_PROJECT_ID=xxx
+ *   export FIREBASE_CLIENT_EMAIL=xxx
+ *   export FIREBASE_PRIVATE_KEY="xxx"
  *   node src/scripts/backfillTimelineTimestamp.js --dry-run
- *   node src/scripts/backfillTimelineTimestamp.js --user-id=abc123
- *
- * ENVIRONMENT:
- *   Requires FIREBASE_SERVICE_ACCOUNT_PATH or GOOGLE_APPLICATION_CREDENTIALS
- *   to be set, or run from an environment with Firebase Admin SDK initialized.
- *
- *   For local dev, set FIREBASE_PROJECT_ID and use Application Default Credentials.
  *
  * ESTIMATED RUNTIME:
  *   ~1 second per 100 timeline documents (rate-limited by Firestore batch writes)
@@ -58,21 +73,47 @@ const TARGET_USER_ID = args.find(a => a.startsWith('--user-id='))?.split('=')[1]
 function initFirebase() {
   if (admin.apps.length > 0) return admin.firestore();
 
+  // Credential resolution — four strategies, in priority order
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
     || process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
   if (serviceAccountPath) {
+    // Strategy 1 & 2: JSON file path
     const serviceAccount = JSON.parse(readFileSync(resolve(serviceAccountPath), 'utf8'));
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       projectId: serviceAccount.project_id
     });
-  } else {
-    // Application Default Credentials (works in GCP, Cloud Run, etc.)
+
+  } else if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    // Strategy 3: Inline env vars (Netlify / local .env pattern)
+    // FIREBASE_PRIVATE_KEY may have literal \n from .env — normalize to real newlines
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey
+      }),
+      projectId: process.env.FIREBASE_PROJECT_ID
+    });
+
+  } else if (process.env.FIREBASE_PROJECT_ID) {
+    // Strategy 4: Application Default Credentials (GCP, Cloud Run, Cloud Functions)
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
       projectId: process.env.FIREBASE_PROJECT_ID
     });
+
+  } else {
+    // No credentials found — fail clearly before touching any data
+    console.error('\n[ERROR] No Firebase credentials found.');
+    console.error('Set one of the following before running:');
+    console.error('  FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/serviceAccount.json');
+    console.error('  FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY + FIREBASE_PROJECT_ID');
+    console.error('  GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json\n');
+    process.exit(1);
   }
 
   return admin.firestore();
@@ -91,6 +132,26 @@ async function runBackfill() {
   console.log(`\n${mode} Timeline timestamp backfill starting`);
   console.log(`${mode} Target user: ${TARGET_USER_ID || 'ALL USERS'}`);
   console.log('─'.repeat(60));
+
+  // ── Preflight: verify DB connection before touching anything ──
+  console.log(`${mode} Preflight: verifying Firestore connection...`);
+  try {
+    await db.collection('users').limit(1).get();
+    console.log(`${mode} Preflight: Firestore connection OK\n`);
+  } catch (err) {
+    console.error(`\n[ERROR] Firestore connection failed: ${err.message}`);
+    console.error('Check your credentials and project ID, then retry.\n');
+    process.exit(1);
+  }
+
+  if (!DRY_RUN && !TARGET_USER_ID) {
+    // Require explicit acknowledgment before full live run
+    console.log('[WARNING] This is a full LIVE run across ALL users.');
+    console.log('[WARNING] Run with --dry-run first to confirm scope.');
+    console.log('[WARNING] Run with --user-id=<id> to test on one user first.');
+    console.log('[WARNING] Proceeding in 3 seconds — Ctrl+C to abort...\n');
+    await new Promise(r => setTimeout(r, 3000));
+  }
 
   let totalUsersScanned = 0;
   let totalContactsScanned = 0;

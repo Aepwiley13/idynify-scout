@@ -453,7 +453,7 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
                 onEngageClick && onEngageClick();
               }}
             >
-              Open Full Engagement Session with Barry
+              Start Engagement with Barry
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

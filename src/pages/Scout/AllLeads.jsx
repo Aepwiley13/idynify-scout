@@ -6,7 +6,8 @@ import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Smartphone, MoreVertical,
   Archive, Sparkles, Send, CheckCircle, Zap,
-  RefreshCcw, RotateCcw, Target, Flag
+  RefreshCcw, RotateCcw, Target, Flag,
+  UserCheck, Handshake, Network, Gift, Star
 } from 'lucide-react';
 import ContactSnapshot from '../../components/contacts/ContactSnapshot';
 import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
@@ -82,6 +83,38 @@ function getLastTouched(contact) {
   return null;
 }
 
+// ── Brigade Lenses ───────────────────────────────────────
+
+const BRIGADE_LENSES = [
+  { id: 'all', label: 'All People', icon: Users },
+  { id: 'leads', label: 'Leads', icon: Target },
+  { id: 'customers', label: 'Customers', icon: UserCheck },
+  { id: 'partners', label: 'Partners', icon: Handshake },
+  { id: 'network', label: 'Network', icon: Network },
+  { id: 'referrals', label: 'Referrals', icon: Gift }
+];
+
+function getBrigadeType(contact) {
+  // Explicit brigade field takes priority
+  const b = contact.brigade;
+  if (b) return b;
+  // Fallback to relationship_type
+  const rt = contact.relationship_type;
+  if (rt === 'partner') return 'partners';
+  if (rt === 'known') return 'network';
+  // Fallback to status-based inference
+  const status = contact.contact_status || contact.lead_status || contact.status;
+  if (status === 'converted' || status === 'customer') return 'customers';
+  if (status === 'referred') return 'referrals';
+  // Default: leads (prospect)
+  return 'leads';
+}
+
+function filterByBrigade(contacts, brigadeId) {
+  if (brigadeId === 'all') return contacts;
+  return contacts.filter(c => getBrigadeType(c) === brigadeId);
+}
+
 // ── Component ────────────────────────────────────────────
 
 export default function AllLeads() {
@@ -98,6 +131,7 @@ export default function AllLeads() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [statusFilter, setStatusFilter] = useState('active');
   const [dataFilter, setDataFilter] = useState(null);
+  const [brigadeFilter, setBrigadeFilter] = useState('all');
 
   // Selection & interaction
   const [selectedContact, setSelectedContact] = useState(null);
@@ -406,6 +440,9 @@ export default function AllLeads() {
   // Filter pipeline
   let filtered = contacts;
 
+  // 0. Brigade lens filter
+  filtered = filterByBrigade(filtered, brigadeFilter);
+
   // 1. Status filter
   filtered = filtered.filter(c => getLeadStatus(c) === statusFilter);
 
@@ -500,9 +537,33 @@ export default function AllLeads() {
       {/* ── Header ─────────────────────────────────── */}
       <div className="enterprise-header">
         <div className="header-content">
-          <h1 className="page-title">All Leads</h1>
-          <p className="page-subtitle">Your pipeline. Ready to engage.</p>
+          <h1 className="page-title">People</h1>
+          <p className="page-subtitle">Every relationship — one place. Context shifts with each lens.</p>
         </div>
+      </div>
+
+      {/* ── Brigade Lenses ──────────────────────────── */}
+      <div className="brigade-lenses">
+        {BRIGADE_LENSES.map(lens => {
+          const LensIcon = lens.icon;
+          const lensCount = lens.id === 'all'
+            ? contacts.length
+            : contacts.filter(c => getBrigadeType(c) === lens.id).length;
+          return (
+            <button
+              key={lens.id}
+              className={`brigade-lens ${brigadeFilter === lens.id ? 'brigade-lens-active' : ''}`}
+              onClick={() => {
+                setBrigadeFilter(lens.id);
+                setSelectedContactIds([]);
+              }}
+            >
+              <LensIcon className="brigade-lens-icon" />
+              <span>{lens.label}</span>
+              <span className="brigade-lens-count">{lensCount}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ── KPI Summary ────────────────────────────── */}

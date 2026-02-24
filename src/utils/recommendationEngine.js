@@ -69,7 +69,9 @@ export const RECOMMENDATION_TYPES = {
   MOMENTUM_COMPRESS: 'momentum_compress',
   STRATEGIC_GAP_NO_ENGAGEMENT: 'strategic_gap_no_engagement',
   STRATEGIC_GAP_NEVER_CONTACTED: 'strategic_gap_never_contacted',
-  STRATEGIC_GAP_NO_OUTCOME: 'strategic_gap_no_outcome'
+  STRATEGIC_GAP_NO_OUTCOME: 'strategic_gap_no_outcome',
+  // Operation People First: Next Best Step
+  NEXT_STEP_OVERDUE: 'next_step_overdue'
 };
 
 // CTA action types
@@ -80,7 +82,8 @@ export const RECOMMENDATION_ACTIONS = {
   RECORD_OUTCOME: 'record_outcome',
   ADD_TO_CAMPAIGN: 'add_to_campaign',
   SWITCH_CHANNEL: 'switch_channel',
-  ACCELERATE_SEQUENCE: 'accelerate_sequence'
+  ACCELERATE_SEQUENCE: 'accelerate_sequence',
+  COMPLETE_NEXT_STEP: 'complete_next_step'
 };
 
 // Priority weights for sorting (lower = higher priority)
@@ -604,6 +607,75 @@ async function deriveMissionMomentumRecommendations(userId, dismissals) {
   return recommendations;
 }
 
+// ── Category 5: Next Best Step Overdue ──────────────────
+
+/**
+ * Detect contacts whose Barry-proposed Next Best Step is past due.
+ * Surfaces to the morning briefing so overdue steps are never silently missed.
+ *
+ * Reads: contact.next_step_due (ISO string), contact.next_step_type
+ * Fires when: next_step_due < now and next_step_due is set
+ */
+async function deriveNextStepOverdueAlerts(userId, dismissals) {
+  const recommendations = [];
+
+  try {
+    const nowIso = new Date().toISOString();
+
+    const overdueQuery = query(
+      collection(db, 'users', userId, 'contacts'),
+      where('next_step_due', '<=', nowIso),
+      orderBy('next_step_due', 'asc'),
+      limit(QUERY_CAP)
+    );
+
+    const overdueSnap = await getDocs(overdueQuery);
+
+    for (const contactDoc of overdueSnap.docs) {
+      const contact = { id: contactDoc.id, ...contactDoc.data() };
+
+      // Skip if next_step_due is not set (where filter may return nulls on some indexes)
+      if (!contact.next_step_due) continue;
+
+      const recId = generateRecommendationId(RECOMMENDATION_TYPES.NEXT_STEP_OVERDUE, contact.id);
+      if (isDismissed(recId, dismissals)) continue;
+
+      const contactName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
+      const isCritical = contact.strategic_value === 'critical';
+      const stepType = contact.next_step_type || 'follow_up';
+      const daysOverdue = Math.abs(Math.floor((new Date() - new Date(contact.next_step_due)) / (1000 * 60 * 60 * 24)));
+
+      const stepLabel = {
+        follow_up: 'a follow-up',
+        try_new_channel: 'a channel switch',
+        referral_opportunity: 'a referral introduction',
+        low_touch: 'a check-in',
+        accelerate: 'an accelerated outreach',
+        schedule_meeting: 'a meeting request'
+      }[stepType] || 'a next step';
+
+      recommendations.push(buildRecommendation({
+        id: recId,
+        type: RECOMMENDATION_TYPES.NEXT_STEP_OVERDUE,
+        category: 'next_step',
+        priorityWeight: isCritical ? PRIORITY_WEIGHTS.critical_contact : PRIORITY_WEIGHTS.approaching_deadline,
+        contactId: contact.id,
+        contactName,
+        observed: `Barry's next step for ${contactName} was due ${daysOverdue === 0 ? 'today' : `${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} ago`}`,
+        whyItMatters: `You confirmed ${stepLabel} and it hasn't been completed — the window is closing`,
+        suggestion: `Complete the next step now or dismiss it if the situation has changed`,
+        rationale: `Confirmed next steps that go uncompleted create engagement gaps and break Barry's context chain`,
+        actionType: RECOMMENDATION_ACTIONS.COMPLETE_NEXT_STEP,
+        actionLabel: 'Complete Step'
+      }));
+    }
+  } catch (error) {
+    console.error('[RecommendationEngine] Next step overdue alert error:', error);
+  }
+
+  return recommendations;
+}
+
 // ── Category 4: Strategic Gap Alerts ────────────────────
 
 /**
@@ -786,16 +858,17 @@ export async function generateDashboardRecommendations(userId) {
   try {
     const dismissals = await loadDismissals(userId);
 
-    // Run all four category derivations in parallel
-    const [stalled, highValue, momentum, gaps] = await Promise.all([
+    // Run all five category derivations in parallel
+    const [stalled, highValue, momentum, gaps, nextStepOverdue] = await Promise.all([
       deriveStalledEngagementAlerts(userId, dismissals),
       deriveHighValueContactAlerts(userId, dismissals),
       deriveMissionMomentumRecommendations(userId, dismissals),
-      deriveStrategicGapAlerts(userId, dismissals)
+      deriveStrategicGapAlerts(userId, dismissals),
+      deriveNextStepOverdueAlerts(userId, dismissals)
     ]);
 
     // Combine and sort by priority weight (lower = higher priority)
-    const all = [...stalled, ...highValue, ...momentum, ...gaps];
+    const all = [...stalled, ...highValue, ...momentum, ...gaps, ...nextStepOverdue];
     all.sort((a, b) => {
       if (a.priorityWeight !== b.priorityWeight) {
         return a.priorityWeight - b.priorityWeight;
@@ -830,6 +903,41 @@ export async function generateContactRecommendations(userId, contactId) {
     const isHighValue = contact.strategic_value === 'high' || isCritical;
 
     const recommendations = [];
+
+    // Check for overdue Next Best Step (Operation People First)
+    if (contact.next_step_due) {
+      const nowIso = new Date().toISOString();
+      if (contact.next_step_due <= nowIso) {
+        const recId = generateRecommendationId(RECOMMENDATION_TYPES.NEXT_STEP_OVERDUE, contact.id);
+        if (!isDismissed(recId, dismissals)) {
+          const daysOverdue = Math.abs(Math.floor((new Date() - new Date(contact.next_step_due)) / (1000 * 60 * 60 * 24)));
+          const stepType = contact.next_step_type || 'follow_up';
+          const stepLabel = {
+            follow_up: 'a follow-up',
+            try_new_channel: 'a channel switch',
+            referral_opportunity: 'a referral introduction',
+            low_touch: 'a check-in',
+            accelerate: 'an accelerated outreach',
+            schedule_meeting: 'a meeting request'
+          }[stepType] || 'a next step';
+
+          recommendations.push(buildRecommendation({
+            id: recId,
+            type: RECOMMENDATION_TYPES.NEXT_STEP_OVERDUE,
+            category: 'next_step',
+            priorityWeight: isCritical ? PRIORITY_WEIGHTS.critical_contact : PRIORITY_WEIGHTS.approaching_deadline,
+            contactId: contact.id,
+            contactName,
+            observed: `Barry's next step was due ${daysOverdue === 0 ? 'today' : `${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} ago`}`,
+            whyItMatters: `You confirmed ${stepLabel} and it hasn't been completed`,
+            suggestion: `Complete the next step now or dismiss it if the situation has changed`,
+            rationale: `Confirmed next steps that go uncompleted create engagement gaps and break Barry's context chain`,
+            actionType: RECOMMENDATION_ACTIONS.COMPLETE_NEXT_STEP,
+            actionLabel: 'Complete Step'
+          }));
+        }
+      }
+    }
 
     // Check stalled engagement for this contact
     if (contact.contact_status === CONTACT_STATUSES.AWAITING_REPLY) {

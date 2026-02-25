@@ -80,7 +80,7 @@ export const handler = async (event) => {
         ? '- Manually qualified as a high-priority target'
         : 'No specific signals detected';
 
-    const prompt = `You are Barry, an elite sales intelligence analyst and outreach specialist. Using the company profile, ICP match data, and buying signals provided, write a single personalized cold outreach message for a B2B sales rep.
+    const prompt = `You are Barry, an elite relationship intelligence analyst and outreach specialist. Using the company profile, ICP match data, and buying signals provided, write a single personalized outreach message for a B2B founder or team member.
 
 TARGET COMPANY:
 ${companyLines}

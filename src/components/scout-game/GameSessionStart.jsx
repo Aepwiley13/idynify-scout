@@ -81,7 +81,7 @@ export default function GameSessionStart({ onSelectBucket }) {
   const totalBucketed = Object.values(bucketCounts).reduce((sum, b) => sum + b.total, 0);
   const totalReady = Object.values(bucketCounts).reduce((sum, b) => sum + b.ready, 0);
 
-  // Zero-bucket state: user has All Leads contacts but none bucketed
+  // Zero-bucket state: user has People contacts but none bucketed
   if (totalBucketed === 0 && totalContacts > 0) {
     return (
       <div className="game-session-start">
@@ -91,13 +91,13 @@ export default function GameSessionStart({ onSelectBucket }) {
         </div>
         <div className="game-empty-state">
           <p className="game-empty-text">
-            Assign contacts to a bucket in All Leads to start a session.
+            Assign contacts to a bucket in People to start a session.
           </p>
           <button
             className="game-empty-cta"
             onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
           >
-            Go to All Leads
+            Go to People
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

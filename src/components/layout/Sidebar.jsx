@@ -109,7 +109,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const scoutItems = [
     {
       icon: Star,
-      label: 'Daily Leads',
+      label: 'Daily Discoveries',
       sublabel: 'Review Queue',
       path: '/scout',
       state: { activeTab: 'daily-leads' },
@@ -123,7 +123,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     },
     {
       icon: Users,
-      label: 'All Leads',
+      label: 'People',
       path: '/scout',
       state: { activeTab: 'all-leads' }
     },

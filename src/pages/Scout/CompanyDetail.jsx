@@ -944,7 +944,7 @@ export default function CompanyDetail() {
                 className="view-all-leads-btn"
                 onClick={() => navigate(`/scout/company/${companyId}/leads`)}
               >
-                View All Leads →
+                View All People →
               </button>
             </div>
 

@@ -154,9 +154,9 @@ const NAV_SECTIONS = [
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
-      { id: 'daily',     label: 'Daily Leads',     Icon: Zap,       desc: 'Review Queue' },
-      { id: 'saved',     label: 'Saved Companies', Icon: Building2, desc: 'Hunt list'    },
-      { id: 'all',       label: 'All Leads',       Icon: Users,     desc: 'All contacts' },
+      { id: 'daily',     label: 'Daily Discoveries', Icon: Zap,       desc: 'Review Queue' },
+      { id: 'saved',     label: 'Saved Companies',  Icon: Building2, desc: 'Hunt list'    },
+      { id: 'all',       label: 'People',            Icon: Users,     desc: 'Your network' },
       { id: 'scoutplus',   label: 'Scout+',          Icon: Plus,     desc: 'Add contacts'       },
       { id: 'comsearch',   label: 'Company Search',  Icon: Search,   desc: 'Find companies'     },
       { id: 'icpsettings', label: 'ICP Settings',    Icon: Settings, desc: 'Targeting criteria' },

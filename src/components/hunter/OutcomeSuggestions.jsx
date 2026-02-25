@@ -41,9 +41,9 @@ const OUTCOME_SUGGESTIONS = {
     color: '#8b5cf6',
     title: 'Opportunity Created',
     suggestions: [
-      'Create opportunity in your CRM',
+      'Log this as an active relationship',
       'Document next steps and timeline',
-      'Plan follow-up cadence based on sales cycle'
+      'Plan your next touchpoint'
     ]
   },
   no_response: {

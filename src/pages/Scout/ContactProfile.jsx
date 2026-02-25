@@ -467,7 +467,7 @@ export default function ContactProfile() {
           onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
           style={{ padding: '8px 18px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
         >
-          <ArrowLeft size={14} /><span>Back to All Leads</span>
+          <ArrowLeft size={14} /><span>Back to People</span>
         </button>
       </div>
     );

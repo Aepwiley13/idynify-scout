@@ -17,7 +17,7 @@ import {
   Zap, Building2, Users, Plus, Search,
   Palette, Check, Settings,
 } from 'lucide-react';
-import { ThemeProvider, useT, useThemeCtx } from '../../theme/ThemeContext';
+import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import DailyLeads from './DailyLeads';
 import SavedCompanies from './SavedCompanies';
@@ -495,8 +495,6 @@ export default function ScoutMain() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <ScoutShellInner user={user} />
-    </ThemeProvider>
+    <ScoutShellInner user={user} />
   );
 }

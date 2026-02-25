@@ -24,10 +24,15 @@ import {
   Zap,
   LayoutDashboard
 } from 'lucide-react';
+import { useThemeCtx } from '../../theme/ThemeContext';
+import { THEMES } from '../../theme/tokens';
 import './Sidebar.css';
 
 const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { themeId, setThemeId } = useThemeCtx();
+  const isLightTheme = !THEMES[themeId]?.isDark;
+  const handleThemeToggle = () => setThemeId(isLightTheme ? 'mission' : 'workspace');
   const [expandedSections, setExpandedSections] = useState({
     recon: true,
     scout: true,
@@ -278,6 +283,21 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-pink', hunterItems)}
         {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
       </nav>
+
+      {/* Theme Toggle */}
+      <button
+        className={`theme-toggle ${isCollapsed ? 'collapsed' : ''}`}
+        onClick={handleThemeToggle}
+        title={isLightTheme ? 'Switch to dark mode' : 'Switch to light mode'}
+        aria-label={isLightTheme ? 'Switch to dark mode' : 'Switch to light mode'}
+      >
+        <span className="theme-toggle-icon">{isLightTheme ? '🌙' : '☀️'}</span>
+        {!isCollapsed && (
+          <span className="theme-toggle-label">
+            {isLightTheme ? 'Dark mode' : 'Light mode'}
+          </span>
+        )}
+      </button>
 
       {/* Collapse Toggle */}
       <button

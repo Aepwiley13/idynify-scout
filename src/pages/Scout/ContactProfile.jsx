@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
@@ -34,10 +34,13 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import './ContactProfile.css';
 
-export default function ContactProfile() {
-  const { contactId } = useParams();
+export default function ContactProfile({ contactId: propContactId, onClose } = {}) {
+  const { contactId: paramContactId } = useParams();
+  const contactId = propContactId || paramContactId;
   const navigate = useNavigate();
+  const location = useLocation();
   const T = useT();
+  const isPanelMode = !!onClose;
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enriching, setEnriching] = useState(false);
@@ -58,10 +61,23 @@ export default function ContactProfile() {
     loadContactProfile();
   }, [contactId]);
 
+  // Auto-trigger engage when navigated here with autoEngage:true state.
+  // Clears the flag from history so back-navigation doesn't re-trigger.
+  useEffect(() => {
+    if (!loading && contact && location?.state?.autoEngage) {
+      triggerInlineEngagement();
+      window.history.replaceState(
+        { ...window.history.state, usr: { ...location.state, autoEngage: false } },
+        ''
+      );
+    }
+  }, [loading, contact]);
+
   async function loadContactProfile() {
     try {
       const user = auth.currentUser;
       if (!user) {
+        if (isPanelMode) { onClose(); return; }
         navigate('/login');
         return;
       }
@@ -73,6 +89,7 @@ export default function ContactProfile() {
 
       if (!contactDoc.exists()) {
         console.error('❌ Contact not found');
+        if (isPanelMode) { onClose(); return; }
         navigate('/scout', { state: { activeTab: 'all-leads' } });
         return;
       }
@@ -157,16 +174,17 @@ export default function ContactProfile() {
   }
 
   function triggerInlineEngagement() {
-    // Scroll the inline engagement section into view, then trigger the flow
+    // Scroll the inline engagement section into view, then trigger the flow.
+    // Double rAF ensures the browser has committed layout before we expand —
+    // avoids the 350ms magic-number that was unreliable on slow connections.
     const el = document.getElementById('engagement-section');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // Small delay to let scroll settle before expanding
-      setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
         if (engagementSectionRef.current?.triggerFlow) {
           engagementSectionRef.current.triggerFlow();
         }
-      }, 350);
+      }));
     } else if (engagementSectionRef.current?.triggerFlow) {
       engagementSectionRef.current.triggerFlow();
     }
@@ -449,7 +467,7 @@ export default function ContactProfile() {
 
   if (loading) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, minHeight: '100vh', background: T.appBg, color: T.textMuted }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, minHeight: isPanelMode ? 200 : '100vh', background: T.appBg, color: T.textMuted }}>
         <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${BRAND.pink}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
         <p style={{ fontSize: 13, margin: 0 }}>Loading contact profile...</p>
         <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
@@ -459,12 +477,12 @@ export default function ContactProfile() {
 
   if (!contact) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, minHeight: '100vh', background: T.appBg, color: T.textMuted }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, minHeight: isPanelMode ? 200 : '100vh', background: T.appBg, color: T.textMuted }}>
         <AlertCircle size={48} color={T.textFaint} />
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Contact Not Found</h3>
         <p style={{ margin: 0, fontSize: 13, color: T.textFaint }}>The contact you're looking for doesn't exist or has been removed.</p>
         <button
-          onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+          onClick={() => isPanelMode ? onClose() : navigate('/scout', { state: { activeTab: 'all-leads' } })}
           style={{ padding: '8px 18px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
         >
           <ArrowLeft size={14} /><span>Back to People</span>
@@ -474,8 +492,9 @@ export default function ContactProfile() {
   }
 
   return (
-    <div className="contact-profile-page" style={{ background: T.appBg, minHeight: '100vh' }}>
-      {/* Header Navigation — v5 style */}
+    <div className="contact-profile-page" style={{ background: T.appBg, minHeight: isPanelMode ? 'unset' : '100vh' }}>
+      {/* Header Navigation — hidden in panel mode (panel host provides its own close bar) */}
+      {!isPanelMode && (
       <div
         className="profile-nav"
         style={{ padding: '12px 22px', borderBottom: `1px solid ${T.border}`, background: T.navBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
@@ -497,6 +516,7 @@ export default function ContactProfile() {
           <BarryKnowledgeButton variant="compact" />
         </div>
       </div>
+      )}
 
       {/* Success Banner */}
       {enrichSuccess && (

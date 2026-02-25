@@ -10,14 +10,14 @@ import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
-  Phone, X, Zap, Star, Rocket, ExternalLink,
-  Check, Clock, ArrowLeft, Target, UserCheck, Handshake,
-  Network, Gift,
+  Phone, X, Zap, Star, ExternalLink,
+  Clock, ArrowLeft, Target, UserCheck, Handshake,
+  Network, Gift, ChevronLeft,
 } from 'lucide-react';
-import { downloadVCard } from '../../utils/vcard';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
+import ContactProfile from './ContactProfile';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 22, style = {} }) {
@@ -185,14 +185,13 @@ function PersonModal({ contact, company, onClose, onOpenProfile }) {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-            <button style={{ padding: 11, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-              <Rocket size={15} />Start Campaign
-            </button>
+          <div style={{ marginBottom: 16 }}>
             <button
-              onClick={() => contact && downloadVCard && downloadVCard(contact)}
-              style={{ padding: 11, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
-            ><Phone size={15} />Save to Phone</button>
+              onClick={() => { onClose(); navigate(`/scout/contact/${contact.id}`, { state: { autoEngage: true } }); }}
+              style={{ width: '100%', padding: 13, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              <Zap size={16} />Engage
+            </button>
           </div>
 
           {/* Contact info */}
@@ -428,9 +427,11 @@ export default function AllLeads() {
   const [modal, setModal] = useState(null);
   const [listSelected, setListSelected] = useState(null);
   const [openProfileId, setOpenProfileId] = useState(null);
+  const [panelContactId, setPanelContactId] = useState(null);
 
   const listRef = useRef(null);
   const [listScrollPos, setListScrollPos] = useState(0);
+  const savedListScroll = useRef(0);
 
   useEffect(() => { loadAllContacts(); }, []);
 
@@ -557,7 +558,7 @@ export default function AllLeads() {
             {[['cards', '⊞ Cards'], ['list', '☰ List']].map(([m, l]) => (
               <button
                 key={m}
-                onClick={() => setViewMode(m)}
+                onClick={() => { setViewMode(m); if (m === 'cards') { setPanelContactId(null); setListSelected(null); } }}
                 style={{ padding: '5px 13px', borderRadius: 6, border: 'none', background: viewMode === m ? BRAND.pink : 'transparent', color: viewMode === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: viewMode === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
               >{l}</button>
             ))}
@@ -626,41 +627,100 @@ export default function AllLeads() {
       </div>
 
       {/* ── Content ── */}
-      <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 22px' }}>
-        {finalContacts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
-            <p style={{ fontSize: 13 }}>No contacts match your current filters.</p>
-          </div>
-        ) : viewMode === 'cards' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12 }}>
-            {finalContacts.map(c => (
-              <AllLeadsCard
-                key={c.id}
-                contact={c}
-                company={companies[c.company_id]}
-                onClick={() => setModal(c)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ background: T.navBg, borderRadius: 11, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '7px 15px', borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textFaint, letterSpacing: 1 }}>
-              <div style={{ width: 30 }} />
-              <div style={{ width: 128 }}>NAME</div>
-              <div style={{ flex: 1 }}>TITLE</div>
-              <div style={{ width: 130 }}>STATUS</div>
-              <div style={{ width: 52 }}>EMAIL</div>
-              <div style={{ width: 80, textAlign: 'right' }}>LAST ACTION</div>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Left: list/cards */}
+        <div
+          ref={listRef}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '14px 22px',
+            transition: 'flex 0.25s ease',
+            minWidth: 0,
+          }}
+        >
+          {finalContacts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
+              <p style={{ fontSize: 13 }}>No contacts match your current filters.</p>
             </div>
-            {finalContacts.map(c => (
-              <AllLeadsRow
-                key={c.id}
-                contact={c}
-                company={companies[c.company_id]}
-                selected={c.id === listSelected}
-                onClick={() => { setListSelected(c.id); setModal(c); }}
-              />
-            ))}
+          ) : viewMode === 'cards' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12 }}>
+              {finalContacts.map(c => (
+                <AllLeadsCard
+                  key={c.id}
+                  contact={c}
+                  company={companies[c.company_id]}
+                  onClick={() => setModal(c)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div style={{ background: T.navBg, borderRadius: 11, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '7px 15px', borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textFaint, letterSpacing: 1 }}>
+                <div style={{ width: 30 }} />
+                <div style={{ width: 128 }}>NAME</div>
+                <div style={{ flex: 1 }}>TITLE</div>
+                <div style={{ width: 130 }}>STATUS</div>
+                <div style={{ width: 52 }}>EMAIL</div>
+                <div style={{ width: 80, textAlign: 'right' }}>LAST ACTION</div>
+              </div>
+              {finalContacts.map(c => (
+                <AllLeadsRow
+                  key={c.id}
+                  contact={c}
+                  company={companies[c.company_id]}
+                  selected={c.id === listSelected}
+                  onClick={() => {
+                  savedListScroll.current = listRef.current?.scrollTop ?? 0;
+                  setListSelected(c.id);
+                  setPanelContactId(c.id);
+                }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right: contact profile panel (list mode only) */}
+        {viewMode === 'list' && panelContactId && (
+          <div style={{
+            width: '52%',
+            flexShrink: 0,
+            borderLeft: `1px solid ${T.border}`,
+            overflowY: 'auto',
+            background: T.appBg,
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideInPanel 0.22s ease',
+          }}>
+            <style>{`@keyframes slideInPanel { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+            {/* Panel close bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, background: T.navBg, flexShrink: 0 }}>
+              <button
+                onClick={() => {
+                  setPanelContactId(null);
+                  setListSelected(null);
+                  requestAnimationFrame(() => {
+                    if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+                  });
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+              >
+                <ChevronLeft size={13} />Close
+              </button>
+              <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
+            </div>
+            <ContactProfile
+              key={panelContactId}
+              contactId={panelContactId}
+              onClose={() => {
+                setPanelContactId(null);
+                setListSelected(null);
+                requestAnimationFrame(() => {
+                  if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+                });
+              }}
+            />
           </div>
         )}
       </div>

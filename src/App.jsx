@@ -13,8 +13,8 @@ import GettingStarted from './pages/GettingStarted';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
-import MissionControlDashboard from './pages/MissionControlDashboard';
 import MissionControlDashboardV2 from './pages/MissionControlDashboardV2';
+// MissionControlDashboard (legacy) archived as MissionControlDashboard.archived.jsx
 import RECONModulePage from './pages/RECONModulePage';
 import RECONSectionPage from './pages/RECONSectionPage';
 

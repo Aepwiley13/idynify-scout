@@ -61,10 +61,15 @@ export default function ContactProfile({ contactId: propContactId, onClose } = {
     loadContactProfile();
   }, [contactId]);
 
-  // Auto-trigger engage when navigated here with autoEngage:true state
+  // Auto-trigger engage when navigated here with autoEngage:true state.
+  // Clears the flag from history so back-navigation doesn't re-trigger.
   useEffect(() => {
     if (!loading && contact && location?.state?.autoEngage) {
       triggerInlineEngagement();
+      window.history.replaceState(
+        { ...window.history.state, usr: { ...location.state, autoEngage: false } },
+        ''
+      );
     }
   }, [loading, contact]);
 
@@ -169,16 +174,17 @@ export default function ContactProfile({ contactId: propContactId, onClose } = {
   }
 
   function triggerInlineEngagement() {
-    // Scroll the inline engagement section into view, then trigger the flow
+    // Scroll the inline engagement section into view, then trigger the flow.
+    // Double rAF ensures the browser has committed layout before we expand —
+    // avoids the 350ms magic-number that was unreliable on slow connections.
     const el = document.getElementById('engagement-section');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // Small delay to let scroll settle before expanding
-      setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
         if (engagementSectionRef.current?.triggerFlow) {
           engagementSectionRef.current.triggerFlow();
         }
-      }, 350);
+      }));
     } else if (engagementSectionRef.current?.triggerFlow) {
       engagementSectionRef.current.triggerFlow();
     }

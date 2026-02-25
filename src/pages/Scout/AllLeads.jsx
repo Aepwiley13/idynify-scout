@@ -431,6 +431,7 @@ export default function AllLeads() {
 
   const listRef = useRef(null);
   const [listScrollPos, setListScrollPos] = useState(0);
+  const savedListScroll = useRef(0);
 
   useEffect(() => { loadAllContacts(); }, []);
 
@@ -669,7 +670,11 @@ export default function AllLeads() {
                   contact={c}
                   company={companies[c.company_id]}
                   selected={c.id === listSelected}
-                  onClick={() => { setListSelected(c.id); setPanelContactId(c.id); }}
+                  onClick={() => {
+                  savedListScroll.current = listRef.current?.scrollTop ?? 0;
+                  setListSelected(c.id);
+                  setPanelContactId(c.id);
+                }}
                 />
               ))}
             </div>
@@ -692,7 +697,13 @@ export default function AllLeads() {
             {/* Panel close bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, background: T.navBg, flexShrink: 0 }}>
               <button
-                onClick={() => { setPanelContactId(null); setListSelected(null); }}
+                onClick={() => {
+                  setPanelContactId(null);
+                  setListSelected(null);
+                  requestAnimationFrame(() => {
+                    if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+                  });
+                }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
               >
                 <ChevronLeft size={13} />Close
@@ -700,8 +711,15 @@ export default function AllLeads() {
               <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
             </div>
             <ContactProfile
+              key={panelContactId}
               contactId={panelContactId}
-              onClose={() => { setPanelContactId(null); setListSelected(null); }}
+              onClose={() => {
+                setPanelContactId(null);
+                setListSelected(null);
+                requestAnimationFrame(() => {
+                  if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+                });
+              }}
             />
           </div>
         )}

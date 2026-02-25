@@ -37,9 +37,9 @@ const MainLayout = ({ children, user }) => {
       return 'Company Profile';
     }
 
-    // Company Leads page
+    // Company People page
     if (pathname.match(/^\/scout\/company\/[^/]+\/leads$/)) {
-      return 'Company Leads';
+      return 'Company People';
     }
 
     // Contact Profile page
@@ -50,11 +50,11 @@ const MainLayout = ({ children, user }) => {
     // Scout main pages with tabs
     if (pathname === '/scout') {
       if (activeTab === 'daily-leads' || !activeTab) {
-        return 'Daily Lead Insights';
+        return 'Daily Discoveries';
       }
       if (activeTab === 'company-search') return 'Company Search';
       if (activeTab === 'saved-companies') return 'Saved Companies';
-      if (activeTab === 'all-leads') return 'All Leads';
+      if (activeTab === 'all-leads') return 'People';
       if (activeTab === 'total-market') return 'Total Market';
       if (activeTab === 'icp-settings') return 'ICP Settings';
       if (activeTab === 'scout-plus') return 'Scout+';

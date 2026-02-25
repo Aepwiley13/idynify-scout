@@ -119,10 +119,12 @@ function CompanySwipeCard({ company, onAccept, onReject }) {
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
+        maxHeight: 'clamp(460px, calc(100vh - 200px), 570px)',
+        overflowY: 'auto',
       }}>
         {/* Header */}
         <div style={{
-          padding: '28px 22px 18px', display: 'flex', flexDirection: 'column',
+          padding: '20px 22px 14px', display: 'flex', flexDirection: 'column',
           alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`,
         }}>
           <div style={{
@@ -244,8 +246,8 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}` }}>
-        <div style={{ padding: '26px 22px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, maxHeight: 'clamp(460px, calc(100vh - 200px), 570px)', overflowY: 'auto' }}>
+        <div style={{ padding: '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
           <Av initials={initials} color={color} size={70} />
           {matchText && (
             <div style={{ marginTop: 12, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 16px', color: STATUS.green, fontSize: 11, fontWeight: 600, marginBottom: 12, width: '88%', textAlign: 'center' }}>
@@ -656,13 +658,14 @@ export default function DailyLeads({ onNavigate }) {
   const currentCompany = companies[currentIndex];
   const visibleCompanies = companies.slice(currentIndex);
 
-  // Ghost cards for depth effect
+  // Ghost cards for depth effect — height matches card wrapper
+  const CARD_H = 'clamp(460px, calc(100vh - 200px), 570px)';
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
         position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8,
         background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22,
-        height: 570, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
+        height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
       }} />
     ));
 
@@ -781,7 +784,7 @@ export default function DailyLeads({ onNavigate }) {
             ) : (
               <>
                 {renderDots(companies.length, currentIndex)}
-                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: 570 }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H }}>
                   {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                   {currentCompany && (
                     <CompanySwipeCard
@@ -847,9 +850,9 @@ export default function DailyLeads({ onNavigate }) {
             ) : (
               <>
                 {renderDots(peopleQueue.length, currentPersonIdx)}
-                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: 545 }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H }}>
                   {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
-                    <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: 545, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
+                    <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                   ))}
                   <PersonSwipeCard
                     key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}

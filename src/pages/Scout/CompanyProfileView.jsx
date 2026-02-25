@@ -49,8 +49,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
   const [savingDMs, setSavingDMs] = useState(false);
 
   // ── UI state ───────────────────────────────────────────────────────────────
-  const [showOverview, setShowOverview] = useState(false);
-  const [showKeywords, setShowKeywords] = useState(false);
+  const [showOverview, setShowOverview] = useState(true);
+  const [showKeywords, setShowKeywords] = useState(true);
   const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
@@ -424,7 +424,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Company info card ── */}
         <div style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden' }}>
           {/* Stats grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 0 }}>
             {[
               ['Employees', company.employee_count || company.company_size || 'N/A', Users],
               ['Founded', company.founded_year || snap.founded_year || 'N/A', Calendar],
@@ -501,7 +501,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Saved Contacts ── */}
         {approvedContacts.length > 0 && (
           <Section title={`Saved Contacts (${approvedContacts.length})`} icon={<CheckCircle size={14} color={STATUS.green} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
               {approvedContacts.map(c => (
                 <ContactPhotoCard
                   key={c.id}
@@ -524,7 +524,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Decision Makers from Apollo ── */}
         {decisionMakers.length > 0 && (
           <Section title="Key Decision Makers" subtitle="Select contacts to add as leads" icon={<Users size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
               {decisionMakers.map((person, i) => {
                 const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
                 const alreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
@@ -638,7 +638,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   )}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
                 {availableResults.map(c => {
                   const isSelected = selectedContactIds.has(c.id);
                   const isApproving = approvingContactIds.has(c.id);
@@ -688,7 +688,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Suggested Contacts ── */}
         {suggestedContacts.length > 0 && (
           <Section title={`Suggested Contacts (${suggestedContacts.length})`} subtitle="Auto-discovered from your ICP" icon={<Target size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
               {suggestedContacts.map(c => (
                 <ContactPhotoCard
                   key={c.id}
@@ -736,11 +736,12 @@ function ContactPhotoCard({ contact, selected, alreadySaved, onClick, badge, foo
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      {/* Photo card */}
+      {/* Photo card — capped at 220px tall so cards never overflow the viewport */}
       <div
         onClick={onClick}
         style={{
-          position: 'relative', width: '100%', paddingTop: '130%',
+          position: 'relative', width: '100%',
+          height: 'clamp(160px, 30vw, 220px)',
           borderRadius: 12, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
           border: `2px solid ${selected ? BRAND.pink : alreadySaved ? STATUS.green : T.border}`,
           boxShadow: selected ? `0 0 0 3px ${BRAND.pink}30` : alreadySaved ? `0 0 0 3px ${STATUS.green}20` : 'none',
@@ -748,8 +749,8 @@ function ContactPhotoCard({ contact, selected, alreadySaved, onClick, badge, foo
         }}
       >
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
-        {/* Gradient overlay — taller so text is always readable */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.6) 50%,transparent 100%)' }} />
+        {/* Gradient overlay */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', background: 'linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.6) 50%,transparent 100%)' }} />
         {/* Leadership badge */}
         {lbadge && (
           <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, background: `${lbadge.color}dd`, color: '#fff', borderRadius: 5, padding: '3px 7px' }}>

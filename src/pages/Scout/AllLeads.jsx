@@ -149,7 +149,7 @@ function Av({ initials, color = BRAND.pink, size = 36, src }) {
 }
 
 // ─── Person Modal ─────────────────────────────────────────────────────────────
-function PersonModal({ contact, company, onClose, onOpenProfile }) {
+function PersonModal({ contact, company, onClose, onEngage, onOpenProfile }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
@@ -187,7 +187,7 @@ function PersonModal({ contact, company, onClose, onOpenProfile }) {
           {/* Action buttons */}
           <div style={{ marginBottom: 16 }}>
             <button
-              onClick={() => { onClose(); navigate(`/scout/contact/${contact.id}`, { state: { autoEngage: true } }); }}
+              onClick={onEngage}
               style={{ width: '100%', padding: 13, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               <Zap size={16} />Engage
@@ -248,7 +248,7 @@ function PersonModal({ contact, company, onClose, onOpenProfile }) {
 }
 
 // ─── AllLeadsCard ─────────────────────────────────────────────────────────────
-function AllLeadsCard({ contact, company, onClick }) {
+function AllLeadsCard({ contact, company, onClick, onCompanyClick }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
@@ -288,9 +288,14 @@ function AllLeadsCard({ contact, company, onClick }) {
 
       {/* Info section */}
       <div style={{ padding: '9px 12px 12px' }}>
-        <div style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '2px 7px', display: 'inline-block', marginBottom: 7, fontWeight: 700 }}>
-          {company?.name || contact.company_name || ''}
-        </div>
+        {(company?.name || contact.company_name) && (
+          <div
+            onClick={e => { e.stopPropagation(); onCompanyClick && onCompanyClick(); }}
+            style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '2px 7px', display: 'inline-block', marginBottom: 7, fontWeight: 700, cursor: onCompanyClick ? 'pointer' : 'default', textDecoration: onCompanyClick ? 'underline' : 'none', textDecorationColor: `${color}60` }}
+          >
+            {company?.name || contact.company_name}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, fontSize: 11 }}>
           <Mail size={12} color={T.textFaint} />
           {email ? (
@@ -319,7 +324,7 @@ function AllLeadsCard({ contact, company, onClick }) {
 }
 
 // ─── AllLeadsRow (Gmail-style) ────────────────────────────────────────────────
-function AllLeadsRow({ contact, company, selected, onClick }) {
+function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
@@ -335,7 +340,10 @@ function AllLeadsRow({ contact, company, selected, onClick }) {
       <Av initials={getInitials(contact.name)} color={color} size={30} src={contact.photo_url} />
       <div style={{ width: 128, flexShrink: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
-        <div style={{ fontSize: 9, color, fontWeight: 700 }}>{company?.name || contact.company_name || ''}</div>
+        <div
+          onClick={e => { e.stopPropagation(); onCompanyClick && onCompanyClick(); }}
+          style={{ fontSize: 9, color, fontWeight: 700, cursor: onCompanyClick ? 'pointer' : 'default', textDecoration: onCompanyClick ? 'underline' : 'none', textDecorationColor: `${color}60` }}
+        >{company?.name || contact.company_name || ''}</div>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', whiteSpace: 'nowrap' }}>{contact.title}</span>
@@ -426,8 +434,8 @@ export default function AllLeads() {
   // Modal / profile
   const [modal, setModal] = useState(null);
   const [listSelected, setListSelected] = useState(null);
-  const [openProfileId, setOpenProfileId] = useState(null);
   const [panelContactId, setPanelContactId] = useState(null);
+  const [panelAutoEngage, setPanelAutoEngage] = useState(false);
 
   const listRef = useRef(null);
   const [listScrollPos, setListScrollPos] = useState(0);
@@ -651,6 +659,13 @@ export default function AllLeads() {
                   contact={c}
                   company={companies[c.company_id]}
                   onClick={() => setModal(c)}
+                  onCompanyClick={
+                    c.company_id && companies[c.company_id]
+                      ? () => navigate(`/scout/company/${c.company_id}`)
+                      : c.company_name
+                        ? () => navigate('/scout', { state: { activeTab: 'company-search', searchCompanyName: c.company_name } })
+                        : undefined
+                  }
                 />
               ))}
             </div>
@@ -671,18 +686,26 @@ export default function AllLeads() {
                   company={companies[c.company_id]}
                   selected={c.id === listSelected}
                   onClick={() => {
-                  savedListScroll.current = listRef.current?.scrollTop ?? 0;
-                  setListSelected(c.id);
-                  setPanelContactId(c.id);
-                }}
+                    savedListScroll.current = listRef.current?.scrollTop ?? 0;
+                    setListSelected(c.id);
+                    setPanelAutoEngage(false);
+                    setPanelContactId(c.id);
+                  }}
+                  onCompanyClick={
+                    c.company_id && companies[c.company_id]
+                      ? () => navigate(`/scout/company/${c.company_id}`)
+                      : c.company_name
+                        ? () => navigate('/scout', { state: { activeTab: 'company-search', searchCompanyName: c.company_name } })
+                        : undefined
+                  }
                 />
               ))}
             </div>
           )}
         </div>
 
-        {/* Right: contact profile panel (list mode only) */}
-        {viewMode === 'list' && panelContactId && (
+        {/* Right: contact profile panel */}
+        {panelContactId && (
           <div style={{
             width: '52%',
             flexShrink: 0,
@@ -700,6 +723,7 @@ export default function AllLeads() {
                 onClick={() => {
                   setPanelContactId(null);
                   setListSelected(null);
+                  setPanelAutoEngage(false);
                   requestAnimationFrame(() => {
                     if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
                   });
@@ -713,9 +737,11 @@ export default function AllLeads() {
             <ContactProfile
               key={panelContactId}
               contactId={panelContactId}
+              autoEngage={panelAutoEngage}
               onClose={() => {
                 setPanelContactId(null);
                 setListSelected(null);
+                setPanelAutoEngage(false);
                 requestAnimationFrame(() => {
                   if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
                 });
@@ -731,9 +757,15 @@ export default function AllLeads() {
           contact={modal}
           company={companies[modal.company_id]}
           onClose={() => setModal(null)}
+          onEngage={() => {
+            setModal(null);
+            setPanelAutoEngage(true);
+            setPanelContactId(modal.id);
+          }}
           onOpenProfile={() => {
             setModal(null);
-            navigate(`/scout/contact/${modal.id}`);
+            setPanelAutoEngage(false);
+            setPanelContactId(modal.id);
           }}
         />
       )}

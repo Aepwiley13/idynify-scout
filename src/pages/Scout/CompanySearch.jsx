@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Search, Building2, Globe, Users, DollarSign, MapPin, Check, X } from 'lucide-react';
@@ -18,12 +19,20 @@ import './CompanySearch.css';
  */
 
 export default function CompanySearch() {
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+
+  // Pre-fill from navigation state (e.g. clicking a company name from People page)
+  useEffect(() => {
+    if (location.state?.searchCompanyName) {
+      setSearchQuery(location.state.searchCompanyName);
+    }
+  }, []);
 
   async function handleSearch(e) {
     e.preventDefault();

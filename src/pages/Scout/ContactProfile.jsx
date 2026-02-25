@@ -34,7 +34,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import './ContactProfile.css';
 
-export default function ContactProfile({ contactId: propContactId, onClose } = {}) {
+export default function ContactProfile({ contactId: propContactId, onClose, autoEngage } = {}) {
   const { contactId: paramContactId } = useParams();
   const contactId = propContactId || paramContactId;
   const navigate = useNavigate();
@@ -72,6 +72,16 @@ export default function ContactProfile({ contactId: propContactId, onClose } = {
       );
     }
   }, [loading, contact]);
+
+  // Auto-trigger engage when the panel opens with autoEngage prop set by AllLeads.
+  // A ref guards against re-firing if loading/contact re-evaluates after first trigger.
+  const autoEngageConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!loading && contact && autoEngage && !autoEngageConsumedRef.current) {
+      autoEngageConsumedRef.current = true;
+      triggerInlineEngagement();
+    }
+  }, [loading, contact, autoEngage]);
 
   async function loadContactProfile() {
     try {

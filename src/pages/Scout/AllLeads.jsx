@@ -12,7 +12,7 @@ import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, Star, ExternalLink,
   Clock, ArrowLeft, Target, UserCheck, Handshake,
-  Network, Gift, ChevronLeft,
+  Network, Gift, ChevronLeft, Menu,
 } from 'lucide-react';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { useT } from '../../theme/ThemeContext';
@@ -441,6 +441,14 @@ export default function AllLeads() {
   const [listScrollPos, setListScrollPos] = useState(0);
   const savedListScroll = useRef(0);
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   useEffect(() => { loadAllContacts(); }, []);
 
   async function loadAllContacts() {
@@ -637,6 +645,7 @@ export default function AllLeads() {
       {/* ── Content ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left: list/cards */}
+        {!(isMobile && panelContactId) && (
         <div
           ref={listRef}
           style={{
@@ -658,7 +667,7 @@ export default function AllLeads() {
                   key={c.id}
                   contact={c}
                   company={companies[c.company_id]}
-                  onClick={() => setModal(c)}
+                  onClick={() => isMobile ? setPanelContactId(c.id) : setModal(c)}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
                       ? () => navigate(`/scout/company/${c.company_id}`)
@@ -703,13 +712,14 @@ export default function AllLeads() {
             </div>
           )}
         </div>
+        )}
 
         {/* Right: contact profile panel */}
         {panelContactId && (
           <div style={{
-            width: '52%',
+            width: isMobile ? '100%' : '52%',
             flexShrink: 0,
-            borderLeft: `1px solid ${T.border}`,
+            borderLeft: isMobile ? 'none' : `1px solid ${T.border}`,
             overflowY: 'auto',
             background: T.appBg,
             display: 'flex',
@@ -719,20 +729,34 @@ export default function AllLeads() {
             <style>{`@keyframes slideInPanel { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
             {/* Panel close bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, background: T.navBg, flexShrink: 0 }}>
-              <button
-                onClick={() => {
-                  setPanelContactId(null);
-                  setListSelected(null);
-                  setPanelAutoEngage(false);
-                  requestAnimationFrame(() => {
-                    if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
-                  });
-                }}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
-              >
-                <ChevronLeft size={13} />Close
-              </button>
-              <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
+              {isMobile ? (
+                <>
+                  <span style={{ flex: 1, fontSize: 11, color: T.textFaint }}>Contact Profile</span>
+                  <button
+                    onClick={() => setDrawerOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '6px 8px', color: T.textMuted, cursor: 'pointer' }}
+                  >
+                    <Menu size={16} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setPanelContactId(null);
+                      setListSelected(null);
+                      setPanelAutoEngage(false);
+                      requestAnimationFrame(() => {
+                        if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+                      });
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+                  >
+                    <ChevronLeft size={13} />Close
+                  </button>
+                  <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
+                </>
+              )}
             </div>
             <ContactProfile
               key={panelContactId}
@@ -750,6 +774,50 @@ export default function AllLeads() {
           </div>
         )}
       </div>
+
+      {/* ── Mobile Hamburger Drawer ── */}
+      {isMobile && drawerOpen && (
+        <>
+          <div
+            onClick={() => setDrawerOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: '#00000060', zIndex: 200 }}
+          />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 240,
+            background: T.navBg, zIndex: 201,
+            borderLeft: `1px solid ${T.border}`,
+            display: 'flex', flexDirection: 'column',
+            padding: '20px 0',
+          }}>
+            <div
+              onClick={() => {
+                setDrawerOpen(false);
+                setPanelContactId(null);
+                setListSelected(null);
+                setPanelAutoEngage(false);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 20px', fontSize: 14, fontWeight: 700, color: BRAND.pink, cursor: 'pointer', borderBottom: `1px solid ${T.border}`, marginBottom: 8 }}
+            >
+              <ChevronLeft size={16} />People
+            </div>
+            {[
+              { label: 'Daily Discoveries', tab: 'daily-leads' },
+              { label: 'Saved Companies',   tab: 'saved-companies' },
+              { label: 'Company Search',    tab: 'company-search' },
+              { label: 'Scout+',            tab: 'scout-plus' },
+              { label: 'ICP Settings',      tab: 'icp-settings' },
+            ].map(item => (
+              <div
+                key={item.tab}
+                onClick={() => { setDrawerOpen(false); navigate(`/scout?tab=${item.tab}`); }}
+                style={{ padding: '12px 20px', fontSize: 13, color: T.textMuted, cursor: 'pointer' }}
+              >
+                {item.label}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── Person Modal ── */}
       {modal && (

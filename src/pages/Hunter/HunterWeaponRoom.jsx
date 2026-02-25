@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard } from 'lucide-react';
@@ -27,22 +27,28 @@ import './HunterWeaponRoom.css';
 export default function HunterWeaponRoom() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Support tab switching from Sidebar via location.state
-  const initialTab = location.state?.activeTab || 'dashboard';
-  const [activeTab, setActiveTab] = useState(initialTab); // Default to dashboard tab (Step 6)
+  // Read active tab from URL (?tab=missions) with fallback to legacy location.state
+  const tabFromUrl = searchParams.get('tab') || location.state?.activeTab || 'dashboard';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [missions, setMissions] = useState([]);
   const [campaigns, setCampaigns] = useState([]); // Keep old campaigns for backward compatibility
   const [loading, setLoading] = useState(true);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState('');
 
-  // Sync tab with Sidebar navigation (location.state may change without unmount)
+  // Sync tab with URL search params (survives refresh, supports deep links)
   useEffect(() => {
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-  }, [location.state?.activeTab]);
+    const tab = searchParams.get('tab') || location.state?.activeTab;
+    if (tab) setActiveTab(tab);
+  }, [searchParams, location.state?.activeTab]);
+
+  // Helper to switch tab and update URL
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab }, { replace: true });
+  };
 
   useEffect(() => {
     loadData();
@@ -133,7 +139,7 @@ export default function HunterWeaponRoom() {
       <div className="hunter-tabs">
         <button
           className={`hunter-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => switchTab('dashboard')}
         >
           <LayoutDashboard className="w-4 h-4" />
           <span>Dashboard</span>
@@ -141,7 +147,7 @@ export default function HunterWeaponRoom() {
 
         <button
           className={`hunter-tab ${activeTab === 'weapons' ? 'active' : ''}`}
-          onClick={() => setActiveTab('weapons')}
+          onClick={() => switchTab('weapons')}
         >
           <Crosshair className="w-4 h-4" />
           <span>Weapons</span>
@@ -149,7 +155,7 @@ export default function HunterWeaponRoom() {
 
         <button
           className={`hunter-tab ${activeTab === 'missions' ? 'active' : ''}`}
-          onClick={() => setActiveTab('missions')}
+          onClick={() => switchTab('missions')}
         >
           <Target className="w-4 h-4" />
           <span>Missions</span>
@@ -160,7 +166,7 @@ export default function HunterWeaponRoom() {
 
         <button
           className={`hunter-tab ${activeTab === 'arsenal' ? 'active' : ''}`}
-          onClick={() => setActiveTab('arsenal')}
+          onClick={() => switchTab('arsenal')}
         >
           <Archive className="w-4 h-4" />
           <span>Arsenal</span>
@@ -168,7 +174,7 @@ export default function HunterWeaponRoom() {
 
         <button
           className={`hunter-tab ${activeTab === 'outcomes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('outcomes')}
+          onClick={() => switchTab('outcomes')}
         >
           <BarChart3 className="w-4 h-4" />
           <span>Outcomes</span>

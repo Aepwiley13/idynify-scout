@@ -1,0 +1,20 @@
+{
+  "name": "Idynify Scout",
+  "short_name": "Scout",
+  "description": "Find and build relationships with your ideal clients — powered by AI.",
+  "start_url": "/scout?tab=daily-leads",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ec4899",
+  "background_color": "#000000",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "screenshots": []
+}

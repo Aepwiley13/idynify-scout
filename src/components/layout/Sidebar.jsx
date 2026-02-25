@@ -42,7 +42,13 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const location = useLocation();
 
   const handleNavigation = (path, state = {}) => {
-    navigate(path, { state });
+    // If state contains an activeTab, encode it as a URL search param instead
+    // so that tab selection survives page refresh and can be deep-linked.
+    if (state?.activeTab) {
+      navigate(`${path}?tab=${state.activeTab}`);
+    } else {
+      navigate(path);
+    }
     onCloseMobileMenu();
   };
 
@@ -55,14 +61,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const isActive = (path, tabName) => {
     if (path === '/scout' && tabName) {
-      return location.pathname === '/scout' &&
-             (location.state?.activeTab === tabName ||
-              (!location.state?.activeTab && tabName === 'daily-leads'));
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'daily-leads';
+      return location.pathname === '/scout' && urlTab === tabName;
     }
     if (path === '/hunter' && tabName) {
-      return location.pathname === '/hunter' &&
-             (location.state?.activeTab === tabName ||
-              (!location.state?.activeTab && tabName === 'missions'));
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'dashboard';
+      return location.pathname === '/hunter' && urlTab === tabName;
     }
     return location.pathname === path;
   };

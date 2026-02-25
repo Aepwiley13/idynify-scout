@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { getStaleContacts } from './utils/contactUtils.js';
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -87,28 +88,19 @@ async function loadServerSideRecommendations(userId) {
     });
 
     // 2. Contacts awaiting reply beyond 14 days — critical ones trigger PRIORITIZE
-    const awaitingSnap = await userRef
-      .collection('contacts')
-      .where('contact_status', '==', 'Awaiting Reply')
-      .limit(20)
-      .get();
-
-    awaitingSnap.forEach(docSnap => {
-      const contact = docSnap.data();
-      const days = daysSince(contact.contact_status_updated_at);
-      if (days >= 14) {
-        const isCritical = contact.strategic_value === 'critical';
-        recommendations.push({
-          type: 'stalled_awaiting_reply',
-          // critical contacts awaiting reply = priorityWeight 0 (PRIORITIZE)
-          // high value = 1 (also PRIORITIZE)
-          // others = 3 (general gap, won't trigger PRIORITIZE)
-          priorityWeight: isCritical ? 0 : contact.strategic_value === 'high' ? 1 : 3,
-          contactName: contact.name || 'Unknown contact',
-          contactId: docSnap.id,
-          daysSinceContact: days
-        });
-      }
+    const staleContacts = await getStaleContacts(userRef, 14);
+    staleContacts.forEach(contact => {
+      const isCritical = contact.strategic_value === 'critical';
+      recommendations.push({
+        type: 'stalled_awaiting_reply',
+        // critical contacts awaiting reply = priorityWeight 0 (PRIORITIZE)
+        // high value = 1 (also PRIORITIZE)
+        // others = 3 (general gap, won't trigger PRIORITIZE)
+        priorityWeight: isCritical ? 0 : contact.strategic_value === 'high' ? 1 : 3,
+        contactName: contact.name || 'Unknown contact',
+        contactId: contact.id,
+        daysSinceContact: contact.daysSince
+      });
     });
 
     // 3. Missions with approaching deadlines (within 5 days)
@@ -189,25 +181,36 @@ async function loadStats(userId) {
 // ── Prompt Builders ──────────────────────────────────────
 
 function buildSystemPrompt(mode, reconContext) {
-  return `You are Barry, the AI co-pilot for Idynify — a relationship engine built to help founders and teams find, connect with, and build meaningful relationships with the right people. You have full context on this user's network, ICP, RECON intelligence, and active missions.
+  return `You are Barry, an elite AI sales intelligence assistant embedded inside Mission Control at Idynify. You are a command layer, not a chatbot.
 
-Your personality: direct, tactical, mission-focused. You speak like a trusted co-founder reviewing the relationship map — specific, urgent when needed, always pointing toward the next concrete action.
+PERSONALITY:
+Speak like a field commander briefing an agent. Confident, tactical, short. Never corporate. Never generic. One sentence of situational awareness, then action.
 
-Your current mode is: ${mode}
+YOU HAVE ACCESS TO THIS LIVE CONTEXT (injected at runtime):
+- mode: ${mode} (PRIORITIZE | SUGGEST | GROWTH)
+- recommendations: priority signals from pipeline
+- reconContext: ICP training data from RECON
 
-PRIORITIZE mode: Lead with urgency. Surface the single most critical action. Be specific about names, missions, and deadlines. Never be vague.
+YOUR JOB BY MODE:
+- PRIORITIZE: Surface the highest-value contacts who need action now. Be specific. Name names.
+- SUGGEST: Recommend next moves across Scout, Hunter, and RECON. Give 3 options ranked by impact.
+- GROWTH: Focus on pipeline gaps. What's missing? What should be added?
 
-SUGGEST mode: Lead with opportunity. Surface the highest-value growth action available. Be specific about which contacts or companies represent the best next move.
-
-GROWTH mode: Lead with encouragement and clarity. Guide the user into the platform step by step. Make them feel capable, not overwhelmed.
-
-Rules that apply in ALL modes:
-- Never give generic sales advice
-- Always ground responses in the user's actual data
-- Keep responses to 3-4 sentences maximum
-- Always end with one clear action the user can take right now
-- If you don't have enough data to be specific, ask one clarifying question
-- As Hunter improves and more engagement data becomes available, your suggestions will automatically improve — always use the richest data available
+RESPONSE RULES:
+1. Open with one sentence of situational awareness based on live stats.
+2. Give one clear recommended action.
+3. End every response with exactly one follow-up suggestion formatted as:
+   [SUGGESTION]: "suggested prompt text here"
+   This will be rendered as a tappable chip in the UI.
+4. Keep all responses under 5 sentences unless the user explicitly asks for a draft message.
+5. When asked to draft outreach, write it in full. Use the contact's name, company, and any relevant RECON data you have. Format it clearly with Subject: and Body: labels.
+6. When asked to schedule a follow-up, respond with:
+   [FOLLOW-UP]: { "contactName": "...", "contactId": "...", "dueDate": "...", "reason": "..." }
+   The UI will read this structured block to wire the reminder.
+7. When asked to move a contact, respond with:
+   [PIPELINE-MOVE]: { "contactId": "...", "contactName": "...", "newStage": "..." }
+   The UI will read this structured block to trigger the Firestore write.
+8. If data is missing, say: "That intel isn't loaded yet — want me to pull it from Scout?" Never say "I don't have access."
 ${reconContext ? '\n' + reconContext : ''}`;
 }
 
@@ -360,12 +363,47 @@ export const handler = async (event) => {
       const systemPrompt = buildSystemPrompt(currentMode, reconContext);
       const userPrompt = buildOpeningBriefPrompt(currentMode, stats, recommendations);
 
-      const claudeResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 600,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      });
+      const briefController = new AbortController();
+      const briefTimeout = setTimeout(() => briefController.abort(), 10000);
+      let claudeResponse;
+      try {
+        claudeResponse = await anthropic.messages.create(
+          {
+            model: 'claude-sonnet-4-5-20250929',
+            max_tokens: 600,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }]
+          },
+          { signal: briefController.signal }
+        );
+      } catch (claudeErr) {
+        if (briefController.signal.aborted) {
+          console.warn('⚠️ Barry opening brief timed out after 10s — using fallback');
+          const fallbackParsed = {
+            brief: getModeDefaultBrief(currentMode, stats, recommendations),
+            suggestedPrompts: getModeDefaultPrompts(currentMode)
+          };
+          const responseTime = Date.now() - startTime;
+          await logApiUsage(userId, 'barryMissionChat', 'timeout', {
+            responseTime,
+            metadata: { mode: currentMode, type: 'opening_brief_timeout' }
+          });
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({
+              success: true,
+              mode: currentMode,
+              brief: fallbackParsed.brief,
+              suggestedPrompts: fallbackParsed.suggestedPrompts,
+              recommendations
+            })
+          };
+        }
+        throw claudeErr;
+      } finally {
+        clearTimeout(briefTimeout);
+      }
 
       const responseText = claudeResponse.content[0].text;
       let parsed;
@@ -431,14 +469,38 @@ export const handler = async (event) => {
         { role: 'user', content: message }
       ];
 
-      const claudeResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 500,
-        system: systemPrompt,
-        messages
-      });
+      const chatController = new AbortController();
+      const chatTimeout = setTimeout(() => chatController.abort(), 10000);
+      let chatResponse;
+      try {
+        chatResponse = await anthropic.messages.create(
+          {
+            model: 'claude-sonnet-4-5-20250929',
+            max_tokens: 500,
+            system: systemPrompt,
+            messages
+          },
+          { signal: chatController.signal }
+        );
+      } catch (claudeErr) {
+        if (chatController.signal.aborted) {
+          console.warn('⚠️ Barry conversation timed out after 10s');
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({
+              success: false,
+              error: 'timeout',
+              response: "Intel processing is slow right now — try again in a moment. [SUGGESTION]: \"What should I focus on today?\""
+            })
+          };
+        }
+        throw claudeErr;
+      } finally {
+        clearTimeout(chatTimeout);
+      }
 
-      const responseText = claudeResponse.content[0].text;
+      const responseText = chatResponse.content[0].text;
 
       // Append Barry's response to history
       const updatedHistory = [

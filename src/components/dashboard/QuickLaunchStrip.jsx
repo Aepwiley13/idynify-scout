@@ -1,17 +1,16 @@
-import { useNavigate } from 'react-router-dom';
-
 /**
- * QuickLaunchStrip — Fast-access module cards shown above Needs Attention.
+ * QuickLaunchStrip — Horizontal scrollable carousel of module tiles.
  *
- * Four tap-friendly cards in a horizontal scrolling row on mobile,
- * 4-column grid on desktop. Receives live stats from Mission Control's
+ * On click, calls onModuleSelect(moduleId) to open the inline MissionCardDeck
+ * below — no full-page navigation. Receives live stats from Mission Control's
  * already-loaded loadDashboardStats() — no extra Firestore reads.
  *
  * Props:
- *   stats — { scoutCompanies, scoutContacts, reconCompletion, hunterMissions }
+ *   stats          — { scoutCompanies, scoutContacts, reconCompletion, hunterMissions }
+ *   onModuleSelect — (moduleId: string) => void
+ *   activeModule   — currently open module id or null
  */
-export default function QuickLaunchStrip({ stats = {} }) {
-  const navigate = useNavigate();
+export default function QuickLaunchStrip({ stats = {}, onModuleSelect, activeModule }) {
 
   const {
     scoutCompanies = 0,
@@ -92,15 +91,13 @@ export default function QuickLaunchStrip({ stats = {} }) {
           <div className="h-px w-20 bg-gradient-to-l from-transparent to-cyan-500/50"></div>
         </div>
 
-        {/* Scroll container — horizontal snap on mobile, 2×2 grid on desktop */}
+        {/* Scroll container — horizontal snap row on all viewports */}
         <div
           className="
-            flex gap-4
+            flex flex-row gap-4
             overflow-x-auto pb-3
             snap-x snap-mandatory
             scroll-smooth
-            md:grid md:grid-cols-2
-            md:overflow-x-visible md:pb-0
             [&::-webkit-scrollbar]:hidden
             [-ms-overflow-style:none]
             [scrollbar-width:none]
@@ -109,7 +106,12 @@ export default function QuickLaunchStrip({ stats = {} }) {
         >
           {cards.map((card) =>
             card.active ? (
-              <ActiveCard key={card.id} card={card} onClick={() => navigate(card.route)} />
+              <ActiveCard
+                key={card.id}
+                card={card}
+                isActive={activeModule === card.id}
+                onClick={() => onModuleSelect && onModuleSelect(card.id)}
+              />
             ) : (
               <LockedCard key={card.id} card={card} />
             )
@@ -122,7 +124,7 @@ export default function QuickLaunchStrip({ stats = {} }) {
 
 /* ── Active Card ──────────────────────────────────────────── */
 
-function ActiveCard({ card, onClick }) {
+function ActiveCard({ card, isActive, onClick }) {
   return (
     <div
       onClick={onClick}
@@ -130,19 +132,20 @@ function ActiveCard({ card, onClick }) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
       aria-label={`Open ${card.label}`}
+      aria-pressed={isActive}
       className={`
         group cursor-pointer
-        flex-shrink-0 w-[72vw] sm:w-[56vw] md:w-auto
+        flex-shrink-0 w-[260px]
         snap-start
         bg-black/50 backdrop-blur-xl rounded-2xl p-5
-        md:min-h-[200px]
-        border-2 ${card.glowClass}
+        min-h-[200px]
+        border-2 ${isActive ? 'border-white/60' : card.glowClass}
         hover:scale-[1.02] active:scale-[0.98]
         transition-all duration-200
         relative overflow-hidden
         select-none
       `}
-      style={card.glowStyle}
+      style={isActive ? { boxShadow: '0 0 24px rgba(255,255,255,0.15)' } : card.glowStyle}
     >
       {/* Hover glow overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none"></div>
@@ -165,12 +168,13 @@ function ActiveCard({ card, onClick }) {
         {card.status}
       </p>
 
-      {/* Tap-to-launch button */}
+      {/* Tap-to-open button */}
       <button
         className={`w-full py-2.5 rounded-xl bg-gradient-to-r ${card.btnClass} text-white font-mono text-xs font-bold transition-all shadow-lg`}
         tabIndex={-1}
+        aria-hidden="true"
       >
-        {card.btnLabel}
+        {isActive ? 'Close ↑' : card.btnLabel}
       </button>
     </div>
   );

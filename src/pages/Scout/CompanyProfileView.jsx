@@ -69,7 +69,26 @@ export default function CompanyProfileView({ companyId, onBack }) {
       if (!companyDoc.exists()) { onBack(); return; }
       const data = { id: companyDoc.id, ...companyDoc.data() };
       setCompany(data);
-      setSelectedTitles(data.selected_titles || []);
+
+      let titles = data.selected_titles || [];
+      // Auto-populate from ICP if no titles saved yet
+      if (titles.length === 0) {
+        try {
+          const icpDoc = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
+          if (icpDoc.exists()) {
+            const icpTitles = icpDoc.data().targetTitles || [];
+            if (icpTitles.length > 0) {
+              titles = icpTitles.map((title, index) => ({ title, rank: index + 1, score: 100 - (index * 10), source: 'icp' }));
+              await updateDoc(doc(db, 'users', user.uid, 'companies', companyId), {
+                selected_titles: titles, titles_source: 'icp_auto', titles_updated_at: new Date().toISOString(),
+              });
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
+      setSelectedTitles(titles);
+      if (titles.length > 0) searchContacts(titles);
+
       if (data.apolloEnrichment) {
         setEnrichedData(data.apolloEnrichment);
       } else {
@@ -509,6 +528,9 @@ export default function CompanyProfileView({ companyId, onBack }) {
               {decisionMakers.map((person, i) => {
                 const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
                 const alreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
+                const savedContact = alreadySaved
+                  ? approvedContacts.find(c => c.apollo_person_id === person.id)
+                  : null;
                 return (
                   <ContactPhotoCard
                     key={i}
@@ -524,6 +546,12 @@ export default function CompanyProfileView({ companyId, onBack }) {
                       ? <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, background: `${STATUS.green}20`, color: STATUS.green, borderRadius: 6, padding: '2px 6px' }}><CheckCircle size={9} />Saved</div>
                       : isSelected ? <div style={{ fontSize: 9, background: `${BRAND.pink}20`, color: BRAND.pink, borderRadius: 6, padding: '2px 6px' }}>Selected</div> : null
                     }
+                    footer={savedContact ? (
+                      <button onClick={() => navigate(`/scout/contact/${savedContact.id}`)}
+                        style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: T.cyanBg, color: T.cyan, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
+                        View Profile →
+                      </button>
+                    ) : undefined}
                     getLeadershipBadge={getLeadershipBadge}
                     T={T}
                   />
@@ -666,6 +694,12 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   key={c.id}
                   contact={c}
                   badge={<div style={{ fontSize: 9, background: `${BRAND.cyan}15`, color: BRAND.cyan, borderRadius: 6, padding: '2px 6px' }}>Suggested</div>}
+                  footer={
+                    <button onClick={e => { e.stopPropagation(); approveContact({ id: c.apollo_person_id || c.id, ...c }); }}
+                      style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                      <UserPlus size={10} />Save to Leads
+                    </button>
+                  }
                   getLeadershipBadge={getLeadershipBadge}
                   T={T}
                 />

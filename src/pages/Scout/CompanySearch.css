@@ -4,6 +4,11 @@
   padding: 2rem;
   max-width: 1200px;
   margin: 0 auto;
+  /* flex: 1 + min-height: 0 + overflow-y: auto lets this scroll
+     inside ScoutMain's overflow:hidden flex shell */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Header */

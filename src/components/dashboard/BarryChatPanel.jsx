@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { auth } from '../../firebase/config';
+import { EmailDraftCard, parseEmailDraft } from '../shared/EmailDraftCard';
 
 // ── Mode configuration ────────────────────────────────────
 
@@ -270,7 +272,11 @@ export default function BarryChatPanel({ userId }) {
                 <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-2/3"></div>
               </div>
             ) : (
-              <p className="text-gray-200 text-sm leading-relaxed">{brief}</p>
+              <div className="text-gray-200 text-sm leading-relaxed">
+                <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+                  {brief}
+                </ReactMarkdown>
+              </div>
             )}
           </div>
 
@@ -302,25 +308,40 @@ export default function BarryChatPanel({ userId }) {
                 aria-live="polite"
                 aria-label="Conversation with Barry"
               >
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-                  >
-                    {msg.role === 'assistant' && (
+                {messages.map((msg, i) => {
+                  if (msg.role === 'user') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row-reverse">
+                        <div className="text-sm px-3 py-2 max-w-[82%] leading-relaxed bg-cyan-500/20 text-cyan-100 border border-cyan-500/30 rounded-2xl rounded-tr-sm">
+                          {msg.content}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Assistant message — check for email draft first
+                  const draft = parseEmailDraft(msg.content);
+                  return (
+                    <div key={i} className="flex gap-2 flex-row">
                       <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                    )}
-                    <div
-                      className={`text-sm px-3 py-2 max-w-[82%] leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/30 rounded-2xl rounded-tr-sm'
-                          : 'bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm'
-                      }`}
-                    >
-                      {msg.content}
+                      {draft ? (
+                        <EmailDraftCard
+                          preamble={draft.preamble}
+                          subject={draft.subject}
+                          body={draft.body}
+                          contactName={draft.contactName}
+                          userId={userId}
+                        />
+                      ) : (
+                        <div className="text-sm px-3 py-2 max-w-[82%] leading-relaxed bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                          <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Typing indicator */}
                 {sending && (

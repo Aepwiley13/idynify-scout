@@ -22,6 +22,7 @@ import { generateContactRecommendations, dismissRecommendation } from '../../uti
 import BarryRecommendationCard from './BarryRecommendationCard';
 import SequencePanel from './SequencePanel';
 import LearningToast from '../LearningToast';
+import { EmailDraftCard } from '../shared/EmailDraftCard';
 import './HunterContactDrawer.css';
 
 /**
@@ -913,6 +914,22 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   </>
                 )}
               </button>
+
+              {/* EmailDraftCard — additional Gmail path for email weapon */}
+              {selectedWeapon === 'email' && subject && message && (
+                <div className="email-draft-card-wrapper">
+                  <div className="email-draft-divider">
+                    <span>or open in Gmail directly</span>
+                  </div>
+                  <EmailDraftCard
+                    subject={subject}
+                    body={message}
+                    preamble={null}
+                    userId={auth.currentUser?.uid}
+                    contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || null}
+                  />
+                </div>
+              )}
             </div>
           )}
 

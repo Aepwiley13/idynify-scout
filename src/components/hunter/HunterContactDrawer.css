@@ -1475,3 +1475,33 @@
   color: rgba(6, 182, 212, 0.7);
   letter-spacing: 0.02em;
 }
+
+/* EmailDraftCard wrapper inside review view */
+.email-draft-card-wrapper {
+  margin-top: 16px;
+}
+
+.email-draft-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #9ca3af;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+}
+
+.email-draft-divider::before,
+.email-draft-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(156, 163, 175, 0.3);
+}
+
+/* Override EmailDraftCard max-width in drawer context */
+.email-draft-card-wrapper > .email-draft-card-wrapper > div,
+.email-draft-card-wrapper > div {
+  max-width: 100%;
+  width: 100%;
+}

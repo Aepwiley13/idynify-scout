@@ -96,6 +96,18 @@ const PRIORITY_WEIGHTS = {
 
 // ── Helpers ─────────────────────────────────────────────
 
+/**
+ * Returns true if the contact is currently snoozed (snoozed_until > now).
+ * Contacts without the field are never considered snoozed.
+ */
+function isContactSnoozed(contactData) {
+  if (!contactData.snoozed_until) return false;
+  const snoozeMs = contactData.snoozed_until?.toMillis
+    ? contactData.snoozed_until.toMillis()
+    : new Date(contactData.snoozed_until).getTime();
+  return snoozeMs > Date.now();
+}
+
 function daysSince(dateStr) {
   if (!dateStr) return Infinity;
   const date = typeof dateStr === 'object' && dateStr.toDate
@@ -204,6 +216,7 @@ async function deriveStalledEngagementAlerts(userId, dismissals) {
     const awaitingSnap = await getDocs(awaitingQuery);
     for (const contactDoc of awaitingSnap.docs) {
       const contact = { id: contactDoc.id, ...contactDoc.data() };
+      if (isContactSnoozed(contact)) continue;
       const days = daysSince(contact.contact_status_updated_at);
 
       if (days >= THRESHOLDS.STALLED_AWAITING_REPLY) {
@@ -359,6 +372,7 @@ async function deriveHighValueContactAlerts(userId, dismissals) {
     const highValueSnap = await getDocs(highValueQuery);
     for (const contactDoc of highValueSnap.docs) {
       const contact = { id: contactDoc.id, ...contactDoc.data() };
+      if (isContactSnoozed(contact)) continue;
       const contactName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown';
       const isCritical = contact.strategic_value === 'critical';
       const status = contact.contact_status || 'New';
@@ -429,6 +443,7 @@ async function deriveHighValueContactAlerts(userId, dismissals) {
     const engagedHighSnap = await getDocs(engagedHighQuery);
     for (const contactDoc of engagedHighSnap.docs) {
       const contact = { id: contactDoc.id, ...contactDoc.data() };
+      if (isContactSnoozed(contact)) continue;
       const daysSinceEngaged = daysSince(contact.contact_status_updated_at);
 
       if (daysSinceEngaged >= THRESHOLDS.HIGH_VALUE_NO_CAMPAIGN) {
@@ -636,6 +651,7 @@ async function deriveNextStepOverdueAlerts(userId, dismissals) {
 
       // Skip if next_step_due is not set (where filter may return nulls on some indexes)
       if (!contact.next_step_due) continue;
+      if (isContactSnoozed(contact)) continue;
 
       const recId = generateRecommendationId(RECOMMENDATION_TYPES.NEXT_STEP_OVERDUE, contact.id);
       if (isDismissed(recId, dismissals)) continue;

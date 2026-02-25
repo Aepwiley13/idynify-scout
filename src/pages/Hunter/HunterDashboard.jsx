@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, getDoc, where, limit, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Mail, Plus, CheckCircle, Clock, Send, ArrowLeft, Sparkles } from 'lucide-react';
+import FollowUpCard from '../../components/hunter/FollowUpCard';
 
 export default function HunterDashboard() {
   const navigate = useNavigate();
@@ -12,6 +13,10 @@ export default function HunterDashboard() {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [followUps, setFollowUps] = useState([]);
+
+  // Keep a ref to the notifications unsubscribe so we can clean up on unmount
+  const unsubNotificationsRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -24,7 +29,13 @@ export default function HunterDashboard() {
       // Remove query param
       navigate('/hunter', { replace: true });
     }
-  }, []);
+
+    return () => {
+      if (unsubNotificationsRef.current) {
+        unsubNotificationsRef.current();
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     try {
@@ -54,10 +65,30 @@ export default function HunterDashboard() {
 
       setCampaigns(campaignsList);
       setLoading(false);
+
+      // Real-time listener for unread follow-up notifications
+      const notificationsRef = collection(db, 'users', user.uid, 'notifications');
+      const notifQuery = query(
+        notificationsRef,
+        where('read', '==', false),
+        where('type', '==', 'follow_up_due'),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+      );
+
+      unsubNotificationsRef.current = onSnapshot(notifQuery, snapshot => {
+        setFollowUps(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, err => {
+        console.error('[HunterDashboard] Notifications listener error:', err);
+      });
     } catch (error) {
       console.error('Error loading Hunter data:', error);
       setLoading(false);
     }
+  }
+
+  function handleDismissFollowUp(notificationId) {
+    setFollowUps(prev => prev.filter(n => n.id !== notificationId));
   }
 
   async function handleConnectGmail() {
@@ -79,6 +110,8 @@ export default function HunterDashboard() {
     const pending = total - sent;
     return { total, sent, pending };
   }
+
+  const userId = auth.currentUser?.uid;
 
   if (loading) {
     return (
@@ -175,6 +208,29 @@ export default function HunterDashboard() {
                   Connect Gmail Account
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Follow-Ups Section — live from notifications collection */}
+        {followUps.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <span>⚡</span>
+              Follow Ups
+              <span className="ml-1 bg-purple-100 text-purple-700 text-xs font-mono font-bold px-2 py-0.5 rounded-full">
+                {followUps.length}
+              </span>
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {followUps.map(notification => (
+                <FollowUpCard
+                  key={notification.id}
+                  notification={notification}
+                  userId={userId}
+                  onDismiss={handleDismissFollowUp}
+                />
+              ))}
             </div>
           </div>
         )}

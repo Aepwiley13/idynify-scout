@@ -36,13 +36,17 @@ exports.handler = async (event) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    // Fetch user's Gmail tokens
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists || !userDoc.data().gmailAccessToken) {
+    // Fetch user's Gmail tokens from integrations subcollection
+    const gmailDoc = await db
+      .collection('users').doc(userId)
+      .collection('integrations').doc('gmail')
+      .get();
+
+    if (!gmailDoc.exists || !gmailDoc.data().gmailAccessToken) {
       return { statusCode: 401, body: JSON.stringify({ error: 'Gmail not connected' }) };
     }
 
-    const { gmailAccessToken, gmailRefreshToken } = userDoc.data();
+    const { gmailAccessToken, gmailRefreshToken } = gmailDoc.data();
 
     // Set up Gmail OAuth2 client
     const oauth2Client = new google.auth.OAuth2(

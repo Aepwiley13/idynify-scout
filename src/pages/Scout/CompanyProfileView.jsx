@@ -716,8 +716,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
 // ── Section wrapper ───────────────────────────────────────────────────────────
 function Section({ title, subtitle, icon, children, T }) {
   return (
-    <div style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 7 }}>
+    <div style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13 }}>
+      <div style={{ padding: '12px 14px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 7, borderRadius: '13px 13px 0 0', overflow: 'hidden' }}>
         {icon}
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{title}</div>

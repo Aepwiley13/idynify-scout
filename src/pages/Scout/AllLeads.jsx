@@ -688,6 +688,7 @@ export default function AllLeads() {
                   onClick={() => {
                     savedListScroll.current = listRef.current?.scrollTop ?? 0;
                     setListSelected(c.id);
+                    setPanelAutoEngage(false);
                     setPanelContactId(c.id);
                   }}
                   onCompanyClick={

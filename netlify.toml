@@ -27,6 +27,9 @@
 [functions."daily-leads-refresh"]
   timeout = 900
 
+[functions."process-barry-queue"]
+  timeout = 900
+
 [dev]
   framework = "#custom"
   command = "npm run dev"

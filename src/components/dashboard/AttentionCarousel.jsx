@@ -68,7 +68,7 @@ export default function AttentionCarousel({ recommendations = [], userId, loadin
   };
 
   const handleAddToMission = (rec) => {
-    navigate(`/hunter?contactId=${rec.contactId}`);
+    navigate(`/hunter/create?contactId=${rec.contactId}`);
   };
 
   // ── Empty state ───────────────────────────────────────────────────

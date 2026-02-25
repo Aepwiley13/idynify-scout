@@ -171,6 +171,13 @@ function ScoutShellInner({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   // Restore active tab from location.state (for backward compat with existing nav links)
   const tabFromState = location.state?.activeTab;
   const initialItem = (() => {
@@ -232,6 +239,89 @@ function ScoutShellInner({ user }) {
 
   const userInitials = (user?.email || 'AW').slice(0, 2).toUpperCase();
 
+  // ── Mobile layout ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        height: '100dvh', width: '100%',
+        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
+        color: T.text, overflow: 'hidden', position: 'relative',
+      }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+          * { box-sizing: border-box; }
+          button, input { font-family: Inter, system-ui, sans-serif; }
+          ::-webkit-scrollbar { width: 3px; height: 3px; }
+          ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
+          @keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
+          @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+          @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
+          input::placeholder { color: ${T.textFaint}; }
+        `}</style>
+
+        {/* ── Mobile top bar ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
+          background: T.railBg, flexShrink: 0, zIndex: 2,
+        }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 7,
+            background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, overflow: 'hidden',
+          }}>
+            <img src={ASSETS.logoMark} alt="Idynify"
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
+            />
+          </div>
+          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
+            {section?.items.find(i => i.id === activeItem)?.label || 'Scout'}
+          </div>
+          <ThemePicker />
+        </div>
+
+        {/* ── Mobile horizontal nav ── */}
+        <div style={{
+          display: 'flex', overflowX: 'auto', flexShrink: 0,
+          background: T.navBg, borderBottom: `1px solid ${T.border}`,
+          padding: '0 6px',
+        }}>
+          {section?.items.map(it => {
+            const active = activeItem === it.id;
+            return (
+              <div
+                key={it.id}
+                onClick={() => { setDrillCompanyId(null); setActiveItem(it.id); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '9px 12px', flexShrink: 0,
+                  borderBottom: `2px solid ${active ? BRAND.pink : 'transparent'}`,
+                  color: active ? BRAND.pink : T.textMuted,
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  transition: 'all 0.12s',
+                }}
+              >
+                <it.Icon size={12} />
+                {it.label}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Mobile main content ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+          {renderMain()}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Desktop layout ───────────────────────────────────────────────────────────
   return (
     <div style={{
       display: 'flex', height: '100vh', width: '100%',

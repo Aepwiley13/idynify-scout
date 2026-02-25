@@ -15,7 +15,7 @@ import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
   Zap, Building2, Users, Plus, Search,
-  Palette, Check,
+  Palette, Check, Settings,
 } from 'lucide-react';
 import { ThemeProvider, useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -24,6 +24,8 @@ import SavedCompanies from './SavedCompanies';
 import AllLeads from './AllLeads';
 import CompanySearch from './CompanySearch';
 import CompanyProfileView from './CompanyProfileView';
+import ScoutPlus from './ScoutPlus';
+import ICPSettings from './ICPSettings';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 28, style = {} }) {
@@ -155,8 +157,9 @@ const NAV_SECTIONS = [
       { id: 'daily',     label: 'Daily Leads',     Icon: Zap,       desc: 'Review Queue' },
       { id: 'saved',     label: 'Saved Companies', Icon: Building2, desc: 'Hunt list'    },
       { id: 'all',       label: 'All Leads',       Icon: Users,     desc: 'All contacts' },
-      { id: 'scoutplus', label: 'Scout+',          Icon: Plus,      desc: 'Add contacts' },
-      { id: 'comsearch', label: 'Company Search',  Icon: Search,    desc: 'Find companies' },
+      { id: 'scoutplus',   label: 'Scout+',          Icon: Plus,     desc: 'Add contacts'       },
+      { id: 'comsearch',   label: 'Company Search',  Icon: Search,   desc: 'Find companies'     },
+      { id: 'icpsettings', label: 'ICP Settings',    Icon: Settings, desc: 'Targeting criteria' },
     ],
   },
   { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter', items: [] },
@@ -177,6 +180,7 @@ function ScoutShellInner({ user }) {
     if (tabFromState === 'saved-companies') return 'saved';
     if (tabFromState === 'all-leads')       return 'all';
     if (tabFromState === 'company-search')  return 'comsearch';
+    if (tabFromState === 'icp-settings')    return 'icpsettings';
     return 'daily';
   })();
 
@@ -187,9 +191,10 @@ function ScoutShellInner({ user }) {
   // Sync when location.state changes (e.g. navigating from Sidebar)
   useEffect(() => {
     if (!tabFromState) return;
-    if (tabFromState === 'saved-companies') setActiveItem('saved');
-    else if (tabFromState === 'all-leads')  setActiveItem('all');
+    if (tabFromState === 'saved-companies')   setActiveItem('saved');
+    else if (tabFromState === 'all-leads')    setActiveItem('all');
     else if (tabFromState === 'company-search') setActiveItem('comsearch');
+    else if (tabFromState === 'icp-settings') setActiveItem('icpsettings');
     else setActiveItem('daily');
   }, [tabFromState]);
 
@@ -213,11 +218,13 @@ function ScoutShellInner({ user }) {
       );
     }
 
-    if (activeItem === 'daily')     return <DailyLeads onNavigate={setActiveItem} />;
-    if (activeItem === 'saved')     return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
-    if (activeItem === 'all')       return <AllLeads />;
-    if (activeItem === 'comsearch') return <CompanySearch />;
-    // Placeholder for Scout+ and other unbuilt sections
+    if (activeItem === 'daily')       return <DailyLeads onNavigate={setActiveItem} />;
+    if (activeItem === 'saved')       return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
+    if (activeItem === 'all')         return <AllLeads />;
+    if (activeItem === 'comsearch')   return <CompanySearch />;
+    if (activeItem === 'scoutplus')   return <ScoutPlus />;
+    if (activeItem === 'icpsettings') return <ICPSettings />;
+    // Placeholder for any future unbuilt sections
     const item = section?.items.find(i => i.id === activeItem);
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>

@@ -15,7 +15,7 @@ import TitleSelectionModal from '../../components/TitleSelectionModal';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
-export default function SavedCompanies() {
+export default function SavedCompanies({ onSelectCompany }) {
   const T = useT();
   const navigate = useNavigate();
 
@@ -99,19 +99,37 @@ export default function SavedCompanies() {
   }
 
   function handleCompanyClick(company) {
-    if (company.contact_count > 0) {
-      navigate(`/scout/company/${company.id}/leads`);
+    if (onSelectCompany) {
+      // Drill into company profile inline within the Scout shell
+      if (company.selected_titles?.length > 0 || company.contact_count > 0) {
+        onSelectCompany(company.id);
+      } else {
+        // No titles set yet — show title selection modal first
+        setSelectedCompany(company);
+        setShowTitleModal(true);
+      }
     } else {
-      setSelectedCompany(company);
-      const hasTitles = company.selected_titles?.length > 0;
-      if (hasTitles) navigate(`/scout/company/${company.id}`);
-      else setShowTitleModal(true);
+      // Fallback: navigate to standalone page (backwards compat)
+      if (company.contact_count > 0) {
+        navigate(`/scout/company/${company.id}/leads`);
+      } else {
+        setSelectedCompany(company);
+        const hasTitles = company.selected_titles?.length > 0;
+        if (hasTitles) navigate(`/scout/company/${company.id}`);
+        else setShowTitleModal(true);
+      }
     }
   }
 
   function handleTitlesSelected() {
     setShowTitleModal(false);
-    if (selectedCompany) navigate(`/scout/company/${selectedCompany.id}`);
+    if (selectedCompany) {
+      if (onSelectCompany) {
+        onSelectCompany(selectedCompany.id);
+      } else {
+        navigate(`/scout/company/${selectedCompany.id}`);
+      }
+    }
   }
 
   // KPIs

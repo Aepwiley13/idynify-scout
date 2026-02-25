@@ -23,6 +23,7 @@ import DailyLeads from './DailyLeads';
 import SavedCompanies from './SavedCompanies';
 import AllLeads from './AllLeads';
 import CompanySearch from './CompanySearch';
+import CompanyProfileView from './CompanyProfileView';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 28, style = {} }) {
@@ -181,6 +182,7 @@ function ScoutShellInner({ user }) {
 
   const [activeSection, setActiveSection] = useState('scout');
   const [activeItem, setActiveItem] = useState(initialItem);
+  const [drillCompanyId, setDrillCompanyId] = useState(null);
 
   // Sync when location.state changes (e.g. navigating from Sidebar)
   useEffect(() => {
@@ -201,8 +203,18 @@ function ScoutShellInner({ user }) {
   };
 
   const renderMain = () => {
+    // Company profile drill-in (overrides the current panel)
+    if (drillCompanyId) {
+      return (
+        <CompanyProfileView
+          companyId={drillCompanyId}
+          onBack={() => setDrillCompanyId(null)}
+        />
+      );
+    }
+
     if (activeItem === 'daily')     return <DailyLeads onNavigate={setActiveItem} />;
-    if (activeItem === 'saved')     return <SavedCompanies />;
+    if (activeItem === 'saved')     return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
     if (activeItem === 'all')       return <AllLeads />;
     if (activeItem === 'comsearch') return <CompanySearch />;
     // Placeholder for Scout+ and other unbuilt sections

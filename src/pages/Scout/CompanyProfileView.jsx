@@ -501,7 +501,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Saved Contacts ── */}
         {approvedContacts.length > 0 && (
           <Section title={`Saved Contacts (${approvedContacts.length})`} icon={<CheckCircle size={14} color={STATUS.green} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,220px))', gap: 10 }}>
               {approvedContacts.map(c => (
                 <ContactPhotoCard
                   key={c.id}
@@ -524,7 +524,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Decision Makers from Apollo ── */}
         {decisionMakers.length > 0 && (
           <Section title="Key Decision Makers" subtitle="Select contacts to add as leads" icon={<Users size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,220px))', gap: 10 }}>
               {decisionMakers.map((person, i) => {
                 const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
                 const alreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
@@ -638,7 +638,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   )}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,220px))', gap: 10 }}>
                 {availableResults.map(c => {
                   const isSelected = selectedContactIds.has(c.id);
                   const isApproving = approvingContactIds.has(c.id);
@@ -688,7 +688,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Suggested Contacts ── */}
         {suggestedContacts.length > 0 && (
           <Section title={`Suggested Contacts (${suggestedContacts.length})`} subtitle="Auto-discovered from your ICP" icon={<Target size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,220px))', gap: 10 }}>
               {suggestedContacts.map(c => (
                 <ContactPhotoCard
                   key={c.id}

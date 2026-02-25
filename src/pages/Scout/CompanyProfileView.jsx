@@ -443,7 +443,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
           </div>
 
           {/* Quick links */}
-          <div style={{ padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: (snap.description || snap.keywords?.length) ? `1px solid ${T.border}` : 'none' }}>
+          <div style={{ padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${T.border}` }}>
             {(company.website_url || snap.website_url) && (
               <button onClick={() => window.open(company.website_url || snap.website_url, '_blank')}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, border: `1px solid #7c5ce430`, background: '#7c5ce410', color: '#b388ff', fontSize: 11, cursor: 'pointer' }}>
@@ -464,22 +464,27 @@ export default function CompanyProfileView({ companyId, onBack }) {
             )}
           </div>
 
-          {/* Collapsible overview */}
-          {snap.description && (
-            <div style={{ borderBottom: `1px solid ${T.border}` }}>
-              <button onClick={() => setShowOverview(v => !v)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileText size={12} />Company Overview</span>
-                {showOverview ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              </button>
-              {showOverview && (
-                <div style={{ padding: '0 14px 12px', fontSize: 12, color: T.textMuted, lineHeight: 1.6 }}>{snap.description}</div>
-              )}
-            </div>
-          )}
+          {/* Collapsible overview — always shown */}
+          <div style={{ borderBottom: (company.industry || snap.keywords?.length > 0) ? `1px solid ${T.border}` : 'none' }}>
+            <button onClick={() => setShowOverview(v => !v)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileText size={12} />Company Overview</span>
+              {showOverview ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {showOverview && (
+              <div style={{ padding: '0 14px 12px', fontSize: 12, color: T.textMuted, lineHeight: 1.6 }}>
+                {snap.description
+                  ? snap.description
+                  : enriching
+                    ? <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Loading overview…</span>
+                    : <span style={{ color: T.textFaint, fontStyle: 'italic' }}>No overview available.</span>
+                }
+              </div>
+            )}
+          </div>
 
-          {/* Collapsible keywords */}
-          {snap.keywords?.length > 0 && (
+          {/* Collapsible keywords — shown when industry OR keywords are present */}
+          {(company.industry || snap.keywords?.length > 0) && (
             <div>
               <button onClick={() => setShowKeywords(v => !v)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
@@ -489,7 +494,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
               {showKeywords && (
                 <div style={{ padding: '0 14px 12px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                   {company.industry && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: `${BRAND.pink}15`, color: BRAND.pink, border: `1px solid ${BRAND.pink}30` }}>{company.industry}</span>}
-                  {snap.keywords.map((kw, i) => (
+                  {snap.keywords?.map((kw, i) => (
                     <span key={i} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: T.surface, color: T.textMuted, border: `1px solid ${T.border}` }}>{kw}</span>
                   ))}
                 </div>

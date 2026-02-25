@@ -1,5 +1,98 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { auth } from '../../firebase/config';
+
+// ── Email draft parser ─────────────────────────────────────
+// Detects Subject: / Body: blocks in Barry's responses and
+// returns structured data for EmailDraftCard.
+
+function parseEmailDraft(content) {
+  const subjectMatch = content.match(/^Subject:\s*(.+)$/m);
+  const bodyMatch = content.match(/^Body:\s*([\s\S]+?)(?=\n\[SUGGESTION\]|\[SUGGESTION\]|$)/m);
+  if (!subjectMatch || !bodyMatch) return null;
+  return {
+    subject: subjectMatch[1].trim(),
+    body: bodyMatch[1].trim(),
+    preamble: content.slice(0, subjectMatch.index).trim()
+  };
+}
+
+// ── Email Draft Card ───────────────────────────────────────
+
+function EmailDraftCard({ preamble, subject, body }) {
+  const [copiedField, setCopiedField] = useState(null);
+
+  const copy = async (text, field) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1800);
+    } catch {
+      // Clipboard API unavailable — silent fail
+    }
+  };
+
+  const fullDraft = `Subject: ${subject}\n\n${body}`;
+
+  return (
+    <div className="w-full max-w-[82%]">
+      {preamble && (
+        <div className="text-sm text-gray-200 leading-relaxed mb-3">
+          <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+            {preamble}
+          </ReactMarkdown>
+        </div>
+      )}
+      <div className="rounded-2xl rounded-tl-sm border border-cyan-500/30 overflow-hidden"
+        style={{ background: 'rgba(0,0,0,0.7)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-cyan-500/20"
+          style={{ background: 'rgba(6,182,212,0.08)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📧</span>
+            <span className="text-xs font-mono font-bold text-cyan-400 tracking-wider">EMAIL DRAFT</span>
+          </div>
+          <button
+            onClick={() => copy(fullDraft, 'all')}
+            className="text-xs font-mono text-gray-400 hover:text-cyan-300 transition-colors px-2 py-0.5 rounded border border-gray-700/60 hover:border-cyan-500/40"
+          >
+            {copiedField === 'all' ? '✓ Copied' : 'Copy All'}
+          </button>
+        </div>
+        {/* Subject */}
+        <div className="px-4 py-3 border-b border-white/5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Subject</div>
+              <div className="text-sm text-white font-medium leading-snug">{subject}</div>
+            </div>
+            <button
+              onClick={() => copy(subject, 'subject')}
+              className="flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors mt-4"
+            >
+              {copiedField === 'subject' ? '✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        {/* Body */}
+        <div className="px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2">Body</div>
+              <div className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{body}</div>
+            </div>
+            <button
+              onClick={() => copy(body, 'body')}
+              className="flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors mt-4"
+            >
+              {copiedField === 'body' ? '✓' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Mode configuration ────────────────────────────────────
 
@@ -270,7 +363,11 @@ export default function BarryChatPanel({ userId }) {
                 <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-2/3"></div>
               </div>
             ) : (
-              <p className="text-gray-200 text-sm leading-relaxed">{brief}</p>
+              <div className="text-gray-200 text-sm leading-relaxed">
+                <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+                  {brief}
+                </ReactMarkdown>
+              </div>
             )}
           </div>
 
@@ -302,25 +399,38 @@ export default function BarryChatPanel({ userId }) {
                 aria-live="polite"
                 aria-label="Conversation with Barry"
               >
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-                  >
-                    {msg.role === 'assistant' && (
+                {messages.map((msg, i) => {
+                  if (msg.role === 'user') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row-reverse">
+                        <div className="text-sm px-3 py-2 max-w-[82%] leading-relaxed bg-cyan-500/20 text-cyan-100 border border-cyan-500/30 rounded-2xl rounded-tr-sm">
+                          {msg.content}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Assistant message — check for email draft first
+                  const draft = parseEmailDraft(msg.content);
+                  return (
+                    <div key={i} className="flex gap-2 flex-row">
                       <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                    )}
-                    <div
-                      className={`text-sm px-3 py-2 max-w-[82%] leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/30 rounded-2xl rounded-tr-sm'
-                          : 'bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm'
-                      }`}
-                    >
-                      {msg.content}
+                      {draft ? (
+                        <EmailDraftCard
+                          preamble={draft.preamble}
+                          subject={draft.subject}
+                          body={draft.body}
+                        />
+                      ) : (
+                        <div className="text-sm px-3 py-2 max-w-[82%] leading-relaxed bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                          <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Typing indicator */}
                 {sending && (

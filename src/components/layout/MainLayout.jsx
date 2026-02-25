@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import BottomNav from './BottomNav';
 import { LogOut, User, Menu } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './MainLayout.css';
@@ -22,7 +23,9 @@ const MainLayout = ({ children, user }) => {
   // Get page title based on current route
   const getPageTitle = () => {
     const pathname = location.pathname;
-    const activeTab = location.state?.activeTab;
+    // Read tab from URL search params (new) with fallback to location.state (legacy)
+    const urlTab = new URLSearchParams(location.search).get('tab');
+    const activeTab = urlTab || location.state?.activeTab;
 
     if (pathname === '/mission-control-v2') {
       return 'Mission Control';
@@ -135,6 +138,9 @@ const MainLayout = ({ children, user }) => {
           {children}
         </main>
       </div>
+
+      {/* Bottom Navigation — mobile only (rendered outside main-content so it's always fixed) */}
+      <BottomNav />
     </div>
   );
 };

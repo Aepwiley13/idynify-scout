@@ -10,7 +10,7 @@
  * The App.jsx /scout route must NOT use withLayout={true}.
  */
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
@@ -174,6 +174,8 @@ function ScoutShellInner({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -181,29 +183,41 @@ function ScoutShellInner({ user }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Restore active tab from location.state (for backward compat with existing nav links)
-  const tabFromState = location.state?.activeTab;
-  const initialItem = (() => {
-    if (tabFromState === 'saved-companies') return 'saved';
-    if (tabFromState === 'all-leads')       return 'all';
-    if (tabFromState === 'company-search')  return 'comsearch';
-    if (tabFromState === 'icp-settings')    return 'icpsettings';
-    return 'daily';
-  })();
+  // Tab ↔ internal item ID mapping
+  const TAB_TO_ITEM = {
+    'daily-leads':     'daily',
+    'saved-companies': 'saved',
+    'all-leads':       'all',
+    'company-search':  'comsearch',
+    'icp-settings':    'icpsettings',
+    'scout-plus':      'scoutplus',
+  };
+  const ITEM_TO_TAB = Object.fromEntries(
+    Object.entries(TAB_TO_ITEM).map(([k, v]) => [v, k])
+  );
+
+  // Read tab from URL (?tab=company-search) with fallback to legacy location.state
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'daily-leads';
+  const initialItem = TAB_TO_ITEM[tabParam] || 'daily';
 
   const [activeSection, setActiveSection] = useState('scout');
   const [activeItem, setActiveItem] = useState(initialItem);
   const [drillCompanyId, setDrillCompanyId] = useState(null);
 
-  // Sync when location.state changes (e.g. navigating from Sidebar)
+  // Sync tab when URL search params change (e.g. navigating from Sidebar)
   useEffect(() => {
-    if (!tabFromState) return;
-    if (tabFromState === 'saved-companies')   setActiveItem('saved');
-    else if (tabFromState === 'all-leads')    setActiveItem('all');
-    else if (tabFromState === 'company-search') setActiveItem('comsearch');
-    else if (tabFromState === 'icp-settings') setActiveItem('icpsettings');
-    else setActiveItem('daily');
-  }, [tabFromState]);
+    const tab = searchParams.get('tab') || location.state?.activeTab;
+    if (tab && TAB_TO_ITEM[tab]) setActiveItem(TAB_TO_ITEM[tab]);
+    else if (!tab) setActiveItem('daily');
+  }, [searchParams, location.state?.activeTab]);
+
+  // Helper: switch tab and update URL
+  const switchItem = (itemId) => {
+    setDrillCompanyId(null);
+    setActiveItem(itemId);
+    const tab = ITEM_TO_TAB[itemId] || 'daily-leads';
+    setSearchParams({ tab }, { replace: true });
+  };
 
   const section = NAV_SECTIONS.find(s => s.id === activeSection);
 
@@ -226,7 +240,7 @@ function ScoutShellInner({ user }) {
       );
     }
 
-    if (activeItem === 'daily')       return <DailyLeads onNavigate={setActiveItem} />;
+    if (activeItem === 'daily')       return <DailyLeads onNavigate={switchItem} />;
     if (activeItem === 'saved')       return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
     if (activeItem === 'all')         return <AllLeads />;
     if (activeItem === 'comsearch')   return <CompanySearch />;
@@ -303,7 +317,7 @@ function ScoutShellInner({ user }) {
             return (
               <div
                 key={it.id}
-                onClick={() => { setDrillCompanyId(null); setActiveItem(it.id); }}
+                onClick={() => switchItem(it.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '9px 12px', flexShrink: 0,
@@ -432,7 +446,7 @@ function ScoutShellInner({ user }) {
             return (
               <div
                 key={it.id}
-                onClick={() => { setDrillCompanyId(null); setActiveItem(it.id); }}
+                onClick={() => switchItem(it.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                   borderRadius: 8, cursor: 'pointer', marginBottom: 1,

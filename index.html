@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Mobile viewport: viewport-fit=cover allows content to extend under notch/home indicator.
+         CSS env(safe-area-inset-*) is then used to push content out of those zones. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA / iOS web app meta -->
+    <!-- Allows the app to run in standalone mode (no Safari UI chrome) when added to home screen -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Idynify Scout" />
+    <!-- Android / Chrome: tints the browser address bar to match the app brand colour -->
+    <meta name="theme-color" content="#ec4899" />
+    <!-- Manifest link — see /public/manifest.json (to be created) -->
+    <link rel="manifest" href="/manifest.json" />
 
     <!-- Primary Meta Tags -->
     <title>idynify Scout - Find Your Ideal Clients in Minutes</title>

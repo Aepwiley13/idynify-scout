@@ -238,5 +238,7 @@
   .page-content {
     padding: 0;
     background: #ffffff;
+    /* Add space so content isn't hidden behind the fixed bottom nav (56px + iOS safe area) */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 }

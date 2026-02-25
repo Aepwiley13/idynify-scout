@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Users, Search, Globe, Linkedin, Target, Archive, RotateCcw, TrendingUp } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
-import TitleSelectionModal from '../../components/TitleSelectionModal';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
@@ -25,8 +24,6 @@ export default function SavedCompanies({ onSelectCompany }) {
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'archived'
   const [searchTerm, setSearchTerm] = useState('');
-  const [showTitleModal, setShowTitleModal] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
 
   useEffect(() => { loadSavedCompanies(); }, []);
 
@@ -100,34 +97,12 @@ export default function SavedCompanies({ onSelectCompany }) {
 
   function handleCompanyClick(company) {
     if (onSelectCompany) {
-      // Drill into company profile inline within the Scout shell
-      if (company.selected_titles?.length > 0 || company.contact_count > 0) {
-        onSelectCompany(company.id);
-      } else {
-        // No titles set yet — show title selection modal first
-        setSelectedCompany(company);
-        setShowTitleModal(true);
-      }
+      onSelectCompany(company.id);
     } else {
-      // Fallback: navigate to standalone page (backwards compat)
       if (company.contact_count > 0) {
         navigate(`/scout/company/${company.id}/leads`);
       } else {
-        setSelectedCompany(company);
-        const hasTitles = company.selected_titles?.length > 0;
-        if (hasTitles) navigate(`/scout/company/${company.id}`);
-        else setShowTitleModal(true);
-      }
-    }
-  }
-
-  function handleTitlesSelected() {
-    setShowTitleModal(false);
-    if (selectedCompany) {
-      if (onSelectCompany) {
-        onSelectCompany(selectedCompany.id);
-      } else {
-        navigate(`/scout/company/${selectedCompany.id}`);
+        navigate(`/scout/company/${company.id}`);
       }
     }
   }
@@ -294,13 +269,6 @@ export default function SavedCompanies({ onSelectCompany }) {
         )}
       </div>
 
-      {showTitleModal && selectedCompany && (
-        <TitleSelectionModal
-          company={selectedCompany}
-          onComplete={handleTitlesSelected}
-          onClose={() => setShowTitleModal(false)}
-        />
-      )}
     </div>
   );
 }

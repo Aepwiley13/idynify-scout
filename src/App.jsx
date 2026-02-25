@@ -375,11 +375,11 @@ function App() {
           }
         />
 
-        {/* Scout Module - NEW 4-Tab Structure */}
+        {/* Scout Module — self-contained two-column shell (no MainLayout) */}
         <Route
           path="/scout"
           element={
-            <ProtectedRoute withLayout={true}>
+            <ProtectedRoute>
               <ScoutMain />
             </ProtectedRoute>
           }

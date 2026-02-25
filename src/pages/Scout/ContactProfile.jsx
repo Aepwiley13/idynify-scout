@@ -12,7 +12,9 @@ import {
   Brain,
   ArrowRight,
   Linkedin,
-  Link2
+  Link2,
+  Star,
+  Zap,
 } from 'lucide-react';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
@@ -28,11 +30,14 @@ import GameBucketSelector from '../../components/contacts/GameBucketSelector';
 import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
 import NextBestStep from '../../components/contacts/NextBestStep';
 import BrigadeSelector from '../../components/contacts/BrigadeSelector';
+import { useT } from '../../theme/ThemeContext';
+import { BRAND } from '../../theme/tokens';
 import './ContactProfile.css';
 
 export default function ContactProfile() {
   const { contactId } = useParams();
   const navigate = useNavigate();
+  const T = useT();
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enriching, setEnriching] = useState(false);
@@ -444,56 +449,53 @@ export default function ContactProfile() {
 
   if (loading) {
     return (
-      <div className="profile-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading contact profile...</p>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, minHeight: '100vh', background: T.appBg, color: T.textMuted }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${BRAND.pink}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+        <p style={{ fontSize: 13, margin: 0 }}>Loading contact profile...</p>
+        <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
       </div>
     );
   }
 
   if (!contact) {
     return (
-      <div className="profile-error">
-        <AlertCircle className="w-16 h-16" />
-        <h3>Contact Not Found</h3>
-        <p>The contact you're looking for doesn't exist or has been removed.</p>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, minHeight: '100vh', background: T.appBg, color: T.textMuted }}>
+        <AlertCircle size={48} color={T.textFaint} />
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Contact Not Found</h3>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint }}>The contact you're looking for doesn't exist or has been removed.</p>
         <button
-          className="btn-back"
           onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+          style={{ padding: '8px 18px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to All Leads</span>
+          <ArrowLeft size={14} /><span>Back to All Leads</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="contact-profile-page">
-      {/* Header Navigation */}
-      <div className="profile-nav">
+    <div className="contact-profile-page" style={{ background: T.appBg, minHeight: '100vh' }}>
+      {/* Header Navigation — v5 style */}
+      <div
+        className="profile-nav"
+        style={{ padding: '12px 22px', borderBottom: `1px solid ${T.border}`, background: T.navBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
         <button
-          className="btn-back-nav"
           onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+          style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 8, padding: '7px 14px', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to People</span>
+          <ArrowLeft size={13} />Back to People
         </button>
-        <button
-          className="btn-enrich-nav"
-          onClick={handleEnrichContact}
-          disabled={enriching}
-        >
-          {enriching ? (
-            <>
-              <Loader className="w-4 h-4 spinner" />
-              <span>Enriching...</span>
-            </>
-          ) : (
-            <span>Enrich Contact</span>
-          )}
-        </button>
-        <BarryKnowledgeButton variant="compact" />
+        <div style={{ display: 'flex', gap: 9 }}>
+          <button
+            onClick={handleEnrichContact}
+            disabled={enriching}
+            style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
+          >
+            {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+          </button>
+          <BarryKnowledgeButton variant="compact" />
+        </div>
       </div>
 
       {/* Success Banner */}

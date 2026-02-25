@@ -424,7 +424,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Company info card ── */}
         <div style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden' }}>
           {/* Stats grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 0 }}>
             {[
               ['Employees', company.employee_count || company.company_size || 'N/A', Users],
               ['Founded', company.founded_year || snap.founded_year || 'N/A', Calendar],
@@ -501,7 +501,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Saved Contacts ── */}
         {approvedContacts.length > 0 && (
           <Section title={`Saved Contacts (${approvedContacts.length})`} icon={<CheckCircle size={14} color={STATUS.green} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
               {approvedContacts.map(c => (
                 <ContactPhotoCard
                   key={c.id}
@@ -509,8 +509,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   badge={<div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, background: `${STATUS.green}20`, color: STATUS.green, borderRadius: 6, padding: '2px 6px' }}><CheckCircle size={9} />Saved</div>}
                   footer={
                     <button onClick={() => navigate(`/scout/contact/${c.id}`)}
-                      style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: T.cyanBg, color: T.cyan, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
-                      View Profile →
+                      style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      View Full Profile →
                     </button>
                   }
                   getLeadershipBadge={getLeadershipBadge}
@@ -524,7 +524,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Decision Makers from Apollo ── */}
         {decisionMakers.length > 0 && (
           <Section title="Key Decision Makers" subtitle="Select contacts to add as leads" icon={<Users size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
               {decisionMakers.map((person, i) => {
                 const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
                 const alreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
@@ -548,8 +548,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
                     }
                     footer={savedContact ? (
                       <button onClick={() => navigate(`/scout/contact/${savedContact.id}`)}
-                        style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: T.cyanBg, color: T.cyan, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
-                        View Profile →
+                        style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        View Full Profile →
                       </button>
                     ) : undefined}
                     getLeadershipBadge={getLeadershipBadge}
@@ -638,7 +638,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   )}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
                 {availableResults.map(c => {
                   const isSelected = selectedContactIds.has(c.id);
                   const isApproving = approvingContactIds.has(c.id);
@@ -659,8 +659,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
                           <div style={{ width: '100%', padding: '5px 0', textAlign: 'center', fontSize: 10, color: T.textFaint }}>Saving…</div>
                         ) : (
                           <button onClick={e => { e.stopPropagation(); approveContact(c); }}
-                            style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
-                            <UserPlus size={10} style={{ display: 'inline', marginRight: 3 }} />Add
+                            style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                            <UserPlus size={12} />Save to Leads
                           </button>
                         )
                       }
@@ -688,7 +688,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         {/* ── Suggested Contacts ── */}
         {suggestedContacts.length > 0 && (
           <Section title={`Suggested Contacts (${suggestedContacts.length})`} subtitle="Auto-discovered from your ICP" icon={<Target size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
               {suggestedContacts.map(c => (
                 <ContactPhotoCard
                   key={c.id}
@@ -696,8 +696,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   badge={<div style={{ fontSize: 9, background: `${BRAND.cyan}15`, color: BRAND.cyan, borderRadius: 6, padding: '2px 6px' }}>Suggested</div>}
                   footer={
                     <button onClick={e => { e.stopPropagation(); approveContact({ id: c.apollo_person_id || c.id, ...c }); }}
-                      style={{ width: '100%', padding: '5px 0', borderRadius: 6, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      <UserPlus size={10} />Save to Leads
+                      style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                      <UserPlus size={12} />Save to Leads
                     </button>
                   }
                   getLeadershipBadge={getLeadershipBadge}
@@ -735,41 +735,42 @@ function ContactPhotoCard({ contact, selected, alreadySaved, onClick, badge, foo
   const lbadge = getLeadershipBadge(contact);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       {/* Photo card */}
       <div
         onClick={onClick}
         style={{
-          position: 'relative', width: '100%', paddingTop: '120%',
-          borderRadius: 10, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
+          position: 'relative', width: '100%', paddingTop: '130%',
+          borderRadius: 12, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
           border: `2px solid ${selected ? BRAND.pink : alreadySaved ? STATUS.green : T.border}`,
-          transition: 'border-color 0.15s',
+          boxShadow: selected ? `0 0 0 3px ${BRAND.pink}30` : alreadySaved ? `0 0 0 3px ${STATUS.green}20` : 'none',
+          transition: 'border-color 0.15s, box-shadow 0.15s',
         }}
       >
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
-        {/* Gradient overlay */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', background: 'linear-gradient(to top,rgba(0,0,0,0.85),transparent)' }} />
+        {/* Gradient overlay — taller so text is always readable */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.6) 50%,transparent 100%)' }} />
         {/* Leadership badge */}
         {lbadge && (
-          <div style={{ position: 'absolute', top: 6, left: 6, display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 700, background: `${lbadge.color}cc`, color: '#fff', borderRadius: 5, padding: '2px 5px' }}>
-            <Award size={9} />{lbadge.letter}
+          <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, background: `${lbadge.color}dd`, color: '#fff', borderRadius: 5, padding: '3px 7px' }}>
+            <Award size={10} />{lbadge.letter}
           </div>
         )}
         {/* Badge top right */}
         {badge && (
-          <div style={{ position: 'absolute', top: 6, right: 6 }}>{badge}</div>
+          <div style={{ position: 'absolute', top: 8, right: 8 }}>{badge}</div>
         )}
         {/* Name / title */}
-        <div style={{ position: 'absolute', bottom: 7, left: 7, right: 7 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', lineHeight: 1.2, marginBottom: 2 }}>{contact.name || 'Unknown'}</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{contact.title}</div>
+        <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.25, marginBottom: 3, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{contact.name || 'Unknown'}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{contact.title}</div>
         </div>
       </div>
       {/* LinkedIn */}
       {contact.linkedin_url && (
         <button onClick={e => { e.stopPropagation(); window.open(contact.linkedin_url, '_blank'); }}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '4px 0', borderRadius: 6, border: `1px solid #0077b530`, background: '#0077b510', color: '#3b82f6', fontSize: 10, cursor: 'pointer' }}>
-          <Linkedin size={10} />LinkedIn
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 0', borderRadius: 7, border: `1px solid #0077b540`, background: '#0077b512', color: '#3b82f6', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          <Linkedin size={12} />View LinkedIn
         </button>
       )}
       {/* Footer action */}

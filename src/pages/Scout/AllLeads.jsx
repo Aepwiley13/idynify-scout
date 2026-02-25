@@ -1,38 +1,55 @@
-import { useEffect, useState } from 'react';
+/**
+ * AllLeads.jsx — Contact grid/list with brigade tabs, Person modal, and full profile.
+ *
+ * UI: idynify-v5 design (cards + Gmail-style list toggle, Person modal, Contact Profile).
+ * Data: Firebase Firestore (all original data loading preserved).
+ */
+import { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
-  Phone, X, Smartphone, MoreVertical,
-  Archive, Sparkles, Send, CheckCircle, Zap,
-  RefreshCcw, RotateCcw, Target, Flag,
-  UserCheck, Handshake, Network, Gift, Star
+  Phone, X, Zap, Star, Rocket, ExternalLink,
+  Check, Clock, ArrowLeft, Target, UserCheck, Handshake,
+  Network, Gift,
 } from 'lucide-react';
-import ContactSnapshot from '../../components/contacts/ContactSnapshot';
-import HunterContactDrawer from '../../components/hunter/HunterContactDrawer';
 import { downloadVCard } from '../../utils/vcard';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
-import { updateContactStatus, STATUS_TRIGGERS, getContactStatus, CONTACT_STATUSES } from '../../utils/contactStateMachine';
-import { GAME_BUCKET_LIST, GAME_BUCKETS } from '../../utils/buildAutoIntent';
-import './AllLeads.css';
+import { useT } from '../../theme/ThemeContext';
+import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
 
-// ── Helpers ──────────────────────────────────────────────
-
-function getLeadStatus(contact) {
-  const s = contact.lead_status || contact.status;
-  if (!s || s === 'saved' || s === 'pending_enrichment' || s === 'active' || s === 'exported') return 'active';
-  if (s === 'contacted') return 'engaged';
-  return s; // archived, engaged, converted
+// ─── BarryAvatar ─────────────────────────────────────────────────────────────
+function BarryAvatar({ size = 22, style = {} }) {
+  const glow = `0 0 ${size * 0.5}px ${BRAND.cyan}50`;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+      border: `2px solid ${BRAND.cyan}50`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.46, flexShrink: 0, boxShadow: glow, overflow: 'hidden', ...style,
+    }}>
+      <img
+        src={ASSETS.barryAvatar}
+        alt="Barry AI"
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }}
+      />
+    </div>
+  );
 }
 
-function getReadiness(contact) {
-  const hasEmail = !!(contact.email || contact.work_email);
-  const hasPhone = !!(contact.phone_mobile || contact.phone_direct || contact.phone);
-  const hasLinkedIn = !!contact.linkedin_url;
-  if (hasEmail && hasPhone && hasLinkedIn) return 'ready';
-  if (hasEmail) return 'partial';
-  return 'needs-enrichment';
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function getLeadStatus(contact) {
+  const s = contact.contact_status || contact.lead_status || contact.status;
+  if (!s || s === 'saved' || s === 'pending_enrichment' || s === 'active' || s === 'exported') return 'not_contacted';
+  if (s === 'contacted' || s === 'engaged') return 'engaged';
+  if (s === 'awaiting_reply') return 'awaiting_reply';
+  if (s === 'in_pipeline') return 'in_pipeline';
+  if (s === 'snoozed') return 'snoozed';
+  if (s === 'follow_up') return 'follow_up';
+  return 'not_contacted';
 }
 
 function formatRelativeTime(dateStr) {
@@ -40,135 +57,371 @@ function formatRelativeTime(dateStr) {
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return null;
   const now = new Date();
-  const diffMs = now - date;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return 'yesterday';
+  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays}d ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-  return date.toLocaleDateString();
+  return `${Math.floor(diffDays / 30)}mo ago`;
 }
 
-function getLastTouched(contact) {
-  // Check activity log for latest event
-  if (contact.activity_log && contact.activity_log.length > 0) {
-    const sorted = [...contact.activity_log].sort((a, b) =>
-      new Date(b.timestamp) - new Date(a.timestamp)
-    );
-    const latest = sorted[0];
+function getLastAction(contact) {
+  if (contact.activity_log?.length > 0) {
+    const latest = [...contact.activity_log].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
     const time = formatRelativeTime(latest.timestamp);
-    if (time) {
-      const labels = {
-        enriched: 'Enriched',
-        email_sent: 'Emailed',
-        email_drafted: 'Drafted email',
-        note_added: 'Note added',
-        profile_viewed: 'Viewed',
-        contact_created: 'Added',
-        status_changed: 'Updated'
-      };
-      return `${labels[latest.type] || 'Activity'} ${time}`;
-    }
-  }
-  if (contact.last_enriched_at) {
-    const time = formatRelativeTime(contact.last_enriched_at);
-    if (time) return `Enriched ${time}`;
+    if (time) return time;
   }
   const savedAt = contact.saved_at || contact.addedAt;
   if (savedAt) {
     const time = formatRelativeTime(typeof savedAt === 'object' && savedAt.toDate ? savedAt.toDate().toISOString() : savedAt);
     if (time) return `Added ${time}`;
   }
-  return null;
+  return 'New';
 }
 
-// ── Brigade Lenses ───────────────────────────────────────
-
-const BRIGADE_LENSES = [
-  { id: 'all', label: 'All People', icon: Users },
-  { id: 'leads', label: 'Leads', icon: Target },
-  { id: 'customers', label: 'Customers', icon: UserCheck },
-  { id: 'partners', label: 'Partners', icon: Handshake },
-  { id: 'network', label: 'Network', icon: Network },
-  { id: 'referrals', label: 'Referrals', icon: Gift }
-];
+function getInitials(name) {
+  if (!name) return '??';
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
 
 function getBrigadeType(contact) {
-  // Explicit brigade field takes priority
   const b = contact.brigade;
-  if (b) return b;
-  // Fallback to relationship_type
+  if (b) return b.toLowerCase();
   const rt = contact.relationship_type;
   if (rt === 'partner') return 'partners';
   if (rt === 'known') return 'network';
-  // Fallback to status-based inference
   const status = contact.contact_status || contact.lead_status || contact.status;
   if (status === 'converted' || status === 'customer') return 'customers';
   if (status === 'referred') return 'referrals';
-  // Default: leads (prospect)
   return 'leads';
 }
 
-function filterByBrigade(contacts, brigadeId) {
-  if (brigadeId === 'all') return contacts;
-  return contacts.filter(c => getBrigadeType(c) === brigadeId);
+const STATUS_LABELS = {
+  not_contacted:  'NOT CONTACTED',
+  engaged:        'ENGAGED',
+  awaiting_reply: 'AWAITING REPLY',
+  in_pipeline:    'IN PIPELINE',
+  snoozed:        'SNOOZED',
+  follow_up:      'FOLLOW UP',
+};
+
+// ─── StatusBadge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status, small }) {
+  const sc = STATUS_COLORS[status] || STATUS_COLORS.not_contacted;
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: small ? '1px 7px' : '3px 10px', borderRadius: 20,
+      background: sc.bg, color: sc.c, border: `1px solid ${sc.border}`,
+      fontSize: small ? 9 : 10, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap',
+    }}>
+      {STATUS_LABELS[status] || status?.toUpperCase()}
+    </span>
+  );
 }
 
-// ── Component ────────────────────────────────────────────
+// ─── Av (initials avatar) ─────────────────────────────────────────────────────
+function Av({ initials, color = BRAND.pink, size = 36 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: `${color}20`, border: `1.5px solid ${color}50`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.3, fontWeight: 700, color, flexShrink: 0,
+    }}>
+      {initials}
+    </div>
+  );
+}
 
+// ─── Person Modal ─────────────────────────────────────────────────────────────
+function PersonModal({ contact, company, onClose, onOpenProfile }) {
+  const T = useT();
+  const color = BRAND.pink;
+  const email = contact.email || contact.work_email;
+  const emailVerified = contact.email_status === 'verified';
+  const phone = contact.phone_mobile || contact.phone_direct || contact.phone;
+  const status = getLeadStatus(contact);
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: '#00000099', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: T.modalBg, borderRadius: 22, overflow: 'hidden', width: '100%', maxWidth: 480, boxShadow: `0 40px 100px ${T.isDark ? '#000000cc' : '#00000030'}`, animation: 'slideUp 0.2s ease' }}
+      >
+        {/* Hero header */}
+        <div style={{ position: 'relative', height: 188, background: `linear-gradient(150deg,${color}44,${T.cardBg2} 80%)`, display: 'flex', alignItems: 'flex-end', padding: '0 22px 16px' }}>
+          <button
+            onClick={onClose}
+            style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: '50%', background: '#00000060', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          ><X size={15} /></button>
+          <Av initials={getInitials(contact.name)} color={color} size={60} />
+          <div style={{ marginLeft: 14 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{contact.name}</div>
+            <div style={{ fontSize: 13, color: '#ffffff90' }}>{contact.title}{company?.name ? ` · ${company.name}` : ''}</div>
+          </div>
+        </div>
+
+        <div style={{ padding: '14px 22px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 13 }}>
+            <StatusBadge status={status} />
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+            <button style={{ padding: 11, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <Rocket size={15} />Start Campaign
+            </button>
+            <button
+              onClick={() => contact && downloadVCard && downloadVCard(contact)}
+              style={{ padding: 11, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            ><Phone size={15} />Save to Phone</button>
+          </div>
+
+          {/* Contact info */}
+          <div style={{ borderTop: `1px solid ${T.modalLine}`, paddingTop: 13, marginBottom: 13 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.modalText, marginBottom: 10 }}>Contact Information</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8, fontSize: 13 }}>
+              <Mail size={15} color={T.textFaint} />
+              {email ? (
+                <>
+                  <span style={{ color: BRIGADE.blue }}>{email}</span>
+                  {emailVerified && <span style={{ fontSize: 9, color: STATUS.green, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}30`, borderRadius: 10, padding: '2px 7px', marginLeft: 6 }}>✓ VERIFIED</span>}
+                </>
+              ) : (
+                <span style={{ color: T.textFaint }}>No email found</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8, fontSize: 13, color: T.textFaint }}>
+              <Phone size={15} />{phone || 'Phone not available'}
+            </div>
+            {contact.linkedin_url && (
+              <div
+                onClick={() => window.open(contact.linkedin_url, '_blank')}
+                style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: BRIGADE.blue, cursor: 'pointer' }}
+              ><Linkedin size={15} />View LinkedIn Profile →</div>
+            )}
+          </div>
+
+          {/* Barry context */}
+          {contact.barryContext && (
+            <div style={{ borderTop: `1px solid ${T.modalLine}`, paddingTop: 13, marginBottom: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <BarryAvatar size={22} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.modalText }}>Context by Barry</div>
+              </div>
+              <div style={{ fontSize: 12, color: T.modalMuted, lineHeight: 1.6, background: T.statBg, borderRadius: 9, padding: '10px 12px', border: `1px solid ${T.modalBdr}` }}>
+                {contact.barryContext}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={onOpenProfile}
+            style={{ width: '100%', padding: 12, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          ><ExternalLink size={16} />Open Full Profile</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AllLeadsCard ─────────────────────────────────────────────────────────────
+function AllLeadsCard({ contact, company, onClick }) {
+  const T = useT();
+  const color = BRAND.pink;
+  const email = contact.email || contact.work_email;
+  const status = getLeadStatus(contact);
+
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = T.borderHov; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = T.border; }}
+    >
+      <div style={{ height: 128, background: `linear-gradient(155deg,${color}30,${T.cardBg} 75%)`, position: 'relative', display: 'flex', alignItems: 'flex-end', padding: '0 13px 11px' }}>
+        <div style={{ position: 'absolute', top: 9, right: 9 }}>
+          <StatusBadge status={status} small />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 9 }}>
+          <Av initials={getInitials(contact.name)} color={color} size={40} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.isDark ? '#fff' : T.text }}>{contact.name}</div>
+            <div style={{ fontSize: 11, color: T.isDark ? '#bbb' : T.textMuted }}>{contact.title}</div>
+            <div style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '1px 6px', display: 'inline-block', marginTop: 2, fontWeight: 700 }}>
+              {company?.name || contact.company_name || ''}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: '9px 13px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, fontSize: 11 }}>
+          <Mail size={12} color={T.textFaint} />
+          {email ? (
+            <span style={{ color: BRIGADE.blue, fontSize: 11 }}>{email}</span>
+          ) : (
+            <>
+              <span style={{ color: T.textFaint }}>No email found</span>
+              <span style={{ marginLeft: 'auto', fontSize: 9, color: BRAND.pink, background: T.accentBg, borderRadius: 5, padding: '1px 6px', cursor: 'pointer' }}>✦ Enrich</span>
+            </>
+          )}
+        </div>
+        <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 9, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Clock size={11} color={T.textFaint} />{getLastAction(contact)}
+        </div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <button style={{ flex: 1, padding: 5, borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
+            Engage
+          </button>
+          {!email && (
+            <button style={{ padding: '5px 9px', borderRadius: 7, border: `1px solid ${T.accentBdr}`, background: T.accentBg, color: BRAND.pink, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>✦</button>
+          )}
+          {contact.linkedin_url && (
+            <button
+              onClick={e => { e.stopPropagation(); window.open(contact.linkedin_url, '_blank'); }}
+              style={{ padding: '5px 9px', borderRadius: 7, border: `1px solid #0077b540`, background: '#0077b510', color: BRIGADE.blue, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            ><Linkedin size={11} /></button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AllLeadsRow (Gmail-style) ────────────────────────────────────────────────
+function AllLeadsRow({ contact, company, selected, onClick }) {
+  const T = useT();
+  const color = BRAND.pink;
+  const email = contact.email || contact.work_email;
+  const status = getLeadStatus(contact);
+
+  return (
+    <div
+      onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 15px', borderBottom: `1px solid ${T.border}`, cursor: 'pointer', background: selected ? T.rowSel : 'transparent', borderLeft: `2px solid ${selected ? BRAND.pink : 'transparent'}`, transition: 'all 0.1s' }}
+      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = T.rowHov; }}
+      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+    >
+      <Av initials={getInitials(contact.name)} color={color} size={30} />
+      <div style={{ width: 128, flexShrink: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
+        <div style={{ fontSize: 9, color, fontWeight: 700 }}>{company?.name || contact.company_name || ''}</div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', whiteSpace: 'nowrap' }}>{contact.title}</span>
+      </div>
+      <StatusBadge status={status} small />
+      <div style={{ width: 52, flexShrink: 0, textAlign: 'right' }}>
+        {email ? <Mail size={12} color={BRIGADE.blue} /> : <span style={{ fontSize: 10, color: T.textFaint }}>—</span>}
+      </div>
+      <div style={{ width: 80, flexShrink: 0, textAlign: 'right', fontSize: 10, color: T.textFaint }}>
+        {getLastAction(contact)}
+      </div>
+    </div>
+  );
+}
+
+// ─── Brigade config ───────────────────────────────────────────────────────────
+const BRIGADE_LENSES = [
+  { id: 'all',      label: 'All People', Icon: Users       },
+  { id: 'leads',    label: 'Leads',      Icon: Target      },
+  { id: 'customers',label: 'Customers',  Icon: UserCheck   },
+  { id: 'partners', label: 'Partners',   Icon: Handshake   },
+  { id: 'network',  label: 'Network',    Icon: Network     },
+  { id: 'referrals',label: 'Referrals',  Icon: Gift        },
+];
+
+// ─── Contact Profile (full page, embedded) ───────────────────────────────────
+function ContactProfileView({ contactId, onBack }) {
+  const T = useT();
+  const navigate = useNavigate();
+  const [contact, setContact] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        // Try to get from Firestore
+        const { doc: docFn, getDoc } = await import('firebase/firestore');
+        const snap = await getDoc(docFn(db, 'users', user.uid, 'contacts', contactId));
+        if (snap.exists()) setContact({ id: snap.id, ...snap.data() });
+      } catch (e) {
+        console.error('ContactProfileView load error:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [contactId]);
+
+  if (loading) {
+    return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textMuted, fontSize: 13 }}>Loading...</div>;
+  }
+
+  if (!contact) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 13, color: T.textMuted }}>Contact not found.</div>
+        <button onClick={onBack} style={{ padding: '7px 16px', borderRadius: 8, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer' }}>← Back</button>
+      </div>
+    );
+  }
+
+  // Navigate to full profile page
+  useEffect(() => {
+    navigate(`/scout/contact/${contactId}`);
+  }, [contactId]);
+
+  return null;
+}
+
+// ─── AllLeads ─────────────────────────────────────────────────────────────────
 export default function AllLeads() {
+  const T = useT();
   const navigate = useNavigate();
 
-  // Core data
+  // Data
   const [contacts, setContacts] = useState([]);
   const [companies, setCompanies] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Filters & sort
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('date');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [statusFilter, setStatusFilter] = useState('active');
-  const [dataFilter, setDataFilter] = useState(null);
+  // UI
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
   const [brigadeFilter, setBrigadeFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dataFilter, setDataFilter] = useState(null);
 
-  // Selection & interaction
-  const [selectedContact, setSelectedContact] = useState(null);
-  const [hunterContact, setHunterContact] = useState(null);
-  const [selectedContactIds, setSelectedContactIds] = useState([]);
-  const [menuOpenFor, setMenuOpenFor] = useState(null);
-  const [statusUpdateLoading, setStatusUpdateLoading] = useState(null);
-  const [bucketPopoverOpen, setBucketPopoverOpen] = useState(false);
+  // Modal / profile
+  const [modal, setModal] = useState(null);
+  const [listSelected, setListSelected] = useState(null);
+  const [openProfileId, setOpenProfileId] = useState(null);
 
-  // ── Data Loading ─────────────────────────────────────
+  const listRef = useRef(null);
+  const [listScrollPos, setListScrollPos] = useState(0);
 
   useEffect(() => { loadAllContacts(); }, []);
-
-  // Close three-dot menu and bucket popover on outside click
-  useEffect(() => {
-    if (!menuOpenFor && !bucketPopoverOpen) return;
-    function handleClick(e) {
-      if (menuOpenFor && !e.target.closest('.card-menu')) setMenuOpenFor(null);
-      if (bucketPopoverOpen && !e.target.closest('.bulk-bucket-wrapper')) setBucketPopoverOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpenFor, bucketPopoverOpen]);
 
   async function loadAllContacts() {
     try {
       const user = auth.currentUser;
       if (!user) { navigate('/login'); return; }
-
-      const userId = user.uid;
-      const companiesSnapshot = await getDocs(collection(db, 'users', userId, 'companies'));
+      const companiesSnapshot = await getDocs(collection(db, 'users', user.uid, 'companies'));
       const companiesMap = {};
       companiesSnapshot.docs.forEach(d => { companiesMap[d.id] = d.data(); });
       setCompanies(companiesMap);
-
-      const contactsSnapshot = await getDocs(collection(db, 'users', userId, 'contacts'));
-      const contactsList = contactsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const contactsSnapshot = await getDocs(collection(db, 'users', user.uid, 'contacts'));
+      const contactsList = contactsSnapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => {
+          const s = c.status || '';
+          return !['people_mode_archived', 'people_mode_skipped'].includes(s);
+        });
       setContacts(contactsList);
       setLoading(false);
     } catch (error) {
@@ -177,956 +430,224 @@ export default function AllLeads() {
     }
   }
 
-  // ── Status Management ────────────────────────────────
-
-  async function handleStatusChange(contactId, newStatus) {
-    setStatusUpdateLoading(contactId);
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // Get current status before updating
-      const currentContact = contacts.find(c => c.id === contactId);
-      const previousStatus = getLeadStatus(currentContact);
-
-      const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
-      await updateDoc(contactRef, {
-        lead_status: newStatus,
-        updated_at: new Date().toISOString(),
-        activity_log: arrayUnion({
-          type: 'status_changed',
-          to: newStatus,
-          timestamp: new Date().toISOString(),
-          details: `Lead status changed to ${newStatus}`
-        })
-      });
-
-      // Log timeline event: lead_status_changed
-      logTimelineEvent({
-        userId: user.uid,
-        contactId,
-        type: 'lead_status_changed',
-        actor: ACTORS.USER,
-        preview: `${previousStatus} → ${newStatus}`,
-        metadata: {
-          statusFrom: previousStatus,
-          statusTo: newStatus
-        }
-      });
-
-      setContacts(prev => prev.map(c =>
-        c.id === contactId ? { ...c, lead_status: newStatus } : c
-      ));
-      setMenuOpenFor(null);
-    } catch (error) {
-      console.error('Failed to update status:', error);
-    } finally {
-      setStatusUpdateLoading(null);
-    }
-  }
-
-  async function handleBulkStatusChange(newStatus) {
-    if (selectedContactIds.length === 0) return;
-    setStatusUpdateLoading('bulk');
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-      const promises = selectedContactIds.map(id => {
-        const ref = doc(db, 'users', user.uid, 'contacts', id);
-        return updateDoc(ref, {
-          lead_status: newStatus,
-          updated_at: new Date().toISOString(),
-          activity_log: arrayUnion({
-            type: 'status_changed',
-            to: newStatus,
-            timestamp: new Date().toISOString(),
-            details: `Lead ${newStatus} via bulk action`
-          })
-        });
-      });
-      await Promise.all(promises);
-
-      // Log timeline event: lead_status_changed for each contact in bulk
-      selectedContactIds.forEach(contactId => {
-        const currentContact = contacts.find(c => c.id === contactId);
-        const previousStatus = getLeadStatus(currentContact);
-        logTimelineEvent({
-          userId: user.uid,
-          contactId,
-          type: 'lead_status_changed',
-          actor: ACTORS.USER,
-          preview: `${previousStatus} → ${newStatus}`,
-          metadata: {
-            statusFrom: previousStatus,
-            statusTo: newStatus,
-            bulkAction: true
-          }
-        });
-      });
-
-      setContacts(prev => prev.map(c =>
-        selectedContactIds.includes(c.id) ? { ...c, lead_status: newStatus } : c
-      ));
-      setSelectedContactIds([]);
-    } catch (error) {
-      console.error('Failed to bulk update status:', error);
-    } finally {
-      setStatusUpdateLoading(null);
-    }
-  }
-
-  // ── Bulk Bucket Assignment ─────────────────────────
-
-  async function handleBulkBucketAssign(bucketId) {
-    if (selectedContactIds.length === 0) return;
-    setBucketPopoverOpen(false);
-    setStatusUpdateLoading('bulk');
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-      const promises = selectedContactIds.map(id => {
-        const ref = doc(db, 'users', user.uid, 'contacts', id);
-        return updateDoc(ref, {
-          game_bucket: bucketId,
-          updated_at: new Date().toISOString()
-        });
-      });
-      await Promise.all(promises);
-
-      setContacts(prev => prev.map(c =>
-        selectedContactIds.includes(c.id) ? { ...c, game_bucket: bucketId } : c
-      ));
-      setSelectedContactIds([]);
-    } catch (error) {
-      console.error('Failed to bulk assign bucket:', error);
-    } finally {
-      setStatusUpdateLoading(null);
-    }
-  }
-
-  async function handleBulkBucketRemove() {
-    if (selectedContactIds.length === 0) return;
-    setBucketPopoverOpen(false);
-    setStatusUpdateLoading('bulk');
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-      const promises = selectedContactIds.map(id => {
-        const ref = doc(db, 'users', user.uid, 'contacts', id);
-        return updateDoc(ref, {
-          game_bucket: null,
-          updated_at: new Date().toISOString()
-        });
-      });
-      await Promise.all(promises);
-
-      setContacts(prev => prev.map(c =>
-        selectedContactIds.includes(c.id) ? { ...c, game_bucket: null } : c
-      ));
-      setSelectedContactIds([]);
-    } catch (error) {
-      console.error('Failed to remove bucket assignment:', error);
-    } finally {
-      setStatusUpdateLoading(null);
-    }
-  }
-
-  // ── Contact Status (State Machine) ─────────────────
-
-  async function handleMarkComplete(contactId) {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const contact = contacts.find(c => c.id === contactId);
-      await updateContactStatus({
-        userId: user.uid,
-        contactId,
-        trigger: STATUS_TRIGGERS.MANUAL_COMPLETE,
-        currentStatus: getContactStatus(contact)
-      });
-
-      // Update local state
-      setContacts(prev => prev.map(c =>
-        c.id === contactId ? { ...c, contact_status: CONTACT_STATUSES.MISSION_COMPLETE } : c
-      ));
-      setMenuOpenFor(null);
-    } catch (error) {
-      console.error('Failed to mark complete:', error);
-    }
-  }
-
-  // ── Contact Updates ──────────────────────────────────
-
-  function handleContactUpdate(updatedContact) {
-    setContacts(prev =>
-      prev.map(c => c.id === updatedContact.id ? { ...c, ...updatedContact } : c)
-    );
-    setSelectedContact(null);
-  }
-
-  // ── Selection ────────────────────────────────────────
-
-  function toggleContactSelection(contactId, e) {
-    e.stopPropagation();
-    setSelectedContactIds(prev =>
-      prev.includes(contactId) ? prev.filter(id => id !== contactId) : [...prev, contactId]
-    );
-  }
-
-  function toggleSelectAll() {
-    if (selectedContactIds.length === finalContacts.length) {
-      setSelectedContactIds([]);
-    } else {
-      setSelectedContactIds(finalContacts.map(c => c.id));
-    }
-  }
-
-  // ── Actions ──────────────────────────────────────────
-
-  function handleStartMission(contactIds) {
-    navigate(`/hunter/create?contactIds=${contactIds.join(',')}`);
-  }
-
-  function handleCardClick(contact) {
-    setSelectedContact(contact);
-  }
-
-  function exportToCSV(contactsToExport) {
-    const list = contactsToExport || finalContacts;
+  function exportToCSV() {
+    const list = finalContacts;
     if (list.length === 0) return;
-
-    const headers = [
-      'Name', 'Title', 'Company', 'Email', 'Email Status', 'Email Confidence',
-      'Mobile Phone', 'Direct Line', 'Work Phone', 'LinkedIn',
-      'Seniority', 'Department', 'Lead Status', 'Added Date', 'Last Enriched'
-    ];
-
-    const rows = list.map(contact => {
-      const company = companies[contact.company_id];
-      return [
-        contact.name || '', contact.title || '', company?.name || '',
-        contact.email || '', contact.email_status || '', contact.email_confidence || '',
-        contact.phone_mobile || '', contact.phone_direct || '', contact.phone_work || '',
-        contact.linkedin_url || '', contact.seniority || '',
-        contact.departments?.[0] || contact.department || '',
-        getLeadStatus(contact),
-        contact.saved_at ? new Date(contact.saved_at).toLocaleDateString() : '',
-        contact.last_enriched_at ? new Date(contact.last_enriched_at).toLocaleDateString() : ''
-      ].map(f => `"${f}"`).join(',');
+    const headers = ['Name', 'Title', 'Company', 'Email', 'Phone', 'LinkedIn'];
+    const rows = list.map(c => {
+      const co = companies[c.company_id];
+      return [c.name || '', c.title || '', co?.name || c.company_name || '', c.email || c.work_email || '', c.phone_mobile || c.phone_direct || c.phone || '', c.linkedin_url || ''].map(f => `"${f}"`).join(',');
     });
-
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `scout-leads-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `all-leads-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   }
 
-  // ── Computed Data ────────────────────────────────────
-
-  // Status counts (across ALL contacts)
-  const statusCounts = contacts.reduce((acc, c) => {
-    const s = getLeadStatus(c);
-    acc[s] = (acc[s] || 0) + 1;
-    return acc;
-  }, { active: 0, engaged: 0, archived: 0, converted: 0 });
-
-  // Filter pipeline
+  // ── Computed ─────────────────────────────────────────────────────────────────
   let filtered = contacts;
 
-  // 0. Brigade lens filter
-  filtered = filterByBrigade(filtered, brigadeFilter);
+  // Brigade filter
+  if (brigadeFilter !== 'all') filtered = filtered.filter(c => getBrigadeType(c) === brigadeFilter);
 
-  // 1. Status filter
-  filtered = filtered.filter(c => getLeadStatus(c) === statusFilter);
+  // Data filter
+  if (dataFilter === 'has-email') filtered = filtered.filter(c => !!(c.email || c.work_email));
+  else if (dataFilter === 'needs-email') filtered = filtered.filter(c => !(c.email || c.work_email));
+  else if (dataFilter === 'needs-phone') filtered = filtered.filter(c => !(c.phone_mobile || c.phone_direct || c.phone));
 
-  // 2. Data filter
-  if (dataFilter === 'needs-email') {
-    filtered = filtered.filter(c => !(c.email || c.work_email));
-  } else if (dataFilter === 'has-email') {
-    filtered = filtered.filter(c => !!(c.email || c.work_email));
-  } else if (dataFilter === 'needs-phone') {
-    filtered = filtered.filter(c => !(c.phone_mobile || c.phone_direct || c.phone));
-  }
-
-  // 3. Search filter
+  // Search
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
     filtered = filtered.filter(c => {
-      const company = companies[c.company_id];
-      return (
-        (c.name || '').toLowerCase().includes(lower) ||
+      const co = companies[c.company_id];
+      return (c.name || '').toLowerCase().includes(lower) ||
         (c.title || '').toLowerCase().includes(lower) ||
-        (company?.name || '').toLowerCase().includes(lower) ||
-        (c.email || '').toLowerCase().includes(lower)
-      );
+        (co?.name || c.company_name || '').toLowerCase().includes(lower) ||
+        (c.email || '').toLowerCase().includes(lower);
     });
   }
 
-  // 4. Sort
-  const finalContacts = [...filtered].sort((a, b) => {
-    let cmp = 0;
-    if (sortBy === 'readiness') {
-      const order = { 'ready': 3, 'partial': 2, 'needs-enrichment': 1 };
-      cmp = (order[getReadiness(a)] || 0) - (order[getReadiness(b)] || 0);
-    } else if (sortBy === 'name') {
-      cmp = (a.name || '').localeCompare(b.name || '');
-    } else if (sortBy === 'company') {
-      cmp = (companies[a.company_id]?.name || '').localeCompare(companies[b.company_id]?.name || '');
-    } else if (sortBy === 'date') {
-      const dateA = a.saved_at || a.addedAt || a.created_at || '';
-      const dateB = b.saved_at || b.addedAt || b.created_at || '';
-      cmp = String(dateA).localeCompare(String(dateB));
-    } else if (sortBy === 'email-quality') {
-      const order = { 'verified': 3, 'likely': 2, 'unverified': 1 };
-      cmp = (order[a.email_status] || 0) - (order[b.email_status] || 0);
-    }
-    return sortOrder === 'asc' ? cmp : -cmp;
-  });
+  const finalContacts = filtered;
 
-  // KPIs (pipeline = non-archived)
-  const pipelineContacts = contacts.filter(c => getLeadStatus(c) !== 'archived');
-  const totalPipeline = pipelineContacts.length;
-  const uniqueCompanies = new Set(pipelineContacts.map(c => c.company_id)).size;
-  const withEmail = pipelineContacts.filter(c => c.email || c.work_email).length;
-  const verifiedEmails = pipelineContacts.filter(c => c.email_status === 'verified').length;
-  const withPhone = pipelineContacts.filter(c => c.phone_mobile || c.phone_direct || c.phone).length;
+  // Stats
+  const totalPipeline = contacts.length;
+  const uniqueCompanies = new Set(contacts.map(c => c.company_id)).size;
+  const withEmail = contacts.filter(c => c.email || c.work_email).length;
+  const withPhone = contacts.filter(c => c.phone_mobile || c.phone_direct || c.phone).length;
   const emailRate = totalPipeline > 0 ? Math.round((withEmail / totalPipeline) * 100) : 0;
   const phoneRate = totalPipeline > 0 ? Math.round((withPhone / totalPipeline) * 100) : 0;
-  const needsEnrichmentCount = pipelineContacts.filter(c => !(c.email || c.work_email)).length;
 
-  // ── Render ───────────────────────────────────────────
+  // Brigade counts
+  const brigadeCounts = BRIGADE_LENSES.reduce((acc, lens) => {
+    acc[lens.id] = lens.id === 'all' ? contacts.length : contacts.filter(c => getBrigadeType(c) === lens.id).length;
+    return acc;
+  }, {});
 
   if (loading) {
     return (
-      <div className="all-leads-loading">
-        <div className="loading-spinner" />
-        <p className="loading-text">Loading your pipeline...</p>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textMuted, fontSize: 13, flexDirection: 'column', gap: 12 }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${BRAND.pink}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+        <p style={{ margin: 0 }}>Loading your pipeline...</p>
+        <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
       </div>
     );
   }
 
   if (contacts.length === 0) {
     return (
-      <div className="empty-state">
-        <div className="empty-icon">
-          <Users className="w-16 h-16 text-gray-400" />
-        </div>
-        <h2>No Contacts Yet</h2>
-        <p>Contacts you select from companies will appear here</p>
-        <p className="empty-hint">Go to Matched Companies and select contacts from your interested companies!</p>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, color: T.textMuted }}>
+        <Users size={48} color={T.textFaint} />
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>No Contacts Yet</h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
+          Accept companies in Daily Leads to start building your contact pipeline.
+        </p>
         <button
           onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-          className="empty-action-btn"
-        >
-          <Building2 className="w-5 h-5" />
-          <span>View Matched Companies</span>
-        </button>
+          style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+        ><Building2 size={14} />View Saved Companies</button>
       </div>
     );
   }
 
   return (
-    <div className="all-leads">
-      {/* ── Header ─────────────────────────────────── */}
-      <div className="enterprise-header">
-        <div className="header-content">
-          <h1 className="page-title">People</h1>
-          <p className="page-subtitle">Every relationship — one place. Context shifts with each lens.</p>
-        </div>
-      </div>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
 
-      {/* ── Brigade Lenses ──────────────────────────── */}
-      <div className="brigade-lenses">
-        {BRIGADE_LENSES.map(lens => {
-          const LensIcon = lens.icon;
-          const lensCount = lens.id === 'all'
-            ? contacts.length
-            : contacts.filter(c => getBrigadeType(c) === lens.id).length;
-          return (
-            <button
+      {/* ── Header ── */}
+      <div style={{ padding: '18px 22px 0', background: T.navBg, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>People</h2>
+            <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>Every relationship — one place.</div>
+          </div>
+          {/* View toggle */}
+          <div style={{ display: 'flex', gap: 4, background: T.surface, borderRadius: 8, padding: 3 }}>
+            {[['cards', '⊞ Cards'], ['list', '☰ List']].map(([m, l]) => (
+              <button
+                key={m}
+                onClick={() => setViewMode(m)}
+                style={{ padding: '5px 13px', borderRadius: 6, border: 'none', background: viewMode === m ? BRAND.pink : 'transparent', color: viewMode === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: viewMode === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+              >{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Brigade tabs */}
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginBottom: -1 }}>
+          {BRIGADE_LENSES.map(lens => (
+            <div
               key={lens.id}
-              className={`brigade-lens ${brigadeFilter === lens.id ? 'brigade-lens-active' : ''}`}
-              onClick={() => {
-                setBrigadeFilter(lens.id);
-                setSelectedContactIds([]);
-              }}
+              onClick={() => setBrigadeFilter(lens.id)}
+              style={{ padding: '7px 13px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: `2px solid ${brigadeFilter === lens.id ? BRAND.pink : 'transparent'}`, color: brigadeFilter === lens.id ? BRAND.pink : T.textMuted, background: brigadeFilter === lens.id ? T.accentBg : 'transparent' }}
             >
-              <LensIcon className="brigade-lens-icon" />
-              <span>{lens.label}</span>
-              <span className="brigade-lens-count">{lensCount}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── KPI Summary ────────────────────────────── */}
-      <div className="kpi-summary">
-        <div
-          className={`kpi-card ${!dataFilter ? 'kpi-active' : ''}`}
-          onClick={() => setDataFilter(null)}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="kpi-icon-wrapper">
-            <Users className="kpi-icon" />
-          </div>
-          <div className="kpi-content">
-            <p className="kpi-label">Pipeline</p>
-            <p className="kpi-value">{totalPipeline}</p>
-          </div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-icon-wrapper">
-            <Building2 className="kpi-icon" />
-          </div>
-          <div className="kpi-content">
-            <p className="kpi-label">Companies</p>
-            <p className="kpi-value">{uniqueCompanies}</p>
-          </div>
-        </div>
-
-        <div
-          className={`kpi-card ${dataFilter === 'needs-email' ? 'kpi-active' : ''}`}
-          onClick={() => {
-            setDataFilter(dataFilter === 'needs-email' ? null : 'needs-email');
-            if (statusFilter === 'archived') setStatusFilter('active');
-          }}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="kpi-icon-wrapper">
-            <Mail className="kpi-icon" />
-          </div>
-          <div className="kpi-content">
-            <p className="kpi-label">Email Coverage</p>
-            <p className="kpi-value">{emailRate}%</p>
-            <p className="kpi-detail">{verifiedEmails} verified &middot; {needsEnrichmentCount} need email</p>
-            <div className="kpi-progress-bar">
-              <div className="kpi-progress-fill" style={{ width: `${emailRate}%` }} />
+              {lens.label} {brigadeCounts[lens.id] > 0 ? brigadeCounts[lens.id] : ''}
             </div>
-          </div>
-        </div>
-
-        <div
-          className={`kpi-card ${dataFilter === 'needs-phone' ? 'kpi-active' : ''}`}
-          onClick={() => {
-            setDataFilter(dataFilter === 'needs-phone' ? null : 'needs-phone');
-            if (statusFilter === 'archived') setStatusFilter('active');
-          }}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="kpi-icon-wrapper">
-            <Phone className="kpi-icon" />
-          </div>
-          <div className="kpi-content">
-            <p className="kpi-label">Phone Coverage</p>
-            <p className="kpi-value">{phoneRate}%</p>
-            <p className="kpi-detail">{withPhone} contacts</p>
-            <div className="kpi-progress-bar">
-              <div className="kpi-progress-fill" style={{ width: `${phoneRate}%` }} />
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Status Tabs ────────────────────────────── */}
-      <div className="status-tabs">
+      {/* ── Stats row ── */}
+      <div style={{ padding: '10px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 9, overflowX: 'auto' }}>
         {[
-          { key: 'active', label: 'Active' },
-          { key: 'engaged', label: 'Engaged' },
-          { key: 'archived', label: 'Archived' },
-          { key: 'converted', label: 'Converted' }
-        ].map(tab => (
-          <button
-            key={tab.key}
-            className={`status-tab ${statusFilter === tab.key ? 'status-tab-active' : ''}`}
+          ['Pipeline', totalPipeline, null],
+          ['Companies', uniqueCompanies, null],
+          ['Email Coverage', `${emailRate}%`, dataFilter === 'has-email'],
+          ['Phone Coverage', `${phoneRate}%`, dataFilter === 'needs-phone'],
+        ].map(([l, v, active]) => (
+          <div
+            key={l}
             onClick={() => {
-              setStatusFilter(tab.key);
-              setSelectedContactIds([]);
-              setDataFilter(null);
+              if (l === 'Email Coverage') setDataFilter(d => d === 'has-email' ? null : 'has-email');
+              if (l === 'Phone Coverage') setDataFilter(d => d === 'needs-phone' ? null : 'needs-phone');
             }}
+            style={{ background: active ? T.accentBg : T.statBg, border: `1px solid ${active ? T.accentBdr : T.border}`, borderRadius: 9, padding: '9px 13px', flexShrink: 0, minWidth: 108, cursor: l.includes('Coverage') ? 'pointer' : 'default' }}
           >
-            {tab.label}
-            <span className="tab-count">{statusCounts[tab.key] || 0}</span>
-          </button>
+            <div style={{ fontSize: 9, color: T.textFaint }}>{l}</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: active ? BRAND.pink : T.text }}>{v}</div>
+          </div>
         ))}
       </div>
 
-      {/* ── Controls ───────────────────────────────── */}
-      <div className="controls-section">
-        <div className="search-input-wrapper">
-          <Search className="search-icon" />
+      {/* ── Search + filter chips + export ── */}
+      <div style={{ padding: '9px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 9 }}>
+        <div style={{ flex: 1, background: T.input, border: `1px solid ${T.border}`, borderRadius: 7, padding: '6px 11px', display: 'flex', gap: 7, alignItems: 'center' }}>
+          <Search size={13} color={T.textFaint} />
           <input
-            type="text"
-            className="search-input"
             placeholder="Search by name, title, company, or email..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 11, flex: 1 }}
           />
-          {searchTerm && (
-            <button className="clear-search-btn" onClick={() => setSearchTerm('')}>
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
-
-        <div className="sort-controls">
-          <select
-            className="sort-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="readiness">Sort by Readiness</option>
-            <option value="date">Sort by Date Added</option>
-            <option value="name">Sort by Name</option>
-            <option value="company">Sort by Company</option>
-            <option value="email-quality">Sort by Email Quality</option>
-          </select>
-
+        {/* Filter chips */}
+        {[['Has Email', 'has-email'], ['Needs Email', 'needs-email'], ['Needs Phone', 'needs-phone']].map(([label, id]) => (
           <button
-            className="sort-order-btn"
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-          >
-            {sortOrder === 'asc' ? '\u2191' : '\u2193'}
-          </button>
-
-          <button className="export-btn" onClick={() => exportToCSV()}>
-            <Download className="w-4 h-4" />
-            <span>Export CSV</span>
-          </button>
-        </div>
+            key={id}
+            onClick={() => setDataFilter(d => d === id ? null : id)}
+            style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter === id ? T.accentBdr : T.border}`, background: dataFilter === id ? T.accentBg : 'transparent', color: dataFilter === id ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >{label}</button>
+        ))}
+        <button
+          onClick={exportToCSV}
+          style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
+        ><Download size={12} />Export CSV</button>
       </div>
 
-      {/* ── Data Filter Chips ──────────────────────── */}
-      <div className="data-filters">
-        <button
-          className={`filter-chip ${dataFilter === 'has-email' ? 'filter-chip-active' : ''}`}
-          onClick={() => setDataFilter(dataFilter === 'has-email' ? null : 'has-email')}
-        >
-          <Mail className="w-3.5 h-3.5" /> Has Email
-        </button>
-        <button
-          className={`filter-chip filter-chip-warn ${dataFilter === 'needs-email' ? 'filter-chip-active' : ''}`}
-          onClick={() => setDataFilter(dataFilter === 'needs-email' ? null : 'needs-email')}
-        >
-          <Sparkles className="w-3.5 h-3.5" /> Needs Email
-          {needsEnrichmentCount > 0 && <span className="chip-count">{needsEnrichmentCount}</span>}
-        </button>
-        <button
-          className={`filter-chip ${dataFilter === 'needs-phone' ? 'filter-chip-active' : ''}`}
-          onClick={() => setDataFilter(dataFilter === 'needs-phone' ? null : 'needs-phone')}
-        >
-          <Phone className="w-3.5 h-3.5" /> Needs Phone
-        </button>
-        {dataFilter && (
-          <button className="filter-chip-clear" onClick={() => setDataFilter(null)}>
-            <X className="w-3.5 h-3.5" /> Clear Filter
-          </button>
+      {/* ── Content ── */}
+      <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 22px' }}>
+        {finalContacts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
+            <p style={{ fontSize: 13 }}>No contacts match your current filters.</p>
+          </div>
+        ) : viewMode === 'cards' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12 }}>
+            {finalContacts.map(c => (
+              <AllLeadsCard
+                key={c.id}
+                contact={c}
+                company={companies[c.company_id]}
+                onClick={() => setModal(c)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ background: T.navBg, borderRadius: 11, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '7px 15px', borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textFaint, letterSpacing: 1 }}>
+              <div style={{ width: 30 }} />
+              <div style={{ width: 128 }}>NAME</div>
+              <div style={{ flex: 1 }}>TITLE</div>
+              <div style={{ width: 130 }}>STATUS</div>
+              <div style={{ width: 52 }}>EMAIL</div>
+              <div style={{ width: 80, textAlign: 'right' }}>LAST ACTION</div>
+            </div>
+            {finalContacts.map(c => (
+              <AllLeadsRow
+                key={c.id}
+                contact={c}
+                company={companies[c.company_id]}
+                selected={c.id === listSelected}
+                onClick={() => { setListSelected(c.id); setModal(c); }}
+              />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* ── Bulk Actions Bar ───────────────────────── */}
-      {selectedContactIds.length > 0 && (
-        <div className="bulk-actions-bar">
-          <div className="bulk-left">
-            <span className="bulk-count">
-              {selectedContactIds.length} selected
-            </span>
-            <button className="bulk-clear" onClick={() => setSelectedContactIds([])}>
-              Clear
-            </button>
-          </div>
-          <div className="bulk-right">
-            {statusFilter === 'archived' ? (
-              <button
-                className="bulk-btn bulk-restore"
-                onClick={() => handleBulkStatusChange('active')}
-                disabled={statusUpdateLoading === 'bulk'}
-              >
-                <RotateCcw className="w-4 h-4" />
-                {statusUpdateLoading === 'bulk' ? 'Restoring...' : 'Restore'}
-              </button>
-            ) : (
-              <button
-                className="bulk-btn bulk-archive"
-                onClick={() => handleBulkStatusChange('archived')}
-                disabled={statusUpdateLoading === 'bulk'}
-              >
-                <Archive className="w-4 h-4" />
-                {statusUpdateLoading === 'bulk' ? 'Archiving...' : 'Archive'}
-              </button>
-            )}
-            {/* Bucket Assignment Popover */}
-            <div className="bulk-bucket-wrapper">
-              <button
-                className="bulk-btn bulk-bucket"
-                onClick={() => setBucketPopoverOpen(!bucketPopoverOpen)}
-                disabled={statusUpdateLoading === 'bulk'}
-              >
-                <Zap className="w-4 h-4" />
-                Assign Bucket
-              </button>
-              {bucketPopoverOpen && (
-                <div className="bucket-popover">
-                  {GAME_BUCKET_LIST.map(bucket => (
-                    <button
-                      key={bucket.id}
-                      className="bucket-popover-item"
-                      onClick={() => handleBulkBucketAssign(bucket.id)}
-                    >
-                      <span className="bucket-popover-emoji">{bucket.emoji}</span>
-                      <span>{bucket.label}</span>
-                    </button>
-                  ))}
-                  <div className="bucket-popover-divider" />
-                  <button
-                    className="bucket-popover-item bucket-popover-remove"
-                    onClick={handleBulkBucketRemove}
-                  >
-                    <X className="w-4 h-4" />
-                    <span>Remove from Bucket</span>
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              className="bulk-btn bulk-export"
-              onClick={() => {
-                const selected = finalContacts.filter(c => selectedContactIds.includes(c.id));
-                exportToCSV(selected);
-              }}
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            <button
-              className="bulk-btn bulk-engage"
-              onClick={() => handleStartMission(selectedContactIds)}
-            >
-              <Send className="w-4 h-4" />
-              Start Mission ({selectedContactIds.length})
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Results Count + Select All ─────────────── */}
-      <div className="results-bar">
-        <label className="select-all-label">
-          <input
-            type="checkbox"
-            checked={finalContacts.length > 0 && selectedContactIds.length === finalContacts.length}
-            onChange={toggleSelectAll}
-          />
-          <span>Select All</span>
-        </label>
-        <span className="results-count-text">
-          Showing {finalContacts.length} of {contacts.length} contacts
-          {searchTerm && ` matching "${searchTerm}"`}
-          {dataFilter && ` \u00B7 Filtered`}
-        </span>
-      </div>
-
-      {/* ── Archived Banner ────────────────────────── */}
-      {statusFilter === 'archived' && finalContacts.length > 0 && (
-        <div className="archived-banner">
-          <Archive className="w-4 h-4" />
-          <span>These leads are archived. You can restore them at any time.</span>
-        </div>
-      )}
-
-      {/* ── Contacts Grid ──────────────────────────── */}
-      <div className="leads-grid">
-        {finalContacts.map(contact => {
-          const company = companies[contact.company_id];
-          const isSelected = selectedContactIds.includes(contact.id);
-          const backgroundImage = contact.photo_url || '/barry.png';
-          const readiness = getReadiness(contact);
-          const hasEmail = !!(contact.email || contact.work_email);
-          const lastTouched = getLastTouched(contact);
-          const currentStatus = getLeadStatus(contact);
-          const isUpdating = statusUpdateLoading === contact.id;
-
-          return (
-            <div key={contact.id} className={`lead-card ${isSelected ? 'lead-card-selected' : ''}`}>
-              {/* ── Photo Section ──────────────────── */}
-              <div
-                className="lead-card-photo"
-                onClick={() => handleCardClick(contact)}
-                style={{ backgroundImage: `url(${backgroundImage})` }}
-              >
-                {/* Top Right: Checkbox + Menu */}
-                <div className="card-top-actions" onClick={e => e.stopPropagation()}>
-                  <div
-                    className={`card-checkbox ${isSelected ? 'card-checkbox-checked' : ''}`}
-                    onClick={(e) => toggleContactSelection(contact.id, e)}
-                  >
-                    {isSelected && <CheckCircle className="w-4 h-4" />}
-                  </div>
-
-                  {/* Three-dot menu */}
-                  <div className="card-menu">
-                    <button
-                      className="menu-trigger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMenuOpenFor(menuOpenFor === contact.id ? null : contact.id);
-                      }}
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                    {menuOpenFor === contact.id && (
-                      <div className="menu-dropdown">
-                        {currentStatus !== 'engaged' && (
-                          <button
-                            className="menu-item"
-                            onClick={() => handleStatusChange(contact.id, 'engaged')}
-                            disabled={isUpdating}
-                          >
-                            <Send className="w-4 h-4" /> Mark Engaged
-                          </button>
-                        )}
-                        {currentStatus !== 'converted' && (
-                          <button
-                            className="menu-item"
-                            onClick={() => handleStatusChange(contact.id, 'converted')}
-                            disabled={isUpdating}
-                          >
-                            <CheckCircle className="w-4 h-4" /> Mark Converted
-                          </button>
-                        )}
-                        <button
-                          className="menu-item"
-                          onClick={() => { downloadVCard(contact); setMenuOpenFor(null); }}
-                        >
-                          <Smartphone className="w-4 h-4" /> Save vCard
-                        </button>
-                        {getContactStatus(contact) !== CONTACT_STATUSES.MISSION_COMPLETE && (
-                          <button
-                            className="menu-item"
-                            onClick={() => handleMarkComplete(contact.id)}
-                            disabled={isUpdating}
-                          >
-                            <Flag className="w-4 h-4" /> Mark Complete
-                          </button>
-                        )}
-                        <div className="menu-divider" />
-                        {currentStatus === 'archived' ? (
-                          <button
-                            className="menu-item menu-restore"
-                            onClick={() => handleStatusChange(contact.id, 'active')}
-                            disabled={isUpdating}
-                          >
-                            <RotateCcw className="w-4 h-4" /> Restore Lead
-                          </button>
-                        ) : (
-                          <button
-                            className="menu-item menu-danger"
-                            onClick={() => handleStatusChange(contact.id, 'archived')}
-                            disabled={isUpdating}
-                          >
-                            <Archive className="w-4 h-4" /> Archive Lead
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Gradient + Contact Info */}
-                <div className="card-gradient-overlay">
-                  <p className="card-name">{contact.name || 'Unknown'}</p>
-                  <p className="card-title">{contact.title || 'Title not available'}</p>
-                  <div className="card-badges-row">
-                    {company?.name && (
-                      <span className="card-company-badge">{company.name}</span>
-                    )}
-                    <span className={`contact-status-badge contact-status-${getContactStatus(contact).toLowerCase().replace(/\s+/g, '-')}`}>
-                      {getContactStatus(contact)}
-                    </span>
-                    {contact.game_bucket && GAME_BUCKETS[contact.game_bucket] && (
-                      <span
-                        className="card-bucket-badge"
-                        style={{ borderColor: GAME_BUCKETS[contact.game_bucket].color, color: GAME_BUCKETS[contact.game_bucket].color }}
-                      >
-                        {GAME_BUCKETS[contact.game_bucket].emoji} {GAME_BUCKETS[contact.game_bucket].label}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Info Section ───────────────────── */}
-              <div className="lead-card-info">
-                {/* Email Row */}
-                {hasEmail ? (
-                  <div className="info-row">
-                    <Mail className="w-4 h-4 info-icon" />
-                    <a
-                      href={`mailto:${contact.email}`}
-                      onClick={e => e.stopPropagation()}
-                      className="info-email-link"
-                    >
-                      {contact.email}
-                    </a>
-                    {contact.email_status && (
-                      <span className={`email-status-pill email-status-${contact.email_status}`}>
-                        {contact.email_status}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="info-row info-row-missing">
-                    <Mail className="w-4 h-4 info-icon" />
-                    <span className="missing-label">No email found</span>
-                    <button
-                      className="enrich-inline-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/scout/contact/${contact.id}`);
-                      }}
-                    >
-                      <Sparkles className="w-3 h-3" /> Enrich
-                    </button>
-                  </div>
-                )}
-
-                {/* Phone Row */}
-                {(contact.phone_mobile || contact.phone_direct || contact.phone) ? (
-                  <div className="info-row">
-                    <Phone className="w-4 h-4 info-icon" />
-                    <a
-                      href={`tel:${contact.phone_mobile || contact.phone_direct || contact.phone}`}
-                      onClick={e => e.stopPropagation()}
-                      className="info-phone-link"
-                    >
-                      {contact.phone_mobile ? `M: ${contact.phone_mobile}` :
-                       contact.phone_direct ? `D: ${contact.phone_direct}` :
-                       contact.phone}
-                    </a>
-                  </div>
-                ) : (
-                  <div className="info-row info-row-missing">
-                    <Phone className="w-4 h-4 info-icon" />
-                    <span className="missing-label">No phone</span>
-                  </div>
-                )}
-
-                {/* Last Touched */}
-                {lastTouched && (
-                  <div className="info-row info-row-subtle">
-                    <Zap className="w-3.5 h-3.5 info-icon" />
-                    <span className="last-touched">{lastTouched}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Actions ────────────────────────── */}
-              <div className="lead-card-actions">
-                {/* Primary: Engage button */}
-                <button
-                  className="action-btn action-hunter"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setHunterContact(contact);
-                  }}
-                >
-                  <Target className="w-5 h-5" />
-                  <span>Engage</span>
-                </button>
-
-                {/* Enrich button if no email */}
-                {!hasEmail && (
-                  <button
-                    className="action-btn action-enrich-secondary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/scout/contact/${contact.id}`);
-                    }}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Enrich</span>
-                  </button>
-                )}
-
-                {/* Secondary: LinkedIn */}
-                {contact.linkedin_url && (
-                  <a
-                    href={contact.linkedin_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={e => e.stopPropagation()}
-                    className="action-btn action-linkedin"
-                  >
-                    <Linkedin className="w-4 h-4" />
-                  </a>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── No Results ─────────────────────────────── */}
-      {finalContacts.length === 0 && (
-        <div className="no-results">
-          {searchTerm ? (
-            <>
-              <Search className="w-12 h-12" style={{ color: '#9ca3af', marginBottom: '1rem' }} />
-              <h3>No contacts found</h3>
-              <p>No contacts match your search for &ldquo;{searchTerm}&rdquo;</p>
-              <button className="clear-btn" onClick={() => setSearchTerm('')}>Clear Search</button>
-            </>
-          ) : dataFilter ? (
-            <>
-              <Sparkles className="w-12 h-12" style={{ color: '#f59e0b', marginBottom: '1rem' }} />
-              <h3>No matching contacts</h3>
-              <p>No {statusFilter} contacts match the current filter.</p>
-              <button className="clear-btn" onClick={() => setDataFilter(null)}>Clear Filter</button>
-            </>
-          ) : (
-            <>
-              <CheckCircle className="w-12 h-12" style={{ color: '#10b981', marginBottom: '1rem' }} />
-              <h3>
-                {statusFilter === 'archived' && 'No archived leads'}
-                {statusFilter === 'engaged' && 'No engaged leads yet'}
-                {statusFilter === 'converted' && 'No converted leads yet'}
-                {statusFilter === 'active' && 'All clear'}
-              </h3>
-              <p>
-                {statusFilter === 'archived' && 'Leads you archive will appear here.'}
-                {statusFilter === 'engaged' && 'Mark leads as engaged when you start outreach.'}
-                {statusFilter === 'converted' && 'Mark leads as converted when they become customers.'}
-                {statusFilter === 'active' && 'No active leads found.'}
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Contact Snapshot Modal ─────────────────── */}
-      {selectedContact && (
-        <ContactSnapshot
-          contact={selectedContact}
-          onClose={() => setSelectedContact(null)}
-          onUpdate={handleContactUpdate}
-          context="leads"
-        />
-      )}
-
-      {/* ── Hunter Contact Drawer ──────────────────── */}
-      {hunterContact && (
-        <HunterContactDrawer
-          contact={hunterContact}
-          isOpen={!!hunterContact}
-          onClose={() => setHunterContact(null)}
-          onContactUpdate={handleContactUpdate}
+      {/* ── Person Modal ── */}
+      {modal && (
+        <PersonModal
+          contact={modal}
+          company={companies[modal.company_id]}
+          onClose={() => setModal(null)}
+          onOpenProfile={() => {
+            setModal(null);
+            navigate(`/scout/contact/${modal.id}`);
+          }}
         />
       )}
     </div>

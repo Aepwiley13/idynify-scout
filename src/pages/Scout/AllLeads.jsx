@@ -120,8 +120,22 @@ function StatusBadge({ status, small }) {
   );
 }
 
-// ─── Av (initials avatar) ─────────────────────────────────────────────────────
-function Av({ initials, color = BRAND.pink, size = 36 }) {
+// ─── Av (avatar — photo if available, else initials) ──────────────────────────
+function Av({ initials, color = BRAND.pink, size = 36, src }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  if (src && !imgFailed) {
+    return (
+      <img
+        src={src}
+        alt={initials}
+        onError={() => setImgFailed(true)}
+        style={{
+          width: size, height: size, borderRadius: '50%',
+          objectFit: 'cover', border: `1.5px solid ${color}50`, flexShrink: 0,
+        }}
+      />
+    );
+  }
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -158,7 +172,7 @@ function PersonModal({ contact, company, onClose, onOpenProfile }) {
             onClick={onClose}
             style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: '50%', background: '#00000060', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           ><X size={15} /></button>
-          <Av initials={getInitials(contact.name)} color={color} size={60} />
+          <Av initials={getInitials(contact.name)} color={color} size={60} src={contact.photo_url} />
           <div style={{ marginLeft: 14 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{contact.name}</div>
             <div style={{ fontSize: 13, color: '#ffffff90' }}>{contact.title}{company?.name ? ` · ${company.name}` : ''}</div>
@@ -248,7 +262,7 @@ function AllLeadsCard({ contact, company, onClick }) {
           <StatusBadge status={status} small />
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 9 }}>
-          <Av initials={getInitials(contact.name)} color={color} size={40} />
+          <Av initials={getInitials(contact.name)} color={color} size={40} src={contact.photo_url} />
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.isDark ? '#fff' : T.text }}>{contact.name}</div>
             <div style={{ fontSize: 11, color: T.isDark ? '#bbb' : T.textMuted }}>{contact.title}</div>
@@ -306,7 +320,7 @@ function AllLeadsRow({ contact, company, selected, onClick }) {
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = T.rowHov; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
     >
-      <Av initials={getInitials(contact.name)} color={color} size={30} />
+      <Av initials={getInitials(contact.name)} color={color} size={30} src={contact.photo_url} />
       <div style={{ width: 128, flexShrink: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
         <div style={{ fontSize: 9, color, fontWeight: 700 }}>{company?.name || contact.company_name || ''}</div>

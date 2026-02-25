@@ -58,7 +58,35 @@ export default function CompanyDetail() {
       setCompany(companyData);
 
       // Get selected titles
-      const titles = companyData.selected_titles || [];
+      let titles = companyData.selected_titles || [];
+
+      // If no titles saved, auto-populate from user's ICP targetTitles
+      if (titles.length === 0) {
+        try {
+          const icpDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
+          if (icpDoc.exists()) {
+            const icpTitles = icpDoc.data().targetTitles || [];
+            if (icpTitles.length > 0) {
+              titles = icpTitles.map((title, index) => ({
+                title,
+                rank: index + 1,
+                score: 100 - (index * 10),
+                source: 'icp',
+              }));
+              // Persist so they're saved to the company for next load
+              await updateDoc(doc(db, 'users', userId, 'companies', companyId), {
+                selected_titles: titles,
+                titles_source: 'icp_auto',
+                titles_updated_at: new Date().toISOString(),
+              });
+              console.log('🎯 Auto-loaded ICP titles:', titles.map(t => t.title));
+            }
+          }
+        } catch (icpErr) {
+          console.warn('⚠️ Could not load ICP titles:', icpErr);
+        }
+      }
+
       setSelectedTitles(titles);
 
       console.log('✅ Company loaded:', companyData.name);

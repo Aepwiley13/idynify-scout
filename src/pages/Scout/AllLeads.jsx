@@ -228,7 +228,12 @@ function PersonModal({ contact, company, onClose, onOpenProfile }) {
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.modalText }}>Context by Barry</div>
               </div>
               <div style={{ fontSize: 12, color: T.modalMuted, lineHeight: 1.6, background: T.statBg, borderRadius: 9, padding: '10px 12px', border: `1px solid ${T.modalBdr}` }}>
-                {contact.barryContext}
+                {typeof contact.barryContext === 'string'
+                  ? contact.barryContext
+                  : contact.barryContext?.whoYoureMeeting
+                    || contact.barryContext?.summary
+                    || contact.barryContext?.whatRoleCaresAbout
+                    || ''}
               </div>
             </div>
           )}
@@ -249,55 +254,63 @@ function AllLeadsCard({ contact, company, onClick }) {
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
   const status = getLeadStatus(contact);
+  const photo = contact.photo_url;
 
   return (
     <div
       onClick={onClick}
-      style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s' }}
+      style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column' }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = T.borderHov; }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = T.border; }}
     >
-      <div style={{ height: 128, background: `linear-gradient(155deg,${color}30,${T.cardBg} 75%)`, position: 'relative', display: 'flex', alignItems: 'flex-end', padding: '0 13px 11px' }}>
-        <div style={{ position: 'absolute', top: 9, right: 9 }}>
-          <StatusBadge status={status} small />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 9 }}>
-          <Av initials={getInitials(contact.name)} color={color} size={40} src={contact.photo_url} />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.isDark ? '#fff' : T.text }}>{contact.name}</div>
-            <div style={{ fontSize: 11, color: T.isDark ? '#bbb' : T.textMuted }}>{contact.title}</div>
-            <div style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '1px 6px', display: 'inline-block', marginTop: 2, fontWeight: 700 }}>
-              {company?.name || contact.company_name || ''}
+      {/* Photo area */}
+      <div style={{ position: 'relative', paddingTop: '90%' }}>
+        {photo ? (
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(155deg,${color}30,${T.cardBg2} 80%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${color}20`, border: `2px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color }}>
+              {getInitials(contact.name)}
             </div>
           </div>
+        )}
+        {/* Bottom gradient for text legibility */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 50%,transparent 100%)' }} />
+        {/* Status badge */}
+        <div style={{ position: 'absolute', top: 8, right: 8 }}>
+          <StatusBadge status={status} small />
+        </div>
+        {/* Name + title over gradient */}
+        <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>{contact.title}</div>
         </div>
       </div>
-      <div style={{ padding: '9px 13px 12px' }}>
+
+      {/* Info section */}
+      <div style={{ padding: '9px 12px 12px' }}>
+        <div style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '2px 7px', display: 'inline-block', marginBottom: 7, fontWeight: 700 }}>
+          {company?.name || contact.company_name || ''}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, fontSize: 11 }}>
           <Mail size={12} color={T.textFaint} />
           {email ? (
-            <span style={{ color: BRIGADE.blue, fontSize: 11 }}>{email}</span>
+            <span style={{ color: BRIGADE.blue, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{email}</span>
           ) : (
             <>
               <span style={{ color: T.textFaint }}>No email found</span>
-              <span style={{ marginLeft: 'auto', fontSize: 9, color: BRAND.pink, background: T.accentBg, borderRadius: 5, padding: '1px 6px', cursor: 'pointer' }}>✦ Enrich</span>
+              <span style={{ marginLeft: 'auto', fontSize: 9, color: BRAND.pink, background: T.accentBg, borderRadius: 5, padding: '1px 6px', cursor: 'pointer', flexShrink: 0 }}>✦ Enrich</span>
             </>
           )}
         </div>
-        <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 9, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Clock size={11} color={T.textFaint} />{getLastAction(contact)}
-        </div>
         <div style={{ display: 'flex', gap: 5 }}>
-          <button style={{ flex: 1, padding: 5, borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
+          <button style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
             Engage
           </button>
-          {!email && (
-            <button style={{ padding: '5px 9px', borderRadius: 7, border: `1px solid ${T.accentBdr}`, background: T.accentBg, color: BRAND.pink, fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>✦</button>
-          )}
           {contact.linkedin_url && (
             <button
               onClick={e => { e.stopPropagation(); window.open(contact.linkedin_url, '_blank'); }}
-              style={{ padding: '5px 9px', borderRadius: 7, border: `1px solid #0077b540`, background: '#0077b510', color: BRIGADE.blue, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              style={{ padding: '7px 9px', borderRadius: 7, border: `1px solid #0077b540`, background: '#0077b510', color: BRIGADE.blue, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
             ><Linkedin size={11} /></button>
           )}
         </div>

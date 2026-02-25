@@ -63,6 +63,7 @@ import LeadList from './components/LeadList';
 import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
 import ImpersonationBanner from './components/ImpersonationBanner';
 import MainLayout from './components/layout/MainLayout';
+import { ThemeProvider } from './theme/ThemeContext';
 
 // Hunter Pages
 import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
@@ -439,8 +440,10 @@ function App() {
         <Route
           path="/scout/contact/:contactId"
           element={
-            <ProtectedRoute withLayout={true}>
-              <ContactProfile />
+            <ProtectedRoute>
+              <ThemeProvider>
+                <ContactProfile />
+              </ThemeProvider>
             </ProtectedRoute>
           }
         />

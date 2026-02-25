@@ -87,7 +87,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
         } catch { /* non-fatal */ }
       }
       setSelectedTitles(titles);
-      if (titles.length > 0) searchContacts(titles);
+      // Pass `data` directly — React state (company) is not yet committed here
+      if (titles.length > 0) searchContacts(titles, data);
 
       if (data.apolloEnrichment) {
         setEnrichedData(data.apolloEnrichment);
@@ -157,8 +158,12 @@ export default function CompanyProfileView({ companyId, onBack }) {
   }
 
   // ── Title search ───────────────────────────────────────────────────────────
-  async function searchContacts(titles) {
-    if (!titles.length || !company) return;
+  // companyData is optional — pass it when calling before React has committed
+  // the setCompany() update (e.g. from loadCompany), where the `company` state
+  // variable may still be null due to async batching.
+  async function searchContacts(titles, companyData) {
+    const resolvedCompany = companyData || company;
+    if (!titles.length || !resolvedCompany) return;
     setSearchingContacts(true);
     setSearchResults([]);
     try {
@@ -169,7 +174,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid, authToken,
-          organizationId: company.apollo_organization_id,
+          organizationId: resolvedCompany.apollo_organization_id,
           titles: titles.map(t => t.title),
         }),
       });

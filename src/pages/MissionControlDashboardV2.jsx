@@ -77,8 +77,9 @@ export default function MissionControlDashboardV2() {
       }).length;
 
       // Check if user has completed ICP settings
-      const icpDoc = await getDoc(doc(db, 'users', userId, 'icp', 'settings'));
-      const hasICP = icpDoc.exists() && icpDoc.data().industry;
+      // ICP data is stored at users/{uid}/companyProfile/current (set by ICPSettings + BarryOnboarding)
+      const icpDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
+      const hasICP = icpDoc.exists() && (icpDoc.data().industries?.length > 0 || icpDoc.data().managedByBarry);
       setHasCompletedICP(hasICP);
 
       // Check if user has seen the welcome popup

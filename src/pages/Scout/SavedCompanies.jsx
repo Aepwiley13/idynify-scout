@@ -257,7 +257,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                   ><RotateCcw size={11} />Restore</button>
                 ) : (
                   <button
-                    onClick={e => { e.stopPropagation(); }}
+                    onClick={e => { e.stopPropagation(); handleCompanyClick(company); }}
                     style={{ padding: '5px 11px', borderRadius: 7, border: 'none', background: company.contact_count > 0 ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: company.contact_count > 0 ? T.cyan : '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
                   >
                     {company.contact_count > 0 ? 'View →' : 'Find Contacts'}

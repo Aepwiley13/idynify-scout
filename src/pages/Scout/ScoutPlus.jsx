@@ -5,9 +5,11 @@ import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
 import BusinessCardCapture from '../../components/scout/BusinessCardCapture';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
+import { useT } from '../../theme/ThemeContext';
 
 export default function ScoutPlus() {
   const navigate = useNavigate();
+  const T = useT();
   const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'success'
   const [addedItems, setAddedItems] = useState([]);
   const [lastUploadType, setLastUploadType] = useState(null); // 'leads' or 'companies'
@@ -45,18 +47,18 @@ export default function ScoutPlus() {
   };
 
   return (
-    <div className="min-h-full bg-white">
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: T.appBg, color: T.text }}>
       {/* Page Header */}
-      <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div style={{ borderBottom: `1px solid ${T.border}`, background: T.navBg, padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={currentView === 'menu' ? handleNavigateBack : handleBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
+            style={{ color: T.textMuted, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}
           >
             <ArrowLeft className="w-5 h-5" />
             {currentView !== 'menu' && <span>Back</span>}
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: 0 }}>
             {currentView === 'menu' && 'Scout+'}
             {currentView === 'manual' && 'Add Manually'}
             {currentView === 'csv' && 'Upload CSV'}
@@ -68,23 +70,23 @@ export default function ScoutPlus() {
       </div>
 
       {/* Page Content */}
-      <div className="max-w-2xl mx-auto p-6">
+      <div style={{ maxWidth: 672, margin: '0 auto', padding: 24, width: '100%' }}>
         {currentView === 'menu' && (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* Manual Entry */}
             <button
               onClick={() => setCurrentView('manual')}
-              className="w-full bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-xl p-6 text-left transition-all group"
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
             >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ width: 48, height: 48, background: '#dbeafe', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <UserPlus className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">Add Manually</h3>
-                  <p className="text-sm text-gray-600">
-                    Enter contact details one at a time. Perfect for quick adds.
-                  </p>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Add Manually</h3>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Enter contact details one at a time. Perfect for quick adds.</p>
                 </div>
               </div>
             </button>
@@ -92,17 +94,17 @@ export default function ScoutPlus() {
             {/* CSV Upload */}
             <button
               onClick={() => setCurrentView('csv')}
-              className="w-full bg-white hover:bg-green-50 border-2 border-gray-200 hover:border-green-400 rounded-xl p-6 text-left transition-all group"
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#22c55e'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
             >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-green-200 transition-colors">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ width: 48, height: 48, background: '#dcfce7', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Upload className="w-6 h-6 text-green-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">Upload CSV</h3>
-                  <p className="text-sm text-gray-600">
-                    Import up to 25 contacts from a spreadsheet. Fast bulk upload.
-                  </p>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Upload CSV</h3>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Import up to 25 contacts from a spreadsheet. Fast bulk upload.</p>
                 </div>
               </div>
             </button>
@@ -110,17 +112,17 @@ export default function ScoutPlus() {
             {/* Business Card Capture */}
             <button
               onClick={() => setCurrentView('business-card')}
-              className="w-full bg-white hover:bg-purple-50 border-2 border-gray-200 hover:border-purple-400 rounded-xl p-6 text-left transition-all group"
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#a855f7'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
             >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-purple-200 transition-colors">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ width: 48, height: 48, background: '#f3e8ff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Camera className="w-6 h-6 text-purple-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">Scan Business Card</h3>
-                  <p className="text-sm text-gray-600">
-                    Take a photo or upload an image. Perfect for post-event follow-ups.
-                  </p>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Scan Business Card</h3>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Take a photo or upload an image. Perfect for post-event follow-ups.</p>
                 </div>
               </div>
             </button>
@@ -128,17 +130,17 @@ export default function ScoutPlus() {
             {/* LinkedIn Link */}
             <button
               onClick={() => setCurrentView('linkedin-link')}
-              className="w-full bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-xl p-6 text-left transition-all group"
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#0077b5'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
             >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ width: 48, height: 48, background: '#dbeafe', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Linkedin className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">LinkedIn Link</h3>
-                  <p className="text-sm text-gray-600">
-                    Paste a LinkedIn profile URL and let Barry find the contact instantly.
-                  </p>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>LinkedIn Link</h3>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Paste a LinkedIn profile URL and let Barry find the contact instantly.</p>
                 </div>
               </div>
             </button>
@@ -162,21 +164,21 @@ export default function ScoutPlus() {
         )}
 
         {currentView === 'success' && (
-          <div className="py-8 text-center">
+          <div style={{ padding: '32px 0', textAlign: 'center' }}>
             {/* Success Icon */}
-            <div className="mb-6 flex justify-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+            <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'center' }}>
+              <div style={{ width: 80, height: 80, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CheckCircle className="w-12 h-12 text-green-600" />
               </div>
             </div>
 
             {/* Success Message */}
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: T.text, marginBottom: 8 }}>
               {lastUploadType === 'companies'
                 ? (addedItems.length === 1 ? 'Company Added!' : `${addedItems.length} Companies Added!`)
                 : (addedItems.length === 1 ? 'Contact Added!' : `${addedItems.length} Contacts Added!`)}
             </h3>
-            <p className="text-gray-600 mb-8">
+            <p style={{ color: T.textMuted, marginBottom: 32, fontSize: 13 }}>
               {lastUploadType === 'companies'
                 ? (addedItems.length === 1
                     ? 'Your company has been saved to Saved Companies.'
@@ -187,27 +189,23 @@ export default function ScoutPlus() {
             </p>
 
             {/* Item Summary */}
-            <div className="mb-8 bg-gray-50 rounded-xl p-4 text-left max-h-48 overflow-y-auto">
+            <div style={{ marginBottom: 32, background: T.statBg, borderRadius: 14, padding: 16, textAlign: 'left', maxHeight: 192, overflowY: 'auto', border: `1px solid ${T.border}` }}>
               {addedItems.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 py-2 border-b border-gray-200 last:border-0"
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: index < addedItems.length - 1 ? `1px solid ${T.border}` : 'none' }}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                    lastUploadType === 'companies'
-                      ? 'bg-cyan-100 text-cyan-600'
-                      : 'bg-blue-100 text-blue-600'
-                  }`}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, background: lastUploadType === 'companies' ? '#cffafe' : '#dbeafe', color: lastUploadType === 'companies' ? '#0891b2' : '#2563eb', flexShrink: 0 }}>
                     {lastUploadType === 'companies'
                       ? <Building2 className="w-5 h-5" />
                       : (item.name ? item.name.charAt(0).toUpperCase() : '?')}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{item.name}</p>
-                    <p className="text-sm text-gray-600 truncate">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{item.name}</p>
+                    <p style={{ fontSize: 12, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                       {lastUploadType === 'companies'
                         ? (item.industry || item.website_url || 'Company')
-                        : (<>{item.title || 'No title'} {item.company && `\u2022 ${item.company}`}</>)}
+                        : (<>{item.title || 'No title'} {item.company && `· ${item.company}`}</>)}
                     </p>
                   </div>
                 </div>
@@ -215,10 +213,10 @@ export default function ScoutPlus() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: 12 }}>
               <button
                 onClick={handleViewResults}
-                className="flex-1 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all shadow-md flex items-center justify-center gap-2"
+                style={{ flex: 1, padding: '12px 24px', borderRadius: 12, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 <Eye className="w-5 h-5" />
                 {lastUploadType === 'companies'
@@ -227,7 +225,7 @@ export default function ScoutPlus() {
               </button>
               <button
                 onClick={handleAddMore}
-                className="flex-1 px-6 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+                style={{ flex: 1, padding: '12px 24px', borderRadius: 12, background: T.surface, border: `2px solid ${T.border}`, color: T.textMuted, fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 <PlusCircle className="w-5 h-5" />
                 Add More

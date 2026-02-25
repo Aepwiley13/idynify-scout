@@ -8,7 +8,11 @@
   margin: 0 auto;
   padding: 2rem 1.5rem;
   background: #ffffff;
-  min-height: 100vh;
+  /* flex: 1 + min-height: 0 + overflow-y: auto lets this scroll
+     inside ScoutMain's overflow:hidden flex shell */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ========================================

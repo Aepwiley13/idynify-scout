@@ -210,6 +210,7 @@ function ScoutShellInner({ user }) {
   const handleSectionClick = (sec) => {
     if (sec.locked) return;
     if (sec.route) { navigate(sec.route); return; }
+    setDrillCompanyId(null);
     setActiveSection(sec.id);
     setActiveItem(sec.items[0]?.id || '');
   };
@@ -431,7 +432,7 @@ function ScoutShellInner({ user }) {
             return (
               <div
                 key={it.id}
-                onClick={() => setActiveItem(it.id)}
+                onClick={() => { setDrillCompanyId(null); setActiveItem(it.id); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                   borderRadius: 8, cursor: 'pointer', marginBottom: 1,

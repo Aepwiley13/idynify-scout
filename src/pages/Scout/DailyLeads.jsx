@@ -785,6 +785,7 @@ export default function DailyLeads({ onNavigate }) {
                   {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                   {currentCompany && (
                     <CompanySwipeCard
+                      key={currentCompany.id}
                       company={currentCompany}
                       onAccept={() => handleSwipe('right')}
                       onReject={() => handleSwipe('left')}
@@ -851,6 +852,7 @@ export default function DailyLeads({ onNavigate }) {
                     <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: 545, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                   ))}
                   <PersonSwipeCard
+                    key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}
                     person={peopleQueue[currentPersonIdx].person}
                     company={peopleQueue[currentPersonIdx].company}
                     matchText={getBarryText(peopleQueue[currentPersonIdx].person, peopleQueue[currentPersonIdx].company, targetTitles)}

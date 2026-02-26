@@ -5,12 +5,13 @@
  * Uses swipe-gesture pattern from DailyLeads.jsx (CompanySwipeCard).
  *
  * Props:
- *   module  — 'hunter' | 'recon'
+ *   module  — 'scout' | 'hunter' | 'recon'
  *   userId  — Firebase user ID
  *   onClose — () => void  (called when user closes the deck)
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   collection, getDocs,
   doc, updateDoc, setDoc, Timestamp
@@ -21,6 +22,7 @@ import {
   getDashboardState, getSectionData, startSection,
   completeSection, saveSectionData
 } from '../../utils/dashboardUtils';
+import DailyLeads from '../../pages/Scout/DailyLeads';
 
 // ── RECON section components (same mapping as ReconSectionEditor) ──
 import Section1Foundation from '../recon/Section1Foundation';
@@ -540,14 +542,53 @@ function ReconSectionModal({ section, userId, onClose, onComplete }) {
   );
 }
 
+// ── Scout Deck — mirrors Daily Lead Insights inline ───────────────────
+
+function ScoutDeck({ onClose }) {
+  const navigate = useNavigate();
+  return (
+    <DailyLeads
+      onNavigate={(dest) => {
+        if (dest === 'saved') navigate('/scout', { state: { activeTab: 'saved-companies' } });
+        onClose();
+      }}
+    />
+  );
+}
+
 // ── Main MissionCardDeck ──────────────────────────────────────────────
 
 const MODULE_CONFIG = {
+  scout:  { label: 'SCOUT',  accentColor: '#06b6d4', emoji: '🔭' },
   hunter: { label: 'HUNTER', accentColor: '#ec4899', emoji: '🎯' },
   recon:  { label: 'RECON',  accentColor: '#a855f7', emoji: '🧠' }
 };
 
 export default function MissionCardDeck({ module, userId, onClose }) {
+  // Scout renders DailyLeads directly — it has its own title/tabs/close pattern
+  if (module === 'scout') {
+    return (
+      <section className="mb-12 mt-2" aria-label="Scout daily leads deck">
+        <div
+          className="max-w-2xl mx-auto rounded-2xl border-2 relative overflow-hidden"
+          style={{
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(20px)',
+            borderColor: '#06b6d440',
+            boxShadow: '0 0 30px #06b6d415'
+          }}
+        >
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all text-lg"
+            aria-label="Close deck"
+          >×</button>
+          <ScoutDeck onClose={onClose} />
+        </div>
+      </section>
+    );
+  }
+
   const config = MODULE_CONFIG[module] || MODULE_CONFIG.hunter;
 
   return (

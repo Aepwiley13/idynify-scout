@@ -5,14 +5,14 @@
  * Uses swipe-gesture pattern from DailyLeads.jsx (CompanySwipeCard).
  *
  * Props:
- *   module  — 'scout' | 'hunter' | 'recon'
+ *   module  — 'hunter' | 'recon'
  *   userId  — Firebase user ID
  *   onClose — () => void  (called when user closes the deck)
  */
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  collection, query, where, getDocs,
+  collection, getDocs,
   doc, updateDoc, setDoc, Timestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -158,273 +158,6 @@ function CompletionCard({ count, label, accentColor, onClose }) {
       >
         Close
       </button>
-    </div>
-  );
-}
-
-// ── Scout Deck ────────────────────────────────────────────────────────
-
-function ScoutDeck({ userId, onClose }) {
-  const [mode, setMode] = useState('COMPANIES'); // 'PEOPLE' | 'COMPANIES'
-  const [cards, setCards] = useState([]);
-  const [phase, setPhase] = useState('brief'); // 'brief' | 'swiping' | 'done'
-  const [index, setIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(0);
-
-  const loadCards = async (selectedMode) => {
-    setLoading(true);
-    try {
-      if (selectedMode === 'COMPANIES') {
-        const snap = await getDocs(
-          query(
-            collection(db, 'users', userId, 'companies'),
-            where('status', 'in', ['pending', 'new', ''])
-          )
-        );
-        // Also fetch docs without a status field by getting all and filtering
-        const allSnap = await getDocs(collection(db, 'users', userId, 'companies'));
-        const unreviewed = allSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(c => !['accepted', 'rejected', 'deprioritized'].includes(c.status));
-        setCards(unreviewed);
-      } else {
-        const allSnap = await getDocs(collection(db, 'users', userId, 'contacts'));
-        const unreviewed = allSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(c => !['accepted', 'rejected'].includes(c.status));
-        setCards(unreviewed);
-      }
-    } catch (err) {
-      console.error('[ScoutDeck] Failed to load cards:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStart = async () => {
-    await loadCards(mode);
-    setIndex(0);
-    setSaved(0);
-    setPhase('swiping');
-  };
-
-  const handleToggle = (newMode) => {
-    setMode(newMode);
-    if (phase === 'swiping') {
-      setPhase('brief');
-    }
-  };
-
-  const handleAccept = async () => {
-    const item = cards[index];
-    if (!item) return;
-    try {
-      const collectionName = mode === 'COMPANIES' ? 'companies' : 'contacts';
-      await updateDoc(doc(db, 'users', userId, collectionName, item.id), {
-        priorityList: true,
-        status: 'accepted'
-      });
-      setSaved(s => s + 1);
-    } catch (err) {
-      console.error('[ScoutDeck] Accept failed:', err);
-    }
-    advance();
-  };
-
-  const handleReject = async () => {
-    const item = cards[index];
-    if (!item) return;
-    try {
-      const collectionName = mode === 'COMPANIES' ? 'companies' : 'contacts';
-      await updateDoc(doc(db, 'users', userId, collectionName, item.id), {
-        status: 'rejected'
-      });
-    } catch (err) {
-      console.error('[ScoutDeck] Reject failed:', err);
-    }
-    advance();
-  };
-
-  const advance = () => {
-    setIndex(i => {
-      if (i + 1 >= cards.length) {
-        setPhase('done');
-      }
-      return i + 1;
-    });
-  };
-
-  const currentItem = cards[index];
-  const nextItem = cards[index + 1];
-
-  if (phase === 'brief' || loading) {
-    return (
-      <div>
-        {/* People / Companies toggle */}
-        <div className="flex justify-center mb-6">
-          <div className="inline-flex bg-black/40 border border-cyan-500/30 rounded-xl p-1 gap-1">
-            {['PEOPLE', 'COMPANIES'].map(m => (
-              <button
-                key={m}
-                onClick={() => handleToggle(m)}
-                className={`px-5 py-2 rounded-lg font-mono text-xs font-bold transition-all ${
-                  mode === m
-                    ? 'bg-cyan-500 text-white shadow-lg'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        </div>
-        {loading ? (
-          <div className="text-center py-12 text-cyan-400 font-mono animate-pulse">Loading contacts...</div>
-        ) : (
-          <BriefingCard
-            title="Ready to Scout?"
-            body={`You have ${mode === 'COMPANIES' ? 'companies' : 'contacts'} to review. Start swiping to build your priority list.`}
-            cta="Start Swiping →"
-            accentColor="#06b6d4"
-            onStart={handleStart}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (phase === 'done') {
-    return (
-      <CompletionCard
-        count={saved}
-        label={mode === 'COMPANIES' ? 'companies saved to priority' : 'contacts saved to priority'}
-        accentColor="#06b6d4"
-        onClose={onClose}
-      />
-    );
-  }
-
-  return (
-    <div>
-      {/* Toggle always visible during swiping */}
-      <div className="flex justify-center mb-4">
-        <div className="inline-flex bg-black/40 border border-cyan-500/30 rounded-xl p-1 gap-1">
-          {['PEOPLE', 'COMPANIES'].map(m => (
-            <button
-              key={m}
-              onClick={() => handleToggle(m)}
-              className={`px-5 py-2 rounded-lg font-mono text-xs font-bold transition-all ${
-                mode === m
-                  ? 'bg-cyan-500 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="text-center text-xs text-gray-500 font-mono mb-4">
-        {index + 1} / {cards.length} · {saved} saved to priority
-      </div>
-
-      {/* Card stack */}
-      <div style={{ position: 'relative', height: 360, maxWidth: 480, margin: '0 auto' }}>
-        {/* Background (next) card */}
-        {nextItem && (
-          <div style={{
-            position: 'absolute', width: '100%', maxWidth: 480,
-            left: '50%', marginLeft: -240, top: 8,
-            transform: 'scale(0.96)',
-            zIndex: 1, opacity: 0.6
-          }}>
-            <ScoutCard item={nextItem} mode={mode} />
-          </div>
-        )}
-        {/* Active card */}
-        {currentItem && (
-          <SwipeCard
-            key={`${mode}-${index}`}
-            onAccept={handleAccept}
-            onReject={handleReject}
-            acceptLabel="✓ PRIORITY"
-            rejectLabel="✗ PASS"
-            card={<ScoutCard item={currentItem} mode={mode} />}
-          />
-        )}
-      </div>
-
-      {/* Button fallbacks for non-swipe users */}
-      <div className="flex justify-center gap-4 mt-4">
-        <button
-          onClick={handleReject}
-          className="w-14 h-14 rounded-full bg-red-500/20 border-2 border-red-500/50 text-red-400 text-xl hover:bg-red-500/30 transition-all"
-        >✗</button>
-        <button
-          onClick={handleAccept}
-          className="w-14 h-14 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-400 text-xl hover:bg-emerald-500/30 transition-all"
-        >✓</button>
-      </div>
-    </div>
-  );
-}
-
-function ScoutCard({ item, mode }) {
-  const isCompany = mode === 'COMPANIES';
-  return (
-    <div className="bg-black/70 border border-cyan-500/30 rounded-2xl p-6"
-      style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
-      <div className="flex items-center gap-4 mb-4">
-        <div className="w-14 h-14 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-2xl">
-          {isCompany ? (item.emoji || '🏢') : '👤'}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-bold text-white text-lg truncate">{item.name || 'Unknown'}</div>
-          <div className="text-xs text-gray-400 truncate">
-            {isCompany ? (item.industry || 'Unknown industry') : (item.title || 'Unknown role')}
-          </div>
-        </div>
-        {item.fit_score != null && (
-          <div className={`text-lg font-mono font-bold ${
-            item.fit_score >= 80 ? 'text-emerald-400' :
-            item.fit_score >= 60 ? 'text-amber-400' : 'text-red-400'
-          }`}>{item.fit_score}</div>
-        )}
-      </div>
-      {isCompany ? (
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          {[
-            ['Employees', item.employee_count || 'N/A'],
-            ['Revenue', item.revenue || 'N/A'],
-            ['Founded', item.founded_year || 'N/A'],
-            ['Location', item.location || 'N/A'],
-          ].map(([label, value]) => (
-            <div key={label} className="bg-white/5 rounded-lg p-2">
-              <div className="text-gray-500">{label}</div>
-              <div className="text-white font-medium mt-0.5 truncate">{value}</div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          {[
-            ['Company', item.company_name || 'N/A'],
-            ['Email', item.email || 'N/A'],
-          ].map(([label, value]) => (
-            <div key={label} className="bg-white/5 rounded-lg p-2">
-              <div className="text-gray-500">{label}</div>
-              <div className="text-white font-medium mt-0.5 truncate">{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {item.barry_intel && (
-        <p className="text-xs text-cyan-300/70 mt-3 italic border-t border-white/10 pt-3">
-          🐻 {item.barry_intel}
-        </p>
-      )}
     </div>
   );
 }
@@ -810,7 +543,6 @@ function ReconSectionModal({ section, userId, onClose, onComplete }) {
 // ── Main MissionCardDeck ──────────────────────────────────────────────
 
 const MODULE_CONFIG = {
-  scout:  { label: 'SCOUT',  accentColor: '#06b6d4', emoji: '📍' },
   hunter: { label: 'HUNTER', accentColor: '#ec4899', emoji: '🎯' },
   recon:  { label: 'RECON',  accentColor: '#a855f7', emoji: '🧠' }
 };
@@ -848,7 +580,6 @@ export default function MissionCardDeck({ module, userId, onClose }) {
         </div>
 
         {/* Deck content by module */}
-        {module === 'scout' && <ScoutDeck userId={userId} onClose={onClose} />}
         {module === 'hunter' && <HunterDeck userId={userId} onClose={onClose} />}
         {module === 'recon' && <ReconDeck userId={userId} onClose={onClose} />}
       </div>

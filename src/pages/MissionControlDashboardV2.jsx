@@ -283,7 +283,10 @@ export default function MissionControlDashboardV2() {
         <QuickLaunchStrip
           stats={stats}
           activeModule={activeModule}
-          onModuleSelect={(id) => setActiveModule(prev => prev === id ? null : id)}
+          onModuleSelect={(id) => {
+            if (id === 'scout') navigate('/scout');
+            else setActiveModule(prev => prev === id ? null : id);
+          }}
         />
 
         {/* MISSION CARD DECK — Inline, below carousel */}

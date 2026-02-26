@@ -74,6 +74,9 @@ import MissionDetail from './pages/Hunter/MissionDetail';
 // Barry Onboarding
 import BarryOnboarding from './pages/Onboarding/BarryOnboarding';
 
+// User Settings
+import UserSettings from './pages/UserSettings';
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -483,6 +486,16 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <CampaignDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* User Settings */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <UserSettings />
             </ProtectedRoute>
           }
         />

@@ -24,6 +24,10 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import HunterContactCard from './HunterContactCard';
+import { useMissionSounds } from '../../hooks/useMissionSounds';
+import { getAudioContext, preloadAudio, isAudioAvailable } from '../../utils/hunterAudioContext';
+import { playEngageSound, playArchiveSound } from '../../utils/hunterSounds';
+import { triggerEngageHaptic } from '../../utils/hunterHaptics';
 import './HunterCardStack.css';
 
 // ── Animation variants ─────────────────────────────────
@@ -73,6 +77,18 @@ export default function HunterCardStack({
   const [exitVariant, setExitVariant] = useState(null); // 'engage' | 'archive'
   const controls = useAnimation();
 
+  // Sound + haptics preference
+  const { soundEnabled, hapticsEnabled } = useMissionSounds();
+
+  // iOS audio unlock — fired on first pointer interaction in Hunter
+  const audioPreloaded = useRef(false);
+  const ensureAudioReady = useCallback(() => {
+    if (!audioPreloaded.current && isAudioAvailable()) {
+      preloadAudio();
+      audioPreloaded.current = true;
+    }
+  }, []);
+
   // Drag state
   const dragStart = useRef(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -87,6 +103,14 @@ export default function HunterCardStack({
     if (animating) return;
     setAnimating(true);
     setExitVariant('engage');
+
+    // Sound + haptic fire simultaneously with Phase 1 shake (spec: 0ms delay from animation start)
+    if (soundEnabled && isAudioAvailable()) {
+      try { playEngageSound(getAudioContext()); } catch (_) {}
+    }
+    if (hapticsEnabled) {
+      triggerEngageHaptic();
+    }
 
     // Phase 1: Shake (0–400ms)
     await controls.start({
@@ -114,7 +138,7 @@ export default function HunterCardStack({
       setExitVariant(null);
       controls.set({ x: 0, y: 0, rotate: 0, scale: 1, opacity: 1 });
     }, 250);
-  }, [animating, controls, onEngage]);
+  }, [animating, controls, onEngage, soundEnabled, hapticsEnabled]);
 
   // ── Archive sequence ──────────────────────────────────
 
@@ -122,6 +146,12 @@ export default function HunterCardStack({
     if (animating) return;
     setAnimating(true);
     setExitVariant('archive');
+
+    // Archive sound fires with slide animation
+    // No haptic on archive — intentional per spec (absence of feedback = low energy)
+    if (soundEnabled && isAudioAvailable()) {
+      try { playArchiveSound(getAudioContext()); } catch (_) {}
+    }
 
     await controls.start({
       ...ARCHIVE_EXIT,
@@ -132,12 +162,14 @@ export default function HunterCardStack({
     setAnimating(false);
     setExitVariant(null);
     controls.set({ x: 0, y: 0, rotate: 0, opacity: 1 });
-  }, [animating, controls, onArchive]);
+  }, [animating, controls, onArchive, soundEnabled]);
 
   // ── Drag handlers ─────────────────────────────────────
 
   const handlePointerDown = (e) => {
     if (animating) return;
+    // iOS audio unlock: preload on first gesture in Hunter (not on mount)
+    ensureAudioReady();
     dragStart.current = { x: e.clientX, y: e.clientY };
     setIsDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);

@@ -48,6 +48,11 @@ vi.mock('date-fns', () => ({
   formatDistanceToNow: () => '2 days ago'
 }));
 
+// useMissionSounds pulls from Firestore — mock the hook directly for card stack tests
+vi.mock('../hooks/useMissionSounds', () => ({
+  useMissionSounds: () => ({ soundEnabled: true, hapticsEnabled: false, setSoundEnabled: vi.fn() })
+}));
+
 global.fetch = vi.fn(() => Promise.resolve({
   json: () => Promise.resolve({ success: false })
 }));

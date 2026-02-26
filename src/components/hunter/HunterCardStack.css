@@ -97,6 +97,14 @@
   max-width: 260px;
 }
 
+.hcs-empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 .hcs-empty-cta {
   margin-top: 0.5rem;
   padding: 0.75rem 1.5rem;

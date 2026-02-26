@@ -141,7 +141,7 @@ describe('HunterCardStack — empty state', () => {
         onDeckEmpty={vi.fn()}
       />
     );
-    expect(screen.getByText(/deck clear/i)).toBeInTheDocument();
+    expect(screen.getByText(/hunter deck is clear/i)).toBeInTheDocument();
   });
 
   it('shows empty state when currentIndex has passed the last card', () => {
@@ -154,7 +154,7 @@ describe('HunterCardStack — empty state', () => {
         onDeckEmpty={vi.fn()}
       />
     );
-    expect(screen.getByText(/deck clear/i)).toBeInTheDocument();
+    expect(screen.getByText(/hunter deck is clear/i)).toBeInTheDocument();
   });
 
   it('calls onDeckEmpty when the View Active Missions CTA is clicked in empty state', () => {
@@ -182,7 +182,7 @@ describe('HunterCardStack — empty state', () => {
         // onDeckEmpty not provided
       />
     );
-    expect(screen.getByText(/deck clear/i)).toBeInTheDocument();
+    expect(screen.getByText(/hunter deck is clear/i)).toBeInTheDocument();
   });
 });
 

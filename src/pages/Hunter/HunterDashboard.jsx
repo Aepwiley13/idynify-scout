@@ -14,30 +14,29 @@
  *   3. ActiveMissionsView renders MissionCard which listens to the mission doc
  *   4. Draft appears in real-time when Barry writes it (onSnapshot)
  *
- * First-contact path:
- *   If the contact has no last_outcome/last_interaction_at (new relationship):
- *   - barryHunterProcessEngage sets isFirstContact: true
- *   - Barry generates draft with limited_context: true flag
- *   - MissionCard shows intake prompt to sharpen the draft
- *
- * Micro Intake:
- *   HunterMicroIntake renders when there are contacts with no intake completed.
- *   Queue badge on the Active tab shows the count.
+ * Sprint 4 additions:
+ *   - Loads RECON data from dashboards/{userId} on init
+ *   - Computes reconConfidencePct (0-100) and passes to HunterCardStack + ActiveMissionsView
+ *   - Stuck engaged_pending recovery: if a contact is engaged_pending > 30s, auto-recover
+ *   - Improved empty states on all 3 tabs (Deck: "browse archived" + "go to Scout" CTAs)
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   collection, query, where, orderBy,
-  doc, updateDoc, onSnapshot
+  doc, getDoc, updateDoc, onSnapshot
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, CheckCircle, Archive as ArchiveIcon, Zap } from 'lucide-react';
 import HunterCardStack from '../../components/hunter/HunterCardStack';
 import ActiveMissionsView from '../../components/hunter/ActiveMissionsView';
-import HunterMicroIntake from '../../components/hunter/HunterMicroIntake';
 import { bootstrapContactsForUser } from '../../utils/hunterBootstrap';
+import { calculateReconConfidence } from '../../utils/reconConfidence';
 import './HunterDashboard.css';
+
+// Contacts stuck in engaged_pending for more than 30s get auto-recovered
+const STUCK_TIMEOUT_MS = 30_000;
 
 export default function HunterDashboard() {
   const navigate = useNavigate();
@@ -48,9 +47,9 @@ export default function HunterDashboard() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [bootstrapping, setBootstrapping] = useState(false);
+  const [reconConfidencePct, setReconConfidencePct] = useState(null);
 
-  // Micro Intake queue — contacts in active with no intake
-  const [showIntakeQueue, setShowIntakeQueue] = useState(false);
+  // Intake badge: active contacts with no intake yet
   const intakeQueue = activeContacts.filter(
     c => c.hunter_status === 'active_mission' &&
          !c.hunter_intake?.completed_at &&
@@ -58,15 +57,59 @@ export default function HunterDashboard() {
   );
 
   const unsubRef = useRef(null);
+  // Track which stuck contacts have already been recovered (avoid repeated writes)
+  const recoveredRef = useRef(new Set());
 
   useEffect(() => {
     initHunter();
     return () => { if (unsubRef.current) unsubRef.current(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Stuck contact recovery ────────────────────────────────────────────────
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const now = Date.now();
+    activeContacts.forEach(c => {
+      if (c.hunter_status !== 'engaged_pending') return;
+      if (recoveredRef.current.has(c.id)) return;
+
+      const engagedAt = c.hunter_engaged_at ? new Date(c.hunter_engaged_at).getTime() : 0;
+      if (now - engagedAt > STUCK_TIMEOUT_MS) {
+        recoveredRef.current.add(c.id);
+        recoverStuckContact(user, c);
+      }
+    });
+  }, [activeContacts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function recoverStuckContact(user, contact) {
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        hunter_status: 'active_mission',
+        processing_error: 'Barry took too long. Tap Retry to try again.',
+        processing_error_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      console.log(`[Hunter] Recovered stuck contact: ${contact.id}`);
+    } catch (err) {
+      console.error('[Hunter] Stuck contact recovery failed:', err);
+    }
+  }
+
   async function initHunter() {
     const user = auth.currentUser;
     if (!user) { navigate('/login'); return; }
+
+    // Load RECON confidence score (non-fatal)
+    try {
+      const dashboardDoc = await getDoc(doc(db, 'dashboards', user.uid));
+      if (dashboardDoc.exists()) {
+        setReconConfidencePct(calculateReconConfidence(dashboardDoc.data()));
+      }
+    } catch (err) {
+      console.warn('[Hunter] RECON confidence load failed (non-fatal):', err.message);
+    }
 
     // Bootstrap existing contacts (seeds relationship_state + hunter_status)
     try {
@@ -122,19 +165,15 @@ export default function HunterDashboard() {
     unsubRef.current = () => { unsubDeck(); unsubActive(); unsubArchived(); };
   }
 
-  // ── Engage handler — Sprint 3 ────────────────────────────────────────────
+  // ── Engage handler ────────────────────────────────────────────────────────
   const handleEngage = useCallback(async (contact) => {
     const user = auth.currentUser;
     if (!user) return;
 
-    // Advance deck index immediately (card is animating off screen)
     setCurrentIndex(prev => prev + 1);
 
-    const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
-
-    // Step 1: set engaged_pending immediately
     try {
-      await updateDoc(contactRef, {
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         hunter_status: 'engaged_pending',
         hunter_engaged_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -144,45 +183,26 @@ export default function HunterDashboard() {
       return;
     }
 
-    // Step 2: auto-switch to active tab so user sees the loading state
     setTab('active');
-
-    // Step 3: call barryHunterProcessEngage in background
-    // This creates the mission, generates the draft, moves contact to active_mission
     processEngageBackground(user, contact);
   }, []);
 
   async function processEngageBackground(user, contact) {
     try {
       const authToken = await user.getIdToken();
-
       const res = await fetch('/.netlify/functions/barryHunterProcessEngage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          contactId: contact.id
-        })
+        body: JSON.stringify({ userId: user.uid, authToken, contactId: contact.id })
       });
-
       const data = await res.json();
-
-      if (!data.success) {
-        // barryHunterProcessEngage already writes the error state to Firestore.
-        // The contact will appear in the Active tab with an error card.
-        console.warn('[Hunter] Process engage returned error:', data.error);
-      }
-      // If success: the function already updated hunter_status + created mission.
-      // The onSnapshot in ActiveMissionsView will pick up the changes automatically.
-
+      if (!data.success) console.warn('[Hunter] Process engage error:', data.error);
     } catch (err) {
       console.error('[Hunter] processEngageBackground network error:', err);
-      // Write error state manually if the function didn't complete
       try {
-        const user2 = auth.currentUser;
-        if (user2) {
-          await updateDoc(doc(db, 'users', user2.uid, 'contacts', contact.id), {
+        const u = auth.currentUser;
+        if (u) {
+          await updateDoc(doc(db, 'users', u.uid, 'contacts', contact.id), {
             hunter_status: 'active_mission',
             processing_error: 'Network error — could not reach Barry.',
             processing_error_at: new Date().toISOString(),
@@ -197,9 +217,7 @@ export default function HunterDashboard() {
   const handleArchive = useCallback(async (contact) => {
     const user = auth.currentUser;
     if (!user) return;
-
     setCurrentIndex(prev => prev + 1);
-
     try {
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         hunter_status: 'archived',
@@ -215,7 +233,6 @@ export default function HunterDashboard() {
   const handleRestore = useCallback(async (contact) => {
     const user = auth.currentUser;
     if (!user) return;
-
     try {
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         hunter_status: 'deck',
@@ -228,7 +245,7 @@ export default function HunterDashboard() {
   }, []);
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const deckCount = deckContacts.length;
+  const visibleDeckCount = Math.max(0, deckContacts.length - currentIndex);
   const activeCount = activeContacts.length;
   const archivedCount = archivedContacts.length;
   const intakeCount = intakeQueue.length;
@@ -239,10 +256,7 @@ export default function HunterDashboard() {
       <div className="hunter-header">
         <div className="hunter-header-inner">
           <div className="hunter-header-left">
-            <button
-              className="hunter-back-btn"
-              onClick={() => navigate('/mission-control-v2')}
-            >
+            <button className="hunter-back-btn" onClick={() => navigate('/mission-control-v2')}>
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="hunter-identity">
@@ -256,14 +270,15 @@ export default function HunterDashboard() {
             </div>
           </div>
 
-          {/* Tab switcher */}
           <div className="hunter-tabs">
             <button
               className={`hunter-tab ${tab === 'deck' ? 'hunter-tab--active' : ''}`}
               onClick={() => setTab('deck')}
             >
               Deck
-              {deckCount > 0 && <span className="hunter-tab-badge">{deckCount}</span>}
+              {visibleDeckCount > 0 && (
+                <span className="hunter-tab-badge">{visibleDeckCount}</span>
+              )}
             </button>
             <button
               className={`hunter-tab ${tab === 'active' ? 'hunter-tab--active' : ''}`}
@@ -297,25 +312,25 @@ export default function HunterDashboard() {
         {loading ? (
           <div className="hunter-loading">
             <div className="hunter-loading-spinner" />
-            {bootstrapping
-              ? 'Barry is orienting your contacts...'
-              : 'Loading Hunter...'}
+            {bootstrapping ? 'Barry is orienting your contacts...' : 'Loading Hunter...'}
           </div>
         ) : (
           <>
             {/* Deck tab */}
             {tab === 'deck' && (
               <div className="hunter-deck-view">
+                {/* HunterCardStack handles its own empty state (no contacts left in deck) */}
                 <HunterCardStack
                   contacts={deckContacts}
                   currentIndex={currentIndex}
+                  reconConfidencePct={reconConfidencePct}
                   onEngage={handleEngage}
                   onArchive={handleArchive}
                   onDeckEmpty={() => setTab('active')}
                 />
-                {deckContacts.length > 0 && currentIndex < deckContacts.length && (
+                {visibleDeckCount > 0 && (
                   <p className="hunter-deck-count">
-                    {deckContacts.length - currentIndex} contact{deckContacts.length - currentIndex !== 1 ? 's' : ''} remaining
+                    {visibleDeckCount} contact{visibleDeckCount !== 1 ? 's' : ''} remaining
                   </p>
                 )}
               </div>
@@ -325,11 +340,9 @@ export default function HunterDashboard() {
             {tab === 'active' && (
               <ActiveMissionsView
                 contacts={activeContacts}
+                reconConfidencePct={reconConfidencePct}
                 onGoToDeck={() => setTab('deck')}
                 onMissionComplete={(contact, outcome) => {
-                  // Mission complete (scheduled / not_interested / all steps done)
-                  // Contact stays in active_mission status for now
-                  // (future: move to a 'completed' status)
                   console.log(`[Hunter] Mission complete for ${contact.name}: ${outcome}`);
                 }}
               />
@@ -342,7 +355,9 @@ export default function HunterDashboard() {
                   <div className="hunter-empty">
                     <div className="hunter-empty-icon">📁</div>
                     <p className="hunter-empty-title">Nothing archived yet.</p>
-                    <p className="hunter-empty-sub">Contacts you archive from the deck appear here.</p>
+                    <p className="hunter-empty-sub">
+                      Contacts you skip in the deck will appear here.
+                    </p>
                   </div>
                 ) : (
                   <div className="hunter-contact-list">
@@ -364,7 +379,7 @@ export default function HunterDashboard() {
   );
 }
 
-// ── Archived card (unchanged from Sprint 1) ──────────────────────────────────
+// ── Archived card ─────────────────────────────────────────────────────────────
 
 function ArchivedCard({ contact, onRestore }) {
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
@@ -382,7 +397,7 @@ function ArchivedCard({ contact, onRestore }) {
       </div>
       <button
         className="hunter-restore-btn"
-        onClick={(e) => { e.stopPropagation(); onRestore(); }}
+        onClick={e => { e.stopPropagation(); onRestore(); }}
       >
         Restore
       </button>

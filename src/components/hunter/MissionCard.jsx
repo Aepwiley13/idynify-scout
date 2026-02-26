@@ -1,6 +1,13 @@
 /**
  * MissionCard — Full mission card with Barry's draft UI.
  *
+ * Sprint 4 additions:
+ *   - MISSION_CTA_LABELS: "Send →" button label is now dynamic based on outcome_goal
+ *   - Barry context line: reflects reconEnhanced status and confidence level
+ *   - RECON confidence warnings: <40% → warning, 40-79% → partial note, 80%+ → silent
+ *   - next_outcome_goal suggestion: shown after outcome is recorded, dismissable
+ *   - reconConfidencePct prop flows in from HunterDashboard → ActiveMissionsView
+ *
  * States (in order):
  *   1. Loading    — contact info immediate, "Barry is loading context..." indicator
  *   2. Draft      — AngleSelector + EditableMessageField + MissionStepProgress
@@ -9,11 +16,6 @@
  *   5. Error      — retry + manual write fallback
  *
  * Real-time: listens to users/{uid}/missions/{missionId} for draft updates.
- * The draft appears without page refresh — the onSnapshot fires when Barry writes it.
- *
- * First-contact path:
- *   If contact.hunter_intake is not completed, shows inline intake prompt.
- *   Completing intake triggers draft regeneration via barryHunterGenerateStep.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -25,9 +27,25 @@ import EditableMessageField from './EditableMessageField';
 import MissionStepProgress from './MissionStepProgress';
 import HunterOutcomeOverlay from './HunterOutcomeOverlay';
 import HunterMicroIntake from './HunterMicroIntake';
+import { predictNextOutcomeGoal } from '../../utils/nextOutcomeGoal';
 import './MissionCard.css';
 
-// Relationship state color map
+// ── CTA labels for the Send button (dynamic by outcome_goal) ────────────────
+const MISSION_CTA_LABELS = {
+  enter_conversation:  'Start Conversation',
+  build_rapport:       'Build Rapport',
+  deepen_conversation: 'Deepen Relationship',
+  reconnect:           'Reconnect',
+  rebuild_relationship: 'Rebuild Trust',
+  get_introduction:    'Request Introduction',
+  define_next_step:    'Advance Mission',
+  schedule_meeting:    'Schedule Meeting',
+  close_deal:          'Close Deal',
+  ask_for_referral:    'Ask for Referral',
+  default:             'Send Message'
+};
+
+// ── Relationship state color map ─────────────────────────────────────────────
 const STATE_COLORS = {
   unaware:          '#6b7280',
   aware:            '#60a5fa',
@@ -40,7 +58,7 @@ const STATE_COLORS = {
   strategic_partner: '#fbbf24'
 };
 
-export default function MissionCard({ contact, onMissionComplete }) {
+export default function MissionCard({ contact, reconConfidencePct, onMissionComplete }) {
   const [mission, setMission] = useState(null);
   const [missionError, setMissionError] = useState(null);
   const [missionLoading, setMissionLoading] = useState(true);
@@ -57,11 +75,15 @@ export default function MissionCard({ contact, onMissionComplete }) {
   const [generatingNextStep, setGeneratingNextStep] = useState(false);
   const [nextStepError, setNextStepError] = useState(null);
 
+  // Next outcome goal suggestion (shown after outcome recorded)
+  const [nextGoalSuggestion, setNextGoalSuggestion] = useState(null);
+
   // Intake state (first-contact path)
   const [showIntake, setShowIntake] = useState(false);
 
   const unsubRef = useRef(null);
   const missionId = contact.active_mission_id;
+  const firstName = contact.first_name || contact.name?.split(' ')[0] || 'them';
 
   // ── Subscribe to mission document ─────────────────────────────────────────
   useEffect(() => {
@@ -89,7 +111,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
       const activeIdx = idx >= 0 ? idx : 0;
       setCurrentStepIndex(activeIdx);
 
-      // Pre-load the recommended angle when draft arrives
+      // Pre-load the recommended angle when draft arrives (only on first load)
       const step = (data.steps || [])[activeIdx];
       if (step?.draft && !selectedAngle) {
         const rec = step.draft.recommended_angle || step.draft.angles?.[0]?.id;
@@ -133,7 +155,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
     if (!user || !missionId) return;
 
     const step = mission?.steps?.[currentStepIndex];
-    if (!step || !subject || !message) return;
+    if (!step || !message) return;
 
     try {
       const updatePath = {};
@@ -170,18 +192,20 @@ export default function MissionCard({ contact, onMissionComplete }) {
       console.error('[MissionCard] Outcome write error:', err);
     }
 
+    // Predict next outcome_goal suggestion
+    const effectiveState = newRelationshipState || contact.relationship_state;
+    const suggestion = predictNextOutcomeGoal(
+      effectiveState, mission?.outcome_goal, outcomeId
+    );
+    if (suggestion && !mission?.next_goal_dismissed) {
+      setNextGoalSuggestion(suggestion);
+    }
+
     // Check if there's a next step
     const nextIdx = currentStepIndex + 1;
     const totalSteps = mission?.steps?.length || 0;
 
-    if (nextIdx >= totalSteps) {
-      // All steps done — mission is over
-      if (onMissionComplete) onMissionComplete(outcomeId);
-      return;
-    }
-
-    // Terminal outcomes — no next draft
-    if (['scheduled', 'not_interested'].includes(outcomeId)) {
+    if (nextIdx >= totalSteps || ['scheduled', 'not_interested'].includes(outcomeId)) {
       if (onMissionComplete) onMissionComplete(outcomeId);
       return;
     }
@@ -209,14 +233,48 @@ export default function MissionCard({ contact, onMissionComplete }) {
       if (!data.success) throw new Error(data.error || 'Step generation failed');
 
       // The onSnapshot above will pick up the new draft automatically
-      setSelectedAngle(null);  // Reset angle selection for the new step
+      setSelectedAngle(null);
     } catch (err) {
       console.error('[MissionCard] Next step generation error:', err);
       setNextStepError(err.message);
     } finally {
       setGeneratingNextStep(false);
     }
-  }, [missionId, currentStepIndex, mission, contact.id, onMissionComplete]);
+  }, [missionId, currentStepIndex, mission, contact.id, contact.relationship_state, onMissionComplete]);
+
+  // ── Handle next goal adoption ──────────────────────────────────────────────
+  const handleAdoptNextGoal = useCallback(async () => {
+    if (!nextGoalSuggestion) return;
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      // Update mission and contact with new outcome_goal
+      await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
+        outcome_goal: nextGoalSuggestion.goal,
+        updated_at: new Date().toISOString()
+      });
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        outcome_goal: nextGoalSuggestion.goal,
+        updated_at: new Date().toISOString()
+      });
+      setNextGoalSuggestion(null);
+    } catch (err) {
+      console.error('[MissionCard] Adopt goal error:', err);
+    }
+  }, [nextGoalSuggestion, missionId, contact.id]);
+
+  const handleDismissNextGoal = useCallback(async () => {
+    setNextGoalSuggestion(null);
+    const user = auth.currentUser;
+    if (!user || !missionId) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
+        next_goal_dismissed: true,
+        updated_at: new Date().toISOString()
+      });
+    } catch (_) {}
+  }, [missionId]);
 
   // ── Handle retry (processing_error) ───────────────────────────────────────
   const handleRetry = useCallback(async () => {
@@ -224,7 +282,6 @@ export default function MissionCard({ contact, onMissionComplete }) {
     if (!user) return;
 
     try {
-      // Clear error flag
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         processing_error: null,
         processing_error_at: null,
@@ -232,13 +289,12 @@ export default function MissionCard({ contact, onMissionComplete }) {
         active_mission_id: null,
         updated_at: new Date().toISOString()
       });
-      // The parent HunterDashboard will re-detect engaged_pending and re-call barryHunterProcessEngage
     } catch (err) {
       console.error('[MissionCard] Retry error:', err);
     }
   }, [contact.id]);
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
+  // ── Derived values ─────────────────────────────────────────────────────────
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
   const initials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const stateColor = STATE_COLORS[contact.relationship_state] || '#6b7280';
@@ -249,6 +305,23 @@ export default function MissionCard({ contact, onMissionComplete }) {
   const draft = currentStep?.draft;
   const stepSent = !!currentStep?.sent_at;
   const needsIntake = !contact.hunter_intake?.completed_at && !contact.hunter_intake?.skipped;
+
+  // Dynamic send button label
+  const sendCTALabel = MISSION_CTA_LABELS[mission?.outcome_goal] || MISSION_CTA_LABELS.default;
+
+  // Barry context line (reconEnhanced-aware)
+  const confidence = reconConfidencePct ?? 0;
+  const reconEnhanced = confidence >= 40;
+  let barryContextLine = null;
+  if (!isPending && !hasError && mission) {
+    if (reconEnhanced && confidence >= 80) {
+      barryContextLine = null;  // 80%+ → Barry just works, no note needed
+    } else if (reconEnhanced) {
+      barryContextLine = `RECON is ${confidence}% complete — messages will improve as you add more.`;
+    } else {
+      barryContextLine = `Working with limited context on ${firstName} — complete RECON to sharpen these messages.`;
+    }
+  }
 
   return (
     <div className="mc-card">
@@ -281,6 +354,13 @@ export default function MissionCard({ contact, onMissionComplete }) {
         </div>
       )}
 
+      {/* RECON confidence context line */}
+      {barryContextLine && (
+        <div className={`mc-recon-context ${confidence < 40 ? 'mc-recon-context--warn' : 'mc-recon-context--partial'}`}>
+          {barryContextLine}
+        </div>
+      )}
+
       {/* Error state — never a blank screen */}
       {hasError && (
         <div className="mc-error">
@@ -289,7 +369,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
             <button className="mc-btn mc-btn--retry" onClick={handleRetry}>
               <RefreshCw className="w-4 h-4" /> Retry
             </button>
-            <button className="mc-btn mc-btn--manual" onClick={() => setShowOutcome(false)}>
+            <button className="mc-btn mc-btn--manual">
               <Edit3 className="w-4 h-4" /> Write manually
             </button>
           </div>
@@ -304,7 +384,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
           </div>
           <p className="mc-loading-text">
             {isPending
-              ? `Reviewing your history with ${contact.first_name || name} and what we know about ${contact.company_name || 'their company'}.`
+              ? `Reviewing your history with ${firstName} and what we know about ${contact.company_name || 'their company'}.`
               : 'Loading mission data...'}
           </p>
         </div>
@@ -315,7 +395,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
         <div className="mc-intake-prompt">
           <p className="mc-intake-note">
             {draft?.limited_context
-              ? `Working with limited context on ${contact.first_name || name} — complete the intake to sharpen this draft.`
+              ? `Working with limited context on ${firstName} — complete the intake to sharpen this draft.`
               : `Tell Barry more about this contact to get a sharper draft.`}
           </p>
           <button
@@ -356,10 +436,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
           {nextStepError && (
             <div className="mc-error">
               <p className="mc-error-msg">Could not generate next step: {nextStepError}</p>
-              <button
-                className="mc-btn mc-btn--retry"
-                onClick={() => setNextStepError(null)}
-              >
+              <button className="mc-btn mc-btn--retry" onClick={() => setNextStepError(null)}>
                 Dismiss
               </button>
             </div>
@@ -394,7 +471,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
                 />
               )}
 
-              {/* Send button */}
+              {/* Send button — dynamic CTA label */}
               {selectedAngle && !stepSent && (
                 <div className="mc-actions">
                   <button
@@ -403,7 +480,7 @@ export default function MissionCard({ contact, onMissionComplete }) {
                     disabled={!message.trim()}
                   >
                     <Send className="w-4 h-4" />
-                    Send →
+                    {sendCTALabel}
                   </button>
                 </div>
               )}
@@ -435,6 +512,25 @@ export default function MissionCard({ contact, onMissionComplete }) {
                   currentStepIndex={currentStepIndex}
                 />
               )}
+            </div>
+          )}
+
+          {/* Next outcome goal suggestion */}
+          {nextGoalSuggestion && !mission?.next_goal_dismissed && (
+            <div className="mc-next-goal">
+              <div className="mc-next-goal-header">── WHAT'S NEXT ──</div>
+              <div className="mc-next-goal-body">
+                <Sparkles className="w-3.5 h-3.5 mc-sparkle" />
+                <span>Barry suggests: <strong>{nextGoalSuggestion.label}</strong></span>
+              </div>
+              <div className="mc-next-goal-actions">
+                <button className="mc-btn mc-btn--adopt-goal" onClick={handleAdoptNextGoal}>
+                  Make this the goal
+                </button>
+                <button className="mc-btn mc-btn--dismiss-goal" onClick={handleDismissNextGoal}>
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
         </>

@@ -68,7 +68,8 @@ function SwipeIndicator({ direction }) {
 export default function HunterCardStack({
   contacts,
   currentIndex,
-  reconCompletion,
+  reconConfidencePct,    // 0-100 global RECON score (same for all contacts)
+  reconCompletion,       // legacy map — kept for compat, ignored when reconConfidencePct set
   onEngage,
   onArchive,
   onDeckEmpty
@@ -218,18 +219,20 @@ export default function HunterCardStack({
     else if (dragOffset.y < -INDICATOR_THRESHOLD && Math.abs(dragOffset.y) > Math.abs(dragOffset.x)) swipeIndicator = 'engage';
   }
 
-  // Empty state
+  // Empty state — spec: "Browse Archived" + "Go to Scout" CTAs
   if (!currentContact) {
     return (
       <div className="hcs-empty">
         <div className="hcs-empty-icon">🎯</div>
-        <p className="hcs-empty-title">Deck clear.</p>
-        <p className="hcs-empty-sub">All contacts have been actioned. Check Active Missions.</p>
-        {onDeckEmpty && (
-          <button className="hcs-empty-cta" onClick={onDeckEmpty}>
-            View Active Missions
-          </button>
-        )}
+        <p className="hcs-empty-title">Your Hunter deck is clear.</p>
+        <p className="hcs-empty-sub">All contacts have been engaged or archived.</p>
+        <div className="hcs-empty-actions">
+          {onDeckEmpty && (
+            <button className="hcs-empty-cta" onClick={onDeckEmpty}>
+              View Active Missions
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -246,7 +249,7 @@ export default function HunterCardStack({
           >
             <HunterContactCard
               contact={nextContact}
-              reconCompletion={null}
+              reconConfidencePct={reconConfidencePct ?? null}
               hasActiveMission={false}
               onEngage={() => {}}
               onArchive={() => {}}
@@ -270,7 +273,7 @@ export default function HunterCardStack({
         <SwipeIndicator direction={swipeIndicator} />
         <HunterContactCard
           contact={currentContact}
-          reconCompletion={reconCompletion?.[currentContact.id] ?? null}
+          reconConfidencePct={reconConfidencePct ?? null}
           hasActiveMission={currentContact.hunter_status === 'active_mission'}
           onEngage={triggerEngage}
           onArchive={triggerArchive}

@@ -16,13 +16,13 @@
 import MissionCard from './MissionCard';
 import './ActiveMissionsView.css';
 
-export default function ActiveMissionsView({ contacts, onGoToDeck, onMissionComplete }) {
+export default function ActiveMissionsView({ contacts, reconConfidencePct, onGoToDeck, onMissionComplete }) {
   if (!contacts || contacts.length === 0) {
     return (
       <div className="amv-empty">
         <div className="amv-empty-icon">🎯</div>
         <p className="amv-empty-title">No active missions yet.</p>
-        <p className="amv-empty-sub">Engage contacts from the deck to launch missions.</p>
+        <p className="amv-empty-sub">Engage contacts from your deck to start missions.</p>
         {onGoToDeck && (
           <button className="amv-empty-cta" onClick={onGoToDeck}>
             Go to deck
@@ -38,6 +38,7 @@ export default function ActiveMissionsView({ contacts, onGoToDeck, onMissionComp
         <MissionCard
           key={contact.id}
           contact={contact}
+          reconConfidencePct={reconConfidencePct ?? null}
           onMissionComplete={(outcome) => onMissionComplete && onMissionComplete(contact, outcome)}
         />
       ))}

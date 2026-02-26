@@ -23,17 +23,27 @@ import { formatDistanceToNow } from 'date-fns';
 import './HunterContactCard.css';
 
 // ── RECON confidence dot ────────────────────────────────
+// Accepts reconConfidencePct (0-100) — the new interface from reconConfidence.js.
+// Also accepts legacy reconCompletion (0-1) for backward compatibility.
 
-function ReconDot({ reconCompletion }) {
-  if (reconCompletion === null || reconCompletion === undefined) {
+function ReconDot({ reconConfidencePct, reconCompletion }) {
+  // Normalise to a 0-100 integer
+  let pct = reconConfidencePct;
+  if (pct === null || pct === undefined) {
+    pct = reconCompletion !== null && reconCompletion !== undefined
+      ? Math.round(reconCompletion * 100)
+      : null;
+  }
+  if (pct === null || pct === undefined) {
     return <span className="hcc-recon-dot hcc-recon-dot--none" title="No RECON data" />;
   }
-  const level = reconCompletion >= 0.8 ? 'high' : reconCompletion >= 0.4 ? 'mid' : 'low';
+  const level = pct >= 80 ? 'high' : pct >= 40 ? 'mid' : 'low';
   const labels = { high: 'Strong context', mid: 'Partial context', low: 'Limited context' };
   return (
     <span
       className={`hcc-recon-dot hcc-recon-dot--${level}`}
-      title={`RECON: ${labels[level]} (${Math.round(reconCompletion * 100)}%)`}
+      title={`RECON: ${labels[level]} (${pct}%)`}
+      aria-label={`RECON: ${labels[level]}`}
     />
   );
 }
@@ -154,13 +164,17 @@ function BarryRead({ contact }) {
 
 export default function HunterContactCard({
   contact,
-  reconCompletion,
+  reconConfidencePct,
+  reconCompletion,       // legacy — accepted for compat
   hasActiveMission,
   onEngage,
   onArchive,
   isBackground
 }) {
   const cta = getCTAForContact(contact.relationship_state, hasActiveMission);
+  // reconEnhanced: true when user has enough RECON for Barry to be grounded (≥40%)
+  const pct = reconConfidencePct ?? (reconCompletion != null ? Math.round(reconCompletion * 100) : null);
+  const reconEnhanced = pct !== null && pct >= 40;
 
   if (isBackground) {
     return (
@@ -211,7 +225,15 @@ export default function HunterContactCard({
       <div className="hcc-barry-section">
         <div className="hcc-barry-header">
           <span className="hcc-barry-label">Barry</span>
-          <ReconDot reconCompletion={reconCompletion} />
+          <ReconDot reconConfidencePct={pct} />
+          {reconEnhanced && (
+            <span
+              className="hcc-recon-enhanced-badge"
+              title="Barry has enhanced context on this contact"
+            >
+              ◈ Enhanced
+            </span>
+          )}
         </div>
         <BarryRead contact={contact} />
       </div>

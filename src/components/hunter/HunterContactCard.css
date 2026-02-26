@@ -156,6 +156,15 @@
   color: #6b7280;
 }
 
+/* RECON enhanced badge */
+.hcc-recon-enhanced-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a78bfa;
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+}
+
 /* RECON confidence dot */
 .hcc-recon-dot {
   display: inline-block;

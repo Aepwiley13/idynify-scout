@@ -91,10 +91,11 @@ function CompanySwipeCard({ company, onAccept, onReject }) {
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: 420,
-        transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        top: 0, left: '50%', marginLeft: -210,
+        touchAction: 'pan-y',
+        top: 0, left: '50%',
       }}
     >
       {dx > 30 && (
@@ -234,10 +235,11 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: 420,
-        transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        top: 0, left: '50%', marginLeft: -210,
+        touchAction: 'pan-y',
+        top: 0, left: '50%',
       }}
     >
       {dx > 30 && (
@@ -742,7 +744,7 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {/* Content area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '18px 18px 8px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
 
         {/* ── Companies Tab ── */}
         {tab === 'companies' && (
@@ -784,7 +786,7 @@ export default function DailyLeads({ onNavigate }) {
             ) : (
               <>
                 {renderDots(companies.length, currentIndex)}
-                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H, overflowX: 'hidden' }}>
                   {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                   {currentCompany && (
                     <CompanySwipeCard
@@ -850,7 +852,7 @@ export default function DailyLeads({ onNavigate }) {
             ) : (
               <>
                 {renderDots(peopleQueue.length, currentPersonIdx)}
-                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H, overflowX: 'hidden' }}>
                   {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                     <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                   ))}

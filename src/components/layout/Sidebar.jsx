@@ -288,6 +288,17 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
       </nav>
 
+      {/* Settings Link */}
+      <button
+        className={`theme-toggle ${isCollapsed ? 'collapsed' : ''} ${isActive('/settings') ? 'active' : ''}`}
+        onClick={() => handleNavigation('/settings')}
+        title={isCollapsed ? 'Settings' : ''}
+        aria-label="Settings"
+      >
+        <Settings size={16} />
+        {!isCollapsed && <span className="theme-toggle-label">Settings</span>}
+      </button>
+
       {/* Theme Toggle */}
       <button
         className={`theme-toggle ${isCollapsed ? 'collapsed' : ''}`}

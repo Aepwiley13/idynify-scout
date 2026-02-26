@@ -79,6 +79,7 @@ const MainLayout = ({ children, user }) => {
 
     // Legacy RECON path
     if (pathname.startsWith('/mission-control-v2/recon')) return 'RECON';
+    if (pathname === '/settings') return 'Settings';
     if (pathname === '/admin') return 'Admin';
 
     return 'Idynify Scout';

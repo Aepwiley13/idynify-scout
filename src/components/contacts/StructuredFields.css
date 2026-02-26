@@ -94,6 +94,21 @@
   font-weight: 600;
 }
 
+/* Wide field variant — for relationship_state which has 9 options */
+.sf-field-wide {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+
+.sf-field-wide .sf-field-label {
+  min-width: unset;
+}
+
+.sf-field-wide .sf-options {
+  flex-wrap: wrap;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .sf-field {

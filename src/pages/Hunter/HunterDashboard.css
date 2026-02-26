@@ -1,0 +1,358 @@
+/* ============================================
+   HUNTER DASHBOARD
+   Pink/dark — Hunter module identity
+   ============================================ */
+
+.hunter-dashboard {
+  min-height: 100vh;
+  background: #0d0d1a;
+  color: #f3f4f6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────── */
+
+.hunter-header {
+  border-bottom: 1px solid rgba(236, 72, 153, 0.15);
+  background: rgba(13, 13, 26, 0.95);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.hunter-header-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hunter-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.hunter-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.hunter-back-btn:hover { background: rgba(255, 255, 255, 0.1); color: #f3f4f6; }
+
+.hunter-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hunter-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(236, 72, 153, 0.35);
+}
+
+.hunter-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.hunter-subtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1;
+}
+
+/* ── Tabs ───────────────────────────────────── */
+
+.hunter-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.625rem;
+  padding: 3px;
+}
+
+.hunter-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.4375rem;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.hunter-tab:hover { color: #d1d5db; }
+
+.hunter-tab--active {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f9a8d4;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.hunter-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: rgba(236, 72, 153, 0.4);
+  color: #fce7f3;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.hunter-tab-badge--muted {
+  background: rgba(107, 114, 128, 0.3);
+  color: #9ca3af;
+}
+
+/* ── Content ─────────────────────────────────── */
+
+.hunter-content {
+  flex: 1;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+/* Loading */
+.hunter-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.hunter-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(236, 72, 153, 0.2);
+  border-top-color: #ec4899;
+  border-radius: 50%;
+  animation: hunter-spin 0.8s linear infinite;
+}
+
+@keyframes hunter-spin { to { transform: rotate(360deg); } }
+
+/* Deck view */
+.hunter-deck-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hunter-deck-count {
+  font-size: 0.8125rem;
+  color: #4b5563;
+  text-align: center;
+  margin: 0;
+}
+
+/* Active + Archived view */
+.hunter-active-view,
+.hunter-archived-view {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Empty states */
+.hunter-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.hunter-empty-icon {
+  font-size: 2.5rem;
+}
+
+.hunter-empty-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #d1d5db;
+  margin: 0;
+}
+
+.hunter-empty-sub {
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 0;
+  max-width: 280px;
+}
+
+.hunter-empty-cta {
+  margin-top: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.hunter-empty-cta:hover { opacity: 0.88; }
+
+/* Contact list (Active + Archived) */
+.hunter-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.hunter-list-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.875rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hunter-list-card--active:hover {
+  background: rgba(236, 72, 153, 0.06);
+  border-color: rgba(236, 72, 153, 0.2);
+}
+
+.hunter-list-card--archived {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.hunter-list-card--archived:hover { opacity: 0.85; }
+
+.hunter-list-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.625rem;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hunter-list-card-avatar--muted {
+  background: #1f2937;
+  color: #6b7280;
+}
+
+.hunter-list-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hunter-list-card-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hunter-list-card-sub {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status badges */
+.hunter-status-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 1rem;
+  white-space: nowrap;
+}
+
+.hunter-status-badge--active {
+  background: rgba(236, 72, 153, 0.15);
+  color: #f9a8d4;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.hunter-status-badge--pending {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  animation: hunter-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes hunter-pulse {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
+}
+
+/* Restore button */
+.hunter-restore-btn {
+  padding: 0.375rem 0.875rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.hunter-restore-btn:hover {
+  background: rgba(236, 72, 153, 0.1);
+  border-color: rgba(236, 72, 153, 0.25);
+  color: #f9a8d4;
+}

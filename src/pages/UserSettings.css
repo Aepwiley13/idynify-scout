@@ -1,0 +1,157 @@
+/* ============================================
+   USER SETTINGS PAGE
+   Minimal — settings don't need decoration.
+   ============================================ */
+
+.user-settings {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+/* Header */
+.us-header {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 2rem;
+}
+
+.us-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.us-back-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3f4f6;
+}
+
+.us-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f9fafb;
+  letter-spacing: -0.01em;
+}
+
+/* Content */
+.us-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Section */
+.us-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.us-section-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+  margin: 0 0 0.25rem;
+}
+
+/* Row */
+.us-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.875rem;
+}
+
+.us-row-info {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.us-row-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0.625rem;
+  background: rgba(236, 72, 153, 0.12);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f9a8d4;
+  flex-shrink: 0;
+}
+
+.us-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.us-row-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.us-row-desc {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+/* Toggle switch */
+.us-toggle {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.us-toggle--on {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+}
+
+.us-toggle--off {
+  background: #374151;
+}
+
+.us-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: left 0.2s ease;
+}
+
+.us-toggle--on .us-toggle-thumb {
+  left: calc(100% - 25px);
+}
+
+.us-toggle--off .us-toggle-thumb {
+  left: 3px;
+}

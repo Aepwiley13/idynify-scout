@@ -1,0 +1,123 @@
+/* ============================================
+   HUNTER CARD STACK
+   Container, layering, swipe indicator overlay
+   ============================================ */
+
+.hcs-stack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 540px;
+  /* Enough vertical clearance for the next card to peek below */
+}
+
+/* Card layers */
+.hcs-card-layer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 360px;
+}
+
+.hcs-card-layer--next {
+  z-index: 1;
+  top: 16px; /* slightly lower = depth effect */
+  transform: translateX(-50%) scale(0.96);
+  pointer-events: none;
+}
+
+.hcs-card-layer--current {
+  z-index: 2;
+  touch-action: none; /* required for pointer capture on mobile */
+}
+
+/* Swipe direction overlay on the card */
+.hcs-swipe-indicator {
+  position: absolute;
+  top: 1rem;
+  z-index: 10;
+  padding: 0.375rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.hcs-swipe-indicator--engage {
+  top: 0.875rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(236, 72, 153, 0.9);
+  color: white;
+  box-shadow: 0 4px 20px rgba(236, 72, 153, 0.4);
+}
+
+.hcs-swipe-indicator--archive {
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  background: rgba(107, 114, 128, 0.9);
+  color: white;
+}
+
+/* Empty state */
+.hcs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.hcs-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.hcs-empty-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #d1d5db;
+  margin: 0;
+}
+
+.hcs-empty-sub {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  max-width: 260px;
+}
+
+.hcs-empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.hcs-empty-cta {
+  margin-top: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.hcs-empty-cta:hover {
+  opacity: 0.9;
+}

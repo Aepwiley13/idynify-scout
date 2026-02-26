@@ -4,6 +4,7 @@ import { db, auth } from '../../firebase/config';
 import { Settings2 } from 'lucide-react';
 import {
   RELATIONSHIP_TYPES,
+  RELATIONSHIP_STATES,
   WARMTH_LEVELS,
   STRATEGIC_VALUES,
   getLabelById
@@ -60,20 +61,21 @@ export default function StructuredFields({ contact, onUpdate }) {
       </div>
 
       <div className="structured-fields-grid">
+        {/* Relationship State — primary Hunter signal */}
+        <FieldSelector
+          label="Relationship State"
+          options={RELATIONSHIP_STATES}
+          value={contact.relationship_state || null}
+          onChange={(val) => handleFieldChange('relationship_state', val)}
+          wide
+        />
+
         {/* Relationship Type */}
         <FieldSelector
           label="Relationship"
           options={RELATIONSHIP_TYPES}
           value={contact.relationship_type || null}
           onChange={(val) => handleFieldChange('relationship_type', val)}
-        />
-
-        {/* Warmth Level */}
-        <FieldSelector
-          label="Warmth"
-          options={WARMTH_LEVELS}
-          value={contact.warmth_level || null}
-          onChange={(val) => handleFieldChange('warmth_level', val)}
         />
 
         {/* Strategic Value */}
@@ -88,9 +90,9 @@ export default function StructuredFields({ contact, onUpdate }) {
   );
 }
 
-function FieldSelector({ label, options, value, onChange }) {
+function FieldSelector({ label, options, value, onChange, wide }) {
   return (
-    <div className="sf-field">
+    <div className={`sf-field ${wide ? 'sf-field-wide' : ''}`}>
       <span className="sf-field-label">{label}</span>
       <div className="sf-options">
         {options.map((option) => (

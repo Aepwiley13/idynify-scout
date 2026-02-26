@@ -1,0 +1,458 @@
+/* ── MissionCard ─────────────────────────────────────────────────────────── */
+
+.mc-card {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Header ── */
+.mc-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mc-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e63946, #c1121f);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mc-contact-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mc-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f0f0f0;
+  line-height: 1.3;
+}
+
+.mc-sub {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mc-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.mc-state-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: capitalize;
+}
+
+.mc-goal-badge {
+  font-size: 10px;
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: capitalize;
+}
+
+/* ── Barry reasoning ── */
+.mc-barry-reasoning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(230, 57, 70, 0.08);
+  border-left: 2px solid #e63946;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #d1d5db;
+  line-height: 1.5;
+}
+
+.mc-sparkle {
+  color: #e63946;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Loading state ── */
+.mc-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+}
+
+.mc-loading-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.mc-loading-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e63946;
+  animation: mc-bounce 1.2s infinite ease-in-out;
+}
+
+.mc-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.mc-loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes mc-bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.mc-loading-text {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.5;
+  max-width: 280px;
+}
+
+/* ── Error state ── */
+.mc-error {
+  padding: 12px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mc-error-msg {
+  font-size: 13px;
+  color: #fca5a5;
+  line-height: 1.4;
+}
+
+.mc-error-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Intake prompt ── */
+.mc-intake-prompt {
+  padding: 12px;
+  background: rgba(167, 139, 250, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mc-intake-note {
+  font-size: 12px;
+  color: #c4b5fd;
+  line-height: 1.5;
+}
+
+/* ── Step header ── */
+.mc-step-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mc-step-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mc-barry-note {
+  font-size: 12px;
+  color: #a78bfa;
+  font-style: italic;
+}
+
+/* ── Actions ── */
+.mc-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.mc-btn:hover { opacity: 0.85; }
+.mc-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.mc-btn--send {
+  background: #e63946;
+  color: #fff;
+  padding: 10px 22px;
+}
+
+.mc-btn--retry {
+  background: rgba(255,255,255,0.08);
+  color: #f0f0f0;
+}
+
+.mc-btn--manual {
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.mc-btn--intake {
+  background: rgba(167, 139, 250, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+.mc-outcome-cta {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #9ca3af;
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.mc-outcome-cta:hover {
+  border-color: rgba(230, 57, 70, 0.4);
+  color: #f0f0f0;
+}
+
+/* ── Step progress toggle ── */
+.mc-steps-section {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 12px;
+}
+
+.mc-steps-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.mc-steps-toggle:hover { color: #9ca3af; }
+
+/* ── AngleSelector (inline styles) ── */
+.as-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.as-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #9ca3af;
+  transition: all 0.15s;
+}
+
+.as-tab:hover {
+  border-color: rgba(255,255,255,0.2);
+  color: #f0f0f0;
+}
+
+.as-tab--selected {
+  background: rgba(230, 57, 70, 0.15);
+  border-color: rgba(230, 57, 70, 0.5);
+  color: #fca5a5;
+}
+
+.as-tab--recommended {
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+.as-tab--selected.as-tab--recommended {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.6);
+  color: #c4b5fd;
+}
+
+.as-star {
+  font-size: 10px;
+  color: #a78bfa;
+}
+
+/* ── EditableMessageField (inline styles) ── */
+.emf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.emf-subject-row,
+.emf-body-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.emf-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.emf-subject {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #f0f0f0;
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.emf-subject:focus {
+  border-color: rgba(230, 57, 70, 0.4);
+}
+
+.emf-body {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #f0f0f0;
+  font-size: 13px;
+  padding: 10px 12px;
+  outline: none;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+  width: 100%;
+  font-family: inherit;
+}
+
+.emf-body:focus {
+  border-color: rgba(230, 57, 70, 0.4);
+}
+
+/* ── MissionStepProgress (inline styles) ── */
+.msp-track {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+}
+
+.msp-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+}
+
+.msp-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.msp-step--done .msp-dot {
+  background: #34d399;
+  color: #fff;
+}
+
+.msp-step--current .msp-dot {
+  background: #e63946;
+  color: #fff;
+}
+
+.msp-step--pending .msp-dot {
+  background: rgba(255,255,255,0.08);
+  color: #6b7280;
+}
+
+.msp-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 16px;
+}
+
+.msp-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+.msp-sub {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.msp-connector {
+  position: absolute;
+  left: 9px;
+  top: 22px;
+  width: 2px;
+  height: calc(100% - 4px);
+  background: rgba(255,255,255,0.08);
+}

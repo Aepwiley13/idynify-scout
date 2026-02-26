@@ -1,323 +1,424 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, doc, getDoc, where, limit, onSnapshot } from 'firebase/firestore';
+/**
+ * HunterDashboard — Rebuilt as the Hunter card deck entry point.
+ *
+ * Primary surface: card deck swipe experience (Hunter spec).
+ * Secondary surface: Active Missions tab (contacts with hunter_status: 'active_mission')
+ * Archived tab: contacts with hunter_status: 'archived' — retrievable.
+ *
+ * On first load, runs hunterBootstrap to seed relationship_state and hunter_status
+ * for existing contacts that predate those fields.
+ *
+ * Engage flow:
+ *   1. Card rocket launches (animation in HunterCardStack)
+ *   2. Contact hunter_status → 'engaged_pending' (immediate)
+ *   3. Barry processes in background (barryGenerateMissionSequence)
+ *   4. Contact hunter_status → 'active_mission' (on Barry completion)
+ *
+ * Archive flow:
+ *   1. Card slides left
+ *   2. Contact hunter_status → 'archived'
+ *   3. Contact appears in Archived tab, retrievable
+ */
+
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  collection, getDocs, query, where, orderBy,
+  doc, updateDoc, onSnapshot
+} from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Mail, Plus, CheckCircle, Clock, Send, ArrowLeft, Sparkles } from 'lucide-react';
-import FollowUpCard from '../../components/hunter/FollowUpCard';
+import { ArrowLeft, Target, CheckCircle, Archive as ArchiveIcon } from 'lucide-react';
+import HunterCardStack from '../../components/hunter/HunterCardStack';
+import { bootstrapContactsForUser } from '../../utils/hunterBootstrap';
+import { getDefaultOutcomeGoal } from '../../constants/structuredFields';
+import './HunterDashboard.css';
+
+const TABS = ['deck', 'active', 'archived'];
 
 export default function HunterDashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [campaigns, setCampaigns] = useState([]);
+  const [tab, setTab] = useState('deck');
+  const [deckContacts, setDeckContacts] = useState([]);
+  const [activeContacts, setActiveContacts] = useState([]);
+  const [archivedContacts, setArchivedContacts] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [gmailEmail, setGmailEmail] = useState('');
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
-  const [followUps, setFollowUps] = useState([]);
-
-  // Keep a ref to the notifications unsubscribe so we can clean up on unmount
-  const unsubNotificationsRef = useRef(null);
+  const [bootstrapping, setBootstrapping] = useState(false);
+  const unsubRef = useRef(null);
 
   useEffect(() => {
-    loadData();
-
-    // Check for OAuth success
-    const params = new URLSearchParams(location.search);
-    if (params.get('connected') === 'true') {
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
-      // Remove query param
-      navigate('/hunter', { replace: true });
-    }
-
-    return () => {
-      if (unsubNotificationsRef.current) {
-        unsubNotificationsRef.current();
-      }
-    };
+    initHunter();
+    return () => { if (unsubRef.current) unsubRef.current(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function loadData() {
+  async function initHunter() {
+    const user = auth.currentUser;
+    if (!user) { navigate('/login'); return; }
+
+    // Bootstrap existing contacts (seeds relationship_state + hunter_status)
+    // Only runs if contacts are missing these fields — safe to call every time
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
+      setBootstrapping(true);
+      await bootstrapContactsForUser(user.uid);
+    } catch (err) {
+      console.warn('[Hunter] Bootstrap warning (non-fatal):', err.message);
+    } finally {
+      setBootstrapping(false);
+    }
 
-      // Check Gmail connection
-      const gmailDoc = await getDoc(doc(db, 'users', user.uid, 'integrations', 'gmail'));
-      if (gmailDoc.exists()) {
-        const gmailData = gmailDoc.data();
-        setGmailConnected(gmailData.status === 'connected');
-        setGmailEmail(gmailData.email || '');
-      }
+    // Real-time listener for deck contacts
+    const contactsRef = collection(db, 'users', user.uid, 'contacts');
 
-      // Load campaigns
-      const campaignsRef = collection(db, 'users', user.uid, 'campaigns');
-      const campaignsQuery = query(campaignsRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(campaignsQuery);
+    const deckQuery = query(
+      contactsRef,
+      where('hunter_status', '==', 'deck'),
+      orderBy('strategic_value', 'desc')
+    );
 
-      const campaignsList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const activeQuery = query(
+      contactsRef,
+      where('hunter_status', 'in', ['active_mission', 'engaged_pending']),
+      orderBy('updated_at', 'desc')
+    );
 
-      setCampaigns(campaignsList);
-      setLoading(false);
+    const archivedQuery = query(
+      contactsRef,
+      where('hunter_status', '==', 'archived'),
+      orderBy('updated_at', 'desc')
+    );
 
-      // Real-time listener for unread follow-up notifications
-      const notificationsRef = collection(db, 'users', user.uid, 'notifications');
-      const notifQuery = query(
-        notificationsRef,
-        where('read', '==', false),
-        where('type', '==', 'follow_up_due'),
-        orderBy('createdAt', 'desc'),
-        limit(10)
-      );
+    let deckData = [], activeData = [], archivedData = [];
+    let loadedCount = 0;
 
-      unsubNotificationsRef.current = onSnapshot(notifQuery, snapshot => {
-        setFollowUps(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      }, err => {
-        console.error('[HunterDashboard] Notifications listener error:', err);
+    function checkAllLoaded() {
+      loadedCount++;
+      if (loadedCount >= 3) setLoading(false);
+    }
+
+    const unsubDeck = onSnapshot(deckQuery, snap => {
+      deckData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setDeckContacts([...deckData]);
+      checkAllLoaded();
+    }, err => {
+      console.error('[Hunter] Deck listener error:', err);
+      checkAllLoaded();
+    });
+
+    const unsubActive = onSnapshot(activeQuery, snap => {
+      activeData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setActiveContacts([...activeData]);
+      checkAllLoaded();
+    }, err => {
+      console.error('[Hunter] Active listener error:', err);
+      checkAllLoaded();
+    });
+
+    const unsubArchived = onSnapshot(archivedQuery, snap => {
+      archivedData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setArchivedContacts([...archivedData]);
+      checkAllLoaded();
+    }, err => {
+      console.error('[Hunter] Archived listener error:', err);
+      checkAllLoaded();
+    });
+
+    unsubRef.current = () => { unsubDeck(); unsubActive(); unsubArchived(); };
+  }
+
+  // ── Engage handler ──────────────────────────────────────
+
+  const handleEngage = useCallback(async (contact) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // Advance index immediately (card is already animating off screen)
+    setCurrentIndex(prev => prev + 1);
+
+    // Set to engaged_pending immediately — holds the contact in limbo
+    // while Barry generates the mission in background
+    const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+    try {
+      await updateDoc(contactRef, {
+        hunter_status: 'engaged_pending',
+        hunter_engaged_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
-    } catch (error) {
-      console.error('Error loading Hunter data:', error);
-      setLoading(false);
+    } catch (err) {
+      console.error('[Hunter] Failed to set engaged_pending:', err);
+    }
+
+    // Background: create the mission
+    createMissionInBackground(user, contact, contactRef);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function createMissionInBackground(user, contact, contactRef) {
+    try {
+      const authToken = await user.getIdToken();
+      const outcomeGoal = getDefaultOutcomeGoal(contact.relationship_state);
+
+      const res = await fetch('/.netlify/functions/barryGenerateMissionSequence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          contact,
+          missionParams: {
+            outcome_goal: outcomeGoal,
+            engagement_style: 'moderate',
+            timeframe: 'this_month',
+            source: 'hunter_deck'
+          }
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.missionId) {
+        // Mission created — move contact to active_mission
+        await updateDoc(contactRef, {
+          hunter_status: 'active_mission',
+          active_mission_id: data.missionId,
+          updated_at: new Date().toISOString()
+        });
+      } else {
+        console.warn('[Hunter] Mission generation incomplete, contact stays in engaged_pending');
+      }
+    } catch (err) {
+      console.error('[Hunter] Background mission creation failed:', err);
+      // Contact stays in engaged_pending — user will see it in Active tab
+      // and Barry will retry on next visit
     }
   }
 
-  function handleDismissFollowUp(notificationId) {
-    setFollowUps(prev => prev.filter(n => n.id !== notificationId));
-  }
+  // ── Archive handler ─────────────────────────────────────
 
-  async function handleConnectGmail() {
+  const handleArchive = useCallback(async (contact) => {
     const user = auth.currentUser;
-    const authToken = await user.getIdToken();
+    if (!user) return;
 
-    const response = await fetch('/.netlify/functions/gmail-oauth-init', {
-      method: 'POST',
-      body: JSON.stringify({ userId: user.uid, authToken })
-    });
+    setCurrentIndex(prev => prev + 1);
 
-    const data = await response.json();
-    window.location.href = data.authUrl;
-  }
+    const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+    try {
+      await updateDoc(contactRef, {
+        hunter_status: 'archived',
+        hunter_archived_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[Hunter] Failed to archive contact:', err);
+    }
+  }, []);
 
-  function getCampaignStats(campaign) {
-    const total = campaign.messages?.length || 0;
-    const sent = campaign.messages?.filter(m => m.status === 'sent').length || 0;
-    const pending = total - sent;
-    return { total, sent, pending };
-  }
+  // ── Restore from archive ────────────────────────────────
 
-  const userId = auth.currentUser?.uid;
+  const handleRestore = useCallback(async (contact) => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-cyan-400 text-xl font-mono">Loading Hunter...</div>
-      </div>
-    );
-  }
+    const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+    try {
+      await updateDoc(contactRef, {
+        hunter_status: 'deck',
+        hunter_archived_at: null,
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[Hunter] Failed to restore contact:', err);
+    }
+  }, []);
+
+  // ── Render ──────────────────────────────────────────────
+
+  const deckCount = deckContacts.length;
+  const activeCount = activeContacts.length;
+  const archivedCount = archivedContacts.length;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* Success Toast */}
-      {showSuccessToast && (
-        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50">
-          <CheckCircle className="w-5 h-5" />
-          Gmail connected successfully!
-        </div>
-      )}
-
+    <div className="hunter-dashboard">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-gray-50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/mission-control-v2')}
-                className="text-gray-500 hover:text-gray-900 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-                  <Mail className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold">Hunter</h1>
-                  <p className="text-sm text-gray-500">Outreach Execution</p>
-                </div>
+      <div className="hunter-header">
+        <div className="hunter-header-inner">
+          <div className="hunter-header-left">
+            <button
+              className="hunter-back-btn"
+              onClick={() => navigate('/mission-control-v2')}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="hunter-identity">
+              <div className="hunter-icon-wrap">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="hunter-title">Hunter</h1>
+                <p className="hunter-subtitle">Engage your contacts</p>
               </div>
             </div>
+          </div>
 
-            <div className="flex items-center gap-4">
-              {/* Gmail Status Badge */}
-              {gmailConnected ? (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg">
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                  <span className="text-sm text-green-400">{gmailEmail}</span>
-                </div>
-              ) : (
-                <button
-                  onClick={handleConnectGmail}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Connect Gmail
-                </button>
-              )}
-
-              {/* Create Campaign Button */}
-              <button
-                onClick={() => navigate('/hunter/campaign/new')}
-                disabled={!gmailConnected}
-                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-all ${
-                  gmailConnected
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 shadow-lg'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                <Plus className="w-5 h-5" />
-                Create Campaign
-              </button>
-            </div>
+          {/* Tab switcher */}
+          <div className="hunter-tabs">
+            <button
+              className={`hunter-tab ${tab === 'deck' ? 'hunter-tab--active' : ''}`}
+              onClick={() => setTab('deck')}
+            >
+              Deck
+              {deckCount > 0 && <span className="hunter-tab-badge">{deckCount}</span>}
+            </button>
+            <button
+              className={`hunter-tab ${tab === 'active' ? 'hunter-tab--active' : ''}`}
+              onClick={() => setTab('active')}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              Active
+              {activeCount > 0 && <span className="hunter-tab-badge">{activeCount}</span>}
+            </button>
+            <button
+              className={`hunter-tab ${tab === 'archived' ? 'hunter-tab--active' : ''}`}
+              onClick={() => setTab('archived')}
+            >
+              <ArchiveIcon className="w-3.5 h-3.5" />
+              Archived
+              {archivedCount > 0 && <span className="hunter-tab-badge hunter-tab-badge--muted">{archivedCount}</span>}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Gmail Connection Card (if not connected) */}
-        {!gmailConnected && (
-          <div className="mb-8 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-2xl p-8">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0">
-                <Mail className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold mb-2">Connect Gmail to Start Sending</h3>
-                <p className="text-gray-700 mb-4">
-                  Hunter sends emails directly from your Gmail account. Connect your Gmail to create campaigns and send personalized outreach.
-                </p>
-                <button
-                  onClick={handleConnectGmail}
-                  className="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg font-bold transition-colors"
-                >
-                  Connect Gmail Account
-                </button>
-              </div>
-            </div>
+      {/* Content */}
+      <div className="hunter-content">
+        {loading ? (
+          <div className="hunter-loading">
+            <div className="hunter-loading-spinner" />
+            {bootstrapping
+              ? 'Barry is orienting your contacts...'
+              : 'Loading Hunter...'}
           </div>
-        )}
-
-        {/* Follow-Ups Section — live from notifications collection */}
-        {followUps.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span>⚡</span>
-              Follow Ups
-              <span className="ml-1 bg-purple-100 text-purple-700 text-xs font-mono font-bold px-2 py-0.5 rounded-full">
-                {followUps.length}
-              </span>
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {followUps.map(notification => (
-                <FollowUpCard
-                  key={notification.id}
-                  notification={notification}
-                  userId={userId}
-                  onDismiss={handleDismissFollowUp}
+        ) : (
+          <>
+            {/* Deck tab */}
+            {tab === 'deck' && (
+              <div className="hunter-deck-view">
+                <HunterCardStack
+                  contacts={deckContacts}
+                  currentIndex={currentIndex}
+                  onEngage={handleEngage}
+                  onArchive={handleArchive}
+                  onDeckEmpty={() => setTab('active')}
                 />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Campaigns List */}
-        <div>
-          <h2 className="text-xl font-bold mb-4">Campaigns</h2>
-
-          {campaigns.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-gray-400" />
+                {deckContacts.length > 0 && currentIndex < deckContacts.length && (
+                  <p className="hunter-deck-count">
+                    {deckContacts.length - currentIndex} contact{deckContacts.length - currentIndex !== 1 ? 's' : ''} remaining
+                  </p>
+                )}
               </div>
-              <h3 className="text-lg font-bold mb-2">No campaigns yet</h3>
-              <p className="text-gray-500 mb-6">
-                {gmailConnected
-                  ? "Create your first campaign to start outreach!"
-                  : "Connect Gmail to create your first campaign"
-                }
-              </p>
-              {gmailConnected && (
-                <button
-                  onClick={() => navigate('/hunter/campaign/new')}
-                  className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg font-bold transition-all"
-                >
-                  Create First Campaign
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {campaigns.map(campaign => {
-                const stats = getCampaignStats(campaign);
-                const statusColor = {
-                  draft: 'text-gray-500 bg-gray-100',
-                  in_progress: 'text-blue-400 bg-blue-500/20',
-                  completed: 'text-green-400 bg-green-500/20'
-                }[campaign.status] || 'text-gray-500 bg-gray-100';
+            )}
 
-                return (
-                  <div
-                    key={campaign.id}
-                    onClick={() => navigate(`/hunter/campaign/${campaign.id}`)}
-                    className="bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-xl p-6 cursor-pointer transition-all hover:bg-gray-100"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-bold">{campaign.name}</h3>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-                            {campaign.status === 'in_progress' ? 'In Progress' : campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
-                          </span>
-                          {campaign.reconUsed && (
-                            <span className="flex items-center gap-1 px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full text-xs text-purple-400">
-                              <Sparkles className="w-3 h-3" />
-                              RECON
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-6 text-sm text-gray-500">
-                          <span className="flex items-center gap-2">
-                            <Mail className="w-4 h-4" />
-                            {stats.total} contacts
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-400" />
-                            {stats.sent} sent
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-gray-500" />
-                            {stats.pending} pending
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="text-right text-sm text-gray-400">
-                        {new Date(campaign.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
+            {/* Active Missions tab */}
+            {tab === 'active' && (
+              <div className="hunter-active-view">
+                {activeContacts.length === 0 ? (
+                  <div className="hunter-empty">
+                    <div className="hunter-empty-icon">🎯</div>
+                    <p className="hunter-empty-title">No active missions yet.</p>
+                    <p className="hunter-empty-sub">Engage contacts from the deck to launch missions.</p>
+                    <button className="hunter-empty-cta" onClick={() => setTab('deck')}>
+                      Go to deck
+                    </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ) : (
+                  <div className="hunter-contact-list">
+                    {activeContacts.map(contact => (
+                      <ActiveMissionCard
+                        key={contact.id}
+                        contact={contact}
+                        onClick={() => navigate(`/hunter/mission/${contact.active_mission_id || contact.id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Archived tab */}
+            {tab === 'archived' && (
+              <div className="hunter-archived-view">
+                {archivedContacts.length === 0 ? (
+                  <div className="hunter-empty">
+                    <div className="hunter-empty-icon">📁</div>
+                    <p className="hunter-empty-title">Nothing archived yet.</p>
+                    <p className="hunter-empty-sub">Contacts you archive from the deck appear here.</p>
+                  </div>
+                ) : (
+                  <div className="hunter-contact-list">
+                    {archivedContacts.map(contact => (
+                      <ArchivedCard
+                        key={contact.id}
+                        contact={contact}
+                        onRestore={() => handleRestore(contact)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-components ─────────────────────────────────────
+
+function ActiveMissionCard({ contact, onClick }) {
+  const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+  const isPending = contact.hunter_status === 'engaged_pending';
+
+  return (
+    <div className="hunter-list-card hunter-list-card--active" onClick={onClick}>
+      <div className="hunter-list-card-avatar">
+        {name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+      </div>
+      <div className="hunter-list-card-info">
+        <div className="hunter-list-card-name">{name}</div>
+        <div className="hunter-list-card-sub">
+          {[contact.title, contact.company_name].filter(Boolean).join(' · ')}
         </div>
       </div>
+      <div className="hunter-list-card-status">
+        {isPending ? (
+          <span className="hunter-status-badge hunter-status-badge--pending">Barry working...</span>
+        ) : (
+          <span className="hunter-status-badge hunter-status-badge--active">Active Mission</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ArchivedCard({ contact, onRestore }) {
+  const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+
+  return (
+    <div className="hunter-list-card hunter-list-card--archived">
+      <div className="hunter-list-card-avatar hunter-list-card-avatar--muted">
+        {name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+      </div>
+      <div className="hunter-list-card-info">
+        <div className="hunter-list-card-name">{name}</div>
+        <div className="hunter-list-card-sub">
+          {[contact.title, contact.company_name].filter(Boolean).join(' · ')}
+        </div>
+      </div>
+      <button
+        className="hunter-restore-btn"
+        onClick={(e) => { e.stopPropagation(); onRestore(); }}
+      >
+        Restore
+      </button>
     </div>
   );
 }

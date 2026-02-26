@@ -192,6 +192,79 @@ export const NEXT_STEP_TYPES = [
   { id: 'follow_up', label: 'Follow Up', description: 'Check in after a previous interaction' }
 ];
 
+// ── Hunter Status ───────────────────────────────────────
+
+/**
+ * HUNTER_STATUS — Contact lifecycle within the Hunter deck.
+ * 'deck'             — In the swipe queue, awaiting a decision
+ * 'engaged_pending'  — Rocket launched; Barry processing in background (3–5s gap)
+ * 'active_mission'   — In Active Missions, mission created
+ * 'archived'         — Soft-dismissed from deck; retrievable from Archived tab
+ */
+export const HUNTER_STATUSES = ['deck', 'engaged_pending', 'active_mission', 'archived'];
+
+// ── CTA Label Engine ────────────────────────────────────
+
+/**
+ * CTA_LABEL_MAP — Maps relationship_state to the correct button label for Hunter cards.
+ * When an active mission exists, always use 'active_mission' key regardless of state.
+ * For unmapped states, fallback is 'Engage'.
+ */
+export const CTA_LABEL_MAP = {
+  unaware:          { outcomeGoal: 'enter_conversation',    label: 'Start Conversation' },
+  aware:            { outcomeGoal: 'build_rapport',         label: 'Build Rapport' },
+  engaged:          { outcomeGoal: 'deepen_conversation',   label: 'Deepen Conversation' },
+  warm:             { outcomeGoal: 'deepen_conversation',   label: 'Deepen Relationship' },
+  trusted:          { outcomeGoal: 'get_introduction',      label: 'Request Introduction' },
+  advocate:         { outcomeGoal: 'strengthen_loyalty',    label: 'Strengthen Relationship' },
+  dormant:          { outcomeGoal: 'reconnect',             label: 'Reconnect' },
+  strained:         { outcomeGoal: 'rebuild_relationship',  label: 'Rebuild Trust' },
+  strategic_partner:{ outcomeGoal: 'strategic_alignment',   label: 'Advance Partnership' },
+  active_mission:   { outcomeGoal: 'define_next_step',      label: 'Advance Mission' }
+};
+
+/**
+ * getCTAForContact — Returns { label, outcomeGoal } for the Hunter Engage button.
+ * Pass hasActiveMission=true to override with 'Advance Mission' regardless of state.
+ */
+export function getCTAForContact(relationshipState, hasActiveMission = false) {
+  if (hasActiveMission) return CTA_LABEL_MAP.active_mission;
+  return CTA_LABEL_MAP[relationshipState] || { outcomeGoal: 'enter_conversation', label: 'Engage' };
+}
+
+/**
+ * getDefaultOutcomeGoal — Returns the Barry-recommended outcome_goal for a given
+ * relationship_state. Used to auto-select outcome_goal in mission setup instead of
+ * making the user pick from 60+ goals.
+ */
+export function getDefaultOutcomeGoal(relationshipState) {
+  const mapping = CTA_LABEL_MAP[relationshipState];
+  return mapping?.outcomeGoal || 'enter_conversation';
+}
+
+// ── OUTCOME_GOALS grouped by category ──────────────────
+
+/**
+ * OUTCOME_GOALS_BY_CATEGORY — Same goals, grouped for UI dropdowns that
+ * need category sections. Keys match the category field on each goal.
+ */
+export const OUTCOME_GOALS_BY_CATEGORY = OUTCOME_GOALS.reduce((acc, goal) => {
+  if (!acc[goal.category]) acc[goal.category] = [];
+  acc[goal.category].push(goal);
+  return acc;
+}, {});
+
+export const OUTCOME_GOAL_CATEGORIES = [
+  { id: 'awareness',    label: 'Awareness & Relevance' },
+  { id: 'engagement',  label: 'Engagement & Trust Building' },
+  { id: 'strategic',   label: 'Strategic Advancement' },
+  { id: 'maintenance', label: 'Relationship Maintenance' },
+  { id: 'expansion',   label: 'Expansion & Leverage' },
+  { id: 'validation',  label: 'Validation & Insight' },
+  { id: 'transactional', label: 'Transactional' },
+  { id: 'meta',        label: 'Meta-Outcomes' }
+];
+
 // ── Lookup helpers ──────────────────────────────────────
 
 export function getLabelById(options, id) {

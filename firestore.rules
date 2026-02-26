@@ -15,6 +15,13 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // Notifications subcollection — explicit rule for clarity.
+    // process-barry-queue.js writes via Admin SDK (bypasses rules).
+    // HunterDashboard onSnapshot reads via web SDK (hits this rule).
+    match /users/{userId}/notifications/{notificationId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // API Logs collection - write allowed for all authenticated users (for logging)
     // Read access handled by admin backend (not exposed to frontend)
     match /apiLogs/{logId} {

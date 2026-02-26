@@ -463,7 +463,7 @@ function HunterDeck({ userId, onClose }) {
       // Write to Barry's attention queue
       await setDoc(
         doc(collection(db, 'users', userId, 'barryQueue')),
-        { contactId: contact.id, reason: 're_engage', createdAt: Timestamp.now() }
+        { contactId: contact.id, reason: 're_engage', createdAt: Timestamp.now(), processed: false }
       );
       setQueued(q => q + 1);
     } catch (err) {

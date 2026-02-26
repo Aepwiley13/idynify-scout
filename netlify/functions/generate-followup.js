@@ -48,9 +48,12 @@ exports.handler = async (event) => {
     }
     const contactData = contactDoc.data();
 
-    // Fetch original campaign for context
-    const campaignDoc = await db.collection('users').doc(userId).collection('campaigns').doc(originalCampaignId).get();
-    const campaignData = campaignDoc.exists ? campaignDoc.data() : {};
+    // Fetch original campaign for context (skip if no campaign ID — e.g. follow-ups from FollowUpCard)
+    let campaignData = {};
+    if (originalCampaignId && originalCampaignId !== 'null') {
+      const campaignDoc = await db.collection('users').doc(userId).collection('campaigns').doc(originalCampaignId).get();
+      campaignData = campaignDoc.exists ? campaignDoc.data() : {};
+    }
 
     // Build prompt for follow-up generation
     const prompt = `You are a B2B sales follow-up email writer. Generate a follow-up email body based on the context below.

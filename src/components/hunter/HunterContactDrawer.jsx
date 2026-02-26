@@ -927,6 +927,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                     preamble={null}
                     userId={auth.currentUser?.uid}
                     contactName={`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || null}
+                    theme="light"
                   />
                 </div>
               )}

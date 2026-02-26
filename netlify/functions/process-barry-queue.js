@@ -77,16 +77,12 @@ const handler = async () => {
  */
 async function processUserQueue(userId, results) {
   const queueRef = db.collection('users').doc(userId).collection('barryQueue');
+  // where('processed', '!=', true) matches docs where the field is missing,
+  // null, false, or any value other than true — correctly handles all write sites.
   const unprocessedSnap = await queueRef
-    .where('processed', '==', null)
+    .where('processed', '!=', true)
     .get();
-
-  // Firestore doesn't return docs where the field doesn't exist when using == null
-  // in Admin SDK — also query for docs without the field by fetching all and filtering
-  const allUnprocessedSnap = await queueRef.get();
-  const docs = allUnprocessedSnap.docs.filter(
-    d => d.data().processed == null || d.data().processed === false
-  );
+  const docs = unprocessedSnap.docs;
 
   if (docs.length === 0) return;
 

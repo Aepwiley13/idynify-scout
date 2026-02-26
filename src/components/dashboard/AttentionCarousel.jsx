@@ -37,7 +37,7 @@ export default function AttentionCarousel({ recommendations = [], userId, loadin
       });
       await setDoc(
         doc(collection(db, 'users', userId, 'barryQueue')),
-        { contactId: rec.contactId, reason: 're_engage', createdAt: Timestamp.now() }
+        { contactId: rec.contactId, reason: 're_engage', createdAt: Timestamp.now(), processed: false }
       );
       dismiss(rec.contactId);
     } catch (err) {

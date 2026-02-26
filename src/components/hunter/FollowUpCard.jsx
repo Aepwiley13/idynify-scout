@@ -57,7 +57,6 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
         body: JSON.stringify({
           idToken,
           contactId,
-          originalCampaignId: null,
           outcome: 'no_response',
           originalMessage: ''
         })
@@ -81,6 +80,7 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
   async function handleMarkDone() {
     if (acting) return;
     setActing(true);
+    onDismiss(id);
     try {
       const notifRef = doc(db, 'users', userId, 'notifications', id);
       await updateDoc(notifRef, { read: true, resolvedAt: Timestamp.now() });
@@ -91,11 +91,9 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
           contact_status_updated_at: new Date().toISOString()
         });
       }
-
-      onDismiss(id);
     } catch (err) {
       console.error('[FollowUpCard] Mark done failed:', err);
-      setActing(false);
+      // onSnapshot will re-render the card if the write failed
     }
   }
 
@@ -104,6 +102,7 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
   async function handleSnooze() {
     if (acting) return;
     setActing(true);
+    onDismiss(id);
     try {
       const snoozeUntil = Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -115,11 +114,9 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
           snoozed_until: snoozeUntil
         });
       }
-
-      onDismiss(id);
     } catch (err) {
       console.error('[FollowUpCard] Snooze failed:', err);
-      setActing(false);
+      // onSnapshot will re-render the card if the write failed
     }
   }
 
@@ -189,6 +186,7 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
             preamble={null}
             userId={userId}
             contactName={contactName || null}
+            theme="light"
           />
         </div>
       )}

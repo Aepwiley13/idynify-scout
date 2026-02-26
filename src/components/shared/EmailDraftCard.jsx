@@ -34,11 +34,55 @@ export function parseEmailDraft(content) {
   return { subject: subjectMatch[1].trim(), body, preamble, contactName };
 }
 
+// ── Theme style maps ───────────────────────────────────────
+
+const darkStyles = {
+  wrapper:     'w-full max-w-[82%]',
+  preamble:    'text-sm text-gray-200 leading-relaxed mb-3',
+  card:        'rounded-2xl rounded-tl-sm border border-cyan-500/30 overflow-hidden',
+  cardBg:      'rgba(0,0,0,0.7)',
+  header:      'flex items-center justify-between px-4 py-2.5 border-b border-cyan-500/20',
+  headerBg:    'rgba(6,182,212,0.08)',
+  headerLabel: 'text-xs font-mono font-bold text-cyan-400 tracking-wider',
+  copyAllBtn:  'text-xs font-mono text-gray-400 hover:text-cyan-300 transition-colors px-2 py-0.5 rounded border border-gray-700/60 hover:border-cyan-500/40',
+  section:     'px-4 py-3 border-b border-white/5',
+  fieldLabel:  'text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1',
+  toInput:     'w-full bg-transparent text-sm text-white placeholder-gray-600 focus:outline-none border-b border-transparent focus:border-cyan-500/40 transition-colors pb-0.5',
+  subjectText: 'text-sm text-white font-medium leading-snug',
+  bodyText:    'text-sm text-gray-200 leading-relaxed whitespace-pre-wrap',
+  copyBtn:     'flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors',
+  copyBtnTop:  'flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors disabled:opacity-30',
+  gmailSection:'px-4 py-3',
+  gmailBtn:    'w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-bold transition-all shadow-lg shadow-cyan-500/30',
+};
+
+const lightStyles = {
+  wrapper:     'w-full',
+  preamble:    'text-sm text-gray-600 leading-relaxed mb-3',
+  card:        'rounded-2xl border border-gray-200 overflow-hidden',
+  cardBg:      '#ffffff',
+  header:      'flex items-center justify-between px-4 py-2.5 border-b border-gray-100',
+  headerBg:    '#f9fafb',
+  headerLabel: 'text-xs font-mono font-bold text-gray-500 tracking-wider',
+  copyAllBtn:  'text-xs font-mono text-gray-400 hover:text-gray-600 transition-colors px-2 py-0.5 rounded border border-gray-200 hover:border-gray-400',
+  section:     'px-4 py-3 border-b border-gray-100',
+  fieldLabel:  'text-[10px] font-mono text-gray-400 uppercase tracking-wider mb-1',
+  toInput:     'w-full bg-transparent text-sm text-gray-800 placeholder-gray-300 focus:outline-none border-b border-transparent focus:border-blue-400 transition-colors pb-0.5',
+  subjectText: 'text-sm text-gray-800 font-medium leading-snug',
+  bodyText:    'text-sm text-gray-700 leading-relaxed whitespace-pre-wrap',
+  copyBtn:     'flex-shrink-0 text-xs font-mono text-gray-400 hover:text-gray-600 transition-colors',
+  copyBtnTop:  'flex-shrink-0 text-xs font-mono text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30',
+  gmailSection:'px-4 py-3',
+  gmailBtn:    'w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white font-mono text-xs font-bold transition-all',
+};
+
 // ── Email Draft Card ───────────────────────────────────────
 
-export function EmailDraftCard({ preamble, subject, body, contactName, userId }) {
+export function EmailDraftCard({ preamble, subject, body, contactName, userId, theme = 'dark' }) {
   const [copiedField, setCopiedField] = useState(null);
   const [toEmail, setToEmail] = useState('');
+
+  const s = theme === 'light' ? lightStyles : darkStyles;
 
   // Auto-lookup the contact's email in Firestore when a name was detected.
   useEffect(() => {
@@ -75,49 +119,47 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId })
   };
 
   return (
-    <div className="w-full max-w-[82%]">
+    <div className={s.wrapper}>
       {preamble && (
-        <div className="text-sm text-gray-200 leading-relaxed mb-3">
-          <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+        <div className={`${s.preamble} mb-3`}>
+          <ReactMarkdown className="prose prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
             {preamble}
           </ReactMarkdown>
         </div>
       )}
-      <div className="rounded-2xl rounded-tl-sm border border-cyan-500/30 overflow-hidden"
-        style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className={s.card} style={{ background: s.cardBg }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-cyan-500/20"
-          style={{ background: 'rgba(6,182,212,0.08)' }}>
+        <div className={s.header} style={{ background: s.headerBg }}>
           <div className="flex items-center gap-2">
             <span className="text-sm">📧</span>
-            <span className="text-xs font-mono font-bold text-cyan-400 tracking-wider">EMAIL DRAFT</span>
+            <span className={s.headerLabel}>EMAIL DRAFT</span>
           </div>
           <button
             onClick={() => copy(fullDraft, 'all')}
-            className="text-xs font-mono text-gray-400 hover:text-cyan-300 transition-colors px-2 py-0.5 rounded border border-gray-700/60 hover:border-cyan-500/40"
+            className={s.copyAllBtn}
           >
             {copiedField === 'all' ? '✓ Copied' : 'Copy All'}
           </button>
         </div>
 
         {/* To field */}
-        <div className="px-4 py-3 border-b border-white/5">
+        <div className={s.section}>
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">To</div>
+              <div className={s.fieldLabel}>To</div>
               <input
                 type="email"
                 value={toEmail}
                 onChange={(e) => setToEmail(e.target.value)}
                 placeholder="recipient@company.com"
-                className="w-full bg-transparent text-sm text-white placeholder-gray-600 focus:outline-none border-b border-transparent focus:border-cyan-500/40 transition-colors pb-0.5"
+                className={s.toInput}
               />
             </div>
             <button
               onClick={() => copy(toEmail, 'to')}
               disabled={!toEmail}
-              className="flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors disabled:opacity-30"
+              className={s.copyBtnTop}
             >
               {copiedField === 'to' ? '✓' : 'Copy'}
             </button>
@@ -125,15 +167,15 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId })
         </div>
 
         {/* Subject */}
-        <div className="px-4 py-3 border-b border-white/5">
+        <div className={s.section}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Subject</div>
-              <div className="text-sm text-white font-medium leading-snug">{subject}</div>
+              <div className={s.fieldLabel}>Subject</div>
+              <div className={s.subjectText}>{subject}</div>
             </div>
             <button
               onClick={() => copy(subject, 'subject')}
-              className="flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors mt-4"
+              className={`${s.copyBtn} mt-4`}
             >
               {copiedField === 'subject' ? '✓' : 'Copy'}
             </button>
@@ -141,15 +183,15 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId })
         </div>
 
         {/* Body */}
-        <div className="px-4 py-3 border-b border-white/5">
+        <div className={s.section}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2">Body</div>
-              <div className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{body}</div>
+              <div className={`${s.fieldLabel} mb-2`}>Body</div>
+              <div className={s.bodyText}>{body}</div>
             </div>
             <button
               onClick={() => copy(body, 'body')}
-              className="flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors mt-4"
+              className={`${s.copyBtn} mt-4`}
             >
               {copiedField === 'body' ? '✓' : 'Copy'}
             </button>
@@ -157,10 +199,10 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId })
         </div>
 
         {/* Open in Gmail — primary action */}
-        <div className="px-4 py-3">
+        <div className={s.gmailSection}>
           <button
             onClick={openInGmail}
-            className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-bold transition-all shadow-lg shadow-cyan-500/30"
+            className={s.gmailBtn}
           >
             Open in Gmail →
           </button>

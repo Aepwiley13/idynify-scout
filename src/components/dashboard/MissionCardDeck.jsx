@@ -548,7 +548,7 @@ const MODULE_CONFIG = {
 };
 
 export default function MissionCardDeck({ module, userId, onClose }) {
-  const config = MODULE_CONFIG[module] || MODULE_CONFIG.scout;
+  const config = MODULE_CONFIG[module] || MODULE_CONFIG.hunter;
 
   return (
     <section

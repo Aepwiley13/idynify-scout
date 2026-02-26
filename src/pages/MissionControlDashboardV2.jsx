@@ -171,7 +171,7 @@ export default function MissionControlDashboardV2() {
 
   const handleScoutClick = () => {
     // Always route to Daily Leads (default tab)
-    navigate('/scout');
+    navigate('/scout?tab=daily-leads');
   };
 
   if (loading) {
@@ -279,12 +279,12 @@ export default function MissionControlDashboardV2() {
         {/* BARRY CHAT PANEL — Mission Co-pilot */}
         {userId && <BarryChatPanel userId={userId} />}
 
-        {/* QUICK LAUNCH STRIP — Horizontal carousel, opens inline deck */}
+        {/* QUICK LAUNCH STRIP — Horizontal carousel, navigates to Daily Lead Insights */}
         <QuickLaunchStrip
           stats={stats}
           activeModule={activeModule}
           onModuleSelect={(id) => {
-            if (id === 'scout') navigate('/scout');
+            if (id === 'scout') navigate('/scout?tab=daily-leads');
             else setActiveModule(prev => prev === id ? null : id);
           }}
         />

@@ -443,10 +443,62 @@ export default function AllLeads() {
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Tracks whether we pushed a history entry for the mobile profile view,
+  // so we can safely call history.back() on UI-initiated closes.
+  const mobilePanelHistoryPushed = useRef(false);
+  // Touch tracking for swipe-left-to-close gesture.
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
+
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
+    // Edge case: if a profile is open on desktop and the window is resized to
+    // mobile, the list hides and the hamburger appears in the profile header.
+    // The user can still navigate back via hamburger → "Back to list". Rare
+    // enough not to handle explicitly for now.
+  }, []);
+
+  // Close mobile profile (UI-initiated). Pops the history entry we pushed on open.
+  function closeMobileProfile() {
+    setPanelContactId(null);
+    setListSelected(null);
+    setPanelAutoEngage(false);
+    setDrawerOpen(false);
+    requestAnimationFrame(() => {
+      if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+    });
+    if (mobilePanelHistoryPushed.current) {
+      mobilePanelHistoryPushed.current = false;
+      window.history.back();
+    }
+  }
+
+  // Open mobile profile. Pushes a history entry so the browser/Android back
+  // button closes the profile instead of leaving the page.
+  function openMobileProfile(contactId) {
+    window.history.pushState({ mobilePanelOpen: true }, '');
+    mobilePanelHistoryPushed.current = true;
+    setPanelContactId(contactId);
+  }
+
+  // Handle browser/Android back button while profile is open.
+  // Uses empty deps — reads only refs so no stale-closure risk.
+  useEffect(() => {
+    const handler = () => {
+      if (!mobilePanelHistoryPushed.current) return;
+      mobilePanelHistoryPushed.current = false;
+      setPanelContactId(null);
+      setListSelected(null);
+      setPanelAutoEngage(false);
+      setDrawerOpen(false);
+      requestAnimationFrame(() => {
+        if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
+      });
+    };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
   }, []);
 
   useEffect(() => { loadAllContacts(); }, []);
@@ -667,7 +719,7 @@ export default function AllLeads() {
                   key={c.id}
                   contact={c}
                   company={companies[c.company_id]}
-                  onClick={() => isMobile ? setPanelContactId(c.id) : setModal(c)}
+                  onClick={() => isMobile ? openMobileProfile(c.id) : setModal(c)}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
                       ? () => navigate(`/scout/company/${c.company_id}`)
@@ -698,7 +750,8 @@ export default function AllLeads() {
                     savedListScroll.current = listRef.current?.scrollTop ?? 0;
                     setListSelected(c.id);
                     setPanelAutoEngage(false);
-                    setPanelContactId(c.id);
+                    if (isMobile) openMobileProfile(c.id);
+                    else setPanelContactId(c.id);
                   }}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
@@ -716,16 +769,31 @@ export default function AllLeads() {
 
         {/* Right: contact profile panel */}
         {panelContactId && (
-          <div style={{
-            width: isMobile ? '100%' : '52%',
-            flexShrink: 0,
-            borderLeft: isMobile ? 'none' : `1px solid ${T.border}`,
-            overflowY: 'auto',
-            background: T.appBg,
-            display: 'flex',
-            flexDirection: 'column',
-            animation: 'slideInPanel 0.22s ease',
-          }}>
+          <div
+            style={{
+              width: isMobile ? '100%' : '52%',
+              flexShrink: 0,
+              borderLeft: isMobile ? 'none' : `1px solid ${T.border}`,
+              overflowY: 'auto',
+              background: T.appBg,
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'slideInPanel 0.22s ease',
+            }}
+            onTouchStart={isMobile ? (e) => {
+              touchStartX.current = e.touches[0].clientX;
+              touchStartY.current = e.touches[0].clientY;
+            } : undefined}
+            onTouchEnd={isMobile ? (e) => {
+              if (touchStartX.current === null) return;
+              const dx = touchStartX.current - e.changedTouches[0].clientX;
+              const dy = Math.abs(touchStartY.current - e.changedTouches[0].clientY);
+              // Swipe left: horizontal travel > 60px and more horizontal than vertical
+              if (dx > 60 && dx > dy) closeMobileProfile();
+              touchStartX.current = null;
+              touchStartY.current = null;
+            } : undefined}
+          >
             <style>{`@keyframes slideInPanel { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
             {/* Panel close bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, background: T.navBg, flexShrink: 0 }}>
@@ -733,6 +801,7 @@ export default function AllLeads() {
                 <>
                   <span style={{ flex: 1, fontSize: 11, color: T.textFaint }}>Contact Profile</span>
                   <button
+                    aria-label="Open navigation menu"
                     onClick={() => setDrawerOpen(true)}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '6px 8px', color: T.textMuted, cursor: 'pointer' }}
                   >
@@ -762,14 +831,14 @@ export default function AllLeads() {
               key={panelContactId}
               contactId={panelContactId}
               autoEngage={panelAutoEngage}
-              onClose={() => {
+              onClose={() => isMobile ? closeMobileProfile() : (() => {
                 setPanelContactId(null);
                 setListSelected(null);
                 setPanelAutoEngage(false);
                 requestAnimationFrame(() => {
                   if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
                 });
-              }}
+              })()}
             />
           </div>
         )}
@@ -782,23 +851,24 @@ export default function AllLeads() {
             onClick={() => setDrawerOpen(false)}
             style={{ position: 'fixed', inset: 0, background: '#00000060', zIndex: 200 }}
           />
-          <div style={{
-            position: 'fixed', top: 0, right: 0, bottom: 0, width: 240,
-            background: T.navBg, zIndex: 201,
-            borderLeft: `1px solid ${T.border}`,
-            display: 'flex', flexDirection: 'column',
-            padding: '20px 0',
-          }}>
+          {/* TODO: drawer nav links are currently hardcoded — should pull from
+              a shared nav config in a future refactor to avoid drift. */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0, width: 240,
+              background: T.navBg, zIndex: 201,
+              borderLeft: `1px solid ${T.border}`,
+              display: 'flex', flexDirection: 'column',
+              padding: '20px 0',
+            }}
+          >
             <div
-              onClick={() => {
-                setDrawerOpen(false);
-                setPanelContactId(null);
-                setListSelected(null);
-                setPanelAutoEngage(false);
-              }}
+              onClick={() => closeMobileProfile()}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 20px', fontSize: 14, fontWeight: 700, color: BRAND.pink, cursor: 'pointer', borderBottom: `1px solid ${T.border}`, marginBottom: 8 }}
             >
-              <ChevronLeft size={16} />People
+              <ChevronLeft size={16} />Back to list
             </div>
             {[
               { label: 'Daily Discoveries', tab: 'daily-leads' },

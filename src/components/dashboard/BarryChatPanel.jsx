@@ -215,11 +215,20 @@ export default function BarryChatPanel({ userId }) {
             <div className="flex items-center flex-wrap gap-2">
               <span className="text-white font-semibold text-sm font-mono">Barry</span>
 
-              {/* Mode badge */}
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-mono ${modeConfig.pillClass}`}>
+              {/* Mode badge — clickable to override */}
+              <button
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-mono cursor-pointer transition-opacity hover:opacity-80 ${modeConfig.pillClass}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const modes = ['SUGGEST', 'PRIORITIZE', 'GROWTH'];
+                  const next = modes[(modes.indexOf(mode) + 1) % modes.length];
+                  setMode(next);
+                }}
+                title="Click to change Barry's mode"
+              >
                 <span className={`w-1.5 h-1.5 rounded-full ${modeConfig.dotClass}`}></span>
                 {modeConfig.label}
-              </span>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 mt-0.5">
@@ -280,21 +289,7 @@ export default function BarryChatPanel({ userId }) {
             )}
           </div>
 
-          {/* Suggested Prompt Chips */}
-          {!loading && suggestedPrompts.length > 0 && (
-            <div className="px-5 pb-4 flex flex-wrap gap-2">
-              {suggestedPrompts.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleChipClick(prompt)}
-                  disabled={sending}
-                  className="text-xs px-3 py-1.5 rounded-full border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-400/60 transition-all font-mono disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* No suggestion chips — command interface model */}
 
           {/* Conversation Thread */}
           {(hasConversation || sending) && (
@@ -369,7 +364,7 @@ export default function BarryChatPanel({ userId }) {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask Barry..."
+                placeholder="Tell me what you want to work on..."
                 disabled={sending || loading}
                 aria-label="Message Barry"
                 className="flex-1 min-w-0 bg-black/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50 font-mono"

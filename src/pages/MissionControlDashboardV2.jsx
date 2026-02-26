@@ -279,13 +279,12 @@ export default function MissionControlDashboardV2() {
         {/* BARRY CHAT PANEL — Mission Co-pilot */}
         {userId && <BarryChatPanel userId={userId} />}
 
-        {/* QUICK LAUNCH STRIP — Horizontal carousel, navigates to Daily Lead Insights */}
+        {/* QUICK LAUNCH STRIP — Horizontal carousel, opens inline deck (Scout, Hunter, RECON) */}
         <QuickLaunchStrip
           stats={stats}
           activeModule={activeModule}
           onModuleSelect={(id) => {
-            if (id === 'scout') navigate('/scout?tab=daily-leads');
-            else setActiveModule(prev => prev === id ? null : id);
+            setActiveModule(prev => prev === id ? null : id);
           }}
         />
 

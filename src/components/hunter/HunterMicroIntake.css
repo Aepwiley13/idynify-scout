@@ -1,0 +1,229 @@
+/* ============================================
+   HUNTER MICRO INTAKE
+   3-question first-contact context overlay
+   ============================================ */
+
+.hmi-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+}
+
+@media (min-width: 480px) {
+  .hmi-overlay {
+    align-items: center;
+  }
+}
+
+.hmi-panel {
+  background: #111827;
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding: 1.75rem 1.5rem 2rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.5);
+}
+
+@media (min-width: 480px) {
+  .hmi-panel {
+    border-radius: 1.25rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* Header */
+.hmi-header {
+  margin-bottom: 1.25rem;
+}
+
+.hmi-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.625rem;
+}
+
+.hmi-barry-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #ec4899;
+}
+
+.hmi-queue-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.5rem;
+  border-radius: 1rem;
+}
+
+.hmi-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f9fafb;
+  margin: 0 0 0.375rem;
+  letter-spacing: -0.01em;
+}
+
+.hmi-sub {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Step dots */
+.hmi-steps {
+  display: flex;
+  gap: 0.375rem;
+  margin-bottom: 1.25rem;
+}
+
+.hmi-step-dot {
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.hmi-step-dot--done,
+.hmi-step-dot--active {
+  background: rgba(236, 72, 153, 0.6);
+}
+
+.hmi-step-dot--active {
+  background: #ec4899;
+}
+
+/* Question */
+.hmi-question {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.hmi-question-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #f3f4f6;
+  margin: 0;
+}
+
+/* Reason grid (option buttons) */
+.hmi-reason-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hmi-reason-btn {
+  padding: 0.4375rem 0.875rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2rem;
+  color: #9ca3af;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.hmi-reason-btn:hover {
+  background: rgba(236, 72, 153, 0.08);
+  border-color: rgba(236, 72, 153, 0.3);
+  color: #f9a8d4;
+}
+
+.hmi-reason-btn--active {
+  background: rgba(236, 72, 153, 0.15);
+  border-color: #ec4899;
+  color: #f9a8d4;
+  font-weight: 600;
+}
+
+/* Text input */
+.hmi-text-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  color: #f3f4f6;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.hmi-text-input::placeholder { color: #4b5563; }
+.hmi-text-input:focus {
+  outline: none;
+  border-color: rgba(236, 72, 153, 0.4);
+}
+
+/* Action row */
+.hmi-question-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+  padding-top: 0.25rem;
+}
+
+.hmi-back-link,
+.hmi-skip-link {
+  background: none;
+  border: none;
+  color: #4b5563;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.hmi-back-link:hover,
+.hmi-skip-link:hover {
+  color: #9ca3af;
+}
+
+.hmi-next-btn {
+  padding: 0.625rem 1.25rem;
+  background: rgba(236, 72, 153, 0.15);
+  border: 1px solid rgba(236, 72, 153, 0.35);
+  border-radius: 0.625rem;
+  color: #f9a8d4;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hmi-next-btn:hover:not(:disabled) {
+  background: rgba(236, 72, 153, 0.25);
+}
+
+.hmi-next-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.hmi-next-btn--launch {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 4px 16px rgba(236, 72, 153, 0.3);
+}
+
+.hmi-next-btn--launch:hover:not(:disabled) {
+  background: linear-gradient(135deg, #db2777, #7c3aed);
+}

@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Sparkles } from 'lucide-react';
+import { getStateTransition } from '../../utils/hunterOutcomeLogic';
 import './HunterOutcomeOverlay.css';
 
 const OUTCOME_OPTIONS = [
@@ -28,25 +29,6 @@ const OUTCOME_OPTIONS = [
   { id: 'scheduled',       label: 'Scheduled ✓',       emoji: '📅', color: '#a78bfa', description: 'Meeting or call booked' },
   { id: 'not_interested',  label: 'Not interested',    emoji: '🚫', color: '#6b7280', description: 'Closed for now' }
 ];
-
-// Conservative relationship_state transitions from outcome + current state
-function getStateTransition(outcome, currentState) {
-  if (outcome === 'scheduled') {
-    // They agreed to meet — minimum 'engaged' regardless of current state
-    const engagedStates = ['engaged', 'warm', 'trusted', 'advocate', 'strategic_partner'];
-    if (engagedStates.includes(currentState)) return null; // already there or better
-    return 'engaged';
-  }
-
-  if (outcome === 'positive_reply') {
-    if (currentState === 'unaware') return 'aware';    // they responded = they know user now
-    if (currentState === 'aware') return 'engaged';    // positive exchange = conversation alive
-    if (currentState === 'dormant') return 'aware';    // dormant + positive = relationship reactivating
-    return null; // warm/trusted/etc — positive reply doesn't change their state
-  }
-
-  return null; // all other outcomes: no automatic state change
-}
 
 export default function HunterOutcomeOverlay({
   contact,

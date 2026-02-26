@@ -36,6 +36,26 @@
   targetPort = 5173
   port = 8888
   
+# index.html must never be cached — ensures browsers always fetch the latest
+# build on navigation so the ETag-based version check works correctly.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# manifest.json is also not hashed, so keep it fresh too.
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Vite's hashed JS/CSS assets can be cached indefinitely — the hash changes
+# with every new build so stale content is never served.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

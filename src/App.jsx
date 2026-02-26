@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
+import { useVersionCheck } from './hooks/useVersionCheck';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -50,6 +51,7 @@ import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
 import CrispChat from './components/CrispChat';
+import UpdateBanner from './components/UpdateBanner';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
@@ -82,6 +84,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [impersonationSession, setImpersonationSession] = useState(null);
+  const updateAvailable = useVersionCheck();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -233,6 +236,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      {updateAvailable && <UpdateBanner />}
       {impersonationSession && (
         <ImpersonationBanner
           session={impersonationSession}

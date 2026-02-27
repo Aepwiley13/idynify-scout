@@ -1,13 +1,110 @@
-/* Identity Card - TOP OF PAGE */
+/* ── Flip card outer wrapper ─────────────────────────────── */
+.identity-card-flipper {
+  perspective: 1400px;
+  margin-bottom: 32px;
+}
+
+/* Holds both faces in the same grid cell so height = taller face */
+.identity-card-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.identity-card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+/* Shared card face styles */
 .identity-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 24px;
+  grid-area: 1 / 1;
   background: white;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  margin-bottom: 32px;
+  position: relative;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Front face — horizontal photo + info layout */
+.identity-card--front {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 52px 24px 24px; /* extra right for flip btn */
+}
+
+/* Back face — vertical brigade + context layout */
+.identity-card--back {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  transform: rotateY(180deg);
+}
+
+/* ── Flip button (top-right of each face) ───────────────── */
+.card-flip-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.15s ease;
+  z-index: 1;
+}
+
+.card-flip-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+/* Amber pulsing dot on flip button when context is unset */
+.card-flip-btn-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  animation: badge-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.8); }
+}
+
+/* ── Needs-setup notice on back face ───────────────────── */
+.card-back-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: #78350f;
+  line-height: 1.45;
+  margin-top: 28px; /* clear the flip button */
+}
+
+.card-back-notice-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: #d97706;
+  margin-top: 1px;
 }
 
 /* Photo wrapper - positions refresh button relative to avatar */
@@ -18,55 +115,127 @@
 
 /* Photo - circular, clean */
 .identity-photo {
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
   background: #f9fafb;
+  position: relative;
 }
 
-/* Refresh Photo Button - small icon adjacent to avatar */
-.refresh-photo-btn {
+/* Clickable avatar (when no real photo exists) */
+.identity-photo--clickable {
+  cursor: pointer;
+}
+
+/* Camera overlay — slides up on hover */
+.photo-change-overlay {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 46%;
+  background: rgba(0, 0, 0, 0.46);
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: #6b7280;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  padding: 0;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.refresh-photo-btn:hover {
-  background: #f0f9ff;
-  border-color: #3b82f6;
-  color: #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
-  transform: scale(1.1);
+.identity-photo--clickable:hover .photo-change-overlay,
+.identity-photo--clickable:focus .photo-change-overlay {
+  opacity: 1;
 }
 
-.refresh-photo-btn.refreshing {
-  background: #f0f9ff;
-  border-color: #93c5fd;
-  color: #3b82f6;
-  cursor: not-allowed;
-}
-
-.refresh-spinner {
+.photo-overlay-spinner {
   animation: spin 1s linear infinite;
 }
 
-@keyframes refreshSpin {
+@keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Photo action menu — appears below the avatar */
+.photo-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 190px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  z-index: 20;
+}
+
+.photo-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.photo-menu-item:hover {
+  background: #f3f4f6;
+}
+
+/* URL paste row inside the photo menu */
+.photo-url-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.photo-url-input {
+  flex: 1;
+  border: 1.5px solid #d1d5db;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.15s ease;
+}
+
+.photo-url-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.photo-url-save-btn {
+  flex-shrink: 0;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.photo-url-save-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.photo-url-save-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
 }
 
 /* Inline error message for photo refresh failure */
@@ -84,22 +253,157 @@
   object-fit: cover;
 }
 
-.photo-fallback {
+/* Initials avatar — shown when no real photo */
+.photo-initials {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-  color: #9ca3af;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+  user-select: none;
 }
 
-/* Info - name, title, company ONLY */
+/* Info - name, title, company, email, phone */
 .identity-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1;
+}
+
+/* ── Inline edit wrapper ─────────────────────────────────────── */
+.identity-field-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.identity-field-wrapper:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Pencil icon — hidden until wrapper is hovered */
+.identity-edit-icon {
+  width: 12px;
+  height: 12px;
+  color: #9ca3af;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.identity-field-wrapper:hover .identity-edit-icon {
+  opacity: 1;
+}
+
+/* Pencil button — used when the field has its own link action */
+.identity-pencil-btn {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.identity-pencil-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.identity-edit-icon--btn {
+  opacity: 0;
+}
+
+.identity-field-wrapper:hover .identity-edit-icon--btn {
+  opacity: 1;
+}
+
+/* Placeholder text for empty fields */
+.identity-placeholder {
+  color: #c0c4cc;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* ── Inline edit inputs ──────────────────────────────────────── */
+.identity-edit-input {
+  border: 1.5px solid #3b82f6;
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: #1a1a1a;
+  padding: 2px 8px;
+  width: 100%;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  transition: box-shadow 0.15s ease;
+}
+
+.identity-edit-input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.identity-name-input {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 2px 8px;
+}
+
+.identity-title-input {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 2px 8px;
+}
+
+.identity-company-input {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 2px 8px;
+}
+
+.identity-contact-input {
+  font-size: 13px;
+  font-weight: 400;
+  padding: 2px 8px;
+}
+
+/* ── Add field buttons (for missing email / phone) ───────────── */
+.identity-add-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+}
+
+.identity-add-field:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
 }
 
 /* Name - prominent */
@@ -127,22 +431,196 @@
   line-height: 1.4;
   color: #666;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Company as a clickable link button */
+.identity-company-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.identity-company-link:hover {
+  color: #3b82f6;
+}
+
+/* Email / Phone contact rows */
+.identity-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #555;
+  text-decoration: none;
+  margin-top: 2px;
+  transition: color 0.15s ease;
+}
+
+.identity-contact-row:hover {
+  color: #3b82f6;
+}
+
+/* Icon used beside company / email / phone */
+.identity-contact-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+/* ── Save confirmation checkmark ─────────────────────────────── */
+.identity-saved-icon {
+  width: 13px;
+  height: 13px;
+  color: #10b981;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  animation: identity-saved-pop 0.25s ease forwards;
+}
+
+.identity-saved-icon--visible {
+  opacity: 1;
+}
+
+@keyframes identity-saved-pop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Field action buttons (copy + pencil grouped) ────────────── */
+.identity-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.identity-icon-btn {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.identity-icon-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.identity-action-icon {
+  width: 12px;
+  height: 12px;
+  color: #9ca3af;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.identity-action-icon--copied {
+  color: #10b981;
+  opacity: 1 !important;
+}
+
+.identity-field-wrapper:hover .identity-action-icon {
+  opacity: 1;
+}
+
+/* ── Edit hint (Enter / Esc) ─────────────────────────────────── */
+.identity-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.identity-edit-hint {
+  font-size: 10px;
+  color: #9ca3af;
+  padding-left: 2px;
+}
+
+/* ── Email verification badge ────────────────────────────────── */
+.identity-email-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 20px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.identity-email-badge.badge-verified {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.identity-email-badge.badge-likely {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.identity-email-badge.badge-unverified {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* ── LinkedIn quick-link ─────────────────────────────────────── */
+.identity-linkedin-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0a66c2;
+  text-decoration: none;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  align-self: flex-start;
+}
+
+.identity-linkedin-link:hover {
+  background: rgba(10, 102, 194, 0.08);
 }
 
 /* Mobile responsive */
 @media (max-width: 768px) {
-  .identity-card {
-    margin-bottom: 32px;
+  .identity-card-flipper {
+    perspective: 800px;
+  }
+
+  .identity-card--front {
+    padding-right: 44px;
   }
 
   .identity-photo {
-    width: 64px;
-    height: 64px;
+    width: 76px;
+    height: 76px;
   }
 
-  .refresh-photo-btn {
-    width: 24px;
-    height: 24px;
+  .photo-initials {
+    font-size: 22px;
+  }
+
+  .photo-menu {
+    left: 0;
+    transform: none;
   }
 
   .identity-name {
@@ -152,6 +630,10 @@
   .identity-title,
   .identity-company {
     font-size: 13px;
+  }
+
+  .identity-contact-row {
+    font-size: 12px;
   }
 }
 

@@ -11,7 +11,7 @@ import {
   collection, query, where, getDocs, doc, getDoc,
   setDoc, updateDoc, deleteDoc,
 } from 'firebase/firestore';
-import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw } from 'lucide-react';
+import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
@@ -307,6 +307,211 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
 }
 
 // ─── DailyLeads ──────────────────────────────────────────────────────────────
+// ─── ICP Reclarification Modal ────────────────────────────────────────────────
+function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
+  const T = useT();
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [hasEnoughContext, setHasEnoughContext] = useState(false);
+  const [icpParams, setIcpParams] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => { sendToBarry('__ICP_RECLARIFICATION__', []); }, []);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const sendToBarry = async (msg, history) => {
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/barryMissionChat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, authToken, message: msg, conversationHistory: history, icpMode: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages(prev => [...prev, { role: 'barry', content: data.response_text }]);
+        const newHistory = [
+          ...history,
+          ...(msg !== '__ICP_RECLARIFICATION__' ? [{ role: 'user', content: msg }] : []),
+          { role: 'assistant', content: data.response_text },
+        ];
+        setConversationHistory(newHistory);
+        if (data.has_enough_context) {
+          setHasEnoughContext(true);
+          setIcpParams(data.icp_params);
+        }
+      }
+    } catch (err) {
+      console.error('ICP chat error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendMessage = () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    sendToBarry(userMsg, conversationHistory);
+  };
+
+  const handleFindCompanies = async () => {
+    if (!icpParams || isSearching) return;
+    setIsSearching(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) { onSearchComplete(); return; }
+      const authToken = await user.getIdToken();
+      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+      const profileDoc = await getDoc(profileRef);
+      const baseProfile = profileDoc.exists() ? profileDoc.data() : {};
+      const mergedProfile = {
+        ...baseProfile,
+        ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
+        ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
+        ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
+        ...(icpParams.companyKeywords?.length > 0 && { companyKeywords: icpParams.companyKeywords }),
+      };
+      await fetch('/.netlify/functions/search-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile }),
+      });
+    } catch (err) {
+      console.error('ICP search error:', err);
+    } finally {
+      onSearchComplete();
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.88)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 20,
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 460,
+        background: T.cardBg,
+        borderRadius: 20,
+        border: `1px solid ${T.border}`,
+        display: 'flex', flexDirection: 'column',
+        maxHeight: '82vh',
+        overflow: 'hidden',
+        boxShadow: `0 24px 64px rgba(0,0,0,0.5)`,
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        }}>
+          <BarryAvatar size={36} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: T.text }}>Barry</div>
+            <div style={{ fontSize: 11, color: T.textFaint }}>Let's find the right targets</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 22, lineHeight: 1, padding: 4 }}
+          >×</button>
+        </div>
+
+        {/* Messages */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {messages.map((msg, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8, alignItems: 'flex-end' }}>
+              {msg.role === 'barry' && <BarryAvatar size={26} style={{ flexShrink: 0 }} />}
+              <div style={{
+                maxWidth: '80%',
+                padding: '10px 14px',
+                borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                background: msg.role === 'user' ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface,
+                color: msg.role === 'user' ? '#fff' : T.text,
+                fontSize: 13, lineHeight: 1.55,
+                border: msg.role === 'barry' ? `1px solid ${T.border2}` : 'none',
+              }}>
+                {msg.content}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BarryAvatar size={26} style={{ flexShrink: 0 }} />
+              <div style={{ padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: T.surface, border: `1px solid ${T.border2}` }}>
+                <Loader size={14} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} />
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Find Companies CTA */}
+        {hasEnoughContext && (
+          <div style={{ padding: '0 20px 12px', flexShrink: 0 }}>
+            <button
+              onClick={handleFindCompanies}
+              disabled={isSearching}
+              style={{
+                width: '100%', padding: '13px',
+                borderRadius: 12,
+                background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                border: 'none', color: '#fff',
+                fontWeight: 700, fontSize: 14,
+                cursor: isSearching ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: isSearching ? 0.75 : 1,
+              }}
+            >
+              {isSearching ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
+              {isSearching ? 'Finding your companies...' : 'Find My Companies'}
+            </button>
+          </div>
+        )}
+
+        {/* Input */}
+        <div style={{ padding: hasEnoughContext ? '0 20px 16px' : '12px 20px', borderTop: hasEnoughContext ? 'none' : `1px solid ${T.border}`, display: 'flex', gap: 8, flexShrink: 0 }}>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            placeholder={hasEnoughContext ? 'Anything else to add...' : 'Tell Barry who you\'re targeting...'}
+            disabled={loading || isSearching}
+            style={{
+              flex: 1, padding: '10px 14px',
+              borderRadius: 10, border: `1px solid ${T.border2}`,
+              background: T.surface, color: T.text,
+              fontSize: 13, outline: 'none',
+            }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading || !input.trim() || isSearching}
+            style={{
+              padding: '10px 14px', borderRadius: 10,
+              background: hasEnoughContext ? T.surface : `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+              border: hasEnoughContext ? `1px solid ${T.border2}` : 'none',
+              color: hasEnoughContext ? T.textMuted : '#fff',
+              cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+              opacity: loading || !input.trim() ? 0.5 : 1,
+            }}
+          >
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DailyLeads({ onNavigate }) {
   const T = useT();
   const navigate = useNavigate();
@@ -332,6 +537,14 @@ export default function DailyLeads({ onNavigate }) {
   const [showUndo, setShowUndo] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
+
+  // ── Batch Mode state ─────────────────────────────────────────────────────────
+  const BATCH_SIZE = 10;
+  const [batchSaves, setBatchSaves] = useState(0);
+  const [batchSwipeCount, setBatchSwipeCount] = useState(0);
+  const [batchSavedCompanies, setBatchSavedCompanies] = useState([]);
+  const [showBatchEnd, setShowBatchEnd] = useState(false);
+  const [showICPChat, setShowICPChat] = useState(false);
 
   // ── People Mode state ───────────────────────────────────────────────────────
   const [tab, setTab] = useState('companies');
@@ -502,6 +715,18 @@ export default function DailyLeads({ onNavigate }) {
         setHasSeenTitleSetup(true);
         await setDoc(swipeProgressRef, { dailySwipeCount: newSwipeCount, lastSwipeDate: today, hasSeenTitleSetup: true });
       }
+      // ── Batch tracking ───────────────────────────────────────────────────
+      const updatedBatchSaves = isInterested ? batchSaves + 1 : batchSaves;
+      const updatedBatchSwipeCount = batchSwipeCount + 1;
+      if (isInterested) {
+        setBatchSaves(updatedBatchSaves);
+        setBatchSavedCompanies(prev => [...prev, company]);
+      }
+      setBatchSwipeCount(updatedBatchSwipeCount);
+      if (updatedBatchSwipeCount >= BATCH_SIZE) {
+        setShowBatchEnd(true);
+        return; // Batch complete — show batch end screen instead of advancing
+      }
       if (currentIndex < companies.length - 1) setCurrentIndex(currentIndex + 1);
       else loadTodayLeads();
     } catch (error) {
@@ -538,6 +763,58 @@ export default function DailyLeads({ onNavigate }) {
   };
 
   const handleTitleSetupComplete = () => setShowTitleSetup(false);
+
+  // ── Batch Mode helpers ───────────────────────────────────────────────────────
+
+  const resetBatch = () => {
+    setBatchSaves(0);
+    setBatchSwipeCount(0);
+    setBatchSavedCompanies([]);
+    setShowBatchEnd(false);
+    setShowICPChat(false);
+  };
+
+  const triggerAdaptiveSearch = async (savedCompanies) => {
+    if (!savedCompanies || savedCompanies.length === 0) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const authToken = await user.getIdToken();
+      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+      const profileDoc = await getDoc(profileRef);
+      if (!profileDoc.exists()) return;
+
+      // Extract industry signals from companies saved in this batch
+      const savedIndustries = [...new Set(savedCompanies.map(c => c.industry).filter(Boolean))];
+
+      // Pull titles from ALL accepted companies' contacts as ICP signal
+      const contactsSnap = await getDocs(collection(db, 'users', user.uid, 'contacts'));
+      const savedTitles = [...new Set(contactsSnap.docs.map(d => d.data().title).filter(Boolean))];
+
+      fetch('/.netlify/functions/search-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: profileDoc.data(),
+          adaptiveSignals: { savedIndustries, savedTitles },
+        }),
+      }).catch(err => console.error('Adaptive search error:', err));
+    } catch (err) {
+      console.error('Error triggering adaptive search:', err);
+    }
+  };
+
+  const handleNextBatch = async () => {
+    const snapshot = [...batchSavedCompanies];
+    resetBatch();
+    // Advance to next card first (so the UI is responsive)
+    if (currentIndex < companies.length - 1) setCurrentIndex(currentIndex + 1);
+    else loadTodayLeads();
+    // Fire adaptive search in background
+    triggerAdaptiveSearch(snapshot);
+  };
 
   // ── People Mode ─────────────────────────────────────────────────────────────
 
@@ -684,6 +961,22 @@ export default function DailyLeads({ onNavigate }) {
       }} />
     ));
 
+  // Batch progress dots (10 dots, one per swipe in current batch)
+  const renderBatchDots = () => (
+    <div style={{ display: 'flex', gap: 5, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
+      {Array.from({ length: BATCH_SIZE }).map((_, i) => (
+        <div key={i} style={{
+          width: 7, height: 7, borderRadius: 4,
+          background: i < batchSwipeCount
+            ? (i < batchSaves ? BRAND.pink : T.isDark ? '#ffffff30' : '#00000020')
+            : T.isDark ? '#ffffff0d' : '#00000010',
+          transition: 'all 0.3s',
+        }} />
+      ))}
+      <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 6 }}>{batchSwipeCount}/{BATCH_SIZE}</span>
+    </div>
+  );
+
   // Progress dots
   const renderDots = (total, current) => {
     const displayTotal = Math.min(total, 8);
@@ -795,13 +1088,107 @@ export default function DailyLeads({ onNavigate }) {
                   <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>SESSION COMPLETE</div>
                   <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>You've reviewed all targets in this session.</p>
                   <button
-                    onClick={() => { setCurrentIndex(0); loadTodayLeads(); }}
+                    onClick={() => { resetBatch(); setCurrentIndex(0); loadTodayLeads(); }}
                     style={{ padding: '8px 20px', borderRadius: 10, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, cursor: 'pointer', fontSize: 12 }}
                   >Reset Queue</button>
                 </div>
+              ) : showBatchEnd ? (
+                /* ── Batch end screen ───────────────────────────────────── */
+                <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%' }}>
+                  <BarryAvatar size={52} style={{ margin: '0 auto 18px' }} />
+                  {batchSaves === 0 ? (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                        Let me sharpen your targeting
+                      </div>
+                      <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
+                        None of those felt right — that's useful data. Let's talk through who you're actually looking for so I can find better matches.
+                      </p>
+                      <button
+                        onClick={() => setShowICPChat(true)}
+                        style={{
+                          width: '100%', padding: '13px',
+                          borderRadius: 12,
+                          background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                          border: 'none', color: '#fff',
+                          fontWeight: 700, fontSize: 14,
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <MessageCircle size={16} />Talk to Barry
+                      </button>
+                      <button
+                        onClick={handleNextBatch}
+                        style={{ width: '100%', padding: '10px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer' }}
+                      >
+                        Skip — keep swiping
+                      </button>
+                    </>
+                  ) : batchSaves >= BATCH_SIZE ? (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                        Perfect 10 — you're locked in!
+                      </div>
+                      <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
+                        Every company matched. I'm finding more exactly like these.
+                      </p>
+                      <button
+                        onClick={handleNextBatch}
+                        style={{
+                          width: '100%', padding: '13px',
+                          borderRadius: 12,
+                          background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                          border: 'none', color: '#fff',
+                          fontWeight: 700, fontSize: 14,
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        }}
+                      >
+                        <ArrowRight size={16} />Next Batch
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                        Good eye — {batchSaves} of 10 matched
+                      </div>
+                      <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
+                        Using your saves to find more companies like {batchSavedCompanies[0]?.name || 'those'}.
+                      </p>
+                      <button
+                        onClick={handleNextBatch}
+                        style={{
+                          width: '100%', padding: '13px',
+                          borderRadius: 12,
+                          background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                          border: 'none', color: '#fff',
+                          fontWeight: 700, fontSize: 14,
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <ArrowRight size={16} />Find More Like These
+                      </button>
+                      <button
+                        onClick={() => setShowICPChat(true)}
+                        style={{ width: '100%', padding: '10px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      >
+                        <MessageCircle size={13} />Refine with Barry
+                      </button>
+                    </>
+                  )}
+                  {batchSaves > 0 && (
+                    <div style={{ marginTop: 16, fontSize: 11, color: T.textFaint }}>
+                      {batchSaves} {batchSaves === 1 ? 'company' : 'companies'} added to your hunt list
+                    </div>
+                  )}
+                </div>
               ) : (
                 <>
-                  {renderDots(companies.length, currentIndex)}
+                  {renderBatchDots()}
                   <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
@@ -987,6 +1374,16 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {showTitleSetup && <ContactTitleSetup onComplete={handleTitleSetupComplete} />}
+      {showICPChat && (
+        <IcpReclarificationModal
+          userId={auth.currentUser?.uid}
+          onClose={() => setShowICPChat(false)}
+          onSearchComplete={() => {
+            resetBatch();
+            loadTodayLeads();
+          }}
+        />
+      )}
     </div>
   );
 }

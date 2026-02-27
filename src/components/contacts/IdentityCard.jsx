@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { User, RefreshCw, Loader } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, RefreshCw, Loader, Mail, Phone, Building2 } from 'lucide-react';
 import './IdentityCard.css';
 
 /**
@@ -23,6 +24,7 @@ export default function IdentityCard({
   photoRefreshError
 }) {
   const [imgBroken, setImgBroken] = useState(false);
+  const navigate = useNavigate();
 
   const hasLinkedIn = !!contact.linkedin_url;
   const hasNameAndCompany = !!contact.name && !!contact.company_name;
@@ -72,7 +74,32 @@ export default function IdentityCard({
       <div className="identity-info">
         <h1 className="identity-name">{contact.name || 'Unknown Contact'}</h1>
         <p className="identity-title">{contact.title || 'No title specified'}</p>
-        <p className="identity-company">{contact.company_name || 'No company'}</p>
+        {contact.company_id ? (
+          <button
+            className="identity-company identity-company-link"
+            onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+          >
+            <Building2 className="identity-contact-icon" />
+            {contact.company_name || 'No company'}
+          </button>
+        ) : (
+          <p className="identity-company">
+            {contact.company_name && <Building2 className="identity-contact-icon" />}
+            {contact.company_name || 'No company'}
+          </p>
+        )}
+        {contact.email && (
+          <a href={`mailto:${contact.email}`} className="identity-contact-row">
+            <Mail className="identity-contact-icon" />
+            <span>{contact.email}</span>
+          </a>
+        )}
+        {contact.phone && (
+          <a href={`tel:${contact.phone}`} className="identity-contact-row">
+            <Phone className="identity-contact-icon" />
+            <span>{contact.phone}</span>
+          </a>
+        )}
         {photoRefreshError && (
           <p className="photo-refresh-error">{photoRefreshError}</p>
         )}

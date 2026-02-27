@@ -127,6 +127,48 @@
   line-height: 1.4;
   color: #666;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Company as a clickable link button */
+.identity-company-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.identity-company-link:hover {
+  color: #3b82f6;
+}
+
+/* Email / Phone contact rows */
+.identity-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #555;
+  text-decoration: none;
+  margin-top: 2px;
+  transition: color 0.15s ease;
+}
+
+.identity-contact-row:hover {
+  color: #3b82f6;
+}
+
+/* Icon used beside company / email / phone */
+.identity-contact-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
 /* Mobile responsive */
@@ -152,6 +194,10 @@
   .identity-title,
   .identity-company {
     font-size: 13px;
+  }
+
+  .identity-contact-row {
+    font-size: 12px;
   }
 }
 

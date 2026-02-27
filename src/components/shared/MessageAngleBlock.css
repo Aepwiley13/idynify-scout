@@ -1,0 +1,202 @@
+/* ── MessageAngleBlock ─────────────────────────────────────────────────────── */
+
+.mab {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 0.875rem;
+  overflow: hidden;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+}
+
+/* ── Tabs ── */
+
+.mab-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(6, 182, 212, 0.15);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mab-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mab-tab {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #9ca3af;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.mab-tab:hover {
+  color: #e5e7eb;
+}
+
+.mab-tab--active {
+  color: #22d3ee;
+  border-bottom-color: #22d3ee;
+  background: rgba(6, 182, 212, 0.06);
+}
+
+.mab-star {
+  font-size: 0.65rem;
+  color: #f59e0b;
+  line-height: 1;
+}
+
+/* ── Editor ── */
+
+.mab-editor {
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.mab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mab-field-label {
+  font-size: 0.65rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mab-subject-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.625rem;
+  font-size: 0.78rem;
+  color: #f3f4f6;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.mab-subject-input:focus {
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+.mab-message-textarea {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.625rem;
+  font-size: 0.78rem;
+  color: #f3f4f6;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  line-height: 1.55;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+  min-height: 110px;
+}
+
+.mab-message-textarea:focus {
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+/* ── Actions ── */
+
+.mab-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem 0.875rem;
+  border-top: 1px solid rgba(6, 182, 212, 0.1);
+}
+
+.mab-copy-btn {
+  padding: 0.45rem 0.875rem;
+  font-size: 0.72rem;
+  font-family: inherit;
+  background: rgba(75, 85, 99, 0.3);
+  border: 1px solid rgba(75, 85, 99, 0.4);
+  border-radius: 0.5rem;
+  color: #d1d5db;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.mab-copy-btn:hover {
+  background: rgba(75, 85, 99, 0.5);
+  color: #f9fafb;
+}
+
+.mab-hunter-btn {
+  flex: 1;
+  padding: 0.45rem 0.875rem;
+  font-size: 0.72rem;
+  font-family: inherit;
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  border-radius: 0.5rem;
+  color: #22d3ee;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.mab-hunter-btn:hover:not(:disabled) {
+  background: rgba(6, 182, 212, 0.25);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+.mab-hunter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Feedback ── */
+
+.mab-feedback {
+  margin: 0 1rem 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.mab-feedback--success {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.mab-feedback--warn {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fcd34d;
+}
+
+.mab-feedback--error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}

@@ -18,55 +18,127 @@
 
 /* Photo - circular, clean */
 .identity-photo {
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
   background: #f9fafb;
+  position: relative;
 }
 
-/* Refresh Photo Button - small icon adjacent to avatar */
-.refresh-photo-btn {
+/* Clickable avatar (when no real photo exists) */
+.identity-photo--clickable {
+  cursor: pointer;
+}
+
+/* Camera overlay — slides up on hover */
+.photo-change-overlay {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 46%;
+  background: rgba(0, 0, 0, 0.46);
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: #6b7280;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  padding: 0;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.refresh-photo-btn:hover {
-  background: #f0f9ff;
-  border-color: #3b82f6;
-  color: #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
-  transform: scale(1.1);
+.identity-photo--clickable:hover .photo-change-overlay,
+.identity-photo--clickable:focus .photo-change-overlay {
+  opacity: 1;
 }
 
-.refresh-photo-btn.refreshing {
-  background: #f0f9ff;
-  border-color: #93c5fd;
-  color: #3b82f6;
-  cursor: not-allowed;
-}
-
-.refresh-spinner {
+.photo-overlay-spinner {
   animation: spin 1s linear infinite;
 }
 
-@keyframes refreshSpin {
+@keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Photo action menu — appears below the avatar */
+.photo-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 190px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  z-index: 20;
+}
+
+.photo-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.photo-menu-item:hover {
+  background: #f3f4f6;
+}
+
+/* URL paste row inside the photo menu */
+.photo-url-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.photo-url-input {
+  flex: 1;
+  border: 1.5px solid #d1d5db;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.15s ease;
+}
+
+.photo-url-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.photo-url-save-btn {
+  flex-shrink: 0;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.photo-url-save-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.photo-url-save-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
 }
 
 /* Inline error message for photo refresh failure */
@@ -437,17 +509,17 @@
   }
 
   .identity-photo {
-    width: 64px;
-    height: 64px;
+    width: 76px;
+    height: 76px;
   }
 
   .photo-initials {
-    font-size: 20px;
+    font-size: 22px;
   }
 
-  .refresh-photo-btn {
-    width: 24px;
-    height: 24px;
+  .photo-menu {
+    left: 0;
+    transform: none;
   }
 
   .identity-name {

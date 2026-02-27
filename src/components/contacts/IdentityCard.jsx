@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Loader, Mail, Phone, Building2, Pencil, Copy, Check, Linkedin } from 'lucide-react';
+import { RefreshCw, Loader, Mail, Phone, Building2, Pencil, Copy, Check, Linkedin, Camera, Link2 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import './IdentityCard.css';
@@ -48,20 +48,46 @@ export default function IdentityCard({
 }) {
   const [imgBroken, setImgBroken] = useState(false);
   const navigate = useNavigate();
+
+  // Field editing
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
-  const [savedField, setSavedField] = useState(null); // field name that just saved
-  const [copiedField, setCopiedField] = useState(null); // 'email' | 'phone'
+  const [savedField, setSavedField] = useState(null);
+  const [copiedField, setCopiedField] = useState(null);
   const inputRef = useRef(null);
+
+  // Photo menu
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
+  const [photoUrlMode, setPhotoUrlMode] = useState(false);
+  const [photoUrlInput, setPhotoUrlInput] = useState('');
+  const photoMenuRef = useRef(null);
+  const photoUrlInputRef = useRef(null);
 
   const hasLinkedIn = !!contact.linkedin_url;
   const hasNameAndCompany = !!contact.name && !!contact.company_name;
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
-  const hasCustomUpload = !!contact.photo_source && contact.photo_source === 'user_upload';
-
   const canSearch = hasLinkedIn || hasNameAndCompany;
-  const showRefreshButton = canSearch && !hasRealPhoto && !hasCustomUpload && !photoRefreshLoading;
-  const showSpinner = photoRefreshLoading;
+
+  // Close photo menu when clicking outside
+  useEffect(() => {
+    if (!photoMenuOpen) return;
+    function handleOutsideClick(e) {
+      if (photoMenuRef.current && !photoMenuRef.current.contains(e.target)) {
+        setPhotoMenuOpen(false);
+        setPhotoUrlMode(false);
+        setPhotoUrlInput('');
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [photoMenuOpen]);
+
+  // Focus URL input when URL mode opens
+  useEffect(() => {
+    if (photoUrlMode && photoUrlInputRef.current) {
+      photoUrlInputRef.current.focus();
+    }
+  }, [photoUrlMode]);
 
   // Focus + select input when a field enters edit mode
   useEffect(() => {
@@ -87,7 +113,6 @@ export default function IdentityCard({
     const trimmed = editValue.trim();
     const updated = { ...contact, [field]: trimmed };
 
-    // Optimistic update + flash confirmation
     onUpdate?.(updated);
     setEditingField(null);
     setEditValue('');
@@ -101,7 +126,7 @@ export default function IdentityCard({
       await updateDoc(ref, { [field]: trimmed, updated_at: new Date().toISOString() });
     } catch (err) {
       console.error('[IdentityCard] Save failed:', err);
-      onUpdate?.(contact); // revert
+      onUpdate?.(contact);
       setSavedField(null);
     }
   }, [editingField, editValue, contact, onUpdate]);
@@ -114,22 +139,44 @@ export default function IdentityCard({
   async function copyToClipboard(value, field) {
     try {
       await navigator.clipboard.writeText(value);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
     } catch {
-      // fallback: select + execCommand for older browsers
       const el = document.createElement('textarea');
       el.value = value;
       document.body.appendChild(el);
       el.select();
       document.execCommand('copy');
       document.body.removeChild(el);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
+    }
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  async function saveManualPhotoUrl() {
+    const url = photoUrlInput.trim();
+    if (!url.startsWith('http')) return;
+
+    const updated = { ...contact, photo_url: url, photo_source: 'manual_url' };
+    onUpdate?.(updated);
+    setPhotoMenuOpen(false);
+    setPhotoUrlMode(false);
+    setPhotoUrlInput('');
+    setImgBroken(false);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const ref = doc(db, 'users', user.uid, 'contacts', contact.id);
+      await updateDoc(ref, {
+        photo_url: url,
+        photo_source: 'manual_url',
+        updated_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[IdentityCard] Photo URL save failed:', err);
+      onUpdate?.(contact);
     }
   }
 
-  // Email verification badge
   function EmailBadge() {
     if (!contact.email_status) return null;
     const map = {
@@ -144,8 +191,13 @@ export default function IdentityCard({
 
   return (
     <div className="identity-card">
-      <div className="identity-photo-wrapper">
-        <div className="identity-photo">
+
+      {/* ── Photo ── */}
+      <div className="identity-photo-wrapper" ref={photoMenuRef}>
+        <div
+          className={`identity-photo${!hasRealPhoto ? ' identity-photo--clickable' : ''}`}
+          onClick={() => !hasRealPhoto && !photoRefreshLoading && setPhotoMenuOpen(v => !v)}
+        >
           {hasRealPhoto ? (
             <img
               src={contact.photo_url}
@@ -153,33 +205,75 @@ export default function IdentityCard({
               onError={() => setImgBroken(true)}
             />
           ) : (
-            <div
-              className="photo-initials"
-              style={{ background: getAvatarColor(contact.name) }}
-            >
-              {getInitials(contact.name)}
-            </div>
+            <>
+              <div
+                className="photo-initials"
+                style={{ background: getAvatarColor(contact.name) }}
+              >
+                {getInitials(contact.name)}
+              </div>
+              <div className="photo-change-overlay">
+                {photoRefreshLoading
+                  ? <Loader className="w-4 h-4 photo-overlay-spinner" />
+                  : <Camera className="w-4 h-4" />}
+              </div>
+            </>
           )}
         </div>
-        {showRefreshButton && (
-          <button
-            className="refresh-photo-btn"
-            onClick={onRefreshPhoto}
-            title="Retry LinkedIn Photo"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {showSpinner && (
-          <button className="refresh-photo-btn refreshing" disabled>
-            <Loader className="w-3.5 h-3.5 refresh-spinner" />
-          </button>
+
+        {/* Photo action menu */}
+        {photoMenuOpen && !photoRefreshLoading && (
+          <div className="photo-menu">
+            {photoUrlMode ? (
+              <div className="photo-url-row">
+                <input
+                  ref={photoUrlInputRef}
+                  className="photo-url-input"
+                  value={photoUrlInput}
+                  onChange={e => setPhotoUrlInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') saveManualPhotoUrl();
+                    if (e.key === 'Escape') { setPhotoUrlMode(false); setPhotoUrlInput(''); }
+                  }}
+                  placeholder="https://..."
+                  type="url"
+                />
+                <button
+                  className="photo-url-save-btn"
+                  onClick={saveManualPhotoUrl}
+                  disabled={!photoUrlInput.trim().startsWith('http')}
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <>
+                {canSearch && (
+                  <button
+                    className="photo-menu-item"
+                    onClick={() => { setPhotoMenuOpen(false); onRefreshPhoto?.(); }}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Search LinkedIn</span>
+                  </button>
+                )}
+                <button
+                  className="photo-menu-item"
+                  onClick={() => setPhotoUrlMode(true)}
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span>Paste photo URL</span>
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
+      {/* ── Info ── */}
       <div className="identity-info">
 
-        {/* Name — click anywhere to edit */}
+        {/* Name */}
         {editingField === 'name' ? (
           <input
             ref={inputRef}
@@ -203,7 +297,7 @@ export default function IdentityCard({
           </div>
         )}
 
-        {/* Title — click anywhere to edit */}
+        {/* Title */}
         {editingField === 'title' ? (
           <input
             ref={inputRef}
@@ -229,7 +323,7 @@ export default function IdentityCard({
           </div>
         )}
 
-        {/* Company — pencil edits the name; company text links to profile */}
+        {/* Company */}
         {editingField === 'company_name' ? (
           <input
             ref={inputRef}
@@ -270,7 +364,7 @@ export default function IdentityCard({
           </div>
         )}
 
-        {/* Email — pencil edits; copy button; verification badge */}
+        {/* Email */}
         {editingField === 'email' ? (
           <div className="identity-edit-row">
             <input
@@ -322,7 +416,7 @@ export default function IdentityCard({
           </button>
         )}
 
-        {/* Phone — pencil edits; copy button */}
+        {/* Phone */}
         {editingField === 'phone' ? (
           <div className="identity-edit-row">
             <input

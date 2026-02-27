@@ -302,7 +302,7 @@ export default function BarryChatPanel({ userId }) {
               <span className="text-xs text-cyan-400 font-mono">Online</span>
 
               {/* Collapsed: show last message preview */}
-              {isCollapsed && lastMessage && (
+              {isCollapsed && lastMessage && lastMessage.content && (
                 <span className="text-xs text-gray-400 truncate max-w-xs ml-1">
                   {lastMessage.content.length > 50
                     ? lastMessage.content.slice(0, 50) + '...'
@@ -377,6 +377,24 @@ export default function BarryChatPanel({ userId }) {
                 aria-label="Conversation with Barry"
               >
                 {messages.map((msg, i) => {
+                  // Mission-created confirmation bubble
+                  if (msg.role === 'event' && msg.event === 'mission_created') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="text-sm px-3 py-2 leading-relaxed bg-emerald-500/10 text-emerald-200 border border-emerald-500/25 rounded-2xl rounded-tl-sm">
+                          ✓ Mission created for <strong>{msg.contactName}</strong>. Draft is ready in Active Missions.{' '}
+                          <a
+                            href="/hunter"
+                            className="underline underline-offset-2 text-emerald-300 hover:text-emerald-100 transition-colors"
+                          >
+                            View in Hunter →
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   if (msg.role === 'user') {
                     return (
                       <div key={i} className="flex gap-2 flex-row-reverse">
@@ -407,6 +425,16 @@ export default function BarryChatPanel({ userId }) {
                             angles={msg.angles}
                             contactId={msg.contact_id}
                             userId={userId}
+                            onLoaded={(result) => {
+                              if (result.created) {
+                                setMessages(prev => [...prev, {
+                                  role: 'event',
+                                  event: 'mission_created',
+                                  contactName: result.contactName,
+                                  missionId: result.missionId
+                                }]);
+                              }
+                            }}
                           />
                         )}
                       </div>

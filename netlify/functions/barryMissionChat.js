@@ -165,6 +165,7 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
   const recon = contextStack?.recon || {};
+  const userStyle = contextStack?.user_style || null;
 
   // Build a concise contact list for the prompt (avoid token overload)
   const contactSummary = contacts.slice(0, 20).map(c =>
@@ -198,6 +199,8 @@ ${recon.pain_points ? `Pain points: ${recon.pain_points}` : 'Pain points: not se
 ${recon.icp ? `ICP: ${recon.icp}` : 'ICP: not set'}
 ${recon.value_proposition ? `Value prop: ${recon.value_proposition}` : 'Value prop: not set'}
 ${reconContext ? reconContext.slice(0, 800) : ''}
+
+User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' ') : 'warm and conversational'}. Write all drafted messages in this style. When style is null, default to warm and conversational.
 
 ━━━ CRITICAL RULES ━━━
 1. Never narrate internal thinking ("Now I'm looking at...")

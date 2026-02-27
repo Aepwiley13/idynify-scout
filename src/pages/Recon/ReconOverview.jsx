@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import ImpactPreviewPanel from '../../components/recon/ImpactPreviewPanel';
+import CommunicationStyleSelector from '../../components/recon/CommunicationStyleSelector';
 import './ReconOverview.css';
 
 // Map RECON sections to the new module structure
@@ -450,6 +451,12 @@ export default function ReconOverview() {
             </div>
           );
         })()}
+      </div>
+
+      {/* Communication Style */}
+      <div className="recon-modules-section" style={{ marginBottom: '1.5rem' }}>
+        <h2 className="recon-section-title">Barry&apos;s Writing Style</h2>
+        <CommunicationStyleSelector userId={auth.currentUser?.uid} />
       </div>
 
       {/* RECON Modules Grid */}

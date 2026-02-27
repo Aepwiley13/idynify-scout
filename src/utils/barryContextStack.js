@@ -127,6 +127,7 @@ export async function buildContextStack(userId) {
       contacts,
       missions,
       recon,
+      user_style: dashboardData?.communicationStyle || null,
       timestamp: new Date().toISOString()
     };
   } catch (err) {

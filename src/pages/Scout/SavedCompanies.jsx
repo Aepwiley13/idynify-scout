@@ -246,7 +246,7 @@ export default function SavedCompanies({ onSelectCompany }) {
               <p style={{ fontSize: 13 }}>{searchTerm ? 'No companies match your search.' : isArchived ? 'No archived companies.' : 'No saved companies yet.'}</p>
             </div>
           ) : viewMode === 'cards' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(258px,1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
               {filteredCompanies.map(company => (
                 <CompanyCardV5
                   key={company.id}
@@ -508,7 +508,7 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
             key={i}
             style={{
               position: 'absolute',
-              width: '100%', maxWidth: 420,
+              width: '100%', maxWidth: 600,
               top: 0, bottom: 16,
               background: T.cardBg,
               border: `1px solid ${T.border}`,
@@ -524,7 +524,7 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
         <div
           style={{
             position: 'relative',
-            width: '100%', maxWidth: 420,
+            width: '100%', maxWidth: 600,
             background: T.cardBg,
             border: `1px solid ${T.borderHov || T.border}`,
             borderRadius: 20,
@@ -571,61 +571,61 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
           )}
 
           {/* Card body */}
-          <div style={{ padding: '18px 20px 14px', flex: 1 }}>
+          <div style={{ padding: '24px 28px 18px', flex: 1 }}>
 
             {/* Company header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 14 }}>
-              <div style={{ width: 54, height: 54, borderRadius: 14, flexShrink: 0, background: T.surface, border: `1px solid ${T.border2 || T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+              <div style={{ width: 72, height: 72, borderRadius: 18, flexShrink: 0, background: T.surface, border: `1px solid ${T.border2 || T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                 <CompanyLogo company={current} size="large" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 17, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.name}</div>
-                <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{current.industry}</div>
-                {current.location && <div style={{ fontSize: 11, color: T.textFaint, marginTop: 1 }}>{current.location}</div>}
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.name}</div>
+                <div style={{ fontSize: 14, color: T.textMuted, marginTop: 3 }}>{current.industry}</div>
+                {current.location && <div style={{ fontSize: 12, color: T.textFaint, marginTop: 2 }}>{current.location}</div>}
               </div>
               {current.fit_score > 0 && (
-                <div style={{ flexShrink: 0, textAlign: 'center', background: T.cyanBg || `${BRAND.cyan}15`, border: `1px solid ${T.cyanBdr || `${BRAND.cyan}30`}`, borderRadius: 11, padding: '7px 11px' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: T.cyan || BRAND.cyan, lineHeight: 1 }}>{current.fit_score}</div>
-                  <div style={{ fontSize: 8, color: T.textFaint, letterSpacing: 0.8, marginTop: 2 }}>FIT SCORE</div>
+                <div style={{ flexShrink: 0, textAlign: 'center', background: T.cyanBg || `${BRAND.cyan}15`, border: `1px solid ${T.cyanBdr || `${BRAND.cyan}30`}`, borderRadius: 13, padding: '10px 15px' }}>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: T.cyan || BRAND.cyan, lineHeight: 1 }}>{current.fit_score}</div>
+                  <div style={{ fontSize: 9, color: T.textFaint, letterSpacing: 0.8, marginTop: 3 }}>FIT SCORE</div>
                 </div>
               )}
             </div>
 
             {/* Stats grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 13 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
               {[
                 ['EMPLOYEES', current.employee_count || current.company_size || 'N/A'],
                 ['FOUNDED',   current.founded_year || 'N/A'],
                 ['REVENUE',   current.revenue || 'N/A'],
                 ['HQ',        current.location || current.city || 'N/A'],
               ].map(([label, value]) => (
-                <div key={label} style={{ background: T.surface, borderRadius: 10, padding: '8px 11px' }}>
-                  <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint, marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                <div key={label} style={{ background: T.surface, borderRadius: 11, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 9, letterSpacing: 1, color: T.textFaint, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
                 </div>
               ))}
             </div>
 
             {/* Description snippet */}
             {current.description && (
-              <p style={{ margin: '0 0 13px', fontSize: 11, color: T.textMuted, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              <p style={{ margin: '0 0 16px', fontSize: 13, color: T.textMuted, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {current.description}
               </p>
             )}
 
             {/* Website / LinkedIn quick links */}
             {(current.website_url || current.linkedin_url) && (
-              <div style={{ display: 'flex', gap: 7 }}>
+              <div style={{ display: 'flex', gap: 9 }}>
                 {current.website_url && (
                   <button onClick={e => { e.stopPropagation(); window.open(current.website_url, '_blank'); }}
-                    style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid #7c5ce430', background: '#7c5ce415', color: '#b388ff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    <Globe size={11} /> Website
+                    style={{ flex: 1, padding: '9px 14px', borderRadius: 9, border: '1px solid #7c5ce430', background: '#7c5ce415', color: '#b388ff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <Globe size={13} /> Website
                   </button>
                 )}
                 {current.linkedin_url && (
                   <button onClick={e => { e.stopPropagation(); window.open(current.linkedin_url, '_blank'); }}
-                    style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid #0077b530', background: '#0077b515', color: '#3b82f6', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    <Linkedin size={11} /> LinkedIn
+                    style={{ flex: 1, padding: '9px 14px', borderRadius: 9, border: '1px solid #0077b530', background: '#0077b515', color: '#3b82f6', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <Linkedin size={13} /> LinkedIn
                   </button>
                 )}
               </div>
@@ -633,16 +633,16 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
           </div>
 
           {/* Action buttons */}
-          <div style={{ padding: '12px 18px 18px', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 10 }}>
+          <div style={{ padding: '16px 24px 22px', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 12 }}>
             <button
               onClick={e => { e.stopPropagation(); handleSkip(); }}
-              style={{ flex: 1, padding: '13px 0', borderRadius: 13, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s' }}
+              style={{ flex: 1, padding: '15px 0', borderRadius: 14, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = T.borderHov || T.border; e.currentTarget.style.color = T.text; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
             >← Not Now</button>
             <button
               onClick={e => { e.stopPropagation(); handleFindContact(); }}
-              style={{ flex: 2, padding: '13px 0', borderRadius: 13, border: 'none', background: `linear-gradient(135deg, ${BRAND.pink}, #c0146a)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 4px 20px ${BRAND.pink}50`, transition: 'all 0.15s' }}
+              style={{ flex: 2, padding: '15px 0', borderRadius: 14, border: 'none', background: `linear-gradient(135deg, ${BRAND.pink}, #c0146a)`, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 4px 20px ${BRAND.pink}50`, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = `0 6px 28px ${BRAND.pink}70`; }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 20px ${BRAND.pink}50`; }}
             >Find a Contact →</button>
@@ -671,27 +671,27 @@ function CompanyCardV5({ company, isArchived, T, onClick, onArchive, onRestore }
       onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = 'none'; }}
       onClick={onClick}
     >
-      <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ padding: '18px 18px 14px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, overflow: 'hidden', flexShrink: 0 }}>
             <CompanyLogo company={company} size="default" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
-            <div style={{ fontSize: 10, color: T.textMuted }}>{company.industry}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+            <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{company.industry}</div>
           </div>
           {company.contact_count > 0 && (
-            <div style={{ fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
+            <div style={{ fontSize: 10, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 8, padding: '3px 9px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
               {company.contact_count} contact{company.contact_count !== 1 ? 's' : ''}
             </div>
           )}
           {isArchived && (
-            <div style={{ fontSize: 9, background: T.surface, color: T.textFaint, borderRadius: 7, padding: '2px 7px', border: `1px solid ${T.border}`, flexShrink: 0 }}>
+            <div style={{ fontSize: 10, background: T.surface, color: T.textFaint, borderRadius: 8, padding: '3px 9px', border: `1px solid ${T.border}`, flexShrink: 0 }}>
               Archived
             </div>
           )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
             ['EMPLOYEES', company.employee_count || company.company_size || 'N/A'],
             ['FOUNDED', company.founded_year || 'N/A'],
@@ -699,40 +699,40 @@ function CompanyCardV5({ company, isArchived, T, onClick, onArchive, onRestore }
             ['LOCATION', company.location || company.city || 'N/A'],
           ].map(([l, v]) => (
             <div key={l}>
-              <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{l}</div>
-              <div style={{ fontSize: 10, color: T.textMuted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+              <div style={{ fontSize: 9, letterSpacing: 1, color: T.textFaint }}>{l}</div>
+              <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
             </div>
           ))}
         </div>
       </div>
-      <div style={{ padding: '9px 12px' }}>
-        <div style={{ display: 'flex', gap: 5, marginBottom: 7 }}>
+      <div style={{ padding: '12px 16px' }}>
+        <div style={{ display: 'flex', gap: 7, marginBottom: 9 }}>
           <button
             onClick={e => { e.stopPropagation(); if (company.website_url) window.open(company.website_url, '_blank'); }}
-            style={{ flex: 1, padding: 4, borderRadius: 6, border: `1px solid #7c5ce430`, background: '#7c5ce410', color: '#b388ff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-          ><Globe size={11} />Visit</button>
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: `1px solid #7c5ce430`, background: '#7c5ce410', color: '#b388ff', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          ><Globe size={12} />Visit</button>
           <button
             onClick={e => { e.stopPropagation(); if (company.linkedin_url) window.open(company.linkedin_url, '_blank'); }}
-            style={{ flex: 1, padding: 4, borderRadius: 6, border: `1px solid #0077b530`, background: '#0077b510', color: '#3b82f6', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-          ><Linkedin size={11} />LinkedIn</button>
+            style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: `1px solid #0077b530`, background: '#0077b510', color: '#3b82f6', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          ><Linkedin size={12} />LinkedIn</button>
           {!isArchived && (
             <button
               onClick={e => { e.stopPropagation(); onArchive(); }}
               title="Archive company"
-              style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            ><Archive size={11} /></button>
+              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            ><Archive size={12} /></button>
           )}
           {isArchived && (
             <button
               onClick={e => { e.stopPropagation(); onRestore(); }}
               title="Restore company"
-              style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            ><RotateCcw size={11} /></button>
+              style={{ padding: '6px 10px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            ><RotateCcw size={12} /></button>
           )}
         </div>
         <button
           onClick={e => { e.stopPropagation(); onClick(); }}
-          style={{ width: '100%', padding: 7, borderRadius: 7, border: 'none', background: company.contact_count > 0 ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: company.contact_count > 0 ? T.cyan : '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderColor: company.contact_count > 0 ? T.cyanBdr : 'none' }}
+          style={{ width: '100%', padding: '10px 0', borderRadius: 9, border: 'none', background: company.contact_count > 0 ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: company.contact_count > 0 ? T.cyan : '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderColor: company.contact_count > 0 ? T.cyanBdr : 'none' }}
         >
           {company.contact_count > 0 ? 'View Contacts →' : 'Find Contacts →'}
         </button>

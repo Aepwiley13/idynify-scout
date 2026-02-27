@@ -369,6 +369,7 @@ export default function DailyLeads({ onNavigate }) {
       const companiesData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       companiesData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
       setCompanies(companiesData);
+      setCurrentIndex(0);
 
       const acceptedQuery = query(companiesRef, where('status', '==', 'accepted'));
       const acceptedSnapshot = await getDocs(acceptedQuery);

@@ -610,10 +610,16 @@ export default function CompanyProfileView({ companyId, onBack }) {
                       : isSelected ? <div style={{ fontSize: 9, background: `${BRAND.pink}20`, color: BRAND.pink, borderRadius: 6, padding: '2px 6px' }}>Selected</div> : null
                     }
                     footer={savedContact ? (
-                      <button onClick={() => navigate(`/scout/contact/${savedContact.id}`)}
-                        style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                        View Full Profile →
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <button onClick={() => setEngageContactId(savedContact.id)}
+                          style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <Zap size={13} />Engage
+                        </button>
+                        <button onClick={() => navigate(`/scout/contact/${savedContact.id}`)}
+                          style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                          View Full Profile →
+                        </button>
+                      </div>
                     ) : undefined}
                     getLeadershipBadge={getLeadershipBadge}
                     T={T}
@@ -775,32 +781,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
 
       {/* ── Engage panel overlay ── */}
       {engageContactId && (
-        <div
-          onClick={() => setEngageContactId(null)}
-          style={{ position: 'fixed', inset: 0, background: '#00000070', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 480, background: T.bg, display: 'flex', flexDirection: 'column', overflowY: 'auto', boxShadow: '-8px 0 40px rgba(0,0,0,0.25)', animation: 'slideInEngagePanel 0.2s ease-out' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, background: T.navBg, flexShrink: 0 }}>
-              <button
-                onClick={() => setEngageContactId(null)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
-              >
-                <ChevronLeft size={13} />Close
-              </button>
-              <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
-            </div>
-            <ContactProfile
-              key={engageContactId}
-              contactId={engageContactId}
-              autoEngage={true}
-              onClose={() => setEngageContactId(null)}
-            />
-          </div>
-          <style>{`@keyframes slideInEngagePanel { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
-        </div>
+        <EngagePanel contactId={engageContactId} onClose={() => setEngageContactId(null)} T={T} />
       )}
     </div>
   );
@@ -872,3 +853,60 @@ function ContactPhotoCard({ contact, selected, alreadySaved, onClick, badge, foo
     </div>
   );
 }
+
+// ── Engage panel ──────────────────────────────────────────────────────────────
+function EngagePanel({ contactId, onClose, T }) {
+  const isMobile = window.innerWidth <= 768;
+
+  // Escape key to close
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  // Lock body scroll while panel is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: '#00000070', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: isMobile ? '100%' : '480px',
+          background: T.appBg,
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          boxShadow: '-8px 0 40px rgba(0,0,0,0.25)',
+          animation: 'slideInEngagePanel 0.22s ease',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${T.border}`, background: T.navBg, flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+          >
+            <ChevronLeft size={13} />Close
+          </button>
+          <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
+        </div>
+        <ContactProfile
+          key={contactId}
+          contactId={contactId}
+          autoEngage={true}
+          onClose={onClose}
+        />
+      </div>
+      <style>{`@keyframes slideInEngagePanel { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+    </div>
+  );
+}
+

@@ -18,6 +18,7 @@ import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
 import ContactProfile from './ContactProfile';
+import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 22, style = {} }) {
@@ -431,6 +432,9 @@ export default function AllLeads() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
 
+  // LinkedIn modal
+  const [showLinkedInModal, setShowLinkedInModal] = useState(false);
+
   // Modal / profile
   const [modal, setModal] = useState(null);
   const [listSelected, setListSelected] = useState(null);
@@ -689,6 +693,10 @@ export default function AllLeads() {
           >{label}</button>
         ))}
         <button
+          onClick={() => setShowLinkedInModal(true)}
+          style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,#0077b5,#005f8e)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
+        ><Linkedin size={12} />Add via LinkedIn</button>
+        <button
           onClick={exportToCSV}
           style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
         ><Download size={12} />Export CSV</button>
@@ -887,6 +895,34 @@ export default function AllLeads() {
             ))}
           </div>
         </>
+      )}
+
+      {/* ── LinkedIn Link Modal ── */}
+      {showLinkedInModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: '#00000099', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setShowLinkedInModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: T.modalBg, borderRadius: 22, overflow: 'hidden', width: '100%', maxWidth: 560, boxShadow: `0 40px 100px ${T.isDark ? '#000000cc' : '#00000030'}`, maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: `1px solid ${T.modalLine}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Linkedin size={18} color="#0077b5" />
+                <span style={{ fontSize: 15, fontWeight: 700, color: T.text }}>Add via LinkedIn</span>
+              </div>
+              <button
+                onClick={() => setShowLinkedInModal(false)}
+                style={{ width: 28, height: 28, borderRadius: '50%', background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              ><X size={14} /></button>
+            </div>
+            <LinkedInLinkSearch
+              onContactAdded={() => { setShowLinkedInModal(false); loadAllContacts(); }}
+              onCancel={() => setShowLinkedInModal(false)}
+            />
+          </div>
+        </div>
       )}
 
       {/* ── Person Modal ── */}

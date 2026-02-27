@@ -10,10 +10,9 @@ import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
-  Phone, X, Zap, Star, ExternalLink,
-  Clock, ArrowLeft, Target, UserCheck, Handshake,
-  Network, Gift, ChevronLeft, Menu,
+  Phone, X, Zap, ExternalLink, ChevronLeft, Menu,
 } from 'lucide-react';
+import { BRIGADES } from '../../components/contacts/BrigadeSelector';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
@@ -360,13 +359,11 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick }) {
 }
 
 // ─── Brigade config ───────────────────────────────────────────────────────────
+// Derived from the single source of truth in BrigadeSelector — adding a new
+// brigade there will automatically add it here as a filter tab.
 const BRIGADE_LENSES = [
-  { id: 'all',      label: 'All People', Icon: Users       },
-  { id: 'leads',    label: 'Leads',      Icon: Target      },
-  { id: 'customers',label: 'Customers',  Icon: UserCheck   },
-  { id: 'partners', label: 'Partners',   Icon: Handshake   },
-  { id: 'network',  label: 'Network',    Icon: Network     },
-  { id: 'referrals',label: 'Referrals',  Icon: Gift        },
+  { id: 'all', label: 'All People', Icon: Users },
+  ...BRIGADES.map(b => ({ id: b.id, label: b.label, Icon: b.icon })),
 ];
 
 // ─── Contact Profile (full page, embedded) ───────────────────────────────────

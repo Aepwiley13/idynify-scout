@@ -1,13 +1,110 @@
-/* Identity Card - TOP OF PAGE */
+/* ── Flip card outer wrapper ─────────────────────────────── */
+.identity-card-flipper {
+  perspective: 1400px;
+  margin-bottom: 32px;
+}
+
+/* Holds both faces in the same grid cell so height = taller face */
+.identity-card-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.identity-card-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+/* Shared card face styles */
 .identity-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 24px;
+  grid-area: 1 / 1;
   background: white;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  margin-bottom: 32px;
+  position: relative;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Front face — horizontal photo + info layout */
+.identity-card--front {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 52px 24px 24px; /* extra right for flip btn */
+}
+
+/* Back face — vertical brigade + context layout */
+.identity-card--back {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  transform: rotateY(180deg);
+}
+
+/* ── Flip button (top-right of each face) ───────────────── */
+.card-flip-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.15s ease;
+  z-index: 1;
+}
+
+.card-flip-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+/* Amber pulsing dot on flip button when context is unset */
+.card-flip-btn-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  animation: badge-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.8); }
+}
+
+/* ── Needs-setup notice on back face ───────────────────── */
+.card-back-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: #78350f;
+  line-height: 1.45;
+  margin-top: 28px; /* clear the flip button */
+}
+
+.card-back-notice-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: #d97706;
+  margin-top: 1px;
 }
 
 /* Photo wrapper - positions refresh button relative to avatar */
@@ -504,8 +601,12 @@
 
 /* Mobile responsive */
 @media (max-width: 768px) {
-  .identity-card {
-    margin-bottom: 32px;
+  .identity-card-flipper {
+    perspective: 800px;
+  }
+
+  .identity-card--front {
+    padding-right: 44px;
   }
 
   .identity-photo {

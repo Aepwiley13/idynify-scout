@@ -19,9 +19,14 @@ export default function ScoutPlus() {
   };
 
   const handleContactAdded = (items) => {
-    setAddedItems(items);
     // Detect upload type from the _uploadType flag set by CSVUpload
     const isCompanyUpload = items.length > 0 && items[0]?._uploadType === 'companies';
+    // Auto-navigate to the contact profile when a single LinkedIn contact is saved
+    if (currentView === 'linkedin-link' && items.length === 1 && items[0]?.id && !isCompanyUpload) {
+      navigate(`/scout/contact/${items[0].id}`);
+      return;
+    }
+    setAddedItems(items);
     setLastUploadType(isCompanyUpload ? 'companies' : 'leads');
     setCurrentView('success');
   };

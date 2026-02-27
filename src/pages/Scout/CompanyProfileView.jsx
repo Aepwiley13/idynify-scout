@@ -15,7 +15,7 @@ import {
   ArrowLeft, Building2, Users, Globe, Linkedin, MapPin, Calendar,
   DollarSign, Briefcase, Target, Search, X, UserPlus, CheckCircle,
   Award, Archive, RotateCcw, RefreshCw, ChevronDown, ChevronUp,
-  FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft,
+  FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft, Mail,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
@@ -48,6 +48,24 @@ export default function CompanyProfileView({ companyId, onBack }) {
   // ── Decision makers state ──────────────────────────────────────────────────
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingDMs, setSavingDMs] = useState(false);
+
+  // ── Add Contact state ──────────────────────────────────────────────────────
+  const [addContactMode, setAddContactMode] = useState(null); // null | 'name' | 'linkedin'
+  // Name search
+  const [nameQuery, setNameQuery] = useState('');
+  const [nameSearching, setNameSearching] = useState(false);
+  const [nameResults, setNameResults] = useState(null);
+  const [nameBarryRec, setNameBarryRec] = useState(null);
+  const [nameValidating, setNameValidating] = useState(false);
+  const [nameSelectedContact, setNameSelectedContact] = useState(null);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameError, setNameError] = useState(null);
+  // LinkedIn link
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [linkedinSearching, setLinkedinSearching] = useState(false);
+  const [linkedinContact, setLinkedinContact] = useState(null);
+  const [linkedinSaving, setLinkedinSaving] = useState(false);
+  const [linkedinError, setLinkedinError] = useState(null);
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [showOverview, setShowOverview] = useState(true);
@@ -322,6 +340,163 @@ export default function CompanyProfileView({ companyId, onBack }) {
       console.error('Failed to save decision makers:', err);
     } finally {
       setSavingDMs(false);
+    }
+  }
+
+  // ── Add Contact: Search by Name ────────────────────────────────────────────
+  async function searchByName() {
+    if (!nameQuery.trim()) return;
+    setNameSearching(true);
+    setNameError(null);
+    setNameResults(null);
+    setNameBarryRec(null);
+    setNameSelectedContact(null);
+    try {
+      const user = auth.currentUser;
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/findContact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid, authToken,
+          searchParams: { name: nameQuery.trim(), company_name: company.name },
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Search failed');
+      if (!data.results?.length) {
+        setNameError('No matches found. Try a different name or spelling.');
+        setNameSearching(false);
+        return;
+      }
+      setNameResults(data.results);
+      setNameSearching(false);
+      setNameValidating(true);
+      const recRes = await fetch('/.netlify/functions/barryValidateContact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid, authToken,
+          results: data.results,
+          searchParams: { name: nameQuery.trim(), company_name: company.name },
+        }),
+      });
+      const recData = await recRes.json();
+      setNameBarryRec(
+        recData.success
+          ? recData.recommendation
+          : { contact: data.results[0], confidence: 'medium', explanation: 'Top match for your search.' }
+      );
+    } catch (err) {
+      setNameError(err.message || 'Search failed. Please try again.');
+      setNameSearching(false);
+    } finally {
+      setNameValidating(false);
+    }
+  }
+
+  async function saveNameContact(contact) {
+    setNameSaving(true);
+    setNameError(null);
+    try {
+      const user = auth.currentUser;
+      const contactDocId = `${companyId}_${contact.id}`;
+      await setDoc(doc(db, 'users', user.uid, 'contacts', contactDocId), {
+        apollo_person_id: contact.id,
+        name: contact.name || 'Unknown',
+        title: contact.title || '',
+        email: contact.email || null,
+        phone: contact.phone_numbers?.[0]?.sanitized_number || null,
+        linkedin_url: contact.linkedin_url || null,
+        photo_url: contact.photo_url || null,
+        company_id: companyId,
+        company_name: company.name,
+        company_industry: company.industry || null,
+        department: contact.departments?.[0] || null,
+        seniority: contact.seniority || null,
+        lead_owner: user.uid,
+        status: 'pending_enrichment',
+        saved_at: new Date().toISOString(),
+        source: 'name_search',
+        match_quality: contact.match_quality || 0,
+      });
+      await enrichContact(user.uid, contact.id);
+      await loadContacts();
+      setAddContactMode(null);
+      setNameQuery('');
+      setNameResults(null);
+      setNameBarryRec(null);
+      setNameSelectedContact(null);
+    } catch (err) {
+      setNameError(err.message || 'Failed to save contact. Please try again.');
+    } finally {
+      setNameSaving(false);
+    }
+  }
+
+  // ── Add Contact: LinkedIn Link ─────────────────────────────────────────────
+  async function searchByLinkedIn() {
+    if (!linkedinUrl.trim() || !linkedinUrl.includes('linkedin.com')) {
+      setLinkedinError('Please enter a valid LinkedIn URL (must contain linkedin.com)');
+      return;
+    }
+    setLinkedinSearching(true);
+    setLinkedinError(null);
+    setLinkedinContact(null);
+    try {
+      const user = auth.currentUser;
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/findContactByLinkedInUrl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, linkedin_url: linkedinUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to find contact');
+      if (!data.contact) throw new Error('Unable to retrieve profile details. Please verify the URL and try again.');
+      setLinkedinContact(data.contact);
+    } catch (err) {
+      setLinkedinError(err.message || 'Search failed. Please try again.');
+    } finally {
+      setLinkedinSearching(false);
+    }
+  }
+
+  async function saveLinkedInContact() {
+    if (!linkedinContact) return;
+    setLinkedinSaving(true);
+    setLinkedinError(null);
+    try {
+      const user = auth.currentUser;
+      const contactDocId = `${companyId}_${linkedinContact.id}`;
+      await setDoc(doc(db, 'users', user.uid, 'contacts', contactDocId), {
+        apollo_person_id: linkedinContact.id,
+        name: linkedinContact.name || 'Unknown',
+        title: linkedinContact.title || '',
+        email: linkedinContact.email || null,
+        phone: linkedinContact.phone_numbers?.[0]?.sanitized_number || null,
+        linkedin_url: linkedinContact.linkedin_url || null,
+        photo_url: linkedinContact.photo_url || null,
+        company_id: companyId,
+        company_name: company.name,
+        company_industry: company.industry || null,
+        department: linkedinContact.departments?.[0] || null,
+        seniority: linkedinContact.seniority || null,
+        lead_owner: user.uid,
+        status: 'pending_enrichment',
+        saved_at: new Date().toISOString(),
+        source: 'LinkedIn Link',
+        match_quality: 100,
+      });
+      await enrichContact(user.uid, linkedinContact.id);
+      await loadContacts();
+      setAddContactMode(null);
+      setLinkedinUrl('');
+      setLinkedinContact(null);
+    } catch (err) {
+      setLinkedinError(err.message || 'Failed to save contact. Please try again.');
+    } finally {
+      setLinkedinSaving(false);
     }
   }
 
@@ -754,6 +929,254 @@ export default function CompanyProfileView({ companyId, onBack }) {
           ) : null}
         </Section>
 
+        {/* ── Add a Contact ── */}
+        <Section title="Add a Contact" subtitle="Search by name or paste a LinkedIn profile link" icon={<UserPlus size={14} color={BRAND.cyan} />} T={T}>
+
+          {/* ── Method selector ── */}
+          {!addContactMode && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button
+                onClick={() => setAddContactMode('name')}
+                style={{ padding: '14px 12px', borderRadius: 10, border: `1.5px solid ${T.border}`, background: T.surface, cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: `${BRAND.cyan}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Search size={14} color={BRAND.cyan} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: T.text }}>Search by Name</span>
+                </div>
+                <span style={{ fontSize: 10, color: T.textFaint, lineHeight: 1.4 }}>Find anyone at {company.name} by their name</span>
+              </button>
+              <button
+                onClick={() => setAddContactMode('linkedin')}
+                style={{ padding: '14px 12px', borderRadius: 10, border: '1.5px solid #0077b540', background: '#0077b508', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 7 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: '#0077b520', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Linkedin size={14} color="#0077b5" />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: T.text }}>LinkedIn Link</span>
+                </div>
+                <span style={{ fontSize: 10, color: T.textFaint, lineHeight: 1.4 }}>Paste a LinkedIn profile URL to add instantly</span>
+              </button>
+            </div>
+          )}
+
+          {/* ── Name search ── */}
+          {addContactMode === 'name' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                onClick={() => { setAddContactMode(null); setNameQuery(''); setNameResults(null); setNameBarryRec(null); setNameSelectedContact(null); setNameError(null); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 0', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 11, alignSelf: 'flex-start' }}
+              >
+                <ArrowLeft size={12} /> Back
+              </button>
+
+              {!nameResults && (
+                <form onSubmit={e => { e.preventDefault(); searchByName(); }} style={{ display: 'flex', gap: 7 }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, background: T.input, border: `1.5px solid ${nameError ? STATUS.red : T.border}`, borderRadius: 9, padding: '8px 12px', transition: 'border-color 0.15s' }}>
+                    <Search size={13} color={T.textFaint} />
+                    <input
+                      value={nameQuery}
+                      onChange={e => { setNameQuery(e.target.value); setNameError(null); }}
+                      placeholder={`Search for a person at ${company.name}…`}
+                      style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: T.text }}
+                      autoFocus
+                      disabled={nameSearching}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!nameQuery.trim() || nameSearching}
+                    style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: nameQuery.trim() && !nameSearching ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface, color: nameQuery.trim() && !nameSearching ? '#fff' : T.textMuted, fontSize: 12, fontWeight: 700, cursor: nameQuery.trim() && !nameSearching ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', transition: 'all 0.15s' }}
+                  >
+                    {nameSearching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Searching…</> : <><Search size={13} />Find</>}
+                  </button>
+                </form>
+              )}
+
+              {nameError && !nameResults && (
+                <div style={{ padding: '10px 13px', borderRadius: 9, background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, fontSize: 12, color: STATUS.red }}>{nameError}</div>
+              )}
+
+              {nameValidating && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px', color: T.textFaint, fontSize: 12 }}>
+                  <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />Barry is reviewing matches…
+                </div>
+              )}
+
+              {nameBarryRec && !nameSelectedContact && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ padding: '10px 13px', borderRadius: 9, background: `${STATUS.green}10`, border: `1px solid ${STATUS.green}35`, fontSize: 12, color: STATUS.green }}>
+                    🐻 {nameBarryRec.explanation}
+                  </div>
+                  <NameSearchResultCard
+                    contact={nameBarryRec.contact}
+                    confidence={nameBarryRec.confidence}
+                    onConfirm={() => setNameSelectedContact(nameBarryRec.contact)}
+                    onReject={() => { setNameBarryRec(null); setNameResults(null); setNameError('Try a more specific name or include their last name.'); }}
+                    T={T}
+                  />
+                  {nameResults?.length > 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 10, color: T.textFaint, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>Other potential matches</div>
+                      {nameResults.slice(1).map((c, i) => (
+                        <button key={i} onClick={() => setNameSelectedContact(c)}
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: `1px solid ${T.border}`, background: T.surface, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {c.photo_url
+                            ? <img src={c.photo_url} alt={c.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                            : <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${BRAND.cyan}20`, flexShrink: 0 }} />
+                          }
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{c.name}</div>
+                            <div style={{ fontSize: 11, color: T.textFaint }}>{c.title}{c.organization_name ? ` · ${c.organization_name}` : ''}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {nameSelectedContact && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ padding: '9px 13px', borderRadius: 9, background: `#0077b510`, border: `1px solid #0077b530`, fontSize: 12, color: '#3b82f6' }}>
+                    Confirm this is the right person before saving to {company.name}
+                  </div>
+                  <NameSearchResultCard contact={nameSelectedContact} confidence={nameBarryRec?.confidence || 'medium'} T={T} />
+                  {nameError && (
+                    <div style={{ padding: '10px 13px', borderRadius: 9, background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, fontSize: 12, color: STATUS.red }}>{nameError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => saveNameContact(nameSelectedContact)} disabled={nameSaving}
+                      style={{ flex: 1, padding: '10px 0', borderRadius: 9, border: 'none', background: nameSaving ? T.surface : `linear-gradient(135deg,${STATUS.green},#059669)`, color: nameSaving ? T.textMuted : '#fff', fontSize: 13, fontWeight: 700, cursor: nameSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                      {nameSaving ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Saving…</> : <><UserPlus size={13} />Add to {company.name}</>}
+                    </button>
+                    <button onClick={() => { setNameSelectedContact(null); setNameBarryRec(null); setNameResults(null); }} disabled={nameSaving}
+                      style={{ padding: '10px 16px', borderRadius: 9, border: `1.5px solid ${T.border}`, background: 'transparent', color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      Start Over
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── LinkedIn link ── */}
+          {addContactMode === 'linkedin' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                onClick={() => { setAddContactMode(null); setLinkedinUrl(''); setLinkedinContact(null); setLinkedinError(null); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 0', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 11, alignSelf: 'flex-start' }}
+              >
+                <ArrowLeft size={12} /> Back
+              </button>
+
+              {!linkedinContact && (
+                <form onSubmit={e => { e.preventDefault(); searchByLinkedIn(); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', background: T.input, border: `1.5px solid ${linkedinError ? STATUS.red : T.border}`, borderRadius: 9, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+                    <div style={{ padding: '0 12px', borderRight: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', height: '100%' }}>
+                      <Linkedin size={15} color="#0077b5" />
+                    </div>
+                    <input
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={e => { setLinkedinUrl(e.target.value); setLinkedinError(null); }}
+                      placeholder="https://linkedin.com/in/johndoe"
+                      style={{ flex: 1, padding: '10px 12px', background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: T.text }}
+                      disabled={linkedinSearching}
+                      autoFocus
+                    />
+                  </div>
+                  <p style={{ margin: 0, fontSize: 11, color: T.textFaint }}>
+                    Copy the full LinkedIn profile URL and paste it here — we'll find their contact details instantly.
+                  </p>
+                  {linkedinError && (
+                    <div style={{ padding: '9px 12px', borderRadius: 8, background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, fontSize: 12, color: STATUS.red }}>{linkedinError}</div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={linkedinSearching}
+                    style={{ padding: '11px 0', borderRadius: 9, border: 'none', background: linkedinSearching ? T.surface : 'linear-gradient(135deg,#0077b5,#005f8e)', color: linkedinSearching ? T.textMuted : '#fff', fontSize: 13, fontWeight: 700, cursor: linkedinSearching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s' }}
+                  >
+                    {linkedinSearching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Finding…</> : <><Search size={13} />Find Contact</>}
+                  </button>
+                </form>
+              )}
+
+              {linkedinContact && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', background: `${STATUS.green}10`, border: `1px solid ${STATUS.green}35`, borderRadius: 9 }}>
+                    <CheckCircle size={14} color={STATUS.green} />
+                    <span style={{ fontSize: 12, color: STATUS.green, fontWeight: 600 }}>Contact found — review and add to {company.name}</span>
+                  </div>
+
+                  {/* LinkedIn contact card */}
+                  <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.cardBg }}>
+                    <div style={{ position: 'relative', height: 140, background: `linear-gradient(150deg,#0077b520,${T.cardBg} 80%)` }}>
+                      {linkedinContact.photo_url
+                        ? <img src={linkedinContact.photo_url} alt={linkedinContact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#0077b520', border: '2px solid #0077b540', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Linkedin size={24} color="#0077b5" />
+                            </div>
+                          </div>
+                      }
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.3) 55%,transparent 100%)' }} />
+                      <div style={{ position: 'absolute', bottom: 12, left: 14, right: 14 }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', textShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>{linkedinContact.name}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{linkedinContact.title || 'Title not available'}</div>
+                      </div>
+                      <div style={{ position: 'absolute', top: 10, right: 10, background: '#0077b5', borderRadius: 6, padding: '3px 7px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Linkedin size={10} color="#fff" />
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>EXACT MATCH</span>
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {linkedinContact.email && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: T.textMuted }}>
+                          <Mail size={12} color={T.textFaint} />{linkedinContact.email}
+                        </div>
+                      )}
+                      {linkedinContact.phone_numbers?.[0]?.sanitized_number && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: T.textMuted }}>
+                          <Phone size={12} color={T.textFaint} />{linkedinContact.phone_numbers[0].sanitized_number}
+                        </div>
+                      )}
+                      {linkedinContact.location && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: T.textMuted }}>
+                          <MapPin size={12} color={T.textFaint} />{linkedinContact.location}
+                        </div>
+                      )}
+                      {linkedinContact.linkedin_url && (
+                        <a href={linkedinContact.linkedin_url} target="_blank" rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#0077b5', textDecoration: 'none', padding: '7px 10px', background: '#0077b510', border: '1px solid #0077b530', borderRadius: 7, marginTop: 2 }}>
+                          <Linkedin size={12} color="#0077b5" />View LinkedIn Profile →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {linkedinError && (
+                    <div style={{ padding: '9px 13px', borderRadius: 9, background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, fontSize: 12, color: STATUS.red }}>{linkedinError}</div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={saveLinkedInContact} disabled={linkedinSaving}
+                      style={{ flex: 1, padding: '11px 0', borderRadius: 9, border: 'none', background: linkedinSaving ? T.surface : `linear-gradient(135deg,${STATUS.green},#059669)`, color: linkedinSaving ? T.textMuted : '#fff', fontSize: 13, fontWeight: 700, cursor: linkedinSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                      {linkedinSaving ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Saving…</> : <><UserPlus size={13} />Add to {company.name}</>}
+                    </button>
+                    <button onClick={() => { setLinkedinContact(null); setLinkedinUrl(''); setLinkedinError(null); }} disabled={linkedinSaving}
+                      style={{ padding: '11px 16px', borderRadius: 9, border: `1.5px solid ${T.border}`, background: 'transparent', color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      Start Over
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
+
         {/* ── Suggested Contacts ── */}
         {suggestedContacts.length > 0 && (
           <Section title={`Suggested Contacts (${suggestedContacts.length})`} subtitle="Auto-discovered from your ICP" icon={<Target size={14} color={BRAND.cyan} />} T={T}>
@@ -910,3 +1333,74 @@ function EngagePanel({ contactId, onClose, T }) {
   );
 }
 
+// ── Name search result card ────────────────────────────────────────────────────
+function NameSearchResultCard({ contact, confidence, onConfirm, onReject, T }) {
+  const confidenceColor = confidence === 'high' ? STATUS.green : confidence === 'low' ? '#f97316' : '#f59e0b';
+  const confidenceLabel = confidence === 'high' ? '✓ High Match' : confidence === 'low' ? '⚠ Low Match' : '~ Medium Match';
+
+  return (
+    <div style={{ borderRadius: 12, border: `1.5px solid ${confidenceColor}40`, background: T.cardBg, overflow: 'hidden' }}>
+      {/* Photo hero or plain header */}
+      {contact.photo_url ? (
+        <div style={{ position: 'relative', height: 120 }}>
+          <img src={contact.photo_url} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.82) 0%,transparent 60%)' }} />
+          <div style={{ position: 'absolute', bottom: 10, left: 13 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', textShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>{contact.name}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>{contact.title}</div>
+          </div>
+          <div style={{ position: 'absolute', top: 9, right: 9, padding: '3px 8px', borderRadius: 6, background: `${confidenceColor}cc`, fontSize: 10, fontWeight: 700, color: '#fff' }}>
+            {confidenceLabel}
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: `${BRAND.cyan}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: 18 }}>👤</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{contact.name}</div>
+            <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact.title}</div>
+          </div>
+          <div style={{ padding: '3px 8px', borderRadius: 6, background: `${confidenceColor}20`, border: `1px solid ${confidenceColor}40`, fontSize: 10, fontWeight: 700, color: confidenceColor, flexShrink: 0 }}>
+            {confidenceLabel}
+          </div>
+        </div>
+      )}
+
+      {/* Details */}
+      <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {contact.organization_name && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: T.textMuted }}>
+            <Building2 size={12} color={T.textFaint} />{contact.organization_name}
+          </div>
+        )}
+        {contact.email && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: T.textMuted }}>
+            <Mail size={12} color={T.textFaint} />{contact.email}
+          </div>
+        )}
+        {contact.linkedin_url && (
+          <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#0077b5', textDecoration: 'none' }}>
+            <Linkedin size={12} color="#0077b5" />View LinkedIn →
+          </a>
+        )}
+      </div>
+
+      {/* Confirm / reject buttons */}
+      {(onConfirm || onReject) && (
+        <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
+          <button onClick={onConfirm}
+            style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${STATUS.green},#059669)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <CheckCircle size={12} />This is the right person
+          </button>
+          <button onClick={onReject}
+            style={{ padding: '9px 13px', borderRadius: 8, border: `1.5px solid ${T.border}`, background: 'transparent', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

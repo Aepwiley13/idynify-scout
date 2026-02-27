@@ -22,14 +22,12 @@ import RecessiveActions from '../../components/contacts/RecessiveActions';
 import DetailDrawer from '../../components/contacts/DetailDrawer';
 import EngagementTimeline from '../../components/contacts/EngagementTimeline';
 import InlineEngagementSection from '../../components/contacts/InlineEngagementSection';
-import StructuredFields from '../../components/contacts/StructuredFields';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import GameBucketSelector from '../../components/contacts/GameBucketSelector';
 import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
 import NextBestStep from '../../components/contacts/NextBestStep';
-import BrigadeSelector from '../../components/contacts/BrigadeSelector';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import './ContactProfile.css';
@@ -672,12 +670,6 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
             }
           }}
         />
-
-        {/* 2. BRIGADE — Strategic relationship classification (replaces Game Bucket) */}
-        <BrigadeSelector contact={contact} onUpdate={handleContactUpdate} />
-
-        {/* 2b. STRUCTURED CONTEXT — Detailed classification */}
-        <StructuredFields contact={contact} onUpdate={handleContactUpdate} />
 
         {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (

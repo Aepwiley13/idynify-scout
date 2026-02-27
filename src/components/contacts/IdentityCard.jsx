@@ -1,30 +1,51 @@
+/**
+ * IdentityCard — Premium hero card for the contact profile.
+ *
+ * Layout:
+ *   ┌──────────────────────────────────────────┐
+ *   │  [brigade-coloured gradient banner]       │
+ *   │  (blurred photo behind gradient if avail) │
+ *   ├──────────────────────────────────────────┤
+ *   │  ◉ Avatar  (overlaps banner)  [✉][☎][in] │
+ *   │  Name                                     │
+ *   │  Title · Company                          │
+ *   │  ● Brigade badge  ▾                       │
+ *   │  ─────────────────────────────────────── │
+ *   │  Contact details (email / phone / linkedin│
+ *   │  ─────────────────────────────────────── │
+ *   │  Strategic Context (StructuredFields)     │
+ *   └──────────────────────────────────────────┘
+ *
+ * Brigade chooser is an inline popover from the badge.
+ * StructuredFields is embedded at the bottom so nothing
+ * is hidden behind a flip or pushed below the card.
+ */
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  RefreshCw, Loader, Mail, Phone, Building2, Pencil,
-  Copy, Check, Linkedin, Camera, Link2, RotateCcw, RotateCw, AlertTriangle
+  Mail, Phone, Building2, Pencil,
+  Copy, Check, Linkedin, Camera, Link2,
+  Loader, ChevronDown, RefreshCw,
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import BrigadeSelector from './BrigadeSelector';
+import { BRIGADES, BRIGADE_MAP } from './BrigadeSelector';
 import StructuredFields from './StructuredFields';
+import { onBrigadeChange } from '../../utils/brigadeSystem';
+import { useT } from '../../theme/ThemeContext';
+import { BRAND } from '../../theme/tokens';
 import './IdentityCard.css';
 
-/**
- * Check if a photo URL is a placeholder/default image (not a real profile photo).
- * Mirrors the backend isValidLinkedInPhoto logic.
- */
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function isPlaceholderPhoto(url) {
   if (!url) return true;
   const lower = url.toLowerCase();
-  const placeholders = [
-    'ghost-person', 'ghost_person', 'default-avatar',
-    'no-photo', 'placeholder', '/static.licdn.com/sc/h/', 'data:image'
-  ];
-  return placeholders.some(p => lower.includes(p));
+  return ['ghost-person', 'ghost_person', 'default-avatar', 'no-photo',
+    'placeholder', '/static.licdn.com/sc/h/', 'data:image'].some(p => lower.includes(p));
 }
 
-/** Generate initials from a full name (up to 2 chars). */
 function getInitials(name) {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
@@ -32,7 +53,6 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** Pick a consistent avatar bg color from the contact name. */
 const AVATAR_COLORS = [
   '#e85d7a', '#7c3aed', '#0ea5e9', '#10b981',
   '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
@@ -44,20 +64,20 @@ function getAvatarColor(name) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+// ─── IdentityCard ─────────────────────────────────────────────────────────────
+
 export default function IdentityCard({
   contact,
   onRefreshPhoto,
   photoRefreshLoading,
   photoRefreshError,
-  onUpdate
+  onUpdate,
 }) {
-  const [imgBroken, setImgBroken] = useState(false);
+  const T = useT();
   const navigate = useNavigate();
+  const [imgBroken, setImgBroken] = useState(false);
 
-  // Card flip
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  // Field editing
+  // Inline editing
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [savedField, setSavedField] = useState(null);
@@ -71,39 +91,52 @@ export default function IdentityCard({
   const photoMenuRef = useRef(null);
   const photoUrlInputRef = useRef(null);
 
-  const hasLinkedIn = !!contact.linkedin_url;
-  const hasNameAndCompany = !!contact.name && !!contact.company_name;
+  // Brigade chooser
+  const [brigadePanelOpen, setBrigadePanelOpen] = useState(false);
+  const [brigadeSaving, setBrigadeSaving] = useState(false);
+  const brigadeRef = useRef(null);
+
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
-  const canSearch = hasLinkedIn || hasNameAndCompany;
+  const canSearch = !!contact.linkedin_url || (!!contact.name && !!contact.company_name);
+  const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
+  const email = contact.email || contact.work_email;
+  const phone = contact.phone_mobile || contact.phone_direct || contact.phone;
+  const emailVerified = contact.email_status === 'verified';
+  const emailLikely = contact.email_status === 'likely';
 
-  // True when brigade + all key strategic fields are unset
-  const needsContextSetup = !contact.brigade
-    && !contact.relationship_state
-    && !contact.relationship_type
-    && !contact.strategic_value;
+  // Banner: brigade colour or pink gradient
+  const bannerAccent = currentBrigade?.color || BRAND.pink;
+  const bannerGradient = hasRealPhoto
+    ? `linear-gradient(160deg, ${bannerAccent}bb 0%, ${bannerAccent}55 60%, transparent 100%)`
+    : `linear-gradient(150deg, ${bannerAccent}dd 0%, ${bannerAccent}88 50%, ${bannerAccent}22 100%)`;
 
-  // Close photo menu when clicking outside
+  // ── Close-outside handlers ──────────────────────────────────────────────────
   useEffect(() => {
     if (!photoMenuOpen) return;
-    function handleOutsideClick(e) {
+    const h = (e) => {
       if (photoMenuRef.current && !photoMenuRef.current.contains(e.target)) {
         setPhotoMenuOpen(false);
         setPhotoUrlMode(false);
         setPhotoUrlInput('');
       }
-    }
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, [photoMenuOpen]);
 
-  // Focus URL input when URL mode opens
   useEffect(() => {
-    if (photoUrlMode && photoUrlInputRef.current) {
-      photoUrlInputRef.current.focus();
-    }
+    if (!brigadePanelOpen) return;
+    const h = (e) => {
+      if (brigadeRef.current && !brigadeRef.current.contains(e.target)) setBrigadePanelOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [brigadePanelOpen]);
+
+  useEffect(() => {
+    if (photoUrlMode && photoUrlInputRef.current) photoUrlInputRef.current.focus();
   }, [photoUrlMode]);
 
-  // Focus + select input when a field enters edit mode
   useEffect(() => {
     if (editingField && inputRef.current) {
       inputRef.current.focus();
@@ -111,33 +144,25 @@ export default function IdentityCard({
     }
   }, [editingField]);
 
-  function startEdit(field, currentValue) {
-    setEditingField(field);
-    setEditValue(currentValue || '');
-  }
-
-  function cancelEdit() {
-    setEditingField(null);
-    setEditValue('');
-  }
+  // ── Editing ─────────────────────────────────────────────────────────────────
+  function startEdit(field, val) { setEditingField(field); setEditValue(val || ''); }
+  function cancelEdit() { setEditingField(null); setEditValue(''); }
 
   const saveEdit = useCallback(async () => {
     if (!editingField) return;
     const field = editingField;
     const trimmed = editValue.trim();
-    const updated = { ...contact, [field]: trimmed };
-
-    onUpdate?.(updated);
+    onUpdate?.({ ...contact, [field]: trimmed });
     setEditingField(null);
     setEditValue('');
     setSavedField(field);
     setTimeout(() => setSavedField(null), 2000);
-
     try {
       const user = auth.currentUser;
       if (!user) return;
-      const ref = doc(db, 'users', user.uid, 'contacts', contact.id);
-      await updateDoc(ref, { [field]: trimmed, updated_at: new Date().toISOString() });
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        [field]: trimmed, updated_at: new Date().toISOString(),
+      });
     } catch (err) {
       console.error('[IdentityCard] Save failed:', err);
       onUpdate?.(contact);
@@ -151,9 +176,7 @@ export default function IdentityCard({
   }
 
   async function copyToClipboard(value, field) {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
+    try { await navigator.clipboard.writeText(value); } catch {
       const el = document.createElement('textarea');
       el.value = value;
       document.body.appendChild(el);
@@ -168,22 +191,16 @@ export default function IdentityCard({
   async function saveManualPhotoUrl() {
     const url = photoUrlInput.trim();
     if (!url.startsWith('http')) return;
-
-    const updated = { ...contact, photo_url: url, photo_source: 'manual_url' };
-    onUpdate?.(updated);
+    onUpdate?.({ ...contact, photo_url: url, photo_source: 'manual_url' });
     setPhotoMenuOpen(false);
     setPhotoUrlMode(false);
     setPhotoUrlInput('');
     setImgBroken(false);
-
     try {
       const user = auth.currentUser;
       if (!user) return;
-      const ref = doc(db, 'users', user.uid, 'contacts', contact.id);
-      await updateDoc(ref, {
-        photo_url: url,
-        photo_source: 'manual_url',
-        updated_at: new Date().toISOString()
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        photo_url: url, photo_source: 'manual_url', updated_at: new Date().toISOString(),
       });
     } catch (err) {
       console.error('[IdentityCard] Photo URL save failed:', err);
@@ -191,357 +208,434 @@ export default function IdentityCard({
     }
   }
 
-  function EmailBadge() {
-    if (!contact.email_status) return null;
-    const map = {
-      verified:   { label: '✓ Verified',   cls: 'badge-verified' },
-      likely:     { label: '~ Likely',      cls: 'badge-likely' },
-      unverified: { label: 'Unverified',    cls: 'badge-unverified' },
-    };
-    const b = map[contact.email_status];
-    if (!b) return null;
-    return <span className={`identity-email-badge ${b.cls}`}>{b.label}</span>;
+  // ── Brigade ─────────────────────────────────────────────────────────────────
+  async function handleBrigadeSelect(brigadeId) {
+    const user = auth.currentUser;
+    if (!user || !contact?.id) return;
+    const newValue = contact.brigade === brigadeId ? null : brigadeId;
+    onUpdate({ ...contact, brigade: newValue });
+    setBrigadePanelOpen(false);
+    try {
+      setBrigadeSaving(true);
+      await onBrigadeChange({
+        userId: user.uid, contactId: contact.id,
+        fromBrigade: contact.brigade || null, toBrigade: newValue,
+        contactName: contact.name || null,
+      });
+    } catch (err) {
+      console.error('[IdentityCard] Brigade save failed:', err);
+      onUpdate(contact);
+    } finally {
+      setBrigadeSaving(false);
+    }
   }
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="identity-card-flipper">
-      <div className={`identity-card-inner${isFlipped ? ' is-flipped' : ''}`}>
+    <div
+      className="idc-card"
+      style={{ background: T.cardBg, border: `1px solid ${T.border}` }}
+    >
 
-        {/* ══════════════════════ FRONT FACE ══════════════════════ */}
-        <div className="identity-card identity-card--front">
+      {/* ── Banner ── */}
+      <div className="idc-banner" style={{ background: bannerGradient }}>
+        {hasRealPhoto && (
+          <img
+            src={contact.photo_url}
+            alt=""
+            className="idc-banner-blur"
+          />
+        )}
+      </div>
 
-          {/* Flip to back button */}
-          <button
-            className="card-flip-btn"
-            onClick={() => setIsFlipped(true)}
-            title="View Brigade & Strategic Context"
+      {/* ── Avatar row ── */}
+      <div className="idc-avatar-row">
+        {/* Avatar */}
+        <div className="idc-photo-wrap" ref={photoMenuRef}>
+          <div
+            className={`idc-photo${!hasRealPhoto ? ' idc-photo--click' : ''}`}
+            style={{ border: `3px solid ${T.cardBg}` }}
+            onClick={() => !hasRealPhoto && !photoRefreshLoading && setPhotoMenuOpen(v => !v)}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Context</span>
-            {needsContextSetup && <span className="card-flip-btn-badge" />}
-          </button>
-
-          {/* ── Photo ── */}
-          <div className="identity-photo-wrapper" ref={photoMenuRef}>
-            <div
-              className={`identity-photo${!hasRealPhoto ? ' identity-photo--clickable' : ''}`}
-              onClick={() => !hasRealPhoto && !photoRefreshLoading && setPhotoMenuOpen(v => !v)}
-            >
-              {hasRealPhoto ? (
-                <img
-                  src={contact.photo_url}
-                  alt={contact.name}
-                  onError={() => setImgBroken(true)}
-                />
-              ) : (
-                <>
-                  <div
-                    className="photo-initials"
-                    style={{ background: getAvatarColor(contact.name) }}
-                  >
-                    {getInitials(contact.name)}
-                  </div>
-                  <div className="photo-change-overlay">
-                    {photoRefreshLoading
-                      ? <Loader className="w-4 h-4 photo-overlay-spinner" />
-                      : <Camera className="w-4 h-4" />}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Photo action menu */}
-            {photoMenuOpen && !photoRefreshLoading && (
-              <div className="photo-menu">
-                {photoUrlMode ? (
-                  <div className="photo-url-row">
-                    <input
-                      ref={photoUrlInputRef}
-                      className="photo-url-input"
-                      value={photoUrlInput}
-                      onChange={e => setPhotoUrlInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') saveManualPhotoUrl();
-                        if (e.key === 'Escape') { setPhotoUrlMode(false); setPhotoUrlInput(''); }
-                      }}
-                      placeholder="https://..."
-                      type="url"
-                    />
-                    <button
-                      className="photo-url-save-btn"
-                      onClick={saveManualPhotoUrl}
-                      disabled={!photoUrlInput.trim().startsWith('http')}
-                    >
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {canSearch && (
-                      <button
-                        className="photo-menu-item"
-                        onClick={() => { setPhotoMenuOpen(false); onRefreshPhoto?.(); }}
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Search LinkedIn</span>
-                      </button>
-                    )}
-                    <button
-                      className="photo-menu-item"
-                      onClick={() => setPhotoUrlMode(true)}
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                      <span>Paste photo URL</span>
-                    </button>
-                  </>
-                )}
-              </div>
+            {hasRealPhoto ? (
+              <img src={contact.photo_url} alt={contact.name} onError={() => setImgBroken(true)} />
+            ) : (
+              <>
+                <div className="idc-initials" style={{ background: getAvatarColor(contact.name) }}>
+                  {getInitials(contact.name)}
+                </div>
+                <div className="idc-photo-overlay">
+                  {photoRefreshLoading
+                    ? <Loader size={16} className="idc-spin" />
+                    : <Camera size={16} />}
+                </div>
+              </>
             )}
           </div>
 
-          {/* ── Info ── */}
-          <div className="identity-info">
-
-            {/* Name */}
-            {editingField === 'name' ? (
-              <input
-                ref={inputRef}
-                className="identity-edit-input identity-name-input"
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onBlur={saveEdit}
-                onKeyDown={handleKeyDown}
-                placeholder="Full name"
-              />
-            ) : (
-              <div
-                className="identity-field-wrapper"
-                onClick={() => startEdit('name', contact.name)}
-                title="Click to edit name"
-              >
-                <h1 className="identity-name">{contact.name || 'Unknown Contact'}</h1>
-                {savedField === 'name'
-                  ? <Check className="identity-saved-icon" />
-                  : <Pencil className="identity-edit-icon" />}
-              </div>
-            )}
-
-            {/* Title */}
-            {editingField === 'title' ? (
-              <input
-                ref={inputRef}
-                className="identity-edit-input identity-title-input"
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onBlur={saveEdit}
-                onKeyDown={handleKeyDown}
-                placeholder="Job title"
-              />
-            ) : (
-              <div
-                className="identity-field-wrapper"
-                onClick={() => startEdit('title', contact.title)}
-                title="Click to edit title"
-              >
-                <p className="identity-title">
-                  {contact.title || <span className="identity-placeholder">Add title</span>}
-                </p>
-                {savedField === 'title'
-                  ? <Check className="identity-saved-icon" />
-                  : <Pencil className="identity-edit-icon" />}
-              </div>
-            )}
-
-            {/* Company */}
-            {editingField === 'company_name' ? (
-              <input
-                ref={inputRef}
-                className="identity-edit-input identity-company-input"
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onBlur={saveEdit}
-                onKeyDown={handleKeyDown}
-                placeholder="Company name"
-              />
-            ) : (
-              <div className="identity-field-wrapper">
-                {contact.company_id ? (
+          {/* Photo action menu */}
+          {photoMenuOpen && !photoRefreshLoading && (
+            <div
+              className="idc-photo-menu"
+              style={{ background: T.cardBg, border: `1px solid ${T.border}`, boxShadow: `0 8px 28px ${T.isDark ? '#00000070' : '#00000018'}` }}
+            >
+              {photoUrlMode ? (
+                <div className="idc-photo-url-row">
+                  <input
+                    ref={photoUrlInputRef}
+                    value={photoUrlInput}
+                    onChange={e => setPhotoUrlInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') saveManualPhotoUrl();
+                      if (e.key === 'Escape') { setPhotoUrlMode(false); setPhotoUrlInput(''); }
+                    }}
+                    placeholder="https://..."
+                    type="url"
+                    style={{ background: T.input, border: `1px solid ${T.border}`, color: T.text }}
+                  />
                   <button
-                    className="identity-company identity-company-link"
-                    onClick={() => navigate(`/scout/company/${contact.company_id}`)}
-                  >
-                    <Building2 className="identity-contact-icon" />
-                    {contact.company_name || 'No company'}
-                  </button>
-                ) : (
-                  <p className="identity-company">
-                    {contact.company_name && <Building2 className="identity-contact-icon" />}
-                    {contact.company_name || <span className="identity-placeholder">Add company</span>}
-                  </p>
-                )}
-                {savedField === 'company_name' ? (
-                  <Check className="identity-saved-icon identity-saved-icon--visible" />
-                ) : (
+                    onClick={saveManualPhotoUrl}
+                    disabled={!photoUrlInput.trim().startsWith('http')}
+                    style={{ background: BRAND.pink, color: '#fff' }}
+                  >Save</button>
+                </div>
+              ) : (
+                <>
+                  {canSearch && (
+                    <button
+                      className="idc-photo-menu-item"
+                      style={{ color: T.textMuted }}
+                      onClick={() => { setPhotoMenuOpen(false); onRefreshPhoto?.(); }}
+                    >
+                      <RefreshCw size={13} />Search LinkedIn
+                    </button>
+                  )}
                   <button
-                    className="identity-pencil-btn"
-                    onClick={() => startEdit('company_name', contact.company_name)}
-                    title="Edit company name"
+                    className="idc-photo-menu-item"
+                    style={{ color: T.textMuted }}
+                    onClick={() => setPhotoUrlMode(true)}
                   >
-                    <Pencil className="identity-edit-icon identity-edit-icon--btn" />
+                    <Link2 size={13} />Paste photo URL
                   </button>
-                )}
-              </div>
-            )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-            {/* Email */}
-            {editingField === 'email' ? (
-              <div className="identity-edit-row">
-                <input
-                  ref={inputRef}
-                  className="identity-edit-input identity-contact-input"
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  onBlur={saveEdit}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Email address"
-                  type="email"
-                />
-                <span className="identity-edit-hint">Enter to save · Esc to cancel</span>
-              </div>
-            ) : contact.email ? (
-              <div className="identity-field-wrapper">
-                <a href={`mailto:${contact.email}`} className="identity-contact-row">
-                  <Mail className="identity-contact-icon" />
-                  <span>{contact.email}</span>
-                </a>
-                <EmailBadge />
-                {savedField === 'email' ? (
-                  <Check className="identity-saved-icon identity-saved-icon--visible" />
-                ) : (
-                  <div className="identity-field-actions">
-                    <button
-                      className="identity-icon-btn"
-                      onClick={() => copyToClipboard(contact.email, 'email')}
-                      title="Copy email"
-                    >
-                      {copiedField === 'email'
-                        ? <Check className="identity-action-icon identity-action-icon--copied" />
-                        : <Copy className="identity-action-icon" />}
-                    </button>
-                    <button
-                      className="identity-pencil-btn"
-                      onClick={() => startEdit('email', contact.email)}
-                      title="Edit email"
-                    >
-                      <Pencil className="identity-edit-icon identity-edit-icon--btn" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button className="identity-add-field" onClick={() => startEdit('email', '')}>
-                <Mail className="identity-contact-icon" />
-                <span>Add email</span>
+        {/* Quick action icon buttons — right side */}
+        <div className="idc-quick-btns">
+          {email && (
+            <a
+              href={`mailto:${email}`}
+              className="idc-quick-btn"
+              style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted }}
+              title={email}
+            >
+              <Mail size={14} />
+            </a>
+          )}
+          {phone && (
+            <a
+              href={`tel:${phone}`}
+              className="idc-quick-btn"
+              style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted }}
+              title={phone}
+            >
+              <Phone size={14} />
+            </a>
+          )}
+          {contact.linkedin_url && (
+            <a
+              href={contact.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="idc-quick-btn idc-quick-btn--li"
+              title="LinkedIn"
+            >
+              <Linkedin size={14} />
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* ── Identity body ── */}
+      <div className="idc-body">
+
+        {/* Name */}
+        {editingField === 'name' ? (
+          <input
+            ref={inputRef}
+            className="idc-edit-input idc-name-input"
+            style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            placeholder="Full name"
+          />
+        ) : (
+          <div className="idc-field-row" onClick={() => startEdit('name', contact.name)} title="Click to edit">
+            <h1 className="idc-name" style={{ color: T.text }}>{contact.name || 'Unknown Contact'}</h1>
+            {savedField === 'name'
+              ? <Check size={13} color="#10b981" style={{ flexShrink: 0 }} />
+              : <Pencil size={11} className="idc-edit-icon" color={T.textFaint} />}
+          </div>
+        )}
+
+        {/* Title */}
+        {editingField === 'title' ? (
+          <input
+            ref={inputRef}
+            className="idc-edit-input idc-sub-input"
+            style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            placeholder="Job title"
+          />
+        ) : (
+          <div className="idc-field-row" onClick={() => startEdit('title', contact.title)} title="Click to edit">
+            <p className="idc-sub-text" style={{ color: T.textMuted }}>
+              {contact.title || <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Add title</span>}
+            </p>
+            {savedField === 'title'
+              ? <Check size={13} color="#10b981" style={{ flexShrink: 0 }} />
+              : <Pencil size={11} className="idc-edit-icon" color={T.textFaint} />}
+          </div>
+        )}
+
+        {/* Company */}
+        {editingField === 'company_name' ? (
+          <input
+            ref={inputRef}
+            className="idc-edit-input idc-sub-input"
+            style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={saveEdit}
+            onKeyDown={handleKeyDown}
+            placeholder="Company"
+          />
+        ) : (
+          <div className="idc-field-row" style={{ cursor: 'default' }}>
+            {contact.company_id ? (
+              <button
+                className="idc-company-link"
+                style={{ color: T.textMuted }}
+                onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+              >
+                <Building2 size={13} style={{ flexShrink: 0 }} />
+                {contact.company_name || 'View Company'}
               </button>
-            )}
-
-            {/* Phone */}
-            {editingField === 'phone' ? (
-              <div className="identity-edit-row">
-                <input
-                  ref={inputRef}
-                  className="identity-edit-input identity-contact-input"
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  onBlur={saveEdit}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Phone number"
-                  type="tel"
-                />
-                <span className="identity-edit-hint">Enter to save · Esc to cancel</span>
-              </div>
-            ) : contact.phone ? (
-              <div className="identity-field-wrapper">
-                <a href={`tel:${contact.phone}`} className="identity-contact-row">
-                  <Phone className="identity-contact-icon" />
-                  <span>{contact.phone}</span>
-                </a>
-                {savedField === 'phone' ? (
-                  <Check className="identity-saved-icon identity-saved-icon--visible" />
-                ) : (
-                  <div className="identity-field-actions">
-                    <button
-                      className="identity-icon-btn"
-                      onClick={() => copyToClipboard(contact.phone, 'phone')}
-                      title="Copy phone"
-                    >
-                      {copiedField === 'phone'
-                        ? <Check className="identity-action-icon identity-action-icon--copied" />
-                        : <Copy className="identity-action-icon" />}
-                    </button>
-                    <button
-                      className="identity-pencil-btn"
-                      onClick={() => startEdit('phone', contact.phone)}
-                      title="Edit phone"
-                    >
-                      <Pencil className="identity-edit-icon identity-edit-icon--btn" />
-                    </button>
-                  </div>
-                )}
-              </div>
+            ) : contact.company_name ? (
+              <span
+                className="idc-company-text"
+                style={{ color: T.textMuted, cursor: 'pointer' }}
+                onClick={() => startEdit('company_name', contact.company_name)}
+              >
+                <Building2 size={13} style={{ flexShrink: 0 }} />{contact.company_name}
+              </span>
             ) : (
-              <button className="identity-add-field" onClick={() => startEdit('phone', '')}>
-                <Phone className="identity-contact-icon" />
-                <span>Add phone</span>
-              </button>
+              <span
+                style={{ color: T.textFaint, fontStyle: 'italic', fontSize: 13, cursor: 'pointer' }}
+                onClick={() => startEdit('company_name', '')}
+              >
+                Add company
+              </span>
             )}
+            {savedField === 'company_name'
+              ? <Check size={13} color="#10b981" style={{ flexShrink: 0 }} />
+              : (
+                <button className="idc-pencil" onClick={() => startEdit('company_name', contact.company_name)}>
+                  <Pencil size={11} color={T.textFaint} />
+                </button>
+              )}
+          </div>
+        )}
 
-            {/* LinkedIn quick-link */}
-            {contact.linkedin_url && (
+        {/* ── Brigade badge ── */}
+        <div className="idc-brigade-row" ref={brigadeRef}>
+          <button
+            className="idc-brigade-badge"
+            onClick={() => setBrigadePanelOpen(v => !v)}
+            style={currentBrigade ? {
+              background: currentBrigade.bgColor,
+              border: `1.5px solid ${currentBrigade.borderColor}`,
+              color: currentBrigade.color,
+            } : {
+              background: T.surface,
+              border: `1.5px dashed ${T.border}`,
+              color: T.textFaint,
+            }}
+          >
+            {currentBrigade ? (
+              <>
+                <currentBrigade.icon size={12} />
+                <span>{currentBrigade.label}</span>
+              </>
+            ) : (
+              <span>+ Set Brigade</span>
+            )}
+            {brigadeSaving
+              ? <Loader size={10} className="idc-spin" />
+              : <ChevronDown size={11} style={{ opacity: 0.6 }} />}
+          </button>
+
+          {/* Brigade chooser popover */}
+          {brigadePanelOpen && (
+            <div
+              className="idc-brigade-panel"
+              style={{
+                background: T.cardBg,
+                border: `1px solid ${T.border}`,
+                boxShadow: `0 8px 32px ${T.isDark ? '#00000080' : '#0000001a'}`,
+              }}
+            >
+              <div className="idc-brigade-panel-label" style={{ color: T.textFaint }}>
+                Select Brigade
+              </div>
+              {BRIGADES.map(b => {
+                const BIcon = b.icon;
+                const isActive = contact.brigade === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    className="idc-brigade-opt"
+                    onClick={() => handleBrigadeSelect(b.id)}
+                    style={{
+                      background: isActive ? b.bgColor : 'transparent',
+                      color: isActive ? b.color : T.textMuted,
+                      borderLeft: `3px solid ${isActive ? b.color : 'transparent'}`,
+                    }}
+                    title={b.description}
+                  >
+                    <BIcon size={13} style={{ flexShrink: 0 }} />
+                    <span className="idc-brigade-opt-label">{b.label}</span>
+                    {isActive && <Check size={12} style={{ marginLeft: 'auto', flexShrink: 0, color: b.color }} />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Divider ── */}
+        <div className="idc-divider" style={{ background: T.border }} />
+
+        {/* ── Contact details ── */}
+        <div className="idc-contact-details">
+
+          {/* Email */}
+          {editingField === 'email' ? (
+            <div className="idc-edit-row">
+              <input
+                ref={inputRef}
+                className="idc-edit-input idc-contact-input"
+                style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={saveEdit}
+                onKeyDown={handleKeyDown}
+                placeholder="Email address"
+                type="email"
+              />
+              <span className="idc-edit-hint" style={{ color: T.textFaint }}>Enter · Esc</span>
+            </div>
+          ) : email ? (
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon" style={{ background: '#3b82f612', color: '#3b82f6' }}>
+                <Mail size={13} />
+              </div>
+              <div className="idc-detail-info">
+                <a href={`mailto:${email}`} className="idc-detail-val" style={{ color: T.text }}>{email}</a>
+                {emailVerified && <span className="idc-badge idc-badge--ok">✓ Verified</span>}
+                {emailLikely && !emailVerified && <span className="idc-badge idc-badge--warn">~ Likely</span>}
+              </div>
+              <button className="idc-icon-btn" onClick={() => copyToClipboard(email, 'email')} title="Copy">
+                {copiedField === 'email' ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
+              </button>
+              <button className="idc-icon-btn" onClick={() => startEdit('email', email)} title="Edit">
+                <Pencil size={11} color={T.textFaint} />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="idc-add-field"
+              style={{ color: T.textFaint, borderColor: T.border }}
+              onClick={() => startEdit('email', '')}
+            >
+              <Mail size={12} /><span>Add email</span>
+            </button>
+          )}
+
+          {/* Phone */}
+          {editingField === 'phone' ? (
+            <div className="idc-edit-row">
+              <input
+                ref={inputRef}
+                className="idc-edit-input idc-contact-input"
+                style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                onBlur={saveEdit}
+                onKeyDown={handleKeyDown}
+                placeholder="Phone number"
+                type="tel"
+              />
+              <span className="idc-edit-hint" style={{ color: T.textFaint }}>Enter · Esc</span>
+            </div>
+          ) : phone ? (
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon" style={{ background: '#10b98112', color: '#10b981' }}>
+                <Phone size={13} />
+              </div>
+              <a href={`tel:${phone}`} className="idc-detail-val" style={{ color: T.text, flex: 1 }}>{phone}</a>
+              <button className="idc-icon-btn" onClick={() => copyToClipboard(phone, 'phone')} title="Copy">
+                {copiedField === 'phone' ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
+              </button>
+              <button className="idc-icon-btn" onClick={() => startEdit('phone', phone)} title="Edit">
+                <Pencil size={11} color={T.textFaint} />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="idc-add-field"
+              style={{ color: T.textFaint, borderColor: T.border }}
+              onClick={() => startEdit('phone', '')}
+            >
+              <Phone size={12} /><span>Add phone</span>
+            </button>
+          )}
+
+          {/* LinkedIn */}
+          {contact.linkedin_url && (
+            <div className="idc-detail-row">
+              <div className="idc-detail-icon" style={{ background: '#0077b512', color: '#0077b5' }}>
+                <Linkedin size={13} />
+              </div>
               <a
                 href={contact.linkedin_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="identity-linkedin-link"
+                className="idc-detail-val"
+                style={{ color: T.text, flex: 1 }}
               >
-                <Linkedin className="identity-contact-icon" />
-                <span>LinkedIn</span>
+                LinkedIn Profile →
               </a>
-            )}
-
-            {photoRefreshError && (
-              <p className="photo-refresh-error">{photoRefreshError}</p>
-            )}
-          </div>
-        </div>
-
-        {/* ══════════════════════ BACK FACE ═══════════════════════ */}
-        <div className="identity-card identity-card--back">
-
-          {/* Flip back to front button */}
-          <button
-            className="card-flip-btn"
-            onClick={() => setIsFlipped(false)}
-            title="Back to profile"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>Profile</span>
-          </button>
-
-          {/* Needs-setup notice */}
-          {needsContextSetup && (
-            <div className="card-back-notice">
-              <AlertTriangle className="card-back-notice-icon" />
-              <span>
-                Assign a Brigade and set strategic context so Barry knows how to engage this contact.
-              </span>
             </div>
           )}
-
-          <BrigadeSelector contact={contact} onUpdate={onUpdate} />
-          <StructuredFields contact={contact} onUpdate={onUpdate} />
-
         </div>
+
+        {photoRefreshError && (
+          <p className="idc-photo-err">{photoRefreshError}</p>
+        )}
+
+        {/* ── Strategic Context (embedded, no flip needed) ── */}
+        <div className="idc-divider" style={{ background: T.border, marginTop: 4 }} />
+        <StructuredFields contact={contact} onUpdate={onUpdate} />
+
       </div>
     </div>
   );

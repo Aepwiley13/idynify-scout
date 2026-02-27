@@ -18,7 +18,6 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Mail, Phone, Building2, Pencil,
   Copy, Check, Linkedin, Camera, Link2,
@@ -174,7 +173,6 @@ export default function IdentityCard({
   onUpdate,
 }) {
   const T = useT();
-  const navigate = useNavigate();
   const [imgBroken, setImgBroken] = useState(false);
 
   // Inline editing

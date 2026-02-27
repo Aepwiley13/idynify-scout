@@ -94,12 +94,143 @@
   color: #9ca3af;
 }
 
-/* Info - name, title, company ONLY */
+/* Info - name, title, company, email, phone */
 .identity-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1;
+}
+
+/* ── Inline edit wrapper ─────────────────────────────────────── */
+.identity-field-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.identity-field-wrapper:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Pencil icon — hidden until wrapper is hovered */
+.identity-edit-icon {
+  width: 12px;
+  height: 12px;
+  color: #9ca3af;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.identity-field-wrapper:hover .identity-edit-icon {
+  opacity: 1;
+}
+
+/* Pencil button — used when the field has its own link action */
+.identity-pencil-btn {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.identity-pencil-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.identity-edit-icon--btn {
+  opacity: 0;
+}
+
+.identity-field-wrapper:hover .identity-edit-icon--btn {
+  opacity: 1;
+}
+
+/* Placeholder text for empty fields */
+.identity-placeholder {
+  color: #c0c4cc;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* ── Inline edit inputs ──────────────────────────────────────── */
+.identity-edit-input {
+  border: 1.5px solid #3b82f6;
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: #1a1a1a;
+  padding: 2px 8px;
+  width: 100%;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  transition: box-shadow 0.15s ease;
+}
+
+.identity-edit-input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.identity-name-input {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 2px 8px;
+}
+
+.identity-title-input {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 2px 8px;
+}
+
+.identity-company-input {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 2px 8px;
+}
+
+.identity-contact-input {
+  font-size: 13px;
+  font-weight: 400;
+  padding: 2px 8px;
+}
+
+/* ── Add field buttons (for missing email / phone) ───────────── */
+.identity-add-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+}
+
+.identity-add-field:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
 }
 
 /* Name - prominent */

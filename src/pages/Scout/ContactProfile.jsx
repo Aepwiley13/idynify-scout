@@ -646,6 +646,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
           onRefreshPhoto={handleRefreshPhoto}
           photoRefreshLoading={photoRefreshLoading}
           photoRefreshError={photoRefreshError}
+          onUpdate={handleContactUpdate}
         />
 
         {/* Contact Status Badge (State Machine) */}

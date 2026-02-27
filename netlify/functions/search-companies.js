@@ -557,7 +557,9 @@ function buildApolloQuery(companyProfile) {
     console.log(`📍 Locations selected: ${companyProfile.locations.join(', ')}`);
     console.log(`📍 Mapped to Apollo format: ${query.organization_locations.join(', ')}`);
   } else if (companyProfile.isNationwide) {
-    console.log('🌎 Nationwide search enabled');
+    // Restrict to United States only — without this Apollo returns global results
+    query.organization_locations = ["United States"];
+    console.log('🌎 Nationwide search enabled - filtering to United States');
   } else {
     console.log('⚠️  No locations selected and not nationwide!');
   }

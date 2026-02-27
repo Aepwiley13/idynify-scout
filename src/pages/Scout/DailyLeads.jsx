@@ -52,7 +52,7 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
 }
 
 // ─── CompanySwipeCard ─────────────────────────────────────────────────────────
-function CompanySwipeCard({ company, onAccept, onReject }) {
+function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -90,7 +90,7 @@ function CompanySwipeCard({ company, onAccept, onReject }) {
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: 420,
+        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -120,22 +120,22 @@ function CompanySwipeCard({ company, onAccept, onReject }) {
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
-        maxHeight: 'clamp(460px, calc(100vh - 200px), 570px)',
+        maxHeight: wide ? 'clamp(500px, calc(100vh - 160px), 700px)' : 'clamp(460px, calc(100vh - 200px), 570px)',
         overflowY: 'auto',
       }}>
         {/* Header */}
         <div style={{
-          padding: '20px 22px 14px', display: 'flex', flexDirection: 'column',
+          padding: wide ? '24px 28px 18px' : '20px 22px 14px', display: 'flex', flexDirection: 'column',
           alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`,
         }}>
           <div style={{
-            width: 68, height: 68, borderRadius: 16, background: T.surface,
+            width: wide ? 80 : 68, height: wide ? 80 : 68, borderRadius: 18, background: T.surface,
             border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 30, marginBottom: 12,
+            justifyContent: 'center', fontSize: wide ? 36 : 30, marginBottom: 14,
           }}>
             {company.emoji || company.logo || '🏢'}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>{company.name}</div>
+          <div style={{ fontSize: wide ? 22 : 20, fontWeight: 700, color: T.text }}>{company.name}</div>
           <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
             {(company.industry || '').toUpperCase()}
           </div>
@@ -148,49 +148,49 @@ function CompanySwipeCard({ company, onAccept, onReject }) {
             ['REVENUE',   company.revenue || 'N/A'],
             ['FOUNDED',   company.founded_year || 'N/A'],
           ].map(([l, v]) => (
-            <div key={l} style={{ padding: '11px 16px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+            <div key={l} style={{ padding: wide ? '13px 20px' : '11px 16px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 3 }}>{l}</div>
-              <div style={{ fontSize: 12, color: T.textMuted }}>{v}</div>
+              <div style={{ fontSize: wide ? 13 : 12, color: T.textMuted }}>{v}</div>
             </div>
           ))}
         </div>
         {/* Barry Intel */}
-        <div style={{ padding: '12px 16px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
+        <div style={{ padding: wide ? '14px 20px' : '12px 16px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
             <BarryAvatar size={20} />
             <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
           </div>
-          <p style={{ margin: 0, fontSize: 12, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.55 }}>
+          <p style={{ margin: 0, fontSize: wide ? 13 : 12, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
             {barryText}
           </p>
         </div>
         {/* Action links */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '11px 12px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
           <button
             onClick={e => { e.stopPropagation(); if (company.website_url) window.open(company.website_url, '_blank'); }}
-            style={{ padding: 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
           ><Globe size={13} />Visit Website</button>
           <button
             onClick={e => { e.stopPropagation(); if (company.linkedin_url) window.open(company.linkedin_url, '_blank'); }}
-            style={{ padding: 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
           ><Linkedin size={13} />LinkedIn</button>
         </div>
         {/* Decision buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '11px 12px' }}>
+        <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px' : '11px 12px' }}>
           <button
             onClick={e => { e.stopPropagation(); setGone('l'); setTimeout(onReject, 280); }}
-            style={{ padding: 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><X size={15} />Not a Match</button>
           <button
             onClick={e => { e.stopPropagation(); setGone('r'); setTimeout(onAccept, 280); }}
-            style={{ padding: 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><Check size={15} />This is a Match</button>
         </div>
         {/* Score footer */}
-        <div style={{ padding: '9px 16px 14px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: wide ? '11px 20px 16px' : '9px 16px 14px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>COMPANY LEAD SCORE</div>
-            <span style={{ fontSize: 20, fontWeight: 800, color: sc }}>{score}</span>
+            <span style={{ fontSize: wide ? 22 : 20, fontWeight: 800, color: sc }}>{score}</span>
             <span style={{ fontSize: 11, color: T.textFaint }}>/100</span>
           </div>
           <div style={{ fontSize: 9, color: T.textFaint, padding: '3px 9px', background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
@@ -203,7 +203,7 @@ function CompanySwipeCard({ company, onAccept, onReject }) {
 }
 
 // ─── PersonSwipeCard ──────────────────────────────────────────────────────────
-function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSkip }) {
+function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSkip, wide = false }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -234,7 +234,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: 420,
+        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -248,16 +248,16 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, maxHeight: 'clamp(460px, calc(100vh - 200px), 570px)', overflowY: 'auto' }}>
-        <div style={{ padding: '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
-          <Av initials={initials} color={color} size={70} />
+      <div style={{ background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, maxHeight: wide ? 'clamp(500px, calc(100vh - 160px), 700px)' : 'clamp(460px, calc(100vh - 200px), 570px)', overflowY: 'auto' }}>
+        <div style={{ padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
+          <Av initials={initials} color={color} size={wide ? 80 : 70} />
           {matchText && (
-            <div style={{ marginTop: 12, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 16px', color: STATUS.green, fontSize: 11, fontWeight: 600, marginBottom: 12, width: '88%', textAlign: 'center' }}>
+            <div style={{ marginTop: 12, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 16px', color: STATUS.green, fontSize: wide ? 12 : 11, fontWeight: 600, marginBottom: 12, width: '88%', textAlign: 'center' }}>
               {matchText}
             </div>
           )}
-          <div style={{ fontSize: 20, fontWeight: 700, color: T.text }}>{person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim()}</div>
-          <div style={{ fontSize: 13, color: T.textMuted, marginTop: 3 }}>{person.title}</div>
+          <div style={{ fontSize: wide ? 22 : 20, fontWeight: 700, color: T.text }}>{person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim()}</div>
+          <div style={{ fontSize: wide ? 14 : 13, color: T.textMuted, marginTop: 3 }}>{person.title}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
           {[
@@ -266,37 +266,39 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
             ['EMPLOYEES', company?.employee_count || company?.company_size || 'N/A'],
             ['LOCATION',  person.city ? `${person.city}${person.state ? ', ' + person.state : ''}` : 'N/A'],
           ].map(([l, v]) => (
-            <div key={l} style={{ padding: '10px 15px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+            <div key={l} style={{ padding: wide ? '13px 20px' : '10px 15px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
-              <div style={{ fontSize: 11, color: T.textMuted }}>{v}</div>
+              <div style={{ fontSize: wide ? 13 : 11, color: T.textMuted }}>{v}</div>
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '11px 12px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
           <button
             onClick={e => { e.stopPropagation(); if (company?.website_url || person.organization?.website_url) window.open(company?.website_url || person.organization?.website_url, '_blank'); }}
-            style={{ padding: 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
           ><Globe size={13} />Visit Website</button>
           <button
             onClick={e => { e.stopPropagation(); if (person.linkedin_url) window.open(person.linkedin_url, '_blank'); }}
-            style={{ padding: 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
           ><Linkedin size={13} />LinkedIn</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '11px 12px 6px' }}>
+        <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px 6px' : '11px 12px 6px' }}>
           <button
             onClick={e => { e.stopPropagation(); setGone('l'); setTimeout(onReject, 280); }}
-            style={{ padding: 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><X size={15} />Not a Match</button>
           <button
             onClick={e => { e.stopPropagation(); setGone('r'); setTimeout(onAccept, 280); }}
-            style={{ padding: 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><Check size={15} />This is a Match</button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: wide ? '6px 16px 8px' : '4px 12px 6px' }}>
           <button
             onClick={e => { e.stopPropagation(); onSkip(); }}
-            style={{ padding: 8, borderRadius: 10, border: 'none', background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
           >⊙ Skip for Today</button>
         </div>
-        <div style={{ textAlign: 'center', padding: '6px 0 13px', fontSize: 10, color: T.textGhost }}>
+        <div style={{ textAlign: 'center', padding: '4px 0 12px', fontSize: 10, color: T.textGhost }}>
           Drag left or right, or use the buttons above
         </div>
       </div>
@@ -308,6 +310,14 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
 export default function DailyLeads({ onNavigate }) {
   const T = useT();
   const navigate = useNavigate();
+
+  // ── Responsive state ────────────────────────────────────────────────────────
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   // ── Company Mode state ──────────────────────────────────────────────────────
   const [companies, setCompanies] = useState([]);
@@ -661,7 +671,9 @@ export default function DailyLeads({ onNavigate }) {
   const visibleCompanies = companies.slice(currentIndex);
 
   // Ghost cards for depth effect — height matches card wrapper
-  const CARD_H = 'clamp(460px, calc(100vh - 200px), 570px)';
+  const CARD_H = isDesktop
+    ? 'clamp(500px, calc(100vh - 160px), 700px)'
+    : 'clamp(460px, calc(100vh - 200px), 570px)';
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
@@ -703,11 +715,11 @@ export default function DailyLeads({ onNavigate }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
       {/* Header + tabs */}
-      <div style={{ padding: '16px 26px 0', background: T.appBg }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ padding: isDesktop ? '20px 32px 0' : '16px 26px 0', background: T.appBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDesktop ? 16 : 14 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Daily Lead Insights</h2>
-            <p style={{ margin: '2px 0 0', fontSize: 11, color: T.textFaint }}>AI-curated prospects matching your ICP</p>
+            <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Lead Insights</h2>
+            <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>AI-curated prospects matching your ICP</p>
           </div>
           <button
             onClick={handleManualRefresh}
@@ -743,136 +755,233 @@ export default function DailyLeads({ onNavigate }) {
         </div>
       </div>
 
-      {/* Content area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
+      {/* Content area — two-column on desktop */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* ── Companies Tab ── */}
-        {tab === 'companies' && (
-          <>
-            {companies.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>ALL COMPANIES REVIEWED</div>
-                <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>
-                  {companies.length === 0 ? "No pending companies in your queue." : "You've reviewed all companies for today."}
-                </p>
-                <button
-                  onClick={handleManualRefresh}
-                  disabled={isRefreshing}
-                  style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}
-                >
-                  {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
-                  Find More Targets
-                </button>
-                {totalAcceptedCompanies > 0 && (
+        {/* ── Card column ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
+
+          {/* ── Companies Tab ── */}
+          {tab === 'companies' && (
+            <>
+              {companies.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                  <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>ALL COMPANIES REVIEWED</div>
+                  <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>
+                    {companies.length === 0 ? "No pending companies in your queue." : "You've reviewed all companies for today."}
+                  </p>
                   <button
-                    onClick={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-                    style={{ marginTop: 10, padding: '8px 20px', borderRadius: 10, background: T.cyanBg, border: `1px solid ${T.cyanBdr}`, color: T.cyan, fontSize: 12, cursor: 'pointer' }}
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}
                   >
-                    View {totalAcceptedCompanies} Saved Companies →
+                    {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
+                    Find More Targets
                   </button>
-                )}
-              </div>
-            ) : currentIndex >= companies.length ? (
-              <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>SESSION COMPLETE</div>
-                <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>You've reviewed all targets in this session.</p>
-                <button
-                  onClick={() => { setCurrentIndex(0); loadTodayLeads(); }}
-                  style={{ padding: '8px 20px', borderRadius: 10, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, cursor: 'pointer', fontSize: 12 }}
-                >Reset Queue</button>
-              </div>
-            ) : (
-              <>
-                {renderDots(companies.length, currentIndex)}
-                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H, overflowX: 'hidden' }}>
-                  {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
-                  {currentCompany && (
-                    <CompanySwipeCard
-                      key={currentCompany.id}
-                      company={currentCompany}
-                      onAccept={() => handleSwipe('right')}
-                      onReject={() => handleSwipe('left')}
-                    />
+                  {totalAcceptedCompanies > 0 && (
+                    <button
+                      onClick={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+                      style={{ marginTop: 10, padding: '8px 20px', borderRadius: 10, background: T.cyanBg, border: `1px solid ${T.cyanBdr}`, color: T.cyan, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      View {totalAcceptedCompanies} Saved Companies →
+                    </button>
                   )}
                 </div>
-                {showUndo && lastSwipe && (
+              ) : currentIndex >= companies.length ? (
+                <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                  <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>SESSION COMPLETE</div>
+                  <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>You've reviewed all targets in this session.</p>
                   <button
-                    onClick={handleUndo}
-                    style={{ marginTop: 14, padding: '8px 18px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
-                  >
-                    <RotateCcw size={13} />Undo last swipe
-                  </button>
-                )}
-                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: 440, fontSize: 10, color: T.textGhost }}>
-                  <span>← Sharpens targeting</span>
-                  <span>Add to hunt list →</span>
+                    onClick={() => { setCurrentIndex(0); loadTodayLeads(); }}
+                    style={{ padding: '8px 20px', borderRadius: 10, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, cursor: 'pointer', fontSize: 12 }}
+                  >Reset Queue</button>
                 </div>
-              </>
-            )}
-          </>
-        )}
+              ) : (
+                <>
+                  {renderDots(companies.length, currentIndex)}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                    {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
+                    {currentCompany && (
+                      <CompanySwipeCard
+                        key={currentCompany.id}
+                        company={currentCompany}
+                        onAccept={() => handleSwipe('right')}
+                        onReject={() => handleSwipe('left')}
+                        wide={isDesktop}
+                      />
+                    )}
+                  </div>
+                  {showUndo && lastSwipe && (
+                    <button
+                      onClick={handleUndo}
+                      style={{ marginTop: 14, padding: '8px 18px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
+                    >
+                      <RotateCcw size={13} />Undo last swipe
+                    </button>
+                  )}
+                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                    <span>← Sharpens targeting</span>
+                    <span>Add to hunt list →</span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
-        {/* ── People Tab ── */}
-        {tab === 'people' && (
-          <>
-            {peopleLoading ? (
-              <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                <Loader size={28} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
-                <p style={{ fontSize: 13, margin: 0 }}>Finding people that match your ICP...</p>
-              </div>
-            ) : peopleModeEmpty === 'no_titles' ? (
-              <div style={{ textAlign: 'center', padding: 50 }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 8 }}>Set Your Target Titles</div>
-                <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>Configure your ICP target titles to start seeing people.</p>
-                <button
-                  onClick={() => navigate('/recon')}
-                  style={{ padding: '8px 20px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, margin: '0 auto' }}
-                >
-                  <Settings size={13} />Configure ICP
-                </button>
-              </div>
-            ) : peopleModeEmpty === 'no_contacts' ? (
-              <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>👥</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 8 }}>No Companies in Queue</div>
-                <p style={{ fontSize: 12, color: T.textFaint }}>Review some companies first to find people inside them.</p>
-              </div>
-            ) : peopleModeEmpty === 'exhausted' || currentPersonIdx >= peopleQueue.length ? (
-              <div style={{ textAlign: 'center', padding: 50 }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>ALL PEOPLE REVIEWED</div>
-                <button
-                  onClick={() => { setPeopleQueue([]); setCurrentPersonIdx(0); peopleModeInitRef.current = false; loadPeopleMode(); }}
-                  style={{ marginTop: 8, padding: '8px 20px', borderRadius: 10, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, cursor: 'pointer', fontSize: 12 }}
-                >Reset Queue</button>
-              </div>
-            ) : (
-              <>
-                {renderDots(peopleQueue.length, currentPersonIdx)}
-                <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: CARD_H, overflowX: 'hidden' }}>
-                  {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
-                    <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
-                  ))}
-                  <PersonSwipeCard
-                    key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}
-                    person={peopleQueue[currentPersonIdx].person}
-                    company={peopleQueue[currentPersonIdx].company}
-                    matchText={getBarryText(peopleQueue[currentPersonIdx].person, peopleQueue[currentPersonIdx].company, targetTitles)}
-                    onAccept={() => handlePersonSwipe('right')}
-                    onReject={() => handlePersonSwipe('left')}
-                    onSkip={() => handlePersonSwipe('skip')}
-                  />
+          {/* ── People Tab ── */}
+          {tab === 'people' && (
+            <>
+              {peopleLoading ? (
+                <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                  <Loader size={28} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+                  <p style={{ fontSize: 13, margin: 0 }}>Finding people that match your ICP...</p>
                 </div>
-                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: 440, fontSize: 10, color: T.textGhost }}>
-                  <span>← Not this person</span>
-                  <span>Save to engage →</span>
+              ) : peopleModeEmpty === 'no_titles' ? (
+                <div style={{ textAlign: 'center', padding: 50 }}>
+                  <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 8 }}>Set Your Target Titles</div>
+                  <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>Configure your ICP target titles to start seeing people.</p>
+                  <button
+                    onClick={() => navigate('/recon')}
+                    style={{ padding: '8px 20px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, margin: '0 auto' }}
+                  >
+                    <Settings size={13} />Configure ICP
+                  </button>
                 </div>
-              </>
+              ) : peopleModeEmpty === 'no_contacts' ? (
+                <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                  <div style={{ fontSize: 44, marginBottom: 12 }}>👥</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 8 }}>No Companies in Queue</div>
+                  <p style={{ fontSize: 12, color: T.textFaint }}>Review some companies first to find people inside them.</p>
+                </div>
+              ) : peopleModeEmpty === 'exhausted' || currentPersonIdx >= peopleQueue.length ? (
+                <div style={{ textAlign: 'center', padding: 50 }}>
+                  <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>ALL PEOPLE REVIEWED</div>
+                  <button
+                    onClick={() => { setPeopleQueue([]); setCurrentPersonIdx(0); peopleModeInitRef.current = false; loadPeopleMode(); }}
+                    style={{ marginTop: 8, padding: '8px 20px', borderRadius: 10, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, cursor: 'pointer', fontSize: 12 }}
+                  >Reset Queue</button>
+                </div>
+              ) : (
+                <>
+                  {renderDots(peopleQueue.length, currentPersonIdx)}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                    {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
+                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
+                    ))}
+                    <PersonSwipeCard
+                      key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}
+                      person={peopleQueue[currentPersonIdx].person}
+                      company={peopleQueue[currentPersonIdx].company}
+                      matchText={getBarryText(peopleQueue[currentPersonIdx].person, peopleQueue[currentPersonIdx].company, targetTitles)}
+                      onAccept={() => handlePersonSwipe('right')}
+                      onReject={() => handlePersonSwipe('left')}
+                      onSkip={() => handlePersonSwipe('skip')}
+                      wide={isDesktop}
+                    />
+                  </div>
+                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                    <span>← Not this person</span>
+                    <span>Save to engage →</span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ── Desktop sidebar ── */}
+        {isDesktop && (
+          <div style={{
+            width: 256, flexShrink: 0,
+            borderLeft: `1px solid ${T.border}`,
+            background: T.navBg,
+            display: 'flex', flexDirection: 'column',
+            padding: '20px 16px',
+            overflowY: 'auto',
+            gap: 16,
+          }}>
+            {/* Daily progress */}
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 10 }}>TODAY'S PROGRESS</div>
+              <div style={{ height: 5, background: T.border, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min((dailySwipeCount / DAILY_SWIPE_LIMIT) * 100, 100)}%`,
+                  background: `linear-gradient(90deg, ${BRAND.pink}, ${BRAND.cyan})`,
+                  borderRadius: 3,
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+              <div style={{ fontSize: 11, color: T.textMuted }}>
+                <span style={{ fontWeight: 700, color: T.text }}>{dailySwipeCount}</span>
+                <span style={{ color: T.textFaint }}> / {DAILY_SWIPE_LIMIT} matches today</span>
+              </div>
+            </div>
+
+            {/* Stats grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ padding: '10px 12px', background: T.surface, borderRadius: 10, border: `1px solid ${T.border2}` }}>
+                <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 5 }}>IN QUEUE</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.text, lineHeight: 1 }}>
+                  {Math.max(0, companies.length - currentIndex)}
+                </div>
+              </div>
+              <div style={{ padding: '10px 12px', background: T.accentBg, borderRadius: 10, border: `1px solid ${T.accentBdr}` }}>
+                <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 5 }}>SAVED</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: BRAND.pink, lineHeight: 1 }}>
+                  {totalAcceptedCompanies}
+                </div>
+              </div>
+            </div>
+
+            {/* View saved button */}
+            {totalAcceptedCompanies > 0 && (
+              <button
+                onClick={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+                style={{
+                  padding: '10px 14px', borderRadius: 10,
+                  background: `linear-gradient(135deg, ${BRAND.pink}, #c0146a)`,
+                  border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', width: '100%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                View {totalAcceptedCompanies} Saved →
+              </button>
             )}
-          </>
+
+            {/* Divider */}
+            <div style={{ height: 1, background: T.border }} />
+
+            {/* How it works */}
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 10 }}>HOW IT WORKS</div>
+              {[
+                ['→ Right drag', 'Add to hunt list'],
+                ['← Left drag', 'Sharpens targeting'],
+                ['↩ Undo', 'Reverse last action'],
+                ['↻ Refresh', 'Find new targets'],
+              ].map(([key, desc]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: BRAND.pink }}>{key}</span>
+                  <span style={{ fontSize: 11, color: T.textFaint }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Barry branding */}
+            <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: T.accentBg, borderRadius: 10, border: `1px solid ${T.accentBdr}` }}>
+              <BarryAvatar size={24} />
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.pink }}>Barry AI</div>
+                <div style={{ fontSize: 9, color: T.textFaint }}>Curating your queue daily</div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 

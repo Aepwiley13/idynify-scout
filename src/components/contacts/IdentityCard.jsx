@@ -33,6 +33,7 @@ import {
   RELATIONSHIP_TYPES,
   STRATEGIC_VALUES,
 } from '../../constants/structuredFields';
+import CompanyDetailModal from '../scout/CompanyDetailModal';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import './IdentityCard.css';
@@ -195,6 +196,9 @@ export default function IdentityCard({
   const [brigadeSaving, setBrigadeSaving] = useState(false);
   const brigadeRef = useRef(null);
 
+  // Company detail modal
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
+
   // Structured field saving indicator
   const [fieldSaving, setFieldSaving] = useState(false);
 
@@ -352,6 +356,7 @@ export default function IdentityCard({
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="idc-card" style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
 
       {/* ── Banner ── */}
@@ -534,15 +539,18 @@ export default function IdentityCard({
         ) : (
           <div className="idc-field-row" style={{ cursor: 'default' }}>
             {contact.company_id ? (
+              /* Linked company — opens rich detail modal inline */
               <button
                 className="idc-company-link"
                 style={{ color: T.textMuted }}
-                onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+                onClick={() => setCompanyModalOpen(true)}
+                title="View company details"
               >
                 <Building2 size={13} style={{ flexShrink: 0 }} />
                 {contact.company_name || 'View Company'}
               </button>
             ) : contact.company_name ? (
+              /* Unlinked company name — click to edit */
               <span
                 className="idc-company-text"
                 style={{ color: T.textMuted, cursor: 'pointer' }}
@@ -776,5 +784,14 @@ export default function IdentityCard({
 
       </div>
     </div>
+
+    {/* Company detail modal — rendered outside the card so it's not clipped */}
+    {companyModalOpen && contact.company_id && (
+      <CompanyDetailModal
+        company={{ id: contact.company_id, name: contact.company_name }}
+        onClose={() => setCompanyModalOpen(false)}
+      />
+    )}
+    </>
   );
 }

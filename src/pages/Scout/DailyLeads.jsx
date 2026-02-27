@@ -90,7 +90,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
+        position: 'absolute', width: '100%', maxWidth: wide ? 680 : 460,
         transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -120,7 +120,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
-        maxHeight: wide ? 'clamp(500px, calc(100vh - 160px), 700px)' : 'clamp(460px, calc(100vh - 200px), 570px)',
+        maxHeight: wide ? 'clamp(560px, calc(100vh - 140px), 800px)' : 'clamp(460px, calc(100vh - 200px), 570px)',
         overflowY: 'auto',
       }}>
         {/* Header */}
@@ -129,13 +129,13 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
           alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`,
         }}>
           <div style={{
-            width: wide ? 80 : 68, height: wide ? 80 : 68, borderRadius: 18, background: T.surface,
+            width: wide ? 96 : 68, height: wide ? 96 : 68, borderRadius: 20, background: T.surface,
             border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: wide ? 36 : 30, marginBottom: 14,
+            justifyContent: 'center', fontSize: wide ? 44 : 30, marginBottom: 14,
           }}>
             {company.emoji || company.logo || '🏢'}
           </div>
-          <div style={{ fontSize: wide ? 22 : 20, fontWeight: 700, color: T.text }}>{company.name}</div>
+          <div style={{ fontSize: wide ? 26 : 20, fontWeight: 700, color: T.text }}>{company.name}</div>
           <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
             {(company.industry || '').toUpperCase()}
           </div>
@@ -150,7 +150,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
           ].map(([l, v]) => (
             <div key={l} style={{ padding: wide ? '13px 20px' : '11px 16px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 3 }}>{l}</div>
-              <div style={{ fontSize: wide ? 13 : 12, color: T.textMuted }}>{v}</div>
+              <div style={{ fontSize: wide ? 15 : 12, fontWeight: wide ? 600 : 400, color: T.textMuted }}>{v}</div>
             </div>
           ))}
         </div>
@@ -160,7 +160,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
             <BarryAvatar size={20} />
             <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
           </div>
-          <p style={{ margin: 0, fontSize: wide ? 13 : 12, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: wide ? 15 : 12, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
             {barryText}
           </p>
         </div>
@@ -190,7 +190,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
         <div style={{ padding: wide ? '11px 20px 16px' : '9px 16px 14px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>COMPANY LEAD SCORE</div>
-            <span style={{ fontSize: wide ? 22 : 20, fontWeight: 800, color: sc }}>{score}</span>
+            <span style={{ fontSize: wide ? 28 : 20, fontWeight: 800, color: sc }}>{score}</span>
             <span style={{ fontSize: 11, color: T.textFaint }}>/100</span>
           </div>
           <div style={{ fontSize: 9, color: T.textFaint, padding: '3px 9px', background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
@@ -234,7 +234,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
+        position: 'absolute', width: '100%', maxWidth: wide ? 680 : 460,
         transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -950,7 +950,7 @@ export default function DailyLeads({ onNavigate }) {
 
   // Ghost cards for depth effect — height matches card wrapper
   const CARD_H = isDesktop
-    ? 'clamp(500px, calc(100vh - 160px), 700px)'
+    ? 'clamp(560px, calc(100vh - 140px), 800px)'
     : 'clamp(460px, calc(100vh - 200px), 570px)';
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
@@ -1189,7 +1189,7 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderBatchDots()}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 700 : 480, height: CARD_H, overflowX: 'hidden' }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -1256,7 +1256,7 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderDots(peopleQueue.length, currentPersonIdx)}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 700 : 480, height: CARD_H, overflowX: 'hidden' }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                       <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}

@@ -384,7 +384,7 @@ function ContactProfileView({ contactId, onBack }) {
         // Try to get from Firestore
         const { doc: docFn, getDoc } = await import('firebase/firestore');
         const snap = await getDoc(docFn(db, 'users', user.uid, 'contacts', contactId));
-        if (snap.exists()) setContact({ id: snap.id, ...snap.data() });
+        if (snap.exists()) setContact({ ...snap.data(), id: snap.id });
       } catch (e) {
         console.error('ContactProfileView load error:', e);
       } finally {
@@ -513,7 +513,7 @@ export default function AllLeads() {
       setCompanies(companiesMap);
       const contactsSnapshot = await getDocs(collection(db, 'users', user.uid, 'contacts'));
       const contactsList = contactsSnapshot.docs
-        .map(d => ({ id: d.id, ...d.data() }))
+        .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {
           const s = c.status || '';
           return !['people_mode_archived', 'people_mode_skipped'].includes(s);

@@ -99,12 +99,12 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
       if (!contactDoc.exists()) {
         console.error('❌ Contact not found');
-        if (isPanelMode) { onClose(); return; }
+        if (isPanelMode) { setLoading(false); return; }
         navigate('/scout', { state: { activeTab: 'all-leads' } });
         return;
       }
 
-      const contactData = { id: contactDoc.id, ...contactDoc.data() };
+      const contactData = { ...contactDoc.data(), id: contactDoc.id };
       setContact(contactData);
       console.log('✅ Contact profile loaded:', contactData.name);
 

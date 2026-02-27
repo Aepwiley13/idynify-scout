@@ -187,7 +187,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, companyProfile } = JSON.parse(event.body);
+    const { userId, authToken, companyProfile, adaptiveSignals } = JSON.parse(event.body);
 
     if (!userId || !authToken || !companyProfile) {
       throw new Error('Missing required parameters');
@@ -242,7 +242,7 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified');
 
     // Map company profile to Apollo API format
-    const apolloQuery = buildApolloQuery(companyProfile);
+    const apolloQuery = buildApolloQuery(companyProfile, adaptiveSignals);
 
     console.log('📊 Search query:', JSON.stringify(apolloQuery, null, 2));
     console.log('🔍 Industry filter check:');
@@ -481,7 +481,7 @@ export const handler = async (event) => {
   }
 };
 
-function buildApolloQuery(companyProfile) {
+function buildApolloQuery(companyProfile, adaptiveSignals) {
   console.log('📋 Building Apollo query from profile:', JSON.stringify(companyProfile, null, 2));
 
   const query = {
@@ -511,6 +511,19 @@ function buildApolloQuery(companyProfile) {
     // Don't add the actual company name, but log that we have a seed
     console.log(`🎯 Lookalike seed: ${companyProfile.lookalikeSeed.name}`);
     console.log(`🎯 Strategy: ${companyProfile.searchStrategy || 'industry_only'}`);
+  }
+
+  // Blend adaptive signals from a previous batch (lookalike bias from user's saves)
+  if (adaptiveSignals?.savedIndustries?.length > 0) {
+    const adaptiveInds = adaptiveSignals.savedIndustries
+      .map(i => i.toLowerCase())
+      .filter(i => !keywordTags.includes(i));
+    // Prepend so they're weighted first in Apollo's keyword matching
+    keywordTags.unshift(...adaptiveInds);
+    console.log(`🎯 Adaptive industry signals blended: ${adaptiveInds.join(', ')}`);
+  }
+  if (adaptiveSignals?.savedTitles?.length > 0) {
+    console.log(`👥 People signal context (${adaptiveSignals.savedTitles.length} titles from saved companies): ${adaptiveSignals.savedTitles.slice(0, 5).join(', ')}`);
   }
 
   // Apply keyword tags if we have any

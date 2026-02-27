@@ -159,6 +159,58 @@ function detectModeShift(contextStack, intent, currentMode) {
   return currentMode || 'SUGGEST';
 }
 
+// ── ICP reclarification prompt ────────────────────────────────────────────────
+
+function buildIcpReclarificationPrompt() {
+  return `You are Barry, an expert B2B sales intelligence AI. You are sharp, warm, and direct.
+
+SITUATION: The user just reviewed 10 company recommendations and saved none of them. The current targeting isn't hitting the mark. Your job: have a focused, natural conversation to understand who they actually want to reach — then give me the ICP parameters to run a better search.
+
+YOUR GOAL: Extract clear signals about:
+1. Industry / type of company they target
+2. Company size (employees, stage, or revenue range)
+3. Who they sell to (titles/roles)
+4. Any specific qualifiers ("PE-backed", "B2B SaaS", "has a sales team", "Series B")
+
+APPROACH:
+- One question at a time — never ask multiple things at once
+- Be warm and conversational — like a sharp colleague helping them think through this
+- Acknowledge what they share before asking the next thing
+- 2-4 turns is usually enough to get clear signals
+- When confident, summarize what you heard and tell them you're ready to search
+
+OUTPUT: Return ONLY valid JSON. No text outside the JSON.
+
+While gathering context:
+{
+  "intent": "ICP_SCOUT_CLARIFY",
+  "response_text": "Barry's single question or warm acknowledgment + next question",
+  "has_enough_context": false,
+  "icp_params": null
+}
+
+When you have enough (2-4 turns typically):
+{
+  "intent": "ICP_SCOUT_CLARIFY",
+  "response_text": "Alright — [1-2 sentence summary of what they're looking for]. Hit 'Find My Companies' and I'll pull a fresh batch.",
+  "has_enough_context": true,
+  "icp_params": {
+    "industries": ["saas", "fintech"],
+    "companySizes": ["51-200", "201-500"],
+    "targetTitles": ["VP of Sales", "Head of Revenue"],
+    "companyKeywords": ["b2b", "enterprise", "series b"]
+  }
+}
+
+icp_params format:
+- industries: array of lowercase strings (e.g. ["technology", "healthcare", "saas"])
+- companySizes: match these ranges exactly: ["1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001+"]
+- targetTitles: array of specific job titles they sell to
+- companyKeywords: descriptive terms (e.g. ["startup", "b2b", "agency", "saas", "enterprise"])
+
+All fields are optional — only include what the user actually mentioned. Start with the first targeted question.`;
+}
+
 // ── System prompt ─────────────────────────────────────────────────────────────
 
 function buildMissionControlSystemPrompt(mode, contextStack, reconContext) {
@@ -327,6 +379,7 @@ export const handler = async (event) => {
     const conversationHistory = body.conversationHistory || [];
     const barryMode = body.barryMode || body.mode || 'SUGGEST';
     const contextStack = body.contextStack || null;
+    const isIcpMode = body.icpMode === true;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -451,6 +504,62 @@ Return valid JSON only:
           // Structured fields (new)
           ...parsed
         })
+      };
+
+    } else if (isIcpMode) {
+      // ── ICP Reclarification Path ───────────────────────────────────────────
+      console.log('[barryMissionChat] ICP reclarification mode...');
+
+      const icpSystemPrompt = buildIcpReclarificationPrompt();
+      const isOpening = message === '__ICP_RECLARIFICATION__';
+
+      const icpMessages = isOpening
+        ? [{ role: 'user', content: 'Start the ICP clarification conversation. Open with your first targeted question.' }]
+        : [...conversationHistory, { role: 'user', content: message }];
+
+      const icpController = new AbortController();
+      const icpTimeout = setTimeout(() => icpController.abort(), 15000);
+      let icpParsed;
+
+      try {
+        const icpResponse = await anthropic.messages.create(
+          {
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 800,
+            system: icpSystemPrompt,
+            messages: icpMessages,
+          },
+          { signal: icpController.signal }
+        );
+
+        const rawText = icpResponse.content[0].text;
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        icpParsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        if (!icpParsed?.response_text) throw new Error('Invalid ICP response structure');
+
+      } catch (err) {
+        if (icpController.signal.aborted) console.warn('[barryMissionChat] ICP chat timed out');
+        else console.warn('[barryMissionChat] ICP parse failed:', err.message);
+
+        icpParsed = {
+          intent: 'ICP_SCOUT_CLARIFY',
+          response_text: 'Who are you trying to reach — what type of company or role do you typically sell to?',
+          has_enough_context: false,
+          icp_params: null,
+        };
+      } finally {
+        clearTimeout(icpTimeout);
+      }
+
+      await logApiUsage(userId, 'barryMissionChat', 'success', {
+        responseTime: Date.now() - startTime,
+        metadata: { type: 'icp_reclarification' }
+      });
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ success: true, ...icpParsed }),
       };
 
     } else {

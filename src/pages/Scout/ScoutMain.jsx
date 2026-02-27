@@ -242,7 +242,7 @@ function ScoutShellInner({ user }) {
 
     if (activeItem === 'daily')       return <DailyLeads onNavigate={switchItem} />;
     if (activeItem === 'saved')       return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
-    if (activeItem === 'all')         return <AllLeads />;
+    if (activeItem === 'all')         return <AllLeads mode="scout" />;
     if (activeItem === 'comsearch')   return <CompanySearch />;
     if (activeItem === 'scoutplus')   return <ScoutPlus />;
     if (activeItem === 'icpsettings') return <ICPSettings />;

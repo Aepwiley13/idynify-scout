@@ -36,6 +36,7 @@ import MissionPhase4Page from './pages/MissionPhase4Page';
 import MissionPhase5Page from './pages/MissionPhase5Page';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
 import ScoutMain from './pages/Scout/ScoutMain';
+import AllLeads from './pages/Scout/AllLeads';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
@@ -378,6 +379,16 @@ function App() {
               <ReconErrorBoundary>
                 <ReconModulePage />
               </ReconErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* People — top-level canonical hub, all contacts, context-aware actions */}
+        <Route
+          path="/people"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <AllLeads mode="people" />
             </ProtectedRoute>
           }
         />

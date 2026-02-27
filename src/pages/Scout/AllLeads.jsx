@@ -10,7 +10,7 @@ import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
-  Phone, X, Zap, ExternalLink, ChevronLeft, Menu,
+  Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw,
 } from 'lucide-react';
 import { BRIGADES } from '../../components/contacts/BrigadeSelector';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
@@ -51,6 +51,32 @@ function getLeadStatus(contact) {
   if (s === 'follow_up') return 'follow_up';
   return 'not_contacted';
 }
+
+// Lightweight engagement state derived from document fields only (no Firestore reads).
+// Used for card button color/label and sort order.
+// States: 'not_started' | 'in_mission' | 'follow_up_due' | 'converted'
+function deriveCardEngageState(contact) {
+  const status = contact.contact_status || contact.lead_status || contact.status;
+  if (status === 'converted' || status === 'customer') return 'converted';
+  if (contact.hunter_status === 'active_mission') {
+    if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
+      return 'follow_up_due';
+    }
+    return 'in_mission';
+  }
+  return 'not_started';
+}
+
+// Sort priority: overdue → active mission → not started → converted
+const ENGAGE_SORT_ORDER = { follow_up_due: 0, in_mission: 1, not_started: 2, converted: 3 };
+
+// Button config per engagement state
+const CARD_BTN_CONFIG = {
+  not_started:   { label: 'Engage',        bg: `linear-gradient(135deg,${BRAND.pink},#c0146a)` },
+  in_mission:    { label: 'Follow Up',     bg: 'linear-gradient(135deg,#7c3aed,#5b21b6)' },
+  follow_up_due: { label: 'Follow Up Now', bg: 'linear-gradient(135deg,#dc2626,#991b1b)' },
+  converted:     { label: 'View',          bg: 'linear-gradient(135deg,#10b981,#047857)' },
+};
 
 function formatRelativeTime(dateStr) {
   if (!dateStr) return null;
@@ -148,8 +174,30 @@ function Av({ initials, color = BRAND.pink, size = 36, src }) {
   );
 }
 
+// ─── EngageBadge ─────────────────────────────────────────────────────────────
+function EngageBadge({ state }) {
+  if (state === 'not_started') return null;
+  const configs = {
+    in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
+    follow_up_due: { label: 'OVERDUE',   bg: '#dc262620', color: '#dc2626', border: '#dc262640' },
+    converted:     { label: 'CONVERTED', bg: '#10b98120', color: '#10b981', border: '#10b98140' },
+  };
+  const cfg = configs[state];
+  if (!cfg) return null;
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '1px 7px', borderRadius: 20,
+      background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+      fontSize: 9, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap',
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
 // ─── Person Modal ─────────────────────────────────────────────────────────────
-function PersonModal({ contact, company, onClose, onEngage, onOpenProfile }) {
+function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engageState = 'not_started' }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
@@ -188,9 +236,9 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile }) {
           <div style={{ marginBottom: 16 }}>
             <button
               onClick={onEngage}
-              style={{ width: '100%', padding: 13, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              style={{ width: '100%', padding: 13, borderRadius: 11, border: 'none', background: (CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started).bg, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
-              <Zap size={16} />Engage
+              <Zap size={16} />{(CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started).label}
             </button>
           </div>
 
@@ -239,7 +287,7 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile }) {
 
           <button
             onClick={onOpenProfile}
-            style={{ width: '100%', padding: 12, borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            style={{ width: '100%', padding: 12, borderRadius: 11, border: 'none', background: (CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started).bg, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           ><ExternalLink size={16} />Open Full Profile</button>
         </div>
       </div>
@@ -248,12 +296,13 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile }) {
 }
 
 // ─── AllLeadsCard ─────────────────────────────────────────────────────────────
-function AllLeadsCard({ contact, company, onClick, onCompanyClick }) {
+function AllLeadsCard({ contact, company, onClick, onCompanyClick, engageState = 'not_started', mode = 'people', onReturnToScout }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
   const status = getLeadStatus(contact);
   const photo = contact.photo_url;
+  const btnCfg = CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started;
 
   return (
     <div
@@ -279,6 +328,12 @@ function AllLeadsCard({ contact, company, onClick, onCompanyClick }) {
         <div style={{ position: 'absolute', top: 8, right: 8 }}>
           <StatusBadge status={status} small />
         </div>
+        {/* Engagement state badge (top-left, only when not new) */}
+        {engageState !== 'not_started' && (
+          <div style={{ position: 'absolute', top: 8, left: 8 }}>
+            <EngageBadge state={engageState} />
+          </div>
+        )}
         {/* Name + title over gradient */}
         <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
@@ -308,15 +363,21 @@ function AllLeadsCard({ contact, company, onClick, onCompanyClick }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
-          <button style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            Engage
+          <button style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: btnCfg.bg, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+            {btnCfg.label}
           </button>
-          {contact.linkedin_url && (
+          {mode === 'hunter' ? (
+            <button
+              onClick={e => { e.stopPropagation(); onReturnToScout && onReturnToScout(); }}
+              style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid #9ca3af40', background: 'transparent', color: '#9ca3af', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              title="Move back to Scout"
+            ><RotateCcw size={11} /></button>
+          ) : contact.linkedin_url ? (
             <button
               onClick={e => { e.stopPropagation(); window.open(contact.linkedin_url, '_blank'); }}
               style={{ padding: '7px 9px', borderRadius: 7, border: `1px solid #0077b540`, background: '#0077b510', color: BRIGADE.blue, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
             ><Linkedin size={11} /></button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -414,7 +475,10 @@ function ContactProfileView({ contactId, onBack }) {
 }
 
 // ─── AllLeads ─────────────────────────────────────────────────────────────────
-export default function AllLeads() {
+// mode: 'people' (all contacts, context-aware CTA)
+//       'scout'  (unengaged only, always pink Engage)
+//       'hunter' (active_mission only, purple Follow Up + Return to Scout)
+export default function AllLeads({ mode = 'people' }) {
   const T = useT();
   const navigate = useNavigate();
 
@@ -517,13 +581,31 @@ export default function AllLeads() {
         .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {
           const s = c.status || '';
-          return !['people_mode_archived', 'people_mode_skipped'].includes(s);
+          if (['people_mode_archived', 'people_mode_skipped'].includes(s)) return false;
+          if (mode === 'scout') return c.hunter_status !== 'active_mission';
+          if (mode === 'hunter') return c.hunter_status === 'active_mission';
+          return true; // 'people' — show all
         });
       setContacts(contactsList);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load contacts:', error);
       setLoading(false);
+    }
+  }
+
+  async function resetContactToScout(contactId) {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
+        hunter_status: null,
+        active_mission_id: null,
+        updated_at: new Date().toISOString(),
+      });
+      await loadAllContacts();
+    } catch (err) {
+      console.error('[AllLeads] resetContactToScout error:', err);
     }
   }
 
@@ -570,7 +652,12 @@ export default function AllLeads() {
     });
   }
 
-  const finalContacts = filtered;
+  // Sort: overdue first → active mission → not started → converted
+  const finalContacts = [...filtered].sort((a, b) => {
+    const orderA = ENGAGE_SORT_ORDER[deriveCardEngageState(a)] ?? 2;
+    const orderB = ENGAGE_SORT_ORDER[deriveCardEngageState(b)] ?? 2;
+    return orderA - orderB;
+  });
 
   // Stats
   const totalPipeline = contacts.length;
@@ -597,17 +684,22 @@ export default function AllLeads() {
   }
 
   if (contacts.length === 0) {
+    const emptyMsg = mode === 'hunter'
+      ? { title: 'No Active Missions', body: 'Engage contacts in Scout to start outreach missions.', cta: null }
+      : mode === 'scout'
+      ? { title: 'No Unengaged Contacts', body: 'All contacts are in active missions, or add new ones via Daily Leads.', cta: null }
+      : { title: 'No Contacts Yet', body: 'Accept companies in Daily Leads to start building your contact pipeline.', cta: 'View Saved Companies' };
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, color: T.textMuted }}>
         <Users size={48} color={T.textFaint} />
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>No Contacts Yet</h2>
-        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
-          Accept companies in Daily Leads to start building your contact pipeline.
-        </p>
-        <button
-          onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-          style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
-        ><Building2 size={14} />View Saved Companies</button>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>{emptyMsg.title}</h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, textAlign: 'center' }}>{emptyMsg.body}</p>
+        {emptyMsg.cta && (
+          <button
+            onClick={() => navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+            style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+          ><Building2 size={14} />{emptyMsg.cta}</button>
+        )}
       </div>
     );
   }
@@ -619,8 +711,16 @@ export default function AllLeads() {
       <div style={{ padding: '18px 22px 0', background: T.navBg, borderBottom: `1px solid ${T.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>People</h2>
-            <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>Every relationship — one place.</div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>
+              {mode === 'hunter' ? 'Active Contacts' : 'People'}
+            </h2>
+            <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
+              {mode === 'hunter'
+                ? 'Contacts with active missions.'
+                : mode === 'scout'
+                ? 'Ready for first contact.'
+                : 'Every relationship — one place.'}
+            </div>
           </div>
           {/* View toggle */}
           <div style={{ display: 'flex', gap: 4, background: T.surface, borderRadius: 8, padding: 3 }}>
@@ -724,6 +824,9 @@ export default function AllLeads() {
                   key={c.id}
                   contact={c}
                   company={companies[c.company_id]}
+                  engageState={deriveCardEngageState(c)}
+                  mode={mode}
+                  onReturnToScout={() => resetContactToScout(c.id)}
                   onClick={() => isMobile ? openMobileProfile(c.id) : setModal(c)}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
@@ -927,6 +1030,7 @@ export default function AllLeads() {
         <PersonModal
           contact={modal}
           company={companies[modal.company_id]}
+          engageState={deriveCardEngageState(modal)}
           onClose={() => setModal(null)}
           onEngage={() => {
             setModal(null);

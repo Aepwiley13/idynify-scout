@@ -15,7 +15,7 @@
 
 /* ── Banner ─────────────────────────────────────────────────────── */
 .idc-banner {
-  height: 128px;
+  height: 160px;
   position: relative;
   overflow: hidden;
 }
@@ -36,8 +36,8 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 0 20px;
-  margin-top: -46px;      /* pull avatar up into banner */
+  padding: 0 22px;
+  margin-top: -92px;      /* half of 184px avatar = perfectly overlap banner */
   margin-bottom: 10px;
   position: relative;
   z-index: 2;
@@ -50,15 +50,16 @@
 }
 
 .idc-photo {
-  width: 92px;
-  height: 92px;
+  width: 184px;
+  height: 184px;
   border-radius: 50%;
   overflow: hidden;
   background: #f3f4f6;
   position: relative;
   box-shadow:
-    0 0 0 3px rgba(255,255,255,0.15),
-    0 6px 20px rgba(0, 0, 0, 0.22);
+    0 0 0 4px rgba(255,255,255,0.12),
+    0 8px 32px rgba(0, 0, 0, 0.28),
+    0 2px 8px rgba(0, 0, 0, 0.18);
   transition: box-shadow 0.2s ease;
 }
 
@@ -85,7 +86,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 58px;
   font-weight: 700;
   color: #fff;
   letter-spacing: 0.5px;
@@ -307,46 +308,55 @@
   opacity: 1 !important;
 }
 
-/* ── Brigade badge + chooser ────────────────────────────────────── */
-.idc-brigade-row {
-  position: relative;
-  margin-top: 10px;
+/* ── Classification chips row ───────────────────────────────────── */
+.idc-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
   margin-bottom: 4px;
 }
 
-.idc-brigade-badge {
+/* Chip wrapper (anchor for popover) */
+.idc-chip-wrap {
+  position: relative;
+}
+
+/* Each chip pill */
+.idc-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 11px 5px 9px;
+  gap: 5px;
+  padding: 5px 10px 5px 9px;
   border-radius: 20px;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
   letter-spacing: 0.1px;
+  white-space: nowrap;
 }
 
-.idc-brigade-badge:hover {
-  filter: brightness(0.93);
+.idc-chip:hover {
+  filter: brightness(0.92);
   transform: translateY(-1px);
 }
 
-/* Brigade chooser popover */
-.idc-brigade-panel {
+/* Chip popover panel */
+.idc-chip-panel {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  min-width: 210px;
+  min-width: 200px;
   border-radius: 13px;
   padding: 6px;
-  z-index: 40;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
-.idc-brigade-panel-label {
+.idc-chip-panel-label {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 1.2px;
@@ -354,28 +364,28 @@
   padding: 4px 10px 8px;
 }
 
-.idc-brigade-opt {
+.idc-chip-opt {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
   background: none;
   border: none;
   border-left: 3px solid transparent;
-  padding: 8px 10px;
+  padding: 7px 10px;
   border-radius: 7px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
   transition: all 0.12s ease;
 }
 
-.idc-brigade-opt:hover {
+.idc-chip-opt:hover {
   background: rgba(0, 0, 0, 0.04);
 }
 
-.idc-brigade-opt-label {
+.idc-chip-opt-label {
   flex: 1;
 }
 
@@ -561,20 +571,20 @@
    ════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
   .idc-banner {
-    height: 104px;
+    height: 120px;
   }
 
   .idc-photo {
-    width: 78px;
-    height: 78px;
+    width: 110px;
+    height: 110px;
   }
 
   .idc-avatar-row {
-    margin-top: -39px;
+    margin-top: -55px;
   }
 
   .idc-initials {
-    font-size: 24px;
+    font-size: 36px;
   }
 
   .idc-name {
@@ -582,8 +592,8 @@
   }
 
   .idc-quick-btn {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
   }
 
   .idc-body {
@@ -593,19 +603,24 @@
 
 @media (max-width: 480px) {
   .idc-banner {
-    height: 90px;
+    height: 100px;
   }
 
   .idc-photo {
-    width: 70px;
-    height: 70px;
+    width: 88px;
+    height: 88px;
   }
 
   .idc-avatar-row {
-    margin-top: -35px;
+    margin-top: -44px;
   }
 
-  .idc-brigade-panel {
+  .idc-initials {
+    font-size: 28px;
+  }
+
+  /* Prevent last chip popovers from going off-screen */
+  .idc-chip-wrap:nth-child(n+3) .idc-chip-panel {
     left: auto;
     right: 0;
   }

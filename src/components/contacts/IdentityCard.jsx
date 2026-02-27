@@ -4,21 +4,17 @@
  * Layout:
  *   ┌──────────────────────────────────────────┐
  *   │  [brigade-coloured gradient banner]       │
- *   │  (blurred photo behind gradient if avail) │
  *   ├──────────────────────────────────────────┤
- *   │  ◉ Avatar  (overlaps banner)  [✉][☎][in] │
+ *   │  ◉ Avatar (large, overlaps banner)  [✉][☎][in] │
  *   │  Name                                     │
  *   │  Title · Company                          │
- *   │  ● Brigade badge  ▾                       │
+ *   │  [Brigade▾] [State▾] [Relationship▾] [Value▾] │
  *   │  ─────────────────────────────────────── │
- *   │  Contact details (email / phone / linkedin│
- *   │  ─────────────────────────────────────── │
- *   │  Strategic Context (StructuredFields)     │
+ *   │  Contact details (email / phone / linkedin)    │
  *   └──────────────────────────────────────────┘
  *
- * Brigade chooser is an inline popover from the badge.
- * StructuredFields is embedded at the bottom so nothing
- * is hidden behind a flip or pushed below the card.
+ * All four classification chips live in one row.
+ * Each chip opens its own inline popover on click.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -31,11 +27,43 @@ import {
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { BRIGADES, BRIGADE_MAP } from './BrigadeSelector';
-import StructuredFields from './StructuredFields';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
+import {
+  RELATIONSHIP_STATES,
+  RELATIONSHIP_TYPES,
+  STRATEGIC_VALUES,
+} from '../../constants/structuredFields';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import './IdentityCard.css';
+
+// ─── Color maps for classification chips ─────────────────────────────────────
+
+const STATE_COLORS = {
+  unaware:          { color: '#6b7280', bg: 'rgba(107,114,128,0.09)', border: 'rgba(107,114,128,0.22)' },
+  aware:            { color: '#3b82f6', bg: 'rgba(59,130,246,0.09)',  border: 'rgba(59,130,246,0.22)'  },
+  engaged:          { color: '#7c3aed', bg: 'rgba(124,58,237,0.09)', border: 'rgba(124,58,237,0.22)' },
+  warm:             { color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)'  },
+  trusted:          { color: '#10b981', bg: 'rgba(16,185,129,0.09)', border: 'rgba(16,185,129,0.22)'  },
+  advocate:         { color: '#059669', bg: 'rgba(5,150,105,0.09)',  border: 'rgba(5,150,105,0.22)'   },
+  dormant:          { color: '#94a3b8', bg: 'rgba(148,163,184,0.09)',border: 'rgba(148,163,184,0.22)' },
+  strained:         { color: '#ef4444', bg: 'rgba(239,68,68,0.09)', border: 'rgba(239,68,68,0.22)'   },
+  strategic_partner:{ color: '#d97706', bg: 'rgba(217,119,6,0.09)', border: 'rgba(217,119,6,0.22)'   },
+};
+
+const TYPE_COLORS = {
+  prospect: { color: '#7c3aed', bg: 'rgba(124,58,237,0.09)', border: 'rgba(124,58,237,0.22)' },
+  known:    { color: '#3b82f6', bg: 'rgba(59,130,246,0.09)', border: 'rgba(59,130,246,0.22)'  },
+  partner:  { color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)'  },
+  delegate: { color: '#6b7280', bg: 'rgba(107,114,128,0.09)',border: 'rgba(107,114,128,0.22)' },
+};
+
+const VALUE_COLORS = {
+  low:      { color: '#6b7280', bg: 'rgba(107,114,128,0.09)',border: 'rgba(107,114,128,0.22)' },
+  medium:   { color: '#3b82f6', bg: 'rgba(59,130,246,0.09)', border: 'rgba(59,130,246,0.22)'  },
+  high:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)'  },
+  critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.09)', border: 'rgba(239,68,68,0.22)'   },
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +90,77 @@ function getAvatarColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ─── Shared mini-popover for any classification chip ─────────────────────────
+
+function FieldChip({ label, value, options, colorMap, onSelect, saving, T }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const current = options.find(o => o.id === value) || null;
+  const colors = current ? (colorMap[current.id] || {}) : {};
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  return (
+    <div className="idc-chip-wrap" ref={ref}>
+      <button
+        className="idc-chip"
+        onClick={() => setOpen(v => !v)}
+        style={current ? {
+          background: colors.bg,
+          border: `1.5px solid ${colors.border}`,
+          color: colors.color,
+        } : {
+          background: T.surface,
+          border: `1.5px dashed ${T.border}`,
+          color: T.textFaint,
+        }}
+      >
+        <span>{current ? current.label : `+ ${label}`}</span>
+        {saving ? <Loader size={9} className="idc-spin" /> : <ChevronDown size={10} style={{ opacity: 0.6 }} />}
+      </button>
+
+      {open && (
+        <div
+          className="idc-chip-panel"
+          style={{
+            background: T.cardBg,
+            border: `1px solid ${T.border}`,
+            boxShadow: `0 8px 32px ${T.isDark ? '#00000080' : '#0000001a'}`,
+          }}
+        >
+          <div className="idc-chip-panel-label" style={{ color: T.textFaint }}>{label}</div>
+          {options.map(opt => {
+            const c = colorMap[opt.id] || {};
+            const isActive = value === opt.id;
+            return (
+              <button
+                key={opt.id}
+                className="idc-chip-opt"
+                onClick={() => { onSelect(isActive ? null : opt.id); setOpen(false); }}
+                title={opt.description}
+                style={{
+                  background: isActive ? (c.bg || 'transparent') : 'transparent',
+                  color: isActive ? (c.color || T.textMuted) : T.textMuted,
+                  borderLeft: `3px solid ${isActive ? (c.color || 'transparent') : 'transparent'}`,
+                }}
+              >
+                <span className="idc-chip-opt-label">{opt.label}</span>
+                {isActive && <Check size={11} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── IdentityCard ─────────────────────────────────────────────────────────────
@@ -96,6 +195,9 @@ export default function IdentityCard({
   const [brigadeSaving, setBrigadeSaving] = useState(false);
   const brigadeRef = useRef(null);
 
+  // Structured field saving indicator
+  const [fieldSaving, setFieldSaving] = useState(false);
+
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
   const canSearch = !!contact.linkedin_url || (!!contact.name && !!contact.company_name);
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
@@ -104,11 +206,11 @@ export default function IdentityCard({
   const emailVerified = contact.email_status === 'verified';
   const emailLikely = contact.email_status === 'likely';
 
-  // Banner: brigade colour or pink gradient
+  // Banner uses brigade colour, fallback to pink
   const bannerAccent = currentBrigade?.color || BRAND.pink;
   const bannerGradient = hasRealPhoto
     ? `linear-gradient(160deg, ${bannerAccent}bb 0%, ${bannerAccent}55 60%, transparent 100%)`
-    : `linear-gradient(150deg, ${bannerAccent}dd 0%, ${bannerAccent}88 50%, ${bannerAccent}22 100%)`;
+    : `linear-gradient(150deg, ${bannerAccent}ee 0%, ${bannerAccent}88 50%, ${bannerAccent}22 100%)`;
 
   // ── Close-outside handlers ──────────────────────────────────────────────────
   useEffect(() => {
@@ -230,21 +332,32 @@ export default function IdentityCard({
     }
   }
 
+  // ── Structured field save ────────────────────────────────────────────────────
+  async function handleFieldSave(fieldName, value) {
+    const user = auth.currentUser;
+    if (!user || !contact?.id) return;
+    onUpdate({ ...contact, [fieldName]: value });
+    try {
+      setFieldSaving(true);
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        [fieldName]: value, updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(`[IdentityCard] Field save failed (${fieldName}):`, err);
+      onUpdate(contact);
+    } finally {
+      setFieldSaving(false);
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div
-      className="idc-card"
-      style={{ background: T.cardBg, border: `1px solid ${T.border}` }}
-    >
+    <div className="idc-card" style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
 
       {/* ── Banner ── */}
       <div className="idc-banner" style={{ background: bannerGradient }}>
         {hasRealPhoto && (
-          <img
-            src={contact.photo_url}
-            alt=""
-            className="idc-banner-blur"
-          />
+          <img src={contact.photo_url} alt="" className="idc-banner-blur" />
         )}
       </div>
 
@@ -254,7 +367,7 @@ export default function IdentityCard({
         <div className="idc-photo-wrap" ref={photoMenuRef}>
           <div
             className={`idc-photo${!hasRealPhoto ? ' idc-photo--click' : ''}`}
-            style={{ border: `3px solid ${T.cardBg}` }}
+            style={{ border: `4px solid ${T.cardBg}` }}
             onClick={() => !hasRealPhoto && !photoRefreshLoading && setPhotoMenuOpen(v => !v)}
           >
             {hasRealPhoto ? (
@@ -266,8 +379,8 @@ export default function IdentityCard({
                 </div>
                 <div className="idc-photo-overlay">
                   {photoRefreshLoading
-                    ? <Loader size={16} className="idc-spin" />
-                    : <Camera size={16} />}
+                    ? <Loader size={20} className="idc-spin" />
+                    : <Camera size={20} />}
                 </div>
               </>
             )}
@@ -323,7 +436,7 @@ export default function IdentityCard({
           )}
         </div>
 
-        {/* Quick action icon buttons — right side */}
+        {/* Quick action icon buttons — right side of avatar row */}
         <div className="idc-quick-btns">
           {email && (
             <a
@@ -332,7 +445,7 @@ export default function IdentityCard({
               style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted }}
               title={email}
             >
-              <Mail size={14} />
+              <Mail size={15} />
             </a>
           )}
           {phone && (
@@ -342,7 +455,7 @@ export default function IdentityCard({
               style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.textMuted }}
               title={phone}
             >
-              <Phone size={14} />
+              <Phone size={15} />
             </a>
           )}
           {contact.linkedin_url && (
@@ -353,7 +466,7 @@ export default function IdentityCard({
               className="idc-quick-btn idc-quick-btn--li"
               title="LinkedIn"
             >
-              <Linkedin size={14} />
+              <Linkedin size={15} />
             </a>
           )}
         </div>
@@ -378,8 +491,8 @@ export default function IdentityCard({
           <div className="idc-field-row" onClick={() => startEdit('name', contact.name)} title="Click to edit">
             <h1 className="idc-name" style={{ color: T.text }}>{contact.name || 'Unknown Contact'}</h1>
             {savedField === 'name'
-              ? <Check size={13} color="#10b981" style={{ flexShrink: 0 }} />
-              : <Pencil size={11} className="idc-edit-icon" color={T.textFaint} />}
+              ? <Check size={14} color="#10b981" style={{ flexShrink: 0 }} />
+              : <Pencil size={12} className="idc-edit-icon" color={T.textFaint} />}
           </div>
         )}
 
@@ -401,8 +514,8 @@ export default function IdentityCard({
               {contact.title || <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Add title</span>}
             </p>
             {savedField === 'title'
-              ? <Check size={13} color="#10b981" style={{ flexShrink: 0 }} />
-              : <Pencil size={11} className="idc-edit-icon" color={T.textFaint} />}
+              ? <Check size={14} color="#10b981" style={{ flexShrink: 0 }} />
+              : <Pencil size={12} className="idc-edit-icon" color={T.textFaint} />}
           </div>
         )}
 
@@ -446,7 +559,7 @@ export default function IdentityCard({
               </span>
             )}
             {savedField === 'company_name'
-              ? <Check size={13} color="#10b981" style={{ flexShrink: 0 }} />
+              ? <Check size={14} color="#10b981" style={{ flexShrink: 0 }} />
               : (
                 <button className="idc-pencil" onClick={() => startEdit('company_name', contact.company_name)}>
                   <Pencil size={11} color={T.textFaint} />
@@ -455,70 +568,99 @@ export default function IdentityCard({
           </div>
         )}
 
-        {/* ── Brigade badge ── */}
-        <div className="idc-brigade-row" ref={brigadeRef}>
-          <button
-            className="idc-brigade-badge"
-            onClick={() => setBrigadePanelOpen(v => !v)}
-            style={currentBrigade ? {
-              background: currentBrigade.bgColor,
-              border: `1.5px solid ${currentBrigade.borderColor}`,
-              color: currentBrigade.color,
-            } : {
-              background: T.surface,
-              border: `1.5px dashed ${T.border}`,
-              color: T.textFaint,
-            }}
-          >
-            {currentBrigade ? (
-              <>
-                <currentBrigade.icon size={12} />
-                <span>{currentBrigade.label}</span>
-              </>
-            ) : (
-              <span>+ Set Brigade</span>
-            )}
-            {brigadeSaving
-              ? <Loader size={10} className="idc-spin" />
-              : <ChevronDown size={11} style={{ opacity: 0.6 }} />}
-          </button>
+        {/* ── Classification chips row ── */}
+        <div className="idc-chips-row">
 
-          {/* Brigade chooser popover */}
-          {brigadePanelOpen && (
-            <div
-              className="idc-brigade-panel"
-              style={{
-                background: T.cardBg,
-                border: `1px solid ${T.border}`,
-                boxShadow: `0 8px 32px ${T.isDark ? '#00000080' : '#0000001a'}`,
+          {/* Brigade */}
+          <div className="idc-chip-wrap" ref={brigadeRef}>
+            <button
+              className="idc-chip"
+              onClick={() => setBrigadePanelOpen(v => !v)}
+              style={currentBrigade ? {
+                background: currentBrigade.bgColor,
+                border: `1.5px solid ${currentBrigade.borderColor}`,
+                color: currentBrigade.color,
+              } : {
+                background: T.surface,
+                border: `1.5px dashed ${T.border}`,
+                color: T.textFaint,
               }}
             >
-              <div className="idc-brigade-panel-label" style={{ color: T.textFaint }}>
-                Select Brigade
+              {currentBrigade
+                ? <><currentBrigade.icon size={11} /><span>{currentBrigade.label}</span></>
+                : <span>+ Brigade</span>}
+              {brigadeSaving
+                ? <Loader size={9} className="idc-spin" />
+                : <ChevronDown size={10} style={{ opacity: 0.6 }} />}
+            </button>
+
+            {brigadePanelOpen && (
+              <div
+                className="idc-chip-panel"
+                style={{
+                  background: T.cardBg,
+                  border: `1px solid ${T.border}`,
+                  boxShadow: `0 8px 32px ${T.isDark ? '#00000080' : '#0000001a'}`,
+                }}
+              >
+                <div className="idc-chip-panel-label" style={{ color: T.textFaint }}>Brigade</div>
+                {BRIGADES.map(b => {
+                  const BIcon = b.icon;
+                  const isActive = contact.brigade === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      className="idc-chip-opt"
+                      onClick={() => { handleBrigadeSelect(b.id); setBrigadePanelOpen(false); }}
+                      title={b.description}
+                      style={{
+                        background: isActive ? b.bgColor : 'transparent',
+                        color: isActive ? b.color : T.textMuted,
+                        borderLeft: `3px solid ${isActive ? b.color : 'transparent'}`,
+                      }}
+                    >
+                      <BIcon size={12} style={{ flexShrink: 0 }} />
+                      <span className="idc-chip-opt-label">{b.label}</span>
+                      {isActive && <Check size={11} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+                    </button>
+                  );
+                })}
               </div>
-              {BRIGADES.map(b => {
-                const BIcon = b.icon;
-                const isActive = contact.brigade === b.id;
-                return (
-                  <button
-                    key={b.id}
-                    className="idc-brigade-opt"
-                    onClick={() => handleBrigadeSelect(b.id)}
-                    style={{
-                      background: isActive ? b.bgColor : 'transparent',
-                      color: isActive ? b.color : T.textMuted,
-                      borderLeft: `3px solid ${isActive ? b.color : 'transparent'}`,
-                    }}
-                    title={b.description}
-                  >
-                    <BIcon size={13} style={{ flexShrink: 0 }} />
-                    <span className="idc-brigade-opt-label">{b.label}</span>
-                    {isActive && <Check size={12} style={{ marginLeft: 'auto', flexShrink: 0, color: b.color }} />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Relationship State */}
+          <FieldChip
+            label="State"
+            value={contact.relationship_state || null}
+            options={RELATIONSHIP_STATES}
+            colorMap={STATE_COLORS}
+            onSelect={val => handleFieldSave('relationship_state', val)}
+            saving={fieldSaving}
+            T={T}
+          />
+
+          {/* Relationship Type */}
+          <FieldChip
+            label="Relationship"
+            value={contact.relationship_type || null}
+            options={RELATIONSHIP_TYPES}
+            colorMap={TYPE_COLORS}
+            onSelect={val => handleFieldSave('relationship_type', val)}
+            saving={fieldSaving}
+            T={T}
+          />
+
+          {/* Strategic Value */}
+          <FieldChip
+            label="Value"
+            value={contact.strategic_value || null}
+            options={STRATEGIC_VALUES}
+            colorMap={VALUE_COLORS}
+            onSelect={val => handleFieldSave('strategic_value', val)}
+            saving={fieldSaving}
+            T={T}
+          />
         </div>
 
         {/* ── Divider ── */}
@@ -631,10 +773,6 @@ export default function IdentityCard({
         {photoRefreshError && (
           <p className="idc-photo-err">{photoRefreshError}</p>
         )}
-
-        {/* ── Strategic Context (embedded, no flip needed) ── */}
-        <div className="idc-divider" style={{ background: T.border, marginTop: 4 }} />
-        <StructuredFields contact={contact} onUpdate={onUpdate} />
 
       </div>
     </div>

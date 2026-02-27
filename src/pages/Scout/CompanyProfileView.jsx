@@ -52,6 +52,11 @@ export default function CompanyProfileView({ companyId, onBack }) {
   const [showOverview, setShowOverview] = useState(true);
   const [showKeywords, setShowKeywords] = useState(true);
   const [archiving, setArchiving] = useState(false);
+  // Swipe queue return: populated when user drilled in from the Find Contacts swipe deck
+  const [swipeQueueLeft, setSwipeQueueLeft] = useState(() => {
+    const val = sessionStorage.getItem('sc_fromSwipe');
+    return val !== null ? parseInt(val, 10) : null;
+  });
 
   useEffect(() => {
     if (!companyId) return;
@@ -393,7 +398,11 @@ export default function CompanyProfileView({ companyId, onBack }) {
       {/* ── Top bar ── */}
       <div style={{ padding: '12px 20px', borderBottom: `1px solid ${T.border}`, background: T.navBg, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         <button
-          onClick={onBack}
+          onClick={() => {
+            sessionStorage.removeItem('sc_fromSwipe');
+            setSwipeQueueLeft(null);
+            onBack();
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 12, cursor: 'pointer', fontWeight: 500 }}
         >
           <ArrowLeft size={14} /> Back
@@ -422,6 +431,42 @@ export default function CompanyProfileView({ companyId, onBack }) {
           )}
         </div>
       </div>
+
+      {/* ── Swipe queue return banner ── */}
+      {swipeQueueLeft !== null && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '9px 20px', flexShrink: 0,
+          background: `linear-gradient(90deg, ${BRAND.pink}18, ${BRAND.cyan}12)`,
+          borderBottom: `1px solid ${BRAND.pink}30`,
+        }}>
+          <span style={{ fontSize: 16 }}>🎯</span>
+          <span style={{ flex: 1, fontSize: 12, color: T.text, fontWeight: 500 }}>
+            {swipeQueueLeft === 0
+              ? 'Add a contact here — this is your last one!'
+              : `Add a contact here, then tackle ${swipeQueueLeft} more.`}
+          </span>
+          <button
+            onClick={() => {
+              sessionStorage.removeItem('sc_fromSwipe');
+              setSwipeQueueLeft(null);
+              onBack();
+            }}
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 12px', borderRadius: 8,
+              border: `1px solid ${BRAND.pink}40`,
+              background: `${BRAND.pink}15`, color: BRAND.pink,
+              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = `${BRAND.pink}28`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = `${BRAND.pink}15`; }}
+          >
+            <ArrowLeft size={11} /> Back to Swipe
+          </button>
+        </div>
+      )}
 
       {/* ── Scrollable body ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>

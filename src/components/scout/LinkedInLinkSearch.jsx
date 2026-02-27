@@ -1,89 +1,45 @@
 import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
+import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone } from 'lucide-react';
+import { useT } from '../../theme/ThemeContext';
+import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
 
-/**
- * LINKEDIN LINK SEARCH - EXACT MATCH ONLY
- *
- * This component is for the LinkedIn Link option in Scout+.
- *
- * Flow:
- * 1. User pastes LinkedIn URL
- * 2. Call findContactByLinkedInUrl (exact match, no fuzzy search)
- * 3. Show preview of exact person
- * 4. User confirms and saves
- *
- * NO Barry validation (not needed for exact URL match)
- * NO "potential matches" (only exact match)
- * NO fuzzy search fallback
- */
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
+  const T = useT();
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [searching, setSearching] = useState(false);
   const [contact, setContact] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleInputChange = (value) => {
-    setLinkedinUrl(value);
-    setError(null);
-  };
-
   const handleFindContact = async (e) => {
     e.preventDefault();
-
-    // Validate LinkedIn URL is provided
     if (!linkedinUrl || linkedinUrl.trim() === '') {
       setError('Please paste a LinkedIn profile URL');
       return;
     }
-
-    // Basic LinkedIn URL validation
     if (!linkedinUrl.includes('linkedin.com')) {
-      setError('Please enter a valid LinkedIn URL');
+      setError('Please enter a valid LinkedIn URL (must contain linkedin.com)');
       return;
     }
-
     setSearching(true);
     setError(null);
     setContact(null);
-
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('You must be logged in');
-      }
-
+      if (!user) throw new Error('You must be logged in');
       const authToken = await user.getIdToken();
-
-      // Call NEW function for exact LinkedIn URL lookup
       const response = await fetch('/.netlify/functions/findContactByLinkedInUrl', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          linkedin_url: linkedinUrl.trim()
-        })
+        body: JSON.stringify({ userId: user.uid, authToken, linkedin_url: linkedinUrl.trim() })
       });
-
       const data = await response.json();
-
-      if (!data.success) {
-        // Use the exact error message from the function
-        throw new Error(data.error || 'Failed to find contact');
-      }
-
-      if (!data.contact) {
-        throw new Error('Unable to retrieve public profile details from this LinkedIn link. Please verify the URL or try again.');
-      }
-
-      console.log(`✅ Found exact match: ${data.contact.name}`);
+      if (!data.success) throw new Error(data.error || 'Failed to find contact');
+      if (!data.contact) throw new Error('Unable to retrieve profile details. Please verify the URL and try again.');
       setContact(data.contact);
-
     } catch (err) {
-      console.error('Search error:', err);
       setError(err.message || 'Search failed. Please try again.');
     } finally {
       setSearching(false);
@@ -92,66 +48,36 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
 
   const handleConfirmAndSave = async () => {
     if (!contact) return;
-
     setSaving(true);
     setError(null);
-
     try {
       const user = auth.currentUser;
-      if (!user) {
-        throw new Error('You must be logged in');
-      }
-
-      // Step 1: Ensure company exists in Saved Companies
+      if (!user) throw new Error('You must be logged in');
       const companyId = await ensureCompanyExists(contact, user.uid);
-
-      // Step 2: Save contact to /users/{uid}/contacts
       const contactId = contact.id || `apollo_${Date.now()}`;
-      const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
-
       const contactData = {
-        // Apollo IDs
         apollo_person_id: contact.id,
-
-        // Basic Info
         name: contact.name || 'Unknown',
         title: contact.title || '',
         email: contact.email || null,
         phone: contact.phone_numbers?.[0]?.sanitized_number || null,
         linkedin_url: contact.linkedin_url || null,
         photo_url: contact.photo_url || null,
-
-        // Company Association
         company_id: companyId,
         company_name: contact.organization_name || null,
         company_industry: contact.organization?.industry || null,
-
-        // Apollo Enrichment Fields
         department: contact.departments?.[0] || null,
         seniority: contact.seniority || null,
         location: contact.location || null,
-
-        // Metadata
         status: 'active',
         saved_at: new Date().toISOString(),
         source: 'LinkedIn Link',
-
-        // Match quality is always 100 for exact LinkedIn URL
         match_quality: 100
       };
-
-      await setDoc(contactRef, contactData);
-
-      console.log('✅ Contact saved:', contactId);
-
-      // Update company contact count
+      await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), contactData);
       await updateCompanyContactCount(companyId, user.uid);
-
-      // Notify parent
       onContactAdded([{ id: contactId, ...contactData }]);
-
     } catch (err) {
-      console.error('Error saving contact:', err);
       setError(err.message || 'Failed to save contact. Please try again.');
       setSaving(false);
     }
@@ -160,201 +86,149 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const ensureCompanyExists = async (contact, userId) => {
     const companyName = contact.organization_name || contact.organization?.name;
     const apolloOrgId = contact.organization_id || contact.organization?.id;
-
-    if (!companyName) {
-      // No company info available
-      return null;
-    }
-
-    // Check if company already exists by apollo_id
+    if (!companyName) return null;
     if (apolloOrgId) {
-      const companiesRef = collection(db, 'users', userId, 'companies');
-      const q = query(companiesRef, where('apollo_id', '==', apolloOrgId));
-      const snapshot = await getDocs(q);
-
-      if (!snapshot.empty) {
-        return snapshot.docs[0].id;
-      }
+      const q = query(collection(db, 'users', userId, 'companies'), where('apollo_id', '==', apolloOrgId));
+      const snap = await getDocs(q);
+      if (!snap.empty) return snap.docs[0].id;
     }
-
-    // Create new company
     const companyId = apolloOrgId || `company_${Date.now()}`;
-    const companyRef = doc(db, 'users', userId, 'companies', companyId);
-
-    const companyData = {
+    await setDoc(doc(db, 'users', userId, 'companies', companyId), {
       apollo_id: apolloOrgId || null,
       name: companyName,
       industry: contact.organization?.industry || null,
       website_url: contact.organization?.website_url || null,
       domain: contact.organization?.primary_domain || null,
       location: contact.organization?.city && contact.organization?.state
-        ? `${contact.organization.city}, ${contact.organization.state}`
-        : null,
+        ? `${contact.organization.city}, ${contact.organization.state}` : null,
       employee_count: contact.organization?.estimated_num_employees || null,
-
-      // Metadata
       saved_at: new Date().toISOString(),
       source: 'LinkedIn Link',
       status: 'accepted',
       contact_count: 0,
-
-      // For future enrichment
       apolloEnriched: false
-    };
-
-    await setDoc(companyRef, companyData);
-    console.log('✅ Company saved:', companyId);
-
+    });
     return companyId;
   };
 
   const updateCompanyContactCount = async (companyId, userId) => {
     if (!companyId) return;
-
     try {
-      const companyRef = doc(db, 'users', userId, 'companies', companyId);
-      const companyDoc = await getDoc(companyRef);
-
-      if (companyDoc.exists()) {
-        const currentCount = companyDoc.data().contact_count || 0;
-        await updateDoc(companyRef, {
-          contact_count: currentCount + 1
-        });
-      }
+      const ref = doc(db, 'users', userId, 'companies', companyId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) await updateDoc(ref, { contact_count: (snap.data().contact_count || 0) + 1 });
     } catch (err) {
       console.error('Error updating company contact count:', err);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <Linkedin className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900 mb-1">Find contact by LinkedIn URL</p>
-            <p className="text-xs text-gray-700">
-              Paste the LinkedIn profile URL below to retrieve contact information.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div style={{ padding: '20px 22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Search Form */}
+      {/* ── URL input form ── */}
       {!contact && (
-        <form onSubmit={handleFindContact} className="space-y-4">
-          {/* LinkedIn URL Input */}
+        <form onSubmit={handleFindContact} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: 0.6, marginBottom: 8, textTransform: 'uppercase' }}>
               LinkedIn Profile URL
             </label>
-            <input
-              type="url"
-              value={linkedinUrl}
-              onChange={(e) => handleInputChange(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all text-lg"
-              placeholder="https://linkedin.com/in/johndoe"
-              disabled={searching}
-              autoFocus
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              Paste the full LinkedIn URL (e.g., https://linkedin.com/in/username)
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: T.input, border: `1.5px solid ${error ? STATUS.red : T.border}`, borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.15s' }}>
+              <div style={{ padding: '0 12px', display: 'flex', alignItems: 'center', borderRight: `1px solid ${T.border}` }}>
+                <Linkedin size={16} color="#0077b5" />
+              </div>
+              <input
+                type="url"
+                value={linkedinUrl}
+                onChange={e => { setLinkedinUrl(e.target.value); setError(null); }}
+                style={{
+                  flex: 1, padding: '11px 14px', background: 'transparent', border: 'none',
+                  outline: 'none', color: T.text, fontSize: 13,
+                }}
+                placeholder="https://linkedin.com/in/johndoe"
+                disabled={searching}
+                autoFocus
+              />
+            </div>
+            <p style={{ marginTop: 6, fontSize: 11, color: T.textFaint }}>
+              Copy the full profile URL from LinkedIn and paste it here.
             </p>
           </div>
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800">{error}</p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '10px 13px', background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, borderRadius: 9 }}>
+              <AlertCircle size={15} color={STATUS.red} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 12, color: STATUS.red, lineHeight: 1.5 }}>{error}</span>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
+          {/* Buttons */}
+          <div style={{ display: 'flex', gap: 9 }}>
             <button
               type="submit"
               disabled={searching}
-              className="flex-1 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
+              style={{
+                flex: 1, padding: '11px 0', borderRadius: 9, border: 'none',
+                background: searching ? T.surface : 'linear-gradient(135deg,#0077b5,#005f8e)',
+                color: searching ? T.textMuted : '#fff',
+                fontSize: 13, fontWeight: 700, cursor: searching ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s'
+              }}
             >
-              {searching ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Finding Contact...
-                </>
-              ) : (
-                <>
-                  <Search className="w-5 h-5" />
-                  Find Contact
-                </>
-              )}
+              {searching ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />Finding...</> : <><Search size={14} />Find Contact</>}
             </button>
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
               disabled={searching}
+              style={{ padding: '11px 18px', borderRadius: 9, border: `1.5px solid ${T.border}`, background: 'transparent', color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
             >
               Cancel
             </button>
           </div>
+          <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
         </form>
       )}
 
-      {/* Contact Preview and Save */}
+      {/* ── Contact found ── */}
       {contact && (
-        <div className="space-y-4">
-          {/* Success message */}
-          <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">Contact Found!</p>
-                <p className="text-xs text-gray-700">Review the details below and confirm to save.</p>
-              </div>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Success banner */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', background: `${STATUS.green}12`, border: `1px solid ${STATUS.green}35`, borderRadius: 9 }}>
+            <CheckCircle size={15} color={STATUS.green} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: STATUS.green, fontWeight: 600 }}>Contact found — review and save below.</span>
           </div>
 
-          {/* Contact Preview Card */}
-          <ContactPreviewCard contact={contact} />
+          {/* Contact card */}
+          <ContactCard contact={contact} T={T} />
 
-          {/* Error Message */}
+          {/* Error on save */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800">{error}</p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '10px 13px', background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, borderRadius: 9 }}>
+              <AlertCircle size={15} color={STATUS.red} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 12, color: STATUS.red, lineHeight: 1.5 }}>{error}</span>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 9 }}>
             <button
               onClick={handleConfirmAndSave}
               disabled={saving}
-              className="flex-1 px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md flex items-center justify-center gap-2"
+              style={{
+                flex: 1, padding: '11px 0', borderRadius: 9, border: 'none',
+                background: saving ? T.surface : `linear-gradient(135deg,${STATUS.green},#059669)`,
+                color: saving ? T.textMuted : '#fff',
+                fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s'
+              }}
             >
-              {saving ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-5 h-5" />
-                  Save Contact
-                </>
-              )}
+              {saving ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />Saving...</> : <><CheckCircle size={14} />Save Contact</>}
             </button>
             <button
-              onClick={() => {
-                setContact(null);
-                setLinkedinUrl('');
-              }}
-              className="px-6 py-3 rounded-xl bg-white border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
+              onClick={() => { setContact(null); setLinkedinUrl(''); setError(null); }}
               disabled={saving}
+              style={{ padding: '11px 18px', borderRadius: 9, border: `1.5px solid ${T.border}`, background: 'transparent', color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
             >
               Start Over
             </button>
@@ -365,175 +239,78 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   );
 }
 
-// Contact Preview Card Component - Key Decision Maker Card Style
-function ContactPreviewCard({ contact }) {
-  // Background image: use person photo or Barry fallback
-  const backgroundImage = contact.photo_url || '/barry.png';
+// ─── ContactCard ──────────────────────────────────────────────────────────────
+function ContactCard({ contact, T }) {
+  const photo = contact.photo_url;
+  const email = contact.email;
+  const phone = contact.phone_numbers?.[0]?.sanitized_number || contact.phone;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {/* Photo Background Card with Gradient Overlay */}
-      <div
-        style={{
-          backgroundImage: `url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          borderRadius: '16px',
-          height: '420px',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          overflow: 'hidden',
-          border: '2px solid transparent',
-          transition: 'all 0.3s ease'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#3b82f6';
-          e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.2)';
-          e.currentTarget.style.transform = 'translateY(-4px)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'transparent';
-          e.currentTarget.style.boxShadow = 'none';
-          e.currentTarget.style.transform = 'translateY(0)';
-        }}
-      >
-        {/* Gradient Overlay */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '50%',
-            background: 'linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.6) 40%, rgba(0, 0, 0, 0.3) 70%, transparent 100%)',
-            display: 'flex',
-            alignItems: 'flex-end',
-            padding: '1.5rem'
-          }}
-        >
-          {/* Text Overlay on Gradient */}
-          <div style={{ width: '100%' }}>
-            {/* Name */}
-            <p
-              style={{
-                fontSize: '1.375rem',
-                fontWeight: 700,
-                color: '#ffffff',
-                margin: '0 0 0.375rem 0',
-                lineHeight: 1.2,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              {contact.name}
-            </p>
-
-            {/* Title */}
-            <p
-              style={{
-                fontSize: '0.9375rem',
-                fontWeight: 500,
-                color: 'rgba(255, 255, 255, 0.95)',
-                margin: '0 0 0.5rem 0',
-                lineHeight: 1.4,
-                textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              {contact.title || 'Title not available'}
-            </p>
-
-            {/* Location */}
-            {contact.location && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.375rem',
-                  marginBottom: '0.5rem'
-                }}
-              >
-                <MapPin className="w-4 h-4" style={{ color: 'rgba(255, 255, 255, 0.9)' }} />
-                <p
-                  style={{
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    margin: 0,
-                    textShadow: '0 1px 4px rgba(0, 0, 0, 0.3)'
-                  }}
-                >
-                  {contact.location}
-                </p>
-              </div>
-            )}
-
-            {/* Company Badge */}
-            {contact.organization_name && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '0.25rem 0.625rem',
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  backdropFilter: 'blur(8px)',
-                  color: '#ffffff',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '6px',
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.02em',
-                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                {contact.organization_name}
-              </span>
-            )}
+    <div style={{ borderRadius: 14, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.cardBg }}>
+      {/* Photo hero */}
+      <div style={{ position: 'relative', height: 180, background: `linear-gradient(150deg,#0077b520,${T.cardBg2} 80%)` }}>
+        {photo ? (
+          <img src={photo} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#0077b520', border: '2px solid #0077b540', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Linkedin size={32} color="#0077b5" />
+            </div>
           </div>
+        )}
+        {/* Gradient overlay */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.4) 50%,transparent 100%)' }} />
+        {/* Name + title over gradient */}
+        <div style={{ position: 'absolute', bottom: 14, left: 16, right: 16 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.5)', marginBottom: 3 }}>{contact.name}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{contact.title || 'Title not available'}</div>
+        </div>
+        {/* LinkedIn badge */}
+        <div style={{ position: 'absolute', top: 12, right: 12, background: '#0077b5', borderRadius: 6, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Linkedin size={11} color="#fff" />
+          <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>EXACT MATCH</span>
         </div>
       </div>
 
-      {/* LinkedIn Button - Below Card */}
-      {contact.linkedin_url && (
-        <a
-          href={contact.linkedin_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1rem',
-            background: 'rgba(59, 130, 246, 0.08)',
-            border: '1.5px solid rgba(59, 130, 246, 0.25)',
-            color: '#60a5fa',
-            borderRadius: '10px',
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            textDecoration: 'none'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
-            e.currentTarget.style.borderColor = '#3b82f6';
-            e.currentTarget.style.color = '#3b82f6';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
-            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.25)';
-            e.currentTarget.style.color = '#60a5fa';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <Linkedin className="w-4 h-4" />
-          <span>View LinkedIn Profile</span>
-        </a>
-      )}
+      {/* Details */}
+      <div style={{ padding: '13px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {contact.organization_name && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.textMuted }}>
+            <Building2 size={13} color={T.textFaint} />
+            <span>{contact.organization_name}</span>
+            {contact.organization?.industry && <span style={{ color: T.textFaint }}>· {contact.organization.industry}</span>}
+          </div>
+        )}
+        {contact.location && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.textMuted }}>
+            <MapPin size={13} color={T.textFaint} />
+            <span>{contact.location}</span>
+          </div>
+        )}
+        {email && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: BRIGADE.blue }}>
+            <Mail size={13} color={T.textFaint} />
+            <span>{email}</span>
+          </div>
+        )}
+        {phone && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.textMuted }}>
+            <Phone size={13} color={T.textFaint} />
+            <span>{phone}</span>
+          </div>
+        )}
+        {contact.linkedin_url && (
+          <a
+            href={contact.linkedin_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#0077b5', textDecoration: 'none', marginTop: 2, padding: '7px 10px', background: '#0077b510', border: '1px solid #0077b530', borderRadius: 7 }}
+          >
+            <Linkedin size={13} color="#0077b5" />
+            View LinkedIn Profile →
+          </a>
+        )}
+      </div>
     </div>
   );
 }

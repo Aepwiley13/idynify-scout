@@ -84,14 +84,18 @@
   object-fit: cover;
 }
 
-.photo-fallback {
+/* Initials avatar — shown when no real photo */
+.photo-initials {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-  color: #9ca3af;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+  user-select: none;
 }
 
 /* Info - name, title, company, email, phone */
@@ -302,6 +306,130 @@
   opacity: 0.6;
 }
 
+/* ── Save confirmation checkmark ─────────────────────────────── */
+.identity-saved-icon {
+  width: 13px;
+  height: 13px;
+  color: #10b981;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  animation: identity-saved-pop 0.25s ease forwards;
+}
+
+.identity-saved-icon--visible {
+  opacity: 1;
+}
+
+@keyframes identity-saved-pop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* ── Field action buttons (copy + pencil grouped) ────────────── */
+.identity-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.identity-icon-btn {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.identity-icon-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.identity-action-icon {
+  width: 12px;
+  height: 12px;
+  color: #9ca3af;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.identity-action-icon--copied {
+  color: #10b981;
+  opacity: 1 !important;
+}
+
+.identity-field-wrapper:hover .identity-action-icon {
+  opacity: 1;
+}
+
+/* ── Edit hint (Enter / Esc) ─────────────────────────────────── */
+.identity-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.identity-edit-hint {
+  font-size: 10px;
+  color: #9ca3af;
+  padding-left: 2px;
+}
+
+/* ── Email verification badge ────────────────────────────────── */
+.identity-email-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 20px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.identity-email-badge.badge-verified {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.identity-email-badge.badge-likely {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.identity-email-badge.badge-unverified {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* ── LinkedIn quick-link ─────────────────────────────────────── */
+.identity-linkedin-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0a66c2;
+  text-decoration: none;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  align-self: flex-start;
+}
+
+.identity-linkedin-link:hover {
+  background: rgba(10, 102, 194, 0.08);
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .identity-card {
@@ -311,6 +439,10 @@
   .identity-photo {
     width: 64px;
     height: 64px;
+  }
+
+  .photo-initials {
+    font-size: 20px;
   }
 
   .refresh-photo-btn {

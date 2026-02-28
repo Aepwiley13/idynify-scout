@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react';
 import { auth } from '../../firebase/config';
 import { getCTAForContact } from '../../constants/structuredFields';
-import { formatDistanceToNow } from 'date-fns';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import './HunterContactCard.css';
 
 // ── RECON confidence dot ────────────────────────────────
@@ -101,11 +101,7 @@ function CompanyAvatar({ contact }) {
 function lastInteractionLabel(contact) {
   const date = contact.last_interaction_at || contact.last_contacted_at;
   if (!date) return 'Never';
-  try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
-  } catch {
-    return 'Unknown';
-  }
+  return formatRelativeTime(date) || 'Unknown';
 }
 
 function strategicValueLabel(val) {

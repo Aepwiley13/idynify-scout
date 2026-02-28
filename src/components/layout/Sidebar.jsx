@@ -34,6 +34,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const isLightTheme = !THEMES[themeId]?.isDark;
   const handleThemeToggle = () => setThemeId(isLightTheme ? 'mission' : 'workspace');
   const [expandedSections, setExpandedSections] = useState({
+    people: true,
     recon: true,
     scout: true,
     hunter: true
@@ -74,6 +75,16 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const isPathActive = (path) => {
     return location.pathname.startsWith(path);
   };
+
+  const peopleItems = [
+    {
+      icon: Users,
+      label: 'All Contacts',
+      sublabel: 'Full view',
+      path: '/people',
+      isPrimary: true
+    }
+  ];
 
   const reconItems = [
     {
@@ -178,6 +189,13 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       isPrimary: true
     },
     {
+      icon: Users,
+      label: 'People',
+      sublabel: 'Active missions',
+      path: '/hunter',
+      state: { activeTab: 'people' }
+    },
+    {
       icon: Crosshair,
       label: 'Missions',
       path: '/hunter',
@@ -232,7 +250,9 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const renderPillar = (id, label, icon, color, items) => {
     const IconComponent = icon;
     const isExpanded = expandedSections[id];
-    const pillarActive = id === 'recon'
+    const pillarActive = id === 'people'
+      ? isPathActive('/people')
+      : id === 'recon'
       ? isPathActive('/recon')
       : id === 'scout'
       ? isPathActive('/scout')
@@ -283,6 +303,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
       {/* Navigation Pillars */}
       <nav className="sidebar-nav">
+        {renderPillar('people', 'PEOPLE', Users, 'pillar-cyan', peopleItems)}
         {renderPillar('scout', 'SCOUT', Search, 'pillar-cyan', scoutItems)}
         {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-pink', hunterItems)}
         {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}

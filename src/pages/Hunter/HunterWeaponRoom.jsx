@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard } from 'lucide-react';
+import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard, Users } from 'lucide-react';
 import DashboardSection from './sections/DashboardSection';
 import WeaponsSection from './sections/WeaponsSection';
 import MissionsSection from './sections/MissionsSection';
 import ArsenalSection from './sections/ArsenalSection';
 import OutcomesSection from './sections/OutcomesSection';
+import AllLeads from '../Scout/AllLeads';
 import './HunterWeaponRoom.css';
 
 /**
@@ -179,6 +180,14 @@ export default function HunterWeaponRoom() {
           <BarChart3 className="w-4 h-4" />
           <span>Outcomes</span>
         </button>
+
+        <button
+          className={`hunter-tab ${activeTab === 'people' ? 'active' : ''}`}
+          onClick={() => switchTab('people')}
+        >
+          <Users className="w-4 h-4" />
+          <span>People</span>
+        </button>
       </div>
 
       {/* Content */}
@@ -210,6 +219,7 @@ export default function HunterWeaponRoom() {
         {activeTab === 'missions' && <MissionsSection missions={missions} loading={false} />}
         {activeTab === 'arsenal' && <ArsenalSection />}
         {activeTab === 'outcomes' && <OutcomesSection campaigns={campaigns} missions={missions} />}
+        {activeTab === 'people' && <AllLeads mode="hunter" />}
       </div>
     </div>
   );

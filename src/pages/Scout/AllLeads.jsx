@@ -338,6 +338,7 @@ function AllLeadsCard({
   }
 
   function handleCardClick(e) {
+    if (brigadeOpen) { setBrigadeOpen(false); return; } // close picker without opening modal
     if (bulkMode) { onSelect && onSelect(contact.id); return; }
     onClick && onClick(e);
   }
@@ -778,17 +779,17 @@ export default function AllLeads({ mode = 'people' }) {
         contactName: contact?.name || null,
       }).catch(err => console.error('[AllLeads] bulk brigade error:', err));
     }));
-    setSelectedIds(new Set());
-    setBulkMode(false);
+    // Selection intentionally preserved so user can export or continue working
   }
 
   // Bulk export — CSV of selected contacts only
   function exportSelectedToCSV(list) {
     if (list.length === 0) return;
-    const headers = ['Name', 'Title', 'Company', 'Email', 'Phone', 'LinkedIn'];
+    const headers = ['Name', 'Title', 'Company', 'Email', 'Phone', 'LinkedIn', 'Brigade'];
     const rows = list.map(c => {
       const co = companies[c.company_id];
-      return [c.name || '', c.title || '', co?.name || c.company_name || '', c.email || c.work_email || '', c.phone_mobile || c.phone_direct || c.phone || '', c.linkedin_url || ''].map(f => `"${f}"`).join(',');
+      const brigadeLabel = c.brigade ? (BRIGADE_MAP[c.brigade]?.label || c.brigade) : '';
+      return [c.name || '', c.title || '', co?.name || c.company_name || '', c.email || c.work_email || '', c.phone_mobile || c.phone_direct || c.phone || '', c.linkedin_url || '', brigadeLabel].map(f => `"${f}"`).join(',');
     });
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -1197,7 +1198,7 @@ export default function AllLeads({ mode = 'people' }) {
             style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           ><Download size={12} />Export</button>
           <button
-            onClick={() => { setSelectedIds(new Set()); setBulkMode(false); setBulkBrigadeOpen(false); }}
+            onClick={() => { setSelectedIds(new Set()); setBulkBrigadeOpen(false); }}
             style={{ padding: '6px 11px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
           >Clear</button>
         </div>

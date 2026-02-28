@@ -69,6 +69,7 @@ export const handler = async (event) => {
       access_type: 'offline', // Get refresh token
       scope: [
         'https://www.googleapis.com/auth/gmail.send',      // Send emails
+        'https://www.googleapis.com/auth/gmail.readonly',  // Read threads for reply detection (Sprint 3)
         'https://www.googleapis.com/auth/userinfo.email'   // Get user email address
       ],
       state: userId, // Pass userId in state for callback

@@ -12,8 +12,10 @@ import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw,
 } from 'lucide-react';
-import { BRIGADES } from '../../components/contacts/BrigadeSelector';
+import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
+import { onBrigadeChange } from '../../utils/brigadeSystem';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
 import ContactProfile from './ContactProfile';
@@ -87,18 +89,6 @@ const CARD_BTN_CONFIG = {
   converted:     { label: 'View',          bg: 'linear-gradient(135deg,#10b981,#047857)' },
 };
 
-function formatRelativeTime(dateStr) {
-  if (!dateStr) return null;
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return null;
-  const now = new Date();
-  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return `${Math.floor(diffDays / 30)}mo ago`;
-}
 
 function getLastAction(contact) {
   if (contact.activity_log?.length > 0) {
@@ -305,23 +295,84 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engag
 }
 
 // ─── AllLeadsCard ─────────────────────────────────────────────────────────────
-function AllLeadsCard({ contact, company, onClick, onCompanyClick, engageState = 'not_started', mode = 'people', onReturnToScout }) {
+function AllLeadsCard({
+  contact, company, onClick, onCompanyClick,
+  engageState = 'not_started', mode = 'people', onReturnToScout,
+  isSelected = false, bulkMode = false, onSelect,
+  onBrigadeUpdate,
+}) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
   const status = getLeadStatus(contact);
   const photo = contact.photo_url;
   const btnCfg = CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started;
+  const [brigadeOpen, setBrigadeOpen] = useState(false);
+  const [brigadeSaving, setBrigadeSaving] = useState(false);
+
+  const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
+
+  async function handleBrigadeClick(brigadeId, e) {
+    e.stopPropagation();
+    if (brigadeSaving) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    const newValue = contact.brigade === brigadeId ? null : brigadeId;
+    setBrigadeOpen(false);
+    setBrigadeSaving(true);
+    onBrigadeUpdate && onBrigadeUpdate(contact.id, newValue);
+    try {
+      await onBrigadeChange({
+        userId: user.uid,
+        contactId: contact.id,
+        fromBrigade: contact.brigade || null,
+        toBrigade: newValue,
+        contactName: contact.name || null,
+      });
+    } catch (err) {
+      console.error('[AllLeads] brigade update failed:', err);
+      onBrigadeUpdate && onBrigadeUpdate(contact.id, contact.brigade); // revert
+    } finally {
+      setBrigadeSaving(false);
+    }
+  }
+
+  function handleCardClick(e) {
+    if (bulkMode) { onSelect && onSelect(contact.id); return; }
+    onClick && onClick(e);
+  }
 
   return (
     <div
-      onClick={onClick}
-      style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', flexDirection: 'column' }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = T.borderHov; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = T.border; }}
+      onClick={handleCardClick}
+      style={{
+        background: isSelected ? T.accentBg : T.cardBg,
+        border: `1px solid ${isSelected ? BRAND.pink : T.border}`,
+        borderRadius: 14, overflow: 'visible', cursor: 'pointer',
+        transition: 'all 0.15s', display: 'flex', flexDirection: 'column',
+        position: 'relative',
+      }}
+      onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = T.borderHov; } }}
+      onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = T.border; } }}
     >
+      {/* Bulk checkbox */}
+      {(bulkMode || isSelected) && (
+        <div
+          onClick={e => { e.stopPropagation(); onSelect && onSelect(contact.id); }}
+          style={{ position: 'absolute', top: 10, right: 10, zIndex: 10,
+            width: 20, height: 20, borderRadius: 5,
+            background: isSelected ? BRAND.pink : T.surface,
+            border: `2px solid ${isSelected ? BRAND.pink : T.border2}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+          }}
+        >
+          {isSelected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+        </div>
+      )}
+
       {/* Photo area */}
-      <div style={{ position: 'relative', paddingTop: '90%' }}>
+      <div style={{ position: 'relative', paddingTop: '90%', borderRadius: '14px 14px 0 0', overflow: 'hidden' }}>
         {photo ? (
           <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
         ) : (
@@ -331,12 +382,13 @@ function AllLeadsCard({ contact, company, onClick, onCompanyClick, engageState =
             </div>
           </div>
         )}
-        {/* Bottom gradient for text legibility */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 50%,transparent 100%)' }} />
-        {/* Status badge */}
-        <div style={{ position: 'absolute', top: 8, right: 8 }}>
-          <StatusBadge status={status} small />
-        </div>
+        {/* Status badge — hidden when bulk checkbox shown */}
+        {!bulkMode && !isSelected && (
+          <div style={{ position: 'absolute', top: 8, right: 8 }}>
+            <StatusBadge status={status} small />
+          </div>
+        )}
         {/* Engagement state badge (top-left) */}
         <div style={{ position: 'absolute', top: 8, left: 8 }}>
           <EngageBadge state={engageState} />
@@ -373,8 +425,76 @@ function AllLeadsCard({ contact, company, onClick, onCompanyClick, engageState =
         <div style={{ fontSize: 9, color: T.textFaint, marginBottom: 6 }}>
           {getLastAction(contact)}
         </div>
+
+        {/* Inline brigade pill */}
+        <div style={{ position: 'relative', marginBottom: 7 }}>
+          <button
+            onClick={e => { e.stopPropagation(); if (!brigadeSaving) setBrigadeOpen(o => !o); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px',
+              borderRadius: 20, border: `1px solid ${currentBrigade ? currentBrigade.borderColor : T.border}`,
+              background: currentBrigade ? currentBrigade.bgColor : T.surface,
+              color: currentBrigade ? currentBrigade.color : T.textFaint,
+              fontSize: 10, fontWeight: currentBrigade ? 600 : 400,
+              cursor: 'pointer', width: '100%', justifyContent: 'flex-start',
+            }}
+          >
+            {currentBrigade ? (
+              <>
+                <currentBrigade.icon size={10} />
+                <span>{currentBrigade.label}</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 9, color: T.textFaint }}>+ Set Brigade</span>
+            )}
+            {brigadeSaving && <span style={{ marginLeft: 'auto', fontSize: 8, color: T.textFaint }}>…</span>}
+          </button>
+
+          {/* Brigade picker popover */}
+          {brigadeOpen && (
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'absolute', bottom: '110%', left: 0, right: 0, zIndex: 50,
+                background: T.cardBg, border: `1px solid ${T.border2}`,
+                borderRadius: 10, padding: 8,
+                boxShadow: `0 8px 24px ${T.isDark ? '#00000080' : '#00000020'}`,
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                {BRIGADES.map(b => {
+                  const BIcon = b.icon;
+                  const active = contact.brigade === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={e => handleBrigadeClick(b.id, e)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                        padding: '5px 4px', borderRadius: 7,
+                        border: `1px solid ${active ? b.borderColor : 'transparent'}`,
+                        background: active ? b.bgColor : 'transparent',
+                        color: active ? b.color : T.textFaint,
+                        fontSize: 9, cursor: 'pointer', transition: 'all 0.1s',
+                      }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <BIcon size={12} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{b.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', gap: 5 }}>
-          <button style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: btnCfg.bg, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+          <button
+            onClick={e => { e.stopPropagation(); if (!bulkMode) onClick && onClick(e); }}
+            style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: btnCfg.bg, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+          >
             {btnCfg.label}
           </button>
           {mode === 'hunter' ? (
@@ -504,6 +624,11 @@ export default function AllLeads({ mode = 'people' }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
 
+  // Bulk selection
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkBrigadeOpen, setBulkBrigadeOpen] = useState(false);
+
   // LinkedIn modal
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
 
@@ -620,8 +745,45 @@ export default function AllLeads({ mode = 'people' }) {
     }
   }
 
-  function exportToCSV() {
-    const list = finalContacts;
+  // Optimistic brigade update from inline card picker
+  function updateContactBrigade(contactId, newBrigade) {
+    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, brigade: newBrigade } : c));
+  }
+
+  // Bulk: toggle one contact in/out of selectedIds
+  function toggleSelect(contactId) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(contactId)) next.delete(contactId); else next.add(contactId);
+      return next;
+    });
+  }
+
+  // Bulk: assign brigade to all selected contacts
+  async function handleBulkBrigadeAssign(brigadeId) {
+    const user = auth.currentUser;
+    if (!user || selectedIds.size === 0) return;
+    setBulkBrigadeOpen(false);
+    const ids = [...selectedIds];
+    // Optimistic update
+    setContacts(prev => prev.map(c => ids.includes(c.id) ? { ...c, brigade: brigadeId } : c));
+    // Persist
+    await Promise.all(ids.map(id => {
+      const contact = contacts.find(c => c.id === id);
+      return onBrigadeChange({
+        userId: user.uid,
+        contactId: id,
+        fromBrigade: contact?.brigade || null,
+        toBrigade: brigadeId,
+        contactName: contact?.name || null,
+      }).catch(err => console.error('[AllLeads] bulk brigade error:', err));
+    }));
+    setSelectedIds(new Set());
+    setBulkMode(false);
+  }
+
+  // Bulk export — CSV of selected contacts only
+  function exportSelectedToCSV(list) {
     if (list.length === 0) return;
     const headers = ['Name', 'Title', 'Company', 'Email', 'Phone', 'LinkedIn'];
     const rows = list.map(c => {
@@ -633,11 +795,17 @@ export default function AllLeads({ mode = 'people' }) {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `all-leads-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `contacts-export-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  }
+
+  function exportToCSV() {
+    const list = finalContacts;
+    if (list.length === 0) return;
+    exportSelectedToCSV(list);
   }
 
   // ── Computed ─────────────────────────────────────────────────────────────────
@@ -651,7 +819,7 @@ export default function AllLeads({ mode = 'people' }) {
   else if (dataFilter === 'needs-email') filtered = filtered.filter(c => !(c.email || c.work_email));
   else if (dataFilter === 'needs-phone') filtered = filtered.filter(c => !(c.phone_mobile || c.phone_direct || c.phone));
 
-  // Search
+  // Search — name, title, company, email, phone, LinkedIn URL
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
     filtered = filtered.filter(c => {
@@ -659,7 +827,9 @@ export default function AllLeads({ mode = 'people' }) {
       return (c.name || '').toLowerCase().includes(lower) ||
         (c.title || '').toLowerCase().includes(lower) ||
         (co?.name || c.company_name || '').toLowerCase().includes(lower) ||
-        (c.email || '').toLowerCase().includes(lower);
+        (c.email || c.work_email || '').toLowerCase().includes(lower) ||
+        (c.phone_mobile || c.phone_direct || c.phone || '').replace(/\D/g, '').includes(lower.replace(/\D/g, '')) ||
+        (c.linkedin_url || '').toLowerCase().includes(lower);
     });
   }
 
@@ -786,7 +956,7 @@ export default function AllLeads({ mode = 'people' }) {
         <div style={{ flex: 1, background: T.input, border: `1px solid ${T.border}`, borderRadius: 7, padding: '6px 11px', display: 'flex', gap: 7, alignItems: 'center' }}>
           <Search size={13} color={T.textFaint} />
           <input
-            placeholder="Search by name, title, company, or email..."
+            placeholder="Search name, title, company, email, phone, or LinkedIn..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             style={{ background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 11, flex: 1 }}
@@ -800,6 +970,11 @@ export default function AllLeads({ mode = 'people' }) {
             style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter === id ? T.accentBdr : T.border}`, background: dataFilter === id ? T.accentBg : 'transparent', color: dataFilter === id ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >{label}</button>
         ))}
+        {/* Select mode toggle */}
+        <button
+          onClick={() => { setBulkMode(m => { if (m) { setSelectedIds(new Set()); } return !m; }); }}
+          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${bulkMode ? T.accentBdr : T.border}`, background: bulkMode ? T.accentBg : 'transparent', color: bulkMode ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >{bulkMode ? `Selecting (${selectedIds.size})` : 'Select'}</button>
         <button
           onClick={() => setShowLinkedInModal(true)}
           style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,#0077b5,#005f8e)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
@@ -846,6 +1021,10 @@ export default function AllLeads({ mode = 'people' }) {
                         ? () => navigate('/scout', { state: { activeTab: 'company-search', searchCompanyName: c.company_name } })
                         : undefined
                   }
+                  isSelected={selectedIds.has(c.id)}
+                  bulkMode={bulkMode}
+                  onSelect={toggleSelect}
+                  onBrigadeUpdate={updateContactBrigade}
                 />
               ))}
             </div>
@@ -962,6 +1141,67 @@ export default function AllLeads({ mode = 'people' }) {
           </div>
         )}
       </div>
+
+      {/* ── Bulk Action Bar ── */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          background: T.cardBg, border: `1px solid ${BRAND.pink}40`,
+          borderRadius: 12, padding: '10px 16px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          boxShadow: `0 8px 32px ${T.isDark ? '#00000099' : '#00000025'}`,
+          zIndex: 100, animation: 'fadeUp 0.15s ease',
+          whiteSpace: 'nowrap',
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: BRAND.pink }}>{selectedIds.size} selected</span>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setBulkBrigadeOpen(o => !o)}
+              style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${T.border2}`, background: T.surface, color: T.textMuted, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              Assign Brigade ▾
+            </button>
+            {bulkBrigadeOpen && (
+              <div style={{
+                position: 'absolute', bottom: '110%', left: 0,
+                background: T.cardBg, border: `1px solid ${T.border2}`,
+                borderRadius: 10, padding: 8, zIndex: 50,
+                boxShadow: `0 8px 24px ${T.isDark ? '#00000080' : '#00000020'}`,
+                minWidth: 200,
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {BRIGADES.map(b => {
+                    const BIcon = b.icon;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => handleBulkBrigadeAssign(b.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 7,
+                          padding: '7px 10px', borderRadius: 7,
+                          border: `1px solid ${b.borderColor}`,
+                          background: b.bgColor, color: b.color,
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        <BIcon size={12} />{b.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => exportSelectedToCSV(finalContacts.filter(c => selectedIds.has(c.id)))}
+            style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+          ><Download size={12} />Export</button>
+          <button
+            onClick={() => { setSelectedIds(new Set()); setBulkMode(false); setBulkBrigadeOpen(false); }}
+            style={{ padding: '6px 11px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
+          >Clear</button>
+        </div>
+      )}
 
       {/* ── Mobile Hamburger Drawer ── */}
       {isMobile && drawerOpen && (

@@ -55,10 +55,19 @@ function getLeadStatus(contact) {
 // Lightweight engagement state derived from document fields only (no Firestore reads).
 // Used for card button color/label and sort order.
 // States: 'not_started' | 'in_mission' | 'follow_up_due' | 'converted'
+//
+// All hunter statuses that represent active engagement (not just 'active_mission').
+const ENGAGED_HUNTER_STATUSES = new Set([
+  'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation'
+]);
+
 function deriveCardEngageState(contact) {
   const status = contact.contact_status || contact.lead_status || contact.status;
-  if (status === 'converted' || status === 'customer') return 'converted';
-  if (contact.hunter_status === 'active_mission') {
+  const hunterStatus = contact.hunter_status;
+
+  if (status === 'converted' || status === 'customer' || hunterStatus === 'converted') return 'converted';
+
+  if (ENGAGED_HUNTER_STATUSES.has(hunterStatus)) {
     if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
       return 'follow_up_due';
     }
@@ -176,8 +185,8 @@ function Av({ initials, color = BRAND.pink, size = 36, src }) {
 
 // ─── EngageBadge ─────────────────────────────────────────────────────────────
 function EngageBadge({ state }) {
-  if (state === 'not_started') return null;
   const configs = {
+    not_started:   { label: 'COLD',      bg: '#6b728020', color: '#9ca3af', border: '#6b728040' },
     in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
     follow_up_due: { label: 'OVERDUE',   bg: '#dc262620', color: '#dc2626', border: '#dc262640' },
     converted:     { label: 'CONVERTED', bg: '#10b98120', color: '#10b981', border: '#10b98140' },
@@ -328,12 +337,10 @@ function AllLeadsCard({ contact, company, onClick, onCompanyClick, engageState =
         <div style={{ position: 'absolute', top: 8, right: 8 }}>
           <StatusBadge status={status} small />
         </div>
-        {/* Engagement state badge (top-left, only when not new) */}
-        {engageState !== 'not_started' && (
-          <div style={{ position: 'absolute', top: 8, left: 8 }}>
-            <EngageBadge state={engageState} />
-          </div>
-        )}
+        {/* Engagement state badge (top-left) */}
+        <div style={{ position: 'absolute', top: 8, left: 8 }}>
+          <EngageBadge state={engageState} />
+        </div>
         {/* Name + title over gradient */}
         <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
@@ -361,6 +368,10 @@ function AllLeadsCard({ contact, company, onClick, onCompanyClick, engageState =
               <span style={{ marginLeft: 'auto', fontSize: 9, color: BRAND.pink, background: T.accentBg, borderRadius: 5, padding: '1px 6px', cursor: 'pointer', flexShrink: 0 }}>✦ Enrich</span>
             </>
           )}
+        </div>
+        {/* Last interaction time */}
+        <div style={{ fontSize: 9, color: T.textFaint, marginBottom: 6 }}>
+          {getLastAction(contact)}
         </div>
         <div style={{ display: 'flex', gap: 5 }}>
           <button style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: btnCfg.bg, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
@@ -582,8 +593,8 @@ export default function AllLeads({ mode = 'people' }) {
         .filter(c => {
           const s = c.status || '';
           if (['people_mode_archived', 'people_mode_skipped'].includes(s)) return false;
-          if (mode === 'scout') return c.hunter_status !== 'active_mission';
-          if (mode === 'hunter') return c.hunter_status === 'active_mission';
+          if (mode === 'scout') return !ENGAGED_HUNTER_STATUSES.has(c.hunter_status);
+          if (mode === 'hunter') return ENGAGED_HUNTER_STATUSES.has(c.hunter_status);
           return true; // 'people' — show all
         });
       setContacts(contactsList);

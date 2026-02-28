@@ -10,7 +10,7 @@ import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
-  Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw,
+  Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -69,6 +69,9 @@ function deriveCardEngageState(contact) {
 
   if (status === 'converted' || status === 'customer' || hunterStatus === 'converted') return 'converted';
 
+  // Sprint 3: explicit in_conversation check before generic ENGAGED_HUNTER_STATUSES
+  if (hunterStatus === 'in_conversation') return 'replied';
+
   if (ENGAGED_HUNTER_STATUSES.has(hunterStatus)) {
     if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
       return 'follow_up_due';
@@ -78,14 +81,15 @@ function deriveCardEngageState(contact) {
   return 'not_started';
 }
 
-// Sort priority: overdue → active mission → not started → converted
-const ENGAGE_SORT_ORDER = { follow_up_due: 0, in_mission: 1, not_started: 2, converted: 3 };
+// Sort priority: overdue → replied → active mission → not started → converted
+const ENGAGE_SORT_ORDER = { follow_up_due: 0, replied: 1, in_mission: 2, not_started: 3, converted: 4 };
 
 // Button config per engagement state
 const CARD_BTN_CONFIG = {
   not_started:   { label: 'Engage',        bg: `linear-gradient(135deg,${BRAND.pink},#c0146a)` },
   in_mission:    { label: 'Follow Up',     bg: 'linear-gradient(135deg,#7c3aed,#5b21b6)' },
   follow_up_due: { label: 'Follow Up Now', bg: 'linear-gradient(135deg,#dc2626,#991b1b)' },
+  replied:       { label: 'Respond',       bg: 'linear-gradient(135deg,#0ea5e9,#0284c7)' },
   converted:     { label: 'View',          bg: 'linear-gradient(135deg,#10b981,#047857)' },
 };
 
@@ -179,6 +183,7 @@ function EngageBadge({ state }) {
     not_started:   { label: 'COLD',      bg: '#6b728020', color: '#9ca3af', border: '#6b728040' },
     in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
     follow_up_due: { label: 'OVERDUE',   bg: '#dc262620', color: '#dc2626', border: '#dc262640' },
+    replied:       { label: 'REPLIED',   bg: '#0ea5e920', color: '#0ea5e9', border: '#0ea5e940' },
     converted:     { label: 'CONVERTED', bg: '#10b98120', color: '#10b981', border: '#10b98140' },
   };
   const cfg = configs[state];
@@ -630,6 +635,10 @@ export default function AllLeads({ mode = 'people' }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkBrigadeOpen, setBulkBrigadeOpen] = useState(false);
 
+  // Sprint 3: Gmail reply sync (hunter mode only)
+  const [syncStatus, setSyncStatus] = useState(null); // null | 'syncing' | 'done' | 'needs_reconnect' | 'error'
+  const [syncResult, setSyncResult] = useState(null); // { count: number }
+
   // LinkedIn modal
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
 
@@ -743,6 +752,37 @@ export default function AllLeads({ mode = 'people' }) {
       await loadAllContacts();
     } catch (err) {
       console.error('[AllLeads] resetContactToScout error:', err);
+    }
+  }
+
+  // Sprint 3: Poll Gmail for replies and auto-transition contacts
+  async function syncGmailReplies() {
+    const user = auth.currentUser;
+    if (!user) return;
+    setSyncStatus('syncing');
+    setSyncResult(null);
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/gmail-poll-replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken }),
+      });
+      const data = await res.json();
+      if (data.code === 'NEEDS_RECONNECT' || data.code === 'GMAIL_NOT_CONNECTED') {
+        setSyncStatus('needs_reconnect');
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || 'Sync failed');
+      setSyncResult({ count: data.transitioned?.length ?? 0 });
+      setSyncStatus('done');
+      if (data.transitioned?.length > 0) await loadAllContacts();
+      // Auto-clear done state after 6s
+      setTimeout(() => setSyncStatus(null), 6000);
+    } catch (err) {
+      console.error('[AllLeads] syncGmailReplies error:', err);
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus(null), 5000);
     }
   }
 
@@ -904,6 +944,39 @@ export default function AllLeads({ mode = 'people' }) {
                 : 'Every relationship — one place.'}
             </div>
           </div>
+          {/* Sprint 3: Sync Replies button — hunter mode only */}
+          {mode === 'hunter' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {syncStatus === 'needs_reconnect' && (
+                <span style={{ fontSize: 10, color: BRAND.pink, cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => window.location.href = '/hunter?tab=weapons'}
+                >Reconnect Gmail to sync replies</span>
+              )}
+              {syncStatus === 'error' && (
+                <span style={{ fontSize: 10, color: '#dc2626' }}>Sync failed</span>
+              )}
+              {syncStatus === 'done' && (
+                <span style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>
+                  {syncResult?.count > 0 ? `${syncResult.count} new ${syncResult.count === 1 ? 'reply' : 'replies'}` : 'Up to date'}
+                </span>
+              )}
+              <button
+                onClick={syncGmailReplies}
+                disabled={syncStatus === 'syncing'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 13px', borderRadius: 8,
+                  border: `1px solid ${T.border2}`, background: T.surface,
+                  color: syncStatus === 'syncing' ? T.textFaint : T.textMuted,
+                  fontSize: 11, fontWeight: 600, cursor: syncStatus === 'syncing' ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <RefreshCw size={12} style={{ animation: syncStatus === 'syncing' ? 'spin 1s linear infinite' : 'none' }} />
+                {syncStatus === 'syncing' ? 'Syncing…' : 'Sync Replies'}
+              </button>
+            </div>
+          )}
+
           {/* View toggle */}
           <div style={{ display: 'flex', gap: 4, background: T.surface, borderRadius: 8, padding: 3 }}>
             {[['cards', '⊞ Cards'], ['list', '☰ List']].map(([m, l]) => (

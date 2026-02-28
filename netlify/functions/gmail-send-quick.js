@@ -220,9 +220,29 @@ export const handler = async (event) => {
     });
 
     const gmailMessageId = result.data.id;
+    const gmailThreadId = result.data.threadId;
     const sentAt = new Date().toISOString();
 
-    console.log('✅ Email sent successfully, Gmail message ID:', gmailMessageId);
+    console.log('✅ Email sent successfully, Gmail message ID:', gmailMessageId, 'thread ID:', gmailThreadId);
+
+    // Store threadId on contact + mark as awaiting_reply (non-blocking)
+    if (contactId && gmailThreadId) {
+      try {
+        await db
+          .collection('users').doc(userId)
+          .collection('contacts').doc(contactId)
+          .update({
+            gmail_thread_id: gmailThreadId,
+            gmail_last_message_id: gmailMessageId,
+            hunter_status: 'awaiting_reply',
+            last_sent_at: sentAt,
+            updated_at: sentAt,
+          });
+        console.log('✅ threadId stored on contact, hunter_status → awaiting_reply');
+      } catch (updateErr) {
+        console.warn('Failed to store threadId on contact, non-blocking:', updateErr);
+      }
+    }
 
     // Log to email_logs collection for admin visibility
     try {
@@ -234,6 +254,7 @@ export const handler = async (event) => {
         subject,
         bodyPreview: body.substring(0, 200),
         gmailMessageId,
+        gmailThreadId: gmailThreadId || null,
         status: 'sent',
         sentAt,
         source: 'quick_engage'
@@ -248,6 +269,7 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         gmailMessageId,
+        gmailThreadId,
         sentAt,
         message: 'Email sent successfully via Gmail'
       })

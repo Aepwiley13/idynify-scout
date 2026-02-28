@@ -193,14 +193,22 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     resetFlow();
     setFlowActive(true);
 
-    // State Machine: Engage clicked
     const user = auth.currentUser;
     if (user && contact?.id) {
+      // State Machine: contact_status → Engaged
       updateContactStatus({
         userId: user.uid,
         contactId: contact.id,
         trigger: STATUS_TRIGGERS.ENGAGE_CLICKED,
         currentStatus: getContactStatus(contact)
+      });
+
+      // Immediately move to Hunter so the contact is visible there while composing.
+      // Barry will later promote to 'active_mission' when the mission is created.
+      updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        hunter_status: 'engaged_pending',
+        hunter_engaged_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
     }
 

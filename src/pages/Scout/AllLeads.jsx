@@ -63,14 +63,22 @@ const ENGAGED_HUNTER_STATUSES = new Set([
   'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation'
 ]);
 
+// Contact statuses that mean the contact has been engaged — used as a fallback
+// when hunter_status is not yet set (e.g. Scout engage before Barry processes).
+const ENGAGED_CONTACT_STATUSES = new Set([
+  'Engaged', 'Awaiting Reply', 'In Conversation',
+  // Legacy statuses — included so old contacts are correctly classified
+  'In Campaign', 'Active Mission', 'Mission Complete',
+]);
+
 function deriveCardEngageState(contact) {
-  const status = contact.contact_status || contact.lead_status || contact.status;
+  const contactStatus = contact.contact_status || contact.lead_status || contact.status;
   const hunterStatus = contact.hunter_status;
 
-  if (status === 'converted' || status === 'customer' || hunterStatus === 'converted') return 'converted';
+  if (contactStatus === 'converted' || contactStatus === 'customer' || hunterStatus === 'converted') return 'converted';
 
-  // Sprint 3: explicit in_conversation check before generic ENGAGED_HUNTER_STATUSES
-  if (hunterStatus === 'in_conversation') return 'replied';
+  // Sprint 3: in_conversation → replied (check both hunter and contact status)
+  if (hunterStatus === 'in_conversation' || contactStatus === 'In Conversation') return 'replied';
 
   if (ENGAGED_HUNTER_STATUSES.has(hunterStatus)) {
     if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
@@ -78,6 +86,16 @@ function deriveCardEngageState(contact) {
     }
     return 'in_mission';
   }
+
+  // Fallback: hunter_status not set yet but contact_status shows prior engagement
+  // (happens between Scout engage click and Barry processing the mission)
+  if (ENGAGED_CONTACT_STATUSES.has(contactStatus)) {
+    if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
+      return 'follow_up_due';
+    }
+    return 'in_mission';
+  }
+
   return 'not_started';
 }
 
@@ -728,8 +746,9 @@ export default function AllLeads({ mode = 'people' }) {
         .filter(c => {
           const s = c.status || '';
           if (['people_mode_archived', 'people_mode_skipped'].includes(s)) return false;
-          if (mode === 'scout') return !ENGAGED_HUNTER_STATUSES.has(c.hunter_status);
-          if (mode === 'hunter') return ENGAGED_HUNTER_STATUSES.has(c.hunter_status);
+          const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);
+          if (mode === 'scout') return !isEngaged;
+          if (mode === 'hunter') return isEngaged;
           return true; // 'people' — show all
         });
       setContacts(contactsList);

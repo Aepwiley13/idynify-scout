@@ -128,7 +128,9 @@ export async function sendEmailViaGmail({ userId, contact, subject, body }) {
         toName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
         subject,
         body,
-        contactId: contact.id
+        contactId: contact.id,
+        // Preserve the existing Gmail thread for follow-ups (Sprint 3)
+        existingThreadId: contact.gmail_thread_id || null,
       })
     });
 

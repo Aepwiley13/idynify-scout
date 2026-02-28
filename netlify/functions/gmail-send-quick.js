@@ -52,7 +52,10 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, toEmail, toName, subject, body, contactId } = JSON.parse(event.body);
+    // existingThreadId: optional — when provided the message is attached to an
+    // existing Gmail thread (follow-up reply). gmail_thread_id in Firestore is
+    // preserved; only gmail_last_message_id and last_sent_at are updated.
+    const { userId, authToken, toEmail, toName, subject, body, contactId, existingThreadId } = JSON.parse(event.body);
 
     // Validate required fields
     if (!userId || !authToken || !toEmail || !subject || !body) {
@@ -215,7 +218,9 @@ export const handler = async (event) => {
     const result = await gmail.users.messages.send({
       userId: 'me',
       requestBody: {
-        raw: encodedEmail
+        raw: encodedEmail,
+        // Attach to existing thread when following up (keeps gmail_thread_id stable)
+        ...(existingThreadId ? { threadId: existingThreadId } : {}),
       }
     });
 
@@ -226,21 +231,28 @@ export const handler = async (event) => {
     console.log('✅ Email sent successfully, Gmail message ID:', gmailMessageId, 'thread ID:', gmailThreadId);
 
     // Store threadId on contact + mark as awaiting_reply (non-blocking)
-    if (contactId && gmailThreadId) {
+    // If existingThreadId was provided (in-thread follow-up), gmail_thread_id is
+    // preserved — only last_message and timestamps are updated.
+    if (contactId) {
       try {
+        const contactUpdate = {
+          gmail_last_message_id: gmailMessageId,
+          hunter_status: 'awaiting_reply',
+          last_sent_at: sentAt,
+          updated_at: sentAt,
+        };
+        if (!existingThreadId && gmailThreadId) {
+          // Fresh send — record the new thread so replies can be tracked
+          contactUpdate.gmail_thread_id = gmailThreadId;
+        }
         await db
           .collection('users').doc(userId)
           .collection('contacts').doc(contactId)
-          .update({
-            gmail_thread_id: gmailThreadId,
-            gmail_last_message_id: gmailMessageId,
-            hunter_status: 'awaiting_reply',
-            last_sent_at: sentAt,
-            updated_at: sentAt,
-          });
-        console.log('✅ threadId stored on contact, hunter_status → awaiting_reply');
+          .update(contactUpdate);
+        const threadLabel = existingThreadId ? `existing thread ${existingThreadId}` : `new thread ${gmailThreadId}`;
+        console.log(`✅ Contact updated — ${threadLabel}, hunter_status → awaiting_reply`);
       } catch (updateErr) {
-        console.warn('Failed to store threadId on contact, non-blocking:', updateErr);
+        console.warn('Failed to update contact after send, non-blocking:', updateErr);
       }
     }
 

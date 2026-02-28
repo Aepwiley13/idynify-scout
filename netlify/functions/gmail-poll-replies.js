@@ -214,7 +214,8 @@ export const handler = async (event) => {
 
         transitioned.push({
           contactId: contact.id,
-          contactName: contact.name || 'Contact',
+          name: contact.name || 'Contact',
+          threadId: contact.gmail_thread_id,
           fromEmail: fromHeader,
         });
 

@@ -399,6 +399,13 @@ export async function executeSendAction({
       contactId: contact.id,
       trigger: STATUS_TRIGGERS.MESSAGE_SENT
     });
+
+    // Auto-set a 3-day follow-up reminder so the OVERDUE indicator fires if no reply
+    const nextDue = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    updateDoc(doc(db, 'users', userId, 'contacts', contact.id), {
+      next_step_due: nextDue,
+      updated_at: new Date().toISOString(),
+    }).catch(() => {}); // fire-and-forget — non-fatal
   }
 
   return {

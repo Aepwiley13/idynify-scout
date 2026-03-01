@@ -126,6 +126,23 @@ function getLastAction(contact) {
   return 'New';
 }
 
+// Hunter-specific last action: prefers reply > sent > engaged timestamps.
+function getHunterLastAction(contact) {
+  if (contact.last_reply_at) {
+    const t = formatRelativeTime(contact.last_reply_at);
+    if (t) return `Replied ${t}`;
+  }
+  if (contact.last_sent_at) {
+    const t = formatRelativeTime(contact.last_sent_at);
+    if (t) return `Sent ${t}`;
+  }
+  if (contact.hunter_engaged_at) {
+    const t = formatRelativeTime(contact.hunter_engaged_at);
+    if (t) return `Engaged ${t}`;
+  }
+  return getLastAction(contact);
+}
+
 function getInitials(name) {
   if (!name) return '??';
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -196,7 +213,15 @@ function Av({ initials, color = BRAND.pink, size = 36, src }) {
 }
 
 // ─── EngageBadge ─────────────────────────────────────────────────────────────
-function EngageBadge({ state }) {
+// hunterStatus: pass contact.hunter_status in Hunter mode for specific labels.
+function EngageBadge({ state, hunterStatus }) {
+  // More descriptive labels for Hunter mode (keyed by hunter_status value)
+  const HUNTER_LABELS = {
+    active_mission:  'ACTIVE MISSION',
+    awaiting_reply:  'AWAITING REPLY',
+    engaged_pending: 'PROCESSING',
+    in_conversation: 'REPLIED',
+  };
   const configs = {
     not_started:   { label: 'COLD',      bg: '#6b728020', color: '#9ca3af', border: '#6b728040' },
     in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
@@ -206,6 +231,7 @@ function EngageBadge({ state }) {
   };
   const cfg = configs[state];
   if (!cfg) return null;
+  const label = (hunterStatus && HUNTER_LABELS[hunterStatus]) || cfg.label;
   return (
     <span style={{
       display: 'inline-block',
@@ -213,7 +239,7 @@ function EngageBadge({ state }) {
       background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
       fontSize: 9, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap',
     }}>
-      {cfg.label}
+      {label}
     </span>
   );
 }
@@ -371,7 +397,7 @@ function AllLeadsCard({
       onClick={handleCardClick}
       style={{
         background: isSelected ? T.accentBg : T.cardBg,
-        border: `1px solid ${isSelected ? BRAND.pink : T.border}`,
+        border: `1px solid ${isSelected ? BRAND.pink : engageState === 'replied' ? '#0ea5e9' : T.border}`,
         borderRadius: 14, overflow: 'visible', cursor: 'pointer',
         transition: 'all 0.15s', display: 'flex', flexDirection: 'column',
         position: 'relative',
@@ -407,15 +433,42 @@ function AllLeadsCard({
           </div>
         )}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 50%,transparent 100%)' }} />
-        {/* Status badge — hidden when bulk checkbox shown */}
+        {/* Top-right badge: Brigade in hunter mode, lead status elsewhere */}
         {!bulkMode && !isSelected && (
           <div style={{ position: 'absolute', top: 8, right: 8 }}>
-            <StatusBadge status={status} small />
+            {mode === 'hunter' ? (
+              currentBrigade ? (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', borderRadius: 20,
+                  background: currentBrigade.bgColor, color: currentBrigade.color,
+                  border: `1px solid ${currentBrigade.borderColor}`,
+                  fontSize: 9, fontWeight: 700, letterSpacing: 0.4, whiteSpace: 'nowrap',
+                }}>
+                  <currentBrigade.icon size={9} />
+                  {currentBrigade.label.toUpperCase()}
+                </span>
+              ) : (
+                <span style={{
+                  display: 'inline-block', padding: '2px 8px', borderRadius: 20,
+                  background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.55)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  fontSize: 9, fontWeight: 400, letterSpacing: 0.3, whiteSpace: 'nowrap',
+                }}>
+                  + Brigade
+                </span>
+              )
+            ) : (
+              <StatusBadge status={status} small />
+            )}
           </div>
         )}
         {/* Engagement state badge (top-left) */}
         <div style={{ position: 'absolute', top: 8, left: 8 }}>
-          <EngageBadge state={engageState} />
+          <EngageBadge
+            state={engageState}
+            hunterStatus={mode === 'hunter' ? contact.hunter_status : undefined}
+          />
         </div>
         {/* Name + title over gradient */}
         <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12 }}>
@@ -447,7 +500,7 @@ function AllLeadsCard({
         </div>
         {/* Last interaction time */}
         <div style={{ fontSize: 9, color: T.textFaint, marginBottom: 6 }}>
-          {getLastAction(contact)}
+          {mode === 'hunter' ? getHunterLastAction(contact) : getLastAction(contact)}
         </div>
 
         {/* Inline brigade pill */}

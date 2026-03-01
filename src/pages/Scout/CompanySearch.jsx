@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Search, Building2, Globe, Users, DollarSign, MapPin, Check, X } from 'lucide-react';
+import { Search, Building2, Globe, Check, X } from 'lucide-react';
 import './CompanySearch.css';
 
 /**
@@ -26,6 +26,14 @@ export default function CompanySearch() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+
+  // Website URL search state
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [websiteSearching, setWebsiteSearching] = useState(false);
+  const [websiteContact, setWebsiteContact] = useState(null);
+  const [websiteError, setWebsiteError] = useState(null);
+  const [websiteSaving, setWebsiteSaving] = useState(false);
+  const [websiteSaveSuccess, setWebsiteSaveSuccess] = useState(false);
 
   // Pre-fill from navigation state (e.g. clicking a company name from People page)
   useEffect(() => {
@@ -159,6 +167,76 @@ export default function CompanySearch() {
     setSelectedCompanyId(selectedCompanyId === companyId ? null : companyId);
   }
 
+  async function handleWebsiteSearch(e) {
+    e.preventDefault();
+    if (!websiteUrl.trim()) {
+      setWebsiteError('Please enter a website URL');
+      return;
+    }
+
+    setWebsiteSearching(true);
+    setWebsiteError(null);
+    setWebsiteContact(null);
+    setWebsiteSaveSuccess(false);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('You must be logged in');
+
+      const authToken = await user.getIdToken();
+
+      const response = await fetch('/.netlify/functions/crawl-website-contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, websiteUrl: websiteUrl.trim() })
+      });
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Failed to scan website');
+
+      setWebsiteContact(data.contact);
+    } catch (err) {
+      setWebsiteError(err.message || "Couldn't find a contact email. Try adding manually.");
+    } finally {
+      setWebsiteSearching(false);
+    }
+  }
+
+  async function handleSaveWebsiteContact() {
+    if (!websiteContact) return;
+
+    setWebsiteSaving(true);
+    setWebsiteError(null);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('You must be logged in');
+
+      await addDoc(collection(db, 'users', user.uid, 'contacts'), {
+        name: websiteContact.companyName,
+        email: websiteContact.email || null,
+        emailSource: 'website',
+        company_name: websiteContact.companyName,
+        company_website: websiteContact.websiteUrl,
+        domain: websiteContact.domain,
+        sourceType: 'website',
+        source: 'website',
+        status: 'saved',
+        saved_at: new Date(),
+        found_at: new Date(),
+        last_enriched_at: null
+      });
+
+      setWebsiteSaveSuccess(true);
+      setWebsiteContact(null);
+      setWebsiteUrl('');
+    } catch (err) {
+      setWebsiteError(err.message || 'Failed to save contact');
+    } finally {
+      setWebsiteSaving(false);
+    }
+  }
+
   return (
     <div className="company-search">
       {/* Header */}
@@ -198,6 +276,89 @@ export default function CompanySearch() {
           )}
         </button>
       </form>
+
+      {/* Website URL Search Section */}
+      <div className="website-search-section">
+        <div className="website-search-divider"><span>or</span></div>
+        <p className="website-search-label">Know their website? Add them directly.</p>
+        <form onSubmit={handleWebsiteSearch} className="search-form">
+          <div className="search-input-container">
+            <Globe className="search-icon" />
+            <input
+              type="text"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://lizwilcox.com"
+              className="search-input"
+              disabled={websiteSearching}
+            />
+          </div>
+          <button
+            type="submit"
+            className="search-button"
+            disabled={websiteSearching || !websiteUrl.trim()}
+          >
+            {websiteSearching ? 'Scanning website...' : 'Find Contact'}
+          </button>
+        </form>
+
+        {websiteError && (
+          <div className="error-message">
+            <X className="w-5 h-5" />
+            <span>{websiteError}</span>
+            <button onClick={() => setWebsiteError(null)}>×</button>
+          </div>
+        )}
+
+        {websiteSaveSuccess && (
+          <div className="success-message">
+            <Check className="w-5 h-5" />
+            <span>Contact saved to People!</span>
+            <button onClick={() => setWebsiteSaveSuccess(false)}>×</button>
+          </div>
+        )}
+
+        {websiteContact && (
+          <div className="website-contact-preview">
+            <div className="preview-header">
+              <div className="preview-avatar">
+                {websiteContact.companyName.charAt(0).toUpperCase()}
+              </div>
+              <div className="preview-info">
+                <h3>{websiteContact.companyName}</h3>
+                <span>{websiteContact.domain}</span>
+              </div>
+            </div>
+            <div className="preview-email">
+              {websiteContact.email ? (
+                <>
+                  <span className="email-label">Email found:</span>
+                  <span className="email-value">{websiteContact.email}</span>
+                </>
+              ) : (
+                <span className="no-email">No email found on website</span>
+              )}
+            </div>
+            <div className="preview-actions">
+              <button
+                className="action-btn reject"
+                onClick={() => setWebsiteContact(null)}
+              >
+                <X className="w-5 h-5" />
+                Dismiss
+              </button>
+              <button
+                className="action-btn accept"
+                onClick={handleSaveWebsiteContact}
+                disabled={websiteSaving}
+              >
+                <Check className="w-5 h-5" />
+                {websiteSaving ? 'Saving...' : 'Save to People'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Success Message */}
       {successMessage && (

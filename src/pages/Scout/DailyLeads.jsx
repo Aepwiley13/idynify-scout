@@ -643,7 +643,13 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
               role: h.role === 'assistant' ? 'barry' : 'user',
               content: h.content,
             }));
-            setMessages(displayMsgs);
+            const sessionLabel = saved.updatedAt?.toDate
+              ? saved.updatedAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+              : 'previous session';
+            setMessages([
+              { role: 'system', content: `— Resumed from ${sessionLabel} —` },
+              ...displayMsgs,
+            ]);
             setConversationHistory(priorHistory);
             setHistoryLoaded(true);
             // Don't re-open — just let Barry pick up where they left off
@@ -698,6 +704,7 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
       }
     } catch (err) {
       console.error('Barry ICP panel error:', err);
+      setMessages(prev => [...prev, { role: 'barry', content: "Something went wrong — please try again." }]);
     } finally {
       setLoading(false);
     }
@@ -718,11 +725,8 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
       const user = auth.currentUser;
       if (!user) { onSearchComplete(); return; }
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      const baseProfile = profileDoc.exists() ? profileDoc.data() : {};
       const mergedProfile = {
-        ...baseProfile,
+        ...icpProfile,
         ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
         ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
         ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
@@ -760,12 +764,40 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
             <div style={{ fontWeight: 700, fontSize: 15, color: T.text }}>Barry</div>
             <div style={{ fontSize: 11, color: T.textFaint }}>ICP-aware targeting assistant</div>
           </div>
-          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
+          {messages.length > 0 && (
+            <button
+              onClick={async () => {
+                const user = auth.currentUser;
+                if (user) {
+                  try { await deleteDoc(doc(db, 'users', user.uid, 'barryConversations', 'icpChat')); } catch (_) {}
+                }
+                setMessages([]);
+                setConversationHistory([]);
+                setHasEnoughContext(false);
+                setIcpParams(null);
+                sendToBarry('__ICP_RECLARIFICATION__', [], icpProfile);
+              }}
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 11, padding: '4px 8px', borderRadius: 6 }}
+              title="Start over"
+            >
+              Start over
+            </button>
+          )}
+          <button onClick={onClose} style={{ marginLeft: messages.length > 0 ? 0 : 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
         </div>
 
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {messages.map((msg, i) => (
+          {!historyLoaded ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Loader size={20} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : messages.map((msg, i) => (
+            msg.role === 'system' ? (
+              <div key={i} style={{ textAlign: 'center', fontSize: 11, color: T.textFaint, padding: '4px 0' }}>
+                {msg.content}
+              </div>
+            ) : (
             <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8, alignItems: 'flex-end' }}>
               {msg.role === 'barry' && <BarryAvatar size={26} style={{ flexShrink: 0 }} />}
               <div style={{
@@ -779,6 +811,7 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
                 {msg.content}
               </div>
             </div>
+            )
           ))}
           {loading && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

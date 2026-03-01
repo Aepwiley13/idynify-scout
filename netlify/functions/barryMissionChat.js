@@ -23,6 +23,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 
@@ -558,8 +559,10 @@ Return valid JSON only:
       const isOpening = message === '__ICP_RECLARIFICATION__';
 
       const icpMessages = isOpening
-        ? [{ role: 'user', content: 'Start the ICP clarification conversation. Open with your first targeted question.' }]
-        : [...conversationHistory, { role: 'user', content: message }];
+        ? [{ role: 'user', content: resolvedIcpProfile
+            ? 'Review my current ICP settings and confirm what you see, then ask if I want to refine anything.'
+            : 'Help me define who I should be targeting.' }]
+        : [...conversationHistory.slice(-10), { role: 'user', content: message }];
 
       const icpController = new AbortController();
       const icpTimeout = setTimeout(() => icpController.abort(), 15000);
@@ -608,7 +611,7 @@ Return valid JSON only:
       try {
         await db.collection('users').doc(userId).collection('barryConversations').doc('icpChat').set({
           messages: updatedIcpHistory,
-          updatedAt: new Date().toISOString(),
+          updatedAt: FieldValue.serverTimestamp(),
           icpProfile: resolvedIcpProfile || null,
         });
       } catch (persistErr) {

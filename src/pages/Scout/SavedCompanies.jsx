@@ -12,6 +12,7 @@ import { Building2, Users, Search, Globe, Linkedin, Target, Archive, RotateCcw, 
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
+import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
 export default function SavedCompanies({ onSelectCompany }) {
@@ -25,6 +26,7 @@ export default function SavedCompanies({ onSelectCompany }) {
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('sc_viewMode') || 'cards');
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'archived'
   const [searchTerm, setSearchTerm] = useState('');
+  const [detailCompany, setDetailCompany] = useState(null);
 
   const updateViewMode = (mode) => {
     setViewMode(mode);
@@ -102,6 +104,10 @@ export default function SavedCompanies({ onSelectCompany }) {
   }
 
   function handleCompanyClick(company) {
+    setDetailCompany(company);
+  }
+
+  function handleFindContacts(company) {
     if (onSelectCompany) {
       onSelectCompany(company.id);
     } else {
@@ -237,7 +243,7 @@ export default function SavedCompanies({ onSelectCompany }) {
           companies={noContactCompanies}
           totalActive={companies.length}
           T={T}
-          onFindContact={handleCompanyClick}
+          onFindContact={company => handleFindContacts(company)}
         />
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px' }}>
@@ -254,6 +260,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                   isArchived={isArchived}
                   T={T}
                   onClick={() => handleCompanyClick(company)}
+                  onFindContacts={() => handleFindContacts(company)}
                   onArchive={() => handleArchiveCompany(company)}
                   onRestore={() => handleRestoreCompany(company)}
                 />
@@ -288,7 +295,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                     ><RotateCcw size={11} />Restore</button>
                   ) : (
                     <button
-                      onClick={e => { e.stopPropagation(); handleCompanyClick(company); }}
+                      onClick={e => { e.stopPropagation(); handleFindContacts(company); }}
                       style={{ padding: '5px 11px', borderRadius: 7, border: 'none', background: company.contact_count > 0 ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: company.contact_count > 0 ? T.cyan : '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}
                     >
                       {company.contact_count > 0 ? 'View →' : 'Find Contacts'}
@@ -299,6 +306,24 @@ export default function SavedCompanies({ onSelectCompany }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Company Detail Modal ── */}
+      {detailCompany && (
+        <CompanyDetailModal
+          company={detailCompany}
+          onClose={() => setDetailCompany(null)}
+          onFindMoreContacts={(id) => {
+            setDetailCompany(null);
+            if (onSelectCompany) {
+              onSelectCompany(id);
+            } else {
+              const c = [...companies, ...archivedCompanies].find(x => x.id === id);
+              if (c && c.contact_count > 0) navigate(`/scout/company/${id}/leads`);
+              else navigate(`/scout/company/${id}`);
+            }
+          }}
+        />
       )}
 
     </div>
@@ -663,7 +688,7 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 }
 
 // ─── Company Card (v5 style) ──────────────────────────────────────────────────
-function CompanyCardV5({ company, isArchived, T, onClick, onArchive, onRestore }) {
+function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArchive, onRestore }) {
   return (
     <div
       style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden', transition: 'all 0.15s', cursor: 'pointer' }}
@@ -731,7 +756,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onArchive, onRestore }
           )}
         </div>
         <button
-          onClick={e => { e.stopPropagation(); onClick(); }}
+          onClick={e => { e.stopPropagation(); (onFindContacts || onClick)(); }}
           style={{ width: '100%', padding: 7, borderRadius: 7, border: 'none', background: company.contact_count > 0 ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: company.contact_count > 0 ? T.cyan : '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderColor: company.contact_count > 0 ? T.cyanBdr : 'none' }}
         >
           {company.contact_count > 0 ? 'View Contacts →' : 'Find Contacts →'}

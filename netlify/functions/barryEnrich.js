@@ -29,6 +29,7 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { googleBusinessLookup } from './utils/googleBusinessLookup.js';
 import { searchLinkedInProfile, searchLinkedInPhoto, extractEmailDomain } from './utils/linkedinSearch.js';
+import { load } from 'cheerio';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -405,6 +406,51 @@ export const handler = async (event) => {
     }
 
     // ═══════════════════════════════════════════════════
+    // STEP 1e: Website Scrape Fallback — email missing after Apollo
+    // ═══════════════════════════════════════════════════
+    const mergedAfterApollo = { ...contact, ...enrichedData };
+    const emailStillMissing = !mergedAfterApollo.email && !mergedAfterApollo.work_email;
+    const websiteForScrape = mergedAfterApollo.company_website ||
+      mergedAfterApollo.website_url ||
+      mergedAfterApollo.company_domain || null;
+
+    if (emailStillMissing && websiteForScrape) {
+      const step1e = {
+        source: 'website_scrape',
+        status: 'running',
+        fieldsFound: [],
+        timestamp: new Date().toISOString(),
+        message: null
+      };
+
+      try {
+        console.log('🌐 Step 1e: Website scrape fallback for email at', websiteForScrape);
+
+        const scrapeResult = await scrapeWebsiteForEmail(websiteForScrape);
+
+        if (scrapeResult.email) {
+          enrichedData.email = scrapeResult.email;
+          enrichedData.emailSource = 'website';
+          step1e.fieldsFound = ['email'];
+          step1e.status = 'success';
+          step1e.message = `Found email on ${scrapeResult.foundOn}`;
+          provenance.email = 'website_scrape';
+          console.log(`✅ Step 1e: Found email via website scrape: ${scrapeResult.email}`);
+        } else {
+          step1e.status = 'no_data';
+          step1e.message = 'No email found on website';
+          console.log('⚠️ Step 1e: No email found on website');
+        }
+      } catch (err) {
+        step1e.status = 'error';
+        step1e.message = err.message;
+        console.error('❌ Step 1e failed:', err.message);
+      }
+
+      steps.push(step1e);
+    }
+
+    // ═══════════════════════════════════════════════════
     // STEP 2: Google Places — company-level fallback
     // ═══════════════════════════════════════════════════
     const mergedSoFar = { ...contact, ...enrichedData };
@@ -481,6 +527,7 @@ export const handler = async (event) => {
       email: enrichedData.email || contact.email || null,
       email_status: enrichedData.email_status || contact.email_status || null,
       email_confidence: enrichedData.email_confidence || contact.email_confidence || null,
+      emailSource: enrichedData.emailSource || contact.emailSource || null,
 
       // Phone (Apollo-sourced, person-level)
       phone: primaryPhone || contact.phone || null,
@@ -902,9 +949,74 @@ function buildDataSources(steps) {
       if (step.source === 'internal_db') sources.add('internal');
       if (step.source === 'linkedin_search') sources.add('linkedin');
       if (step.source === 'linkedin_photo_search') sources.add('linkedin');
+      if (step.source === 'website_scrape') sources.add('website');
     }
   });
   return Array.from(sources);
+}
+
+/**
+ * Extract emails from HTML using cheerio and regex.
+ * Prioritizes emails matching the domain.
+ */
+function extractEmailsFromHTML(html, domain) {
+  const $ = load(html);
+  const emails = new Set();
+
+  // Method 1: mailto: links
+  $('a[href^="mailto:"]').each((_, el) => {
+    const email = $(el).attr('href').replace('mailto:', '').split('?')[0].trim();
+    if (email.includes('@')) emails.add(email.toLowerCase());
+  });
+
+  // Method 2: regex scan of visible text and raw HTML
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const matches = html.match(emailRegex) || [];
+  matches.forEach(email => {
+    // Filter out image/asset false positives
+    if (!email.includes('.png') && !email.includes('.jpg') && !email.includes('.svg')) {
+      emails.add(email.toLowerCase());
+    }
+  });
+
+  // Method 3: prioritize emails matching the domain
+  const domainEmails = [...emails].filter(e => e.includes(domain));
+  return domainEmails.length > 0 ? domainEmails : [...emails];
+}
+
+/**
+ * Scrape a website for contact email addresses.
+ * Fetches homepage, /contact, and /about in parallel.
+ */
+async function scrapeWebsiteForEmail(websiteUrl) {
+  let domain;
+  try {
+    const normalizedUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+    const url = new URL(normalizedUrl);
+    domain = url.hostname.replace('www.', '');
+  } catch {
+    return { email: null };
+  }
+
+  const pages = ['', '/contact', '/about'];
+  const results = await Promise.all(
+    pages.map(path =>
+      fetch(`https://${domain}${path}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)' },
+        signal: AbortSignal.timeout(5000)
+      })
+      .then(r => r.text())
+      .catch(() => '')
+    )
+  );
+
+  const allHTML = results.join(' ');
+  const emails = extractEmailsFromHTML(allHTML, domain);
+
+  return {
+    email: emails[0] || null,
+    foundOn: domain
+  };
 }
 
 /**

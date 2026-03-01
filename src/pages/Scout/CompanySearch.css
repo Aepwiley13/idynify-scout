@@ -493,6 +493,115 @@
   border-color: #3b82f6;
 }
 
+/* Website URL Search Section */
+.website-search-section {
+  max-width: 800px;
+  margin: 0 auto 2rem;
+}
+
+.website-search-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.website-search-divider::before,
+.website-search-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: #e5e7eb;
+}
+
+.website-search-label {
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+}
+
+/* Website Contact Preview Card */
+.website-contact-preview {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.preview-avatar {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-info h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.125rem;
+}
+
+.preview-info span {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.preview-email {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.email-label {
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.email-value {
+  color: #3b82f6;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.no-email {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .company-search {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   ArrowLeft,
@@ -18,7 +18,10 @@ import {
   Send,
   MessageSquare,
   Phone,
-  Link
+  Link,
+  Edit2,
+  Check,
+  X
 } from 'lucide-react';
 import {
   getSequencePlan,
@@ -69,6 +72,12 @@ export default function MissionDetail() {
   const [mission, setMission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pending step approval
+  const [expandedApprovalContactId, setExpandedApprovalContactId] = useState(null);
+  const [editingStep, setEditingStep] = useState(null); // { contactId, stepIndex }
+  const [editStepContent, setEditStepContent] = useState({ subject: '', body: '' });
+  const [approvalSaving, setApprovalSaving] = useState(false);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -122,6 +131,81 @@ export default function MissionDetail() {
 
   const plan = getSequencePlan(mission);
   const contacts = mission?.contacts || [];
+
+  async function handleApproveStep(contactId, stepIndex) {
+    setApprovalSaving(true);
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
+      const snap = await getDoc(missionRef);
+      if (!snap.exists()) return;
+      const updatedContacts = (snap.data().contacts || []).map(c => {
+        if (c.contactId !== contactId) return c;
+        const updatedSteps = (c.personalizedSteps || []).map(s =>
+          s.stepIndex === stepIndex ? { ...s, status: 'approved' } : s
+        );
+        const allApproved = updatedSteps.every(s => s.status === 'approved');
+        return { ...c, personalizedSteps: updatedSteps, personalizationStatus: allApproved ? 'approved' : 'pending_approval' };
+      });
+      await updateDoc(missionRef, { contacts: updatedContacts, updatedAt: new Date().toISOString() });
+    } catch (err) {
+      console.error('Error approving step:', err);
+    } finally {
+      setApprovalSaving(false);
+      setEditingStep(null);
+    }
+  }
+
+  async function handleApproveAllForContact(contactId) {
+    setApprovalSaving(true);
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
+      const snap = await getDoc(missionRef);
+      if (!snap.exists()) return;
+      const updatedContacts = (snap.data().contacts || []).map(c =>
+        c.contactId !== contactId ? c : {
+          ...c,
+          personalizationStatus: 'approved',
+          personalizedSteps: (c.personalizedSteps || []).map(s => ({ ...s, status: 'approved' }))
+        }
+      );
+      await updateDoc(missionRef, { contacts: updatedContacts, updatedAt: new Date().toISOString() });
+      setExpandedApprovalContactId(null);
+    } catch (err) {
+      console.error('Error approving all steps:', err);
+    } finally {
+      setApprovalSaving(false);
+    }
+  }
+
+  async function handleSaveStepEdit(contactId, stepIndex) {
+    setApprovalSaving(true);
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
+      const snap = await getDoc(missionRef);
+      if (!snap.exists()) return;
+      const updatedContacts = (snap.data().contacts || []).map(c => {
+        if (c.contactId !== contactId) return c;
+        const updatedSteps = (c.personalizedSteps || []).map(s =>
+          s.stepIndex === stepIndex
+            ? { ...s, subject: editStepContent.subject, body: editStepContent.body, status: 'approved' }
+            : s
+        );
+        return { ...c, personalizedSteps: updatedSteps };
+      });
+      await updateDoc(missionRef, { contacts: updatedContacts, updatedAt: new Date().toISOString() });
+      setEditingStep(null);
+    } catch (err) {
+      console.error('Error saving step edit:', err);
+    } finally {
+      setApprovalSaving(false);
+    }
+  }
 
   return (
     <div className="mission-detail">
@@ -256,16 +340,123 @@ export default function MissionDetail() {
                   </div>
 
                   <div className="contact-progress-action">
-                    {nextAction.action === 'needs_outcome' && (
-                      <span className="action-hint action-hint-outcome">Needs outcome</span>
+                    {contactEntry.personalizationStatus === 'generating' && (
+                      <span className="action-hint action-hint-generating">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Personalizing...
+                      </span>
                     )}
-                    {nextAction.action === 'propose_step' && (
-                      <span className="action-hint action-hint-ready">Ready for Step {currentStep + 1}</span>
+                    {contactEntry.personalizationStatus === 'pending_approval' && (
+                      <button
+                        className="action-hint action-hint-approval"
+                        onClick={() => setExpandedApprovalContactId(
+                          expandedApprovalContactId === contactEntry.contactId ? null : contactEntry.contactId
+                        )}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        {contactEntry.personalizedSteps?.filter(s => s.status === 'pending_approval').length} steps need approval
+                      </button>
                     )}
-                    {nextAction.action === 'completed' && (
-                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    {contactEntry.personalizationStatus !== 'generating' && contactEntry.personalizationStatus !== 'pending_approval' && (
+                      <>
+                        {nextAction.action === 'needs_outcome' && (
+                          <span className="action-hint action-hint-outcome">Needs outcome</span>
+                        )}
+                        {nextAction.action === 'propose_step' && (
+                          <span className="action-hint action-hint-ready">Ready for Step {currentStep + 1}</span>
+                        )}
+                        {nextAction.action === 'completed' && (
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                        )}
+                      </>
                     )}
                   </div>
+
+                  {/* Expandable step approval panel */}
+                  {expandedApprovalContactId === contactEntry.contactId && contactEntry.personalizedSteps && (
+                    <div className="step-approval-panel">
+                      <div className="step-approval-header">
+                        <Sparkles className="w-4 h-4 text-purple-400" />
+                        <span>Barry personalized {contactEntry.personalizedSteps.length} steps — review before sending</span>
+                        <button
+                          className="btn-approve-all"
+                          onClick={() => handleApproveAllForContact(contactEntry.contactId)}
+                          disabled={approvalSaving}
+                        >
+                          <Check className="w-3 h-3" /> Approve All
+                        </button>
+                      </div>
+                      {contactEntry.personalizedSteps.map((step) => (
+                        <div
+                          key={step.stepIndex}
+                          className={`approval-step-card ${step.status === 'approved' ? 'approved' : ''}`}
+                        >
+                          <div className="approval-step-meta">
+                            <span className="approval-step-num">Step {step.stepNumber}</span>
+                            <span className="approval-step-channel">{step.channel}</span>
+                            {step.status === 'approved' && (
+                              <span className="approval-step-approved"><Check className="w-3 h-3" /> Approved</span>
+                            )}
+                          </div>
+
+                          {editingStep?.contactId === contactEntry.contactId && editingStep?.stepIndex === step.stepIndex ? (
+                            <div className="approval-step-editor">
+                              {step.channel === 'email' && (
+                                <input
+                                  type="text"
+                                  className="approval-edit-input"
+                                  value={editStepContent.subject}
+                                  onChange={e => setEditStepContent(p => ({ ...p, subject: e.target.value }))}
+                                  placeholder="Subject line"
+                                />
+                              )}
+                              <textarea
+                                className="approval-edit-textarea"
+                                value={editStepContent.body}
+                                onChange={e => setEditStepContent(p => ({ ...p, body: e.target.value }))}
+                                rows={4}
+                              />
+                              <div className="approval-edit-actions">
+                                <button className="btn-secondary btn-xs" onClick={() => setEditingStep(null)}>Cancel</button>
+                                <button
+                                  className="btn-primary-hunter btn-xs"
+                                  onClick={() => handleSaveStepEdit(contactEntry.contactId, step.stepIndex)}
+                                  disabled={approvalSaving}
+                                >
+                                  Save & Approve
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {step.subject && <p className="approval-step-subject">Subject: {step.subject}</p>}
+                              <p className="approval-step-body">{step.body}</p>
+                              {step.toneNote && <p className="approval-step-tone"><Sparkles className="w-3 h-3" />{step.toneNote}</p>}
+                              {step.status !== 'approved' && (
+                                <div className="approval-step-actions">
+                                  <button
+                                    className="btn-edit-step"
+                                    onClick={() => {
+                                      setEditingStep({ contactId: contactEntry.contactId, stepIndex: step.stepIndex });
+                                      setEditStepContent({ subject: step.subject || '', body: step.body || '' });
+                                    }}
+                                  >
+                                    <Edit2 className="w-3 h-3" /> Edit
+                                  </button>
+                                  <button
+                                    className="btn-approve-step"
+                                    onClick={() => handleApproveStep(contactEntry.contactId, step.stepIndex)}
+                                    disabled={approvalSaving}
+                                  >
+                                    <Check className="w-3 h-3" /> Approve
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

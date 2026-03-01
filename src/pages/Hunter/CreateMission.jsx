@@ -57,6 +57,10 @@ export default function CreateMission() {
   const [sequenceLoading, setSequenceLoading] = useState(false);
   const [sequenceError, setSequenceError] = useState(null);
 
+  // Step editing state
+  const [editingStepIndex, setEditingStepIndex] = useState(null);
+  const [editingStepContent, setEditingStepContent] = useState({ subject: '', body: '' });
+
   const goals = getAllGoals();
 
   useEffect(() => {
@@ -178,8 +182,27 @@ export default function CreateMission() {
   }
 
   function handleEditStep(stepIndex) {
-    // TODO: Open modal or inline editor for this step
-    alert(`Edit step ${stepIndex + 1} - Coming soon: AI message generation`);
+    const step = missionData.steps[stepIndex];
+    setEditingStepContent({
+      subject: step.subject || '',
+      body: step.body || step.description || ''
+    });
+    setEditingStepIndex(stepIndex);
+  }
+
+  function handleSaveStep(stepIndex) {
+    const updated = { ...missionData };
+    updated.steps[stepIndex] = {
+      ...updated.steps[stepIndex],
+      subject: editingStepContent.subject,
+      body: editingStepContent.body
+    };
+    setMissionData(updated);
+    setEditingStepIndex(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingStepIndex(null);
   }
 
   function toggleContactSelection(contactId) {
@@ -571,10 +594,10 @@ export default function CreateMission() {
                       </button>
                       <button
                         className="btn-icon"
-                        onClick={() => handleEditStep(index)}
-                        title="Edit message"
+                        onClick={() => editingStepIndex === index ? handleCancelEdit() : handleEditStep(index)}
+                        title={editingStepIndex === index ? 'Cancel edit' : 'Edit message'}
                       >
-                        <Edit2 className="w-5 h-5" />
+                        <Edit2 className={`w-5 h-5 ${editingStepIndex === index ? 'text-purple-400' : ''}`} />
                       </button>
                       <button
                         className="btn-icon"
@@ -585,11 +608,74 @@ export default function CreateMission() {
                       </button>
                     </div>
                   </div>
-                  <p className="timeline-description">{step.description}</p>
-                  <div className="timeline-meta">
-                    <span className="weapon-badge">{step.weapon}</span>
-                    <span className="type-badge">{step.type}</span>
-                  </div>
+
+                  {editingStepIndex === index ? (
+                    <div className="step-inline-editor">
+                      {step.weapon === 'email' && (
+                        <div className="step-editor-field">
+                          <label className="step-editor-label">Subject line</label>
+                          <input
+                            type="text"
+                            className="step-editor-input"
+                            value={editingStepContent.subject}
+                            onChange={e => setEditingStepContent(prev => ({ ...prev, subject: e.target.value }))}
+                            placeholder="e.g. Quick question about your team's outreach"
+                          />
+                        </div>
+                      )}
+                      <div className="step-editor-field">
+                        <label className="step-editor-label">
+                          {step.weapon === 'phone' ? 'Call notes / talking points' : 'Message'}
+                        </label>
+                        <textarea
+                          className="step-editor-textarea"
+                          value={editingStepContent.body}
+                          onChange={e => setEditingStepContent(prev => ({ ...prev, body: e.target.value }))}
+                          placeholder={
+                            step.weapon === 'phone'
+                              ? 'Key points to cover on the call...'
+                              : step.weapon === 'text'
+                              ? 'Short, conversational message (160 chars ideal)...'
+                              : 'Your message content. Barry will personalize this per contact when they\'re added to the mission.'
+                          }
+                          rows={step.weapon === 'text' ? 3 : 5}
+                        />
+                        {step.weapon === 'text' && (
+                          <span className="step-editor-charcount">
+                            {editingStepContent.body.length} / 160
+                          </span>
+                        )}
+                      </div>
+                      <div className="step-editor-actions">
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={handleCancelEdit}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn-primary-hunter btn-sm"
+                          onClick={() => handleSaveStep(index)}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="timeline-description">
+                        {step.body || step.description}
+                        {step.body && step.subject && (
+                          <span className="step-subject-preview"> — Subject: "{step.subject}"</span>
+                        )}
+                      </p>
+                      <div className="timeline-meta">
+                        <span className="weapon-badge">{step.weapon}</span>
+                        <span className="type-badge">{step.type}</span>
+                        {step.body && <span className="type-badge text-green-400">✓ Custom message</span>}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

@@ -1505,3 +1505,211 @@
   max-width: 100%;
   width: 100%;
 }
+
+/* ── Options view: "Not ready to send?" mission CTA ── */
+.options-mission-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.options-mission-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ── Task 1.3: Personalization loading view ── */
+.personalization-loading-view,
+.personalization-done-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  gap: 16px;
+  text-align: center;
+}
+
+.personalization-barry-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.personalization-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f0f2ff;
+  margin: 0;
+}
+
+.personalization-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.personalization-steps-loading {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.personalization-step-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+}
+
+.skeleton-step-num {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.skeleton-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.personalization-success-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.personalization-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.personalized-steps-preview {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.personalized-step-card {
+  padding: 12px 14px;
+  background: rgba(168, 85, 247, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 10px;
+  text-align: left;
+}
+
+.ps-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ps-step-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a855f7;
+}
+
+.ps-step-channel {
+  font-size: 10px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.ps-step-subject {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d1d5db;
+  margin-bottom: 4px;
+}
+
+.ps-step-body {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.ps-tone-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.personalization-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Mission picker: Create new mission button ── */
+.mission-create-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed rgba(168, 85, 247, 0.3);
+  border-radius: 10px;
+  color: #a855f7;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.mission-create-new:hover {
+  background: rgba(168, 85, 247, 0.06);
+  border-color: rgba(168, 85, 247, 0.5);
+}

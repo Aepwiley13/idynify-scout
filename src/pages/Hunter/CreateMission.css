@@ -759,3 +759,85 @@
 .empty-state p {
   margin-bottom: 1.5rem;
 }
+
+/* ── Inline Step Editor ── */
+.step-inline-editor {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-editor-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a855f7;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.step-editor-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #f0f2ff;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.step-editor-input:focus {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.step-editor-textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #f0f2ff;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.step-editor-textarea:focus {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.step-editor-charcount {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: right;
+  margin-top: -6px;
+}
+
+.step-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+.step-subject-preview {
+  color: #6b7280;
+  font-style: italic;
+}

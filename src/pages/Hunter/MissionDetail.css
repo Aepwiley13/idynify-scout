@@ -298,6 +298,221 @@
   line-height: 1.4;
 }
 
+/* ── Task 1.3: Step approval panel ── */
+.action-hint-generating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #a855f7;
+  font-size: 11px;
+}
+
+.action-hint-approval {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: #a855f7;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-hint-approval:hover {
+  background: rgba(168, 85, 247, 0.18);
+}
+
+.step-approval-panel {
+  margin-top: 12px;
+  padding: 14px;
+  background: rgba(168, 85, 247, 0.04);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step-approval-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.step-approval-header span {
+  flex: 1;
+}
+
+.btn-approve-all {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 6px;
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-approve-all:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.approval-step-card {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  transition: border-color 0.15s;
+}
+
+.approval-step-card.approved {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.approval-step-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.approval-step-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a855f7;
+}
+
+.approval-step-channel {
+  font-size: 10px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+
+.approval-step-approved {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #10b981;
+  margin-left: auto;
+}
+
+.approval-step-subject {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d1d5db;
+  margin-bottom: 4px;
+}
+
+.approval-step-body {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.55;
+  margin-bottom: 6px;
+  white-space: pre-wrap;
+}
+
+.approval-step-tone {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.approval-step-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-edit-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.btn-approve-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-approve-step:disabled,
+.btn-approve-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.approval-step-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.approval-edit-input,
+.approval-edit-textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #f0f2ff;
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+}
+
+.approval-edit-input:focus,
+.approval-edit-textarea:focus {
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.approval-edit-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.approval-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.btn-xs {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
 @media (max-width: 640px) {
   .strategy-grid {
     grid-template-columns: 1fr;

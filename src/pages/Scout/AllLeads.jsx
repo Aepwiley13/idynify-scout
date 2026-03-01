@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
+  Target, Plus, Loader,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -363,6 +364,72 @@ function AllLeadsCard({
 
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
 
+  // Mission quick-assign state
+  const [missionPickerOpen, setMissionPickerOpen] = useState(false);
+  const [missions, setMissions] = useState([]);
+  const [missionsLoading, setMissionsLoading] = useState(false);
+  const [missionAssigning, setMissionAssigning] = useState(false);
+  const [missionAssigned, setMissionAssigned] = useState(null); // mission name after success
+
+  async function openMissionPicker(e) {
+    e.stopPropagation();
+    if (missionPickerOpen) { setMissionPickerOpen(false); return; }
+    const user = auth.currentUser;
+    if (!user) return;
+    setMissionsLoading(true);
+    setMissionPickerOpen(true);
+    try {
+      const snap = await getDocs(collection(db, 'users', user.uid, 'missions'));
+      const list = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(m => m.status !== 'completed');
+      setMissions(list);
+    } catch (err) {
+      console.error('[AllLeads] mission fetch failed:', err);
+    } finally {
+      setMissionsLoading(false);
+    }
+  }
+
+  async function assignToMission(missionId, missionName, e) {
+    e.stopPropagation();
+    const user = auth.currentUser;
+    if (!user) return;
+    setMissionAssigning(true);
+    try {
+      const snap = await getDocs(collection(db, 'users', user.uid, 'missions'));
+      const missionDoc = snap.docs.find(d => d.id === missionId);
+      if (!missionDoc) return;
+      const missionData = missionDoc.data();
+      const alreadyIn = (missionData.contacts || []).some(c => c.contactId === contact.id);
+      if (!alreadyIn) {
+        await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
+          contacts: arrayUnion({
+            contactId: contact.id,
+            name: contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+            email: contact.email || null,
+            phone: contact.phone || null,
+            currentStepIndex: 0,
+            lastTouchDate: null,
+            status: 'active',
+            outcomes: [],
+            sequenceStatus: 'pending',
+            stepHistory: [],
+            lastOutcome: null
+          }),
+          updatedAt: new Date().toISOString()
+        });
+      }
+      setMissionAssigned(missionName);
+      setMissionPickerOpen(false);
+      setTimeout(() => setMissionAssigned(null), 2500);
+    } catch (err) {
+      console.error('[AllLeads] mission assign failed:', err);
+    } finally {
+      setMissionAssigning(false);
+    }
+  }
+
   async function handleBrigadeClick(brigadeId, e) {
     e.stopPropagation();
     if (brigadeSaving) return;
@@ -583,11 +650,71 @@ function AllLeadsCard({
             {btnCfg.label}
           </button>
           {mode === 'hunter' ? (
-            <button
-              onClick={e => { e.stopPropagation(); onReturnToScout && onReturnToScout(); }}
-              style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid #9ca3af40', background: 'transparent', color: '#9ca3af', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-              title="Move back to Scout"
-            ><RotateCcw size={11} /></button>
+            <>
+              {/* Mission quick-assign */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={openMissionPicker}
+                  style={{
+                    padding: '7px 9px', borderRadius: 7,
+                    border: missionPickerOpen ? '1px solid #a855f760' : '1px solid #a855f730',
+                    background: missionPickerOpen ? 'rgba(168,85,247,0.1)' : 'transparent',
+                    color: missionAssigned ? '#10b981' : '#a855f7',
+                    fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    transition: 'all 0.15s'
+                  }}
+                  title={missionAssigned ? `Added to ${missionAssigned}` : 'Add to Mission'}
+                >
+                  {missionAssigning ? <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} /> : missionAssigned ? '✓' : <Target size={11} />}
+                </button>
+
+                {missionPickerOpen && (
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      position: 'absolute', bottom: '110%', right: 0, zIndex: 60,
+                      background: T.cardBg, border: `1px solid ${T.border2}`,
+                      borderRadius: 10, padding: 8, minWidth: 200,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    <div style={{ fontSize: 9, color: T.textFaint, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', padding: '2px 4px 6px' }}>
+                      Add to Mission
+                    </div>
+                    {missionsLoading ? (
+                      <div style={{ padding: '8px 4px', color: T.textFaint, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
+                      </div>
+                    ) : missions.length === 0 ? (
+                      <div style={{ padding: '6px 4px', color: T.textFaint, fontSize: 11 }}>No active missions</div>
+                    ) : (
+                      missions.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={e => assignToMission(m.id, m.name, e)}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            padding: '7px 8px', borderRadius: 7, border: 'none',
+                            background: 'transparent', color: T.text, fontSize: 12,
+                            cursor: 'pointer', transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = T.rowHov}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div style={{ fontWeight: 600, marginBottom: 1 }}>{m.name}</div>
+                          <div style={{ fontSize: 10, color: T.textFaint }}>{m.contacts?.length || 0} contacts</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={e => { e.stopPropagation(); onReturnToScout && onReturnToScout(); }}
+                style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid #9ca3af40', background: 'transparent', color: '#9ca3af', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                title="Move back to Scout"
+              ><RotateCcw size={11} /></button>
+            </>
           ) : contact.linkedin_url ? (
             <button
               onClick={e => { e.stopPropagation(); window.open(contact.linkedin_url, '_blank'); }}

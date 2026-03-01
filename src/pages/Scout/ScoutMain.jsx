@@ -15,7 +15,7 @@ import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
   Zap, Building2, Users, Plus, Search,
-  Palette, Check, Settings,
+  Palette, Check, Settings, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -203,6 +203,7 @@ function ScoutShellInner({ user }) {
   const [activeSection, setActiveSection] = useState('scout');
   const [activeItem, setActiveItem] = useState(initialItem);
   const [drillCompanyId, setDrillCompanyId] = useState(null);
+  const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('scout_subnav_collapsed') !== 'true');
 
   // Sync tab when URL search params change (e.g. navigating from Sidebar)
   useEffect(() => {
@@ -426,66 +427,96 @@ function ScoutShellInner({ user }) {
         </div>
       </div>
 
-      {/* ── SUB-NAV ── */}
+      {/* ── SUB-NAV (collapsible) ── */}
       <div style={{
-        width: 190, flexShrink: 0, background: T.navBg,
-        borderRight: `1px solid ${T.border}`,
+        width: subNavOpen ? 190 : 0, flexShrink: 0, background: T.navBg,
+        borderRight: subNavOpen ? `1px solid ${T.border}` : 'none',
         display: 'flex', flexDirection: 'column',
-        position: 'relative', zIndex: 2, transition: 'background 0.25s',
+        position: 'relative', zIndex: 2,
+        transition: 'width 0.2s ease, background 0.25s',
+        overflow: 'hidden',
       }}>
-        <div style={{ padding: '13px 13px 9px', borderBottom: `1px solid ${T.border}` }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, marginBottom: 1 }}>
-            {section?.label}
-          </div>
-          <div style={{ fontSize: 9, color: T.textFaint }}>{section?.items.length} modules</div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
-          {section?.items.map(it => {
-            const active = activeItem === it.id;
-            return (
-              <div
-                key={it.id}
-                onClick={() => switchItem(it.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
-                  borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                  background: active ? T.accentBg : 'transparent',
-                  borderLeft: `2px solid ${active ? BRAND.pink : 'transparent'}`,
-                  transition: 'all 0.12s',
-                }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <it.Icon size={13} color={active ? BRAND.pink : T.textFaint} style={{ flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 12, fontWeight: active ? 600 : 400,
-                    color: active ? BRAND.pink : T.textMuted,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {it.label}
-                  </div>
-                  <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{it.desc}</div>
-                </div>
+        <div style={{ width: 190, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ padding: '13px 13px 9px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, marginBottom: 1 }}>
+                {section?.label}
               </div>
-            );
-          })}
-        </div>
-
-        {/* User footer */}
-        <div style={{ padding: '9px 11px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Av initials={userInitials} color={BRAND.pink} size={24} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.email || 'user@idynify.com'}
+              <div style={{ fontSize: 9, color: T.textFaint }}>{section?.items.length} modules</div>
             </div>
-            <div style={{ fontSize: 8, color: T.textFaint }}>
-              {THEMES[themeId]?.label || 'Mission Control'}
+            <div
+              onClick={() => { setSubNavOpen(false); localStorage.setItem('scout_subnav_collapsed', 'true'); }}
+              title="Collapse sidebar"
+              style={{ width: 22, height: 22, borderRadius: 6, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <ChevronLeft size={12} color={T.textFaint} />
+            </div>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
+            {section?.items.map(it => {
+              const active = activeItem === it.id;
+              return (
+                <div
+                  key={it.id}
+                  onClick={() => switchItem(it.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
+                    borderRadius: 8, cursor: 'pointer', marginBottom: 1,
+                    background: active ? T.accentBg : 'transparent',
+                    borderLeft: `2px solid ${active ? BRAND.pink : 'transparent'}`,
+                    transition: 'all 0.12s',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <it.Icon size={13} color={active ? BRAND.pink : T.textFaint} style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 12, fontWeight: active ? 600 : 400,
+                      color: active ? BRAND.pink : T.textMuted,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {it.label}
+                    </div>
+                    <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{it.desc}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* User footer */}
+          <div style={{ padding: '9px 11px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+            <Av initials={userInitials} color={BRAND.pink} size={24} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.email || 'user@idynify.com'}
+              </div>
+              <div style={{ fontSize: 8, color: T.textFaint }}>
+                {THEMES[themeId]?.label || 'Mission Control'}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Sub-nav expand button (shown when collapsed) */}
+      {!subNavOpen && (
+        <div
+          onClick={() => { setSubNavOpen(true); localStorage.setItem('scout_subnav_collapsed', 'false'); }}
+          title="Expand sidebar"
+          style={{
+            position: 'absolute', left: 60, top: 13, zIndex: 3,
+            width: 22, height: 22, borderRadius: '0 6px 6px 0',
+            background: T.navBg, border: `1px solid ${T.border}`, borderLeft: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronRight size={12} color={T.textFaint} />
+        </div>
+      )}
 
       {/* ── MAIN CONTENT ── */}
       <div style={{

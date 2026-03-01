@@ -11,10 +11,11 @@ import {
   collection, query, where, getDocs, doc, getDoc,
   setDoc, updateDoc, deleteDoc,
 } from 'firebase/firestore';
-import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight } from 'lucide-react';
+import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
+import { getScoreBreakdown, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 20, style = {} }) {
@@ -52,11 +53,12 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
 }
 
 // ─── CompanySwipeCard ─────────────────────────────────────────────────────────
-function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
+function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfile, icpWeights }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
   const [gone, setGone] = useState(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const s = useRef(null);
 
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
@@ -75,15 +77,35 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
   };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
-  const sc = (company.fit_score || company.score || 0) >= 80
-    ? STATUS.green
-    : (company.fit_score || company.score || 0) >= 60
-    ? STATUS.amber
-    : STATUS.red;
-
   const score = company.fit_score || company.score || 0;
+  const sc = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
+  const scoreLabel = score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
   const barryText = company.barry_intel || company.barry_context || company.barryIntel
     || `${company.name} is a ${company.industry || 'company'} — review their profile to assess fit.`;
+
+  // ICP factor breakdown (calculated live from stored profile)
+  const breakdown = (icpProfile && company) ? getScoreBreakdown(company, icpProfile, icpWeights || DEFAULT_WEIGHTS) : null;
+
+  // HQ and CEO — try multiple Apollo field names
+  const hqLocation = company.hq_location
+    || (company.headquarters_city ? `${company.headquarters_city}${company.headquarters_state ? ', ' + company.headquarters_state : ''}` : null)
+    || company.headquarters
+    || company.location
+    || company.state
+    || null;
+
+  const ceoName = company.ceo_name
+    || (company.primary_contact?.name ? `${company.primary_contact.name}${company.primary_contact.title ? ' · ' + company.primary_contact.title : ''}` : null)
+    || null;
+
+  // Confidence: count meaningful data fields
+  const dataFields = [company.industry, company.employee_count || company.company_size,
+    company.revenue, hqLocation, ceoName, company.barry_intel || company.barry_context].filter(Boolean);
+  const confidence = dataFields.length >= 4 ? 'High' : dataFields.length >= 2 ? 'Medium' : 'Low';
+  const confColor = confidence === 'High' ? STATUS.green : confidence === 'Medium' ? STATUS.amber : STATUS.red;
+
+  const swipeProgress = Math.min(Math.abs(dx) / 100, 1);
+  const overlayOpacity = Math.min(swipeProgress * 1.5, 0.85);
 
   return (
     <div
@@ -91,20 +113,20 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y',
-        top: 0, left: '50%',
+        touchAction: 'pan-y', top: 0, left: '50%',
       }}
     >
+      {/* Swipe overlay labels */}
       {dx > 30 && (
         <div style={{
           position: 'absolute', top: 22, left: 16, zIndex: 10,
           padding: '5px 13px', borderRadius: 8,
           border: `3px solid ${STATUS.green}`, color: STATUS.green,
           fontSize: 13, fontWeight: 700, transform: 'rotate(-11deg)',
-          background: `${STATUS.green}10`,
+          background: `${STATUS.green}10`, opacity: Math.min((dx - 30) / 70, 1),
         }}>✓ IT'S A MATCH</div>
       )}
       {dx < -30 && (
@@ -113,89 +135,159 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false }) {
           padding: '5px 13px', borderRadius: 8,
           border: `3px solid ${STATUS.red}`, color: STATUS.red,
           fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)',
-          background: `${STATUS.red}10`,
+          background: `${STATUS.red}10`, opacity: Math.min((Math.abs(dx) - 30) / 70, 1),
         }}>✗ NOT A MATCH</div>
       )}
+
+      {/* Card — no overflow scroll, content sized to fit */}
       <div style={{
+        position: 'relative',
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
-        maxHeight: wide ? 'clamp(500px, calc(100vh - 160px), 700px)' : 'clamp(460px, calc(100vh - 200px), 570px)',
-        overflowY: 'auto',
       }}>
+        {/* Full-card swipe color overlay */}
+        {dx > 10 && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 5, borderRadius: 22, background: `${STATUS.green}${Math.round(overlayOpacity * 20).toString(16).padStart(2,'0')}`, pointerEvents: 'none' }} />
+        )}
+        {dx < -10 && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 5, borderRadius: 22, background: `${STATUS.red}${Math.round(overlayOpacity * 20).toString(16).padStart(2,'0')}`, pointerEvents: 'none' }} />
+        )}
+
+        {/* Confidence badge — top right */}
+        <div style={{
+          position: 'absolute', top: 12, right: 12, zIndex: 6,
+          fontSize: 9, color: confColor, fontWeight: 700, letterSpacing: 1,
+          padding: '3px 8px', background: `${confColor}18`, borderRadius: 5,
+          border: `1px solid ${confColor}40`,
+        }}>
+          {confidence} confidence
+        </div>
+
         {/* Header */}
         <div style={{
-          padding: wide ? '24px 28px 18px' : '20px 22px 14px', display: 'flex', flexDirection: 'column',
+          padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column',
           alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`,
         }}>
           <div style={{
-            width: wide ? 80 : 68, height: wide ? 80 : 68, borderRadius: 18, background: T.surface,
+            width: wide ? 72 : 60, height: wide ? 72 : 60, borderRadius: 16, background: T.surface,
             border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: wide ? 36 : 30, marginBottom: 14,
+            justifyContent: 'center', fontSize: wide ? 32 : 26, marginBottom: 12,
           }}>
             {company.emoji || company.logo || '🏢'}
           </div>
-          <div style={{ fontSize: wide ? 22 : 20, fontWeight: 700, color: T.text }}>{company.name}</div>
+          <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{company.name}</div>
           <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
             {(company.industry || '').toUpperCase()}
           </div>
         </div>
-        {/* Stats grid */}
+
+        {/* Stats grid — 3 rows: Industry/Employees, Revenue/Founded, HQ/CEO */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
           {[
             ['INDUSTRY',  company.industry || 'N/A'],
             ['EMPLOYEES', company.employee_count || company.company_size || 'N/A'],
             ['REVENUE',   company.revenue || 'N/A'],
             ['FOUNDED',   company.founded_year || 'N/A'],
+            ['HQ',        hqLocation || '—'],
+            ['CEO',       ceoName || '—'],
           ].map(([l, v]) => (
-            <div key={l} style={{ padding: wide ? '13px 20px' : '11px 16px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 3 }}>{l}</div>
-              <div style={{ fontSize: wide ? 13 : 12, color: T.textMuted }}>{v}</div>
+            <div key={l} style={{ padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+              <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
             </div>
           ))}
         </div>
+
+        {/* ICP Score row — clickable to expand breakdown */}
+        <div
+          onClick={() => breakdown && setShowBreakdown(p => !p)}
+          style={{
+            padding: wide ? '10px 18px' : '8px 14px', borderBottom: `1px solid ${T.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            cursor: breakdown ? 'pointer' : 'default',
+            background: showBreakdown ? T.surface : 'transparent',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>ICP MATCH SCORE</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ fontSize: wide ? 20 : 18, fontWeight: 800, color: sc }}>{score}</span>
+              <span style={{ fontSize: 10, color: T.textFaint }}>/100</span>
+              <span style={{
+                fontSize: 9, color: sc, fontWeight: 700,
+                padding: '2px 7px', background: `${sc}15`, borderRadius: 5,
+                border: `1px solid ${sc}40`,
+              }}>{scoreLabel}</span>
+            </div>
+          </div>
+          {breakdown && (
+            <div style={{ fontSize: 10, color: T.textFaint, display: 'flex', alignItems: 'center', gap: 3 }}>
+              Details
+              <ChevronDown size={12} style={{ transform: showBreakdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </div>
+          )}
+        </div>
+
+        {/* Score breakdown — expanded */}
+        {showBreakdown && breakdown && (
+          <div style={{
+            padding: wide ? '10px 18px' : '8px 14px', borderBottom: `1px solid ${T.border}`,
+            background: T.surface, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+          }}>
+            {[
+              ['Industry', breakdown.industry],
+              ['Location', breakdown.location],
+              ['Size', breakdown.employeeSize],
+              ['Revenue', breakdown.revenue],
+            ].map(([label, data]) => {
+              const matchColor = data.match === 100 ? STATUS.green : data.match === 50 ? STATUS.amber : STATUS.red;
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+                  <span style={{ color: matchColor, fontWeight: 700, fontSize: 12, lineHeight: 1 }}>
+                    {data.match === 100 ? '✓' : data.match === 50 ? '≈' : '✗'}
+                  </span>
+                  <span style={{ color: T.textMuted }}>{label}</span>
+                  <span style={{ marginLeft: 'auto', color: T.textFaint, fontWeight: 600 }}>{data.contribution}pt</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Barry Intel */}
-        <div style={{ padding: wide ? '14px 20px' : '12px 16px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
+        <div style={{ padding: wide ? '12px 18px' : '10px 14px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-            <BarryAvatar size={20} />
+            <BarryAvatar size={18} />
             <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
           </div>
-          <p style={{ margin: 0, fontSize: wide ? 13 : 12, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: wide ? 12 : 11, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
             {barryText}
           </p>
         </div>
+
         {/* Action links */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '11px 14px' : '9px 12px', borderBottom: `1px solid ${T.border}` }}>
           <button
             onClick={e => { e.stopPropagation(); if (company.website_url) window.open(company.website_url, '_blank'); }}
-            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-          ><Globe size={13} />Visit Website</button>
+            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          ><Globe size={12} />Website</button>
           <button
             onClick={e => { e.stopPropagation(); if (company.linkedin_url) window.open(company.linkedin_url, '_blank'); }}
-            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-          ><Linkedin size={13} />LinkedIn</button>
+            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          ><Linkedin size={12} />LinkedIn</button>
         </div>
+
         {/* Decision buttons */}
-        <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px' : '11px 12px' }}>
+        <div style={{ display: 'flex', gap: 8, padding: wide ? '12px 14px 14px' : '10px 12px 12px' }}>
           <button
             onClick={e => { e.stopPropagation(); setGone('l'); setTimeout(onReject, 280); }}
-            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
-          ><X size={15} />Not a Match</button>
+            style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          ><X size={14} />Not a Match</button>
           <button
             onClick={e => { e.stopPropagation(); setGone('r'); setTimeout(onAccept, 280); }}
-            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
-          ><Check size={15} />This is a Match</button>
-        </div>
-        {/* Score footer */}
-        <div style={{ padding: wide ? '11px 20px 16px' : '9px 16px 14px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>COMPANY LEAD SCORE</div>
-            <span style={{ fontSize: wide ? 22 : 20, fontWeight: 800, color: sc }}>{score}</span>
-            <span style={{ fontSize: 11, color: T.textFaint }}>/100</span>
-          </div>
-          <div style={{ fontSize: 9, color: T.textFaint, padding: '3px 9px', background: T.surface, borderRadius: 6, border: `1px solid ${T.border}` }}>
-            {score >= 80 ? 'STRONG FIT' : score >= 60 ? 'NEEDS REVIEW' : 'LOW FIT'}
-          </div>
+            style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          ><Check size={14} />This is a Match</button>
         </div>
       </div>
     </div>
@@ -303,6 +395,407 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── QueueListPanel ───────────────────────────────────────────────────────────
+function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose }) {
+  const T = useT();
+  const upcoming = companies.slice(currentIndex);
+  const skipped = companies.filter(c => skippedIds.includes(c.id));
+
+  const ScorePip = ({ score }) => {
+    const c = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
+    return (
+      <span style={{ fontSize: 10, fontWeight: 700, color: c, padding: '2px 6px', background: `${c}18`, borderRadius: 4, border: `1px solid ${c}40` }}>
+        {score}
+      </span>
+    );
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: 320, zIndex: 500,
+      background: T.cardBg, borderLeft: `1px solid ${T.border}`,
+      display: 'flex', flexDirection: 'column',
+      boxShadow: `-8px 0 32px ${T.isDark ? '#00000060' : '#00000018'}`,
+      animation: 'slideIn 0.2s ease',
+    }}>
+      {/* Header */}
+      <div style={{ padding: '16px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>Queue</div>
+          <div style={{ fontSize: 10, color: T.textFaint }}>{upcoming.length} remaining</div>
+        </div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 20, lineHeight: 1 }}>×</button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Upcoming */}
+        <div style={{ padding: '10px 0' }}>
+          {upcoming.map((co, i) => (
+            <div
+              key={co.id}
+              onClick={() => { onJumpTo(currentIndex + i); onClose(); }}
+              style={{
+                padding: '9px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                borderBottom: `1px solid ${T.border}`,
+                background: i === 0 ? T.accentBg : 'transparent',
+              }}
+              onMouseEnter={e => { if (i !== 0) e.currentTarget.style.background = T.surface; }}
+              onMouseLeave={e => { if (i !== 0) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <div style={{ fontSize: 18, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {i === 0 && '▶ '}{co.name}
+                </div>
+                <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.industry || '—'}</div>
+              </div>
+              <ScorePip score={co.fit_score || co.score || 0} />
+            </div>
+          ))}
+          {upcoming.length === 0 && (
+            <div style={{ padding: '24px 18px', textAlign: 'center', color: T.textFaint, fontSize: 12 }}>Queue is empty</div>
+          )}
+        </div>
+
+        {/* Skipped */}
+        {skipped.length > 0 && (
+          <>
+            <div style={{ padding: '8px 18px 4px', fontSize: 9, letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
+              SKIPPED THIS SESSION
+            </div>
+            {skipped.map(co => (
+              <div
+                key={co.id}
+                onClick={() => { const idx = companies.findIndex(c => c.id === co.id); if (idx >= 0) { onJumpTo(idx); onClose(); } }}
+                style={{
+                  padding: '9px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: `1px solid ${T.border}`, opacity: 0.7,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = T.surface; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ fontSize: 16, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
+                  <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
+                </div>
+                <ScorePip score={co.fit_score || co.score || 0} />
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── SessionSummaryScreen ─────────────────────────────────────────────────────
+function SessionSummaryScreen({ reviewed, saved, skipped, streak, savedCompanies, onViewSaved, onDismiss, onRefresh, isRefreshing }) {
+  const T = useT();
+  const matchRate = reviewed > 0 ? Math.round((saved / reviewed) * 100) : 0;
+  const topMatch = savedCompanies.length > 0
+    ? savedCompanies.reduce((best, c) => ((c.fit_score || 0) > (best.fit_score || 0) ? c : best), savedCompanies[0])
+    : null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', maxWidth: 420, width: '100%', animation: 'slideUp 0.3s ease' }}>
+      <div style={{ fontSize: 40, marginBottom: 16 }}>🎯</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 4 }}>Session Complete</div>
+      <div style={{ fontSize: 12, color: T.textFaint, marginBottom: 24 }}>Here's how you did</div>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, width: '100%', marginBottom: 20 }}>
+        {[
+          ['Reviewed', reviewed, T.text, T.surface],
+          ['Saved', saved, BRAND.pink, T.accentBg],
+          ['Skipped', skipped, T.textMuted, T.surface],
+          ['Match Rate', `${matchRate}%`, STATUS.green, `${STATUS.green}10`],
+        ].map(([label, value, color, bg]) => (
+          <div key={label} style={{ padding: '12px 14px', background: bg, borderRadius: 12, border: `1px solid ${T.border2}`, textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: 10, color: T.textFaint, marginTop: 4 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Top match */}
+      {topMatch && (
+        <div style={{ width: '100%', padding: '12px 14px', background: T.surface, borderRadius: 12, border: `1px solid ${T.border2}`, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 28, flexShrink: 0 }}>{topMatch.emoji || topMatch.logo || '🏢'}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 2 }}>TOP MATCH</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topMatch.name}</div>
+            <div style={{ fontSize: 10, color: T.textFaint }}>{topMatch.industry || '—'}</div>
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score || 0}</div>
+        </div>
+      )}
+
+      {/* Streak */}
+      {streak > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20, padding: '8px 16px', background: `${STATUS.amber}18`, borderRadius: 20, border: `1px solid ${STATUS.amber}40` }}>
+          <Flame size={16} color={STATUS.amber} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: STATUS.amber }}>{streak}-day streak</span>
+        </div>
+      )}
+
+      {/* CTAs */}
+      {saved > 0 && (
+        <button
+          onClick={onViewSaved}
+          style={{ width: '100%', padding: 13, borderRadius: 12, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 }}
+        >
+          <Trophy size={16} />View {saved} Saved Companies
+        </button>
+      )}
+      <button
+        onClick={onRefresh}
+        disabled={isRefreshing}
+        style={{ width: '100%', padding: 12, borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}
+      >
+        {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
+        Find More Targets
+      </button>
+      <button
+        onClick={onDismiss}
+        style={{ padding: '8px 20px', borderRadius: 10, background: 'transparent', border: 'none', color: T.textFaint, fontSize: 12, cursor: 'pointer' }}
+      >
+        Come Back Tomorrow
+      </button>
+    </div>
+  );
+}
+
+// ─── BarryNudgeCard ───────────────────────────────────────────────────────────
+function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
+  const T = useT();
+  return (
+    <div style={{
+      position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)',
+      width: '90%', maxWidth: 400, zIndex: 50,
+      background: T.cardBg, border: `1px solid ${BRAND.pink}40`,
+      borderRadius: 16, padding: '14px 16px',
+      boxShadow: `0 8px 32px ${BRAND.pink}30`,
+      animation: 'slideUp 0.3s ease',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <BarryAvatar size={32} style={{ flexShrink: 0, marginTop: 2 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: T.text, marginBottom: 4 }}>
+            I'm noticing a pattern
+          </div>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: T.textMuted, lineHeight: 1.5 }}>
+            {count} of your recent saves are {industry} companies. Want me to weight that higher in your ICP?
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={onAccept}
+              style={{ flex: 1, padding: '7px 12px', borderRadius: 8, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Update ICP
+            </button>
+            <button
+              onClick={onDismiss}
+              style={{ padding: '7px 12px', borderRadius: 8, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BarryICPPanel ────────────────────────────────────────────────────────────
+// Side panel version of ICP chat — user can see the card while chatting
+function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
+  const T = useT();
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [hasEnoughContext, setHasEnoughContext] = useState(false);
+  const [icpParams, setIcpParams] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Build opening context message from ICP profile
+  const icpSummary = icpProfile
+    ? [
+        icpProfile.industries?.length ? `targeting ${icpProfile.industries.slice(0, 2).join(', ')}` : null,
+        icpProfile.isNationwide ? 'nationwide' : icpProfile.locations?.length ? `in ${icpProfile.locations.slice(0, 2).join(', ')}` : null,
+        icpProfile.companySizes?.length ? `${icpProfile.companySizes.slice(0, 2).join(' or ')} employees` : null,
+      ].filter(Boolean).join(', ')
+    : null;
+
+  useEffect(() => {
+    const openingMsg = icpSummary
+      ? `I'm looking at your ICP settings — ${icpSummary}. What do you want to dig into or refine?`
+      : null;
+    sendToBarry('__ICP_RECLARIFICATION__', [], openingMsg);
+  }, []);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const sendToBarry = async (msg, history, prefillResponse = null) => {
+    if (prefillResponse) {
+      setMessages([{ role: 'barry', content: prefillResponse }]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/barryMissionChat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, authToken, message: msg, conversationHistory: history, icpMode: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages(prev => [...prev, { role: 'barry', content: data.response_text }]);
+        const newHistory = [
+          ...history,
+          ...(msg !== '__ICP_RECLARIFICATION__' ? [{ role: 'user', content: msg }] : []),
+          { role: 'assistant', content: data.response_text },
+        ];
+        setConversationHistory(newHistory);
+        if (data.has_enough_context) { setHasEnoughContext(true); setIcpParams(data.icp_params); }
+      }
+    } catch (err) {
+      console.error('Barry ICP panel error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendMessage = () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    sendToBarry(userMsg, conversationHistory);
+  };
+
+  const handleFindCompanies = async () => {
+    if (!icpParams || isSearching) return;
+    setIsSearching(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) { onSearchComplete(); return; }
+      const authToken = await user.getIdToken();
+      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+      const profileDoc = await getDoc(profileRef);
+      const baseProfile = profileDoc.exists() ? profileDoc.data() : {};
+      const mergedProfile = {
+        ...baseProfile,
+        ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
+        ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
+        ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
+        ...(icpParams.companyKeywords?.length > 0 && { companyKeywords: icpParams.companyKeywords }),
+      };
+      await fetch('/.netlify/functions/search-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile }),
+      });
+    } catch (err) {
+      console.error('ICP search error:', err);
+    } finally {
+      onSearchComplete();
+    }
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 498, background: 'rgba(0,0,0,0.4)' }} />
+
+      {/* Side panel */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, zIndex: 499,
+        background: T.cardBg, borderLeft: `1px solid ${T.border}`,
+        display: 'flex', flexDirection: 'column',
+        boxShadow: `-8px 0 40px rgba(0,0,0,0.3)`,
+        animation: 'slideIn 0.22s ease',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <BarryAvatar size={36} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: T.text }}>Barry</div>
+            <div style={{ fontSize: 11, color: T.textFaint }}>ICP-aware targeting assistant</div>
+          </div>
+          <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
+        </div>
+
+        {/* Messages */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {messages.map((msg, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8, alignItems: 'flex-end' }}>
+              {msg.role === 'barry' && <BarryAvatar size={26} style={{ flexShrink: 0 }} />}
+              <div style={{
+                maxWidth: '82%', padding: '10px 14px',
+                borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                background: msg.role === 'user' ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface,
+                color: msg.role === 'user' ? '#fff' : T.text,
+                fontSize: 13, lineHeight: 1.55,
+                border: msg.role === 'barry' ? `1px solid ${T.border2}` : 'none',
+              }}>
+                {msg.content}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BarryAvatar size={26} style={{ flexShrink: 0 }} />
+              <div style={{ padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: T.surface, border: `1px solid ${T.border2}` }}>
+                <Loader size={14} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} />
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Find Companies CTA */}
+        {hasEnoughContext && (
+          <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
+            <button
+              onClick={handleFindCompanies}
+              disabled={isSearching}
+              style={{ width: '100%', padding: 13, borderRadius: 12, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontWeight: 700, fontSize: 14, cursor: isSearching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: isSearching ? 0.75 : 1 }}
+            >
+              {isSearching ? <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
+              {isSearching ? 'Finding companies…' : 'Find My Companies'}
+            </button>
+          </div>
+        )}
+
+        {/* Input */}
+        <div style={{ padding: hasEnoughContext ? '0 20px 16px' : '12px 20px', borderTop: hasEnoughContext ? 'none' : `1px solid ${T.border}`, display: 'flex', gap: 8, flexShrink: 0 }}>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            placeholder={hasEnoughContext ? 'Anything else to add…' : "Tell Barry who you're targeting…"}
+            disabled={loading || isSearching}
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border2}`, background: T.surface, color: T.text, fontSize: 13, outline: 'none' }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading || !input.trim() || isSearching}
+            style={{ padding: '10px 14px', borderRadius: 10, background: hasEnoughContext ? T.surface : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: hasEnoughContext ? `1px solid ${T.border2}` : 'none', color: hasEnoughContext ? T.textMuted : '#fff', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', opacity: loading || !input.trim() ? 0.5 : 1 }}
+          >
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -538,6 +1031,48 @@ export default function DailyLeads({ onNavigate }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
 
+  // ── ICP profile (for score breakdown) ───────────────────────────────────────
+  const [icpProfile, setIcpProfile] = useState(null);
+  const [icpWeights, setIcpWeights] = useState(DEFAULT_WEIGHTS);
+
+  // ── Session stats ────────────────────────────────────────────────────────────
+  const [sessionReviewed, setSessionReviewed] = useState(0);
+  const [sessionSaved, setSessionSaved] = useState(0);
+  const [sessionSkipped, setSessionSkipped] = useState(0);
+  const [sessionSavedCompanies, setSessionSavedCompanies] = useState([]);
+
+  // ── Extended undo history (up to 5) ──────────────────────────────────────────
+  const [swipeHistory, setSwipeHistory] = useState([]);
+  const [skippedInSession, setSkippedInSession] = useState([]); // company ids
+  const undoTimerRef = useRef(null);
+
+  // ── Queue list view ──────────────────────────────────────────────────────────
+  const [queueListOpen, setQueueListOpen] = useState(false);
+
+  // ── Barry side panel ─────────────────────────────────────────────────────────
+  const [barryPanelOpen, setBarryPanelOpen] = useState(false);
+
+  // ── Daily streak ─────────────────────────────────────────────────────────────
+  const [streakDays, setStreakDays] = useState(0);
+  const [showStreakMilestone, setShowStreakMilestone] = useState(null);
+
+  // ── Barry nudge between swipes ───────────────────────────────────────────────
+  const [nudgeData, setNudgeData] = useState(null);
+  const [showNudge, setShowNudge] = useState(false);
+
+  // ── Today's saved quick preview ──────────────────────────────────────────────
+  const [savedTodayOpen, setSavedTodayOpen] = useState(false);
+
+  // ── Session summary ──────────────────────────────────────────────────────────
+  const [showSessionSummary, setShowSessionSummary] = useState(false);
+
+  // ── Keyboard hint ────────────────────────────────────────────────────────────
+  const [showKeyHint, setShowKeyHint] = useState(false);
+
+  // Refs for keyboard handler (avoid stale closures)
+  const handleSwipeRef = useRef(null);
+  const handleUndoRef = useRef(null);
+
   // ── Batch Mode state ─────────────────────────────────────────────────────────
   const BATCH_SIZE = 10;
   const [batchSaves, setBatchSaves] = useState(0);
@@ -565,6 +1100,29 @@ export default function DailyLeads({ onNavigate }) {
 
   useEffect(() => { loadTodayLeads(); }, []);
 
+  // ── Keep refs current so keyboard handler never goes stale ──────────────────
+  useEffect(() => { handleSwipeRef.current = handleSwipe; });
+  useEffect(() => { handleUndoRef.current = handleUndo; });
+
+  // ── Keyboard shortcuts ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      // Never fire when typing in any input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      // Don't fire when modals/panels are open
+      if (showTitleSetup || showICPChat || barryPanelOpen || queueListOpen) return;
+
+      if (tab === 'companies' && !showBatchEnd) {
+        if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'L') { e.preventDefault(); handleSwipeRef.current?.('right'); }
+        if (e.key === 'ArrowLeft' || e.key === 'j' || e.key === 'J') { e.preventDefault(); handleSwipeRef.current?.('left'); }
+        if ((e.key === 'u' || e.key === 'U') && swipeHistory.length > 0) { e.preventDefault(); handleUndoRef.current?.(); }
+      }
+      if (e.key === 'b' || e.key === 'B') { e.preventDefault(); setBarryPanelOpen(true); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tab, showBatchEnd, showTitleSetup, showICPChat, barryPanelOpen, queueListOpen, swipeHistory.length]);
+
   // ── Company Mode ────────────────────────────────────────────────────────────
 
   const loadTodayLeads = async () => {
@@ -572,9 +1130,13 @@ export default function DailyLeads({ onNavigate }) {
       const user = auth.currentUser;
       if (!user) { navigate('/login'); return; }
 
+      // Load ICP profile (for score breakdown + Barry panel)
       const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
       const profileDoc = await getDoc(profileRef);
       if (!profileDoc.exists()) { setLoading(false); return; }
+      const profile = profileDoc.data();
+      setIcpProfile(profile);
+      if (profile.scoringWeights) setIcpWeights(profile.scoringWeights);
 
       const companiesRef = collection(db, 'users', user.uid, 'companies');
       const q = query(companiesRef, where('status', '==', 'pending'));
@@ -588,16 +1150,40 @@ export default function DailyLeads({ onNavigate }) {
       const acceptedSnapshot = await getDocs(acceptedQuery);
       setTotalAcceptedCompanies(acceptedSnapshot.size);
 
+      // Load today's accepted companies for the quick preview
+      const today = new Date().toISOString().split('T')[0];
+      const todaySaved = acceptedSnapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => c.swipedAt && c.swipedAt.startsWith(today));
+      setSessionSavedCompanies(todaySaved);
+
       const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
       const swipeProgressDoc = await getDoc(swipeProgressRef);
       if (swipeProgressDoc.exists()) {
         const data = swipeProgressDoc.data();
-        const today = new Date().toISOString().split('T')[0];
         if (data.lastSwipeDate === today) setDailySwipeCount(data.dailySwipeCount || 0);
         else setDailySwipeCount(0);
         setLastSwipeDate(data.lastSwipeDate || '');
         setHasSeenTitleSetup(data.hasSeenTitleSetup || false);
       }
+
+      // Load streak
+      const streakRef = doc(db, 'users', user.uid, 'scoutProgress', 'streak');
+      const streakDoc = await getDoc(streakRef);
+      if (streakDoc.exists()) {
+        const sd = streakDoc.data();
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        if (sd.lastActiveDate === today || sd.lastActiveDate === yesterday) {
+          setStreakDays(sd.currentStreak || 0);
+        } else {
+          setStreakDays(0);
+        }
+      }
+
+      // Show keyboard hint once
+      const hintSeen = localStorage.getItem('scout_keyhint_seen');
+      if (!hintSeen) { setShowKeyHint(true); localStorage.setItem('scout_keyhint_seen', '1'); }
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading daily leads:', error);
@@ -657,6 +1243,7 @@ export default function DailyLeads({ onNavigate }) {
       return;
     }
     const company = companies[currentIndex];
+    if (!company) return;
     try {
       const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
       await updateDoc(companyRef, {
@@ -715,6 +1302,63 @@ export default function DailyLeads({ onNavigate }) {
         setHasSeenTitleSetup(true);
         await setDoc(swipeProgressRef, { dailySwipeCount: newSwipeCount, lastSwipeDate: today, hasSeenTitleSetup: true });
       }
+      // ── Session stats ─────────────────────────────────────────────────────
+      const newReviewed = sessionReviewed + 1;
+      const newSaved = isInterested ? sessionSaved + 1 : sessionSaved;
+      const newSkipped = !isInterested ? sessionSkipped + 1 : sessionSkipped;
+      setSessionReviewed(newReviewed);
+      setSessionSaved(newSaved);
+      setSessionSkipped(newSkipped);
+      if (isInterested) {
+        setSessionSavedCompanies(prev => [...prev, company]);
+      }
+
+      // ── Undo history (keep last 5) ────────────────────────────────────────
+      const historyEntry = { company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount };
+      setSwipeHistory(prev => [...prev.slice(-4), historyEntry]);
+      setLastSwipe(historyEntry);
+
+      // Show undo button for skips (5 seconds), clear timer
+      if (!isInterested) {
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        setShowUndo(true);
+        setSkippedInSession(prev => [...prev, company.id]);
+        undoTimerRef.current = setTimeout(() => setShowUndo(false), 5000);
+      } else {
+        setShowUndo(false);
+        // Remove from skipped list if re-swiped right
+        setSkippedInSession(prev => prev.filter(id => id !== company.id));
+      }
+
+      // ── Streak update (first swipe of today) ─────────────────────────────
+      if (lastSwipeDate !== today) {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+        const streakRef = doc(db, 'users', user.uid, 'scoutProgress', 'streak');
+        const streakDoc = await getDoc(streakRef);
+        const currentStreak = streakDoc.exists() ? (streakDoc.data().currentStreak || 0) : 0;
+        const lastActive = streakDoc.exists() ? (streakDoc.data().lastActiveDate || '') : '';
+        const newStreak = lastActive === yesterday ? currentStreak + 1 : 1;
+        await setDoc(streakRef, { currentStreak: newStreak, lastActiveDate: today, longestStreak: Math.max(newStreak, streakDoc.exists() ? (streakDoc.data().longestStreak || 0) : 0) }, { merge: true });
+        setStreakDays(newStreak);
+        if ([3, 7, 14, 30].includes(newStreak)) {
+          setShowStreakMilestone(newStreak);
+          setTimeout(() => setShowStreakMilestone(null), 3000);
+        }
+      }
+
+      // ── Barry nudge — check pattern every 5 saves ─────────────────────────
+      if (isInterested && newSaved > 0 && newSaved % 5 === 0) {
+        const recentSaves = [...sessionSavedCompanies, company];
+        const last5 = recentSaves.slice(-5);
+        const industryCounts = {};
+        last5.forEach(c => { if (c.industry) industryCounts[c.industry] = (industryCounts[c.industry] || 0) + 1; });
+        const topIndustry = Object.entries(industryCounts).sort((a, b) => b[1] - a[1])[0];
+        if (topIndustry && topIndustry[1] >= 3 && !showNudge) {
+          setNudgeData({ industry: topIndustry[0], count: topIndustry[1] });
+          setShowNudge(true);
+        }
+      }
+
       // ── Batch tracking ───────────────────────────────────────────────────
       const updatedBatchSaves = isInterested ? batchSaves + 1 : batchSaves;
       const updatedBatchSwipeCount = batchSwipeCount + 1;
@@ -727,8 +1371,12 @@ export default function DailyLeads({ onNavigate }) {
         setShowBatchEnd(true);
         return; // Batch complete — show batch end screen instead of advancing
       }
-      if (currentIndex < companies.length - 1) setCurrentIndex(currentIndex + 1);
-      else loadTodayLeads();
+      if (currentIndex < companies.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      } else {
+        // Queue exhausted — show session summary
+        setShowSessionSummary(true);
+      }
     } catch (error) {
       console.error('Error handling swipe:', error);
       alert('Failed to save swipe. Please try again.');
@@ -736,26 +1384,37 @@ export default function DailyLeads({ onNavigate }) {
   };
 
   const handleUndo = async () => {
-    if (!lastSwipe) return;
+    // Pop from history (last item is the most recent)
+    const entry = swipeHistory.length > 0 ? swipeHistory[swipeHistory.length - 1] : lastSwipe;
+    if (!entry) return;
     const user = auth.currentUser;
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', lastSwipe.company.id);
+      const companyRef = doc(db, 'users', user.uid, 'companies', entry.company.id);
       await updateDoc(companyRef, { status: 'pending', swipedAt: null, swipeDirection: null });
-      if (lastSwipe.direction === 'right') {
+      if (entry.direction === 'right') {
         const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
-        await setDoc(swipeProgressRef, { dailySwipeCount: lastSwipe.previousSwipeCount, lastSwipeDate: today, hasSeenTitleSetup });
-        setDailySwipeCount(lastSwipe.previousSwipeCount);
-        setTotalAcceptedCompanies(totalAcceptedCompanies - 1);
+        await setDoc(swipeProgressRef, { dailySwipeCount: entry.previousSwipeCount, lastSwipeDate: today, hasSeenTitleSetup });
+        setDailySwipeCount(entry.previousSwipeCount);
+        setTotalAcceptedCompanies(prev => Math.max(0, prev - 1));
         await updateDoc(companyRef, { selected_titles: null, titles_updated_at: null, titles_source: null, auto_contact_status: null, auto_contact_count: null, auto_contact_searched_at: null });
-        const autoContactsQuery = query(collection(db, 'users', user.uid, 'contacts'), where('company_id', '==', lastSwipe.company.id), where('source', '==', 'icp_auto_discovery'));
+        const autoContactsQuery = query(collection(db, 'users', user.uid, 'contacts'), where('company_id', '==', entry.company.id), where('source', '==', 'icp_auto_discovery'));
         const autoContactDocs = await getDocs(autoContactsQuery);
         for (const contactDoc of autoContactDocs.docs) await deleteDoc(contactDoc.ref);
+        setSessionSaved(prev => Math.max(0, prev - 1));
+        setSessionSavedCompanies(prev => prev.filter(c => c.id !== entry.company.id));
+      } else {
+        setSessionSkipped(prev => Math.max(0, prev - 1));
+        setSkippedInSession(prev => prev.filter(id => id !== entry.company.id));
       }
-      setCurrentIndex(lastSwipe.index);
-      setLastSwipe(null);
+      setSessionReviewed(prev => Math.max(0, prev - 1));
+      // Pop from history
+      setSwipeHistory(prev => prev.slice(0, -1));
+      setLastSwipe(swipeHistory.length > 1 ? swipeHistory[swipeHistory.length - 2] : null);
+      setCurrentIndex(entry.index);
       setShowUndo(false);
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     } catch (error) {
       console.error('Error undoing swipe:', error);
       alert('Failed to undo swipe. Please try again.');
@@ -948,10 +1607,11 @@ export default function DailyLeads({ onNavigate }) {
   const currentCompany = companies[currentIndex];
   const visibleCompanies = companies.slice(currentIndex);
 
-  // Ghost cards for depth effect — height matches card wrapper
+  // Ghost cards for depth effect — CARD_H accounts for header + batch dots + hints
+  // so the outer column never overflows and shows no scrollbar
   const CARD_H = isDesktop
-    ? 'clamp(500px, calc(100vh - 160px), 700px)'
-    : 'clamp(460px, calc(100vh - 200px), 570px)';
+    ? 'clamp(440px, calc(100vh - 280px), 660px)'
+    : 'clamp(400px, calc(100vh - 300px), 560px)';
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
@@ -1008,6 +1668,40 @@ export default function DailyLeads({ onNavigate }) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+      {/* Streak milestone celebration */}
+      {showStreakMilestone && (
+        <div style={{
+          position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 600,
+          background: `linear-gradient(135deg,${STATUS.amber},#f97316)`,
+          color: '#fff', padding: '10px 20px', borderRadius: 20,
+          fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: `0 8px 24px ${STATUS.amber}60`,
+          animation: 'slideUp 0.3s ease',
+        }}>
+          <Flame size={16} /> {showStreakMilestone}-day streak — keep going!
+        </div>
+      )}
+
+      {/* Keyboard hint (first visit only) */}
+      {showKeyHint && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 600,
+          background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 12,
+          padding: '10px 14px', fontSize: 11, color: T.textMuted,
+          boxShadow: `0 4px 16px ${T.isDark ? '#00000060' : '#00000018'}`,
+          animation: 'slideUp 0.3s ease',
+        }}>
+          <div style={{ fontWeight: 700, color: T.text, marginBottom: 6 }}>Keyboard shortcuts</div>
+          {[['→ / L', 'Save'], ['← / J', 'Skip'], ['U', 'Undo'], ['B', 'Barry']].map(([k, d]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 2 }}>
+              <span style={{ color: BRAND.pink, fontWeight: 600 }}>{k}</span>
+              <span>{d}</span>
+            </div>
+          ))}
+          <button onClick={() => setShowKeyHint(false)} style={{ marginTop: 8, width: '100%', padding: '4px 0', background: 'none', border: 'none', color: T.textFaint, fontSize: 10, cursor: 'pointer' }}>Got it</button>
+        </div>
+      )}
+
       {/* Header + tabs */}
       <div style={{ padding: isDesktop ? '20px 32px 0' : '16px 26px 0', background: T.appBg }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDesktop ? 16 : 14 }}>
@@ -1015,14 +1709,25 @@ export default function DailyLeads({ onNavigate }) {
             <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Lead Insights</h2>
             <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>AI-curated prospects matching your ICP</p>
           </div>
-          <button
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            title="Refresh queue"
-            style={{ width: 34, height: 34, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isRefreshing ? 'not-allowed' : 'pointer', opacity: isRefreshing ? 0.5 : 1 }}
-          >
-            <RefreshCw size={14} color={T.textMuted} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {isDesktop && (
+              <button
+                onClick={() => setQueueListOpen(o => !o)}
+                title="View Queue"
+                style={{ width: 34, height: 34, borderRadius: 9, background: queueListOpen ? T.accentBg : T.surface, border: `1px solid ${queueListOpen ? T.accentBdr : T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <List size={14} color={queueListOpen ? BRAND.pink : T.textMuted} />
+              </button>
+            )}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              title="Refresh queue"
+              style={{ width: 34, height: 34, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isRefreshing ? 'not-allowed' : 'pointer', opacity: isRefreshing ? 0.5 : 1 }}
+            >
+              <RefreshCw size={14} color={T.textMuted} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+            </button>
+          </div>
         </div>
         {refreshMessage && (
           <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: 12 }}>
@@ -1053,45 +1758,48 @@ export default function DailyLeads({ onNavigate }) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'hidden', overflowX: 'hidden', position: 'relative' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
             <>
               {companies.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                  <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>ALL COMPANIES REVIEWED</div>
-                  <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>
-                    {companies.length === 0 ? "No pending companies in your queue." : "You've reviewed all companies for today."}
-                  </p>
-                  <button
-                    onClick={handleManualRefresh}
-                    disabled={isRefreshing}
-                    style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}
-                  >
-                    {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
-                    Find More Targets
-                  </button>
-                  {totalAcceptedCompanies > 0 && (
-                    <button
-                      onClick={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-                      style={{ marginTop: 10, padding: '8px 20px', borderRadius: 10, background: T.cyanBg, border: `1px solid ${T.cyanBdr}`, color: T.cyan, fontSize: 12, cursor: 'pointer' }}
-                    >
-                      View {totalAcceptedCompanies} Saved Companies →
+                /* Empty queue — session summary if we reviewed something, else find more */
+                showSessionSummary || sessionReviewed > 0 ? (
+                  <SessionSummaryScreen
+                    reviewed={sessionReviewed}
+                    saved={sessionSaved}
+                    skipped={sessionSkipped}
+                    streak={streakDays}
+                    savedCompanies={sessionSavedCompanies}
+                    onViewSaved={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+                    onDismiss={() => setShowSessionSummary(false)}
+                    onRefresh={handleManualRefresh}
+                    isRefreshing={isRefreshing}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                    <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>QUEUE EMPTY</div>
+                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>No pending companies. Barry will find new targets.</p>
+                    <button onClick={handleManualRefresh} disabled={isRefreshing} style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
+                      {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
+                      Find More Targets
                     </button>
-                  )}
-                </div>
-              ) : currentIndex >= companies.length ? (
-                <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                  <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>SESSION COMPLETE</div>
-                  <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>You've reviewed all targets in this session.</p>
-                  <button
-                    onClick={() => { resetBatch(); setCurrentIndex(0); loadTodayLeads(); }}
-                    style={{ padding: '8px 20px', borderRadius: 10, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, cursor: 'pointer', fontSize: 12 }}
-                  >Reset Queue</button>
-                </div>
+                  </div>
+                )
+              ) : showSessionSummary || currentIndex >= companies.length ? (
+                <SessionSummaryScreen
+                  reviewed={sessionReviewed}
+                  saved={sessionSaved}
+                  skipped={sessionSkipped}
+                  streak={streakDays}
+                  savedCompanies={sessionSavedCompanies}
+                  onViewSaved={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+                  onDismiss={() => { setShowSessionSummary(false); resetBatch(); setCurrentIndex(0); loadTodayLeads(); }}
+                  onRefresh={handleManualRefresh}
+                  isRefreshing={isRefreshing}
+                />
               ) : showBatchEnd ? (
                 /* ── Batch end screen ───────────────────────────────────── */
                 <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%' }}>
@@ -1198,18 +1906,32 @@ export default function DailyLeads({ onNavigate }) {
                         onAccept={() => handleSwipe('right')}
                         onReject={() => handleSwipe('left')}
                         wide={isDesktop}
+                        icpProfile={icpProfile}
+                        icpWeights={icpWeights}
+                      />
+                    )}
+
+                    {/* Barry nudge card (overlaid at bottom of card) */}
+                    {showNudge && nudgeData && (
+                      <BarryNudgeCard
+                        industry={nudgeData.industry}
+                        count={nudgeData.count}
+                        onAccept={() => { setShowNudge(false); if (onNavigate) onNavigate('icpsettings'); }}
+                        onDismiss={() => setShowNudge(false)}
                       />
                     )}
                   </div>
-                  {showUndo && lastSwipe && (
+
+                  {/* Undo button — floats below card, disappears after 5s */}
+                  {showUndo && swipeHistory.length > 0 && (
                     <button
                       onClick={handleUndo}
-                      style={{ marginTop: 14, padding: '8px 18px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
+                      style={{ marginTop: 10, padding: '7px 16px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, animation: 'slideUp 0.2s ease' }}
                     >
-                      <RotateCcw size={13} />Undo last swipe
+                      <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Sharpens targeting</span>
                     <span>Add to hunt list →</span>
                   </div>
@@ -1290,18 +2012,24 @@ export default function DailyLeads({ onNavigate }) {
             display: 'flex', flexDirection: 'column',
             padding: '20px 16px',
             overflowY: 'auto',
-            gap: 16,
+            gap: 14,
           }}>
-            {/* Daily progress */}
+            {/* Daily progress bar */}
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 10 }}>TODAY'S PROGRESS</div>
-              <div style={{ height: 5, background: T.border, borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint }}>TODAY'S PROGRESS</div>
+                {streakDays > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: STATUS.amber }}>
+                    <Flame size={12} color={STATUS.amber} />{streakDays}d
+                  </div>
+                )}
+              </div>
+              <div style={{ height: 5, background: T.border, borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
                 <div style={{
                   height: '100%',
                   width: `${Math.min((dailySwipeCount / DAILY_SWIPE_LIMIT) * 100, 100)}%`,
                   background: `linear-gradient(90deg, ${BRAND.pink}, ${BRAND.cyan})`,
-                  borderRadius: 3,
-                  transition: 'width 0.4s ease',
+                  borderRadius: 3, transition: 'width 0.4s ease',
                 }} />
               </div>
               <div style={{ fontSize: 11, color: T.textMuted }}>
@@ -1310,70 +2038,122 @@ export default function DailyLeads({ onNavigate }) {
               </div>
             </div>
 
-            {/* Stats grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ padding: '10px 12px', background: T.surface, borderRadius: 10, border: `1px solid ${T.border2}` }}>
-                <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 5 }}>IN QUEUE</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: T.text, lineHeight: 1 }}>
-                  {Math.max(0, companies.length - currentIndex)}
-                </div>
-              </div>
-              <div style={{ padding: '10px 12px', background: T.accentBg, borderRadius: 10, border: `1px solid ${T.accentBdr}` }}>
-                <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 5 }}>SAVED</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: BRAND.pink, lineHeight: 1 }}>
-                  {totalAcceptedCompanies}
-                </div>
+            {/* Session stats — 4-up grid */}
+            <div>
+              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 8 }}>THIS SESSION</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+                {[
+                  ['REVIEWED', sessionReviewed, T.text, T.surface],
+                  ['SAVED', sessionSaved, BRAND.pink, T.accentBg],
+                  ['SKIPPED', sessionSkipped, T.textMuted, T.surface],
+                  ['MATCH %', sessionReviewed > 0 ? `${Math.round((sessionSaved / sessionReviewed) * 100)}%` : '—', STATUS.green, `${STATUS.green}10`],
+                ].map(([label, value, color, bg]) => (
+                  <div key={label} style={{ padding: '8px 10px', background: bg, borderRadius: 9, border: `1px solid ${T.border2}` }}>
+                    <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* View saved button */}
-            {totalAcceptedCompanies > 0 && (
+            {/* Queue count */}
+            <div style={{ padding: '10px 12px', background: T.surface, borderRadius: 10, border: `1px solid ${T.border2}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 4 }}>IN QUEUE</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.text, lineHeight: 1 }}>{Math.max(0, companies.length - currentIndex)}</div>
+              </div>
               <button
-                onClick={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
-                style={{
-                  padding: '10px 14px', borderRadius: 10,
-                  background: `linear-gradient(135deg, ${BRAND.pink}, #c0146a)`,
-                  border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', width: '100%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
+                onClick={() => setQueueListOpen(o => !o)}
+                style={{ padding: '5px 10px', borderRadius: 7, background: queueListOpen ? T.accentBg : 'transparent', border: `1px solid ${queueListOpen ? T.accentBdr : T.border2}`, color: queueListOpen ? BRAND.pink : T.textFaint, fontSize: 11, cursor: 'pointer' }}
               >
-                View {totalAcceptedCompanies} Saved →
+                View
               </button>
+            </div>
+
+            {/* Today's saved quick preview */}
+            {sessionSavedCompanies.length > 0 && (
+              <div>
+                <div
+                  onClick={() => setSavedTodayOpen(o => !o)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: savedTodayOpen ? 8 : 0 }}
+                >
+                  <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint }}>SAVED TODAY ({sessionSavedCompanies.length})</div>
+                  <ChevronDown size={12} color={T.textFaint} style={{ transform: savedTodayOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </div>
+                {savedTodayOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {sessionSavedCompanies.slice(-4).reverse().map(co => (
+                      <div key={co.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.surface, borderRadius: 8, border: `1px solid ${T.border2}` }}>
+                        <div style={{ fontSize: 16, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
+                          <div style={{ fontSize: 10, color: T.textFaint }}>{co.fit_score || 0}/100</div>
+                        </div>
+                        <button
+                          onClick={() => navigate('/recon', { state: { companyId: co.id } })}
+                          style={{ padding: '3px 7px', borderRadius: 5, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: 9, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          Recon
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
+                      style={{ padding: '7px', borderRadius: 8, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      View All Saved →
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Divider */}
             <div style={{ height: 1, background: T.border }} />
 
-            {/* How it works */}
+            {/* Keyboard shortcuts reference */}
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 10 }}>HOW IT WORKS</div>
+              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 8 }}>SHORTCUTS</div>
               {[
-                ['→ Right drag', 'Add to hunt list'],
-                ['← Left drag', 'Sharpens targeting'],
-                ['↩ Undo', 'Reverse last action'],
-                ['↻ Refresh', 'Find new targets'],
+                ['→ / L', 'Save'],
+                ['← / J', 'Skip'],
+                ['U', 'Undo'],
+                ['B', 'Barry'],
               ].map(([key, desc]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${T.border}` }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: BRAND.pink }}>{key}</span>
                   <span style={{ fontSize: 11, color: T.textFaint }}>{desc}</span>
                 </div>
               ))}
             </div>
 
-            {/* Barry branding */}
-            <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: T.accentBg, borderRadius: 10, border: `1px solid ${T.accentBdr}` }}>
-              <BarryAvatar size={24} />
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: BRAND.pink }}>Barry AI</div>
-                <div style={{ fontSize: 9, color: T.textFaint }}>Curating your queue daily</div>
-              </div>
+            {/* Barry branding + Chat button */}
+            <div style={{ marginTop: 'auto' }}>
+              <button
+                onClick={() => setBarryPanelOpen(true)}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 10,
+                  background: T.accentBg, border: `1px solid ${T.accentBdr}`,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                  textAlign: 'left',
+                }}
+              >
+                <BarryAvatar size={28} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.pink }}>Chat with Barry</div>
+                  <div style={{ fontSize: 9, color: T.textFaint }}>Refine your ICP targeting</div>
+                </div>
+                <ArrowRight size={13} color={BRAND.pink} />
+              </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Title setup modal */}
       {showTitleSetup && <ContactTitleSetup onComplete={handleTitleSetupComplete} />}
+
+      {/* ICP Chat modal (post-batch) */}
       {showICPChat && (
         <IcpReclarificationModal
           userId={auth.currentUser?.uid}
@@ -1382,6 +2162,30 @@ export default function DailyLeads({ onNavigate }) {
             resetBatch();
             loadTodayLeads();
           }}
+        />
+      )}
+
+      {/* Barry ICP-aware side panel (manual trigger) */}
+      {barryPanelOpen && (
+        <BarryICPPanel
+          userId={auth.currentUser?.uid}
+          icpProfile={icpProfile}
+          onClose={() => setBarryPanelOpen(false)}
+          onSearchComplete={() => {
+            setBarryPanelOpen(false);
+            loadTodayLeads();
+          }}
+        />
+      )}
+
+      {/* Queue list panel */}
+      {queueListOpen && isDesktop && (
+        <QueueListPanel
+          companies={companies}
+          currentIndex={currentIndex}
+          skippedIds={skippedInSession}
+          onJumpTo={(idx) => setCurrentIndex(idx)}
+          onClose={() => setQueueListOpen(false)}
         />
       )}
     </div>

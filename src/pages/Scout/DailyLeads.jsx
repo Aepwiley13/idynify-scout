@@ -621,45 +621,74 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
   const [icpParams, setIcpParams] = useState(null);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Build opening context message from ICP profile
-  const icpSummary = icpProfile
-    ? [
-        icpProfile.industries?.length ? `targeting ${icpProfile.industries.slice(0, 2).join(', ')}` : null,
-        icpProfile.isNationwide ? 'nationwide' : icpProfile.locations?.length ? `in ${icpProfile.locations.slice(0, 2).join(', ')}` : null,
-        icpProfile.companySizes?.length ? `${icpProfile.companySizes.slice(0, 2).join(' or ')} employees` : null,
-      ].filter(Boolean).join(', ')
-    : null;
-
+  // On mount: load prior conversation from Firestore, then open a fresh Barry turn
   useEffect(() => {
-    const openingMsg = icpSummary
-      ? `I'm looking at your ICP settings — ${icpSummary}. What do you want to dig into or refine?`
-      : null;
-    sendToBarry('__ICP_RECLARIFICATION__', [], openingMsg);
-  }, []);
+    let cancelled = false;
+    async function init() {
+      const user = auth.currentUser;
+      if (!user) { setHistoryLoaded(true); sendToBarry('__ICP_RECLARIFICATION__', [], icpProfile); return; }
+
+      try {
+        const convRef = doc(db, 'users', user.uid, 'barryConversations', 'icpChat');
+        const convDoc = await getDoc(convRef);
+        if (!cancelled && convDoc.exists()) {
+          const saved = convDoc.data();
+          const priorHistory = saved.messages || [];
+          if (priorHistory.length > 0) {
+            // Rebuild display messages from history
+            const displayMsgs = priorHistory.map(h => ({
+              role: h.role === 'assistant' ? 'barry' : 'user',
+              content: h.content,
+            }));
+            setMessages(displayMsgs);
+            setConversationHistory(priorHistory);
+            setHistoryLoaded(true);
+            // Don't re-open — just let Barry pick up where they left off
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load Barry conversation history:', err);
+      }
+
+      if (!cancelled) {
+        setHistoryLoaded(true);
+        sendToBarry('__ICP_RECLARIFICATION__', [], icpProfile);
+      }
+    }
+    init();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const sendToBarry = async (msg, history, prefillResponse = null) => {
-    if (prefillResponse) {
-      setMessages([{ role: 'barry', content: prefillResponse }]);
-      return;
-    }
+  const sendToBarry = async (msg, history, profileOverride) => {
     setLoading(true);
     try {
       const user = auth.currentUser;
       if (!user) return;
       const authToken = await user.getIdToken();
+      const profileToSend = profileOverride !== undefined ? profileOverride : icpProfile;
       const res = await fetch('/.netlify/functions/barryMissionChat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, authToken, message: msg, conversationHistory: history, icpMode: true }),
+        body: JSON.stringify({
+          userId,
+          authToken,
+          message: msg,
+          conversationHistory: history,
+          icpMode: true,
+          icpProfile: profileToSend,
+        }),
       });
       const data = await res.json();
       if (data.success) {
         setMessages(prev => [...prev, { role: 'barry', content: data.response_text }]);
-        const newHistory = [
+        // Use server-returned history (includes Firestore persistence on server side)
+        const newHistory = data.updatedHistory || [
           ...history,
           ...(msg !== '__ICP_RECLARIFICATION__' ? [{ role: 'user', content: msg }] : []),
           { role: 'assistant', content: data.response_text },

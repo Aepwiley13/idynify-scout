@@ -161,12 +161,44 @@ function detectModeShift(contextStack, intent, currentMode) {
 
 // ── ICP reclarification prompt ────────────────────────────────────────────────
 
-function buildIcpReclarificationPrompt() {
+function buildIcpReclarificationPrompt(icpProfile) {
+  // Build a human-readable summary of the current ICP settings if available
+  let currentIcpBlock = '';
+  if (icpProfile) {
+    const lines = [];
+    if (icpProfile.industries?.length) lines.push(`- Industries: ${icpProfile.industries.join(', ')}`);
+    if (icpProfile.isNationwide) {
+      lines.push('- Location: Nationwide (all US)');
+    } else if (icpProfile.locations?.length) {
+      lines.push(`- Locations: ${icpProfile.locations.join(', ')}`);
+    }
+    if (icpProfile.companySizes?.length) lines.push(`- Company sizes: ${icpProfile.companySizes.join(', ')}`);
+    if (icpProfile.revenueRanges?.length) lines.push(`- Revenue ranges: ${icpProfile.revenueRanges.join(', ')}`);
+    if (icpProfile.targetTitles?.length) lines.push(`- Target titles: ${icpProfile.targetTitles.join(', ')}`);
+    if (icpProfile.companyKeywords?.length) lines.push(`- Keywords: ${icpProfile.companyKeywords.join(', ')}`);
+
+    if (lines.length > 0) {
+      currentIcpBlock = `
+CURRENT ICP SETTINGS (already saved by the user):
+${lines.join('\n')}
+
+The user has an existing ICP set up. Your job is to:
+1. Briefly confirm you can see these settings (name the key ones — industries, sizes, locations)
+2. Ask if this is still accurate or if anything has changed
+3. Once confirmed or refined, you have enough context — summarize and offer to search
+
+Do NOT ask from scratch if settings already exist. Start by acknowledging what's there.
+`;
+    }
+  }
+
+  const hasExistingIcp = currentIcpBlock.length > 0;
+
   return `You are Barry, an expert B2B sales intelligence AI. You are sharp, warm, and direct.
-
-SITUATION: The user just reviewed 10 company recommendations and saved none of them. The current targeting isn't hitting the mark. Your job: have a focused, natural conversation to understand who they actually want to reach — then give me the ICP parameters to run a better search.
-
-YOUR GOAL: Extract clear signals about:
+${hasExistingIcp ? currentIcpBlock : `
+SITUATION: The user wants to define or refine their target company profile. Your job: have a focused, natural conversation to understand who they actually want to reach — then give the ICP parameters to run a better search.
+`}
+YOUR GOAL: Extract or confirm clear signals about:
 1. Industry / type of company they target
 2. Company size (employees, stage, or revenue range)
 3. Who they sell to (titles/roles)
@@ -176,7 +208,7 @@ APPROACH:
 - One question at a time — never ask multiple things at once
 - Be warm and conversational — like a sharp colleague helping them think through this
 - Acknowledge what they share before asking the next thing
-- 2-4 turns is usually enough to get clear signals
+- If settings already exist, confirm them first — don't re-ask what you already know
 - When confident, summarize what you heard and tell them you're ready to search
 
 OUTPUT: Return ONLY valid JSON. No text outside the JSON.
@@ -189,7 +221,7 @@ While gathering context:
   "icp_params": null
 }
 
-When you have enough (2-4 turns typically):
+When you have enough context (immediately if existing ICP is confirmed, or after 2-4 turns otherwise):
 {
   "intent": "ICP_SCOUT_CLARIFY",
   "response_text": "Alright — [1-2 sentence summary of what they're looking for]. Hit 'Find My Companies' and I'll pull a fresh batch.",
@@ -208,7 +240,7 @@ icp_params format:
 - targetTitles: array of specific job titles they sell to
 - companyKeywords: descriptive terms (e.g. ["startup", "b2b", "agency", "saas", "enterprise"])
 
-All fields are optional — only include what the user actually mentioned. Start with the first targeted question.`;
+All fields are optional — only include what the user actually mentioned or confirmed. ${hasExistingIcp ? 'Start by acknowledging the current ICP settings.' : 'Start with the first targeted question.'}`;
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -380,6 +412,7 @@ export const handler = async (event) => {
     const barryMode = body.barryMode || body.mode || 'SUGGEST';
     const contextStack = body.contextStack || null;
     const isIcpMode = body.icpMode === true;
+    const icpProfile = body.icpProfile || null;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -510,7 +543,18 @@ Return valid JSON only:
       // ── ICP Reclarification Path ───────────────────────────────────────────
       console.log('[barryMissionChat] ICP reclarification mode...');
 
-      const icpSystemPrompt = buildIcpReclarificationPrompt();
+      // Use client-provided ICP profile, or fall back to loading from Firestore
+      let resolvedIcpProfile = icpProfile;
+      if (!resolvedIcpProfile) {
+        try {
+          const profileDoc = await db.collection('users').doc(userId).collection('companyProfile').doc('current').get();
+          if (profileDoc.exists) resolvedIcpProfile = profileDoc.data();
+        } catch (icpErr) {
+          console.warn('[barryMissionChat] Could not load ICP profile from Firestore:', icpErr.message);
+        }
+      }
+
+      const icpSystemPrompt = buildIcpReclarificationPrompt(resolvedIcpProfile);
       const isOpening = message === '__ICP_RECLARIFICATION__';
 
       const icpMessages = isOpening
@@ -551,6 +595,26 @@ Return valid JSON only:
         clearTimeout(icpTimeout);
       }
 
+      // Build updated conversation history to return to the client
+      const updatedIcpHistory = isOpening
+        ? [{ role: 'assistant', content: icpParsed.response_text }]
+        : [
+            ...conversationHistory,
+            { role: 'user', content: message },
+            { role: 'assistant', content: icpParsed.response_text },
+          ];
+
+      // Persist conversation to Firestore (non-fatal)
+      try {
+        await db.collection('users').doc(userId).collection('barryConversations').doc('icpChat').set({
+          messages: updatedIcpHistory,
+          updatedAt: new Date().toISOString(),
+          icpProfile: resolvedIcpProfile || null,
+        });
+      } catch (persistErr) {
+        console.warn('[barryMissionChat] Could not persist ICP conversation:', persistErr.message);
+      }
+
       await logApiUsage(userId, 'barryMissionChat', 'success', {
         responseTime: Date.now() - startTime,
         metadata: { type: 'icp_reclarification' }
@@ -559,7 +623,7 @@ Return valid JSON only:
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ success: true, ...icpParsed }),
+        body: JSON.stringify({ success: true, updatedHistory: updatedIcpHistory, ...icpParsed }),
       };
 
     } else {

@@ -176,6 +176,7 @@ export default function CreateMission() {
   }
 
   function handleRemoveStep(stepIndex) {
+    if (editingStepIndex === stepIndex) setEditingStepIndex(null);
     const updated = { ...missionData };
     updated.steps = updated.steps.filter((_, index) => index !== stepIndex);
     setMissionData(updated);

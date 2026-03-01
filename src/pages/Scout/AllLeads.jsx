@@ -399,7 +399,11 @@ function AllLeadsCard({
     try {
       const snap = await getDocs(collection(db, 'users', user.uid, 'missions'));
       const missionDoc = snap.docs.find(d => d.id === missionId);
-      if (!missionDoc) return;
+      if (!missionDoc) {
+        setMissionAssigned('⚠ Mission not found');
+        setTimeout(() => setMissionAssigned(null), 2500);
+        return;
+      }
       const missionData = missionDoc.data();
       const alreadyIn = (missionData.contacts || []).some(c => c.contactId === contact.id);
       if (!alreadyIn) {
@@ -425,6 +429,8 @@ function AllLeadsCard({
       setTimeout(() => setMissionAssigned(null), 2500);
     } catch (err) {
       console.error('[AllLeads] mission assign failed:', err);
+      setMissionAssigned('⚠ Failed');
+      setTimeout(() => setMissionAssigned(null), 2500);
     } finally {
       setMissionAssigning(false);
     }
@@ -665,7 +671,7 @@ function AllLeadsCard({
                   }}
                   title={missionAssigned ? `Added to ${missionAssigned}` : 'Add to Mission'}
                 >
-                  {missionAssigning ? <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} /> : missionAssigned ? '✓' : <Target size={11} />}
+                  {missionAssigning ? <Loader size={11} className="mission-assign-spin" /> : missionAssigned ? '✓' : <Target size={11} />}
                 </button>
 
                 {missionPickerOpen && (
@@ -683,7 +689,7 @@ function AllLeadsCard({
                     </div>
                     {missionsLoading ? (
                       <div style={{ padding: '8px 4px', color: T.textFaint, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
+                        <Loader size={11} className="mission-assign-spin" /> Loading...
                       </div>
                     ) : missions.length === 0 ? (
                       <div style={{ padding: '6px 4px', color: T.textFaint, fontSize: 11 }}>No active missions</div>

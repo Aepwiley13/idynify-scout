@@ -1691,6 +1691,14 @@
 }
 
 /* ── Mission picker: Create new mission button ── */
+.missions-empty-hint {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  padding: 16px 8px;
+  line-height: 1.5;
+}
+
 .mission-create-new {
   display: flex;
   align-items: center;

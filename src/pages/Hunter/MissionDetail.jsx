@@ -348,9 +348,11 @@ export default function MissionDetail() {
                     {contactEntry.personalizationStatus === 'pending_approval' && (
                       <button
                         className="action-hint action-hint-approval"
-                        onClick={() => setExpandedApprovalContactId(
-                          expandedApprovalContactId === contactEntry.contactId ? null : contactEntry.contactId
-                        )}
+                        onClick={() => {
+                          const closing = expandedApprovalContactId === contactEntry.contactId;
+                          setExpandedApprovalContactId(closing ? null : contactEntry.contactId);
+                          if (closing) setEditingStep(null);
+                        }}
                       >
                         <Sparkles className="w-3 h-3" />
                         {contactEntry.personalizedSteps?.filter(s => s.status === 'pending_approval').length} steps need approval

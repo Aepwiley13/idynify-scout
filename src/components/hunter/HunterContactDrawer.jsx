@@ -429,10 +429,16 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // === ADD TO MISSION ===
 
   async function handleAddToMission(missionId) {
+    if (loading) return; // prevent double-click while in flight
     setLoading(true);
     try {
       const user = auth.currentUser;
       const mission = missions.find(m => m.id === missionId);
+      if (!mission) {
+        setToastMessage('Mission not found. Please try again.');
+        setLoading(false);
+        return;
+      }
 
       const newContactEntry = {
         contactId: contact.id,
@@ -1216,23 +1222,27 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               <h3 className="view-title">Add to Mission</h3>
 
               <div className="missions-list">
-                {missions.map(mission => (
-                  <div
-                    key={mission.id}
-                    className="mission-select-item"
-                    onClick={() => handleAddToMission(mission.id)}
-                  >
-                    <div className="mission-info">
-                      <span className="mission-name">{mission.name}</span>
-                      <span className="mission-goal">{mission.goalName}</span>
+                {missions.length === 0 ? (
+                  <p className="missions-empty-hint">No active missions yet. Create one to start running sequences.</p>
+                ) : (
+                  missions.map(mission => (
+                    <div
+                      key={mission.id}
+                      className="mission-select-item"
+                      onClick={() => handleAddToMission(mission.id)}
+                    >
+                      <div className="mission-info">
+                        <span className="mission-name">{mission.name}</span>
+                        <span className="mission-goal">{mission.goalName}</span>
+                      </div>
+                      <div className="mission-stats">
+                        <span>{mission.contacts?.length || 0} contacts</span>
+                        <span>•</span>
+                        <span>{mission.steps?.filter(s => s.enabled !== false).length || 0} steps</span>
+                      </div>
                     </div>
-                    <div className="mission-stats">
-                      <span>{mission.contacts?.length || 0} contacts</span>
-                      <span>•</span>
-                      <span>{mission.steps?.filter(s => s.enabled !== false).length || 0} steps</span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
                 <button
                   className="mission-create-new"
                   onClick={() => navigate('/hunter/create-mission')}
@@ -1280,7 +1290,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               )}
 
               <h3 className="personalization-title">
-                {personalizationError
+                {personalizationError || personalizedSteps.length === 0
                   ? `${contact.firstName || 'Contact'} added to mission`
                   : `Barry personalized ${personalizedSteps.length} step${personalizedSteps.length !== 1 ? 's' : ''} for ${contact.firstName || 'this contact'}`
                 }

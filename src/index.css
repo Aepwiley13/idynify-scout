@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global utility: spin animation for Lucide Loader icon (used in inline-styled components) */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.mission-assign-spin {
+  animation: spin 1s linear infinite;
+}

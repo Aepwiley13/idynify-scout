@@ -400,8 +400,9 @@ export async function executeSendAction({
       trigger: STATUS_TRIGGERS.MESSAGE_SENT
     });
 
-    // Auto-set a 3-day follow-up reminder so the OVERDUE indicator fires if no reply
-    const nextDue = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    // Auto-set a follow-up reminder so the OVERDUE indicator fires if no reply arrives
+    const FOLLOW_UP_DAYS = 3;
+    const nextDue = new Date(Date.now() + FOLLOW_UP_DAYS * 24 * 60 * 60 * 1000).toISOString();
     updateDoc(doc(db, 'users', userId, 'contacts', contact.id), {
       next_step_due: nextDue,
       updated_at: new Date().toISOString(),

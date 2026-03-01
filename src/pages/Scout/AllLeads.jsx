@@ -212,26 +212,28 @@ function Av({ initials, color = BRAND.pink, size = 36, src }) {
   );
 }
 
+// ─── EngageBadge constants (module-scope — not recreated per render) ──────────
+const HUNTER_STATUS_LABELS = {
+  active_mission:  'ACTIVE MISSION',
+  awaiting_reply:  'AWAITING REPLY',
+  engaged_pending: 'PROCESSING',
+  in_conversation: 'REPLIED',
+};
+
+const ENGAGE_BADGE_CONFIGS = {
+  not_started:   { label: 'COLD',      bg: '#6b728020', color: '#9ca3af', border: '#6b728040' },
+  in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
+  follow_up_due: { label: 'OVERDUE',   bg: '#dc262620', color: '#dc2626', border: '#dc262640' },
+  replied:       { label: 'REPLIED',   bg: '#0ea5e920', color: '#0ea5e9', border: '#0ea5e940' },
+  converted:     { label: 'CONVERTED', bg: '#10b98120', color: '#10b981', border: '#10b98140' },
+};
+
 // ─── EngageBadge ─────────────────────────────────────────────────────────────
 // hunterStatus: pass contact.hunter_status in Hunter mode for specific labels.
 function EngageBadge({ state, hunterStatus }) {
-  // More descriptive labels for Hunter mode (keyed by hunter_status value)
-  const HUNTER_LABELS = {
-    active_mission:  'ACTIVE MISSION',
-    awaiting_reply:  'AWAITING REPLY',
-    engaged_pending: 'PROCESSING',
-    in_conversation: 'REPLIED',
-  };
-  const configs = {
-    not_started:   { label: 'COLD',      bg: '#6b728020', color: '#9ca3af', border: '#6b728040' },
-    in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
-    follow_up_due: { label: 'OVERDUE',   bg: '#dc262620', color: '#dc2626', border: '#dc262640' },
-    replied:       { label: 'REPLIED',   bg: '#0ea5e920', color: '#0ea5e9', border: '#0ea5e940' },
-    converted:     { label: 'CONVERTED', bg: '#10b98120', color: '#10b981', border: '#10b98140' },
-  };
-  const cfg = configs[state];
+  const cfg = ENGAGE_BADGE_CONFIGS[state];
   if (!cfg) return null;
-  const label = (hunterStatus && HUNTER_LABELS[hunterStatus]) || cfg.label;
+  const label = (hunterStatus && HUNTER_STATUS_LABELS[hunterStatus]) || cfg.label;
   return (
     <span style={{
       display: 'inline-block',
@@ -397,7 +399,7 @@ function AllLeadsCard({
       onClick={handleCardClick}
       style={{
         background: isSelected ? T.accentBg : T.cardBg,
-        border: `1px solid ${isSelected ? BRAND.pink : engageState === 'replied' ? '#0ea5e9' : T.border}`,
+        border: `1px solid ${isSelected ? BRAND.pink : engageState === 'replied' ? ENGAGE_BADGE_CONFIGS.replied.color : T.border}`,
         borderRadius: 14, overflow: 'visible', cursor: 'pointer',
         transition: 'all 0.15s', display: 'flex', flexDirection: 'column',
         position: 'relative',
@@ -437,27 +439,33 @@ function AllLeadsCard({
         {!bulkMode && !isSelected && (
           <div style={{ position: 'absolute', top: 8, right: 8 }}>
             {mode === 'hunter' ? (
-              currentBrigade ? (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px', borderRadius: 20,
-                  background: currentBrigade.bgColor, color: currentBrigade.color,
-                  border: `1px solid ${currentBrigade.borderColor}`,
-                  fontSize: 9, fontWeight: 700, letterSpacing: 0.4, whiteSpace: 'nowrap',
-                }}>
-                  <currentBrigade.icon size={9} />
-                  {currentBrigade.label.toUpperCase()}
-                </span>
-              ) : (
-                <span style={{
-                  display: 'inline-block', padding: '2px 8px', borderRadius: 20,
-                  background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.55)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  fontSize: 9, fontWeight: 400, letterSpacing: 0.3, whiteSpace: 'nowrap',
-                }}>
-                  + Brigade
-                </span>
-              )
+              <button
+                onClick={e => { e.stopPropagation(); if (!brigadeSaving) setBrigadeOpen(o => !o); }}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                title={currentBrigade ? 'Change Brigade' : 'Set Brigade'}
+              >
+                {currentBrigade ? (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 20,
+                    background: currentBrigade.bgColor, color: currentBrigade.color,
+                    border: `1px solid ${currentBrigade.borderColor}`,
+                    fontSize: 9, fontWeight: 700, letterSpacing: 0.4, whiteSpace: 'nowrap',
+                  }}>
+                    <currentBrigade.icon size={9} />
+                    {currentBrigade.label.toUpperCase()}
+                  </span>
+                ) : (
+                  <span style={{
+                    display: 'inline-block', padding: '2px 8px', borderRadius: 20,
+                    background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.55)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    fontSize: 9, fontWeight: 400, letterSpacing: 0.3, whiteSpace: 'nowrap',
+                  }}>
+                    + Brigade
+                  </span>
+                )}
+              </button>
             ) : (
               <StatusBadge status={status} small />
             )}

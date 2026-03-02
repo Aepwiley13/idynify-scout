@@ -98,8 +98,8 @@ export default function AdminDashboard() {
           bVal = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
           break;
         case 'totalCredits':
-          aVal = a.credits.total;
-          bVal = b.credits.total;
+          aVal = a.credits?.total ?? 0;
+          bVal = b.credits?.total ?? 0;
           break;
         default:
           aVal = 0;
@@ -311,29 +311,29 @@ export default function AdminDashboard() {
                 </td>
                 <td>
                   <div className="scout-metrics">
-                    <p className="metric-main">{user.scout.companiesTotal} companies</p>
+                    <p className="metric-main">{user.scout?.companiesTotal ?? 0} companies</p>
                     <p className="metric-detail">
-                      {user.scout.companiesAccepted} accepted, {user.scout.contactsTotal} contacts
+                      {user.scout?.companiesAccepted ?? 0} accepted, {user.scout?.contactsTotal ?? 0} contacts
                     </p>
-                    {user.scout.icpConfigured && (
+                    {user.scout?.icpConfigured && (
                       <span className="badge badge-success">ICP ✓</span>
                     )}
                   </div>
                 </td>
                 <td>
                   <div className="recon-metrics">
-                    <p className="metric-main">{user.recon.leadsTotal} leads</p>
-                    {user.recon.icpBriefGenerated && (
+                    <p className="metric-main">{user.recon?.leadsTotal ?? 0} leads</p>
+                    {user.recon?.icpBriefGenerated && (
                       <span className="badge badge-info">ICP Brief ✓</span>
                     )}
                   </div>
                 </td>
                 <td>
                   <div className="credits-metrics">
-                    <p className="metric-main">{user.credits.total}</p>
-                    {user.credits.total > 0 && (
+                    <p className="metric-main">{user.credits?.total ?? 0}</p>
+                    {(user.credits?.total ?? 0) > 0 && (
                       <p className="metric-detail">
-                        {user.credits.searchCompanies}s · {user.credits.enrichContact}e
+                        {user.credits?.searchCompanies ?? 0}s · {user.credits?.enrichContact ?? 0}e
                       </p>
                     )}
                   </div>

@@ -7,7 +7,7 @@ import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
 
-export default function CompanyDetailModal({ company, onClose }) {
+export default function CompanyDetailModal({ company, onClose, onFindMoreContacts }) {
   const navigate = useNavigate();
   const [enrichedData, setEnrichedData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -275,7 +275,11 @@ export default function CompanyDetailModal({ company, onClose }) {
   }
 
   function handleFindMoreContacts() {
-    navigate(`/scout/company/${company.id}`);
+    if (onFindMoreContacts) {
+      onFindMoreContacts(company.id);
+    } else {
+      navigate(`/scout/company/${company.id}`);
+    }
     onClose();
   }
 

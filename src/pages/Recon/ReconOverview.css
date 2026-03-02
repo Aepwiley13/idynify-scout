@@ -975,3 +975,238 @@
   font-size: 1rem;
   font-weight: 500;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 2 — Confidence score, 5-state Knowledge Map, Train Next inline
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Barry's Context Confidence score block ─────────────────────────────── */
+
+.recon-confidence-score-block {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.recon-confidence-score-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.recon-confidence-score-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.recon-confidence-score-number {
+  font-size: 48px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: color 300ms ease;
+}
+
+.recon-confidence-score-dot {
+  font-size: 18px;
+  line-height: 1;
+  transition: color 300ms ease;
+}
+
+.score--red       { color: #dc2626; }
+.score--amber     { color: #d97706; }
+.score--green     { color: #16a34a; }
+.score--deep-green{ color: #059669; }
+
+.recon-confidence-score-delta {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  animation: delta-appear 0.3s ease;
+}
+
+.delta--up   { color: #065f46; background: #d1fae5; }
+.delta--down { color: #92400e; background: #fde68a; }
+
+@keyframes delta-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.recon-confidence-score-sub {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ── Knowledge Map container ────────────────────────────────────────────── */
+
+.recon-knowledge-map {
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px 24px 16px;
+  margin-bottom: 2rem;
+}
+
+/* Legend items — updated for 5 states */
+.km-state--strong  { background: #10b981; }
+.km-state--weak    { background: #d97706; }
+.km-state--stale   { background: #64748b; }
+.km-state--conflict{ background: #ea580c; }
+.km-state--empty   { background: #d1d5db; }
+
+/* ── 5-state tile backgrounds ────────────────────────────────────────────── */
+
+.km-tile--empty    { background: #1a1a1a; }
+.km-tile--weak     { background: #2d2200; }
+.km-tile--strong   { background: #0d2b1a; }
+.km-tile--stale    { background: #1a1f2b; }
+.km-tile--conflict { background: #2d1800; }
+
+/* ── Tile icon colors ────────────────────────────────────────────────────── */
+
+.km-tile-icon { flex-shrink: 0; }
+.km-tile-icon--strong   { color: #10b981; }
+.km-tile-icon--weak     { color: #d97706; }
+.km-tile-icon--stale    { color: #64748b; }
+.km-tile-icon--conflict { color: #ea580c; }
+.km-tile-icon--empty    { color: #4b5563; }
+
+/* ── Tile label colors per state ─────────────────────────────────────────── */
+
+.km-label--strong   { color: #10b981; }
+.km-label--weak     { color: #d97706; }
+.km-label--stale    { color: #64748b; }
+.km-label--conflict { color: #ea580c; }
+.km-label--empty    { color: #4b5563; }
+
+/* ── Tooltip content additions ───────────────────────────────────────────── */
+
+.recon-heatmap-tooltip-body {
+  font-size: 11px;
+  color: #d1d5db;
+  line-height: 1.5;
+  margin: 4px 0 6px;
+}
+
+.km-tooltip-assumption em {
+  color: #fcd34d;
+  font-style: italic;
+}
+
+.km-tooltip--conflict {
+  color: #fb923c;
+}
+
+.recon-heatmap-tooltip-cta {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a78bfa;
+  margin: 0;
+}
+
+/* ── Train Next — inline inside Knowledge Map ────────────────────────────── */
+
+.recon-train-next-inline {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.recon-train-next-complete-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.complete-icon { color: #10b981; }
+
+.train-next-complete-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 2px;
+}
+
+.train-next-complete-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.recon-train-next-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.train-next-label-col {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+}
+
+.train-next-state-icon {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.train-next-state-icon.conflict { color: #ea580c; }
+.train-next-state-icon.stale    { color: #64748b; }
+.train-next-state-icon.weak     { color: #d97706; }
+.train-next-state-icon.empty    { color: #7c3aed; }
+
+.train-next-cta-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin: 0 0 2px;
+}
+
+.train-next-dimension-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+}
+
+.train-next-reason {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.train-next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.train-next-btn:hover { background: #6d28d9; }
+

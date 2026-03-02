@@ -31,6 +31,7 @@ import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, CheckCircle, Archive as ArchiveIcon, Zap } from 'lucide-react';
 import HunterCardStack from '../../components/hunter/HunterCardStack';
 import ActiveMissionsView from '../../components/hunter/ActiveMissionsView';
+import QuickMissionAssignModal from '../../components/hunter/QuickMissionAssignModal';
 import { bootstrapContactsForUser } from '../../utils/hunterBootstrap';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import './HunterDashboard.css';
@@ -48,6 +49,9 @@ export default function HunterDashboard() {
   const [loading, setLoading] = useState(true);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [reconConfidencePct, setReconConfidencePct] = useState(null);
+
+  // Sprint 1.2: Quick mission assign
+  const [quickAssignContact, setQuickAssignContact] = useState(null);
 
   // Intake badge: active contacts with no intake yet
   const intakeQueue = activeContacts.filter(
@@ -229,6 +233,11 @@ export default function HunterDashboard() {
     }
   }, []);
 
+  // ── Sprint 1.2: Quick mission assign ────────────────────────────────────
+  const handleQuickMissionAssign = useCallback((contact) => {
+    setQuickAssignContact(contact);
+  }, []);
+
   // ── Restore from archive ─────────────────────────────────────────────────
   const handleRestore = useCallback(async (contact) => {
     const user = auth.currentUser;
@@ -252,6 +261,17 @@ export default function HunterDashboard() {
 
   return (
     <div className="hunter-dashboard">
+      {/* Sprint 1.2: Quick Mission Assign Modal */}
+      {quickAssignContact && (
+        <QuickMissionAssignModal
+          contact={quickAssignContact}
+          onClose={() => setQuickAssignContact(null)}
+          onNavigateCreate={(contactId) => {
+            setQuickAssignContact(null);
+            navigate(`/hunter/create-mission?contactId=${contactId}`);
+          }}
+        />
+      )}
       {/* Header */}
       <div className="hunter-header">
         <div className="hunter-header-inner">
@@ -326,6 +346,7 @@ export default function HunterDashboard() {
                   reconConfidencePct={reconConfidencePct}
                   onEngage={handleEngage}
                   onArchive={handleArchive}
+                  onQuickMissionAssign={handleQuickMissionAssign}
                   onDeckEmpty={() => setTab('active')}
                 />
                 {visibleDeckCount > 0 && (

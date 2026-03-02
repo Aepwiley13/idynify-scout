@@ -57,6 +57,14 @@ export default function CreateMission() {
   const [sequenceLoading, setSequenceLoading] = useState(false);
   const [sequenceError, setSequenceError] = useState(null);
 
+  // Template step editing state
+  const [editingStepIndex, setEditingStepIndex] = useState(null);
+  const [editingStepContent, setEditingStepContent] = useState({ subject: '', body: '' });
+
+  // Task 1.4: Micro-sequence step editing
+  const [editingMicroStepIndex, setEditingMicroStepIndex] = useState(null);
+  const [editingMicroStepContent, setEditingMicroStepContent] = useState({ action: '', channel: '', timing: '' });
+
   const goals = getAllGoals();
 
   useEffect(() => {
@@ -172,14 +180,60 @@ export default function CreateMission() {
   }
 
   function handleRemoveStep(stepIndex) {
+    if (editingStepIndex === stepIndex) setEditingStepIndex(null);
     const updated = { ...missionData };
     updated.steps = updated.steps.filter((_, index) => index !== stepIndex);
     setMissionData(updated);
   }
 
   function handleEditStep(stepIndex) {
-    // TODO: Open modal or inline editor for this step
-    alert(`Edit step ${stepIndex + 1} - Coming soon: AI message generation`);
+    const step = missionData.steps[stepIndex];
+    setEditingStepContent({
+      subject: step.subject || '',
+      body: step.body || step.description || ''
+    });
+    setEditingStepIndex(stepIndex);
+  }
+
+  function handleSaveStep(stepIndex) {
+    const updated = { ...missionData };
+    updated.steps[stepIndex] = {
+      ...updated.steps[stepIndex],
+      subject: editingStepContent.subject,
+      body: editingStepContent.body
+    };
+    setMissionData(updated);
+    setEditingStepIndex(null);
+  }
+
+  function handleCancelEdit() {
+    setEditingStepIndex(null);
+  }
+
+  // Task 1.4: Micro-sequence step editing
+  function handleEditMicroStep(index) {
+    const step = microSequence.steps[index];
+    setEditingMicroStepContent({
+      action: step.action || '',
+      channel: step.channel || 'email',
+      timing: step.suggestedTiming || step.timing || ''
+    });
+    setEditingMicroStepIndex(index);
+  }
+
+  function handleSaveMicroStep(index) {
+    const updated = { ...microSequence };
+    updated.steps = updated.steps.map((s, i) =>
+      i === index
+        ? { ...s, ...editingMicroStepContent, suggestedTiming: editingMicroStepContent.timing }
+        : s
+    );
+    setMicroSequence(updated);
+    setEditingMicroStepIndex(null);
+  }
+
+  function handleCancelMicroEdit() {
+    setEditingMicroStepIndex(null);
   }
 
   function toggleContactSelection(contactId) {
@@ -517,21 +571,78 @@ export default function CreateMission() {
                 <div className="micro-sequence-steps">
                   {microSequence.steps.map((step, index) => (
                     <div key={index} className="micro-step">
-                      <div className="micro-step-header">
-                        <div className="micro-step-number">{step.stepNumber}</div>
-                        <div className="micro-step-timing">{step.timing}</div>
-                        <div className="micro-step-channel">
-                          {channelIcons[step.channel] || '📨'} {step.channel}
+                      {editingMicroStepIndex === index ? (
+                        /* ── Inline editor (Task 1.4) ── */
+                        <div className="micro-step-editor">
+                          <div className="micro-step-editor-row">
+                            <label className="micro-step-editor-label">What Barry does</label>
+                            <textarea
+                              className="micro-step-editor-textarea"
+                              value={editingMicroStepContent.action}
+                              onChange={e => setEditingMicroStepContent(prev => ({ ...prev, action: e.target.value }))}
+                              rows={2}
+                              placeholder="Describe what this step should accomplish..."
+                            />
+                          </div>
+                          <div className="micro-step-editor-inline">
+                            <div className="micro-step-editor-row micro-step-editor-row--half">
+                              <label className="micro-step-editor-label">Channel</label>
+                              <select
+                                className="micro-step-editor-select"
+                                value={editingMicroStepContent.channel}
+                                onChange={e => setEditingMicroStepContent(prev => ({ ...prev, channel: e.target.value }))}
+                              >
+                                {['email', 'text', 'phone', 'linkedin', 'calendar'].map(c => (
+                                  <option key={c} value={c}>{channelIcons[c]} {c}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="micro-step-editor-row micro-step-editor-row--half">
+                              <label className="micro-step-editor-label">Timing</label>
+                              <input
+                                type="text"
+                                className="micro-step-editor-input"
+                                value={editingMicroStepContent.timing}
+                                onChange={e => setEditingMicroStepContent(prev => ({ ...prev, timing: e.target.value }))}
+                                placeholder="e.g. Day 3"
+                              />
+                            </div>
+                          </div>
+                          <div className="step-editor-actions">
+                            <button className="btn-secondary btn-sm" onClick={handleCancelMicroEdit}>
+                              Cancel
+                            </button>
+                            <button className="btn-primary-hunter btn-sm" onClick={() => handleSaveMicroStep(index)}>
+                              Save
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="micro-step-body">
-                        <p className="micro-step-action">{step.action}</p>
-                        <p className="micro-step-purpose">{step.purpose}</p>
-                      </div>
-                      <div className="micro-step-approval">
-                        <CheckCircle className="w-4 h-4" />
-                        Requires your approval
-                      </div>
+                      ) : (
+                        <>
+                          <div className="micro-step-header">
+                            <div className="micro-step-number">{step.stepNumber}</div>
+                            <div className="micro-step-timing">{step.suggestedTiming || step.timing}</div>
+                            <div className="micro-step-channel">
+                              {channelIcons[step.channel] || '📨'} {step.channel}
+                            </div>
+                            <button
+                              className="btn-icon micro-step-edit-btn"
+                              onClick={() => handleEditMicroStep(index)}
+                              title="Edit this step"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="micro-step-body">
+                            <p className="micro-step-action">{step.action}</p>
+                            <p className="micro-step-purpose">{step.purpose}</p>
+                          </div>
+                          <div className="micro-step-approval">
+                            <CheckCircle className="w-4 h-4" />
+                            Requires your approval
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -571,10 +682,10 @@ export default function CreateMission() {
                       </button>
                       <button
                         className="btn-icon"
-                        onClick={() => handleEditStep(index)}
-                        title="Edit message"
+                        onClick={() => editingStepIndex === index ? handleCancelEdit() : handleEditStep(index)}
+                        title={editingStepIndex === index ? 'Cancel edit' : 'Edit message'}
                       >
-                        <Edit2 className="w-5 h-5" />
+                        <Edit2 className={`w-5 h-5 ${editingStepIndex === index ? 'text-purple-400' : ''}`} />
                       </button>
                       <button
                         className="btn-icon"
@@ -585,11 +696,74 @@ export default function CreateMission() {
                       </button>
                     </div>
                   </div>
-                  <p className="timeline-description">{step.description}</p>
-                  <div className="timeline-meta">
-                    <span className="weapon-badge">{step.weapon}</span>
-                    <span className="type-badge">{step.type}</span>
-                  </div>
+
+                  {editingStepIndex === index ? (
+                    <div className="step-inline-editor">
+                      {step.weapon === 'email' && (
+                        <div className="step-editor-field">
+                          <label className="step-editor-label">Subject line</label>
+                          <input
+                            type="text"
+                            className="step-editor-input"
+                            value={editingStepContent.subject}
+                            onChange={e => setEditingStepContent(prev => ({ ...prev, subject: e.target.value }))}
+                            placeholder="e.g. Quick question about your team's outreach"
+                          />
+                        </div>
+                      )}
+                      <div className="step-editor-field">
+                        <label className="step-editor-label">
+                          {step.weapon === 'phone' ? 'Call notes / talking points' : 'Message'}
+                        </label>
+                        <textarea
+                          className="step-editor-textarea"
+                          value={editingStepContent.body}
+                          onChange={e => setEditingStepContent(prev => ({ ...prev, body: e.target.value }))}
+                          placeholder={
+                            step.weapon === 'phone'
+                              ? 'Key points to cover on the call...'
+                              : step.weapon === 'text'
+                              ? 'Short, conversational message (160 chars ideal)...'
+                              : 'Your message content. Barry will personalize this per contact when they\'re added to the mission.'
+                          }
+                          rows={step.weapon === 'text' ? 3 : 5}
+                        />
+                        {step.weapon === 'text' && (
+                          <span className="step-editor-charcount">
+                            {editingStepContent.body.length} / 160
+                          </span>
+                        )}
+                      </div>
+                      <div className="step-editor-actions">
+                        <button
+                          className="btn-secondary btn-sm"
+                          onClick={handleCancelEdit}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="btn-primary-hunter btn-sm"
+                          onClick={() => handleSaveStep(index)}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="timeline-description">
+                        {step.body || step.description}
+                        {step.body && step.subject && (
+                          <span className="step-subject-preview"> — Subject: "{step.subject}"</span>
+                        )}
+                      </p>
+                      <div className="timeline-meta">
+                        <span className="weapon-badge">{step.weapon}</span>
+                        <span className="type-badge">{step.type}</span>
+                        {step.body && <span className="type-badge text-green-400">✓ Custom message</span>}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

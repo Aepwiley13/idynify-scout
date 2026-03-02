@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, arrayUnion, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   X, Target, Plus, Mail, MessageSquare, Phone, Check,
@@ -86,6 +86,12 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   // Toast notification state (replaces native alert())
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Task 1.3: Per-contact Barry personalization
+  const [personalizingMissionId, setPersonalizingMissionId] = useState(null);
+  const [personalizingStepCount, setPersonalizingStepCount] = useState(0);
+  const [personalizedSteps, setPersonalizedSteps] = useState([]);
+  const [personalizationError, setPersonalizationError] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -423,42 +429,50 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // === ADD TO MISSION ===
 
   async function handleAddToMission(missionId) {
+    if (loading) return; // prevent double-click while in flight
     setLoading(true);
     try {
       const user = auth.currentUser;
       const mission = missions.find(m => m.id === missionId);
+      if (!mission) {
+        setToastMessage('Mission not found. Please try again.');
+        setLoading(false);
+        return;
+      }
 
-      const updatedContacts = [
-        ...(mission.contacts || []),
-        {
-          contactId: contact.id,
-          name: `${contact.firstName} ${contact.lastName}`,
-          email: contact.email || null,
-          phone: contact.phone || null,
-          currentStepIndex: 0,
-          lastTouchDate: null,
-          status: 'active',
-          outcomes: []
-        }
-      ];
+      const newContactEntry = {
+        contactId: contact.id,
+        name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || '',
+        firstName: contact.firstName || null,
+        lastName: contact.lastName || null,
+        email: contact.email || null,
+        phone: contact.phone || null,
+        currentStepIndex: 0,
+        lastTouchDate: null,
+        status: 'active',
+        outcomes: [],
+        sequenceStatus: 'pending',
+        stepHistory: [],
+        lastOutcome: null,
+        personalizationStatus: 'generating',
+        personalizedSteps: null
+      };
+
+      const updatedContacts = [...(mission.contacts || []), newContactEntry];
 
       await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
         contacts: updatedContacts,
         updatedAt: new Date().toISOString()
       });
 
-      // Log timeline event: mission_assigned
+      // Log timeline event
       logTimelineEvent({
         userId: user.uid,
         contactId: contact.id,
         type: 'mission_assigned',
         actor: ACTORS.USER,
         preview: mission.name || mission.goalName || 'Mission',
-        metadata: {
-          missionId,
-          missionName: mission.name || null,
-          goalName: mission.goalName || null
-        }
+        metadata: { missionId, missionName: mission.name || null, goalName: mission.goalName || null }
       });
 
       // State Machine: Mission assigned → Active Mission
@@ -469,15 +483,161 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
         currentStatus: getContactStatus(contact)
       });
 
-      const contactDisplayName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Contact';
-      setToastMessage(`${contactDisplayName} added to mission!`);
-      loadData();
-      setActiveView('main');
+      // Transition to personalizing view and start Barry generation
+      const stepsToGenerate = _getStepsFromMission(mission);
+      setPersonalizingMissionId(missionId);
+      setPersonalizingStepCount(stepsToGenerate.length);
+      setPersonalizedSteps([]);
+      setPersonalizationError(null);
+      setLoading(false);
+      setActiveView('personalizing');
+
+      await _generatePersonalizedSteps(user, missionId, mission, updatedContacts, stepsToGenerate);
+
     } catch (error) {
       console.error('Error adding to mission:', error);
       setToastMessage('Failed to add to mission. Please try again.');
-    } finally {
       setLoading(false);
+    }
+  }
+
+  // Extract steps from mission (sequence or template)
+  function _getStepsFromMission(mission) {
+    if (mission.sequence?.steps?.length) {
+      return mission.sequence.steps.map((s, i) => ({
+        stepNumber: s.stepNumber || i + 1,
+        channel: s.channel,
+        stepType: s.stepType || 'message',
+        action: s.action,
+        purpose: s.purpose
+      }));
+    }
+    return (mission.steps || [])
+      .filter(s => s.enabled !== false)
+      .map((s, i) => ({
+        stepNumber: i + 1,
+        channel: s.weapon,
+        stepType: s.type || 'message',
+        action: s.label,
+        purpose: s.description
+      }));
+  }
+
+  async function _generatePersonalizedSteps(user, missionId, mission, currentContacts, stepsToGenerate) {
+    try {
+      if (!stepsToGenerate.length) {
+        setPersonalizedSteps([]);
+        setActiveView('personalization-done');
+        return;
+      }
+
+      const token = await user.getIdToken();
+      const missionFields = {
+        outcome_goal: mission.outcome_goal || null,
+        engagement_style: mission.engagement_style || null,
+        timeframe: mission.timeframe || null,
+        next_step_type: mission.next_step_type || null
+      };
+      const contactData = {
+        name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || '',
+        firstName: contact.firstName || null,
+        lastName: contact.lastName || null,
+        title: contact.title || contact.current_position_title || null,
+        company_name: contact.company_name || contact.current_company_name || null,
+        engagementIntent: contact.engagementIntent || 'prospect',
+        relationship_type: contact.relationship_type || null,
+        warmth_level: contact.warmth_level || null,
+        strategic_value: contact.strategic_value || null
+      };
+
+      const generatedSteps = [];
+      for (let i = 0; i < stepsToGenerate.length; i++) {
+        const stepPlan = stepsToGenerate[i];
+        try {
+          const response = await fetch('/.netlify/functions/barryGenerateSequenceStep', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.uid,
+              authToken: token,
+              contact: contactData,
+              missionFields,
+              stepPlan,
+              stepIndex: i,
+              stepHistory: [],
+              previousOutcome: null
+            })
+          });
+          const data = await response.json();
+          if (data.success && data.generatedContent) {
+            generatedSteps.push({
+              stepIndex: i,
+              stepNumber: stepPlan.stepNumber,
+              channel: data.generatedContent.channel || stepPlan.channel,
+              subject: data.generatedContent.subject || null,
+              body: data.generatedContent.body,
+              toneNote: data.generatedContent.toneNote || null,
+              status: 'pending_approval',
+              generatedAt: data.generatedContent.generatedAt || new Date().toISOString()
+            });
+          }
+        } catch (stepErr) {
+          console.warn(`Step ${i + 1} generation failed (non-fatal):`, stepErr);
+        }
+      }
+
+      // Update the contact's entry in Firestore with generated steps
+      const updatedContacts = currentContacts.map(c =>
+        c.contactId === contact.id
+          ? {
+              ...c,
+              personalizationStatus: generatedSteps.length > 0 ? 'pending_approval' : 'failed',
+              personalizedSteps: generatedSteps.length > 0 ? generatedSteps : null
+            }
+          : c
+      );
+
+      await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
+        contacts: updatedContacts,
+        updatedAt: new Date().toISOString()
+      });
+
+      setPersonalizedSteps(generatedSteps);
+      setActiveView('personalization-done');
+
+    } catch (error) {
+      console.error('Error in personalization:', error);
+      setPersonalizationError('Barry had trouble generating steps. You can review them in the mission.');
+      setPersonalizedSteps([]);
+      setActiveView('personalization-done');
+    }
+  }
+
+  async function handleApproveAllSteps() {
+    const user = auth.currentUser;
+    if (!user || !personalizingMissionId) return;
+    try {
+      const missionRef = doc(db, 'users', user.uid, 'missions', personalizingMissionId);
+      const missionSnap = await getDoc(missionRef);
+      if (!missionSnap.exists()) return;
+      const missionData = missionSnap.data();
+      const updatedContacts = (missionData.contacts || []).map(c =>
+        c.contactId === contact.id && c.personalizedSteps
+          ? {
+              ...c,
+              personalizationStatus: 'approved',
+              personalizedSteps: c.personalizedSteps.map(s => ({ ...s, status: 'approved' }))
+            }
+          : c
+      );
+      await updateDoc(missionRef, { contacts: updatedContacts, updatedAt: new Date().toISOString() });
+      loadData();
+      setActiveView('main');
+      const name = contact.firstName || 'Contact';
+      setToastMessage(`${name} added and steps approved!`);
+    } catch (err) {
+      console.error('Error approving steps:', err);
+      setToastMessage('Approval failed. Please try from the mission page.');
     }
   }
 
@@ -747,6 +907,16 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                         )}
                       </button>
                     ))}
+                  </div>
+
+                  <div className="options-mission-cta">
+                    <button
+                      className="btn-add-mission-options"
+                      onClick={() => setActiveView('add-mission')}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add {firstName} to Mission →
+                    </button>
                   </div>
                 </>
               )}
@@ -1051,23 +1221,132 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               <h3 className="view-title">Add to Mission</h3>
 
               <div className="missions-list">
-                {missions.map(mission => (
-                  <div
-                    key={mission.id}
-                    className="mission-select-item"
-                    onClick={() => handleAddToMission(mission.id)}
-                  >
-                    <div className="mission-info">
-                      <span className="mission-name">{mission.name}</span>
-                      <span className="mission-goal">{mission.goalName}</span>
+                {missions.length === 0 ? (
+                  <p className="missions-empty-hint">No active missions yet. Create one to start running sequences.</p>
+                ) : (
+                  missions.map(mission => (
+                    <div
+                      key={mission.id}
+                      className="mission-select-item"
+                      onClick={() => handleAddToMission(mission.id)}
+                    >
+                      <div className="mission-info">
+                        <span className="mission-name">{mission.name}</span>
+                        <span className="mission-goal">{mission.goalName}</span>
+                      </div>
+                      <div className="mission-stats">
+                        <span>{mission.contacts?.length || 0} contacts</span>
+                        <span>•</span>
+                        <span>{
+                          mission.sequence?.steps?.length ||
+                          mission.microSequence?.steps?.length ||
+                          mission.steps?.filter(s => s.enabled !== false).length ||
+                          0
+                        } steps</span>
+                      </div>
                     </div>
-                    <div className="mission-stats">
-                      <span>{mission.contacts?.length || 0} contacts</span>
-                      <span>•</span>
-                      <span>{mission.steps?.filter(s => s.enabled !== false).length || 0} steps</span>
-                    </div>
+                  ))
+                )}
+                <button
+                  className="mission-create-new"
+                  onClick={() => navigate(`/hunter/create-mission?contactId=${contact.id}`)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create new mission
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* === BARRY PERSONALIZING (loading) === */}
+          {activeView === 'personalizing' && (
+            <div className="drawer-view personalization-loading-view">
+              <div className="personalization-barry-avatar">
+                <Sparkles className="w-6 h-6 text-purple-400 animate-pulse" />
+              </div>
+              <h3 className="personalization-title">Barry is personalizing your steps</h3>
+              <p className="personalization-subtitle">
+                Generating {personalizingStepCount} message{personalizingStepCount !== 1 ? 's' : ''} for {contact.firstName || 'this contact'} using their RECON profile...
+              </p>
+              <div className="personalization-steps-loading">
+                {Array.from({ length: personalizingStepCount }).map((_, i) => (
+                  <div key={i} className="personalization-step-skeleton">
+                    <div className="skeleton-step-num">Step {i + 1}</div>
+                    <div className="skeleton-bar" />
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* === PERSONALIZATION DONE (hybrid confirm) === */}
+          {activeView === 'personalization-done' && (
+            <div className="drawer-view personalization-done-view">
+              {personalizationError ? (
+                <div className="personalization-error-banner">
+                  <AlertCircle className="w-5 h-5" />
+                  <span>{personalizationError}</span>
+                </div>
+              ) : (
+                <div className="personalization-success-icon">
+                  <Check className="w-8 h-8 text-green-400" />
+                </div>
+              )}
+
+              <h3 className="personalization-title">
+                {personalizationError || personalizedSteps.length === 0
+                  ? `${contact.firstName || 'Contact'} added to mission`
+                  : `Barry personalized ${personalizedSteps.length} step${personalizedSteps.length !== 1 ? 's' : ''} for ${contact.firstName || 'this contact'}`
+                }
+              </h3>
+
+              {!personalizationError && personalizedSteps.length > 0 && (
+                <div className="personalized-steps-preview">
+                  {personalizedSteps.map((step, i) => (
+                    <div key={i} className="personalized-step-card">
+                      <div className="ps-step-header">
+                        <span className="ps-step-num">Step {step.stepNumber}</span>
+                        <span className="ps-step-channel">{step.channel}</span>
+                      </div>
+                      {step.subject && (
+                        <p className="ps-step-subject">Subject: {step.subject}</p>
+                      )}
+                      <p className="ps-step-body">{step.body?.substring(0, 120)}{step.body?.length > 120 ? '...' : ''}</p>
+                      {step.toneNote && (
+                        <p className="ps-tone-note">
+                          <Sparkles className="w-3 h-3" />
+                          {step.toneNote}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="personalization-actions">
+                {!personalizationError && personalizedSteps.length > 0 && (
+                  <button
+                    className="btn-primary-hunter"
+                    onClick={handleApproveAllSteps}
+                    disabled={loading}
+                  >
+                    <Check className="w-4 h-4" />
+                    Approve & Close
+                  </button>
+                )}
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    onClose();
+                    navigate(`/hunter/mission/${personalizingMissionId}`);
+                  }}
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  Review in Mission →
+                </button>
+                <button className="btn-secondary" onClick={onClose}>
+                  Close
+                </button>
               </div>
             </div>
           )}

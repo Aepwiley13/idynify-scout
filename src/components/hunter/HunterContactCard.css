@@ -246,3 +246,20 @@
 .hcc-btn--engage:active {
   transform: translateY(0);
 }
+
+/* Sprint 1.2: Quick mission assign button */
+.hcc-btn--mission {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  flex-shrink: 0;
+}
+
+.hcc-btn--mission:hover {
+  background: rgba(124, 58, 237, 0.28);
+  border-color: rgba(124, 58, 237, 0.55);
+  color: #c4b5fd;
+}

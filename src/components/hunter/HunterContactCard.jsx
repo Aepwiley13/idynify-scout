@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Crosshair } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import { getCTAForContact } from '../../constants/structuredFields';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
@@ -165,6 +166,7 @@ export default function HunterContactCard({
   hasActiveMission,
   onEngage,
   onArchive,
+  onQuickMissionAssign,  // Sprint 1.2: lightweight mission picker, no full Barry load
   isBackground
 }) {
   const cta = getCTAForContact(contact.relationship_state, hasActiveMission);
@@ -243,6 +245,17 @@ export default function HunterContactCard({
         >
           Archive
         </button>
+        {onQuickMissionAssign && (
+          <button
+            className="hcc-btn hcc-btn--mission"
+            onClick={(e) => { e.stopPropagation(); onQuickMissionAssign(contact); }}
+            aria-label="Add to mission"
+            title="Quick-add to mission"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            Mission
+          </button>
+        )}
         <button
           className="hcc-btn hcc-btn--engage"
           onClick={() => onEngage(contact)}

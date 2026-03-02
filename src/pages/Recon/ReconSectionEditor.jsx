@@ -4,6 +4,7 @@ import { ArrowLeft, Brain } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import ReconFeedbackToast from '../../components/recon/ReconFeedbackToast';
+import BarryCoachingResponse from '../../components/recon/BarryCoachingResponse';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../../utils/dashboardUtils';
 import Section1Foundation from '../../components/recon/Section1Foundation';
 import Section2ProductDeepDive from '../../components/recon/Section2ProductDeepDive';
@@ -52,12 +53,17 @@ export default function ReconSectionEditor() {
   const [showToast, setShowToast] = useState(false);
   const [toastVariant, setToastVariant] = useState('save');
 
+  // Barry coaching response state
+  const [coaching, setCoaching] = useState(null);
+  const [coachingLoading, setCoachingLoading] = useState(false);
+
   const sectionNum = parseInt(sectionId);
   const parentModule = SECTION_TO_MODULE[sectionNum];
   const SectionComponent = SECTION_COMPONENTS[sectionNum];
 
   useEffect(() => {
     setLoading(true);
+    setCoaching(null);
     loadSection();
   }, [sectionId]);
 
@@ -94,12 +100,40 @@ export default function ReconSectionEditor() {
     } catch (error) {
       console.error('Error loading section:', error);
     } finally {
-      // Only clear the loading state if we're staying on this page.
-      // If navigate() was called, keep loading=true so there's no
-      // blank/error flash while React Router processes the redirect.
       if (!navigatedAway) {
         setLoading(false);
       }
+    }
+  };
+
+  // ── Call the Barry coaching endpoint after a save ────────────────────────
+  const fetchCoaching = async (savedData) => {
+    setCoachingLoading(true);
+    setCoaching(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const authToken = await user.getIdToken();
+
+      const res = await fetch('/.netlify/functions/barry-coach-section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          sectionId: sectionNum,
+          sectionData: savedData,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Coaching fetch failed: ${res.status}`);
+      const { coaching: c } = await res.json();
+      setCoaching(c);
+    } catch (err) {
+      console.error('[ReconSectionEditor] coaching fetch error:', err);
+      // Coaching is non-blocking — a failure should not break the save flow
+    } finally {
+      setCoachingLoading(false);
     }
   };
 
@@ -111,13 +145,13 @@ export default function ReconSectionEditor() {
       const dataToSave = data || formData;
       await saveSectionData(user.uid, 'recon', sectionNum, dataToSave);
 
-      if (data) {
-        setFormData(data);
-      }
+      if (data) setFormData(data);
 
-      // Show feedback toast
       setToastVariant('save');
       setShowToast(true);
+
+      // Fetch coaching asynchronously — non-blocking
+      fetchCoaching(dataToSave);
     } catch (error) {
       console.error('Error saving:', error);
       throw error;
@@ -130,16 +164,17 @@ export default function ReconSectionEditor() {
       if (!user) return;
 
       const dataToSave = data || formData;
-      const result = await completeSection(user.uid, 'recon', sectionNum, dataToSave);
+      await completeSection(user.uid, 'recon', sectionNum, dataToSave);
 
-      // Show completion toast then navigate
       setToastVariant('complete');
       setShowToast(true);
 
-      // Delay navigation to allow toast to be seen
+      // Fetch coaching, then navigate after short delay so user sees response
+      await fetchCoaching(dataToSave);
+
       setTimeout(() => {
         navigate(parentModule ? `/recon/${parentModule}` : '/recon');
-      }, 2000);
+      }, coaching ? 3500 : 2000);
     } catch (error) {
       console.error('Error completing section:', error);
       alert(`Failed to complete section: ${error.message}`);
@@ -207,11 +242,32 @@ export default function ReconSectionEditor() {
       </div>
 
       {/* Section Content */}
-      <SectionComponent
-        initialData={formData}
-        onSave={handleSave}
-        onComplete={handleComplete}
-      />
+      <div className="section-form">
+        <SectionComponent
+          initialData={formData}
+          onSave={handleSave}
+          onComplete={handleComplete}
+        />
+      </div>
+
+      {/* Barry Coaching Response — appears below the form after save */}
+      {coachingLoading && (
+        <div className="mt-6 text-xs text-purple-500 font-medium animate-pulse">
+          Barry is reviewing your training data...
+        </div>
+      )}
+      {coaching && !coachingLoading && (
+        <BarryCoachingResponse
+          quality={coaching.quality}
+          headline={coaching.headline}
+          mirror={coaching.mirror}
+          inference={coaching.inference}
+          gapWarning={coaching.gap_warning}
+          outputPreview={coaching.output_preview}
+          confidenceImpact={coaching.confidenceImpact}
+          sectionId={sectionNum}
+        />
+      )}
 
       {/* Feedback Toast */}
       <ReconFeedbackToast

@@ -1,0 +1,286 @@
+/* LiveOutputPreview — threshold-gated dynamic Barry output preview */
+
+.live-output-preview {
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 2rem;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.lop-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lop-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin: 0 0 4px;
+}
+
+.lop-threshold-label {
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 2px;
+}
+
+.lop-threshold-desc {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.lop-back-to-live {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lop-back-to-live:hover { color: #5b21b6; }
+
+/* ── Preview card ────────────────────────────────────────────────────────── */
+
+.lop-card {
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.lop-card--historical {
+  opacity: 0.85;
+}
+
+/* ── Persona row ─────────────────────────────────────────────────────────── */
+
+.lop-card-persona {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.lop-persona-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9ca3af;
+}
+
+.lop-persona-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.lop-persona-role {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* ── Preview lines ────────────────────────────────────────────────────────── */
+
+.lop-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lop-line {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lop-line-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #7c3aed;
+  margin: 0;
+}
+
+.lop-line-body {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.lop-line-body ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.lop-line-body li {
+  margin-bottom: 2px;
+}
+
+/* ── Annotation ───────────────────────────────────────────────────────────── */
+
+.lop-annotation {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0;
+  padding-top: 4px;
+}
+
+/* ── Grey slots (locked capabilities) ────────────────────────────────────── */
+
+.lop-grey-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  border: 1px dashed #d1d5db;
+}
+
+.lop-grey-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.lop-grey-slot-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.lop-grey-slot-unlock {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* ── Footnote ─────────────────────────────────────────────────────────────── */
+
+.lop-footnote {
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+  margin: 8px 0 0;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
+}
+
+/* ── Threshold progress indicator ────────────────────────────────────────── */
+
+.lop-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lop-threshold-progress {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lop-threshold-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+  padding: 0;
+}
+
+.lop-dot--achieved {
+  background: #7c3aed;
+  opacity: 0.5;
+}
+
+.lop-dot--achieved:hover {
+  opacity: 0.85;
+  transform: scale(1.2);
+}
+
+.lop-dot--current {
+  background: #7c3aed;
+  transform: scale(1.3);
+  box-shadow: 0 0 0 2px #ede9fe;
+}
+
+.lop-dot--future {
+  background: #d1d5db;
+}
+
+.lop-dot--future:hover {
+  background: #9ca3af;
+  transform: scale(1.15);
+}
+
+.lop-progress-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ── Zero-state CTA ──────────────────────────────────────────────────────── */
+
+.lop-zero-cta {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin: 12px 0 0;
+  text-align: center;
+  font-style: italic;
+}
+
+/* ── Mobile ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .lop-header {
+    flex-direction: column;
+  }
+
+  .lop-threshold-label {
+    font-size: 16px;
+  }
+
+  .lop-grey-slot {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .lop-progress-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Icons only on mobile for threshold indicator */
+  .lop-progress-hint {
+    font-size: 10px;
+  }
+}

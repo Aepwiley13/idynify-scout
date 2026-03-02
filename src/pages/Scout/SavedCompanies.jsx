@@ -450,106 +450,24 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* ── Motivation + Progress ── */}
-      <div style={{ padding: '16px 22px 10px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-          <span style={{ fontSize: 22 }}>{motivation.emoji}</span>
-          <span style={{ fontSize: 15, fontWeight: 700, color: T.text }}>{motivation.headline}</span>
-          <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: T.textMuted }}>{remaining} left</span>
+      {/* ── Progress bar ── */}
+      <div style={{ padding: '12px 22px', flexShrink: 0, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>{motivation.emoji}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{motivation.headline}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: T.textMuted }}>{withContacts} / {totalActive} done</span>
         </div>
-        <p style={{ margin: '0 0 9px', fontSize: 12, color: T.textFaint }}>{motivation.sub}</p>
-        {/* Progress bar */}
-        <div style={{ height: 6, background: T.border, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: 5, background: T.border, borderRadius: 3, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg, ${BRAND.pink}, ${BRAND.cyan})`, borderRadius: 3, transition: 'width 0.5s ease' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 10, color: T.textFaint }}>
-          <span>{withContacts} done</span>
-          <span>{progress}% complete</span>
-        </div>
+        <p style={{ margin: '5px 0 0', fontSize: 11, color: T.textFaint }}>{motivation.sub}</p>
       </div>
 
-      {/* ── Dot position indicator + undo ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 22px 4px', flexShrink: 0 }}>
-        {Array.from({ length: dotsVisible }).map((_, i) => (
-          <div key={i} style={{
-            width: i === 0 ? 20 : 6, height: 6, borderRadius: 3,
-            background: i === 0 ? BRAND.pink : T.border,
-            transition: 'all 0.3s',
-          }} />
-        ))}
-        {remaining > MAX_DOTS && (
-          <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 2 }}>+{remaining - MAX_DOTS}</span>
-        )}
-        {/* Undo button — appears only after a skip */}
-        {lastSkipped && (
-          <button
-            onClick={handleUndo}
-            title="Undo last skip (U)"
-            style={{
-              marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
-              padding: '4px 10px', borderRadius: 7, border: `1px solid ${T.border}`,
-              background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = T.text; e.currentTarget.style.borderColor = T.borderHov || T.border; }}
-            onMouseLeave={e => { e.currentTarget.style.color = T.textMuted; e.currentTarget.style.borderColor = T.border; }}
-          >
-            ↩ Undo
-          </button>
-        )}
-      </div>
-
-      {/* ── Card deck area ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '0 22px 16px' }}>
-
-        {/* Ghost cards stacked behind */}
-        {deck.slice(1, 3).map((_, i) => (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              width: '100%', maxWidth: 420,
-              top: 0, bottom: 16,
-              background: T.cardBg,
-              border: `1px solid ${T.border}`,
-              borderRadius: 20,
-              transform: `scale(${0.96 - i * 0.04}) translateY(${(i + 1) * 12}px)`,
-              zIndex: 1 - i,
-              transition: gone ? 'transform 0.28s ease-out' : 'none',
-            }}
-          />
-        ))}
+      {/* ── Scrollable card + queue ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px 20px' }}>
 
         {/* Main swipeable card */}
-        <div
-          style={{
-            position: 'relative',
-            width: '100%', maxWidth: 420,
-            background: T.cardBg,
-            border: `1px solid ${T.borderHov || T.border}`,
-            borderRadius: 20,
-            boxShadow: `0 8px 40px rgba(0,0,0,0.22)`,
-            zIndex: 10,
-            cursor: gone ? 'default' : isDragging ? 'grabbing' : 'grab',
-            transform: `translateX(${flyX}px) translateY(${dragOffset.y * 0.06}px) rotate(${flyRot}deg)`,
-            opacity: flyOp,
-            transition: gone
-              ? 'transform 0.28s cubic-bezier(0.55,0,1,0.45), opacity 0.22s ease'
-              : isDragging
-              ? 'none'
-              : 'transform 0.32s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s',
-            userSelect: 'none',
-            display: 'flex', flexDirection: 'column',
-            pointerEvents: gone ? 'none' : 'auto',
-          }}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onRelease}
-          onMouseLeave={onRelease}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onRelease}
-        >
+        <div style={{ position: 'relative', marginBottom: 16 }}>
           {/* Swipe direction overlays */}
           {showFindOverlay && (
             <div style={{
@@ -570,92 +488,185 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
             }}>SKIP ✗</div>
           )}
 
-          {/* Card body */}
-          <div style={{ padding: '18px 20px 14px', flex: 1 }}>
+          <div
+            style={{
+              background: T.cardBg,
+              border: `1px solid ${T.borderHov || T.border}`,
+              borderRadius: 20,
+              boxShadow: `0 4px 24px rgba(0,0,0,0.14)`,
+              cursor: gone ? 'default' : isDragging ? 'grabbing' : 'grab',
+              transform: `translateX(${flyX}px) translateY(${dragOffset.y * 0.06}px) rotate(${flyRot}deg)`,
+              opacity: flyOp,
+              transition: gone
+                ? 'transform 0.28s cubic-bezier(0.55,0,1,0.45), opacity 0.22s ease'
+                : isDragging
+                ? 'none'
+                : 'transform 0.32s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s',
+              userSelect: 'none',
+              pointerEvents: gone ? 'none' : 'auto',
+            }}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onRelease}
+            onMouseLeave={onRelease}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onRelease}
+          >
+            {/* Card body */}
+            <div style={{ padding: '18px 20px 14px' }}>
 
-            {/* Company header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 14 }}>
-              <div style={{ width: 54, height: 54, borderRadius: 14, flexShrink: 0, background: T.surface, border: `1px solid ${T.border2 || T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                <CompanyLogo company={current} size="large" />
+              {/* Company header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 14 }}>
+                <div style={{ width: 54, height: 54, borderRadius: 14, flexShrink: 0, background: T.surface, border: `1px solid ${T.border2 || T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <CompanyLogo company={current} size="large" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.name}</div>
+                  <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{current.industry}</div>
+                  {current.location && <div style={{ fontSize: 11, color: T.textFaint, marginTop: 1 }}>{current.location}</div>}
+                </div>
+                {current.fit_score > 0 && (
+                  <div style={{ flexShrink: 0, textAlign: 'center', background: T.cyanBg || `${BRAND.cyan}15`, border: `1px solid ${T.cyanBdr || `${BRAND.cyan}30`}`, borderRadius: 11, padding: '7px 11px' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: T.cyan || BRAND.cyan, lineHeight: 1 }}>{current.fit_score}</div>
+                    <div style={{ fontSize: 8, color: T.textFaint, letterSpacing: 0.8, marginTop: 2 }}>FIT SCORE</div>
+                  </div>
+                )}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 17, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.name}</div>
-                <div style={{ fontSize: 12, color: T.textMuted, marginTop: 2 }}>{current.industry}</div>
-                {current.location && <div style={{ fontSize: 11, color: T.textFaint, marginTop: 1 }}>{current.location}</div>}
+
+              {/* Stats grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 13 }}>
+                {[
+                  ['EMPLOYEES', current.employee_count || current.company_size || 'N/A'],
+                  ['FOUNDED',   current.founded_year || 'N/A'],
+                  ['REVENUE',   current.revenue || 'N/A'],
+                  ['HQ',        current.location || current.city || 'N/A'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: T.surface, borderRadius: 10, padding: '8px 11px' }}>
+                    <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint, marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                  </div>
+                ))}
               </div>
-              {current.fit_score > 0 && (
-                <div style={{ flexShrink: 0, textAlign: 'center', background: T.cyanBg || `${BRAND.cyan}15`, border: `1px solid ${T.cyanBdr || `${BRAND.cyan}30`}`, borderRadius: 11, padding: '7px 11px' }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: T.cyan || BRAND.cyan, lineHeight: 1 }}>{current.fit_score}</div>
-                  <div style={{ fontSize: 8, color: T.textFaint, letterSpacing: 0.8, marginTop: 2 }}>FIT SCORE</div>
+
+              {/* Description snippet */}
+              {current.description && (
+                <p style={{ margin: '0 0 13px', fontSize: 11, color: T.textMuted, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {current.description}
+                </p>
+              )}
+
+              {/* Website / LinkedIn quick links */}
+              {(current.website_url || current.linkedin_url) && (
+                <div style={{ display: 'flex', gap: 7 }}>
+                  {current.website_url && (
+                    <button onClick={e => { e.stopPropagation(); window.open(current.website_url, '_blank'); }}
+                      style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid #7c5ce430', background: '#7c5ce415', color: '#b388ff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                      <Globe size={11} /> Website
+                    </button>
+                  )}
+                  {current.linkedin_url && (
+                    <button onClick={e => { e.stopPropagation(); window.open(current.linkedin_url, '_blank'); }}
+                      style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid #0077b530', background: '#0077b515', color: '#3b82f6', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                      <Linkedin size={11} /> LinkedIn
+                    </button>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Stats grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 13 }}>
-              {[
-                ['EMPLOYEES', current.employee_count || current.company_size || 'N/A'],
-                ['FOUNDED',   current.founded_year || 'N/A'],
-                ['REVENUE',   current.revenue || 'N/A'],
-                ['HQ',        current.location || current.city || 'N/A'],
-              ].map(([label, value]) => (
-                <div key={label} style={{ background: T.surface, borderRadius: 10, padding: '8px 11px' }}>
-                  <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint, marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
-                </div>
-              ))}
+            {/* Action buttons */}
+            <div style={{ padding: '12px 18px 18px', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 10 }}>
+              <button
+                onClick={e => { e.stopPropagation(); handleSkip(); }}
+                style={{ flex: 1, padding: '13px 0', borderRadius: 13, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = T.borderHov || T.border; e.currentTarget.style.color = T.text; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+              >← Not Now</button>
+              <button
+                onClick={e => { e.stopPropagation(); handleFindContact(); }}
+                style={{ flex: 2, padding: '13px 0', borderRadius: 13, border: 'none', background: `linear-gradient(135deg, ${BRAND.pink}, #c0146a)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 4px 20px ${BRAND.pink}50`, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = `0 6px 28px ${BRAND.pink}70`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 20px ${BRAND.pink}50`; }}
+              >Find a Contact →</button>
             </div>
-
-            {/* Description snippet */}
-            {current.description && (
-              <p style={{ margin: '0 0 13px', fontSize: 11, color: T.textMuted, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                {current.description}
-              </p>
-            )}
-
-            {/* Website / LinkedIn quick links */}
-            {(current.website_url || current.linkedin_url) && (
-              <div style={{ display: 'flex', gap: 7 }}>
-                {current.website_url && (
-                  <button onClick={e => { e.stopPropagation(); window.open(current.website_url, '_blank'); }}
-                    style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid #7c5ce430', background: '#7c5ce415', color: '#b388ff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    <Globe size={11} /> Website
-                  </button>
-                )}
-                {current.linkedin_url && (
-                  <button onClick={e => { e.stopPropagation(); window.open(current.linkedin_url, '_blank'); }}
-                    style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid #0077b530', background: '#0077b515', color: '#3b82f6', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    <Linkedin size={11} /> LinkedIn
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ padding: '12px 18px 18px', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 10 }}>
-            <button
-              onClick={e => { e.stopPropagation(); handleSkip(); }}
-              style={{ flex: 1, padding: '13px 0', borderRadius: 13, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = T.borderHov || T.border; e.currentTarget.style.color = T.text; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
-            >← Not Now</button>
-            <button
-              onClick={e => { e.stopPropagation(); handleFindContact(); }}
-              style={{ flex: 2, padding: '13px 0', borderRadius: 13, border: 'none', background: `linear-gradient(135deg, ${BRAND.pink}, #c0146a)`, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 4px 20px ${BRAND.pink}50`, transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = `0 6px 28px ${BRAND.pink}70`; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 20px ${BRAND.pink}50`; }}
-            >Find a Contact →</button>
           </div>
         </div>
 
-        {/* Keyboard shortcut hint */}
-        <p style={{ marginTop: 12, fontSize: 10, color: T.textFaint, textAlign: 'center', flexShrink: 0 }}>
-          Swipe or use <kbd style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: '1px 5px', fontSize: 9 }}>←</kbd> skip &nbsp;·&nbsp;
-          <kbd style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: '1px 5px', fontSize: 9 }}>→</kbd> find contact &nbsp;·&nbsp;
+        {/* ── Up Next queue ── */}
+        {deck.length > 1 && (
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 1, color: T.textFaint, marginBottom: 8 }}>UP NEXT</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {deck.slice(1, 4).map((company, i) => (
+                <div
+                  key={company.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 11,
+                    padding: '10px 14px', background: T.surface,
+                    borderRadius: 11, border: `1px solid ${T.border}`,
+                    opacity: 1 - i * 0.18,
+                  }}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: T.cardBg, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                    <CompanyLogo company={company} size="small" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+                    <div style={{ fontSize: 10, color: T.textFaint }}>{company.industry || 'Unknown industry'}</div>
+                  </div>
+                  {company.fit_score > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: T.cyan || BRAND.cyan, flexShrink: 0 }}>{company.fit_score} fit</span>
+                  )}
+                </div>
+              ))}
+              {deck.length > 4 && (
+                <div style={{ textAlign: 'center', fontSize: 11, color: T.textFaint, padding: '4px 0' }}>
+                  +{deck.length - 4} more companies
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Bottom bar: dots + undo + keyboard hint ── */}
+      <div style={{ padding: '8px 22px', borderTop: `1px solid ${T.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Dot indicators */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {Array.from({ length: dotsVisible }).map((_, i) => (
+            <div key={i} style={{
+              width: i === 0 ? 16 : 5, height: 5, borderRadius: 3,
+              background: i === 0 ? BRAND.pink : T.border,
+              transition: 'all 0.3s',
+            }} />
+          ))}
+          {remaining > MAX_DOTS && (
+            <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 2 }}>+{remaining - MAX_DOTS}</span>
+          )}
+        </div>
+        {/* Keyboard hint */}
+        <p style={{ margin: 0, marginLeft: 'auto', fontSize: 10, color: T.textFaint }}>
+          <kbd style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: '1px 5px', fontSize: 9 }}>←</kbd> skip &nbsp;·&nbsp;
+          <kbd style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: '1px 5px', fontSize: 9 }}>→</kbd> find &nbsp;·&nbsp;
           <kbd style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: '1px 5px', fontSize: 9 }}>U</kbd> undo
         </p>
-
+        {/* Undo button */}
+        {lastSkipped && (
+          <button
+            onClick={handleUndo}
+            title="Undo last skip (U)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 7, border: `1px solid ${T.border}`,
+              background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = T.text; e.currentTarget.style.borderColor = T.borderHov || T.border; }}
+            onMouseLeave={e => { e.currentTarget.style.color = T.textMuted; e.currentTarget.style.borderColor = T.border; }}
+          >↩ Undo</button>
+        )}
       </div>
 
     </div>

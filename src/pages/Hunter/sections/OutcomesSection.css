@@ -4,6 +4,153 @@
   animation: fadeIn 0.3s ease;
 }
 
+/* ── Task 4.2: Barry Insight Card ─────────────────────── */
+
+.barry-insight-card {
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: rgba(168, 85, 247, 0.04);
+  margin-bottom: 1.5rem;
+}
+
+.barry-insight-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #a855f7;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.barry-insight-text {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.barry-insight-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.barry-insight-stat {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.barry-insight-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.barry-insight-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.barry-insight-btn:hover {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: #a855f7;
+}
+
+.barry-insight-btn--dismiss {
+  background: transparent;
+  border-color: #e5e7eb;
+  color: #6b7280;
+}
+
+.barry-insight-btn--dismiss:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* ── Task 4.2: Style Breakdown ─────────────────────────── */
+
+.style-breakdown-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.style-breakdown-card--top {
+  border-color: rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.03);
+}
+
+.style-breakdown-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.style-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.style-top-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+.style-breakdown-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #f3f4f6;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.style-breakdown-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #a855f7, #7c3aed);
+  transition: width 0.4s ease;
+}
+
+.style-breakdown-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.style-stat-rate {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.style-stat-counts {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
 .outcomes-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

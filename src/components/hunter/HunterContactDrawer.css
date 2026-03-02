@@ -1,5 +1,160 @@
 /* HUNTER CONTACT DRAWER - In-Context Hunter Experience */
 
+/* ── Sprint 2.2: Reply Thread Panel ─────────────────────────────────────── */
+
+.reply-thread-panel {
+  margin: 0 0 16px;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  border-radius: 12px;
+  background: rgba(14, 165, 233, 0.04);
+  overflow: hidden;
+}
+
+.reply-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  background: rgba(14, 165, 233, 0.1);
+  border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+  color: #0ea5e9;
+}
+
+.reply-thread-label {
+  font-size: 12px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.reply-thread-time {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.reply-thread-loading,
+.reply-thread-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.reply-thread-error {
+  color: #ef4444;
+}
+
+.reply-thread-messages {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.thread-message {
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.thread-message--inbound {
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+.thread-message--outbound {
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  margin-left: 16px;
+}
+
+.thread-message-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.thread-message-from {
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.thread-message-date {
+  font-size: 10px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.thread-message-subject {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.thread-message-body {
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 80px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.btn-load-thread {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: #0ea5e9;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-load-thread:hover {
+  color: #0284c7;
+}
+
+.btn-ask-barry-reply {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(14, 165, 233, 0.08);
+  border: none;
+  border-top: 1px solid rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-ask-barry-reply:hover {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0284c7;
+}
+
 .hunter-contact-drawer-overlay {
   position: fixed;
   top: 0;
@@ -1732,3 +1887,4 @@
   background: rgba(168, 85, 247, 0.06);
   border-color: rgba(168, 85, 247, 0.5);
 }
+

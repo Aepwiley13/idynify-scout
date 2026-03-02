@@ -1,5 +1,100 @@
 /* DASHBOARD SECTION (Step 6) — Operational Clarity Layer */
 
+/* ── Task 4.1: Barry Check-In Cards ─────────────────── */
+
+.barry-checkin-panel {
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(168, 85, 247, 0.03);
+}
+
+.barry-checkin-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(168, 85, 247, 0.08);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.barry-checkin-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.08);
+}
+
+.barry-checkin-card:last-child { border-bottom: none; }
+
+.barry-checkin-voice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.barry-checkin-voice p {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.barry-checkin-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.barry-checkin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: rgba(168, 85, 247, 0.08);
+  color: #a855f7;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.barry-checkin-btn:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: #a855f7;
+}
+
+.barry-checkin-btn--muted {
+  background: rgba(107, 114, 128, 0.08);
+  border-color: rgba(107, 114, 128, 0.3);
+  color: #6b7280;
+}
+
+.barry-checkin-btn--muted:hover:not(:disabled) {
+  background: rgba(107, 114, 128, 0.15);
+  border-color: #6b7280;
+}
+
+.barry-checkin-btn--danger {
+  background: rgba(239, 68, 68, 0.07);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.barry-checkin-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.13);
+  border-color: #ef4444;
+}
+
+.barry-checkin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Finding 22: Standardized to 1400px (Scout's list/overview width) */
 .dashboard-section {
   max-width: 1400px;
@@ -253,6 +348,26 @@
 .btn-attention-action:hover {
   background: rgba(139, 92, 246, 0.15);
   border-color: #8b5cf6;
+}
+
+.btn-attention-action--purple {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: #a855f7;
+}
+.btn-attention-action--purple:hover {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: #a855f7;
+}
+
+.btn-attention-action--blue {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.25);
+  color: #0ea5e9;
+}
+.btn-attention-action--blue:hover {
+  background: rgba(14, 165, 233, 0.18);
+  border-color: #0ea5e9;
 }
 
 /* ── Campaign Cards ──────────────────────────────────── */

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard, Users } from 'lucide-react';
+import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard, Users, Home } from 'lucide-react';
 import DashboardSection from './sections/DashboardSection';
 import WeaponsSection from './sections/WeaponsSection';
 import MissionsSection from './sections/MissionsSection';
@@ -130,6 +130,18 @@ export default function HunterWeaponRoom() {
 
   return (
     <div className="hunter-weapon-room">
+      {/* Task 4.3: Mission Control button — same position/style as Scout sidebar */}
+      <div className="hunter-mission-control-bar">
+        <button
+          className="hunter-mc-link"
+          onClick={() => navigate('/mission-control-v2')}
+          title="Mission Control"
+        >
+          <Home className="w-4 h-4" />
+          <span>Mission Control</span>
+        </button>
+      </div>
+
       {/* Header — Finding 7: Scout's centered enterprise-header */}
       <div className="enterprise-header">
         <h1 className="page-title">Hunter</h1>

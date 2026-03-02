@@ -179,19 +179,49 @@ export const handler = async (event) => {
 
         console.log(`✉️  Reply detected for contact ${contact.id} from ${fromHeader}`);
 
-        // Write transition to Firestore
-        await db
+        // Write transition to Firestore (contact document)
+        const contactRef = db
           .collection('users').doc(userId)
-          .collection('contacts').doc(contact.id)
-          .update({
-            hunter_status: 'in_conversation',
-            contact_status: 'In Conversation',
-            contact_status_updated_at: receivedAt,
-            last_reply_at: receivedAt,
-            last_reply_from: fromHeader,
-            last_interaction_at: receivedAt,
-            updated_at: receivedAt,
-          });
+          .collection('contacts').doc(contact.id);
+
+        await contactRef.update({
+          hunter_status: 'in_conversation',
+          contact_status: 'In Conversation',
+          contact_status_updated_at: receivedAt,
+          last_reply_at: receivedAt,
+          last_reply_from: fromHeader,
+          last_interaction_at: receivedAt,
+          updated_at: receivedAt,
+        });
+
+        // ── Task 2.1: Also update mission document if contact is in a mission ──
+        // Re-read the contact to get the latest active_mission_id
+        const freshContactSnap = await contactRef.get();
+        const freshContact = freshContactSnap.data() || {};
+        const activeMissionId = freshContact.active_mission_id || contact.active_mission_id;
+
+        if (activeMissionId) {
+          try {
+            const missionRef = db
+              .collection('users').doc(userId)
+              .collection('missions').doc(activeMissionId);
+            const missionSnap = await missionRef.get();
+
+            if (missionSnap.exists) {
+              const missionData = missionSnap.data();
+              const updatedContacts = (missionData.contacts || []).map(c =>
+                c.contactId === contact.id
+                  ? { ...c, replyStatus: 'replied', repliedAt: receivedAt, repliedFrom: fromHeader }
+                  : c
+              );
+              await missionRef.update({ contacts: updatedContacts, updatedAt: receivedAt });
+              console.log(`✅ Mission ${activeMissionId} updated — contact ${contact.id} marked replied`);
+            }
+          } catch (missionErr) {
+            // Non-fatal — contact is still updated; log and continue
+            console.warn(`[PollReplies] Mission update skipped for ${contact.id}:`, missionErr.message);
+          }
+        }
 
         // Log timeline event
         await db

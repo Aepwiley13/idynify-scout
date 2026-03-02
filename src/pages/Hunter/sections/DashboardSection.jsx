@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../../firebase/config';
+import { db, auth } from '../../../firebase/config';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { backfillMissionContactNames } from '../../../utils/backfillMissionContacts';
 import {
   AlertCircle,
@@ -18,7 +19,9 @@ import {
   Filter,
   Sparkles,
   Zap,
-  ArrowRight
+  ArrowRight,
+  RefreshCw,
+  SkipForward
 } from 'lucide-react';
 import {
   getNeedsAttentionItems,
@@ -166,6 +169,50 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
     navigate(`/hunter/mission/${item.missionId}`);
   }
 
+  // ── Task 4.1: Barry check-in state + handlers ────────────────────────────
+  // dismissedCheckins: Set of `${missionId}-${contactId}` keys the user has acted on this session
+  const [dismissedCheckins, setDismissedCheckins] = useState(new Set());
+  const [checkinSaving, setCheckinSaving] = useState(null);
+
+  // Contacts stalled > 4 days that need a Barry check-in card
+  const checkinItems = useMemo(() => {
+    return attentionItems.filter(item =>
+      (item.type === 'overdue_reply' || item.type === 'stalled_contact') &&
+      !dismissedCheckins.has(`${item.missionId}-${item.contactId}`)
+    );
+  }, [attentionItems, dismissedCheckins]);
+
+  // "Try a different angle" — navigate to mission detail; Barry will offer new personalization
+  function handleTryDifferentAngle(item) {
+    navigate(`/hunter/mission/${item.missionId}`);
+    setDismissedCheckins(s => new Set([...s, `${item.missionId}-${item.contactId}`]));
+  }
+
+  // "Wait longer" — snooze: add 7 days to the step's effective timing (client-only dismiss this session)
+  async function handleWaitLonger(item) {
+    setDismissedCheckins(s => new Set([...s, `${item.missionId}-${item.contactId}`]));
+  }
+
+  // "Move on" — remove from mission
+  async function handleMoveOn(item) {
+    const user = auth.currentUser;
+    if (!user || checkinSaving) return;
+    const key = `${item.missionId}-${item.contactId}`;
+    setCheckinSaving(key);
+    try {
+      const missionRef = doc(db, 'users', user.uid, 'missions', item.missionId);
+      const snap = await getDoc(missionRef);
+      if (!snap.exists()) return;
+      const updatedContacts = (snap.data().contacts || []).filter(c => c.contactId !== item.contactId);
+      await updateDoc(missionRef, { contacts: updatedContacts, updatedAt: new Date().toISOString() });
+      setDismissedCheckins(s => new Set([...s, key]));
+    } catch (err) {
+      console.error('[DashboardSection] handleMoveOn error:', err);
+    } finally {
+      setCheckinSaving(null);
+    }
+  }
+
   // ── Quick Stats ─────────────────────────────────────
 
   const totalActiveContacts = Object.values(statusGroups).reduce(
@@ -215,6 +262,62 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
           </div>
         </div>
       </div>
+
+      {/* ─── Task 4.1: Barry Check-In Cards ─── */}
+      {checkinItems.length > 0 && (
+        <div className="barry-checkin-panel">
+          <div className="barry-checkin-header">
+            <Sparkles className="w-4 h-4" />
+            <span>Barry flagged {checkinItems.length} contact{checkinItems.length !== 1 ? 's' : ''} that may need a new approach</span>
+          </div>
+          {checkinItems.slice(0, 3).map((item, idx) => {
+            const isSaving = checkinSaving === `${item.missionId}-${item.contactId}`;
+            const dayLabel = item.daysSinceSent || item.daysSinceAdded;
+            return (
+              <div key={`${item.missionId}-${item.contactId}-${idx}`} className="barry-checkin-card">
+                <div className="barry-checkin-voice">
+                  <Sparkles className="w-3 h-3" style={{ color: '#a855f7' }} />
+                  <p>
+                    <strong>{item.contactName}</strong> hasn't responded
+                    {item.stepIndex !== undefined ? ` to Step ${item.stepIndex + 1}` : ''}
+                    {dayLabel ? ` in ${dayLabel} day${dayLabel !== 1 ? 's' : ''}` : ''}.
+                    What do you want to do?
+                  </p>
+                </div>
+                <div className="barry-checkin-actions">
+                  <button
+                    className="barry-checkin-btn"
+                    onClick={() => handleTryDifferentAngle(item)}
+                    disabled={isSaving}
+                    title="Barry will generate a new approach for this contact"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Try a different angle
+                  </button>
+                  <button
+                    className="barry-checkin-btn barry-checkin-btn--muted"
+                    onClick={() => handleWaitLonger(item)}
+                    disabled={isSaving}
+                    title="Dismiss for now — check back in a few days"
+                  >
+                    <Clock className="w-3 h-3" />
+                    Wait longer
+                  </button>
+                  <button
+                    className="barry-checkin-btn barry-checkin-btn--danger"
+                    onClick={() => handleMoveOn(item)}
+                    disabled={isSaving}
+                    title="Remove this contact from the mission"
+                  >
+                    <SkipForward className="w-3 h-3" />
+                    Move on
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ─── Section 1: Needs Attention ─── */}
       <div className="dashboard-panel dashboard-panel-attention">
@@ -266,7 +369,25 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
                     </div>
                   </div>
                   <div className="attention-item-actions">
-                    {(item.type === 'step_ready' || item.type === 'outcome_needed' || item.type === 'overdue_reply') && (
+                    {(item.type === 'personalization_approval') && (
+                      <button
+                        className="btn-attention-action btn-attention-action--purple"
+                        onClick={() => handleOpenMission(item.missionId)}
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Review
+                      </button>
+                    )}
+                    {(item.type === 'contact_replied') && (
+                      <button
+                        className="btn-attention-action btn-attention-action--blue"
+                        onClick={() => handleOpenMission(item.missionId)}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Respond
+                      </button>
+                    )}
+                    {(item.type === 'step_ready' || item.type === 'outcome_needed' || item.type === 'overdue_reply' || item.type === 'stalled_contact') && (
                       <button
                         className="btn-attention-action"
                         onClick={() => handleReviewStep(item)}

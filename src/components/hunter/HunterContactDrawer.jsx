@@ -93,11 +93,22 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   const [personalizedSteps, setPersonalizedSteps] = useState([]);
   const [personalizationError, setPersonalizationError] = useState(null);
 
+  // Sprint 2.2: Reply thread viewer
+  const [replyThread, setReplyThread] = useState(null);   // [{ id, from, to, subject, body, date, isInbound }]
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadError, setThreadError] = useState(null);
+
   useEffect(() => {
     if (isOpen) {
       loadData();
       setActiveView('main');
       resetEngagementState();
+      // If contact has replied, load the thread automatically
+      setReplyThread(null);
+      setThreadError(null);
+      if (contact?.hunter_status === 'in_conversation' && contact?.gmail_thread_id) {
+        loadReplyThread(contact.gmail_thread_id);
+      }
       // Load existing intent from contact
       setEngagementIntent(contact?.engagementIntent || 'prospect');
 
@@ -180,6 +191,34 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       setDrawerRecommendations(recs);
     } catch (error) {
       console.error('[HunterContactDrawer] Failed to load recommendations:', error);
+    }
+  }
+
+  // Sprint 2.2: Load Gmail thread so the reply is readable inside the app
+  async function loadReplyThread(threadId) {
+    const user = auth.currentUser;
+    if (!user || !threadId) return;
+    setThreadLoading(true);
+    setThreadError(null);
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/gmail-get-thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, threadId }),
+      });
+      const data = await res.json();
+      if (data.code === 'GMAIL_NOT_CONNECTED' || data.code === 'NEEDS_RECONNECT') {
+        setThreadError('Gmail not connected — reconnect to view the reply thread.');
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || 'Failed to load thread');
+      setReplyThread(data.messages || []);
+    } catch (err) {
+      console.error('[HunterContactDrawer] loadReplyThread error:', err);
+      setThreadError('Could not load reply thread.');
+    } finally {
+      setThreadLoading(false);
     }
   }
 
@@ -724,12 +763,94 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 </div>
               )}
 
+              {/* Sprint 2.2: Reply Thread Viewer — shown when contact has replied */}
+              {contact.hunter_status === 'in_conversation' && (
+                <div className="reply-thread-panel">
+                  <div className="reply-thread-header">
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="reply-thread-label">Reply from {firstName}</span>
+                    {contact.last_reply_at && (
+                      <span className="reply-thread-time">
+                        {new Date(contact.last_reply_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {threadLoading && (
+                    <div className="reply-thread-loading">
+                      <Loader className="w-4 h-4 animate-spin" />
+                      <span>Loading reply...</span>
+                    </div>
+                  )}
+
+                  {threadError && (
+                    <div className="reply-thread-error">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{threadError}</span>
+                    </div>
+                  )}
+
+                  {!threadLoading && !threadError && replyThread && replyThread.length > 0 && (
+                    <div className="reply-thread-messages">
+                      {replyThread.map((msg, idx) => (
+                        <div
+                          key={msg.id || idx}
+                          className={`thread-message ${msg.isInbound ? 'thread-message--inbound' : 'thread-message--outbound'}`}
+                        >
+                          <div className="thread-message-meta">
+                            <span className="thread-message-from">{msg.from}</span>
+                            {msg.date && (
+                              <span className="thread-message-date">
+                                {new Date(msg.date).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          {msg.subject && idx === 0 && (
+                            <div className="thread-message-subject">Re: {msg.subject}</div>
+                          )}
+                          <p className="thread-message-body">{msg.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!threadLoading && !threadError && !replyThread && contact.gmail_thread_id && (
+                    <button
+                      className="btn-load-thread"
+                      onClick={() => loadReplyThread(contact.gmail_thread_id)}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Load reply thread
+                    </button>
+                  )}
+
+                  {/* Ask Barry how to respond CTA */}
+                  <button
+                    className="btn-ask-barry-reply"
+                    onClick={() => {
+                      const latestReply = replyThread?.filter(m => m.isInbound).slice(-1)[0];
+                      const prePrompt = latestReply
+                        ? `${firstName} replied: "${latestReply.body.slice(0, 200).trim()}..." — help me respond`
+                        : `${firstName} replied to my outreach — help me craft a response`;
+                      setUserIntent(prePrompt);
+                    }}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Ask Barry how to respond
+                  </button>
+                </div>
+              )}
+
               {/* Barry's Question - Single line */}
               <div className="barry-question-section">
                 <div className="barry-avatar">
                   <Sparkles className="w-5 h-5" />
                 </div>
-                <p className="barry-question">What do you want to do with {firstName}?</p>
+                <p className="barry-question">
+                  {contact.hunter_status === 'in_conversation'
+                    ? `${firstName} replied — how do you want to respond?`
+                    : `What do you want to do with ${firstName}?`}
+                </p>
               </div>
 
               {/* FREE-FORM Chat Input - THIS IS THE PRIMARY INTERFACE */}

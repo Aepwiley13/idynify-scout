@@ -5,8 +5,8 @@
  * engagement style, surface a Barry insight card when one style
  * is clearly outperforming others.
  */
-import { useMemo } from 'react';
-import { BarChart3, TrendingUp, Target, Award, Sparkles, ArrowRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { BarChart3, TrendingUp, Target, Award, Sparkles, ArrowRight, Check } from 'lucide-react';
 import './OutcomesSection.css';
 
 // Engagement style labels used in mission.engagement_style
@@ -21,7 +21,7 @@ const STYLE_LABELS = {
   followup:  'Follow-Up',
 };
 
-export default function OutcomesSection({ campaigns = [], missions = [] }) {
+export default function OutcomesSection({ campaigns = [], missions = [], onSetDefaultStyle }) {
   // ── Aggregate stats from old campaigns ──────────────────────────────────
   const campaignStats = useMemo(() => {
     let totalSent = 0, totalReplied = 0, totalMeetings = 0, totalOpportunities = 0;
@@ -90,6 +90,22 @@ export default function OutcomesSection({ campaigns = [], missions = [] }) {
     return { top, second, multiplier };
   }, [stylePerformance]);
 
+  // Barry insight dismiss / apply state
+  const [insightDismissed, setInsightDismissed] = useState(false);
+  const [insightApplied, setInsightApplied] = useState(false);
+
+  function handleUseDefaultStyle() {
+    setInsightApplied(true);
+    if (onSetDefaultStyle && barryInsight) {
+      onSetDefaultStyle(barryInsight.top.style);
+    }
+    setTimeout(() => setInsightDismissed(true), 1500);
+  }
+
+  function handleKeepSettings() {
+    setInsightDismissed(true);
+  }
+
   const hasData = campaigns.length > 0 || missions.length > 0;
 
   if (!hasData) {
@@ -109,7 +125,7 @@ export default function OutcomesSection({ campaigns = [], missions = [] }) {
   return (
     <div className="outcomes-section">
       {/* ── Task 4.2: Barry Performance Insight Card ── */}
-      {barryInsight && (
+      {barryInsight && !insightDismissed && (
         <div className="barry-insight-card">
           <div className="barry-insight-header">
             <Sparkles className="w-4 h-4" />
@@ -126,11 +142,11 @@ export default function OutcomesSection({ campaigns = [], missions = [] }) {
             <span className="barry-insight-stat">{barryInsight.second.label}: {barryInsight.second.rateDisplay} reply rate</span>
           </div>
           <div className="barry-insight-actions">
-            <button className="barry-insight-btn">
-              <ArrowRight className="w-3 h-3" />
-              Use {barryInsight.top.label} by default
+            <button className="barry-insight-btn" onClick={handleUseDefaultStyle} disabled={insightApplied}>
+              {insightApplied ? <Check className="w-3 h-3" /> : <ArrowRight className="w-3 h-3" />}
+              {insightApplied ? `${barryInsight.top.label} set as default` : `Use ${barryInsight.top.label} by default`}
             </button>
-            <button className="barry-insight-btn barry-insight-btn--dismiss">
+            <button className="barry-insight-btn barry-insight-btn--dismiss" onClick={handleKeepSettings}>
               Keep current settings
             </button>
           </div>

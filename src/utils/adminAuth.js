@@ -63,8 +63,17 @@ export async function fetchAllUsers(userId, authToken, options = {}) {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to fetch users');
+    let errorMessage = `Server error (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      // Response was not JSON (e.g. 504 HTML timeout page) — use status-based message
+      if (response.status === 504) {
+        errorMessage = 'Request timed out — too many users to load at once. Please try again.';
+      }
+    }
+    throw new Error(errorMessage);
   }
 
   return await response.json();
@@ -100,8 +109,14 @@ export async function fetchApiLogs(userId, authToken, filters = {}) {
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to fetch API logs');
+    let errorMessage = `Server error (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      // Response was not JSON (e.g. 504 HTML timeout page)
+    }
+    throw new Error(errorMessage);
   }
 
   return await response.json();

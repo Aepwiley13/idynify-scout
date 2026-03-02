@@ -30,7 +30,7 @@ const db = getFirestore();
 export const handler = async (event) => {
   // CORS headers
   const headers = {
-    'Access-Control-Allow-Origin': 'https://idynify.com',
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
@@ -127,21 +127,27 @@ export const handler = async (event) => {
     const usersSnapshot = await db.collection('users').get();
     console.log(`✅ Found ${usersSnapshot.size} users in Firestore`);
 
-    // Step 4: Aggregate data for each user
+    // Step 4: Aggregate data for each user in parallel batches
+    const BATCH_SIZE = 10;
+    const userDocs = usersSnapshot.docs;
     const usersWithData = [];
     const errors = [];
 
-    for (const userDoc of usersSnapshot.docs) {
-      try {
-        const userData = await aggregateUserData(userDoc.id);
-        usersWithData.push(userData);
-      } catch (error) {
-        console.error(`❌ Error aggregating data for user ${userDoc.id}:`, error.message);
-        errors.push({
-          userId: userDoc.id,
-          error: error.message
-        });
-      }
+    for (let i = 0; i < userDocs.length; i += BATCH_SIZE) {
+      const batch = userDocs.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(userDoc => aggregateUserData(userDoc.id))
+      );
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          usersWithData.push(result.value);
+        } else {
+          const uid = batch[idx].id;
+          console.error(`❌ Error aggregating data for user ${uid}:`, result.reason?.message);
+          errors.push({ userId: uid, error: result.reason?.message });
+        }
+      });
     }
 
     // Step 5: Calculate platform-wide stats
@@ -162,7 +168,7 @@ export const handler = async (event) => {
     };
 
   } catch (error) {
-    console.error('❌ Error in admin-get-users:', error);
+    console.error('❌ Error in adminGetUsers:', error);
     return {
       statusCode: 500,
       headers,
@@ -178,7 +184,7 @@ export const handler = async (event) => {
  * Check if user has admin access
  */
 async function checkAdminAccess(userId) {
-  // Check environment variable
+  // Check environment variable first (fast path)
   const adminUserIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 
   if (adminUserIds.includes(userId)) {
@@ -206,35 +212,57 @@ async function checkAdminAccess(userId) {
 }
 
 /**
- * Aggregate all data for a single user
+ * Aggregate all data for a single user — runs all Firestore reads in parallel.
  */
 async function aggregateUserData(uid) {
-  // Fetch auth data for this user
-  let email = null;
-  let signupDate = null;
-  let lastLogin = null;
+  const userRef = db.collection('users').doc(uid);
 
-  try {
-    const authUser = await auth.getUser(uid);
-    email = authUser.email || null;
-    signupDate = authUser.metadata.creationTime || null;
-    lastLogin = authUser.metadata.lastSignInTime || null;
-  } catch (error) {
-    console.error(`Failed to fetch auth data for ${uid}:`, error);
-  }
+  // Fire all reads concurrently
+  const [
+    authUser,
+    usageDoc,
+    icpDoc,
+    progressDoc,
+    companiesTotal,
+    companiesPending,
+    companiesAccepted,
+    companiesRejected,
+    contactsCount,
+    leadsCount
+  ] = await Promise.allSettled([
+    auth.getUser(uid),
+    userRef.collection('apiUsage').doc('summary').get(),
+    userRef.collection('companyProfile').doc('current').get(),
+    userRef.collection('scoutProgress').doc('swipes').get(),
+    userRef.collection('companies').count().get(),
+    userRef.collection('companies').where('status', '==', 'pending').count().get(),
+    userRef.collection('companies').where('status', '==', 'accepted').count().get(),
+    userRef.collection('companies').where('status', '==', 'rejected').count().get(),
+    userRef.collection('contacts').count().get(),
+    userRef.collection('leads').count().get()
+  ]);
 
+  // Helper: safely extract fulfilled value
+  const val = (settled) => settled.status === 'fulfilled' ? settled.value : null;
+
+  const authData = val(authUser);
+  const usageData = val(usageDoc);
+  const icpData = val(icpDoc);
+  const progressData = val(progressDoc);
+
+  // Build user object
   const userData = {
     uid,
-    email,
-    signupDate,
-    lastLogin,
+    email: authData?.email || null,
+    signupDate: authData?.metadata?.creationTime || null,
+    lastLogin: authData?.metadata?.lastSignInTime || null,
 
     scout: {
-      companiesTotal: 0,
-      companiesPending: 0,
-      companiesAccepted: 0,
-      companiesRejected: 0,
-      contactsTotal: 0,
+      companiesTotal: val(companiesTotal)?.data().count ?? 0,
+      companiesPending: val(companiesPending)?.data().count ?? 0,
+      companiesAccepted: val(companiesAccepted)?.data().count ?? 0,
+      companiesRejected: val(companiesRejected)?.data().count ?? 0,
+      contactsTotal: val(contactsCount)?.data().count ?? 0,
       icpConfigured: false,
       icpIndustries: 0,
       icpCompanySizes: 0,
@@ -246,7 +274,7 @@ async function aggregateUserData(uid) {
     },
 
     recon: {
-      leadsTotal: 0,
+      leadsTotal: val(leadsCount)?.data().count ?? 0,
       icpBriefGenerated: false,
       lastActivity: null
     },
@@ -261,100 +289,37 @@ async function aggregateUserData(uid) {
     }
   };
 
-  // Fetch API usage summary
-  try {
-    const usageDoc = await db.collection('users').doc(uid).collection('apiUsage').doc('summary').get();
-
-    if (usageDoc.exists) {
-      const data = usageDoc.data();
-      userData.credits = {
-        total: data.totalCredits || 0,
-        enrichContact: data.enrichContact || 0,
-        enrichCompany: data.enrichCompany || 0,
-        searchPeople: data.searchPeople || 0,
-        searchCompanies: data.searchCompanies || 0,
-        lastUsed: data.lastUpdated ? data.lastUpdated.toDate().toISOString() : null
-      };
-    }
-  } catch (error) {
-    console.error(`Failed to fetch API usage for ${uid}:`, error);
+  // Populate credits
+  if (usageData?.exists) {
+    const d = usageData.data();
+    userData.credits = {
+      total: d.totalCredits || 0,
+      enrichContact: d.enrichContact || 0,
+      enrichCompany: d.enrichCompany || 0,
+      searchPeople: d.searchPeople || 0,
+      searchCompanies: d.searchCompanies || 0,
+      lastUsed: d.lastUpdated ? d.lastUpdated.toDate().toISOString() : null
+    };
   }
 
-  // Fetch ICP profile
-  try {
-    const icpDoc = await db.collection('users').doc(uid).collection('companyProfile').doc('current').get();
+  // Populate ICP / scout fields
+  if (icpData?.exists) {
+    const d = icpData.data();
+    const industries = d.industries || [];
+    const companySizes = d.companySizes || [];
+    const locations = d.locations || [];
+    const targetTitles = d.targetTitles || [];
 
-    if (icpDoc.exists) {
-      const data = icpDoc.data();
-      const industries = data.industries || [];
-      const companySizes = data.companySizes || [];
-      const locations = data.locations || [];
-      const targetTitles = data.targetTitles || [];
-
-      userData.scout.icpConfigured = industries.length > 0 || companySizes.length > 0;
-      userData.scout.icpIndustries = industries.length;
-      userData.scout.icpCompanySizes = companySizes.length;
-      userData.scout.icpLocations = locations.length;
-      userData.scout.targetTitles = targetTitles.length;
-    }
-  } catch (error) {
-    console.error(`Failed to fetch ICP for ${uid}:`, error);
+    userData.scout.icpConfigured = industries.length > 0 || companySizes.length > 0;
+    userData.scout.icpIndustries = industries.length;
+    userData.scout.icpCompanySizes = companySizes.length;
+    userData.scout.icpLocations = locations.length;
+    userData.scout.targetTitles = targetTitles.length;
   }
 
-  // Fetch Scout progress
-  try {
-    const progressDoc = await db.collection('users').doc(uid).collection('scoutProgress').doc('swipes').get();
-
-    if (progressDoc.exists) {
-      const data = progressDoc.data();
-      userData.scout.dailySwipeCount = data.dailySwipeCount || 0;
-    }
-  } catch (error) {
-    console.error(`Failed to fetch Scout progress for ${uid}:`, error);
-  }
-
-  // Count companies by status
-  try {
-    const companiesSnapshot = await db.collection('users').doc(uid).collection('companies').get();
-    const companies = companiesSnapshot.docs;
-
-    userData.scout.companiesTotal = companies.length;
-    userData.scout.companiesPending = companies.filter(doc => doc.data().status === 'pending').length;
-    userData.scout.companiesAccepted = companies.filter(doc => doc.data().status === 'accepted').length;
-    userData.scout.companiesRejected = companies.filter(doc => doc.data().status === 'rejected').length;
-
-    // Find last activity
-    let lastActivityTimestamp = null;
-    companies.forEach(doc => {
-      const data = doc.data();
-      const swipedAt = data.swipedAt;
-      const createdAt = data.createdAt;
-      const timestamp = swipedAt || createdAt;
-
-      if (timestamp && (!lastActivityTimestamp || timestamp.toDate() > lastActivityTimestamp)) {
-        lastActivityTimestamp = timestamp.toDate();
-      }
-    });
-
-    userData.scout.lastActivity = lastActivityTimestamp ? lastActivityTimestamp.toISOString() : null;
-  } catch (error) {
-    console.error(`Failed to fetch companies for ${uid}:`, error);
-  }
-
-  // Count contacts
-  try {
-    const contactsSnapshot = await db.collection('users').doc(uid).collection('contacts').get();
-    userData.scout.contactsTotal = contactsSnapshot.size;
-  } catch (error) {
-    console.error(`Failed to fetch contacts for ${uid}:`, error);
-  }
-
-  // Count Recon leads
-  try {
-    const leadsSnapshot = await db.collection('users').doc(uid).collection('leads').get();
-    userData.recon.leadsTotal = leadsSnapshot.size;
-  } catch (error) {
-    console.error(`Failed to fetch leads for ${uid}:`, error);
+  // Populate daily swipe count
+  if (progressData?.exists) {
+    userData.scout.dailySwipeCount = progressData.data().dailySwipeCount || 0;
   }
 
   return userData;
@@ -385,9 +350,9 @@ function calculatePlatformStats(users) {
     }
 
     // Sum totals
-    stats.totalCredits += user.credits.total;
-    stats.totalCompanies += user.scout.companiesTotal;
-    stats.totalContacts += user.scout.contactsTotal;
+    stats.totalCredits += user.credits?.total ?? 0;
+    stats.totalCompanies += user.scout?.companiesTotal ?? 0;
+    stats.totalContacts += user.scout?.contactsTotal ?? 0;
   });
 
   return stats;

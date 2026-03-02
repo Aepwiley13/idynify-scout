@@ -164,9 +164,12 @@ export function isMissionApproachingDeadline(mission) {
  * Returns a flat array of action items sorted by urgency.
  *
  * Types:
+ *   - personalization_approval: Barry personalized steps awaiting user review
+ *   - contact_replied: Contact replied, needs user response
  *   - step_ready: Sequence step ready for approval
  *   - outcome_needed: Step sent, outcome not recorded
  *   - overdue_reply: Contact awaiting reply beyond expected time
+ *   - stalled_contact: No activity on a contact for 7+ days
  *   - deadline_approaching: Mission approaching timeframe deadline
  */
 export function getNeedsAttentionItems(missions) {
@@ -183,6 +186,43 @@ export function getNeedsAttentionItems(missions) {
 
       const history = contact.stepHistory || [];
       const lastEntry = history.length > 0 ? history[history.length - 1] : null;
+      const contactName = contact.name || contact.firstName
+        ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || 'Unknown'
+        : 'Unknown';
+
+      // ── Task 3.3: Personalization approval pending ─────────────────────────
+      // Barry has generated personalized steps; user hasn't approved them yet.
+      if (contact.personalizationStatus === 'pending_approval' && contact.personalizedSteps?.length > 0) {
+        const pendingCount = contact.personalizedSteps.filter(s => s.status === 'pending_approval').length;
+        if (pendingCount > 0) {
+          items.push({
+            type: 'personalization_approval',
+            urgency: 4,
+            missionId: mission.id,
+            missionName: mission.name,
+            contactId: contact.contactId,
+            contactName,
+            message: `${pendingCount} personalized step${pendingCount !== 1 ? 's' : ''} awaiting your approval before anything sends`
+          });
+          continue; // Approval is the top priority — skip other checks for this contact
+        }
+      }
+
+      // ── Task 3.3: Contact replied ──────────────────────────────────────────
+      // Reply detected via gmail-poll-replies; user needs to respond.
+      if (contact.replyStatus === 'replied') {
+        items.push({
+          type: 'contact_replied',
+          urgency: 4,
+          missionId: mission.id,
+          missionName: mission.name,
+          contactId: contact.contactId,
+          contactName,
+          repliedAt: contact.repliedAt,
+          message: `Replied ${contact.repliedAt ? `on ${new Date(contact.repliedAt).toLocaleDateString()}` : 'recently'} — respond now`
+        });
+        continue;
+      }
 
       // Step ready for approval: active status, last entry is not 'sent'
       // (either no history, or last action was outcome-recorded/skipped meaning next step is ready)
@@ -201,7 +241,7 @@ export function getNeedsAttentionItems(missions) {
             missionId: mission.id,
             missionName: mission.name,
             contactId: contact.contactId,
-            contactName: contact.name || 'Unknown',
+            contactName,
             stepIndex,
             stepType: step.stepType || step.action,
             channel: step.channel,
@@ -220,7 +260,7 @@ export function getNeedsAttentionItems(missions) {
           missionId: mission.id,
           missionName: mission.name,
           contactId: contact.contactId,
-          contactName: contact.name || 'Unknown',
+          contactName,
           stepIndex: lastEntry.stepIndex,
           sentAt: lastEntry.sentAt,
           daysSinceSent: daysSince(lastEntry.sentAt),
@@ -228,6 +268,24 @@ export function getNeedsAttentionItems(missions) {
             ? `Awaiting reply — ${daysSince(lastEntry.sentAt)} days since sent`
             : `Record outcome for Step ${lastEntry.stepIndex + 1}`
         });
+      }
+
+      // ── Task 3.3: Stalled contact — no activity for 7+ days ───────────────
+      if (!lastEntry) {
+        // Contact added to mission but no steps sent yet, and it's been 7+ days
+        const addedAt = contact.addedAt || mission.createdAt;
+        if (daysSince(addedAt) >= STALLED_THRESHOLD_DAYS) {
+          items.push({
+            type: 'stalled_contact',
+            urgency: 2,
+            missionId: mission.id,
+            missionName: mission.name,
+            contactId: contact.contactId,
+            contactName,
+            daysSinceAdded: daysSince(addedAt),
+            message: `No activity — added ${daysSince(addedAt)} days ago but no steps sent`
+          });
+        }
       }
     }
 
@@ -457,15 +515,21 @@ export const HEALTH_COLORS = {
 };
 
 export const ATTENTION_TYPE_LABELS = {
+  personalization_approval: 'Approve Steps',
+  contact_replied: 'Reply',
   step_ready: 'Approve Step',
   outcome_needed: 'Record Outcome',
   overdue_reply: 'Overdue',
+  stalled_contact: 'Stalled',
   deadline_approaching: 'Deadline'
 };
 
 export const ATTENTION_TYPE_COLORS = {
-  step_ready: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6' },
-  outcome_needed: { bg: 'rgba(245, 158, 11, 0.15)', text: '#f59e0b' },
-  overdue_reply: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444' },
-  deadline_approaching: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7' }
+  personalization_approval: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7' },
+  contact_replied:          { bg: 'rgba(14, 165, 233, 0.15)',  text: '#0ea5e9' },
+  step_ready:               { bg: 'rgba(59, 130, 246, 0.15)',  text: '#3b82f6' },
+  outcome_needed:           { bg: 'rgba(245, 158, 11, 0.15)',  text: '#f59e0b' },
+  overdue_reply:            { bg: 'rgba(239, 68, 68, 0.15)',   text: '#ef4444' },
+  stalled_contact:          { bg: 'rgba(107, 114, 128, 0.15)', text: '#6b7280' },
+  deadline_approaching:     { bg: 'rgba(168, 85, 247, 0.15)',  text: '#a855f7' }
 };

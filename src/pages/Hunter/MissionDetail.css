@@ -1,5 +1,353 @@
 /* MISSION DETAIL PAGE — Step 5 Command View */
 
+/* ── Task 3.1: Step Progress Grid ────────────────────── */
+
+.contacts-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.btn-add-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  color: #a855f7;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-add-contact:hover {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: #a855f7;
+}
+
+.step-grid-container {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.step-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.step-grid-th {
+  padding: 8px 10px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.step-grid-th-contact { min-width: 150px; }
+.step-grid-th-step { width: 60px; text-align: center; }
+.step-grid-th-status { width: 130px; }
+.step-grid-th-actions { width: 100px; text-align: center; }
+
+.step-grid-header-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.step-grid-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.step-grid-channel {
+  font-size: 9px;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.step-grid-row:nth-child(even) { background: #fafafa; }
+.step-grid-row:hover { background: rgba(168, 85, 247, 0.03); }
+.step-grid-row--paused { opacity: 0.6; }
+
+.step-grid-td {
+  padding: 10px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.step-grid-td-contact { }
+.step-grid-td-step { text-align: center; }
+.step-grid-td-status { }
+.step-grid-td-controls { text-align: center; }
+
+.grid-contact-name {
+  font-weight: 600;
+  color: #111827;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.grid-contact-email {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.grid-paused-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.grid-converted-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-weight: 600;
+}
+
+.grid-replied-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+  font-weight: 600;
+}
+
+.grid-status-badge {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Step cells */
+.step-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  margin: 0 auto;
+}
+
+.step-cell--upcoming   { background: #f3f4f6; color: #d1d5db; }
+.step-cell--current    { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1.5px solid #3b82f6; }
+.step-cell--generating { background: rgba(168, 85, 247, 0.1);  color: #a855f7; }
+.step-cell--approval   { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.step-cell--approved   { background: rgba(16, 185, 129, 0.1);  color: #10b981; }
+.step-cell--sent       { background: rgba(59, 130, 246, 0.1);  color: #3b82f6; }
+.step-cell--replied    { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+.step-cell--skipped    { background: #f3f4f6; color: #9ca3af; }
+
+/* Per-contact controls */
+.contact-controls {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.contact-ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.contact-ctrl-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.contact-ctrl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.contact-ctrl-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+/* ── Task 3.2: Add Contact Modal ─────────────────────── */
+
+.add-contact-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.add-contact-modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.add-contact-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.add-contact-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.btn-modal-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  border-radius: 6px;
+}
+
+.btn-modal-close:hover { background: #f3f4f6; color: #374151; }
+
+.add-contact-modal-sub {
+  font-size: 12px;
+  color: #6b7280;
+  padding: 10px 20px 0;
+  margin: 0;
+}
+
+.add-contact-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 16px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #9ca3af;
+}
+
+.add-contact-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #111827;
+  flex: 1;
+}
+
+.add-contact-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 8px 12px;
+}
+
+.add-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.add-contact-row:hover:not(:disabled) { background: rgba(168, 85, 247, 0.05); }
+.add-contact-row:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.add-contact-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.add-contact-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.add-contact-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.add-contact-email {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.add-contact-title {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.add-contact-empty {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 20px;
+}
+
 .mission-detail {
   max-width: 800px;
   margin: 0 auto;

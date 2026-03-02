@@ -266,7 +266,25 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
                     </div>
                   </div>
                   <div className="attention-item-actions">
-                    {(item.type === 'step_ready' || item.type === 'outcome_needed' || item.type === 'overdue_reply') && (
+                    {(item.type === 'personalization_approval') && (
+                      <button
+                        className="btn-attention-action btn-attention-action--purple"
+                        onClick={() => handleOpenMission(item.missionId)}
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Review
+                      </button>
+                    )}
+                    {(item.type === 'contact_replied') && (
+                      <button
+                        className="btn-attention-action btn-attention-action--blue"
+                        onClick={() => handleOpenMission(item.missionId)}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Respond
+                      </button>
+                    )}
+                    {(item.type === 'step_ready' || item.type === 'outcome_needed' || item.type === 'overdue_reply' || item.type === 'stalled_contact') && (
                       <button
                         className="btn-attention-action"
                         onClick={() => handleReviewStep(item)}

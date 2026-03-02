@@ -72,6 +72,7 @@ export default function HunterCardStack({
   reconCompletion,       // legacy map — kept for compat, ignored when reconConfidencePct set
   onEngage,
   onArchive,
+  onQuickMissionAssign,  // Sprint 1.2: quick mission assign from card
   onDeckEmpty
 }) {
   const [animating, setAnimating] = useState(false);
@@ -277,6 +278,7 @@ export default function HunterCardStack({
           hasActiveMission={currentContact.hunter_status === 'active_mission'}
           onEngage={triggerEngage}
           onArchive={triggerArchive}
+          onQuickMissionAssign={onQuickMissionAssign}
         />
       </motion.div>
     </div>

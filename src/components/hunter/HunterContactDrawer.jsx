@@ -910,13 +910,12 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   </div>
 
                   <div className="options-mission-cta">
-                    <span className="options-mission-label">Not ready to send?</span>
                     <button
-                      className="btn-add-mission-subtle"
+                      className="btn-add-mission-options"
                       onClick={() => setActiveView('add-mission')}
                     >
                       <Plus className="w-4 h-4" />
-                      Add to Mission
+                      Add {firstName} to Mission →
                     </button>
                   </div>
                 </>
@@ -1238,14 +1237,19 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                       <div className="mission-stats">
                         <span>{mission.contacts?.length || 0} contacts</span>
                         <span>•</span>
-                        <span>{mission.steps?.filter(s => s.enabled !== false).length || 0} steps</span>
+                        <span>{
+                          mission.sequence?.steps?.length ||
+                          mission.microSequence?.steps?.length ||
+                          mission.steps?.filter(s => s.enabled !== false).length ||
+                          0
+                        } steps</span>
                       </div>
                     </div>
                   ))
                 )}
                 <button
                   className="mission-create-new"
-                  onClick={() => navigate('/hunter/create-mission')}
+                  onClick={() => navigate(`/hunter/create-mission?contactId=${contact.id}`)}
                 >
                   <Plus className="w-4 h-4" />
                   Create new mission

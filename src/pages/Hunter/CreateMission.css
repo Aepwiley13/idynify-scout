@@ -841,3 +841,92 @@
   color: #6b7280;
   font-style: italic;
 }
+
+/* ── Task 1.4: Micro-sequence step inline editor ── */
+
+.micro-step {
+  position: relative;
+}
+
+.micro-step-edit-btn {
+  margin-left: auto;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.micro-step:hover .micro-step-edit-btn {
+  opacity: 1;
+}
+
+.micro-step-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 10px;
+}
+
+.micro-step-editor-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.micro-step-editor-row--half {
+  flex: 1;
+}
+
+.micro-step-editor-inline {
+  display: flex;
+  gap: 10px;
+}
+
+.micro-step-editor-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.micro-step-editor-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #f3f4f6;
+  font-size: 13px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.micro-step-editor-textarea:focus,
+.micro-step-editor-input:focus,
+.micro-step-editor-select:focus {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+.micro-step-editor-input {
+  width: 100%;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #f3f4f6;
+  font-size: 12px;
+}
+
+.micro-step-editor-select {
+  width: 100%;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #f3f4f6;
+  font-size: 12px;
+  cursor: pointer;
+}

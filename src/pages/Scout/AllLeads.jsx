@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
-  Target, Plus, Loader,
+  Target, Plus, Loader, ArrowUpDown,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -841,6 +841,7 @@ export default function AllLeads({ mode = 'people' }) {
   const [brigadeFilter, setBrigadeFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
+  const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('al_sortOrder') || 'newest');
 
   // Bulk selection
   const [bulkMode, setBulkMode] = useState(false);
@@ -1076,22 +1077,32 @@ export default function AllLeads({ mode = 'people' }) {
   // Search — name, title, company, email, phone, LinkedIn URL
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
+    const digitsOnly = lower.replace(/\D/g, '');
     filtered = filtered.filter(c => {
       const co = companies[c.company_id];
       return (c.name || '').toLowerCase().includes(lower) ||
         (c.title || '').toLowerCase().includes(lower) ||
         (co?.name || c.company_name || '').toLowerCase().includes(lower) ||
         (c.email || c.work_email || '').toLowerCase().includes(lower) ||
-        (c.phone_mobile || c.phone_direct || c.phone || '').replace(/\D/g, '').includes(lower.replace(/\D/g, '')) ||
+        (digitsOnly && (c.phone_mobile || c.phone_direct || c.phone || '').replace(/\D/g, '').includes(digitsOnly)) ||
         (c.linkedin_url || '').toLowerCase().includes(lower);
     });
   }
 
-  // Sort: overdue first → active mission → not started → converted
+  // Sort based on user preference
   const finalContacts = [...filtered].sort((a, b) => {
-    const orderA = ENGAGE_SORT_ORDER[deriveCardEngageState(a)] ?? 2;
-    const orderB = ENGAGE_SORT_ORDER[deriveCardEngageState(b)] ?? 2;
-    return orderA - orderB;
+    if (sortOrder === 'name') return (a.name || '').localeCompare(b.name || '');
+    if (sortOrder === 'status') {
+      const orderA = ENGAGE_SORT_ORDER[deriveCardEngageState(a)] ?? 2;
+      const orderB = ENGAGE_SORT_ORDER[deriveCardEngageState(b)] ?? 2;
+      return orderA - orderB;
+    }
+    // newest / oldest — sort by saved_at / addedAt timestamp
+    const dA = a.saved_at || a.addedAt || '';
+    const dB = b.saved_at || b.addedAt || '';
+    return sortOrder === 'oldest'
+      ? String(dA).localeCompare(String(dB))
+      : String(dB).localeCompare(String(dA)); // default: newest first
   });
 
   // Stats
@@ -1257,6 +1268,20 @@ export default function AllLeads({ mode = 'people' }) {
             style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter === id ? T.accentBdr : T.border}`, background: dataFilter === id ? T.accentBg : 'transparent', color: dataFilter === id ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >{label}</button>
         ))}
+        {/* Sort selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: '5px 10px', flexShrink: 0 }}>
+          <ArrowUpDown size={11} color={T.textFaint} />
+          <select
+            value={sortOrder}
+            onChange={e => { setSortOrder(e.target.value); localStorage.setItem('al_sortOrder', e.target.value); }}
+            style={{ background: 'transparent', border: 'none', outline: 'none', color: T.textMuted, fontSize: 10, cursor: 'pointer' }}
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="name">A–Z Name</option>
+            <option value="status">By Status</option>
+          </select>
+        </div>
         {/* Select mode toggle */}
         <button
           onClick={() => { setBulkMode(m => { if (m) { setSelectedIds(new Set()); } return !m; }); }}

@@ -1,5 +1,33 @@
 /* HUNTER WEAPON ROOM - Main Dashboard Styles */
 
+/* Task 4.3: Mission Control top-bar — matches Scout sidebar style */
+.hunter-mission-control-bar {
+  padding: 10px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fafafa;
+}
+
+.hunter-mc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hunter-mc-link:hover {
+  background: rgba(168, 85, 247, 0.06);
+  border-color: rgba(168, 85, 247, 0.3);
+  color: #a855f7;
+}
+
 .hunter-weapon-room {
   min-height: 100vh;
   background: #ffffff;

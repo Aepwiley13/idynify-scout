@@ -540,7 +540,7 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
         </div>
 
         {/* Fixed-height card deck — same pattern as DailyLeads */}
-        <div style={{ position: 'relative', width: '100%', maxWidth: 420, height: CARD_H, overflowX: 'hidden', flexShrink: 0 }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 420, height: CARD_H, overflow: 'hidden', flexShrink: 0 }}>
 
           {/* Ghost cards (depth stack) */}
           {deck.slice(1, 3).map((_, i) => (

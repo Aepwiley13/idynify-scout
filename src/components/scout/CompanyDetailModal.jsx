@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, ChevronDown, RefreshCw } from 'lucide-react';
+import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, ChevronDown, RefreshCw, Search, User } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
+import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
 
 export default function CompanyDetailModal({ company, onClose }) {
@@ -24,6 +25,15 @@ export default function CompanyDetailModal({ company, onClose }) {
   // Collapsible section states
   const [departmentsExpanded, setDepartmentsExpanded] = useState(true);
   const [techStackExpanded, setTechStackExpanded] = useState(true);
+
+  // Add People from Your Contacts states
+  const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
+  const [peopleResults, setPeopleResults] = useState([]);
+  const [searchingPeople, setSearchingPeople] = useState(false);
+  const [selectedPeopleToAdd, setSelectedPeopleToAdd] = useState([]);
+  const [addingPeopleToCompany, setAddingPeopleToCompany] = useState(false);
+  const [addPeopleSuccess, setAddPeopleSuccess] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
     enrichCompanyData();
@@ -267,6 +277,76 @@ export default function CompanyDetailModal({ company, onClose }) {
   function handleFindMoreContacts() {
     navigate(`/scout/company/${company.id}`);
     onClose();
+  }
+
+  function handlePeopleSearch(e) {
+    const query = e.target.value;
+    setPeopleSearchQuery(query);
+
+    clearTimeout(searchTimeoutRef.current);
+
+    if (query.trim().length < 2) {
+      setPeopleResults([]);
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearchingPeople(true);
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const results = await searchPeople(user.uid, query);
+        setPeopleResults(results);
+      } finally {
+        setSearchingPeople(false);
+      }
+    }, 300);
+  }
+
+  function handleTogglePersonSelection(person) {
+    setSelectedPeopleToAdd(prev => {
+      const isSelected = prev.some(p => p.id === person.id);
+      if (isSelected) return prev.filter(p => p.id !== person.id);
+      return [...prev, person];
+    });
+  }
+
+  async function handleAddPeopleToCompany() {
+    if (selectedPeopleToAdd.length === 0) return;
+
+    setAddingPeopleToCompany(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      for (const person of selectedPeopleToAdd) {
+        await updatePerson(user.uid, person.id, {
+          company_id: company.id,
+          company_name: company.name,
+          company_industry: company.industry || null,
+          company: company.name
+        });
+      }
+
+      // Update company contact count
+      const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
+      const companyDoc = await getDoc(companyRef);
+      const currentCount = companyDoc.data()?.contact_count || 0;
+      await updateDoc(companyRef, {
+        contact_count: currentCount + selectedPeopleToAdd.length
+      });
+
+      setAddPeopleSuccess(true);
+      setSelectedPeopleToAdd([]);
+      setPeopleSearchQuery('');
+      setPeopleResults([]);
+      setTimeout(() => setAddPeopleSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error adding people to company:', err);
+      alert('Failed to add people to company. Please try again.');
+    } finally {
+      setAddingPeopleToCompany(false);
+    }
   }
 
   async function handleForceRefresh() {
@@ -523,6 +603,116 @@ export default function CompanyDetailModal({ company, onClose }) {
                   </div>
                 </div>
               )}
+
+              {/* Section: Add People from Your Contacts */}
+              <div className="detail-section add-from-people-section">
+                <div className="section-header-with-actions">
+                  <h3 className="section-title">Add from Your People</h3>
+                  <p className="section-subtitle">Search your contacts by name and link them to this company</p>
+                </div>
+
+                {addPeopleSuccess && (
+                  <div className="people-add-success">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Contacts linked to {company.name} successfully!</span>
+                  </div>
+                )}
+
+                <div className="people-search-container">
+                  <div className="people-search-input-wrapper">
+                    <Search className="people-search-icon" />
+                    <input
+                      type="text"
+                      className="people-search-input"
+                      placeholder="Search by name..."
+                      value={peopleSearchQuery}
+                      onChange={handlePeopleSearch}
+                    />
+                    {peopleSearchQuery && (
+                      <button
+                        className="people-search-clear"
+                        onClick={() => {
+                          setPeopleSearchQuery('');
+                          setPeopleResults([]);
+                          setSelectedPeopleToAdd([]);
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {searchingPeople && (
+                    <div className="people-search-loading">
+                      <Loader className="w-4 h-4 spinner" />
+                      <span>Searching...</span>
+                    </div>
+                  )}
+
+                  {!searchingPeople && peopleResults.length > 0 && (
+                    <div className="people-search-results">
+                      {peopleResults.map(person => {
+                        const isSelected = selectedPeopleToAdd.some(p => p.id === person.id);
+                        const isAlreadyLinked = person.company_id === company.id;
+                        return (
+                          <div
+                            key={person.id}
+                            className={`people-result-item ${isSelected ? 'selected' : ''} ${isAlreadyLinked ? 'already-linked' : ''}`}
+                            onClick={() => !isAlreadyLinked && handleTogglePersonSelection(person)}
+                          >
+                            <div className="people-result-avatar">
+                              {person.photo_url ? (
+                                <img src={person.photo_url} alt={person.name} />
+                              ) : (
+                                <User className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="people-result-info">
+                              <p className="people-result-name">{person.name}</p>
+                              <p className="people-result-meta">
+                                {[person.title, person.company_name || person.company].filter(Boolean).join(' • ')}
+                              </p>
+                            </div>
+                            {isAlreadyLinked ? (
+                              <span className="people-already-linked-badge">Already linked</span>
+                            ) : (
+                              <div className={`people-select-indicator ${isSelected ? 'checked' : ''}`}>
+                                {isSelected && <CheckCircle className="w-4 h-4" />}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!searchingPeople && peopleSearchQuery.length >= 2 && peopleResults.length === 0 && (
+                    <div className="people-no-results">
+                      <p>No contacts found for &ldquo;{peopleSearchQuery}&rdquo;</p>
+                    </div>
+                  )}
+
+                  {selectedPeopleToAdd.length > 0 && (
+                    <button
+                      className="btn-add-people-to-company"
+                      onClick={handleAddPeopleToCompany}
+                      disabled={addingPeopleToCompany}
+                    >
+                      {addingPeopleToCompany ? (
+                        <>
+                          <Loader className="w-4 h-4 spinner" />
+                          <span>Adding...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4" />
+                          <span>Add {selectedPeopleToAdd.length} to {company.name}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* Section 4: Department Breakdown */}
               {enrichedData.departments && Object.values(enrichedData.departments).some(d => d) && (

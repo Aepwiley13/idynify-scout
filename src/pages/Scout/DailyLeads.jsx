@@ -52,6 +52,73 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
   );
 }
 
+// ─── Match feedback ───────────────────────────────────────────────────────────
+const MATCH_REASONS = ['Industry fit', 'Right size', 'Good location', 'Revenue match', 'Strong signals', 'Known brand'];
+
+function FeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, onSubmit, T, wide }) {
+  const toggle = (r) => setReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: wide ? '28px 24px 20px' : '22px 18px 16px', gap: 12, animation: 'feedbackFlipIn 0.25s ease' }}>
+      <div style={{ fontSize: 30 }}>🎯</div>
+      <div style={{ fontSize: wide ? 16 : 14, fontWeight: 700, color: T.text, textAlign: 'center' }}>Great catch!</div>
+      <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, textAlign: 'center', lineHeight: 1.55 }}>
+        Why is <strong>{entityName}</strong> a good fit?
+        <br />
+        <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry find more matches like this.</span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', width: '100%' }}>
+        {MATCH_REASONS.map(r => (
+          <button
+            key={r}
+            onClick={e => { e.stopPropagation(); toggle(r); }}
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: wide ? 11 : 10, fontWeight: 600,
+              cursor: 'pointer', border: `1.5px solid`,
+              borderColor: reasons.includes(r) ? '#10b981' : T.border2,
+              background: reasons.includes(r) ? '#10b98118' : T.surface,
+              color: reasons.includes(r) ? '#10b981' : T.textMuted,
+              transition: 'all 0.15s',
+            }}
+          >
+            {reasons.includes(r) ? '✓ ' : ''}{r}
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={note}
+        onChange={e => setNote(e.target.value)}
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+        placeholder="Add a note for Barry... (optional)"
+        rows={2}
+        style={{
+          width: '100%', padding: '8px 10px', borderRadius: 9,
+          border: `1.5px solid ${T.border2}`, background: T.surface,
+          color: T.text, fontSize: wide ? 12 : 11, resize: 'none',
+          fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+        <button
+          onClick={e => { e.stopPropagation(); onSkip(); }}
+          onMouseDown={e => e.stopPropagation()}
+          style={{ flex: 1, padding: wide ? 10 : 8, borderRadius: 10, border: `1.5px solid ${T.border2}`, background: T.surface, color: T.textMuted, fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer' }}
+        >
+          Skip
+        </button>
+        <button
+          onClick={e => { e.stopPropagation(); onSubmit(); }}
+          onMouseDown={e => e.stopPropagation()}
+          style={{ flex: 2, padding: wide ? 10 : 8, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+        >
+          <BarryAvatar size={14} />Send to Barry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── CompanySwipeCard ─────────────────────────────────────────────────────────
 function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfile, icpWeights }) {
   const T = useT();
@@ -59,6 +126,10 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const [dy, setDy] = useState(0);
   const [gone, setGone] = useState(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackReasons, setFeedbackReasons] = useState([]);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
 
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
@@ -70,11 +141,19 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
     setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(onAccept, 280); }
+    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
     else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
     else { setDx(0); setDy(0); }
     s.current = null;
   };
+
+  const handleMatchClick = (e) => {
+    e.stopPropagation();
+    setIsFlipping(true);
+    setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
+  };
+  const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
+  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   const score = company.fit_score || company.score || 0;
@@ -145,7 +224,21 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
+        transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
+        transition: 'transform 0.14s ease',
       }}>
+        {/* Feedback overlay — appears after "This is a Match" click */}
+        {showFeedback && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
+            <FeedbackFace
+              entityName={company.name}
+              reasons={feedbackReasons} setReasons={setFeedbackReasons}
+              note={feedbackNote} setNote={setFeedbackNote}
+              onSkip={handleSkipFeedback} onSubmit={handleSendFeedback}
+              T={T} wide={wide}
+            />
+          </div>
+        )}
         {/* Full-card swipe color overlay */}
         {dx > 10 && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 5, borderRadius: 22, background: `${STATUS.green}${Math.round(overlayOpacity * 20).toString(16).padStart(2,'0')}`, pointerEvents: 'none' }} />
@@ -291,7 +384,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
             style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           ><X size={14} />Not a Match</button>
           <button
-            onClick={e => { e.stopPropagation(); setGone('r'); setTimeout(onAccept, 280); }}
+            onClick={handleMatchClick}
             style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           ><Check size={14} />This is a Match</button>
         </div>
@@ -306,6 +399,10 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
   const [gone, setGone] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackReasons, setFeedbackReasons] = useState([]);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
 
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
@@ -317,11 +414,19 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
     setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(onAccept, 280); }
+    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
     else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
     else { setDx(0); setDy(0); }
     s.current = null;
   };
+
+  const handleMatchClick = (e) => {
+    e.stopPropagation();
+    setIsFlipping(true);
+    setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
+  };
+  const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
+  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   const initials = (person.name || person.first_name || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -346,7 +451,18 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, maxHeight: wide ? 'clamp(500px, calc(100vh - 160px), 700px)' : 'clamp(460px, calc(100vh - 200px), 570px)', overflowY: 'auto' }}>
+      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
+        {showFeedback && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
+            <FeedbackFace
+              entityName={person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim()}
+              reasons={feedbackReasons} setReasons={setFeedbackReasons}
+              note={feedbackNote} setNote={setFeedbackNote}
+              onSkip={handleSkipFeedback} onSubmit={handleSendFeedback}
+              T={T} wide={wide}
+            />
+          </div>
+        )}
         <div style={{ padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
           <Av initials={initials} color={color} size={wide ? 80 : 70} />
           {matchText && (
@@ -392,7 +508,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
             style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><X size={15} />Not a Match</button>
           <button
-            onClick={e => { e.stopPropagation(); setGone('r'); setTimeout(onAccept, 280); }}
+            onClick={handleMatchClick}
             style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><Check size={15} />This is a Match</button>
         </div>
@@ -1306,7 +1422,7 @@ export default function DailyLeads({ onNavigate }) {
     }
   };
 
-  const handleSwipe = async (direction) => {
+  const handleSwipe = async (direction, feedback = null) => {
     const user = auth.currentUser;
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
@@ -1324,6 +1440,7 @@ export default function DailyLeads({ onNavigate }) {
         status: direction === 'right' ? 'accepted' : 'rejected',
         swipedAt: new Date().toISOString(),
         swipeDirection: direction,
+        ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
       });
       const isInterested = direction === 'right';
       const newSwipeCount = isInterested
@@ -1640,7 +1757,7 @@ export default function DailyLeads({ onNavigate }) {
     return 'Title match — outside your target industry.';
   };
 
-  const handlePersonSwipe = async (direction) => {
+  const handlePersonSwipe = async (direction, feedback = null) => {
     const user = auth.currentUser;
     if (!user) return;
     const today = todayRef.current;
@@ -1651,7 +1768,7 @@ export default function DailyLeads({ onNavigate }) {
     const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
     try {
       if (direction === 'right') {
-        await setDoc(contactRef, { ...person, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString() }, { merge: true });
+        await setDoc(contactRef, { ...person, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString(), ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}) }, { merge: true });
         if (company.status === 'pending') {
           const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
           await updateDoc(companyRef, { status: 'accepted', swipedAt: new Date().toISOString(), swipeDirection: 'right', swipe_source: 'people_mode' });
@@ -1977,7 +2094,7 @@ export default function DailyLeads({ onNavigate }) {
                       <CompanySwipeCard
                         key={currentCompany.id}
                         company={currentCompany}
-                        onAccept={() => handleSwipe('right')}
+                        onAccept={(feedback) => handleSwipe('right', feedback)}
                         onReject={() => handleSwipe('left')}
                         wide={isDesktop}
                         icpProfile={icpProfile}
@@ -2061,7 +2178,7 @@ export default function DailyLeads({ onNavigate }) {
                       person={peopleQueue[currentPersonIdx].person}
                       company={peopleQueue[currentPersonIdx].company}
                       matchText={getBarryText(peopleQueue[currentPersonIdx].person, peopleQueue[currentPersonIdx].company, targetTitles)}
-                      onAccept={() => handlePersonSwipe('right')}
+                      onAccept={(feedback) => handlePersonSwipe('right', feedback)}
                       onReject={() => handlePersonSwipe('left')}
                       onSkip={() => handlePersonSwipe('skip')}
                       wide={isDesktop}

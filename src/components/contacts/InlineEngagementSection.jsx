@@ -1,4 +1,4 @@
-import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   collection, query, orderBy, limit, onSnapshot,
   getDocs, updateDoc, doc, addDoc
@@ -205,6 +205,28 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [loading, setLoading] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Refs for auto-resizing textareas
+  const intentTextareaRef = useRef(null);
+  const weaponMessageRef = useRef(null);
+  const reviewMessageRef = useRef(null);
+
+  // Auto-resize intent textarea
+  useEffect(() => {
+    const el = intentTextareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [userIntent]);
+
+  // Auto-resize message textarea (weapon step & review step share same state)
+  useEffect(() => {
+    [weaponMessageRef.current, reviewMessageRef.current].forEach(el => {
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    });
+  }, [message]);
 
   // Saved prompts
   const [savedPrompts, setSavedPrompts] = useState([]);
@@ -758,12 +780,12 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 </p>
               </div>
               <textarea
+                ref={intentTextareaRef}
                 className="ies-intent-input"
                 value={userIntent}
                 onChange={(e) => setUserIntent(e.target.value)}
                 onKeyDown={handleIntentKeyDown}
                 placeholder={`E.g., "Follow up on our conversation at the conference" or "Introduce myself and see if they need help with marketing automation"`}
-                rows={3}
                 autoFocus
               />
               {/* Saved prompts chips */}
@@ -985,10 +1007,10 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 )}
                 <label className="ies-preview-label">Message</label>
                 <textarea
+                  ref={weaponMessageRef}
                   className="ies-message-textarea"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  rows={4}
                 />
               </div>
               <p className="ies-weapon-prompt">How do you want to send this?</p>
@@ -1093,10 +1115,10 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 )}
                 <label className="ies-preview-label">Message</label>
                 <textarea
+                  ref={reviewMessageRef}
                   className="ies-message-textarea"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  rows={6}
                 />
                 {selectedWeapon === 'text' && (
                   <span className="ies-char-count">

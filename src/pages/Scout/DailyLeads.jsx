@@ -268,14 +268,20 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
 
         {/* Action links */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '11px 14px' : '9px 12px', borderBottom: `1px solid ${T.border}` }}>
-          <button
-            onClick={e => { e.stopPropagation(); if (company.website_url) window.open(company.website_url, '_blank'); }}
-            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-          ><Globe size={12} />Website</button>
-          <button
-            onClick={e => { e.stopPropagation(); if (company.linkedin_url) window.open(company.linkedin_url, '_blank'); }}
-            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-          ><Linkedin size={12} />LinkedIn</button>
+          <a
+            href={company.website_url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => { e.stopPropagation(); if (!company.website_url) e.preventDefault(); }}
+            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: company.website_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: company.website_url ? 1 : 0.5 }}
+          ><Globe size={12} />Website</a>
+          <a
+            href={company.linkedin_url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => { e.stopPropagation(); if (!company.linkedin_url) e.preventDefault(); }}
+            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: company.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: company.linkedin_url ? 1 : 0.5 }}
+          ><Linkedin size={12} />LinkedIn</a>
         </div>
 
         {/* Decision buttons */}
@@ -365,14 +371,20 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
           ))}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
-          <button
-            onClick={e => { e.stopPropagation(); if (company?.website_url || person.organization?.website_url) window.open(company?.website_url || person.organization?.website_url, '_blank'); }}
-            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-          ><Globe size={13} />Visit Website</button>
-          <button
-            onClick={e => { e.stopPropagation(); if (person.linkedin_url) window.open(person.linkedin_url, '_blank'); }}
-            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-          ><Linkedin size={13} />LinkedIn</button>
+          <a
+            href={company?.website_url || person.organization?.website_url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => { e.stopPropagation(); if (!(company?.website_url || person.organization?.website_url)) e.preventDefault(); }}
+            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: (company?.website_url || person.organization?.website_url) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: (company?.website_url || person.organization?.website_url) ? 1 : 0.5 }}
+          ><Globe size={13} />Visit Website</a>
+          <a
+            href={person.linkedin_url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => { e.stopPropagation(); if (!person.linkedin_url) e.preventDefault(); }}
+            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: person.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: person.linkedin_url ? 1 : 0.5 }}
+          ><Linkedin size={13} />LinkedIn</a>
         </div>
         <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px 6px' : '11px 12px 6px' }}>
           <button

@@ -39,6 +39,15 @@
   targetPort = 5173
   port = 8888
   
+# Content Security Policy applied to all pages.
+# 'unsafe-inline' is required for React's inline styles and Vite's injected
+# module-preload polyfill. 'unsafe-eval' is required by Firebase SDK.
+# Tighten these once a nonce-based approach is adopted.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https:; worker-src 'self' blob:; frame-src 'self' https:; media-src 'self' https:;"
+
 # index.html must never be cached — ensures browsers always fetch the latest
 # build on navigation so the ETag-based version check works correctly.
 [[headers]]

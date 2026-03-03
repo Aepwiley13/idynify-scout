@@ -323,6 +323,7 @@ Classify the user's message into one of:
 - SCHEDULE: set up a call, book time, send calendar invite
 - RESEARCH: find out about, who is the decision maker, what do we know
 - PIPELINE_CHECK: status of pipeline, how many contacts, what's active
+- ICP_CHANGE: user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
 - CUSTOM: anything else
 
 ━━━ THE THREE-STEP LOOP ━━━
@@ -386,6 +387,20 @@ For intake step (Barry needs clarification):
   "angles": [],
   "actions": [],
   "clarifying_question": "Which contact did you want to follow up with?"
+}
+
+For ICP_CHANGE intent (user signals a new targeting focus — client handles the add/replace confirmation):
+{
+  "intent": "ICP_CHANGE",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "",
+  "new_target": "exact target type the user described, e.g. 'dental offices', 'plumbers', 'med spas'",
+  "contact_id": null,
+  "has_message_angles": false,
+  "angles": [],
+  "actions": [],
+  "clarifying_question": null
 }`;
 }
 

@@ -30,13 +30,25 @@ import MessageAngleBlock from '../shared/MessageAngleBlock';
 
 function detectIcpIntent(message) {
   const patterns = [
+    // Explicit target verbs
     /i want to target\s+(.+)/i,
     /let'?s go after\s+(.+)/i,
-    /switch (?:our )?focus to\s+(.+)/i,
-    /add (.+?) to (?:our )?targeting/i,
-    /forget .+?,?\s+let'?s (?:now )?focus on\s+(.+)/i,
     /start targeting\s+(.+)/i,
     /we should (?:be )?targeting\s+(.+)/i,
+    /can we (?:target|go after|focus on)\s+(.+)/i,
+    // Switch / pivot / replace
+    /switch (?:our )?focus to\s+(.+)/i,
+    /pivot to\s+(.+)/i,
+    /try (?:targeting\s+)?(.+?)\s+instead/i,
+    /forget .+?,?\s*(?:let'?s\s+)?(?:do|try|focus on)\s+(.+)/i,
+    /forget .+?,?\s+let'?s (?:now )?focus on\s+(.+)/i,
+    // Add / expand
+    /add (.+?) to (?:our )?targeting/i,
+    /^add\s+(.+?)(?:\s+to.+)?$/i,
+    // Casual phrasing
+    /what about (?:targeting\s+)?(.+?)(?:\?|$)/i,
+    /what if we (?:target|focus on|go after)\s+(.+)/i,
+    /(?:let'?s )?focus on\s+(.+)/i,
   ];
   for (const pattern of patterns) {
     const match = message.match(pattern);
@@ -316,6 +328,19 @@ export default function BarryChatPanel({ userId }) {
         // Auto-update mode if Barry detected a shift
         if (data.barry_mode && data.barry_mode !== mode) {
           setMode(data.barry_mode);
+        }
+
+        // LLM-detected ICP change intent — trigger add/replace confirmation flow
+        if (data.intent === 'ICP_CHANGE' && data.new_target && contextStack?.icpProfile) {
+          const summary = buildIcpSummary(contextStack.icpProfile);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `You're currently targeting ${summary}. Do you want to add "${data.new_target}" to your current ICP, or replace it entirely?`,
+            has_message_angles: false,
+            angles: []
+          }]);
+          setPendingIcpChange({ originalMessage: userMessage, newTarget: data.new_target });
+          return;
         }
 
         // Build assistant message object with structured fields

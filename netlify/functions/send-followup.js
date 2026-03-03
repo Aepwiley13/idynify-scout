@@ -11,6 +11,35 @@
 const admin = require('firebase-admin');
 const { google } = require('googleapis');
 
+// Fetch user's Gmail signature and return as plain text (non-blocking)
+async function getGmailSignature(gmail) {
+  try {
+    const res = await gmail.users.settings.sendAs.list({ userId: 'me' });
+    const entries = res.data.sendAs || [];
+    const primary = entries.find(s => s.isDefault) || entries[0];
+    if (primary && primary.signature) {
+      return primary.signature
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<p[^>]*>/gi, '\n')
+        .replace(/<\/p>/gi, '')
+        .replace(/<div[^>]*>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+    return '';
+  } catch (err) {
+    console.warn('⚠️ Could not fetch Gmail signature (non-blocking):', err.message);
+    return '';
+  }
+}
+
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -62,13 +91,17 @@ exports.handler = async (event) => {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
+    // Fetch and append Gmail signature (non-blocking — falls back to no signature)
+    const signature = await getGmailSignature(gmail);
+    const bodyWithSignature = signature ? `${body}\n\n-- \n${signature}` : body;
+
     // Create email
     const emailLines = [
       `To: ${toEmail}`,
       `Subject: ${subject}`,
       'Content-Type: text/plain; charset=utf-8',
       '',
-      body
+      bodyWithSignature
     ];
 
     const email = emailLines.join('\r\n');

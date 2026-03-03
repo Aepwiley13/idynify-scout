@@ -2,6 +2,11 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # Vite 7 requires Node >=20.19.0 or >=22.12.0.
+  # Netlify's default Node 20 is pre-20.19, so pin explicitly.
+  NODE_VERSION = "22"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

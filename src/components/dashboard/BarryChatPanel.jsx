@@ -332,6 +332,8 @@ export default function BarryChatPanel({ userId }) {
 
         // LLM-detected ICP change intent — trigger add/replace confirmation flow
         if (data.intent === 'ICP_CHANGE' && data.new_target && contextStack?.icpProfile) {
+          // Log suppressed response for intent classification tuning
+          console.warn('[BarryChatPanel] ICP_CHANGE intercepted — suppressed response_text:', data.response_text || '(empty)', '| new_target:', data.new_target);
           const summary = buildIcpSummary(contextStack.icpProfile);
           setMessages(prev => [...prev, {
             role: 'assistant',

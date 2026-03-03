@@ -1,28 +1,29 @@
 /* ============================================
-   USER SETTINGS PAGE
-   Minimal — settings don't need decoration.
+   USER SETTINGS PAGE — enterprise tabbed layout
+   Designed to match the dark-mode B2B aesthetic.
    ============================================ */
 
-.user-settings {
-  max-width: 560px;
+/* ── page shell ── */
+.us-page {
+  max-width: 600px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  padding: 1.5rem 1.25rem 4rem;
 }
 
-/* Header */
+/* ── header ── */
 .us-header {
   display: flex;
   align-items: center;
   gap: 0.875rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .us-back-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 0.5rem;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -31,7 +32,6 @@
   transition: all 0.15s;
   flex-shrink: 0;
 }
-
 .us-back-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #f3f4f6;
@@ -44,18 +44,72 @@
   letter-spacing: -0.01em;
 }
 
-/* Content */
-.us-content {
+/* ── tab bar ── */
+.us-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  gap: 0.25rem;
+  margin-bottom: 1.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.875rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.us-tabs::-webkit-scrollbar { display: none; }
+
+.us-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.45rem 0.875rem;
+  border-radius: 0.625rem;
+  border: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  background: transparent;
+  color: #6b7280;
+}
+.us-tab:hover {
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.04);
+}
+.us-tab--active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3f4f6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Section */
+/* ── panel ── */
+.us-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── section stack ── */
+.us-section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* ── section ── */
 .us-section {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.us-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 
 .us-section-title {
@@ -67,57 +121,213 @@
   margin: 0 0 0.25rem;
 }
 
-/* Row */
-.us-row {
+.us-section-note {
+  font-size: 0.8125rem;
+  color: #4b5563;
+  line-height: 1.5;
+  margin-bottom: 0.25rem;
+}
+
+/* ── card (base row) ── */
+.us-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 0.875rem;
   padding: 0.875rem 1rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 0.875rem;
+  transition: border-color 0.15s;
+}
+.us-card--action {
+  flex-wrap: wrap;
+}
+.us-card--muted {
+  opacity: 0.7;
+}
+.us-card--toggle {
+  align-items: center;
 }
 
-.us-row-info {
+/* ── card icon ── */
+.us-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0.625rem;
   display: flex;
   align-items: center;
-  gap: 0.875rem;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+/* ── card body ── */
+.us-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
   flex: 1;
   min-width: 0;
 }
 
-.us-row-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 0.625rem;
-  background: rgba(236, 72, 153, 0.12);
-  border: 1px solid rgba(236, 72, 153, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #f9a8d4;
-  flex-shrink: 0;
-}
-
-.us-row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.us-row-label {
+.us-card-label {
   font-size: 0.9375rem;
   font-weight: 600;
   color: #f3f4f6;
 }
 
-.us-row-desc {
+.us-card-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.us-card-value {
   font-size: 0.8125rem;
+  color: #e5e7eb;
+}
+.us-card-value--muted {
   color: #6b7280;
 }
 
-/* Toggle switch */
+/* ── inline error ── */
+.us-inline-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #f87171;
+  margin-top: 0.25rem;
+}
+
+/* ── status chip ── */
+.us-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.us-status-chip--green {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+.us-status-chip--gray {
+  background: rgba(107, 114, 128, 0.12);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  color: #6b7280;
+}
+
+/* ── coming-soon chip ── */
+.us-coming-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── feedback banners ── */
+.us-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.625rem;
+  line-height: 1.4;
+}
+.us-feedback--error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+.us-feedback--success {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+/* ── action buttons ── */
+.us-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.4rem 0.875rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.us-action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f9fafb;
+}
+.us-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.us-action-btn--primary {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  border-color: transparent;
+  color: #fff;
+}
+.us-action-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #db2777, #7c3aed);
+}
+.us-action-btn--danger {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+.us-action-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+.us-action-btn--danger-icon {
+  padding: 0.4rem 0.6rem;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+.us-action-btn--danger-icon:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+.us-action-btn--done {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+/* ── gmail actions group ── */
+.us-gmail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+/* ── toggle switch ── */
 .us-toggle {
   position: relative;
   width: 48px;
@@ -128,14 +338,8 @@
   transition: background 0.2s ease;
   flex-shrink: 0;
 }
-
-.us-toggle--on {
-  background: linear-gradient(135deg, #ec4899, #8b5cf6);
-}
-
-.us-toggle--off {
-  background: #374151;
-}
+.us-toggle--on  { background: linear-gradient(135deg, #ec4899, #8b5cf6); }
+.us-toggle--off { background: #374151; }
 
 .us-toggle-thumb {
   position: absolute;
@@ -147,125 +351,257 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   transition: left 0.2s ease;
 }
+.us-toggle--on  .us-toggle-thumb { left: calc(100% - 25px); }
+.us-toggle--off .us-toggle-thumb { left: 3px; }
 
-.us-toggle--on .us-toggle-thumb {
-  left: calc(100% - 25px);
+/* ── MFA setup flow ── */
+.us-mfa-setup {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.875rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
 }
 
-.us-toggle--off .us-toggle-thumb {
-  left: 3px;
+.us-mfa-step {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin: 0;
 }
 
-/* Gmail row */
-.us-row--gmail {
-  align-items: flex-start;
-  gap: 0.75rem;
+.us-mfa-qr {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  display: inline-block;
+  width: fit-content;
 }
 
-.us-row-icon--gmail {
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.25);
-  color: #93c5fd;
+.us-mfa-secret {
+  display: block;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8125rem;
+  color: #67e8f9;
+  background: rgba(6, 182, 212, 0.06);
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  word-break: break-all;
+  letter-spacing: 0.04em;
 }
 
-.us-gmail-label-row {
+.us-mfa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.us-mfa-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.625rem;
+  color: #f9fafb;
+  font-size: 1.5rem;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  letter-spacing: 0.5rem;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.us-mfa-input:focus {
+  border-color: rgba(6, 182, 212, 0.4);
+}
+.us-mfa-input::placeholder {
+  color: #374151;
+  letter-spacing: 0.25rem;
+}
+
+.us-mfa-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── billing plan card ── */
+.us-billing-plan-card {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.125rem 1.125rem;
+  background: rgba(236, 72, 153, 0.05);
+  border: 1px solid rgba(236, 72, 153, 0.15);
+  border-radius: 0.875rem;
   flex-wrap: wrap;
 }
 
-.us-gmail-badge {
-  display: inline-flex;
+.us-billing-plan-left {
+  display: flex;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
+  gap: 0.875rem;
+}
+
+.us-billing-plan-badge {
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding: 0.3rem 0.75rem;
   border-radius: 20px;
+  background: linear-gradient(135deg, rgba(236,72,153,0.18), rgba(139,92,246,0.18));
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  color: #f9a8d4;
+  text-transform: capitalize;
 }
 
-.us-gmail-badge--connected {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: #86efac;
-}
-
-.us-gmail-badge--disconnected {
-  background: rgba(107, 114, 128, 0.12);
-  border: 1px solid rgba(107, 114, 128, 0.2);
-  color: #6b7280;
-}
-
-.us-gmail-error {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: #f87171;
-  margin-top: 0.25rem;
-}
-
-.us-gmail-spinner {
-  color: #6b7280;
-}
-
-/* Gmail action buttons */
-.us-gmail-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex-shrink: 0;
-  padding-top: 0.125rem;
-}
-
-.us-gmail-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  padding: 0.4rem 0.875rem;
-  border-radius: 0.5rem;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.us-gmail-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.us-gmail-btn--connect {
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
-  color: #fff;
-}
-
-.us-gmail-btn--connect:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-}
-
-.us-gmail-btn--reconnect {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d1d5db;
-}
-
-.us-gmail-btn--reconnect:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+.us-billing-plan-price {
+  font-size: 1.125rem;
+  font-weight: 700;
   color: #f9fafb;
 }
 
-.us-gmail-btn--disconnect {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.18);
-  color: #f87171;
-  padding: 0.4rem 0.6rem;
+/* ── credit card ── */
+.us-credit-card {
+  padding: 1.125rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
 }
 
-.us-gmail-btn--disconnect:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+.us-credit-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.us-credit-remaining {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #f9fafb;
+  line-height: 1;
+}
+.us-credit-of {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+.us-credit-pct {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #9ca3af;
+}
+
+.us-credit-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.us-credit-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ec4899, #8b5cf6);
+  transition: width 0.6s ease;
+}
+
+.us-credit-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.us-credit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.us-credit-meta-label {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+.us-credit-meta-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #d1d5db;
+}
+
+/* ── integration grid ── */
+.us-integration-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.us-integration-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.875rem;
+  opacity: 0.65;
+  transition: opacity 0.15s;
+}
+.us-integration-tile:hover {
+  opacity: 0.85;
+}
+
+.us-integration-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.us-integration-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.us-integration-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+.us-integration-desc {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+/* ── stub list ── */
+.us-stub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── loading state ── */
+.us-loading-state {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  padding: 2rem 0;
+  justify-content: center;
 }

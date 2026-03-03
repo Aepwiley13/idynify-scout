@@ -23,7 +23,48 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { auth } from '../../firebase/config';
 import { buildContextStack } from '../../utils/barryContextStack';
+import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
+
+// ── ICP intent helpers (pure, outside component) ───────────────────────────────
+
+function detectIcpIntent(message) {
+  const patterns = [
+    // Explicit target verbs
+    /i want to target\s+(.+)/i,
+    /let'?s go after\s+(.+)/i,
+    /start targeting\s+(.+)/i,
+    /we should (?:be )?targeting\s+(.+)/i,
+    /can we (?:target|go after|focus on)\s+(.+)/i,
+    // Switch / pivot / replace
+    /switch (?:our )?focus to\s+(.+)/i,
+    /pivot to\s+(.+)/i,
+    /try (?:targeting\s+)?(.+?)\s+instead/i,
+    /forget .+?,?\s*(?:let'?s\s+)?(?:do|try|focus on)\s+(.+)/i,
+    /forget .+?,?\s+let'?s (?:now )?focus on\s+(.+)/i,
+    // Add / expand
+    /add (.+?) to (?:our )?targeting/i,
+    /^add\s+(.+?)(?:\s+to.+)?$/i,
+    // Casual phrasing
+    /what about (?:targeting\s+)?(.+?)(?:\?|$)/i,
+    /what if we (?:target|focus on|go after)\s+(.+)/i,
+    /(?:let'?s )?focus on\s+(.+)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match) return { detected: true, newTarget: match[1].replace(/[.!?]$/, '').trim() };
+  }
+  return { detected: false, newTarget: null };
+}
+
+function buildIcpSummary(icpProfile) {
+  const parts = [];
+  if (icpProfile.industries?.length) parts.push(icpProfile.industries.slice(0, 3).join(', '));
+  if (icpProfile.companySizes?.length) parts.push(icpProfile.companySizes.slice(0, 2).join('/') + ' employees');
+  if (icpProfile.isNationwide) parts.push('nationwide');
+  else if (icpProfile.locations?.length) parts.push(icpProfile.locations.slice(0, 2).join(', '));
+  return parts.length ? parts.join(' — ') : 'your current profile';
+}
 
 // ── Mode configuration ─────────────────────────────────────────────────────────
 
@@ -60,6 +101,7 @@ export default function BarryChatPanel({ userId }) {
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const [contextStack, setContextStack] = useState(null);
+  const [pendingIcpChange, setPendingIcpChange] = useState(null);
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
@@ -149,6 +191,60 @@ export default function BarryChatPanel({ userId }) {
     ]);
   }
 
+  // ── ICP update: extract params from original message, write to Firestore ──
+
+  async function processIcpUpdate(originalMessage, action) {
+    try {
+      const user = auth.currentUser;
+      if (!user) { setSending(false); return; }
+      const authToken = await user.getIdToken();
+
+      // Use the ICP reclarification backend path to extract icp_params
+      const res = await fetch('/.netlify/functions/barryMissionChat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          authToken,
+          message: originalMessage,
+          icpMode: true,
+          icpProfile: null,
+          conversationHistory: []
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.icp_params) {
+        const newProfile = await updateIcpFromChat(userId, data.icp_params, action, contextStack?.icpProfile);
+        setContextStack(prev => ({ ...prev, icpProfile: newProfile }));
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: "Got it. I've updated your ICP. I'll use this for targeting going forward.",
+          has_message_angles: false,
+          angles: []
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: "I had trouble parsing that target — can you be more specific? (e.g. 'dental offices with 10–50 employees')",
+          has_message_angles: false,
+          angles: []
+        }]);
+      }
+    } catch (err) {
+      console.error('[BarryChatPanel] ICP update failed:', err);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Had trouble updating your ICP — try again in a moment.',
+        has_message_angles: false,
+        angles: []
+      }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
   // ── Send message ──────────────────────────────────────────────────────────
 
   const sendMessage = async (text) => {
@@ -156,6 +252,45 @@ export default function BarryChatPanel({ userId }) {
 
     const userMessage = text.trim();
     setInputValue('');
+
+    // ── ICP confirmation flow (user responding to add vs. replace question) ──
+    if (pendingIcpChange) {
+      const lower = userMessage.toLowerCase();
+      const isAdd = /\badd\b|merge|include|addition/.test(lower);
+      const isReplace = /\breplace\b|swap|overwrite|switch|start fresh|start over/.test(lower);
+
+      if (isAdd || isReplace) {
+        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setSending(true);
+        const action = isReplace ? 'replace' : 'add';
+        const saved = pendingIcpChange;
+        setPendingIcpChange(null);
+        await processIcpUpdate(saved.originalMessage, action);
+        return;
+      }
+      // Ambiguous — clear pending and fall through to normal send
+      setPendingIcpChange(null);
+    }
+
+    // ── ICP intent detection (user signals a new targeting focus) ──
+    const icpIntent = detectIcpIntent(userMessage);
+    if (icpIntent.detected && contextStack?.icpProfile) {
+      const summary = buildIcpSummary(contextStack.icpProfile);
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: userMessage },
+        {
+          role: 'assistant',
+          content: `You're currently targeting ${summary}. Do you want to add "${icpIntent.newTarget}" to your current ICP, or replace it entirely?`,
+          has_message_angles: false,
+          angles: []
+        }
+      ]);
+      setPendingIcpChange({ originalMessage: userMessage, newTarget: icpIntent.newTarget });
+      return;
+    }
+
+    // ── Normal message path ──
     setSending(true);
 
     // Optimistically add user message
@@ -193,6 +328,21 @@ export default function BarryChatPanel({ userId }) {
         // Auto-update mode if Barry detected a shift
         if (data.barry_mode && data.barry_mode !== mode) {
           setMode(data.barry_mode);
+        }
+
+        // LLM-detected ICP change intent — trigger add/replace confirmation flow
+        if (data.intent === 'ICP_CHANGE' && data.new_target && contextStack?.icpProfile) {
+          // Log suppressed response for intent classification tuning
+          console.warn('[BarryChatPanel] ICP_CHANGE intercepted — suppressed response_text:', data.response_text || '(empty)', '| new_target:', data.new_target);
+          const summary = buildIcpSummary(contextStack.icpProfile);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `You're currently targeting ${summary}. Do you want to add "${data.new_target}" to your current ICP, or replace it entirely?`,
+            has_message_angles: false,
+            angles: []
+          }]);
+          setPendingIcpChange({ originalMessage: userMessage, newTarget: data.new_target });
+          return;
         }
 
         // Build assistant message object with structured fields

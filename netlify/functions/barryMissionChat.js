@@ -251,6 +251,20 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext) {
   const missions = contextStack?.missions || [];
   const recon = contextStack?.recon || {};
   const userStyle = contextStack?.user_style || null;
+  const icpProfile = contextStack?.icpProfile || null;
+
+  // Build ICP summary block from structured profile (same field set as buildIcpReclarificationPrompt)
+  const icpLines = [];
+  if (icpProfile) {
+    if (icpProfile.industries?.length) icpLines.push(`Industries: ${icpProfile.industries.join(', ')}`);
+    if (icpProfile.isNationwide) icpLines.push('Locations: Nationwide (all US)');
+    else if (icpProfile.locations?.length) icpLines.push(`Locations: ${icpProfile.locations.join(', ')}`);
+    if (icpProfile.companySizes?.length) icpLines.push(`Company sizes: ${icpProfile.companySizes.join(', ')}`);
+    if (icpProfile.targetTitles?.length) icpLines.push(`Target titles: ${icpProfile.targetTitles.join(', ')}`);
+    if (icpProfile.companyKeywords?.length) icpLines.push(`Keywords: ${icpProfile.companyKeywords.join(', ')}`);
+    if (icpProfile.lookalikeSeed?.name) icpLines.push(`Lookalike anchor: ${icpProfile.lookalikeSeed.name}`);
+  }
+  const icpBlock = icpLines.length > 0 ? icpLines.join('\n') : 'Not configured';
 
   // Build a concise contact list for the prompt (avoid token overload)
   const contactSummary = contacts.slice(0, 20).map(c =>
@@ -281,9 +295,13 @@ ${missionSummary || 'No active missions.'}
 
 ━━━ RECON CONTEXT (${recon.confidence || 0}% complete) ━━━
 ${recon.pain_points ? `Pain points: ${recon.pain_points}` : 'Pain points: not set'}
-${recon.icp ? `ICP: ${recon.icp}` : 'ICP: not set'}
+${recon.icp ? `ICP snapshot: ${recon.icp}` : 'ICP snapshot: not set'}
 ${recon.value_proposition ? `Value prop: ${recon.value_proposition}` : 'Value prop: not set'}
 ${reconContext ? reconContext.slice(0, 800) : ''}
+
+━━━ ICP PROFILE (configured settings) ━━━
+${icpBlock}
+Reference this when discussing prospecting or targeting. This is the user's confirmed ICP — always use it as the baseline when giving targeting advice or drafting outreach.
 
 User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' ') : 'warm and conversational'}. Write all drafted messages in this style. When style is null, default to warm and conversational.
 

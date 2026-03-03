@@ -51,6 +51,16 @@ async function getActiveContacts(userId) {
   }
 }
 
+async function getIcpProfile(userId) {
+  try {
+    const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
+    return profileDoc.exists() ? profileDoc.data() : null;
+  } catch (err) {
+    console.warn('[barryContextStack] Failed to load ICP profile:', err.message);
+    return null;
+  }
+}
+
 async function getActiveMissions(userId) {
   try {
     const snap = await getDocs(
@@ -105,10 +115,11 @@ export async function buildContextStack(userId) {
   if (!userId) return emptyStack();
 
   try {
-    const [contacts, missions, dashboardDoc] = await Promise.all([
+    const [contacts, missions, dashboardDoc, icpProfile] = await Promise.all([
       getActiveContacts(userId),
       getActiveMissions(userId),
-      getDoc(doc(db, 'dashboards', userId))
+      getDoc(doc(db, 'dashboards', userId)),
+      getIcpProfile(userId)
     ]);
 
     const dashboardData = dashboardDoc.exists() ? dashboardDoc.data() : null;
@@ -127,6 +138,7 @@ export async function buildContextStack(userId) {
       contacts,
       missions,
       recon,
+      icpProfile: icpProfile || null,
       user_style: dashboardData?.communicationStyle || null,
       timestamp: new Date().toISOString()
     };
@@ -141,6 +153,7 @@ function emptyStack() {
     contacts: [],
     missions: [],
     recon: { confidence: 0, enhanced: false },
+    icpProfile: null,
     timestamp: new Date().toISOString()
   };
 }

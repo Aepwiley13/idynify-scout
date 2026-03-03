@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, ChevronDown, RefreshCw, Search, User } from 'lucide-react';
+import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
@@ -22,9 +22,12 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
   const contentRef = useRef(null);
   const headerRef = useRef(null);
 
-  // Collapsible section states
-  const [departmentsExpanded, setDepartmentsExpanded] = useState(true);
-  const [techStackExpanded, setTechStackExpanded] = useState(true);
+  // Ghost-click guard: ignore overlay clicks for first 200ms after mount
+  const [overlayReady, setOverlayReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setOverlayReady(true), 200);
+    return () => clearTimeout(t);
+  }, []);
 
   // Add People from Your Contacts states
   const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
@@ -379,7 +382,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
   }
 
   return (
-    <div className="company-detail-overlay" onClick={onClose}>
+    <div className="company-detail-overlay" onClick={overlayReady ? onClose : undefined}>
       <div className="company-detail-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div ref={headerRef} className={`company-detail-header ${isScrolled ? 'scrolled' : ''}`}>
@@ -733,15 +736,8 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
               {/* Section 4: Department Breakdown */}
               {enrichedData.departments && Object.values(enrichedData.departments).some(d => d) && (
                 <div className="detail-section departments-section">
-                  <div
-                    className="section-header-collapsible"
-                    onClick={() => setDepartmentsExpanded(!departmentsExpanded)}
-                  >
-                    <h3 className="section-title">Department Breakdown</h3>
-                    <ChevronDown className={`chevron ${departmentsExpanded ? 'expanded' : ''}`} />
-                  </div>
-                  {departmentsExpanded && (
-                    <div className="departments-grid">
+                  <h3 className="section-title">Department Breakdown</h3>
+                  <div className="departments-grid">
                     {enrichedData.departments.sales && (
                       <div className="dept-card">
                         <p className="dept-label">Sales</p>
@@ -766,23 +762,15 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                         <p className="dept-value">{enrichedData.departments.operations}</p>
                       </div>
                     )}
-                    </div>
-                  )}
+                  </div>
                 </div>
               )}
 
               {/* Section 5: Tech Stack */}
               {enrichedData.techStack && enrichedData.techStack.length > 0 && (
                 <div className="detail-section tech-stack-section">
-                  <div
-                    className="section-header-collapsible"
-                    onClick={() => setTechStackExpanded(!techStackExpanded)}
-                  >
-                    <h3 className="section-title">Tech Stack ({enrichedData.techStack.length})</h3>
-                    <ChevronDown className={`chevron ${techStackExpanded ? 'expanded' : ''}`} />
-                  </div>
-                  {techStackExpanded && (
-                    <div className="tech-stack-grid">
+                  <h3 className="section-title">Tech Stack ({enrichedData.techStack.length})</h3>
+                  <div className="tech-stack-grid">
                     {enrichedData.techStack.map((tech, idx) => (
                       <div key={idx} className="tech-card">
                         <Code className="w-4 h-4 tech-icon" />
@@ -792,8 +780,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                         </div>
                       </div>
                     ))}
-                    </div>
-                  )}
+                  </div>
                 </div>
               )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Loader } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './FollowUpComposer.css';
@@ -28,6 +28,14 @@ export default function FollowUpComposer({
   const [body, setBody] = useState('');
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
+  const bodyTextareaRef = useRef(null);
+
+  useEffect(() => {
+    const el = bodyTextareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [body]);
 
   useEffect(() => {
     // Pre-fill subject with Re: original subject
@@ -161,10 +169,10 @@ export default function FollowUpComposer({
           <div className="form-group">
             <label>Message</label>
             <textarea
+              ref={bodyTextareaRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Write your follow-up message..."
-              rows={12}
               className="form-textarea"
             />
           </div>

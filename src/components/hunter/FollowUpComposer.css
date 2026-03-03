@@ -105,6 +105,78 @@
   text-align: center;
 }
 
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: #111827;
+  background: #fff;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: #111827;
+  background: #fff;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: none;
+  overflow: hidden;
+  min-height: 160px;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.btn-cancel {
+  padding: 0.75rem 1.25rem;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 8px;
+  color: #374151;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
 .original-message-reference {
   margin-top: 1.5rem;
   padding: 1rem;
@@ -138,8 +210,6 @@
 .reference-text {
   line-height: 1.6;
   white-space: pre-wrap;
-  max-height: 150px;
-  overflow-y: auto;
 }
 
 .followup-modal-footer {

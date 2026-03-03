@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp, Archive, RotateCcw } from 'lucide-react';
+import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp, Archive, RotateCcw, RefreshCw, Code, ExternalLink, Loader, User } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
+import { searchPeople, updatePerson } from '../../services/peopleService';
 
 export default function CompanyDetail() {
   const { companyId } = useParams();
@@ -28,6 +29,14 @@ export default function CompanyDetail() {
   const [suggestedContacts, setSuggestedContacts] = useState([]);
   const [selectedSuggestedIds, setSelectedSuggestedIds] = useState(new Set());
   const [approvingSuggested, setApprovingSuggested] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
+  const [peopleResults, setPeopleResults] = useState([]);
+  const [searchingPeople, setSearchingPeople] = useState(false);
+  const [selectedPeopleToAdd, setSelectedPeopleToAdd] = useState([]);
+  const [addingPeopleToCompany, setAddingPeopleToCompany] = useState(false);
+  const [addPeopleSuccess, setAddPeopleSuccess] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
     loadCompanyData();
@@ -97,6 +106,13 @@ export default function CompanyDetail() {
       // Automatically search for contacts if titles exist
       if (titles.length > 0) {
         searchContacts(companyData, titles);
+      }
+
+      // Auto-trigger enrichment if no cached data or cache is stale
+      const isStale = !companyData.apolloEnrichedAt ||
+        Date.now() - companyData.apolloEnrichedAt > 14 * 24 * 60 * 60 * 1000;
+      if (!companyData.apolloEnrichment || isStale) {
+        enrichCompanyData(false);
       }
     } catch (error) {
       console.error('❌ Failed to load company:', error);
@@ -593,6 +609,147 @@ export default function CompanyDetail() {
     }
   }
 
+  // Enrich company data via Apollo (force refresh bypasses 14-day cache)
+  async function enrichCompanyData(forceRefresh = false) {
+    try {
+      setEnriching(true);
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const companyRef = doc(db, 'users', user.uid, 'companies', companyId);
+      const companyDoc = await getDoc(companyRef);
+      if (!companyDoc.exists()) return;
+
+      const currentData = companyDoc.data();
+
+      // Check if cache is still fresh
+      if (!forceRefresh &&
+          currentData.apolloEnrichment &&
+          currentData.apolloEnrichedAt &&
+          Date.now() - currentData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
+        console.log('✅ Using cached Apollo data');
+        return;
+      }
+
+      console.log(forceRefresh ? '🔄 Force refreshing company data...' : '🔄 Fetching Apollo enrichment...');
+
+      const authToken = await user.getIdToken();
+
+      const response = await fetch('/.netlify/functions/enrichCompany', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          domain: currentData.domain || extractDomain(currentData.website_url),
+          organizationId: currentData.apollo_id || null
+        })
+      });
+
+      if (!response.ok) throw new Error('Enrichment failed');
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Enrichment failed');
+
+      await updateDoc(companyRef, {
+        apolloEnrichment: result.data,
+        apolloEnrichedAt: Date.now(),
+        apollo_id: result.data._raw?.apolloOrgId || null
+      });
+
+      // Update local company state with fresh enrichment data
+      setCompany(prev => ({
+        ...prev,
+        apolloEnrichment: result.data,
+        apolloEnrichedAt: Date.now()
+      }));
+
+      console.log('✅ Company enriched successfully');
+    } catch (err) {
+      console.error('❌ Enrichment failed:', err);
+    } finally {
+      setEnriching(false);
+    }
+  }
+
+  function extractDomain(url) {
+    if (!url) return null;
+    try {
+      return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    } catch {
+      return null;
+    }
+  }
+
+  function handlePeopleSearch(e) {
+    const query = e.target.value;
+    setPeopleSearchQuery(query);
+    clearTimeout(searchTimeoutRef.current);
+
+    if (query.trim().length < 2) {
+      setPeopleResults([]);
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearchingPeople(true);
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const results = await searchPeople(user.uid, query);
+        setPeopleResults(results);
+      } finally {
+        setSearchingPeople(false);
+      }
+    }, 300);
+  }
+
+  function handleTogglePersonSelection(person) {
+    setSelectedPeopleToAdd(prev => {
+      const isSelected = prev.some(p => p.id === person.id);
+      if (isSelected) return prev.filter(p => p.id !== person.id);
+      return [...prev, person];
+    });
+  }
+
+  async function handleAddPeopleToCompany() {
+    if (selectedPeopleToAdd.length === 0) return;
+
+    setAddingPeopleToCompany(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      for (const person of selectedPeopleToAdd) {
+        await updatePerson(user.uid, person.id, {
+          company_id: companyId,
+          company_name: company.name,
+          company_industry: company.industry || null,
+          company: company.name
+        });
+      }
+
+      // Update company contact count
+      const companyRef = doc(db, 'users', user.uid, 'companies', companyId);
+      const companyDoc = await getDoc(companyRef);
+      const currentCount = companyDoc.data()?.contact_count || 0;
+      await updateDoc(companyRef, {
+        contact_count: currentCount + selectedPeopleToAdd.length
+      });
+
+      setAddPeopleSuccess(true);
+      setSelectedPeopleToAdd([]);
+      setPeopleSearchQuery('');
+      setPeopleResults([]);
+      setTimeout(() => setAddPeopleSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error adding people to company:', err);
+      alert('Failed to add people to company. Please try again.');
+    } finally {
+      setAddingPeopleToCompany(false);
+    }
+  }
+
   // Archive this company
   async function handleArchiveCompany() {
     const confirmed = window.confirm(
@@ -727,6 +884,24 @@ export default function CompanyDetail() {
           ) : (
             <div className="company-archive-action">
               <button
+                className="company-refresh-btn"
+                onClick={() => enrichCompanyData(true)}
+                disabled={enriching}
+                title="Refresh & enrich company data from Apollo"
+              >
+                {enriching ? (
+                  <>
+                    <Loader className="w-4 h-4 cd-spinner" />
+                    <span>Refreshing...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Refresh / Enrich</span>
+                  </>
+                )}
+              </button>
+              <button
                 className="company-archive-btn"
                 onClick={handleArchiveCompany}
                 disabled={archiving}
@@ -737,7 +912,7 @@ export default function CompanyDetail() {
             </div>
           )}
 
-          {/* Stats Grid - Matching SavedCompanies */}
+          {/* Stats Grid - Company Snapshot */}
           <div className="company-stats-grid">
             {/* Industry */}
             <div className="company-stat-item">
@@ -746,7 +921,9 @@ export default function CompanyDetail() {
               </div>
               <div className="stat-content">
                 <p className="stat-label">Industry</p>
-                <p className="stat-value">{company.industry || 'Not available'}</p>
+                <p className="stat-value">
+                  {company.apolloEnrichment?.snapshot?.industry || company.industry || 'Not available'}
+                </p>
               </div>
             </div>
 
@@ -757,48 +934,52 @@ export default function CompanyDetail() {
               </div>
               <div className="stat-content">
                 <p className="stat-label">Employees</p>
-                <p className="stat-value">{company.employee_count || company.company_size || 'Not available'}</p>
+                <p className="stat-value">
+                  {company.apolloEnrichment?.snapshot?.employee_count_range ||
+                   company.apolloEnrichment?.snapshot?.estimated_num_employees ||
+                   company.employee_count || company.company_size || 'Not available'}
+                </p>
               </div>
             </div>
 
             {/* Revenue */}
-            {company.revenue && (
-              <div className="company-stat-item">
-                <div className="stat-icon">
-                  <DollarSign className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Revenue</p>
-                  <p className="stat-value">{company.revenue}</p>
-                </div>
+            <div className="company-stat-item">
+              <div className="stat-icon">
+                <DollarSign className="w-5 h-5 text-gray-500" />
               </div>
-            )}
+              <div className="stat-content">
+                <p className="stat-label">Revenue</p>
+                <p className="stat-value">
+                  {company.apolloEnrichment?.snapshot?.revenue_range || company.revenue || 'Not available'}
+                </p>
+              </div>
+            </div>
 
             {/* Founded */}
-            {company.founded_year && (
-              <div className="company-stat-item">
-                <div className="stat-icon">
-                  <Calendar className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Founded</p>
-                  <p className="stat-value">{company.founded_year}</p>
-                </div>
+            <div className="company-stat-item">
+              <div className="stat-icon">
+                <Calendar className="w-5 h-5 text-gray-500" />
               </div>
-            )}
+              <div className="stat-content">
+                <p className="stat-label">Founded</p>
+                <p className="stat-value">
+                  {company.apolloEnrichment?.snapshot?.founded_year || company.founded_year || 'Not available'}
+                </p>
+              </div>
+            </div>
 
             {/* Location */}
-            {company.location && (
-              <div className="company-stat-item">
-                <div className="stat-icon">
-                  <MapPin className="w-5 h-5 text-gray-500" />
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Location</p>
-                  <p className="stat-value">{company.location}</p>
-                </div>
+            <div className="company-stat-item">
+              <div className="stat-icon">
+                <MapPin className="w-5 h-5 text-gray-500" />
               </div>
-            )}
+              <div className="stat-content">
+                <p className="stat-label">Location</p>
+                <p className="stat-value">
+                  {company.apolloEnrichment?.snapshot?.location?.full || company.location || 'Not available'}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Quick Links - Expanded with all social media */}
@@ -1477,6 +1658,214 @@ export default function CompanyDetail() {
           }
         })()}
       </div>
+
+      {/* ── Add Your Contacts ───────────────────────────────── */}
+      <div className="cd-add-from-people-section">
+        <div className="section-header-main">
+          <h3 className="section-title-main">
+            <UserPlus className="w-6 h-6" />
+            <span>Add Your Contacts</span>
+          </h3>
+          <p className="section-subtitle-main">Search your existing leads & people by name and link them to this company</p>
+        </div>
+
+        {addPeopleSuccess && (
+          <div className="cd-people-add-success">
+            <CheckCircle className="w-4 h-4" />
+            <span>Contacts successfully linked to {company.name}!</span>
+          </div>
+        )}
+
+        <div className="cd-people-search-container">
+          <div className="cd-people-search-input-wrapper">
+            <Search className="cd-people-search-icon" />
+            <input
+              type="text"
+              className="cd-people-search-input"
+              placeholder="Search all leads & people by name..."
+              value={peopleSearchQuery}
+              onChange={handlePeopleSearch}
+            />
+            {peopleSearchQuery && (
+              <button
+                className="cd-people-search-clear"
+                onClick={() => {
+                  setPeopleSearchQuery('');
+                  setPeopleResults([]);
+                  setSelectedPeopleToAdd([]);
+                }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {searchingPeople && (
+            <div className="cd-people-search-loading">
+              <Loader className="w-4 h-4 cd-spinner" />
+              <span>Searching...</span>
+            </div>
+          )}
+
+          {!searchingPeople && peopleResults.length > 0 && (
+            <div className="cd-people-search-results">
+              {peopleResults.map(person => {
+                const isSelected = selectedPeopleToAdd.some(p => p.id === person.id);
+                const isAlreadyLinked = person.company_id === companyId;
+                return (
+                  <div
+                    key={person.id}
+                    className={`cd-people-result-item ${isSelected ? 'selected' : ''} ${isAlreadyLinked ? 'already-linked' : ''}`}
+                    onClick={() => !isAlreadyLinked && handleTogglePersonSelection(person)}
+                  >
+                    <div className="cd-people-result-avatar">
+                      {person.photo_url ? (
+                        <img src={person.photo_url} alt={person.name} />
+                      ) : (
+                        <User className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div className="cd-people-result-info">
+                      <p className="cd-people-result-name">{person.name}</p>
+                      <p className="cd-people-result-meta">
+                        {[person.title, person.company_name || person.company].filter(Boolean).join(' • ')}
+                      </p>
+                    </div>
+                    {isAlreadyLinked ? (
+                      <span className="cd-people-already-linked-badge">Already linked</span>
+                    ) : (
+                      <div className={`cd-people-select-indicator ${isSelected ? 'checked' : ''}`}>
+                        {isSelected && <CheckCircle className="w-4 h-4" />}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!searchingPeople && peopleSearchQuery.length >= 2 && peopleResults.length === 0 && (
+            <div className="cd-people-no-results">
+              <p>No contacts found for &ldquo;{peopleSearchQuery}&rdquo;</p>
+            </div>
+          )}
+
+          {selectedPeopleToAdd.length > 0 && (
+            <button
+              className="cd-btn-add-people-to-company"
+              onClick={handleAddPeopleToCompany}
+              disabled={addingPeopleToCompany}
+            >
+              {addingPeopleToCompany ? (
+                <>
+                  <Loader className="w-4 h-4 cd-spinner" />
+                  <span>Adding...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  <span>Add {selectedPeopleToAdd.length} to {company.name}</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Tech Stack ──────────────────────────────────────── */}
+      {company.apolloEnrichment?.techStack && company.apolloEnrichment.techStack.length > 0 && (
+        <div className="cd-tech-stack-section">
+          <div className="section-header-main">
+            <h3 className="section-title-main">
+              <Code className="w-6 h-6" />
+              <span>Tech Stack ({company.apolloEnrichment.techStack.length})</span>
+            </h3>
+          </div>
+          <div className="cd-tech-stack-grid">
+            {company.apolloEnrichment.techStack.map((tech, idx) => (
+              <div key={idx} className="cd-tech-card">
+                <Code className="w-4 h-4 cd-tech-icon" />
+                <div>
+                  <p className="cd-tech-name">{tech.name}</p>
+                  {tech.category && <p className="cd-tech-category">{tech.category}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Data Confidence ─────────────────────────────────── */}
+      {company.apolloEnrichment?.dataQuality && (
+        <div className="cd-data-quality-section">
+          <div className="section-header-main">
+            <h3 className="section-title-main">
+              <Shield className="w-6 h-6" />
+              <span>Data Confidence</span>
+            </h3>
+          </div>
+          <div className="cd-data-quality-info">
+            <div className="cd-data-quality-item">
+              <span className="cd-data-quality-label">Last Updated</span>
+              <span className="cd-data-quality-value">
+                {new Date(company.apolloEnrichedAt || Date.now()).toLocaleDateString()}
+              </span>
+            </div>
+            <div className="cd-data-quality-item">
+              <span className="cd-data-quality-label">Status</span>
+              <span className={`cd-data-quality-badge ${company.apolloEnrichment.dataQuality.organization_status || 'active'}`}>
+                {company.apolloEnrichment.dataQuality.organization_status || 'Active'}
+              </span>
+            </div>
+            <div className="cd-data-quality-item">
+              <span className="cd-data-quality-label">Source</span>
+              <span className="cd-data-quality-value">Verified Data</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Links ───────────────────────────────────────────── */}
+      {(company.apolloEnrichment?.snapshot?.website_url || company.apolloEnrichment?.dataQuality?.linkedin_url ||
+        company.website_url || company.linkedin_url) && (
+        <div className="cd-links-section">
+          <div className="section-header-main">
+            <h3 className="section-title-main">
+              <Globe className="w-6 h-6" />
+              <span>Links</span>
+            </h3>
+          </div>
+          <div className="cd-links-container">
+            {(company.apolloEnrichment?.snapshot?.website_url || company.website_url) && (
+              <button
+                className="cd-link-button website"
+                onClick={() => window.open(
+                  company.apolloEnrichment?.snapshot?.website_url || company.website_url,
+                  '_blank', 'noopener,noreferrer'
+                )}
+              >
+                <Globe className="w-5 h-5" />
+                <span>Visit Website</span>
+                <ExternalLink className="w-4 h-4 cd-link-external" />
+              </button>
+            )}
+            {(company.apolloEnrichment?.dataQuality?.linkedin_url || company.linkedin_url) && (
+              <button
+                className="cd-link-button linkedin"
+                onClick={() => window.open(
+                  company.apolloEnrichment?.dataQuality?.linkedin_url || company.linkedin_url,
+                  '_blank', 'noopener,noreferrer'
+                )}
+              >
+                <Linkedin className="w-5 h-5" />
+                <span>View on LinkedIn</span>
+                <ExternalLink className="w-4 h-4 cd-link-external" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );

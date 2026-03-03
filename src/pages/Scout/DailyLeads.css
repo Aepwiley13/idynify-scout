@@ -726,6 +726,16 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes feedbackFlipIn {
+  from { opacity: 0; transform: scaleX(0.4) scaleY(0.95); }
+  to   { opacity: 1; transform: scaleX(1)   scaleY(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .loading-text {
   color: #6b7280;
   font-size: 1rem;

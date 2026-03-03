@@ -1,14 +1,14 @@
 import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import {
   collection, query, orderBy, limit, onSnapshot,
-  getDocs, updateDoc, doc
+  getDocs, updateDoc, doc, addDoc
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   Zap, Mail, Phone, MessageSquare, Linkedin, Check,
   ArrowLeft, ArrowRight, Sparkles, Send, Loader, RefreshCw,
   ExternalLink, AlertCircle, Plus, ChevronDown, ChevronUp,
-  Clock, Target
+  Clock, Target, Bookmark, BookmarkCheck, History
 } from 'lucide-react';
 import {
   executeSendAction,
@@ -123,6 +123,53 @@ function EngagementHistoryEntry({ event, index }) {
   );
 }
 
+// ── All History Entry ──────────────────────────────────────
+
+const ALL_EVENT_LABELS = {
+  message_sent: 'Message sent',
+  message_generated: 'Barry generated messages',
+  engage_session_started: 'Session started',
+  engage_session_completed: 'Session completed',
+  engage_session_abandoned: 'Session abandoned',
+  engage_session_pivoted: 'Channel switched',
+  next_step_queued: 'Next step queued',
+  next_step_completed: 'Next step completed',
+  contact_status_changed: 'Status updated',
+  sequence_step_sent: 'Sequence step sent',
+};
+
+function AllHistoryEntry({ event }) {
+  const [expanded, setExpanded] = useState(false);
+  const meta = event.metadata || {};
+  const label = ALL_EVENT_LABELS[event.type] || event.type?.replace(/_/g, ' ') || 'Activity';
+  const time = formatEngagementTime(event.createdAt || event.timestamp);
+  const preview = event.preview || meta.userIntent || meta.messagePreview || meta.body || null;
+
+  return (
+    <div className="ies-all-history-entry">
+      <div className="ies-all-history-dot" />
+      <div className="ies-all-history-body">
+        <div className="ies-all-history-meta">
+          <span className="ies-all-history-label">{label}</span>
+          {time && <span className="ies-all-history-time"><Clock className="w-3 h-3" />{time}</span>}
+          {preview && (
+            <button
+              className="ies-history-expand-btn"
+              onClick={() => setExpanded(e => !e)}
+              aria-label={expanded ? 'Collapse' : 'Expand'}
+            >
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          )}
+        </div>
+        {expanded && preview && (
+          <p className="ies-all-history-preview">{preview}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────
 
 const InlineEngagementSection = forwardRef(function InlineEngagementSection(
@@ -159,6 +206,21 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [gmailConnected, setGmailConnected] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Saved prompts
+  const [savedPrompts, setSavedPrompts] = useState([]);
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [promptSaved, setPromptSaved] = useState(false);
+
+  // Barry message → template saving
+  const [savedMsgIndices, setSavedMsgIndices] = useState(new Set());
+  const [savingMsgIdx, setSavingMsgIdx] = useState(null);
+
+  // Section collapse / full history
+  const [sectionCollapsed, setSectionCollapsed] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [allHistoryEvents, setAllHistoryEvents] = useState([]);
+  const [allHistoryLoading, setAllHistoryLoading] = useState(false);
+
   // Expose trigger method to parent via ref
   useImperativeHandle(ref, () => ({
     triggerFlow() {
@@ -192,6 +254,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   function activateFlow() {
     resetFlow();
     setFlowActive(true);
+    loadSavedPrompts();
 
     const user = auth.currentUser;
     if (user && contact?.id) {
@@ -233,6 +296,9 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     setSubject('');
     setGenerationError(null);
     setSendResult(null);
+    setSavedMsgIndices(new Set());
+    setSavingMsgIdx(null);
+    setPromptSaved(false);
   }
 
   async function checkGmailStatus() {
@@ -244,6 +310,102 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     } catch {
       setGmailConnected(false);
     }
+  }
+
+  // === Prompt Templates ===
+  async function loadSavedPrompts() {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const promptsRef = collection(db, 'users', user.uid, 'promptTemplates');
+      const q = query(promptsRef, orderBy('createdAt', 'desc'), limit(8));
+      const snap = await getDocs(q);
+      setSavedPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch { /* non-blocking */ }
+  }
+
+  async function handleSavePrompt() {
+    if (!userIntent.trim() || savingPrompt) return;
+    setSavingPrompt(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      await addDoc(collection(db, 'users', user.uid, 'promptTemplates'), {
+        text: userIntent.trim(),
+        createdAt: new Date()
+      });
+      setPromptSaved(true);
+      await loadSavedPrompts();
+      setTimeout(() => setPromptSaved(false), 2500);
+    } catch { /* non-blocking */ }
+    finally { setSavingPrompt(false); }
+  }
+
+  // === Barry Message → Template ===
+  async function handleSaveMessageAsTemplate(option, idx) {
+    if (savingMsgIdx !== null || savedMsgIndices.has(idx)) return;
+    setSavingMsgIdx(idx);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const idToken = await user.getIdToken();
+      const label = option.label || option.strategy || 'Barry Message';
+      const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      await fetch('/.netlify/functions/save-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken,
+          template: {
+            name: `${label} — ${dateStr}`,
+            subject: option.subject || label,
+            body: option.message,
+            intent: engagementIntent || 'prospect'
+          }
+        })
+      });
+      setSavedMsgIndices(prev => new Set([...prev, idx]));
+    } catch { /* non-blocking */ }
+    finally { setSavingMsgIdx(null); }
+  }
+
+  // === Full History ===
+  async function loadAllHistory() {
+    if (allHistoryLoading) return;
+    setAllHistoryLoading(true);
+    const user = auth.currentUser;
+    if (!user || !contact?.id) { setAllHistoryLoading(false); return; }
+    try {
+      const timelineRef = collection(db, 'users', user.uid, 'contacts', contact.id, 'timeline');
+      const q = query(timelineRef, orderBy('createdAt', 'desc'), limit(50));
+      const snap = await getDocs(q);
+      setAllHistoryEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch { /* non-blocking */ }
+    finally { setAllHistoryLoading(false); }
+  }
+
+  // === Barry Auto-Context Refresh (fire-and-forget) ===
+  function triggerBarryContextRefresh() {
+    const user = auth.currentUser;
+    if (!user || !contact?.id) return;
+    user.getIdToken().then(authToken => {
+      fetch('/.netlify/functions/barryGenerateContext', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          contact: {
+            id: contact.id,
+            name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name,
+            title: contact.title || contact.current_position_title,
+            company_name: contact.company_name || contact.current_company_name,
+            email: contact.email,
+            linkedin_url: contact.linkedin_url
+          }
+        })
+      }).catch(() => {});
+    }).catch(() => {});
   }
 
   // === STEP 1: Intent Submission ===
@@ -415,6 +577,9 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
         engagementIntent: engagementIntent
       });
 
+      // Trigger Barry context auto-refresh in background so next engagement is smarter
+      triggerBarryContextRefresh();
+
       setReviewStep(false);
       setResultStep(true);
 
@@ -475,16 +640,26 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
             <span className="ies-section-count">{sentEvents.length} sent</span>
           )}
         </div>
-        {!flowActive && (
-          <button className="ies-start-btn" onClick={activateFlow}>
-            <Zap className="w-4 h-4" />
-            Start New Engagement
+        <div className="ies-section-header-actions">
+          {!flowActive && (
+            <button className="ies-start-btn" onClick={activateFlow}>
+              <Zap className="w-4 h-4" />
+              Start New Engagement
+            </button>
+          )}
+          <button
+            className="ies-section-collapse-btn"
+            onClick={() => setSectionCollapsed(c => !c)}
+            aria-label={sectionCollapsed ? 'Expand section' : 'Collapse section'}
+            title={sectionCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {sectionCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
-        )}
+        </div>
       </div>
 
       {/* ── ENGAGEMENT HISTORY ── */}
-      {!flowActive && (
+      {!sectionCollapsed && !flowActive && (
         <div className="ies-history">
           {historyLoading ? (
             <div className="ies-history-loading">
@@ -504,21 +679,57 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
               </button>
             </div>
           ) : (
-            <div className="ies-history-list">
-              {sentEvents.map((event, idx) => (
-                <EngagementHistoryEntry
-                  key={event.id}
-                  event={event}
-                  index={sentEvents.length - idx}
-                />
-              ))}
-            </div>
+            <>
+              <div className="ies-history-list">
+                {sentEvents.map((event, idx) => (
+                  <EngagementHistoryEntry
+                    key={event.id}
+                    event={event}
+                    index={sentEvents.length - idx}
+                  />
+                ))}
+              </div>
+
+              {/* Full activity toggle */}
+              <div className="ies-history-footer">
+                <button
+                  className="ies-history-expand-all-btn"
+                  onClick={() => {
+                    if (!historyExpanded) loadAllHistory();
+                    setHistoryExpanded(h => !h);
+                  }}
+                >
+                  <History className="w-3.5 h-3.5" />
+                  {historyExpanded ? 'Hide full activity' : 'View full activity'}
+                  {historyExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {historyExpanded && (
+                <div className="ies-all-history">
+                  {allHistoryLoading ? (
+                    <div className="ies-history-loading">
+                      <Loader className="w-4 h-4 ies-spinner" />
+                      <span>Loading activity...</span>
+                    </div>
+                  ) : allHistoryEvents.length === 0 ? (
+                    <p className="ies-all-history-empty">No activity recorded yet.</p>
+                  ) : (
+                    <div className="ies-all-history-list">
+                      {allHistoryEvents.map((event, idx) => (
+                        <AllHistoryEntry key={event.id || idx} event={event} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       {/* ── ACTIVE FLOW ── */}
-      {flowActive && (
+      {!sectionCollapsed && flowActive && (
         <div className="ies-flow">
           {/* Flow header */}
           <div className="ies-flow-header">
@@ -555,6 +766,24 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 rows={3}
                 autoFocus
               />
+              {/* Saved prompts chips */}
+              {savedPrompts.length > 0 && (
+                <div className="ies-saved-prompts">
+                  <span className="ies-saved-prompts-label">Saved prompts:</span>
+                  <div className="ies-prompt-chips">
+                    {savedPrompts.slice(0, 6).map(p => (
+                      <button
+                        key={p.id}
+                        className="ies-prompt-chip"
+                        onClick={() => setUserIntent(p.text)}
+                        title={p.text}
+                      >
+                        {p.text.length > 45 ? p.text.slice(0, 42) + '…' : p.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Contact info at a glance */}
               <div className="ies-contact-channels">
                 <span className={`ies-channel-chip ${hasEmail ? 'ies-chip-ok' : 'ies-chip-missing'}`}>
@@ -576,14 +805,27 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                   )}
                 </span>
               </div>
-              <button
-                className="ies-generate-btn"
-                onClick={handleIntentSubmit}
-                disabled={!userIntent.trim()}
-              >
-                <Send className="w-4 h-4" />
-                Generate Messages
-              </button>
+              <div className="ies-intent-actions">
+                <button
+                  className={`ies-save-prompt-btn ${promptSaved ? 'saved' : ''}`}
+                  onClick={handleSavePrompt}
+                  disabled={!userIntent.trim() || savingPrompt}
+                  title="Save this prompt for future use"
+                >
+                  {promptSaved
+                    ? <><BookmarkCheck className="w-4 h-4" /> Saved!</>
+                    : <><Bookmark className="w-4 h-4" /> Save prompt</>
+                  }
+                </button>
+                <button
+                  className="ies-generate-btn"
+                  onClick={handleIntentSubmit}
+                  disabled={!userIntent.trim()}
+                >
+                  <Send className="w-4 h-4" />
+                  Generate Messages
+                </button>
+              </div>
             </div>
           )}
 
@@ -677,23 +919,37 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
               </div>
               <div className="ies-options-list">
                 {messageOptions.map((option, index) => (
-                  <button
-                    key={index}
-                    className="ies-option-card"
-                    onClick={() => handleSelectStrategy(option)}
-                  >
-                    <div className="ies-option-header">
-                      <span className="ies-option-strategy">{option.label || option.strategy}</span>
-                      <ArrowRight className="w-4 h-4 ies-option-arrow" />
-                    </div>
-                    {option.subject && (
-                      <p className="ies-option-subject">Subject: {option.subject}</p>
-                    )}
-                    <p className="ies-option-preview">{option.message}</p>
-                    {option.reasoning && (
-                      <p className="ies-option-reasoning">{option.reasoning}</p>
-                    )}
-                  </button>
+                  <div key={index} className="ies-option-card-wrap">
+                    <button
+                      className="ies-option-card"
+                      onClick={() => handleSelectStrategy(option)}
+                    >
+                      <div className="ies-option-header">
+                        <span className="ies-option-strategy">{option.label || option.strategy}</span>
+                        <ArrowRight className="w-4 h-4 ies-option-arrow" />
+                      </div>
+                      {option.subject && (
+                        <p className="ies-option-subject">Subject: {option.subject}</p>
+                      )}
+                      <p className="ies-option-preview">{option.message}</p>
+                      {option.reasoning && (
+                        <p className="ies-option-reasoning">{option.reasoning}</p>
+                      )}
+                    </button>
+                    <button
+                      className={`ies-save-template-btn ${savedMsgIndices.has(index) ? 'ies-save-template-btn--saved' : ''}`}
+                      onClick={() => handleSaveMessageAsTemplate(option, index)}
+                      disabled={savingMsgIdx !== null || savedMsgIndices.has(index)}
+                      title={savedMsgIndices.has(index) ? 'Saved as template' : 'Save as template'}
+                    >
+                      {savingMsgIdx === index
+                        ? <Loader className="w-3.5 h-3.5 ies-spinner" />
+                        : savedMsgIndices.has(index)
+                          ? <><BookmarkCheck className="w-3.5 h-3.5" /> Saved</>
+                          : <><Bookmark className="w-3.5 h-3.5" /> Save</>
+                      }
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>

@@ -1116,3 +1116,276 @@
     justify-content: center;
   }
 }
+
+/* ── Section Header Actions ── */
+.ies-section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ies-section-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  color: #9ca3af;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.ies-section-collapse-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+/* ── Saved Prompts ── */
+.ies-saved-prompts {
+  margin: 0.625rem 0 0.5rem;
+}
+
+.ies-saved-prompts-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.375rem;
+}
+
+.ies-prompt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.ies-prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.625rem;
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: #5b21b6;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ies-prompt-chip:hover {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.35);
+}
+
+/* ── Intent Actions Row ── */
+.ies-intent-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  margin-top: 0.75rem;
+}
+
+.ies-intent-actions .ies-generate-btn {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* ── Save Prompt Button ── */
+.ies-save-prompt-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.75rem 0.875rem;
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.ies-save-prompt-btn:hover:not(:disabled) {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.04);
+}
+
+.ies-save-prompt-btn.saved {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #059669;
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.ies-save-prompt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Option Card Wrap (for save-as-template button) ── */
+.ies-option-card-wrap {
+  position: relative;
+}
+
+.ies-option-card-wrap .ies-option-card {
+  width: 100%;
+  padding-bottom: 0.75rem;
+}
+
+/* ── Save Template Button (on message options) ── */
+.ies-save-template-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  backdrop-filter: blur(4px);
+  z-index: 1;
+}
+
+.ies-save-template-btn:hover:not(:disabled) {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.05);
+}
+
+.ies-save-template-btn--saved {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #059669;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.ies-save-template-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── History Footer & Full Activity ── */
+.ies-history-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.625rem;
+  border-top: 1px solid #f3f4f6;
+  margin-top: 0.625rem;
+}
+
+.ies-history-expand-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: transparent;
+  border: none;
+  color: #7c3aed;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.375rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.ies-history-expand-all-btn:hover {
+  background: rgba(124, 58, 237, 0.06);
+}
+
+/* ── Full Activity Timeline ── */
+.ies-all-history {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed rgba(124, 58, 237, 0.15);
+}
+
+.ies-all-history-empty {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 1rem;
+  margin: 0;
+}
+
+.ies-all-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ies-all-history-entry {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.5rem 0;
+  position: relative;
+}
+
+.ies-all-history-entry:not(:last-child) {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ies-all-history-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d1d5db;
+  flex-shrink: 0;
+  margin-top: 0.45rem;
+}
+
+.ies-all-history-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ies-all-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ies-all-history-label {
+  font-size: 0.8125rem;
+  color: #374151;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.ies-all-history-time {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+.ies-all-history-preview {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0.375rem 0 0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}

@@ -73,8 +73,8 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
   }, [enrichedData]);
 
   async function enrichCompanyData(forceRefresh = false) {
+    let existingEnrichment = null;
     try {
-      setLoading(true);
       setError(null);
 
       const user = auth.currentUser;
@@ -91,21 +91,30 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
       }
 
       const currentData = companyDoc.data();
+      existingEnrichment = currentData.apolloEnrichment || null;
 
-      // Check if we already have fresh Apollo data (14 days cache)
-      // Skip cache if forceRefresh is true
+      // Show existing cached data IMMEDIATELY (stale-while-revalidate)
+      if (existingEnrichment) {
+        setEnrichedData(existingEnrichment);
+        setLoading(false);
+      }
+
+      // Check if cache is still fresh (skip API call)
       if (!forceRefresh &&
-          currentData.apolloEnrichment &&
+          existingEnrichment &&
           currentData.apolloEnrichedAt &&
           Date.now() - currentData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
         console.log('✅ Using cached Apollo data');
-        setEnrichedData(currentData.apolloEnrichment);
-        setLoading(false);
         return;
       }
 
       if (forceRefresh) {
         console.log('🔄 Force refresh requested - bypassing cache');
+      }
+
+      // Only show full-page loading spinner when there is no existing data
+      if (!existingEnrichment) {
+        setLoading(true);
       }
 
       // Call Netlify Function to enrich with Apollo
@@ -150,17 +159,20 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
 
     } catch (err) {
       console.error('Error enriching company data:', err);
-      setError(err.message);
       setLoading(false);
 
-      // Show basic company data even if enrichment fails
-      setEnrichedData({
-        snapshot: {
-          name: company.name,
-          industry: company.industry,
-          location: { full: company.location || 'Unknown' }
-        }
-      });
+      // Only show error and fallback when there is no existing data to display
+      if (!existingEnrichment) {
+        setError(err.message);
+        setEnrichedData({
+          snapshot: {
+            name: company.name,
+            industry: company.industry,
+            location: { full: company.location || 'Unknown' }
+          }
+        });
+      }
+      // If we had cached data already showing, silently ignore the refresh failure
     }
   }
 
@@ -396,12 +408,12 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
 
         {/* Content */}
         <div ref={contentRef} className={`company-detail-content ${hasScroll ? 'has-scroll' : ''}`}>
-          {loading ? (
+          {loading && !enrichedData ? (
             <div className="loading-state">
               <Loader className="spinner" />
               <p>Enriching company data...</p>
             </div>
-          ) : error ? (
+          ) : error && !enrichedData ? (
             <div className="error-state">
               <AlertCircle className="error-icon" />
               <p>Enrichment encountered an issue</p>
@@ -608,17 +620,17 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                 </div>
               )}
 
-              {/* Section: Add People from Your Contacts */}
+              {/* Section: Add Your Contacts from All Leads/People */}
               <div className="detail-section add-from-people-section">
                 <div className="section-header-with-actions">
-                  <h3 className="section-title">Add from Your People</h3>
-                  <p className="section-subtitle">Search your contacts by name and link them to this company</p>
+                  <h3 className="section-title">Add Your Contacts</h3>
+                  <p className="section-subtitle">Search your existing leads & people by name and link them to this company</p>
                 </div>
 
                 {addPeopleSuccess && (
                   <div className="people-add-success">
                     <CheckCircle className="w-4 h-4" />
-                    <span>Contacts linked to {company.name} successfully!</span>
+                    <span>Contacts successfully linked to {company.name}!</span>
                   </div>
                 )}
 
@@ -628,7 +640,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                     <input
                       type="text"
                       className="people-search-input"
-                      placeholder="Search by name..."
+                      placeholder="Search all leads & people by name..."
                       value={peopleSearchQuery}
                       onChange={handlePeopleSearch}
                     />

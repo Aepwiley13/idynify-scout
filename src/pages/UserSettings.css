@@ -155,3 +155,117 @@
 .us-toggle--off .us-toggle-thumb {
   left: 3px;
 }
+
+/* Gmail row */
+.us-row--gmail {
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.us-row-icon--gmail {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.us-gmail-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.us-gmail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 20px;
+}
+
+.us-gmail-badge--connected {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+
+.us-gmail-badge--disconnected {
+  background: rgba(107, 114, 128, 0.12);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  color: #6b7280;
+}
+
+.us-gmail-error {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #f87171;
+  margin-top: 0.25rem;
+}
+
+.us-gmail-spinner {
+  color: #6b7280;
+}
+
+/* Gmail action buttons */
+.us-gmail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  padding-top: 0.125rem;
+}
+
+.us-gmail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.4rem 0.875rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.us-gmail-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.us-gmail-btn--connect {
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+}
+
+.us-gmail-btn--connect:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+}
+
+.us-gmail-btn--reconnect {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+}
+
+.us-gmail-btn--reconnect:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f9fafb;
+}
+
+.us-gmail-btn--disconnect {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  padding: 0.4rem 0.6rem;
+}
+
+.us-gmail-btn--disconnect:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}

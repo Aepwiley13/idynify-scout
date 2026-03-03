@@ -10,6 +10,7 @@
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -192,6 +193,11 @@ export const handler = async (event) => {
       }
     }
 
+    // Fetch and append Gmail signature (non-blocking — falls back to no signature)
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    const signature = await getGmailSignature(gmail);
+    const bodyWithSignature = appendSignature(body, signature);
+
     // Create email in RFC 2822 format
     const recipientName = toName || toEmail;
     const email = [
@@ -200,7 +206,7 @@ export const handler = async (event) => {
       'Content-Type: text/plain; charset=utf-8',
       'MIME-Version: 1.0',
       '',
-      body
+      bodyWithSignature
     ].join('\n');
 
     // Encode email in base64url format (required by Gmail API)
@@ -212,8 +218,6 @@ export const handler = async (event) => {
 
     // Send via Gmail API
     console.log('📤 Sending email via Gmail API...');
-
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     const result = await gmail.users.messages.send({
       userId: 'me',

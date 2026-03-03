@@ -68,6 +68,7 @@ import ImpersonationBanner from './components/ImpersonationBanner';
 import MainLayout from './components/layout/MainLayout';
 
 // Hunter Pages
+import HunterMain from './pages/Hunter/HunterMain';
 import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
 import CreateCampaign from './pages/Hunter/CreateCampaign';
 import CampaignDetail from './pages/Hunter/CampaignDetail';
@@ -463,12 +464,12 @@ function App() {
           }
         />
 
-        {/* Hunter Module - Outreach Execution */}
+        {/* Hunter Module — self-contained two-column shell (no MainLayout) */}
         <Route
           path="/hunter"
           element={
-            <ProtectedRoute withLayout={true}>
-              <HunterWeaponRoom />
+            <ProtectedRoute>
+              <HunterMain />
             </ProtectedRoute>
           }
         />

@@ -425,62 +425,102 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
             </div>
           ) : null}
 
-          {enrichedData && (
-            <>
-              {/* Section 1: Company Snapshot (Top Fold) */}
-              <div className="detail-section snapshot-section">
-                <h3 className="section-title">Company Snapshot</h3>
-                <div className="snapshot-grid">
-                  <div className="snapshot-item">
-                    <Briefcase className="snapshot-icon" />
-                    <div>
-                      <p className="snapshot-label">Industry</p>
-                      <p className="snapshot-value">{enrichedData.snapshot?.industry || 'Not available'}</p>
-                    </div>
-                  </div>
-
-                  <div className="snapshot-item">
-                    <Users className="snapshot-icon" />
-                    <div>
-                      <p className="snapshot-label">Employees</p>
-                      <p className="snapshot-value">
-                        {enrichedData.snapshot?.employee_count_range ||
-                         enrichedData.snapshot?.estimated_num_employees ||
-                         'Not available'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="snapshot-item">
-                    <DollarSign className="snapshot-icon" />
-                    <div>
-                      <p className="snapshot-label">Revenue</p>
-                      <p className="snapshot-value">
-                        {enrichedData.snapshot?.revenue_range ||
-                         enrichedData.snapshot?.annual_revenue ||
-                         'Not available'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="snapshot-item">
-                    <Calendar className="snapshot-icon" />
-                    <div>
-                      <p className="snapshot-label">Founded</p>
-                      <p className="snapshot-value">{enrichedData.snapshot?.founded_year || 'Not available'}</p>
-                    </div>
-                  </div>
-
-                  <div className="snapshot-item">
-                    <MapPin className="snapshot-icon" />
-                    <div>
-                      <p className="snapshot-label">Location</p>
-                      <p className="snapshot-value">{enrichedData.snapshot?.location?.full || 'Not available'}</p>
-                    </div>
-                  </div>
+          {/* Section 1: Company Snapshot — always visible, enrichedData fills in richer values */}
+          <div className="detail-section snapshot-section">
+            <h3 className="section-title">Company Snapshot</h3>
+            <div className="snapshot-grid">
+              <div className="snapshot-item">
+                <Briefcase className="snapshot-icon" />
+                <div>
+                  <p className="snapshot-label">Industry</p>
+                  <p className="snapshot-value">{enrichedData?.snapshot?.industry || company.industry || 'Not available'}</p>
                 </div>
               </div>
 
+              <div className="snapshot-item">
+                <Users className="snapshot-icon" />
+                <div>
+                  <p className="snapshot-label">Employees</p>
+                  <p className="snapshot-value">
+                    {enrichedData?.snapshot?.employee_count_range ||
+                     enrichedData?.snapshot?.estimated_num_employees ||
+                     company.employee_count ||
+                     company.company_size ||
+                     'Not available'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="snapshot-item">
+                <DollarSign className="snapshot-icon" />
+                <div>
+                  <p className="snapshot-label">Revenue</p>
+                  <p className="snapshot-value">
+                    {enrichedData?.snapshot?.revenue_range ||
+                     enrichedData?.snapshot?.annual_revenue ||
+                     company.revenue ||
+                     'Not available'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="snapshot-item">
+                <Calendar className="snapshot-icon" />
+                <div>
+                  <p className="snapshot-label">Founded</p>
+                  <p className="snapshot-value">{enrichedData?.snapshot?.founded_year || company.founded_year || 'Not available'}</p>
+                </div>
+              </div>
+
+              <div className="snapshot-item">
+                <MapPin className="snapshot-icon" />
+                <div>
+                  <p className="snapshot-label">Location</p>
+                  <p className="snapshot-value">{enrichedData?.snapshot?.location?.full || company.location || 'Not available'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Company Overview — shown whenever a description is available */}
+          {enrichedData?.snapshot?.description && (
+            <div className="detail-section">
+              <h3 className="section-title">Company Overview</h3>
+              <p className="company-overview-text">{enrichedData.snapshot.description}</p>
+            </div>
+          )}
+
+          {/* Links — always shown when URLs are available */}
+          {(enrichedData?.snapshot?.website_url || enrichedData?.dataQuality?.linkedin_url || company.website_url || company.linkedin_url) && (
+            <div className="detail-section">
+              <h3 className="section-title">Links</h3>
+              <div className="links-container">
+                {(enrichedData?.snapshot?.website_url || company.website_url) && (
+                  <button
+                    className="link-button website"
+                    onClick={() => handleOpenLink(enrichedData?.snapshot?.website_url || company.website_url)}
+                  >
+                    <Globe className="w-5 h-5" />
+                    <span>Visit Website</span>
+                    <ExternalLink className="w-4 h-4 ml-auto" />
+                  </button>
+                )}
+                {(enrichedData?.dataQuality?.linkedin_url || company.linkedin_url) && (
+                  <button
+                    className="link-button linkedin"
+                    onClick={() => handleOpenLink(enrichedData?.dataQuality?.linkedin_url || company.linkedin_url)}
+                  >
+                    <Linkedin className="w-5 h-5" />
+                    <span>View on LinkedIn</span>
+                    <ExternalLink className="w-4 h-4 ml-auto" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {enrichedData && (
+            <>
               {/* Section 2: Growth & Hiring Signals */}
               {enrichedData.growth && (enrichedData.growth.employee_growth_12mo || enrichedData.growth.job_postings_count > 0) && (
                 <div className="detail-section growth-section">
@@ -809,53 +849,25 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                 </div>
               )}
 
-              {/* Social Links */}
-              {(enrichedData.snapshot?.website_url || enrichedData.dataQuality?.linkedin_url || company.website_url || company.linkedin_url) && (
-                <div className="detail-section">
-                  <h3 className="section-title">Links</h3>
-                  <div className="links-container">
-                    {(enrichedData.snapshot?.website_url || company.website_url) && (
-                      <button
-                        className="link-button website"
-                        onClick={() => handleOpenLink(enrichedData.snapshot?.website_url || company.website_url)}
-                      >
-                        <Globe className="w-5 h-5" />
-                        <span>Visit Website</span>
-                        <ExternalLink className="w-4 h-4 ml-auto" />
-                      </button>
-                    )}
-                    {(enrichedData.dataQuality?.linkedin_url || company.linkedin_url) && (
-                      <button
-                        className="link-button linkedin"
-                        onClick={() => handleOpenLink(enrichedData.dataQuality?.linkedin_url || company.linkedin_url)}
-                      >
-                        <Linkedin className="w-5 h-5" />
-                        <span>View on LinkedIn</span>
-                        <ExternalLink className="w-4 h-4 ml-auto" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Contact Status & CTA */}
-              <div className="detail-section">
-                <div className="contact-status-card">
-                  <div className="status-header">
-                    <h3 className="section-title">Ready to Connect?</h3>
-                    {company.contact_count > 0 && (
-                      <span className="contact-badge-inline">
-                        {company.contact_count} contact{company.contact_count !== 1 ? 's' : ''} found
-                      </span>
-                    )}
-                  </div>
-                  <button className="find-contacts-btn" onClick={onClose}>
-                    {company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}
-                  </button>
-                </div>
-              </div>
             </>
           )}
+
+          {/* Contact Status & CTA — always visible */}
+          <div className="detail-section">
+            <div className="contact-status-card">
+              <div className="status-header">
+                <h3 className="section-title">Ready to Connect?</h3>
+                {company.contact_count > 0 && (
+                  <span className="contact-badge-inline">
+                    {company.contact_count} contact{company.contact_count !== 1 ? 's' : ''} found
+                  </span>
+                )}
+              </div>
+              <button className="find-contacts-btn" onClick={onClose}>
+                {company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

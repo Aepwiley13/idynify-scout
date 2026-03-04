@@ -281,7 +281,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
-                    <div style={{ fontSize: 10, color: T.textFaint }}>{company.industry} · {company.founded_year ? `Founded ${company.founded_year}` : ''}</div>
+                    <div style={{ fontSize: 10, color: T.textFaint }}>{company.industry || company.apolloEnrichment?.snapshot?.industry} · {(company.founded_year || company.apolloEnrichment?.snapshot?.founded_year) ? `Founded ${company.founded_year || company.apolloEnrichment?.snapshot?.founded_year}` : ''}</div>
                   </div>
                   {company.contact_count > 0 && (
                     <span style={{ fontSize: 9, background: `${STATUS.green}15`, color: STATUS.green, borderRadius: 7, padding: '2px 7px' }}>
@@ -482,7 +482,8 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
     || `${current?.name} is on your hunt list — find the right contact to start engaging.`;
   const hqLocation = current?.hq_location
     || (current?.headquarters_city ? `${current.headquarters_city}${current.headquarters_state ? ', ' + current.headquarters_state : ''}` : null)
-    || current?.headquarters || current?.location || current?.city || null;
+    || current?.headquarters || current?.location || current?.city
+    || current?.apolloEnrichment?.snapshot?.location?.full || null;
   const CARD_H = 'clamp(390px, calc(100vh - 300px), 590px)';
 
   // ── Dot position indicator ────────────────────────────────────────────────────
@@ -619,16 +620,16 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{current.name}</div>
                 <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
-                  {(current.industry || '').toUpperCase()}
+                  {(current.industry || current.apolloEnrichment?.snapshot?.industry || '').toUpperCase()}
                 </div>
               </div>
 
               {/* Stats grid — bordered cells like DailyLeads */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
                 {[
-                  ['EMPLOYEES', current.employee_count || current.company_size || 'N/A'],
-                  ['FOUNDED',   current.founded_year || 'N/A'],
-                  ['REVENUE',   current.revenue || 'N/A'],
+                  ['EMPLOYEES', current.employee_count || current.apolloEnrichment?.snapshot?.estimated_num_employees || current.company_size || 'N/A'],
+                  ['FOUNDED',   current.founded_year || current.apolloEnrichment?.snapshot?.founded_year || 'N/A'],
+                  ['REVENUE',   current.revenue || current.apolloEnrichment?.snapshot?.revenue_range || 'N/A'],
                   ['HQ',        hqLocation || '—'],
                 ].map(([l, v]) => (
                   <div key={l} style={{ padding: '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
@@ -731,7 +732,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
-            <div style={{ fontSize: 10, color: T.textMuted }}>{company.industry}</div>
+            <div style={{ fontSize: 10, color: T.textMuted }}>{company.industry || company.apolloEnrichment?.snapshot?.industry}</div>
           </div>
           {company.contact_count > 0 && (
             <div style={{ fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
@@ -746,10 +747,10 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
           {[
-            ['EMPLOYEES', company.employee_count || company.company_size || 'N/A'],
-            ['FOUNDED', company.founded_year || 'N/A'],
-            ['INDUSTRY', company.industry || 'N/A'],
-            ['LOCATION', company.location || company.city || 'N/A'],
+            ['EMPLOYEES', company.employee_count || company.apolloEnrichment?.snapshot?.estimated_num_employees || company.company_size || 'N/A'],
+            ['FOUNDED', company.founded_year || company.apolloEnrichment?.snapshot?.founded_year || 'N/A'],
+            ['INDUSTRY', company.industry || company.apolloEnrichment?.snapshot?.industry || 'N/A'],
+            ['LOCATION', company.location || company.city || company.apolloEnrichment?.snapshot?.location?.full || 'N/A'],
           ].map(([l, v]) => (
             <div key={l}>
               <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{l}</div>

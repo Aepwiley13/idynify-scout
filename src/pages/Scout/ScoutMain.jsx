@@ -165,9 +165,10 @@ const NAV_SECTIONS = [
       { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
     ],
   },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter', items: [] },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon',  items: [] },
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: null,      items: [], locked: true },
+  { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
+  { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
+  { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: null,      items: [], locked: true },
+  { id: 'allpeople', label: 'PEOPLE',  Icon: Users,     directTo: { section: 'scout', item: 'all' }, items: [] },
 ];
 
 // ─── ScoutShellInner ─────────────────────────────────────────────────────────
@@ -228,6 +229,14 @@ function ScoutShellInner({ user }) {
   const handleSectionClick = (sec) => {
     if (sec.locked) return;
     if (sec.route) { navigate(sec.route); return; }
+    if (sec.directTo) {
+      setDrillCompanyId(null);
+      setActiveSection(sec.directTo.section);
+      setActiveItem(sec.directTo.item);
+      const tab = ITEM_TO_TAB[sec.directTo.item] || 'daily-leads';
+      setSearchParams({ tab }, { replace: true });
+      return;
+    }
     setDrillCompanyId(null);
     setActiveSection(sec.id);
     setActiveItem(sec.items[0]?.id || '');
@@ -417,7 +426,9 @@ function ScoutShellInner({ user }) {
         </div>
 
         {NAV_SECTIONS.map(sec => {
-          const active = activeSection === sec.id;
+          const active = sec.directTo
+            ? (activeSection === sec.directTo.section && activeItem === sec.directTo.item)
+            : activeSection === sec.id;
           return (
             <div
               key={sec.id}

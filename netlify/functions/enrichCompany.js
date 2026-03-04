@@ -16,11 +16,11 @@ export const handler = async (event) => {
   try {
     const { userId, authToken, domain, organizationId } = JSON.parse(event.body);
 
-    if (!userId || !authToken || !domain) {
-      throw new Error('Missing required parameters');
+    if (!userId || !authToken || (!domain && !organizationId)) {
+      throw new Error('Missing required parameters: need domain or organizationId');
     }
 
-    console.log('🔄 Enriching company:', domain);
+    console.log('🔄 Enriching company:', domain || `(by org ID: ${organizationId})`);
 
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
@@ -55,8 +55,9 @@ export const handler = async (event) => {
     console.log('✅ Auth token verified');
 
     // Step 1: Enrich company data with Apollo Organizations API
+    // Prefer domain lookup; fall back to org ID lookup for swipe-deck companies
     console.log('📊 Calling Apollo Organizations Enrich API...');
-    const orgBody = { domain: domain };
+    const orgBody = domain ? { domain } : { id: organizationId };
 
     const orgResponse = await fetch(APOLLO_ENDPOINTS.ORGANIZATIONS_ENRICH, {
       method: 'POST',

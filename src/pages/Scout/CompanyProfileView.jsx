@@ -147,7 +147,9 @@ export default function CompanyProfileView({ companyId, onBack }) {
       }
 
       const authToken = await user.getIdToken();
-      const domain = companyData.domain || extractDomain(companyData.website_url);
+      const domain = companyData.domain || extractDomain(companyData.website_url) || null;
+      // apollo_organization_id is stored by the swipe-deck pipeline; apollo_id by the contact-search pipeline
+      const organizationId = companyData.apollo_id || companyData.apollo_organization_id || null;
 
       const res = await fetch('/.netlify/functions/enrichCompany', {
         method: 'POST',
@@ -155,7 +157,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
         body: JSON.stringify({
           userId: user.uid, authToken,
           domain,
-          organizationId: companyData.apollo_id || null,
+          organizationId,
         }),
       });
       const result = await res.json();

@@ -199,7 +199,12 @@ export default function Signup() {
           <div className="bg-black/60 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-cyan-500/30">
             {/* Logo/Header */}
             <div className="text-center mb-8">
-              <div className="text-6xl mb-4" style={{ animation: 'floatBear 6s ease-in-out infinite' }}>🐻</div>
+              <img
+                src="/barry-bear.jpg"
+                alt="Barry the Bear"
+                className="w-32 h-32 mx-auto mb-4 rounded-full border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/30"
+                style={{ animation: 'floatBear 6s ease-in-out infinite' }}
+              />
               <h1 className="text-5xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent mb-2">
                 Barry AI
               </h1>

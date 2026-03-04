@@ -20,6 +20,7 @@ import RECONModulePage from './pages/RECONModulePage';
 import RECONSectionPage from './pages/RECONSectionPage';
 
 // New RECON Platform Pages
+import ReconMain from './pages/Recon/ReconMain';
 import ReconOverview from './pages/Recon/ReconOverview';
 import ReconModulePage from './pages/Recon/ReconModulePage';
 import ReconSectionEditor from './pages/Recon/ReconSectionEditor';
@@ -342,47 +343,20 @@ function App() {
           }
         />
 
-        {/* RECON Platform — Top-Level Pillar */}
+        {/* RECON Platform — self-contained shell (no MainLayout) */}
         <Route
           path="/recon"
           element={
-            <ProtectedRoute withLayout={true}>
-              <ReconErrorBoundary>
-                <ReconOverview />
-              </ReconErrorBoundary>
+            <ProtectedRoute>
+              <ReconMain />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/recon/barry-training"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <ReconErrorBoundary>
-                <BarryTraining />
-              </ReconErrorBoundary>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/recon/section/:sectionId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <ReconErrorBoundary>
-                <ReconSectionEditor />
-              </ReconErrorBoundary>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/recon/:moduleId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <ReconErrorBoundary>
-                <ReconModulePage />
-              </ReconErrorBoundary>
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
+          <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
+          <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
+          <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
+        </Route>
 
         {/* People — top-level canonical hub, all contacts, context-aware actions */}
         <Route

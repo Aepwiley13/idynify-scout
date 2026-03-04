@@ -4,7 +4,7 @@
  * Renders inside the ScoutMain shell (no separate page/layout).
  * Shows company info, decision makers, saved contacts, and title-based contact search.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
   setDoc, updateDoc, arrayUnion,
@@ -15,12 +15,13 @@ import {
   ArrowLeft, Building2, Users, Globe, Linkedin, MapPin, Calendar,
   DollarSign, Briefcase, Target, Search, X, UserPlus, CheckCircle,
   Award, Archive, RotateCcw, RefreshCw, ChevronDown, ChevronUp,
-  FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft,
+  FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft, Code, User,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import ContactProfile from './ContactProfile';
+import { searchPeople, updatePerson } from '../../services/peopleService';
 
 export default function CompanyProfileView({ companyId, onBack }) {
   const T = useT();
@@ -59,6 +60,15 @@ export default function CompanyProfileView({ companyId, onBack }) {
     const val = sessionStorage.getItem('sc_fromSwipe');
     return val !== null ? parseInt(val, 10) : null;
   });
+
+  // ── Add Your Contacts (people search) state ─────────────────────────────────
+  const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
+  const [peopleResults, setPeopleResults] = useState([]);
+  const [searchingPeople, setSearchingPeople] = useState(false);
+  const [selectedPeopleToAdd, setSelectedPeopleToAdd] = useState([]);
+  const [addingPeopleToCompany, setAddingPeopleToCompany] = useState(false);
+  const [addPeopleSuccess, setAddPeopleSuccess] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!companyId) return;
@@ -356,6 +366,59 @@ export default function CompanyProfileView({ companyId, onBack }) {
     }
   }
 
+  // ── Add Your Contacts (people search) ──────────────────────────────────────
+  function handlePeopleSearch(e) {
+    const q = e.target.value;
+    setPeopleSearchQuery(q);
+    clearTimeout(searchTimeoutRef.current);
+    if (q.trim().length < 2) { setPeopleResults([]); return; }
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearchingPeople(true);
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const results = await searchPeople(user.uid, q);
+        setPeopleResults(results);
+      } finally {
+        setSearchingPeople(false);
+      }
+    }, 300);
+  }
+
+  function handleTogglePersonSelection(person) {
+    setSelectedPeopleToAdd(prev => {
+      const isSelected = prev.some(p => p.id === person.id);
+      return isSelected ? prev.filter(p => p.id !== person.id) : [...prev, person];
+    });
+  }
+
+  async function handleAddPeopleToCompany() {
+    if (!selectedPeopleToAdd.length) return;
+    setAddingPeopleToCompany(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      for (const person of selectedPeopleToAdd) {
+        await updatePerson(user.uid, person.id, {
+          company_id: companyId, company_name: company.name,
+          company_industry: company.industry || null, company: company.name,
+        });
+      }
+      const companyRef = doc(db, 'users', user.uid, 'companies', companyId);
+      const companyDoc = await getDoc(companyRef);
+      await updateDoc(companyRef, { contact_count: (companyDoc.data()?.contact_count || 0) + selectedPeopleToAdd.length });
+      setAddPeopleSuccess(true);
+      setSelectedPeopleToAdd([]);
+      setPeopleSearchQuery('');
+      setPeopleResults([]);
+      setTimeout(() => setAddPeopleSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to add people to company:', err);
+    } finally {
+      setAddingPeopleToCompany(false);
+    }
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
   function extractDomain(url) {
     if (!url) return null;
@@ -420,6 +483,14 @@ export default function CompanyProfileView({ companyId, onBack }) {
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {enriching && <Loader size={14} color={T.textFaint} style={{ animation: 'spin 1s linear infinite' }} />}
+          <button
+            onClick={() => enrichCompany(company, true)}
+            disabled={enriching}
+            title="Refresh company data"
+            style={{ padding: '5px 10px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+          >
+            <RefreshCw size={11} style={enriching ? { animation: 'spin 1s linear infinite' } : {}} />
+          </button>
           {company.status === 'archived' ? (
             <button onClick={handleRestore} disabled={archiving}
               style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -554,6 +625,47 @@ export default function CompanyProfileView({ companyId, onBack }) {
             </div>
           )}
         </div>
+
+        {/* ── Tech Stack ── */}
+        {enrichedData?.techStack?.length > 0 && (
+          <Section title={`Tech Stack (${enrichedData.techStack.length})`} icon={<Code size={14} color={BRAND.cyan} />} T={T}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8 }}>
+              {enrichedData.techStack.map((tech, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border}` }}>
+                  <Code size={13} color={BRAND.cyan} style={{ flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tech.name}</div>
+                    {tech.category && <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{tech.category}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Data Confidence ── */}
+        {enrichedData?.dataQuality && (
+          <Section title="Data Confidence" icon={<Award size={14} color={STATUS.green} />} T={T}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
+                <span style={{ fontSize: 12, color: T.textMuted }}>Last Updated</span>
+                <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>
+                  {new Date(enrichedData._raw?.enrichedAt || Date.now()).toLocaleDateString()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
+                <span style={{ fontSize: 12, color: T.textMuted }}>Status</span>
+                <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 6, background: `${STATUS.green}15`, color: STATUS.green, border: `1px solid ${STATUS.green}30`, fontWeight: 600 }}>
+                  {enrichedData.dataQuality.organization_status || 'Active'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+                <span style={{ fontSize: 12, color: T.textMuted }}>Source</span>
+                <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>Verified Data</span>
+              </div>
+            </div>
+          </Section>
+        )}
 
         {/* ── Saved Contacts ── */}
         {approvedContacts.length > 0 && (
@@ -776,6 +888,89 @@ export default function CompanyProfileView({ companyId, onBack }) {
             </div>
           </Section>
         )}
+
+        {/* ── Add Your Contacts ── */}
+        <Section title="Add Your Contacts" subtitle="Search your existing leads & people by name and link them to this company" icon={<UserPlus size={14} color={BRAND.pink} />} T={T}>
+          {addPeopleSuccess && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 8, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}30`, color: STATUS.green, fontSize: 12, marginBottom: 10 }}>
+              <CheckCircle size={13} />Contacts successfully linked to {company.name}!
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: T.input, border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 11px', marginBottom: 10 }}>
+            <Search size={13} color={T.textFaint} />
+            <input
+              type="text"
+              value={peopleSearchQuery}
+              onChange={handlePeopleSearch}
+              placeholder="Search all leads & people by name..."
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: T.text }}
+            />
+            {peopleSearchQuery && (
+              <button onClick={() => { setPeopleSearchQuery(''); setPeopleResults([]); setSelectedPeopleToAdd([]); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, display: 'flex', padding: 0 }}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {searchingPeople && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', color: T.textFaint, fontSize: 12 }}>
+              <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Searching…
+            </div>
+          )}
+
+          {!searchingPeople && peopleResults.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              {peopleResults.map(person => {
+                const isSelected = selectedPeopleToAdd.some(p => p.id === person.id);
+                const isAlreadyLinked = person.company_id === companyId;
+                return (
+                  <div
+                    key={person.id}
+                    onClick={() => !isAlreadyLinked && handleTogglePersonSelection(person)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9,
+                      background: isSelected ? `${BRAND.pink}10` : T.surface,
+                      border: `1px solid ${isSelected ? BRAND.pink + '40' : T.border}`,
+                      cursor: isAlreadyLinked ? 'default' : 'pointer', opacity: isAlreadyLinked ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: T.border, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                      {person.photo_url
+                        ? <img src={person.photo_url} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <User size={15} color={T.textFaint} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{person.name}</div>
+                      <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {[person.title, person.company_name || person.company].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    {isAlreadyLinked
+                      ? <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 5, background: `${STATUS.green}15`, color: STATUS.green, flexShrink: 0 }}>Already linked</span>
+                      : <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${isSelected ? BRAND.pink : T.border}`, background: isSelected ? BRAND.pink : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {isSelected && <CheckCircle size={11} color="#fff" />}
+                        </div>
+                    }
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!searchingPeople && peopleSearchQuery.length >= 2 && peopleResults.length === 0 && (
+            <div style={{ fontSize: 12, color: T.textFaint, padding: '8px 0' }}>No contacts found for &ldquo;{peopleSearchQuery}&rdquo;</div>
+          )}
+
+          {selectedPeopleToAdd.length > 0 && (
+            <button onClick={handleAddPeopleToCompany} disabled={addingPeopleToCompany}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              {addingPeopleToCompany
+                ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Adding…</>
+                : <><UserPlus size={13} />Add {selectedPeopleToAdd.length} to {company.name}</>}
+            </button>
+          )}
+        </Section>
 
       </div>
 

@@ -19,7 +19,7 @@ import {
   Radar, Crosshair, Eye, Target,
   LayoutDashboard, Zap, Archive, BarChart3, Users,
   Palette, Check, ChevronLeft, ChevronRight,
-  Mail, CheckCircle, Settings as SettingsIcon,
+  Mail, CheckCircle, Settings as SettingsIcon, Home,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -537,8 +537,27 @@ function HunterShellInner({ user }) {
           );
         })}
 
-        {/* Bottom: Settings + Theme + Barry */}
+        {/* Bottom: Mission Control + Settings + Theme + Barry */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center' }}>
+          {/* Mission Control rail icon */}
+          <div
+            onClick={() => navigate('/mission-control-v2')}
+            title="Mission Control"
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
+              background: 'transparent',
+              border: '1px solid transparent',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${BRAND.pink}40`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
+          >
+            <Home size={14} color={T.textFaint} />
+            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: T.textFaint }}>
+              MC
+            </span>
+          </div>
           {/* Settings rail icon */}
           <div
             onClick={() => navigate('/settings')}

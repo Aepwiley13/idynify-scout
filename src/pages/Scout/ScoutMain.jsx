@@ -15,7 +15,7 @@ import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
   Zap, Building2, Users, Plus, Search,
-  Palette, Check, Settings, ChevronLeft, ChevronRight,
+  Palette, Check, Settings, ChevronLeft, ChevronRight, Home,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -393,17 +393,24 @@ function ScoutShellInner({ user }) {
         paddingTop: 13, paddingBottom: 13, gap: 3,
         position: 'relative', zIndex: 2, transition: 'background 0.25s',
       }}>
-        {/* Logo mark */}
-        <div style={{
-          width: 34, height: 34, borderRadius: 9,
-          background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 17, marginBottom: 16,
-          boxShadow: `0 4px 18px ${BRAND.pink}50`, flexShrink: 0, overflow: 'hidden',
-        }}>
+        {/* Logo mark → Mission Control button */}
+        <div
+          onClick={() => navigate('/mission-control-v2')}
+          title="Mission Control"
+          style={{
+            width: 34, height: 34, borderRadius: 9,
+            background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 17, marginBottom: 16,
+            boxShadow: `0 4px 18px ${BRAND.pink}50`, flexShrink: 0, overflow: 'hidden',
+            cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = `0 6px 22px ${BRAND.pink}70`; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = `0 4px 18px ${BRAND.pink}50`; }}
+        >
           <img
             src={ASSETS.logoMark}
-            alt="Idynify"
+            alt="Mission Control"
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
           />
@@ -436,8 +443,27 @@ function ScoutShellInner({ user }) {
           );
         })}
 
-        {/* Bottom: Settings + Theme + Barry */}
+        {/* Bottom: Mission Control + Settings + Theme + Barry */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center' }}>
+          {/* Mission Control rail icon */}
+          <div
+            onClick={() => navigate('/mission-control-v2')}
+            title="Mission Control"
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
+              background: 'transparent',
+              border: '1px solid transparent',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${BRAND.pink}40`; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
+          >
+            <Home size={14} color={T.textFaint} />
+            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: T.textFaint }}>
+              MC
+            </span>
+          </div>
           {/* Settings rail icon */}
           <div
             onClick={() => navigate('/settings')}

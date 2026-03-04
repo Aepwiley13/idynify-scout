@@ -480,7 +480,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
-            <div style={{ fontSize: 10, color: T.textFaint }}>{company.industry}</div>
+            <div style={{ fontSize: 10, color: T.textFaint }}>{snap.industry || company.industry}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -551,11 +551,11 @@ export default function CompanyProfileView({ companyId, onBack }) {
           {/* Stats grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 0 }}>
             {[
-              ['Employees', company.employee_count || company.company_size || 'N/A', Users],
-              ['Founded', company.founded_year || snap.founded_year || 'N/A', Calendar],
-              ['Location', company.location || snap.location?.full || 'N/A', MapPin],
-              ['Industry', company.industry || 'N/A', Briefcase],
-              ...(company.revenue || snap.annual_revenue ? [['Revenue', company.revenue || snap.annual_revenue, DollarSign]] : []),
+              ['Employees', snap.estimated_num_employees || company.employee_count || company.company_size || 'N/A', Users],
+              ['Founded', snap.founded_year || company.founded_year || 'N/A', Calendar],
+              ['Location', snap.location?.full || company.location || 'N/A', MapPin],
+              ['Industry', snap.industry || company.industry || 'N/A', Briefcase],
+              ...(snap.annual_revenue || snap.revenue_range || company.revenue ? [['Revenue', snap.revenue_range || snap.annual_revenue || company.revenue, DollarSign]] : []),
             ].map(([label, value, Icon]) => (
               <div key={label} style={{ padding: '12px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
@@ -590,7 +590,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
           </div>
 
           {/* Collapsible overview — always shown */}
-          <div style={{ borderBottom: (company.industry || snap.keywords?.length > 0) ? `1px solid ${T.border}` : 'none' }}>
+          <div style={{ borderBottom: (snap.industry || company.industry || snap.keywords?.length > 0) ? `1px solid ${T.border}` : 'none' }}>
             <button onClick={() => setShowOverview(v => !v)}
               style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileText size={12} />Company Overview</span>
@@ -609,7 +609,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
           </div>
 
           {/* Collapsible keywords — shown when industry OR keywords are present */}
-          {(company.industry || snap.keywords?.length > 0) && (
+          {(snap.industry || company.industry || snap.keywords?.length > 0) && (
             <div>
               <button onClick={() => setShowKeywords(v => !v)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
@@ -618,7 +618,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
               </button>
               {showKeywords && (
                 <div style={{ padding: '0 14px 12px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {company.industry && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: `${BRAND.pink}15`, color: BRAND.pink, border: `1px solid ${BRAND.pink}30` }}>{company.industry}</span>}
+                  {(snap.industry || company.industry) && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: `${BRAND.pink}15`, color: BRAND.pink, border: `1px solid ${BRAND.pink}30` }}>{snap.industry || company.industry}</span>}
                   {snap.keywords?.map((kw, i) => (
                     <span key={i} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: T.surface, color: T.textMuted, border: `1px solid ${T.border}` }}>{kw}</span>
                   ))}

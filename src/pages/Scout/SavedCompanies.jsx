@@ -281,7 +281,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
-                    <div style={{ fontSize: 10, color: T.textFaint }}>{company.industry || company.apolloEnrichment?.snapshot?.industry} · {(company.founded_year || company.apolloEnrichment?.snapshot?.founded_year) ? `Founded ${company.founded_year || company.apolloEnrichment?.snapshot?.founded_year}` : ''}</div>
+                    <div style={{ fontSize: 10, color: T.textFaint }}>{company.apolloEnrichment?.snapshot?.industry || company.industry} · {(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year) ? `Founded ${company.apolloEnrichment?.snapshot?.founded_year || company.founded_year}` : ''}</div>
                   </div>
                   {company.contact_count > 0 && (
                     <span style={{ fontSize: 9, background: `${STATUS.green}15`, color: STATUS.green, borderRadius: 7, padding: '2px 7px' }}>
@@ -732,7 +732,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
-            <div style={{ fontSize: 10, color: T.textMuted }}>{company.industry || company.apolloEnrichment?.snapshot?.industry}</div>
+            <div style={{ fontSize: 10, color: T.textMuted }}>{company.apolloEnrichment?.snapshot?.industry || company.industry}</div>
           </div>
           {company.contact_count > 0 && (
             <div style={{ fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
@@ -747,10 +747,10 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
           {[
-            ['EMPLOYEES', company.employee_count || company.apolloEnrichment?.snapshot?.estimated_num_employees || company.company_size || 'N/A'],
-            ['FOUNDED', company.founded_year || company.apolloEnrichment?.snapshot?.founded_year || 'N/A'],
-            ['INDUSTRY', company.industry || company.apolloEnrichment?.snapshot?.industry || 'N/A'],
-            ['LOCATION', company.location || company.city || company.apolloEnrichment?.snapshot?.location?.full || 'N/A'],
+            ['EMPLOYEES', company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size || 'N/A'],
+            ['FOUNDED', company.apolloEnrichment?.snapshot?.founded_year || company.founded_year || 'N/A'],
+            ['INDUSTRY', company.apolloEnrichment?.snapshot?.industry || company.industry || 'N/A'],
+            ['LOCATION', company.apolloEnrichment?.snapshot?.location?.full || company.location || company.city || 'N/A'],
           ].map(([l, v]) => (
             <div key={l}>
               <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{l}</div>

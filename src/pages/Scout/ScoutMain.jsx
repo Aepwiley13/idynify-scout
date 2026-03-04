@@ -163,7 +163,6 @@ const NAV_SECTIONS = [
       { id: 'scoutplus',   label: 'Scout+',           Icon: Plus,     desc: 'Add contacts'       },
       { id: 'comsearch',   label: 'Company Search',   Icon: Search,   desc: 'Find companies'     },
       { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
-      { id: 'settings',    label: 'Settings',          Icon: Settings, desc: 'App settings', route: '/settings' },
     ],
   },
   { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter', items: [] },
@@ -333,24 +332,19 @@ function ScoutShellInner({ user }) {
           padding: '0 6px',
         }}>
           {section?.items.map(it => {
-            const isSettingsLink = it.id === 'settings';
-            const active = isSettingsLink
-              ? location.pathname === '/settings'
-              : activeItem === it.id;
-            const activeColor = isSettingsLink ? SETTINGS_ORANGE : BRAND.pink;
+            const active = activeItem === it.id;
             return (
               <div
                 key={it.id}
-                onClick={() => it.route ? navigate(it.route) : switchItem(it.id)}
+                onClick={() => switchItem(it.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? activeColor : 'transparent'}`,
-                  color: active ? activeColor : (isSettingsLink ? '#d97706' : T.textMuted),
+                  borderBottom: `2px solid ${active ? BRAND.pink : 'transparent'}`,
+                  color: active ? BRAND.pink : T.textMuted,
                   fontSize: 12, fontWeight: active ? 600 : 400,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                   transition: 'all 0.12s',
-                  textShadow: (isSettingsLink && active) ? `0 0 8px rgba(250,170,32,0.55)` : 'none',
                 }}
               >
                 <it.Icon size={12} />
@@ -442,8 +436,28 @@ function ScoutShellInner({ user }) {
           );
         })}
 
-        {/* Bottom: Theme + Barry */}
+        {/* Bottom: Settings + Theme + Barry */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center' }}>
+          {/* Settings rail icon */}
+          <div
+            onClick={() => navigate('/settings')}
+            title="SETTINGS"
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
+              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : 'transparent',
+              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : 'transparent'}`,
+              boxShadow: location.pathname === '/settings' ? `0 0 12px rgba(250,170,32,0.4)` : 'none',
+            }}
+            onMouseEnter={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid rgba(250,170,32,0.3)`; } }}
+            onMouseLeave={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; } }}
+          >
+            <Settings size={14} color={location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint} />
+            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint }}>
+              SET
+            </span>
+          </div>
           <ThemePicker />
           <div title="Barry AI" style={{ cursor: 'pointer' }}>
             <BarryAvatar size={34} style={{ boxShadow: `0 0 14px ${BRAND.cyan}50` }} />
@@ -466,7 +480,7 @@ function ScoutShellInner({ user }) {
               <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, marginBottom: 1 }}>
                 {section?.label}
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{section?.items.filter(i => !i.route).length} modules</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>{section?.items.length} modules</div>
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('scout_subnav_collapsed', 'true'); }}
@@ -479,38 +493,26 @@ function ScoutShellInner({ user }) {
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
             {section?.items.map(it => {
-              const isSettingsLink = it.id === 'settings';
-              const active = isSettingsLink
-                ? location.pathname === '/settings'
-                : activeItem === it.id;
-              const activeColor = isSettingsLink ? SETTINGS_ORANGE : BRAND.pink;
-              const itemBg = active
-                ? (isSettingsLink ? 'rgba(250,170,32,0.1)' : T.accentBg)
-                : 'transparent';
+              const active = activeItem === it.id;
               return (
                 <div
                   key={it.id}
-                  onClick={() => it.route ? navigate(it.route) : switchItem(it.id)}
+                  onClick={() => switchItem(it.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                    background: itemBg,
-                    borderLeft: `2px solid ${active ? activeColor : 'transparent'}`,
+                    background: active ? T.accentBg : 'transparent',
+                    borderLeft: `2px solid ${active ? BRAND.pink : 'transparent'}`,
                     transition: 'all 0.12s',
-                    boxShadow: (isSettingsLink && active) ? '0 0 10px rgba(250,170,32,0.12)' : 'none',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = isSettingsLink ? 'rgba(250,170,32,0.06)' : T.surface; }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <it.Icon
-                    size={13}
-                    color={active ? activeColor : (isSettingsLink ? '#d97706' : T.textFaint)}
-                    style={{ flexShrink: 0 }}
-                  />
+                  <it.Icon size={13} color={active ? BRAND.pink : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? activeColor : (isSettingsLink ? '#d97706' : T.textMuted),
+                      color: active ? BRAND.pink : T.textMuted,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.label}

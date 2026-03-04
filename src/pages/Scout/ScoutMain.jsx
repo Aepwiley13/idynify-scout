@@ -275,6 +275,15 @@ function ScoutShellInner({ user }) {
   const userInitials = (user?.email || 'AW').slice(0, 2).toUpperCase();
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
+  // Bottom nav items: the 5 most navigable scout sub-items (Scout+ is a CTA, not a nav target)
+  const MOBILE_BOTTOM_NAV = [
+    { id: 'daily',       label: 'Daily',   Icon: Zap       },
+    { id: 'saved',       label: 'Saved',   Icon: Building2 },
+    { id: 'all',         label: 'People',  Icon: Users     },
+    { id: 'comsearch',   label: 'Search',  Icon: Search    },
+    { id: 'icpsettings', label: 'ICP',     Icon: Settings  },
+  ];
+
   if (isMobile) {
     return (
       <div style={{
@@ -313,10 +322,12 @@ function ScoutShellInner({ user }) {
               onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
             />
           </div>
-          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            {section?.items.find(i => i.id === activeItem)?.label || 'Scout'}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, lineHeight: 1 }}>SCOUT</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.text, lineHeight: 1.2, marginTop: 1 }}>
+              {section?.items.find(i => i.id === activeItem)?.label || 'Daily Discoveries'}
+            </div>
           </div>
-          {/* Settings shortcut — top-right, always reachable */}
           <div
             onClick={() => navigate('/settings')}
             title="Settings"
@@ -334,38 +345,49 @@ function ScoutShellInner({ user }) {
           <ThemePicker />
         </div>
 
-        {/* ── Mobile horizontal nav ── */}
-        <div style={{
-          display: 'flex', overflowX: 'auto', flexShrink: 0,
-          background: T.navBg, borderBottom: `1px solid ${T.border}`,
-          padding: '0 6px',
-        }}>
-          {section?.items.map(it => {
-            const active = activeItem === it.id;
-            return (
-              <div
-                key={it.id}
-                onClick={() => switchItem(it.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? BRAND.pink : 'transparent'}`,
-                  color: active ? BRAND.pink : T.textMuted,
-                  fontSize: 12, fontWeight: active ? 600 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'all 0.12s',
-                }}
-              >
-                <it.Icon size={12} />
-                {it.label}
-              </div>
-            );
-          })}
-        </div>
-
         {/* ── Mobile main content ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
           {renderMain()}
+        </div>
+
+        {/* ── Mobile bottom nav ── */}
+        <div style={{
+          display: 'flex', flexShrink: 0,
+          background: T.railBg, borderTop: `1px solid ${T.border}`,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}>
+          {MOBILE_BOTTOM_NAV.map(it => {
+            const active = activeItem === it.id;
+            return (
+              <button
+                key={it.id}
+                onClick={() => switchItem(it.id)}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: 3, padding: '10px 4px',
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', minHeight: 56,
+                  color: active ? BRAND.pink : T.textFaint,
+                  transition: 'color 0.15s',
+                  WebkitTapHighlightColor: 'transparent',
+                  position: 'relative',
+                }}
+              >
+                {active && (
+                  <div style={{
+                    position: 'absolute', top: 0, left: '20%', right: '20%', height: 2,
+                    background: BRAND.pink, borderRadius: '0 0 2px 2px',
+                    boxShadow: `0 0 8px ${BRAND.pink}`,
+                  }} />
+                )}
+                <it.Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, letterSpacing: 0.3, lineHeight: 1 }}>
+                  {it.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     );

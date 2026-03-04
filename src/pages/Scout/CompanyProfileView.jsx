@@ -51,7 +51,6 @@ export default function CompanyProfileView({ companyId, onBack }) {
   const [savingDMs, setSavingDMs] = useState(false);
 
   // ── UI state ───────────────────────────────────────────────────────────────
-  const [showOverview, setShowOverview] = useState(true);
   const [showKeywords, setShowKeywords] = useState(true);
   const [archiving, setArchiving] = useState(false);
   const [engageContactId, setEngageContactId] = useState(null);
@@ -72,6 +71,9 @@ export default function CompanyProfileView({ companyId, onBack }) {
 
   useEffect(() => {
     if (!companyId) return;
+    // Reset UI state when switching companies so nothing stays hidden
+    setShowKeywords(true);
+    setEnrichedData(null);
     loadCompany();
     loadContacts();
   }, [companyId]);
@@ -589,23 +591,20 @@ export default function CompanyProfileView({ companyId, onBack }) {
             )}
           </div>
 
-          {/* Collapsible overview — always shown */}
-          <div style={{ borderBottom: (snap.industry || company.industry || snap.keywords?.length > 0) ? `1px solid ${T.border}` : 'none' }}>
-            <button onClick={() => setShowOverview(v => !v)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileText size={12} />Company Overview</span>
-              {showOverview ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-            {showOverview && (
-              <div style={{ padding: '0 14px 12px', fontSize: 12, color: T.textMuted, lineHeight: 1.6 }}>
-                {snap.description
-                  ? snap.description
-                  : enriching
-                    ? <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Loading overview…</span>
-                    : <span style={{ color: T.textFaint, fontStyle: 'italic' }}>No overview available.</span>
-                }
-              </div>
-            )}
+          {/* Company Overview — always visible, never collapsed */}
+          <div style={{ borderBottom: (company.industry || snap.keywords?.length > 0) ? `1px solid ${T.border}` : 'none', padding: '10px 14px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+              <FileText size={12} color={T.textFaint} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: 0.3, textTransform: 'uppercase' }}>Company Overview</span>
+            </div>
+            <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>
+              {snap.description
+                ? snap.description
+                : enriching
+                  ? <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Loading overview…</span>
+                  : <span style={{ color: T.textFaint, fontStyle: 'italic' }}>No overview available.</span>
+              }
+            </div>
           </div>
 
           {/* Collapsible keywords — shown when industry OR keywords are present */}

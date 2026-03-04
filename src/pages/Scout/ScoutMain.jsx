@@ -307,12 +307,13 @@ function ScoutShellInner({ user }) {
 
         {/* ── Mobile top bar ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 10px', borderBottom: `1px solid ${T.border}`,
           background: T.railBg, flexShrink: 0, zIndex: 2,
         }}>
+          {/* Logo */}
           <div style={{
-            width: 28, height: 28, borderRadius: 7,
+            width: 26, height: 26, borderRadius: 7,
             background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, overflow: 'hidden',
@@ -322,25 +323,59 @@ function ScoutShellInner({ user }) {
               onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
             />
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, lineHeight: 1 }}>SCOUT</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.text, lineHeight: 1.2, marginTop: 1 }}>
-              {section?.items.find(i => i.id === activeItem)?.label || 'Daily Discoveries'}
-            </div>
+
+          {/* Section nav icons */}
+          <div style={{ flex: 1, display: 'flex', gap: 3, overflowX: 'auto' }}>
+            {NAV_SECTIONS.map(sec => {
+              // PEOPLE (directTo) is active when its target item is selected
+              // SCOUT is active only when not in a directTo sub-view
+              const hasActiveDirectTo = NAV_SECTIONS.some(
+                s => s.directTo && s.directTo.section === 'scout' && activeItem === s.directTo.item
+              );
+              const active = sec.directTo
+                ? (activeSection === sec.directTo.section && activeItem === sec.directTo.item)
+                : sec.route
+                  ? location.pathname === sec.route
+                  : sec.id === 'scout'
+                    ? (activeSection === 'scout' && !hasActiveDirectTo)
+                    : activeSection === sec.id;
+              return (
+                <button
+                  key={sec.id}
+                  onClick={() => !sec.locked && handleSectionClick(sec)}
+                  title={sec.label}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 2, padding: '4px 8px', borderRadius: 8, flexShrink: 0,
+                    background: active ? T.accentBg : 'transparent',
+                    border: `1px solid ${active ? T.accentBdr : 'transparent'}`,
+                    cursor: sec.locked ? 'not-allowed' : 'pointer',
+                    opacity: sec.locked ? 0.32 : 1,
+                    transition: 'all 0.15s',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <sec.Icon size={13} color={active ? BRAND.pink : T.textFaint} />
+                  <span style={{ fontSize: 7, letterSpacing: 0.6, fontWeight: active ? 700 : 400, color: active ? BRAND.pink : T.textFaint, lineHeight: 1 }}>
+                    {sec.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+
+          {/* Controls */}
           <div
             onClick={() => navigate('/settings')}
             title="Settings"
             style={{
-              width: 34, height: 34, borderRadius: 9,
-              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : T.accentBg,
-              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : T.accentBdr}`,
+              width: 30, height: 30, borderRadius: 8,
+              background: T.accentBg, border: `1px solid ${T.accentBdr}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-              boxShadow: location.pathname === '/settings' ? `0 0 10px rgba(250,170,32,0.45)` : 'none',
+              cursor: 'pointer', flexShrink: 0,
             }}
           >
-            <Settings size={16} color={SETTINGS_ORANGE} />
+            <Settings size={14} color={SETTINGS_ORANGE} />
           </div>
           <ThemePicker />
         </div>

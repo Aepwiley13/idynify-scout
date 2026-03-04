@@ -480,11 +480,11 @@ function App() {
           }
         />
 
-        {/* User Settings */}
+        {/* User Settings — self-contained shell (no MainLayout) */}
         <Route
           path="/settings"
           element={
-            <ProtectedRoute withLayout={true}>
+            <ProtectedRoute>
               <UserSettings />
             </ProtectedRoute>
           }

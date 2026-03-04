@@ -49,12 +49,15 @@ function BarryAvatar({ size = 28, style = {} }) {
 }
 
 // ─── Particles (Mission Control only) ────────────────────────────────────────
+// Generated once at module load — stable, decorative, never changes
+const PARTICLE_STARS = Array.from({ length: 55 }, () => ({
+  x: Math.random() * 100, y: Math.random() * 100,
+  size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
+  dur: Math.random() * 4 + 3, delay: Math.random() * 5,
+}));
+
 function Particles() {
-  const stars = Array.from({ length: 55 }, () => ({
-    x: Math.random() * 100, y: Math.random() * 100,
-    size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
-    dur: Math.random() * 4 + 3, delay: Math.random() * 5,
-  }));
+  const stars = PARTICLE_STARS;
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
       {stars.map((s, i) => (
@@ -209,12 +212,15 @@ function ScoutShellInner({ user }) {
   const [drillCompanyId, setDrillCompanyId] = useState(null);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('scout_subnav_collapsed') !== 'true');
 
-  // Sync tab when URL search params change (e.g. navigating from Sidebar)
+  // Sync tab when URL search params change (e.g. navigating from Sidebar).
+  // setState inside the effect is intentional — URL params are external state
+  // that must be mirrored into local state to drive rendering.
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab && TAB_TO_ITEM[tab]) setActiveItem(TAB_TO_ITEM[tab]);
     else if (!tab) setActiveItem('daily');
-  }, [searchParams, location.state?.activeTab]);
+  }, [searchParams, location.state?.activeTab]); // TAB_TO_ITEM is a stable module-level constant
 
   // Helper: switch tab and update URL
   const switchItem = (itemId) => {

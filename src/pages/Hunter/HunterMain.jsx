@@ -19,7 +19,7 @@ import {
   Radar, Crosshair, Eye, Target,
   LayoutDashboard, Zap, Archive, BarChart3, Users,
   Palette, Check, ChevronLeft, ChevronRight,
-  Mail, CheckCircle,
+  Mail, CheckCircle, Settings as SettingsIcon,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -168,7 +168,11 @@ const HUNTER_ITEMS = [
   { id: 'arsenal',   label: 'Arsenal',   Icon: Archive,         desc: 'Templates library'  },
   { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,       desc: 'Analytics'          },
   { id: 'people',    label: 'People',    Icon: Users,           desc: 'Your contacts'      },
+  { id: 'settings',  label: 'Settings',  Icon: SettingsIcon,    desc: 'App settings',  route: '/settings' },
 ];
+
+// Orange token for settings accent
+const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
 const TAB_MAP = {
@@ -383,6 +387,21 @@ function HunterShellInner({ user }) {
           <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
             {HUNTER_ITEMS.find(i => i.id === activeTab)?.label || 'Hunter'}
           </div>
+          {/* Settings shortcut — top-right, always reachable */}
+          <div
+            onClick={() => navigate('/settings')}
+            title="Settings"
+            style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : T.accentBg,
+              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : T.accentBdr}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
+              boxShadow: location.pathname === '/settings' ? `0 0 10px rgba(250,170,32,0.45)` : 'none',
+            }}
+          >
+            <SettingsIcon size={16} color={SETTINGS_ORANGE} />
+          </div>
           <ThemePicker />
         </div>
 
@@ -393,19 +412,24 @@ function HunterShellInner({ user }) {
           padding: '0 6px',
         }}>
           {HUNTER_ITEMS.map(it => {
-            const active = activeTab === it.id;
+            const isSettings = it.id === 'settings';
+            const active = isSettings
+              ? location.pathname === '/settings'
+              : activeTab === it.id;
+            const activeColor = isSettings ? SETTINGS_ORANGE : BRAND.pink;
             return (
               <div
                 key={it.id}
-                onClick={() => switchTab(it.id)}
+                onClick={() => it.route ? navigate(it.route) : switchTab(it.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? BRAND.pink : 'transparent'}`,
-                  color: active ? BRAND.pink : T.textMuted,
+                  borderBottom: `2px solid ${active ? activeColor : 'transparent'}`,
+                  color: active ? activeColor : (isSettings ? '#d97706' : T.textMuted),
                   fontSize: 12, fontWeight: active ? 600 : 400,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                   transition: 'all 0.12s', position: 'relative',
+                  textShadow: (isSettings && active) ? `0 0 8px rgba(250,170,32,0.55)` : 'none',
                 }}
               >
                 <it.Icon size={12} />
@@ -549,7 +573,7 @@ function HunterShellInner({ user }) {
               <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, marginBottom: 1 }}>
                 HUNTER
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{HUNTER_ITEMS.length} modules</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>{HUNTER_ITEMS.filter(i => !i.route).length} modules</div>
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('hunter_subnav_collapsed', 'true'); }}
@@ -568,26 +592,38 @@ function HunterShellInner({ user }) {
           {/* Sub-nav items */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
             {HUNTER_ITEMS.map(it => {
-              const active = activeTab === it.id;
+              const isSettings = it.id === 'settings';
+              const active = isSettings
+                ? location.pathname === '/settings'
+                : activeTab === it.id;
+              const activeColor = isSettings ? SETTINGS_ORANGE : BRAND.pink;
+              const itemBg = active
+                ? (isSettings ? 'rgba(250,170,32,0.1)' : T.accentBg)
+                : 'transparent';
               return (
                 <div
                   key={it.id}
-                  onClick={() => switchTab(it.id)}
+                  onClick={() => it.route ? navigate(it.route) : switchTab(it.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                    background: active ? T.accentBg : 'transparent',
-                    borderLeft: `2px solid ${active ? BRAND.pink : 'transparent'}`,
+                    background: itemBg,
+                    borderLeft: `2px solid ${active ? activeColor : 'transparent'}`,
                     transition: 'all 0.12s', position: 'relative',
+                    boxShadow: (isSettings && active) ? '0 0 10px rgba(250,170,32,0.12)' : 'none',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = isSettings ? 'rgba(250,170,32,0.06)' : T.surface; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <it.Icon size={13} color={active ? BRAND.pink : T.textFaint} style={{ flexShrink: 0 }} />
+                  <it.Icon
+                    size={13}
+                    color={active ? activeColor : (isSettings ? '#d97706' : T.textFaint)}
+                    style={{ flexShrink: 0 }}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? BRAND.pink : T.textMuted,
+                      color: active ? activeColor : (isSettings ? '#d97706' : T.textMuted),
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.label}

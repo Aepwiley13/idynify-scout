@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
-import { LogOut, User, Menu } from 'lucide-react';
+import { LogOut, User, Menu, Settings } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './MainLayout.css';
 
@@ -115,6 +115,15 @@ const MainLayout = ({ children, user }) => {
           </div>
 
           <div className="top-bar-right">
+            {/* Settings shortcut — visible on mobile portrait at top of screen */}
+            <button
+              className={`topbar-settings-btn ${location.pathname === '/settings' ? 'active' : ''}`}
+              onClick={() => navigate('/settings')}
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings size={20} />
+            </button>
             {user && (
               <>
                 <div className="user-info">

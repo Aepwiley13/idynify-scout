@@ -49,12 +49,15 @@ function BarryAvatar({ size = 28, style = {} }) {
 }
 
 // ─── Particles (Mission Control only) ────────────────────────────────────────
+// Generated once at module load — stable, decorative, never changes
+const PARTICLE_STARS = Array.from({ length: 55 }, () => ({
+  x: Math.random() * 100, y: Math.random() * 100,
+  size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
+  dur: Math.random() * 4 + 3, delay: Math.random() * 5,
+}));
+
 function Particles() {
-  const stars = Array.from({ length: 55 }, () => ({
-    x: Math.random() * 100, y: Math.random() * 100,
-    size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
-    dur: Math.random() * 4 + 3, delay: Math.random() * 5,
-  }));
+  const stars = PARTICLE_STARS;
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
       {stars.map((s, i) => (
@@ -165,9 +168,10 @@ const NAV_SECTIONS = [
       { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
     ],
   },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter', items: [] },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon',  items: [] },
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: null,      items: [], locked: true },
+  { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
+  { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
+  { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: null,      items: [], locked: true },
+  { id: 'allpeople', label: 'PEOPLE',  Icon: Users,     directTo: { section: 'scout', item: 'all' }, items: [] },
 ];
 
 // ─── ScoutShellInner ─────────────────────────────────────────────────────────
@@ -208,12 +212,15 @@ function ScoutShellInner({ user }) {
   const [drillCompanyId, setDrillCompanyId] = useState(null);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('scout_subnav_collapsed') !== 'true');
 
-  // Sync tab when URL search params change (e.g. navigating from Sidebar)
+  // Sync tab when URL search params change (e.g. navigating from Sidebar).
+  // setState inside the effect is intentional — URL params are external state
+  // that must be mirrored into local state to drive rendering.
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab && TAB_TO_ITEM[tab]) setActiveItem(TAB_TO_ITEM[tab]);
     else if (!tab) setActiveItem('daily');
-  }, [searchParams, location.state?.activeTab]);
+  }, [searchParams, location.state?.activeTab]); // TAB_TO_ITEM is a stable module-level constant
 
   // Helper: switch tab and update URL
   const switchItem = (itemId) => {
@@ -228,6 +235,14 @@ function ScoutShellInner({ user }) {
   const handleSectionClick = (sec) => {
     if (sec.locked) return;
     if (sec.route) { navigate(sec.route); return; }
+    if (sec.directTo) {
+      setDrillCompanyId(null);
+      setActiveSection(sec.directTo.section);
+      setActiveItem(sec.directTo.item);
+      const tab = ITEM_TO_TAB[sec.directTo.item] || 'daily-leads';
+      setSearchParams({ tab }, { replace: true });
+      return;
+    }
     setDrillCompanyId(null);
     setActiveSection(sec.id);
     setActiveItem(sec.items[0]?.id || '');
@@ -266,6 +281,15 @@ function ScoutShellInner({ user }) {
   const userInitials = (user?.email || 'AW').slice(0, 2).toUpperCase();
 
   // ── Mobile layout ────────────────────────────────────────────────────────────
+  // Bottom nav items: the 5 most navigable scout sub-items (Scout+ is a CTA, not a nav target)
+  const MOBILE_BOTTOM_NAV = [
+    { id: 'daily',       label: 'Daily',   Icon: Zap       },
+    { id: 'saved',       label: 'Saved',   Icon: Building2 },
+    { id: 'all',         label: 'People',  Icon: Users     },
+    { id: 'comsearch',   label: 'Search',  Icon: Search    },
+    { id: 'icpsettings', label: 'ICP',     Icon: Settings  },
+  ];
+
   if (isMobile) {
     return (
       <div style={{
@@ -289,12 +313,13 @@ function ScoutShellInner({ user }) {
 
         {/* ── Mobile top bar ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 10px', borderBottom: `1px solid ${T.border}`,
           background: T.railBg, flexShrink: 0, zIndex: 2,
         }}>
+          {/* Logo */}
           <div style={{
-            width: 28, height: 28, borderRadius: 7,
+            width: 26, height: 26, borderRadius: 7,
             background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, overflow: 'hidden',
@@ -304,59 +329,106 @@ function ScoutShellInner({ user }) {
               onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
             />
           </div>
-          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            {section?.items.find(i => i.id === activeItem)?.label || 'Scout'}
+
+          {/* Section nav icons */}
+          <div style={{ flex: 1, display: 'flex', gap: 3, overflowX: 'auto' }}>
+            {NAV_SECTIONS.map(sec => {
+              // PEOPLE (directTo) is active when its target item is selected
+              // SCOUT is active only when not in a directTo sub-view
+              const hasActiveDirectTo = NAV_SECTIONS.some(
+                s => s.directTo && s.directTo.section === 'scout' && activeItem === s.directTo.item
+              );
+              const active = sec.directTo
+                ? (activeSection === sec.directTo.section && activeItem === sec.directTo.item)
+                : sec.route
+                  ? location.pathname === sec.route
+                  : sec.id === 'scout'
+                    ? (activeSection === 'scout' && !hasActiveDirectTo)
+                    : activeSection === sec.id;
+              return (
+                <button
+                  key={sec.id}
+                  onClick={() => !sec.locked && handleSectionClick(sec)}
+                  title={sec.label}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 2, padding: '4px 8px', borderRadius: 8, flexShrink: 0,
+                    background: active ? T.accentBg : 'transparent',
+                    border: `1px solid ${active ? T.accentBdr : 'transparent'}`,
+                    cursor: sec.locked ? 'not-allowed' : 'pointer',
+                    opacity: sec.locked ? 0.32 : 1,
+                    transition: 'all 0.15s',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <sec.Icon size={13} color={active ? BRAND.pink : T.textFaint} />
+                  <span style={{ fontSize: 7, letterSpacing: 0.6, fontWeight: active ? 700 : 400, color: active ? BRAND.pink : T.textFaint, lineHeight: 1 }}>
+                    {sec.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          {/* Settings shortcut — top-right, always reachable */}
+
+          {/* Controls */}
           <div
             onClick={() => navigate('/settings')}
             title="Settings"
             style={{
-              width: 34, height: 34, borderRadius: 9,
-              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : T.accentBg,
-              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : T.accentBdr}`,
+              width: 30, height: 30, borderRadius: 8,
+              background: T.accentBg, border: `1px solid ${T.accentBdr}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-              boxShadow: location.pathname === '/settings' ? `0 0 10px rgba(250,170,32,0.45)` : 'none',
+              cursor: 'pointer', flexShrink: 0,
             }}
           >
-            <Settings size={16} color={SETTINGS_ORANGE} />
+            <Settings size={14} color={SETTINGS_ORANGE} />
           </div>
           <ThemePicker />
-        </div>
-
-        {/* ── Mobile horizontal nav ── */}
-        <div style={{
-          display: 'flex', overflowX: 'auto', flexShrink: 0,
-          background: T.navBg, borderBottom: `1px solid ${T.border}`,
-          padding: '0 6px',
-        }}>
-          {section?.items.map(it => {
-            const active = activeItem === it.id;
-            return (
-              <div
-                key={it.id}
-                onClick={() => switchItem(it.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? BRAND.pink : 'transparent'}`,
-                  color: active ? BRAND.pink : T.textMuted,
-                  fontSize: 12, fontWeight: active ? 600 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'all 0.12s',
-                }}
-              >
-                <it.Icon size={12} />
-                {it.label}
-              </div>
-            );
-          })}
         </div>
 
         {/* ── Mobile main content ── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
           {renderMain()}
+        </div>
+
+        {/* ── Mobile bottom nav ── */}
+        <div style={{
+          display: 'flex', flexShrink: 0,
+          background: T.railBg, borderTop: `1px solid ${T.border}`,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}>
+          {MOBILE_BOTTOM_NAV.map(it => {
+            const active = activeItem === it.id;
+            return (
+              <button
+                key={it.id}
+                onClick={() => switchItem(it.id)}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: 3, padding: '10px 4px',
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', minHeight: 56,
+                  color: active ? BRAND.pink : T.textFaint,
+                  transition: 'color 0.15s',
+                  WebkitTapHighlightColor: 'transparent',
+                  position: 'relative',
+                }}
+              >
+                {active && (
+                  <div style={{
+                    position: 'absolute', top: 0, left: '20%', right: '20%', height: 2,
+                    background: BRAND.pink, borderRadius: '0 0 2px 2px',
+                    boxShadow: `0 0 8px ${BRAND.pink}`,
+                  }} />
+                )}
+                <it.Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
+                <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, letterSpacing: 0.3, lineHeight: 1 }}>
+                  {it.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -417,7 +489,9 @@ function ScoutShellInner({ user }) {
         </div>
 
         {NAV_SECTIONS.map(sec => {
-          const active = activeSection === sec.id;
+          const active = sec.directTo
+            ? (activeSection === sec.directTo.section && activeItem === sec.directTo.item)
+            : activeSection === sec.id;
           return (
             <div
               key={sec.id}

@@ -176,6 +176,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       sublabel: '15 in 30',
       path: '/scout/game',
       isPrimary: true
+    },
+    {
+      icon: Settings,
+      label: 'Settings',
+      path: '/settings',
+      isSettings: true
     }
   ];
 
@@ -218,6 +224,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       label: 'Outcomes',
       path: '/hunter',
       state: { activeTab: 'outcomes' }
+    },
+    {
+      icon: Settings,
+      label: 'Settings',
+      path: '/settings',
+      isSettings: true
     }
   ];
 
@@ -229,7 +241,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     return (
       <li key={item.label + (item.state?.activeTab || '')}>
         <button
-          className={`nav-item ${item.isPrimary ? 'primary-item' : ''} ${active ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`}
+          className={`nav-item ${item.isPrimary ? 'primary-item' : ''} ${item.isSettings ? 'settings-item' : ''} ${active ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`}
           onClick={() => handleNavigation(item.path, item.state)}
           title={isCollapsed ? item.label : ''}
         >
@@ -311,13 +323,13 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
       {/* Settings Link */}
       <button
-        className={`theme-toggle ${isCollapsed ? 'collapsed' : ''} ${isActive('/settings') ? 'active' : ''}`}
+        className={`settings-toggle ${isCollapsed ? 'collapsed' : ''} ${isActive('/settings') ? 'active' : ''}`}
         onClick={() => handleNavigation('/settings')}
         title={isCollapsed ? 'Settings' : ''}
         aria-label="Settings"
       >
         <Settings size={16} />
-        {!isCollapsed && <span className="theme-toggle-label">Settings</span>}
+        {!isCollapsed && <span className="settings-toggle-label">Settings</span>}
       </button>
 
       {/* Theme Toggle */}

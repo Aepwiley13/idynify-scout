@@ -133,6 +133,38 @@
   color: #111827;
 }
 
+/* Settings shortcut button in TopBar */
+.topbar-settings-btn {
+  display: none; /* hidden on desktop — sidebar handles settings */
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: 1.5px solid #faaa20;
+  color: #d97706;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.topbar-settings-btn:hover {
+  background: #fffbeb;
+  color: #b45309;
+  box-shadow: 0 0 10px rgba(250, 170, 32, 0.4), 0 0 20px rgba(250, 170, 32, 0.15);
+}
+
+.topbar-settings-btn.active {
+  background: #fffbeb;
+  color: #d97706;
+  box-shadow: 0 0 10px rgba(250, 170, 32, 0.5), 0 0 20px rgba(250, 170, 32, 0.2);
+}
+
+.topbar-settings-btn .lucide {
+  filter: drop-shadow(0 0 3px rgba(250, 170, 32, 0.6));
+}
+
 /* Page Content */
 .page-content {
   flex: 1;
@@ -187,6 +219,13 @@
 
   .page-content {
     padding: 2.5rem 3rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* Show settings shortcut on tablet + mobile (sidebar is collapsed, no pillar items) */
+  .topbar-settings-btn {
+    display: flex;
   }
 }
 

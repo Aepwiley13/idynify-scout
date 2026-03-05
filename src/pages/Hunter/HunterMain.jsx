@@ -17,7 +17,7 @@ import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/fires
 import { db, auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
-  LayoutDashboard, Zap, Archive, BarChart3, Users,
+  LayoutDashboard, Zap, Archive, BarChart3, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight,
   Mail, CheckCircle, Settings as SettingsIcon, Home,
 } from 'lucide-react';
@@ -28,6 +28,7 @@ import WeaponsSection from './sections/WeaponsSection';
 import MissionsSection from './sections/MissionsSection';
 import ArsenalSection from './sections/ArsenalSection';
 import OutcomesSection from './sections/OutcomesSection';
+import CompaniesSection from './sections/CompaniesSection';
 import AllLeads from '../Scout/AllLeads';
 
 // ─── Particles ───────────────────────────────────────────────────────────────
@@ -162,6 +163,7 @@ const MODULE_RAIL = [
 
 // ─── Hunter sub-nav items ─────────────────────────────────────────────────────
 const HUNTER_ITEMS = [
+  { id: 'companies', label: 'Companies', Icon: Building2,       desc: 'Engaged companies'  },
   { id: 'people',    label: 'People',    Icon: Users,           desc: 'Your contacts'      },
   { id: 'weapons',   label: 'Weapons',   Icon: Crosshair,       desc: 'Build messages'     },
   { id: 'missions',  label: 'Missions',  Icon: Zap,             desc: 'Active campaigns'   },
@@ -175,6 +177,7 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
 const TAB_MAP = {
+  'companies': 'companies',
   'dashboard': 'dashboard',
   'weapons':   'weapons',
   'missions':  'missions',
@@ -330,6 +333,7 @@ function HunterShellInner({ user }) {
         )}
 
         <div style={{ flex: 1, overflow: 'auto' }}>
+          {activeTab === 'companies' && <CompaniesSection />}
           {activeTab === 'dashboard' && <DashboardSection missions={missions} campaigns={campaigns} />}
           {activeTab === 'weapons'   && <WeaponsSection />}
           {activeTab === 'missions'  && <MissionsSection missions={missions} loading={false} />}

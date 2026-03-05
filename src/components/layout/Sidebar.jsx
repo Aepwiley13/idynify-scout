@@ -187,25 +187,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const hunterItems = [
     {
-      icon: LayoutDashboard,
-      label: 'Dashboard',
-      sublabel: 'Operational View',
-      path: '/hunter',
-      state: { activeTab: 'dashboard' },
-      isPrimary: true
-    },
-    {
       icon: Users,
       label: 'People',
       sublabel: 'Active missions',
       path: '/hunter',
-      state: { activeTab: 'people' }
-    },
-    {
-      icon: Crosshair,
-      label: 'Missions',
-      path: '/hunter',
-      state: { activeTab: 'missions' }
+      state: { activeTab: 'people' },
+      isPrimary: true
     },
     {
       icon: Mail,
@@ -214,10 +201,23 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       state: { activeTab: 'weapons' }
     },
     {
+      icon: Crosshair,
+      label: 'Missions',
+      path: '/hunter',
+      state: { activeTab: 'missions' }
+    },
+    {
       icon: Package,
       label: 'Arsenal',
       path: '/hunter',
       state: { activeTab: 'arsenal' }
+    },
+    {
+      icon: LayoutDashboard,
+      label: 'Dashboard',
+      sublabel: 'Operational View',
+      path: '/hunter',
+      state: { activeTab: 'dashboard' }
     },
     {
       icon: BarChart3,

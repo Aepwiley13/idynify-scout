@@ -931,11 +931,14 @@ export default function AllLeads({ mode = 'people' }) {
     try {
       const user = auth.currentUser;
       if (!user) { navigate('/login'); return; }
-      const companiesSnapshot = await getDocs(collection(db, 'users', user.uid, 'companies'));
+      // Load companies and contacts in parallel to halve the round-trip time
+      const [companiesSnapshot, contactsSnapshot] = await Promise.all([
+        getDocs(collection(db, 'users', user.uid, 'companies')),
+        getDocs(collection(db, 'users', user.uid, 'contacts')),
+      ]);
       const companiesMap = {};
       companiesSnapshot.docs.forEach(d => { companiesMap[d.id] = d.data(); });
       setCompanies(companiesMap);
-      const contactsSnapshot = await getDocs(collection(db, 'users', user.uid, 'contacts'));
       const contactsList = contactsSnapshot.docs
         .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {

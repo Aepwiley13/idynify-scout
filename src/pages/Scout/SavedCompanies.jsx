@@ -43,20 +43,37 @@ export default function SavedCompanies({ onSelectCompany }) {
 
       const acceptedQuery = query(collection(db, 'users', userId, 'companies'), where('status', '==', 'accepted'));
       const archivedQuery = query(collection(db, 'users', userId, 'companies'), where('status', '==', 'archived'));
-      const [acceptedSnap, archivedSnap] = await Promise.all([getDocs(acceptedQuery), getDocs(archivedQuery)]);
 
-      async function enrichWithContacts(snap) {
-        return Promise.all(snap.docs.map(async companyDoc => {
+      // Load companies and all contacts in parallel — eliminates N+1 per-company queries
+      const [acceptedSnap, archivedSnap, allContactsSnap] = await Promise.all([
+        getDocs(acceptedQuery),
+        getDocs(archivedQuery),
+        getDocs(collection(db, 'users', userId, 'contacts')),
+      ]);
+
+      // Build contact count maps from the single contacts fetch
+      const contactCountMap = {};
+      const suggestedCountMap = {};
+      allContactsSnap.docs.forEach(d => {
+        const data = d.data();
+        const cid = data.company_id;
+        if (!cid) return;
+        if (data.status !== 'suggested') {
+          contactCountMap[cid] = (contactCountMap[cid] || 0) + 1;
+        } else {
+          suggestedCountMap[cid] = (suggestedCountMap[cid] || 0) + 1;
+        }
+      });
+
+      function enrichWithContacts(snap) {
+        return snap.docs.map(companyDoc => {
           const company = { id: companyDoc.id, ...companyDoc.data() };
-          try {
-            const contactsSnap = await getDocs(query(collection(db, 'users', userId, 'contacts'), where('company_id', '==', company.id)));
-            const approvedCount = contactsSnap.docs.filter(d => d.data().status !== 'suggested').length;
-            const suggestedCount = contactsSnap.size - approvedCount;
-            return { ...company, contact_count: approvedCount, suggested_contact_count: suggestedCount };
-          } catch {
-            return { ...company, contact_count: 0, suggested_contact_count: 0 };
-          }
-        }));
+          return {
+            ...company,
+            contact_count: contactCountMap[company.id] || 0,
+            suggested_contact_count: suggestedCountMap[company.id] || 0,
+          };
+        });
       }
 
       const sortNewest = list => list.sort((a, b) => {
@@ -65,7 +82,8 @@ export default function SavedCompanies({ onSelectCompany }) {
         return String(dB).localeCompare(String(dA));
       });
 
-      const [companiesList, archivedList] = await Promise.all([enrichWithContacts(acceptedSnap), enrichWithContacts(archivedSnap)]);
+      const companiesList = enrichWithContacts(acceptedSnap);
+      const archivedList = enrichWithContacts(archivedSnap);
       setCompanies(sortNewest(companiesList));
       setArchivedCompanies(sortNewest(archivedList));
       setLoading(false);

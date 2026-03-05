@@ -162,12 +162,12 @@ const MODULE_RAIL = [
 
 // ─── Hunter sub-nav items ─────────────────────────────────────────────────────
 const HUNTER_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, desc: 'Operational clarity' },
+  { id: 'people',    label: 'People',    Icon: Users,           desc: 'Your contacts'      },
   { id: 'weapons',   label: 'Weapons',   Icon: Crosshair,       desc: 'Build messages'     },
   { id: 'missions',  label: 'Missions',  Icon: Zap,             desc: 'Active campaigns'   },
   { id: 'arsenal',   label: 'Arsenal',   Icon: Archive,         desc: 'Templates library'  },
+  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, desc: 'Operational clarity' },
   { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,       desc: 'Analytics'          },
-  { id: 'people',    label: 'People',    Icon: Users,           desc: 'Your contacts'      },
 ];
 
 // Orange token for settings accent

@@ -333,6 +333,18 @@
   border-color: #3b82f6;
 }
 
+.expandable-header.non-collapsible {
+  cursor: default;
+  pointer-events: none;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.expandable-header.non-collapsible:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
 .expandable-title {
   display: flex;
   align-items: center;

@@ -21,7 +21,6 @@ export default function CompanyDetail() {
   const [searchingContacts, setSearchingContacts] = useState(false);
   const [approvingContactIds, setApprovingContactIds] = useState(new Set());
   const [savingBulkContacts, setSavingBulkContacts] = useState(false);
-  const [showOverview, setShowOverview] = useState(false);
   const [showKeywords, setShowKeywords] = useState(false);
   const [selectedDecisionMakers, setSelectedDecisionMakers] = useState([]);
   const [savingDecisionMakers, setSavingDecisionMakers] = useState(false);
@@ -1046,24 +1045,18 @@ export default function CompanyDetail() {
             )}
           </div>
 
-          {/* Collapsible Company Overview */}
+          {/* Company Overview — always visible */}
           {company.apolloEnrichment?.snapshot?.description && (
             <div className="company-expandable-section">
-              <button
-                className="expandable-header"
-                onClick={() => setShowOverview(!showOverview)}
-              >
+              <div className="expandable-header non-collapsible">
                 <div className="expandable-title">
                   <FileText className="w-5 h-5" />
                   <span>Company Overview</span>
                 </div>
-                {showOverview ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-              </button>
-              {showOverview && (
-                <div className="expandable-content">
-                  <p className="company-description">{company.apolloEnrichment.snapshot.description}</p>
-                </div>
-              )}
+              </div>
+              <div className="expandable-content">
+                <p className="company-description">{company.apolloEnrichment.snapshot.description}</p>
+              </div>
             </div>
           )}
 

@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
-  Target, Plus, Loader, ArrowUpDown,
+  Target, Plus, Loader, ArrowUpDown, Crosshair,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -737,6 +737,20 @@ function AllLeadsCard({
                   </div>
                 )}
               </div>
+              {/* Move to SNIPER */}
+              <button
+                onClick={e => { e.stopPropagation(); if (!inSniper) onAddToSniper && onAddToSniper(); }}
+                title={inSniper ? 'Already in SNIPER pipeline' : 'Move to SNIPER'}
+                style={{
+                  padding: '7px 9px', borderRadius: 7, display: 'flex', alignItems: 'center',
+                  border: inSniper ? '1px solid #14b8a660' : '1px solid #14b8a630',
+                  background: inSniper ? '#14b8a625' : 'transparent',
+                  color: inSniper ? '#14b8a6' : '#14b8a660',
+                  fontSize: 10, cursor: inSniper ? 'default' : 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!inSniper) { e.currentTarget.style.background = '#14b8a618'; e.currentTarget.style.color = '#14b8a6'; e.currentTarget.style.borderColor = '#14b8a650'; } }}
+                onMouseLeave={e => { if (!inSniper) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#14b8a660'; e.currentTarget.style.borderColor = '#14b8a630'; } }}
+              ><Crosshair size={11} /></button>
               <button
                 onClick={e => { e.stopPropagation(); onReturnToScout && onReturnToScout(); }}
                 style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid #9ca3af40', background: 'transparent', color: '#9ca3af', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
@@ -959,7 +973,7 @@ export default function AllLeads({ mode = 'people' }) {
         getDocs(collection(db, 'users', user.uid, 'companies')),
         getDocs(collection(db, 'users', user.uid, 'contacts')),
       ];
-      if (mode === 'sniper') fetches.push(getDocs(collection(db, 'users', user.uid, 'sniper_contacts')));
+      if (mode === 'sniper' || mode === 'hunter') fetches.push(getDocs(collection(db, 'users', user.uid, 'sniper_contacts')));
       const [companiesSnapshot, contactsSnapshot, sniperSnapshot] = await Promise.all(fetches);
 
       const companiesMap = {};

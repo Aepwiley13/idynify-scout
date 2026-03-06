@@ -67,16 +67,16 @@ export default function QuickLaunchStrip({ stats = {}, onModuleSelect, activeMod
     {
       id: 'sniper',
       label: 'SNIPER',
-      route: null,
-      active: false,
+      route: '/sniper',
+      active: true,
       icon: <SniperIcon />,
-      badge: 'COMING SOON',
-      badgeClass: 'bg-gray-600 text-gray-300',
-      status: 'Coming Soon',
-      glowClass: 'border-gray-600/30',
-      glowStyle: {},
-      btnClass: null,
-      btnLabel: null
+      badge: null,
+      badgeClass: '',
+      status: 'Conversion Pipeline',
+      glowClass: 'border-teal-500/40',
+      glowStyle: { boxShadow: '0 0 14px rgba(20,184,166,0.2)' },
+      btnClass: 'from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-teal-500/40',
+      btnLabel: 'Open →'
     }
   ];
 
@@ -274,10 +274,10 @@ function ReconIcon() {
 
 function SniperIcon() {
   return (
-    <div className="relative w-12 h-12 rounded-full border-[3px] border-gray-600 flex items-center justify-center bg-black/60">
-      <div className="w-px h-full bg-gray-600 absolute"></div>
-      <div className="h-px w-full bg-gray-600 absolute"></div>
-      <div className="w-3 h-3 rounded-full bg-gray-600"></div>
+    <div className="relative w-12 h-12 rounded-full border-[3px] border-teal-500 flex items-center justify-center bg-black/60" style={{ boxShadow: '0 0 10px rgba(20,184,166,0.3)' }}>
+      <div className="w-px h-full bg-teal-500 absolute"></div>
+      <div className="h-px w-full bg-teal-500 absolute"></div>
+      <div className="w-3 h-3 rounded-full bg-teal-500"></div>
     </div>
   );
 }

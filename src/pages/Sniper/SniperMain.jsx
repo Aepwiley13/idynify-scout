@@ -1,31 +1,59 @@
 /**
- * ScoutMain.jsx — Two-column nav shell for the Scout module.
+ * SniperMain.jsx — Two-column nav shell for the SNIPER module.
  *
  * Architecture:
  *  ┌─────────────────────────────────────────────────────────┐
  *  │  Icon Rail (60px)  │  Sub-Nav (190px)  │  Main Content  │
  *  └─────────────────────────────────────────────────────────┘
  *
+ * SNIPER = post-demo conversion pipeline. Contacts here have already had
+ * a meeting — the goal is to convert them into customers.
+ *
  * This component is self-contained — it does NOT use MainLayout.
- * The App.jsx /scout route must NOT use withLayout={true}.
+ * The App.jsx /sniper route must NOT use withLayout={true}.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
-  Zap, Building2, Users, Plus, Search,
-  Palette, Check, Settings, ChevronLeft, ChevronRight, Home,
+  LayoutDashboard, Activity, BookOpen, BarChart3, Users,
+  Palette, Check, ChevronLeft, ChevronRight,
+  Settings as SettingsIcon, Home, Trophy,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
-import DailyLeads from './DailyLeads';
-import SavedCompanies from './SavedCompanies';
-import AllLeads from './AllLeads';
-import CompanySearch from './CompanySearch';
-import CompanyProfileView from './CompanyProfileView';
-import ScoutPlus from './ScoutPlus';
-import ICPSettings from './ICPSettings';
+import { auth } from '../../firebase/config';
+
+// Sniper sections
+import PipelineSection from './sections/PipelineSection';
+import TargetsSection  from './sections/TargetsSection';
+import TouchesSection  from './sections/TouchesSection';
+import PlaybooksSection from './sections/PlaybooksSection';
+import OutcomesSection  from './sections/OutcomesSection';
+
+const SNIPER_TEAL = '#14b8a6';
+
+// ─── Particles ───────────────────────────────────────────────────────────────
+function Particles() {
+  const stars = Array.from({ length: 55 }, () => ({
+    x: Math.random() * 100, y: Math.random() * 100,
+    size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
+    dur: Math.random() * 4 + 3, delay: Math.random() * 5,
+  }));
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+      {stars.map((s, i) => (
+        <div key={i} style={{
+          position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
+          width: s.size, height: s.size, borderRadius: '50%', background: '#fff',
+          opacity: s.op,
+          animation: `twinkle ${s.dur}s ease-in-out infinite`,
+          animationDelay: `${s.delay}s`,
+        }} />
+      ))}
+    </div>
+  );
+}
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 28, style = {} }) {
@@ -44,31 +72,6 @@ function BarryAvatar({ size = 28, style = {} }) {
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }}
       />
-    </div>
-  );
-}
-
-// ─── Particles (Mission Control only) ────────────────────────────────────────
-// Generated once at module load — stable, decorative, never changes
-const PARTICLE_STARS = Array.from({ length: 55 }, () => ({
-  x: Math.random() * 100, y: Math.random() * 100,
-  size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
-  dur: Math.random() * 4 + 3, delay: Math.random() * 5,
-}));
-
-function Particles() {
-  const stars = PARTICLE_STARS;
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-      {stars.map((s, i) => (
-        <div key={i} style={{
-          position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
-          width: s.size, height: s.size, borderRadius: '50%', background: '#fff',
-          opacity: s.op,
-          animation: `twinkle ${s.dur}s ease-in-out infinite`,
-          animationDelay: `${s.delay}s`,
-        }} />
-      ))}
     </div>
   );
 }
@@ -139,7 +142,7 @@ function ThemePicker() {
 }
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
-function Av({ initials, color = BRAND.pink, size = 24 }) {
+function Av({ initials, color = SNIPER_TEAL, size = 24 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -152,35 +155,39 @@ function Av({ initials, color = BRAND.pink, size = 24 }) {
   );
 }
 
-// Orange token for settings accent
-const SETTINGS_ORANGE = '#faaa20';
-
-// ─── Nav config ──────────────────────────────────────────────────────────────
-const NAV_SECTIONS = [
-  {
-    id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
-    items: [
-      { id: 'daily',     label: 'Daily Discoveries', Icon: Zap,       desc: 'Review Queue'       },
-      { id: 'saved',     label: 'Saved Companies',   Icon: Building2, desc: 'Hunt list'          },
-      { id: 'all',       label: 'People',             Icon: Users,     desc: 'Your network'      },
-      { id: 'scoutplus',   label: 'Scout+',           Icon: Plus,     desc: 'Add contacts'       },
-      { id: 'comsearch',   label: 'Company Search',   Icon: Search,   desc: 'Find companies'     },
-      { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
-    ],
-  },
-  { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
-  { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
-  { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: '/sniper', items: [] },
-  { id: 'allpeople', label: 'PEOPLE',  Icon: Users,     directTo: { section: 'scout', item: 'all' }, items: [] },
+// ─── Module rail config ───────────────────────────────────────────────────────
+const MODULE_RAIL = [
+  { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
+  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
+  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon'  },
+  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: null      }, // active module
 ];
 
-// ─── ScoutShellInner ─────────────────────────────────────────────────────────
-function ScoutShellInner({ user }) {
+// ─── SNIPER sub-nav items ─────────────────────────────────────────────────────
+const SNIPER_ITEMS = [
+  { id: 'pipeline',  label: 'Pipeline',  Icon: Target,         desc: 'Conversion board'  },
+  { id: 'targets',   label: 'Targets',   Icon: Users,          desc: 'All contacts'      },
+  { id: 'touches',   label: 'Touches',   Icon: Activity,       desc: 'Follow-up log'     },
+  { id: 'playbooks', label: 'Playbooks', Icon: BookOpen,       desc: 'Conversion sequences' },
+  { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,      desc: 'Win/loss analytics' },
+];
+
+const SETTINGS_ORANGE = '#faaa20';
+
+const TAB_MAP = {
+  pipeline:  'pipeline',
+  targets:   'targets',
+  touches:   'touches',
+  playbooks: 'playbooks',
+  outcomes:  'outcomes',
+};
+
+// ─── SniperShellInner ─────────────────────────────────────────────────────────
+function SniperShellInner({ user }) {
   const T = useT();
   const { themeId } = useThemeCtx();
   const navigate = useNavigate();
   const location = useLocation();
-
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -190,106 +197,38 @@ function ScoutShellInner({ user }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Tab ↔ internal item ID mapping
-  const TAB_TO_ITEM = {
-    'daily-leads':     'daily',
-    'saved-companies': 'saved',
-    'all-leads':       'all',
-    'company-search':  'comsearch',
-    'icp-settings':    'icpsettings',
-    'scout-plus':      'scoutplus',
-  };
-  const ITEM_TO_TAB = Object.fromEntries(
-    Object.entries(TAB_TO_ITEM).map(([k, v]) => [v, k])
-  );
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'pipeline';
+  const initialTab = TAB_MAP[tabParam] || 'pipeline';
 
-  // Read tab from URL (?tab=company-search) with fallback to legacy location.state
-  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'daily-leads';
-  const initialItem = TAB_TO_ITEM[tabParam] || 'daily';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('sniper_subnav_collapsed') !== 'true');
 
-  const [activeSection, setActiveSection] = useState('scout');
-  const [activeItem, setActiveItem] = useState(initialItem);
-  const [drillCompanyId, setDrillCompanyId] = useState(null);
-  const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('scout_subnav_collapsed') !== 'true');
-
-  // Sync tab when URL search params change (e.g. navigating from Sidebar).
-  // setState inside the effect is intentional — URL params are external state
-  // that must be mirrored into local state to drive rendering.
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (tab && TAB_TO_ITEM[tab]) setActiveItem(TAB_TO_ITEM[tab]);
-    else if (!tab) setActiveItem('daily');
-  }, [searchParams, location.state?.activeTab]); // TAB_TO_ITEM is a stable module-level constant
+    if (tab && TAB_MAP[tab]) setActiveTab(TAB_MAP[tab]);
+    else if (!tab) setActiveTab('pipeline');
+  }, [searchParams, location.state?.activeTab]);
 
-  // Helper: switch tab and update URL
-  const switchItem = (itemId) => {
-    setDrillCompanyId(null);
-    setActiveItem(itemId);
-    const tab = ITEM_TO_TAB[itemId] || 'daily-leads';
-    setSearchParams({ tab }, { replace: true });
+  const switchTab = (tabId) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId }, { replace: true });
   };
 
-  const section = NAV_SECTIONS.find(s => s.id === activeSection);
+  const userInitials = (user?.email || 'SN').slice(0, 2).toUpperCase();
 
-  const handleSectionClick = (sec) => {
-    if (sec.locked) return;
-    if (sec.route) { navigate(sec.route); return; }
-    if (sec.directTo) {
-      setDrillCompanyId(null);
-      setActiveSection(sec.directTo.section);
-      setActiveItem(sec.directTo.item);
-      const tab = ITEM_TO_TAB[sec.directTo.item] || 'daily-leads';
-      setSearchParams({ tab }, { replace: true });
-      return;
-    }
-    setDrillCompanyId(null);
-    setActiveSection(sec.id);
-    setActiveItem(sec.items[0]?.id || '');
-  };
-
-  const renderMain = () => {
-    // Company profile drill-in (overrides the current panel)
-    if (drillCompanyId) {
-      return (
-        <CompanyProfileView
-          companyId={drillCompanyId}
-          onBack={() => setDrillCompanyId(null)}
-        />
-      );
-    }
-
-    if (activeItem === 'daily')       return <DailyLeads onNavigate={switchItem} />;
-    if (activeItem === 'saved')       return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
-    if (activeItem === 'all')         return <AllLeads mode="scout" />;
-    if (activeItem === 'comsearch')   return <CompanySearch />;
-    if (activeItem === 'scoutplus')   return <ScoutPlus />;
-    if (activeItem === 'icpsettings') return <ICPSettings />;
-    // Placeholder for any future unbuilt sections
-    const item = section?.items.find(i => i.id === activeItem);
-    return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-        <div style={{ textAlign: 'center', color: T.textFaint }}>
-          {item?.Icon && <item.Icon size={44} color={T.textFaint} style={{ marginBottom: 12, opacity: 0.4 }} />}
-          <div style={{ fontSize: 12, color: T.textMuted, letterSpacing: 1 }}>{item?.label?.toUpperCase()}</div>
-          <div style={{ fontSize: 11, marginTop: 5, color: T.textFaint }}>{item?.desc}</div>
-        </div>
+  const renderMain = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {activeTab === 'pipeline'  && <PipelineSection />}
+        {activeTab === 'targets'   && <TargetsSection />}
+        {activeTab === 'touches'   && <TouchesSection />}
+        {activeTab === 'playbooks' && <PlaybooksSection />}
+        {activeTab === 'outcomes'  && <OutcomesSection />}
       </div>
-    );
-  };
+    </div>
+  );
 
-  const userInitials = (user?.email || 'AW').slice(0, 2).toUpperCase();
-
-  // ── Mobile layout ────────────────────────────────────────────────────────────
-  // Bottom nav items: the 5 most navigable scout sub-items (Scout+ is a CTA, not a nav target)
-  const MOBILE_BOTTOM_NAV = [
-    { id: 'daily',       label: 'Daily',   Icon: Zap       },
-    { id: 'saved',       label: 'Saved',   Icon: Building2 },
-    { id: 'all',         label: 'People',  Icon: Users     },
-    { id: 'comsearch',   label: 'Search',  Icon: Search    },
-    { id: 'icpsettings', label: 'ICP',     Icon: Settings  },
-  ];
-
+  // ── Mobile layout ──────────────────────────────────────────────────────────
   if (isMobile) {
     return (
       <div style={{
@@ -301,140 +240,93 @@ function ScoutShellInner({ user }) {
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
           * { box-sizing: border-box; }
-          button, input { font-family: Inter, system-ui, sans-serif; }
+          button, input, select, textarea { font-family: Inter, system-ui, sans-serif; }
           ::-webkit-scrollbar { width: 3px; height: 3px; }
           ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
           @keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
-          @keyframes slideIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
-          @keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
           @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-          input::placeholder { color: ${T.textFaint}; }
+          input::placeholder, textarea::placeholder { color: ${T.textFaint}; }
         `}</style>
 
-        {/* ── Mobile top bar ── */}
+        {/* Mobile top bar */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '8px 10px', borderBottom: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
           background: T.railBg, flexShrink: 0, zIndex: 2,
         }}>
-          {/* Logo */}
-          <div style={{
-            width: 26, height: 26, borderRadius: 7,
-            background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, overflow: 'hidden',
-          }}>
-            <img src={ASSETS.logoMark} alt="Idynify"
+          <div
+            onClick={() => navigate('/mission-control-v2')}
+            title="Mission Control"
+            style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
+              boxShadow: `0 2px 10px ${BRAND.pink}40`,
+            }}
+          >
+            <img src={ASSETS.logoMark} alt="Mission Control"
               style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
             />
           </div>
-
-          {/* Section nav icons */}
-          <div style={{ flex: 1, display: 'flex', gap: 3, overflowX: 'auto' }}>
-            {NAV_SECTIONS.map(sec => {
-              // PEOPLE (directTo) is active when its target item is selected
-              // SCOUT is active only when not in a directTo sub-view
-              const hasActiveDirectTo = NAV_SECTIONS.some(
-                s => s.directTo && s.directTo.section === 'scout' && activeItem === s.directTo.item
-              );
-              const active = sec.directTo
-                ? (activeSection === sec.directTo.section && activeItem === sec.directTo.item)
-                : sec.route
-                  ? location.pathname === sec.route
-                  : sec.id === 'scout'
-                    ? (activeSection === 'scout' && !hasActiveDirectTo)
-                    : activeSection === sec.id;
-              return (
-                <button
-                  key={sec.id}
-                  onClick={() => !sec.locked && handleSectionClick(sec)}
-                  title={sec.label}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 2, padding: '4px 8px', borderRadius: 8, flexShrink: 0,
-                    background: active ? T.accentBg : 'transparent',
-                    border: `1px solid ${active ? T.accentBdr : 'transparent'}`,
-                    cursor: sec.locked ? 'not-allowed' : 'pointer',
-                    opacity: sec.locked ? 0.32 : 1,
-                    transition: 'all 0.15s',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  <sec.Icon size={13} color={active ? BRAND.pink : T.textFaint} />
-                  <span style={{ fontSize: 7, letterSpacing: 0.6, fontWeight: active ? 700 : 400, color: active ? BRAND.pink : T.textFaint, lineHeight: 1 }}>
-                    {sec.label}
-                  </span>
-                </button>
-              );
-            })}
+          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
+            {SNIPER_ITEMS.find(i => i.id === activeTab)?.label || 'SNIPER'}
           </div>
-
-          {/* Controls */}
           <div
             onClick={() => navigate('/settings')}
             title="Settings"
             style={{
-              width: 30, height: 30, borderRadius: 8,
-              background: T.accentBg, border: `1px solid ${T.accentBdr}`,
+              width: 34, height: 34, borderRadius: 9,
+              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : T.accentBg,
+              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : T.accentBdr}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', flexShrink: 0,
+              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
             }}
           >
-            <Settings size={14} color={SETTINGS_ORANGE} />
+            <SettingsIcon size={16} color={SETTINGS_ORANGE} />
           </div>
           <ThemePicker />
         </div>
 
-        {/* ── Mobile main content ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
-          {renderMain()}
-        </div>
-
-        {/* ── Mobile bottom nav ── */}
+        {/* Mobile horizontal tab nav */}
         <div style={{
-          display: 'flex', flexShrink: 0,
-          background: T.railBg, borderTop: `1px solid ${T.border}`,
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          display: 'flex', overflowX: 'auto', flexShrink: 0,
+          background: T.navBg, borderBottom: `1px solid ${T.border}`,
+          padding: '0 6px',
         }}>
-          {MOBILE_BOTTOM_NAV.map(it => {
-            const active = activeItem === it.id;
+          {SNIPER_ITEMS.map(it => {
+            const active = activeTab === it.id;
             return (
-              <button
+              <div
                 key={it.id}
-                onClick={() => switchItem(it.id)}
+                onClick={() => switchTab(it.id)}
                 style={{
-                  flex: 1, display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center',
-                  gap: 3, padding: '10px 4px',
-                  background: 'transparent', border: 'none',
-                  cursor: 'pointer', minHeight: 56,
-                  color: active ? BRAND.pink : T.textFaint,
-                  transition: 'color 0.15s',
-                  WebkitTapHighlightColor: 'transparent',
-                  position: 'relative',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '9px 12px', flexShrink: 0,
+                  borderBottom: `2px solid ${active ? SNIPER_TEAL : 'transparent'}`,
+                  color: active ? SNIPER_TEAL : T.textMuted,
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  transition: 'all 0.12s',
                 }}
               >
-                {active && (
-                  <div style={{
-                    position: 'absolute', top: 0, left: '20%', right: '20%', height: 2,
-                    background: BRAND.pink, borderRadius: '0 0 2px 2px',
-                    boxShadow: `0 0 8px ${BRAND.pink}`,
-                  }} />
-                )}
-                <it.Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-                <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, letterSpacing: 0.3, lineHeight: 1 }}>
-                  {it.label}
-                </span>
-              </button>
+                <it.Icon size={12} />
+                {it.label}
+              </div>
             );
           })}
+        </div>
+
+        {/* Mobile main content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+          {renderMain()}
         </div>
       </div>
     );
   }
 
-  // ── Desktop layout ───────────────────────────────────────────────────────────
+  // ── Desktop layout ─────────────────────────────────────────────────────────
   return (
     <div style={{
       display: 'flex', height: '100vh', width: '100%',
@@ -445,14 +337,14 @@ function ScoutShellInner({ user }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
-        button, input { font-family: Inter, system-ui, sans-serif; }
+        button, input, select, textarea { font-family: Inter, system-ui, sans-serif; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
         @keyframes twinkle  { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
         @keyframes slideIn  { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
         @keyframes slideUp  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
         @keyframes fadeUp   { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-        input::placeholder  { color: ${T.textFaint}; }
+        input::placeholder, textarea::placeholder  { color: ${T.textFaint}; }
       `}</style>
 
       {T.particles && <Particles />}
@@ -488,38 +380,35 @@ function ScoutShellInner({ user }) {
           />
         </div>
 
-        {NAV_SECTIONS.map(sec => {
-          const active = sec.directTo
-            ? (activeSection === sec.directTo.section && activeItem === sec.directTo.item)
-            : activeSection === sec.id;
+        {/* Module icons */}
+        {MODULE_RAIL.map(mod => {
+          const active = mod.id === 'sniper';
           return (
             <div
-              key={sec.id}
-              onClick={() => handleSectionClick(sec)}
-              title={sec.label}
+              key={mod.id}
+              onClick={() => { if (mod.route) navigate(mod.route); }}
+              title={mod.label}
               style={{
                 width: 40, height: 40, borderRadius: 10,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                cursor: sec.locked ? 'not-allowed' : 'pointer',
-                background: active ? T.accentBg : 'transparent',
-                border: `1px solid ${active ? T.accentBdr : 'transparent'}`,
+                cursor: 'pointer',
+                background: active ? `${SNIPER_TEAL}18` : 'transparent',
+                border: `1px solid ${active ? SNIPER_TEAL + '50' : 'transparent'}`,
                 gap: 1, transition: 'all 0.15s', marginBottom: 2,
-                opacity: sec.locked ? 0.32 : 1,
               }}
-              onMouseEnter={e => { if (!active && !sec.locked) e.currentTarget.style.background = T.surface; }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
-              <sec.Icon size={14} color={active ? BRAND.pink : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? BRAND.pink : T.textFaint, marginTop: 1 }}>
-                {sec.label}
+              <mod.Icon size={14} color={active ? SNIPER_TEAL : T.textFaint} />
+              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? SNIPER_TEAL : T.textFaint, marginTop: 1 }}>
+                {mod.label}
               </span>
             </div>
           );
         })}
 
-        {/* Bottom: Mission Control + Settings + Theme + Barry */}
+        {/* Bottom: Home + Settings + Theme + Barry */}
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center' }}>
-          {/* Mission Control rail icon */}
           <div
             onClick={() => navigate('/mission-control-v2')}
             title="Mission Control"
@@ -527,18 +416,14 @@ function ScoutShellInner({ user }) {
               width: 40, height: 40, borderRadius: 10,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', gap: 1, transition: 'all 0.15s',
-              background: 'transparent',
-              border: '1px solid transparent',
+              background: 'transparent', border: '1px solid transparent',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${BRAND.pink}40`; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
           >
             <Home size={14} color={T.textFaint} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: T.textFaint }}>
-              MC
-            </span>
+            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: T.textFaint }}>MC</span>
           </div>
-          {/* Settings rail icon */}
           <div
             onClick={() => navigate('/settings')}
             title="SETTINGS"
@@ -553,7 +438,7 @@ function ScoutShellInner({ user }) {
             onMouseEnter={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid rgba(250,170,32,0.3)`; } }}
             onMouseLeave={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; } }}
           >
-            <Settings size={14} color={location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint} />
+            <SettingsIcon size={14} color={location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint} />
             <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint }}>
               SET
             </span>
@@ -575,44 +460,56 @@ function ScoutShellInner({ user }) {
         overflow: 'hidden',
       }}>
         <div style={{ width: 190, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div style={{ padding: '13px 13px 9px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          {/* Sub-nav header */}
+          <div style={{
+            padding: '13px 13px 9px',
+            borderBottom: `1px solid ${T.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, marginBottom: 1 }}>
-                {section?.label}
+              <div style={{ fontSize: 9, letterSpacing: 2, color: SNIPER_TEAL, fontWeight: 700, marginBottom: 1 }}>
+                SNIPER
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{section?.items.length} modules</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>Conversion pipeline</div>
             </div>
             <div
-              onClick={() => { setSubNavOpen(false); localStorage.setItem('scout_subnav_collapsed', 'true'); }}
+              onClick={() => { setSubNavOpen(false); localStorage.setItem('sniper_subnav_collapsed', 'true'); }}
               title="Collapse sidebar"
-              style={{ width: 22, height: 22, borderRadius: 6, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+              style={{
+                width: 22, height: 22, borderRadius: 6,
+                background: T.surface, border: `1px solid ${T.border2}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+              }}
             >
               <ChevronLeft size={12} color={T.textFaint} />
             </div>
           </div>
 
+          {/* Sub-nav items */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
-            {section?.items.map(it => {
-              const active = activeItem === it.id;
+            {SNIPER_ITEMS.map(it => {
+              const active = activeTab === it.id;
               return (
                 <div
                   key={it.id}
-                  onClick={() => switchItem(it.id)}
+                  onClick={() => switchTab(it.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                    background: active ? T.accentBg : 'transparent',
-                    borderLeft: `2px solid ${active ? BRAND.pink : 'transparent'}`,
+                    background: active ? `${SNIPER_TEAL}12` : 'transparent',
+                    borderLeft: `2px solid ${active ? SNIPER_TEAL : 'transparent'}`,
                     transition: 'all 0.12s',
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <it.Icon size={13} color={active ? BRAND.pink : T.textFaint} style={{ flexShrink: 0 }} />
+                  <it.Icon size={13} color={active ? SNIPER_TEAL : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? BRAND.pink : T.textMuted,
+                      color: active ? SNIPER_TEAL : T.textMuted,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.label}
@@ -625,8 +522,11 @@ function ScoutShellInner({ user }) {
           </div>
 
           {/* User footer */}
-          <div style={{ padding: '9px 11px', borderTop: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-            <Av initials={userInitials} color={BRAND.pink} size={24} />
+          <div style={{
+            padding: '9px 11px', borderTop: `1px solid ${T.border}`,
+            display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
+          }}>
+            <Av initials={userInitials} color={SNIPER_TEAL} size={24} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.email || 'user@idynify.com'}
@@ -639,10 +539,10 @@ function ScoutShellInner({ user }) {
         </div>
       </div>
 
-      {/* Sub-nav expand button (shown when collapsed) */}
+      {/* Sub-nav expand button (when collapsed) */}
       {!subNavOpen && (
         <div
-          onClick={() => { setSubNavOpen(true); localStorage.setItem('scout_subnav_collapsed', 'false'); }}
+          onClick={() => { setSubNavOpen(true); localStorage.setItem('sniper_subnav_collapsed', 'false'); }}
           title="Expand sidebar"
           style={{
             position: 'absolute', left: 60, top: 13, zIndex: 3,
@@ -668,8 +568,8 @@ function ScoutShellInner({ user }) {
   );
 }
 
-// ─── ScoutMain (public export) ────────────────────────────────────────────────
-export default function ScoutMain() {
+// ─── SniperMain (public export) ───────────────────────────────────────────────
+export default function SniperMain() {
   const [user, setUser] = useState(auth.currentUser);
 
   useEffect(() => {
@@ -677,7 +577,5 @@ export default function ScoutMain() {
     return unsub;
   }, []);
 
-  return (
-    <ScoutShellInner user={user} />
-  );
+  return <SniperShellInner user={user} />;
 }

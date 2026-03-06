@@ -101,21 +101,20 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
     {
       id: 'sniper',
       label: 'SNIPER',
-      description: 'Advanced targeting & personalization',
-      stat: 'Precision engagement — coming soon',
+      description: 'Post-demo conversion pipeline',
+      stat: 'Convert warm prospects to customers',
       badge: null,
-      // Color theme: teal (locked/coming-soon styling)
       accent: '#14b8a6',
       accentAlt: '#0f766e',
-      borderClass: 'border-teal-700/30',
-      glowStyle: {},
+      borderClass: 'border-teal-500/40',
+      glowStyle: { boxShadow: '0 0 18px rgba(20, 184, 166, 0.2)' },
       gradientClass: null,
       shadowClass: '',
       bgGradient: 'from-teal-900/10 to-transparent',
       icon: <SniperIcon />,
-      btnLabel: null,
-      onClick: null,
-      locked: true,
+      btnLabel: 'Open SNIPER →',
+      onClick: () => onNavigate('/sniper'),
+      locked: false,
     },
   ];
 

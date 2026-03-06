@@ -55,9 +55,9 @@
             "id": "sniper",
             "label": "SNIPER",
             "icon": "crosshair",
-            "route": "/mission-control/sniper",
-            "disabled": true,
-            "locked": true
+            "route": "/sniper",
+            "disabled": false,
+            "locked": false
           }
         ]
       },
@@ -480,28 +480,28 @@
       {
         "id": "sniper",
         "name": "SNIPER",
-        "description": "Precision outreach and campaign execution",
+        "description": "Post-demo conversion pipeline — convert warm prospects to customers",
         "order": 3,
-        "status": "locked",
-        "unlocked": false,
+        "status": "unlocked",
+        "unlocked": true,
         "startedAt": null,
         "completedAt": null,
-        "totalSections": 0,
+        "totalSections": 5,
         "completedSections": 0,
         "progressPercentage": 0,
         "controls": {
-          "canStart": false,
-          "canContinue": false,
-          "canViewSummary": false,
-          "canEdit": false,
+          "canStart": true,
+          "canContinue": true,
+          "canViewSummary": true,
+          "canEdit": true,
           "canExport": false
         },
-        "sections": [],
+        "sections": ["pipeline", "targets", "touches", "playbooks", "outcomes"],
         "outputs": {},
         "navigation": {
           "nextSection": null,
           "previousSection": null,
-          "canProceed": false,
+          "canProceed": true,
           "requiresAllSections": false
         }
       }

@@ -70,6 +70,9 @@ import MainLayout from './components/layout/MainLayout';
 
 // Hunter Pages
 import HunterMain from './pages/Hunter/HunterMain';
+
+// Sniper Pages
+import SniperMain from './pages/Sniper/SniperMain';
 import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
 import CreateCampaign from './pages/Hunter/CreateCampaign';
 import CampaignDetail from './pages/Hunter/CampaignDetail';
@@ -444,6 +447,16 @@ function App() {
           element={
             <ProtectedRoute>
               <HunterMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Sniper Module — self-contained two-column shell (no MainLayout) */}
+        <Route
+          path="/sniper"
+          element={
+            <ProtectedRoute>
+              <SniperMain />
             </ProtectedRoute>
           }
         />

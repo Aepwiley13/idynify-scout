@@ -11,12 +11,18 @@ import QuickLaunchStrip from '../components/dashboard/QuickLaunchStrip';
 import MissionCardDeck from '../components/dashboard/MissionCardDeck';
 import AttentionCarousel from '../components/dashboard/AttentionCarousel';
 import ModuleNavigationGrid from '../components/dashboard/ModuleNavigationGrid';
+import BottomNav from '../components/layout/BottomNav';
+import { useThemeCtx } from '../theme/ThemeContext';
+import { THEMES } from '../theme/tokens';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const { themeId, setThemeId } = useThemeCtx();
+  const isLightTheme = !THEMES[themeId]?.isDark;
   const [hasCompletedICP, setHasCompletedICP] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [stats, setStats] = useState({
@@ -186,7 +192,7 @@ export default function MissionControlDashboardV2() {
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden text-white">
+    <div className="mc-v2-root min-h-screen bg-black relative overflow-hidden text-white">
       {/* Starfield Background */}
       <div className="absolute inset-0 overflow-hidden">
         {[...Array(200)].map((_, i) => (
@@ -221,8 +227,8 @@ export default function MissionControlDashboardV2() {
         </svg>
       </div>
 
-      {/* LOGOUT and ADMIN Buttons */}
-      <div className="absolute top-6 right-6 z-50 flex items-center gap-3">
+      {/* LOGOUT and ADMIN Buttons — hidden on mobile (accessible via More sheet) */}
+      <div className="mc-top-actions absolute top-6 right-6 z-50 flex items-center gap-3">
         {isAdmin && (
           <button
             onClick={() => navigate('/admin')}
@@ -240,18 +246,17 @@ export default function MissionControlDashboardV2() {
       </div>
 
       {/* HEADER */}
-      <header className="relative z-40 pt-12 pb-8 border-b border-cyan-500/20 backdrop-blur-sm bg-black/30">
-        <div className="max-w-7xl mx-auto px-6">
+      <header className="relative z-40 pt-10 pb-6 md:pt-12 md:pb-8 border-b border-cyan-500/20 backdrop-blur-sm bg-black/30">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           {/* Barry the AI Assistant - Top Left */}
-          <div className="absolute left-8 top-8 flex items-center gap-3 group">
+          <div className="hidden md:flex absolute left-8 top-8 items-center gap-3 group">
             <div className="relative">
               <div className="flex items-center justify-center group-hover:scale-110 transition-transform">
                 <span className="text-6xl">🐻</span>
               </div>
-              {/* Star decoration */}
               <div className="absolute -top-2 -right-2 text-2xl animate-pulse">⭐</div>
             </div>
-            <div className="hidden md:block">
+            <div>
               <p className="text-white font-semibold text-sm">Barry the AI Assistant</p>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -261,13 +266,13 @@ export default function MissionControlDashboardV2() {
           </div>
 
           <div className="text-center">
-            <h1 className="text-6xl font-bold tracking-wider font-mono text-white mb-3" style={{
+            <h1 className="mc-title text-3xl md:text-6xl font-bold tracking-wider font-mono text-white mb-2 md:mb-3" style={{
               textShadow: '0 0 20px rgba(6, 182, 212, 0.8), 0 0 40px rgba(139, 92, 246, 0.4)',
-              letterSpacing: '0.15em'
+              letterSpacing: '0.1em'
             }}>
               MISSION CONTROL
             </h1>
-            <div className="flex items-center justify-center gap-3 text-cyan-400 font-mono text-sm">
+            <div className="flex items-center justify-center gap-3 text-cyan-400 font-mono text-xs md:text-sm">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span>System ready for deployment</span>
             </div>
@@ -276,7 +281,7 @@ export default function MissionControlDashboardV2() {
       </header>
 
       {/* MAIN */}
-      <main className="max-w-7xl mx-auto px-6 py-16 relative z-10">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-16 relative z-10">
         {/* BARRY CHAT PANEL — Mission Co-pilot */}
         {userId && <BarryChatPanel userId={userId} />}
 
@@ -394,6 +399,71 @@ export default function MissionControlDashboardV2() {
         </div>
       )}
 
+      {/* Mobile Bottom Navigation */}
+      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+
+      {/* Mobile More Sheet */}
+      {moreSheetOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(4px)', zIndex: 300, display: 'flex',
+            alignItems: 'flex-end',
+          }}
+          onClick={() => setMoreSheetOpen(false)}
+        >
+          <div
+            style={{
+              background: '#0f0f14', borderRadius: '1.25rem 1.25rem 0 0',
+              padding: '0 0 env(safe-area-inset-bottom, 0px)',
+              width: '100%', borderTop: '1px solid #1e1e2e',
+              animation: 'mcSheetUp 0.25s cubic-bezier(0.4,0,0.2,1)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ width: 40, height: 4, background: '#2d2d44', borderRadius: 2, margin: '12px auto 0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 8px', borderBottom: '1px solid #1e1e2e' }}>
+              <span style={{ fontSize: '1rem', fontWeight: 600, color: '#f1f5f9' }}>More</span>
+              <button onClick={() => setMoreSheetOpen(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#1e1e2e', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 20px' }}>
+              {[
+                { label: 'People', icon: '👥', action: () => { navigate('/people'); setMoreSheetOpen(false); } },
+                { label: 'Settings', icon: '⚙️', action: () => { navigate('/settings'); setMoreSheetOpen(false); } },
+                { label: isLightTheme ? 'Dark Mode' : 'Light Mode', icon: isLightTheme ? '🌙' : '☀️', action: () => { setThemeId(isLightTheme ? 'mission' : 'workspace'); setMoreSheetOpen(false); } },
+                isAdmin ? { label: 'Admin', icon: '🔧', action: () => { navigate('/admin'); setMoreSheetOpen(false); } } : null,
+              ].filter(Boolean).map(item => (
+                <button
+                  key={item.label}
+                  onClick={item.action}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 6, padding: '16px 8px', background: '#1a1a2e', border: '1px solid #2d2d44',
+                    borderRadius: '1rem', color: '#cbd5e1', fontSize: '0.8125rem', fontWeight: 500,
+                    cursor: 'pointer', minHeight: 80, WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={async () => { setMoreSheetOpen(false); await handleLogout(); }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                width: 'calc(100% - 40px)', margin: '0 20px 20px',
+                padding: '14px', background: '#1f0a0a', border: '1px solid #7f1d1d',
+                borderRadius: '0.75rem', color: '#f87171', fontSize: '0.875rem', fontWeight: 600,
+                cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              👤 Log out
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes twinkle {
           0%, 100% { opacity: 0.3; }
@@ -415,8 +485,21 @@ export default function MissionControlDashboardV2() {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.08); }
         }
+        @keyframes mcSheetUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
         .grayscale {
           filter: grayscale(100%);
+        }
+        /* Mobile: add bottom padding so content isn't hidden behind bottom nav */
+        @media (max-width: 768px) {
+          .mc-v2-root {
+            padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+          }
+          .mc-top-actions {
+            display: none;
+          }
         }
       `}</style>
     </div>

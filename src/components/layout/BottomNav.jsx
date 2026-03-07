@@ -54,10 +54,12 @@ export default function BottomNav({ onOpenMore }) {
 
   const isActive = (item) => {
     if (!item.path) return false;
-    if (item.id === 'scout') {
-      return location.pathname === '/scout' || location.pathname.startsWith('/scout/') && item.id !== 'game';
-    }
     if (item.id === 'game') return location.pathname === '/scout/game';
+    if (item.id === 'scout') {
+      // Active on /scout and /scout/* but NOT on /scout/game (that's the Game tab)
+      return (location.pathname === '/scout' || location.pathname.startsWith('/scout/')) &&
+        !location.pathname.startsWith('/scout/game');
+    }
     if (item.id === 'recon') return location.pathname === '/recon' || location.pathname.startsWith('/recon/');
     if (item.id === 'hunter') return location.pathname === '/hunter' || location.pathname.startsWith('/hunter/');
     return location.pathname === item.path;

@@ -1405,7 +1405,7 @@ export default function AllLeads({ mode = 'people' }) {
                     c.company_id && companies[c.company_id]
                       ? () => navigate(`/scout/company/${c.company_id}`)
                       : c.company_name
-                        ? () => navigate('/scout', { state: { activeTab: 'company-search', searchCompanyName: c.company_name } })
+                        ? () => navigate('/scout?tab=scout-plus', { state: { initialView: 'company-search', searchCompanyName: c.company_name } })
                         : undefined
                   }
                   isSelected={selectedIds.has(c.id)}
@@ -1444,7 +1444,7 @@ export default function AllLeads({ mode = 'people' }) {
                     c.company_id && companies[c.company_id]
                       ? () => navigate(`/scout/company/${c.company_id}`)
                       : c.company_name
-                        ? () => navigate('/scout', { state: { activeTab: 'company-search', searchCompanyName: c.company_name } })
+                        ? () => navigate('/scout?tab=scout-plus', { state: { initialView: 'company-search', searchCompanyName: c.company_name } })
                         : undefined
                   }
                 />
@@ -1621,7 +1621,6 @@ export default function AllLeads({ mode = 'people' }) {
             {[
               { label: 'Daily Discoveries', tab: 'daily-leads' },
               { label: 'Saved Companies',   tab: 'saved-companies' },
-              { label: 'Company Search',    tab: 'company-search' },
               { label: 'Scout+',            tab: 'scout-plus' },
               { label: 'ICP Settings',      tab: 'icp-settings' },
             ].map(item => (

@@ -14,7 +14,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
-  Zap, Building2, Users, Plus, Search,
+  Zap, Building2, Users, Plus,
   Palette, Check, Settings, ChevronLeft, ChevronRight, Home,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
@@ -22,7 +22,6 @@ import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import DailyLeads from './DailyLeads';
 import SavedCompanies from './SavedCompanies';
 import AllLeads from './AllLeads';
-import CompanySearch from './CompanySearch';
 import CompanyProfileView from './CompanyProfileView';
 import ScoutPlus from './ScoutPlus';
 import ICPSettings from './ICPSettings';
@@ -164,7 +163,6 @@ const NAV_SECTIONS = [
       { id: 'saved',     label: 'Saved Companies',   Icon: Building2, desc: 'Hunt list'          },
       { id: 'all',       label: 'People',             Icon: Users,     desc: 'Your network'      },
       { id: 'scoutplus',   label: 'Scout+',           Icon: Plus,     desc: 'Add contacts'       },
-      { id: 'comsearch',   label: 'Company Search',   Icon: Search,   desc: 'Find companies'     },
       { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
     ],
   },
@@ -196,9 +194,9 @@ function ScoutShellInner({ user }) {
     'daily-leads':     'daily',
     'saved-companies': 'saved',
     'all-leads':       'all',
-    'company-search':  'comsearch',
     'icp-settings':    'icpsettings',
     'scout-plus':      'scoutplus',
+    'company-search':  'scoutplus',
   };
   const ITEM_TO_TAB = Object.fromEntries(
     Object.entries(TAB_TO_ITEM).map(([k, v]) => [v, k])
@@ -263,7 +261,6 @@ function ScoutShellInner({ user }) {
     if (activeItem === 'daily')       return <DailyLeads onNavigate={switchItem} />;
     if (activeItem === 'saved')       return <SavedCompanies onSelectCompany={id => { setDrillCompanyId(id); }} />;
     if (activeItem === 'all')         return <AllLeads mode="scout" />;
-    if (activeItem === 'comsearch')   return <CompanySearch />;
     if (activeItem === 'scoutplus')   return <ScoutPlus />;
     if (activeItem === 'icpsettings') return <ICPSettings />;
     // Placeholder for any future unbuilt sections
@@ -287,7 +284,7 @@ function ScoutShellInner({ user }) {
     { id: 'daily',       label: 'Daily',   Icon: Zap       },
     { id: 'saved',       label: 'Saved',   Icon: Building2 },
     { id: 'all',         label: 'People',  Icon: Users     },
-    { id: 'comsearch',   label: 'Search',  Icon: Search    },
+    { id: 'scoutplus',   label: 'Scout+',  Icon: Plus      },
     { id: 'icpsettings', label: 'ICP',     Icon: Settings  },
   ];
 

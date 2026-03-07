@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2 } from 'lucide-react';
+import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2, Search } from 'lucide-react';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
 import BusinessCardCapture from '../../components/scout/BusinessCardCapture';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
+import CompanySearch from './CompanySearch';
 import { useT } from '../../theme/ThemeContext';
 
 export default function ScoutPlus() {
   const navigate = useNavigate();
   const T = useT();
-  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'success'
+  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search', 'success'
   const [addedItems, setAddedItems] = useState([]);
   const [lastUploadType, setLastUploadType] = useState(null); // 'leads' or 'companies'
 
@@ -69,6 +70,7 @@ export default function ScoutPlus() {
             {currentView === 'csv' && 'Upload CSV'}
             {currentView === 'business-card' && 'Scan Business Card'}
             {currentView === 'linkedin-link' && 'LinkedIn Link'}
+            {currentView === 'company-search' && 'Company Search'}
             {currentView === 'success' && (lastUploadType === 'companies' ? 'Companies Added Successfully!' : 'Contact Added Successfully!')}
           </h2>
         </div>
@@ -149,6 +151,24 @@ export default function ScoutPlus() {
                 </div>
               </div>
             </button>
+
+            {/* Company Search */}
+            <button
+              onClick={() => setCurrentView('company-search')}
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#f59e0b'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ width: 48, height: 48, background: '#fef3c7', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Search className="w-6 h-6 text-amber-500" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Company Search</h3>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Search by company name or website URL to find and save companies.</p>
+                </div>
+              </div>
+            </button>
           </div>
         )}
 
@@ -166,6 +186,10 @@ export default function ScoutPlus() {
 
         {currentView === 'linkedin-link' && (
           <LinkedInLinkSearch onContactAdded={handleContactAdded} onCancel={handleBack} />
+        )}
+
+        {currentView === 'company-search' && (
+          <CompanySearch />
         )}
 
         {currentView === 'success' && (

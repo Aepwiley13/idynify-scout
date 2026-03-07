@@ -41,7 +41,6 @@ import AllLeads from './pages/Scout/AllLeads';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
-import ScoutPlus from './pages/Scout/ScoutPlus';
 import ScoutGame from './pages/Scout/ScoutGame';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
@@ -381,14 +380,10 @@ function App() {
           }
         />
 
-        {/* Scout+ Dedicated Page */}
+        {/* Scout+ is merged into /scout - redirect legacy URL */}
         <Route
           path="/scout-plus"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <ScoutPlus />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/scout?tab=scout-plus" replace />}
         />
 
         {/* Scout Game Mode */}

@@ -183,12 +183,13 @@ function ScoutShellInner({ user }) {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const mql = window.matchMedia('(max-width: 768px)');
+  const [isMobile, setIsMobile] = useState(() => mql.matches);
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+    const handler = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tab ↔ internal item ID mapping
   const TAB_TO_ITEM = {
@@ -299,7 +300,6 @@ function ScoutShellInner({ user }) {
         color: T.text, overflow: 'hidden', position: 'relative',
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
           * { box-sizing: border-box; }
           button, input { font-family: Inter, system-ui, sans-serif; }
           ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -352,7 +352,8 @@ function ScoutShellInner({ user }) {
                   title={sec.label}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 2, padding: '4px 8px', borderRadius: 8, flexShrink: 0,
+                    gap: 3, padding: '8px 10px', borderRadius: 8, flexShrink: 0,
+                    minHeight: 44, minWidth: 44,
                     background: active ? T.accentBg : 'transparent',
                     border: `1px solid ${active ? T.accentBdr : 'transparent'}`,
                     cursor: sec.locked ? 'not-allowed' : 'pointer',
@@ -361,8 +362,8 @@ function ScoutShellInner({ user }) {
                     WebkitTapHighlightColor: 'transparent',
                   }}
                 >
-                  <sec.Icon size={13} color={active ? BRAND.pink : T.textFaint} />
-                  <span style={{ fontSize: 7, letterSpacing: 0.6, fontWeight: active ? 700 : 400, color: active ? BRAND.pink : T.textFaint, lineHeight: 1 }}>
+                  <sec.Icon size={16} color={active ? BRAND.pink : T.textFaint} />
+                  <span style={{ fontSize: 10, letterSpacing: 0.4, fontWeight: active ? 700 : 400, color: active ? BRAND.pink : T.textFaint, lineHeight: 1 }}>
                     {sec.label}
                   </span>
                 </button>
@@ -443,7 +444,6 @@ function ScoutShellInner({ user }) {
       transition: 'background 0.25s, color 0.25s',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         button, input { font-family: Inter, system-ui, sans-serif; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }

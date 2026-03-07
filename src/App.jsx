@@ -435,7 +435,7 @@ function App() {
         <Route
           path="/scout/contact/:contactId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <ContactProfile />
             </ProtectedRoute>
           }

@@ -824,6 +824,7 @@ export default function UserSettings() {
               </div>
             </section>
 
+            <section className="us-section">
               {/* Google Calendar card */}
               <div className={`us-card ${calStatus === 'connected' ? '' : 'us-card--action'}`} style={{ marginTop: '12px' }}>
                 <div className="us-card-icon" style={{ background: 'rgba(52,211,153,0.1)', borderColor: 'rgba(52,211,153,0.2)', color: '#6ee7b7' }}>

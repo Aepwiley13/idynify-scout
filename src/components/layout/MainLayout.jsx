@@ -2,14 +2,19 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
-import { LogOut, User, Menu, Settings } from 'lucide-react';
+import { LogOut, User, Menu, Settings, Home, Users, X } from 'lucide-react';
 import { auth } from '../../firebase/config';
+import { useThemeCtx } from '../../theme/ThemeContext';
+import { THEMES } from '../../theme/tokens';
 import './MainLayout.css';
 
 const MainLayout = ({ children, user }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const { themeId, setThemeId } = useThemeCtx();
+  const isLightTheme = !THEMES[themeId]?.isDark;
 
   const handleLogout = async () => {
     try {
@@ -150,7 +155,54 @@ const MainLayout = ({ children, user }) => {
       </div>
 
       {/* Bottom Navigation — mobile only (rendered outside main-content so it's always fixed) */}
-      <BottomNav />
+      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+
+      {/* More Sheet — slide-up overlay for secondary navigation on mobile */}
+      {moreSheetOpen && (
+        <div className="more-sheet-backdrop" onClick={() => setMoreSheetOpen(false)}>
+          <div className="more-sheet" onClick={e => e.stopPropagation()}>
+            <div className="more-sheet-handle" />
+            <div className="more-sheet-header">
+              <span className="more-sheet-title">More</span>
+              <button className="more-sheet-close" onClick={() => setMoreSheetOpen(false)} aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="more-sheet-grid">
+              <button className="more-sheet-item" onClick={() => { navigate('/mission-control-v2'); setMoreSheetOpen(false); }}>
+                <Home size={22} />
+                <span>Mission Control</span>
+              </button>
+              <button className="more-sheet-item" onClick={() => { navigate('/people'); setMoreSheetOpen(false); }}>
+                <Users size={22} />
+                <span>People</span>
+              </button>
+              <button className="more-sheet-item" onClick={() => { navigate('/settings'); setMoreSheetOpen(false); }}>
+                <Settings size={22} />
+                <span>Settings</span>
+              </button>
+              <button
+                className="more-sheet-item"
+                onClick={() => { setThemeId(isLightTheme ? 'mission' : 'workspace'); setMoreSheetOpen(false); }}
+              >
+                <span style={{ fontSize: 22, lineHeight: 1 }}>{isLightTheme ? '🌙' : '☀️'}</span>
+                <span>{isLightTheme ? 'Dark Mode' : 'Light Mode'}</span>
+              </button>
+            </div>
+
+            {user && (
+              <button
+                className="more-sheet-logout"
+                onClick={async () => { await auth.signOut(); navigate('/login'); }}
+              >
+                <LogOut size={18} />
+                <span>Log out</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -11,10 +11,12 @@ import {
   executeSendAction,
   resolveSendMethod,
   checkGmailConnection,
+  checkCalendarConnection,
   CHANNELS,
   SEND_RESULT,
   getActionLabels
 } from '../../utils/sendActionResolver';
+import ContactCalendarView from './ContactCalendarView';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import { getSequencePlan } from '../../utils/sequenceEngine';
@@ -77,6 +79,11 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // Gmail connection status
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailChecking, setGmailChecking] = useState(false);
+
+  // Google Calendar connection status
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarEmail, setCalendarEmail] = useState('');
+  const [showCalendarView, setShowCalendarView] = useState(false);
 
   // Send result tracking (for honest UX)
   const [sendResult, setSendResult] = useState(null); // { result, message, method }
@@ -154,6 +161,19 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     }
   }
 
+  async function checkCalendarStatus() {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const status = await checkCalendarConnection(user.uid);
+      setCalendarConnected(status.connected);
+      if (status.connected && status.email) setCalendarEmail(status.email);
+    } catch (error) {
+      console.error('Error checking Calendar status:', error);
+      setCalendarConnected(false);
+    }
+  }
+
   async function loadData() {
     try {
       const user = auth.currentUser;
@@ -177,6 +197,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
       // Check Gmail connection status
       checkGmailStatus();
+
+      // Check Google Calendar connection
+      checkCalendarStatus();
 
       // Load Barry's proactive recommendations (Step 7, non-blocking)
       loadDrawerRecommendations(user.uid, contact.id);
@@ -894,6 +917,28 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Google Calendar — upcoming meetings with this contact */}
+              <div className="contact-calendar-section" style={{ marginTop: '12px' }}>
+                <div
+                  className="calendar-section-toggle"
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: calendarConnected ? '#6ee7b7' : '#6b7280', marginBottom: showCalendarView ? '8px' : '0' }}
+                  onClick={() => setShowCalendarView(v => !v)}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  {calendarConnected
+                    ? (showCalendarView ? 'Hide calendar' : 'View meetings & schedule')
+                    : 'Connect Calendar to schedule meetings'
+                  }
+                </div>
+                {showCalendarView && (
+                  <ContactCalendarView
+                    contact={contact}
+                    calendarConnected={calendarConnected}
+                    calendarEmail={calendarEmail}
+                  />
+                )}
               </div>
 
               {/* Active Missions (if any) */}

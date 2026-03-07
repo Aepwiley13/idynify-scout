@@ -36,6 +36,35 @@ export const CHANNELS = {
 };
 
 /**
+ * Check if Google Calendar is connected for a user
+ */
+export async function checkCalendarConnection(userId) {
+  try {
+    const calDoc = await getDoc(
+      doc(db, 'users', userId, 'integrations', 'googleCalendar')
+    );
+
+    if (!calDoc.exists()) {
+      return { connected: false, reason: 'not_setup' };
+    }
+
+    const data = calDoc.data();
+    if (data.status !== 'connected') {
+      return { connected: false, reason: 'expired' };
+    }
+
+    if (data.expiresAt && Date.now() >= data.expiresAt - 300000) {
+      return { connected: true, mayNeedRefresh: true };
+    }
+
+    return { connected: true, email: data.email };
+  } catch (error) {
+    console.error('Error checking Calendar connection:', error);
+    return { connected: false, reason: 'error' };
+  }
+}
+
+/**
  * Check if Gmail is connected for a user
  */
 export async function checkGmailConnection(userId) {
@@ -100,8 +129,11 @@ export async function resolveSendMethod(channel, userId, contact) {
       return { method: 'native' };
 
     case CHANNELS.CALENDAR:
-      // No calendar integration - use native
-      return { method: 'native' };
+      const calendarStatus = await checkCalendarConnection(userId);
+      if (calendarStatus.connected) {
+        return { method: 'real', integration: 'googleCalendar' };
+      }
+      return { method: 'native', fallbackReason: 'Google Calendar not connected' };
 
     default:
       return { method: 'disabled', reason: 'Unknown channel' };
@@ -236,6 +268,56 @@ export function openLinkedInMessage({ contact, body }) {
 }
 
 /**
+ * OPTION A: Create calendar event via Google Calendar API
+ */
+export async function createCalendarEventViaApi({ userId, contact, title, description, startDateTime, endDateTime, timeZone, location }) {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Not authenticated');
+
+    const authToken = await user.getIdToken();
+
+    const response = await fetch('/.netlify/functions/calendar-create-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        authToken,
+        title,
+        description,
+        startDateTime,
+        endDateTime,
+        timeZone: timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        attendeeEmail: contact.email || null,
+        attendeeName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || null,
+        contactId: contact.id,
+        location: location || ''
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create calendar event');
+    }
+
+    return {
+      result: SEND_RESULT.SENT,
+      eventId: data.eventId,
+      eventLink: data.eventLink,
+      message: 'Meeting scheduled via Google Calendar'
+    };
+
+  } catch (error) {
+    console.error('Calendar create event error:', error);
+    return {
+      result: SEND_RESULT.FAILED,
+      error: error.message
+    };
+  }
+}
+
+/**
  * OPTION B: Open native calendar
  */
 export function openNativeCalendar({ title, description, contact }) {
@@ -295,7 +377,12 @@ export async function executeSendAction({
   body,
   userIntent,
   engagementIntent,
-  strategy
+  strategy,
+  // Calendar-specific params
+  startDateTime,
+  endDateTime,
+  timeZone,
+  location
 }) {
   // Resolve which method to use
   const resolution = await resolveSendMethod(channel, userId, contact);
@@ -342,13 +429,30 @@ export async function executeSendAction({
       break;
 
     case CHANNELS.CALENDAR:
-      // Always Option B
-      sendResult = openNativeCalendar({
-        title: subject,
-        description: body,
-        contact
-      });
-      activityType = 'calendar_opened';
+      if (resolution.method === 'real') {
+        // Option A: Real Google Calendar event creation
+        // startDateTime / endDateTime should be passed in subject/body fields when channel is calendar
+        // The caller should pass startDateTime and endDateTime via the options object
+        sendResult = await createCalendarEventViaApi({
+          userId,
+          contact,
+          title: subject,
+          description: body,
+          startDateTime: startDateTime || null,
+          endDateTime: endDateTime || null,
+          timeZone: timeZone || null,
+          location: location || null
+        });
+        activityType = sendResult.result === SEND_RESULT.SENT ? 'meeting_scheduled' : 'calendar_failed';
+      } else {
+        // Option B: Native calendar handoff
+        sendResult = openNativeCalendar({
+          title: subject,
+          description: body,
+          contact
+        });
+        activityType = 'calendar_opened';
+      }
       break;
 
     default:
@@ -436,6 +540,7 @@ export function getActionLabels(channel, method) {
       native: { button: 'Message on LinkedIn', success: 'LinkedIn opened', icon: 'ExternalLink' }
     },
     calendar: {
+      real: { button: 'Schedule Meeting', success: 'Meeting scheduled', icon: 'Calendar' },
       native: { button: 'Create Calendar Event', success: 'Calendar opened', icon: 'Calendar' }
     }
   };

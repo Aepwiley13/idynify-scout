@@ -198,9 +198,16 @@ function ScoutShellInner({ user }) {
     'scout-plus':      'scoutplus',
     'company-search':  'scoutplus',
   };
-  const ITEM_TO_TAB = Object.fromEntries(
-    Object.entries(TAB_TO_ITEM).map(([k, v]) => [v, k])
-  );
+  // Build ITEM_TO_TAB explicitly — deriving it from Object.fromEntries(TAB_TO_ITEM) is
+  // unsafe because both 'scout-plus' and 'company-search' map to 'scoutplus', causing
+  // the last entry ('company-search') to win and produce the wrong canonical URL.
+  const ITEM_TO_TAB = {
+    'daily':       'daily-leads',
+    'saved':       'saved-companies',
+    'all':         'all-leads',
+    'icpsettings': 'icp-settings',
+    'scoutplus':   'scout-plus',
+  };
 
   // Read tab from URL (?tab=company-search) with fallback to legacy location.state
   const tabParam = searchParams.get('tab') || location.state?.activeTab || 'daily-leads';

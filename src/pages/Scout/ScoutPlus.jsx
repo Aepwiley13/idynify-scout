@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2, Search } from 'lucide-react';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
@@ -10,8 +10,12 @@ import { useT } from '../../theme/ThemeContext';
 
 export default function ScoutPlus() {
   const navigate = useNavigate();
+  const location = useLocation();
   const T = useT();
-  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search', 'success'
+  // Allow callers to deep-link into a specific view via location state (e.g. initialView: 'company-search')
+  const validViews = ['menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search'];
+  const initialView = validViews.includes(location.state?.initialView) ? location.state.initialView : 'menu';
+  const [currentView, setCurrentView] = useState(initialView); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search', 'success'
   const [addedItems, setAddedItems] = useState([]);
   const [lastUploadType, setLastUploadType] = useState(null); // 'leads' or 'companies'
 
@@ -189,7 +193,7 @@ export default function ScoutPlus() {
         )}
 
         {currentView === 'company-search' && (
-          <CompanySearch />
+          <CompanySearch onCompanyAdded={handleContactAdded} />
         )}
 
         {currentView === 'success' && (

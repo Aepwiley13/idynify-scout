@@ -18,7 +18,7 @@ import './CompanySearch.css';
  * - Prevents duplicate companies
  */
 
-export default function CompanySearch() {
+export default function CompanySearch({ onCompanyAdded } = {}) {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -124,7 +124,7 @@ export default function CompanySearch() {
       }
 
       // Add company to Firestore
-      await addDoc(companiesRef, {
+      const docRef = await addDoc(companiesRef, {
         apollo_organization_id: company.apollo_organization_id,
         name: company.name,
         industry: company.industry,
@@ -144,6 +144,13 @@ export default function CompanySearch() {
       });
 
       console.log('✅ Company added successfully');
+
+      // If embedded in Scout+, delegate to its unified success screen
+      if (onCompanyAdded) {
+        onCompanyAdded([{ ...company, id: docRef.id, _uploadType: 'companies' }]);
+        return;
+      }
+
       setSuccessMessage(`${company.name} has been added to your Saved Companies!`);
 
       // Remove from search results

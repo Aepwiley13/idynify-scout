@@ -150,13 +150,8 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     {
       icon: UserPlus,
       label: 'Scout+',
-      path: '/scout-plus'
-    },
-    {
-      icon: Search,
-      label: 'Company Search',
       path: '/scout',
-      state: { activeTab: 'company-search' }
+      state: { activeTab: 'scout-plus' }
     },
     {
       icon: TrendingUp,

@@ -212,13 +212,19 @@ export function openNativeSMS({ contact, body }) {
   const recipient = phone ? encodeURIComponent(phone) : '';
   const smsUrl = `sms:${recipient}?body=${encodeURIComponent(body || '')}`;
 
+  // Copy message to clipboard so user can paste it if the SMS body doesn't prefill
+  if (body) {
+    navigator.clipboard.writeText(body).catch(() => {});
+  }
+
   window.location.href = smsUrl;
 
   return {
     result: SEND_RESULT.OPENED,
     message: phone
-      ? 'Text message opened in your SMS app'
-      : 'SMS app opened — add the recipient and send'
+      ? 'SMS app opened — message copied to clipboard'
+      : 'SMS app opened — message copied to clipboard, add the recipient and send',
+    clipboardCopied: true
   };
 }
 
@@ -492,6 +498,8 @@ export async function executeSendAction({
       sendResult: sendResult.result,
       engagementIntent: engagementIntent || null,
       strategy: strategy || null,
+      subject: subject || null,
+      fullMessage: body || null,
       ...(sendResult.gmailMessageId && { gmailMessageId: sendResult.gmailMessageId })
     }
   });

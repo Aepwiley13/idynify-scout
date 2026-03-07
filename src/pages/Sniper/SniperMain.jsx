@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Radar, Crosshair, Eye, Target,
-  LayoutDashboard, Activity, BookOpen, BarChart3, Users,
+  LayoutDashboard, Activity, BookOpen, BarChart3, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home, Trophy,
 } from 'lucide-react';
@@ -25,11 +25,13 @@ import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import { auth } from '../../firebase/config';
 
 // Sniper sections
-import PipelineSection from './sections/PipelineSection';
-import TargetsSection  from './sections/TargetsSection';
-import TouchesSection  from './sections/TouchesSection';
-import PlaybooksSection from './sections/PlaybooksSection';
-import OutcomesSection  from './sections/OutcomesSection';
+import PipelineSection         from './sections/PipelineSection';
+import TargetsSection          from './sections/TargetsSection';
+import TouchesSection          from './sections/TouchesSection';
+import PlaybooksSection        from './sections/PlaybooksSection';
+import OutcomesSection         from './sections/OutcomesSection';
+import SniperCompaniesSection  from './sections/SniperCompaniesSection';
+import AllLeads                from '../Scout/AllLeads';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -165,11 +167,13 @@ const MODULE_RAIL = [
 
 // ─── SNIPER sub-nav items ─────────────────────────────────────────────────────
 const SNIPER_ITEMS = [
-  { id: 'pipeline',  label: 'Pipeline',  Icon: Target,         desc: 'Conversion board'  },
-  { id: 'targets',   label: 'Targets',   Icon: Users,          desc: 'All contacts'      },
-  { id: 'touches',   label: 'Touches',   Icon: Activity,       desc: 'Follow-up log'     },
+  { id: 'pipeline',  label: 'Pipeline',  Icon: Target,         desc: 'Conversion board'     },
+  { id: 'targets',   label: 'Targets',   Icon: Users,          desc: 'All contacts'         },
+  { id: 'companies', label: 'Companies', Icon: Building2,      desc: 'Saved companies'      },
+  { id: 'people',    label: 'People',    Icon: Users,          desc: 'Add to pipeline'      },
+  { id: 'touches',   label: 'Touches',   Icon: Activity,       desc: 'Follow-up log'        },
   { id: 'playbooks', label: 'Playbooks', Icon: BookOpen,       desc: 'Conversion sequences' },
-  { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,      desc: 'Win/loss analytics' },
+  { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,      desc: 'Win/loss analytics'   },
 ];
 
 const SETTINGS_ORANGE = '#faaa20';
@@ -177,6 +181,8 @@ const SETTINGS_ORANGE = '#faaa20';
 const TAB_MAP = {
   pipeline:  'pipeline',
   targets:   'targets',
+  companies: 'companies',
+  people:    'people',
   touches:   'touches',
   playbooks: 'playbooks',
   outcomes:  'outcomes',
@@ -221,6 +227,8 @@ function SniperShellInner({ user }) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {activeTab === 'pipeline'  && <PipelineSection />}
         {activeTab === 'targets'   && <TargetsSection />}
+        {activeTab === 'companies' && <SniperCompaniesSection />}
+        {activeTab === 'people'    && <AllLeads mode="sniper" />}
         {activeTab === 'touches'   && <TouchesSection />}
         {activeTab === 'playbooks' && <PlaybooksSection />}
         {activeTab === 'outcomes'  && <OutcomesSection />}

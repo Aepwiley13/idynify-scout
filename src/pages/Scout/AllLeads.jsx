@@ -5,13 +5,13 @@
  * Data: Firebase Firestore (all original data loading preserved).
  */
 import { useEffect, useState, useRef } from 'react';
-import { collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
-  Target, Plus, Loader, ArrowUpDown,
+  Target, Plus, Loader, ArrowUpDown, Crosshair,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -352,6 +352,7 @@ function AllLeadsCard({
   engageState = 'not_started', mode = 'people', onReturnToScout,
   isSelected = false, bulkMode = false, onSelect,
   onBrigadeUpdate,
+  inSniper = false, onAddToSniper,
 }) {
   const T = useT();
   const color = BRAND.pink;
@@ -508,10 +509,14 @@ function AllLeadsCard({
           </div>
         )}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 50%,transparent 100%)' }} />
-        {/* Top-right badge: Brigade in hunter mode, lead status elsewhere */}
+        {/* Top-right badge: Brigade in hunter mode, SNIPER in sniper mode, lead status elsewhere */}
         {!bulkMode && !isSelected && (
           <div style={{ position: 'absolute', top: 8, right: 8 }}>
-            {mode === 'hunter' ? (
+            {mode === 'sniper' && inSniper ? (
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: '#14b8a625', color: '#14b8a6', border: '1px solid #14b8a650' }}>
+                IN SNIPER
+              </span>
+            ) : mode === 'hunter' ? (
               <button
                 onClick={e => { e.stopPropagation(); if (!brigadeSaving) setBrigadeOpen(o => !o); }}
                 style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
@@ -650,12 +655,29 @@ function AllLeadsCard({
 
         <div style={{ display: 'flex', gap: 5 }}>
           <button
-            onClick={e => { e.stopPropagation(); if (!bulkMode) onClick && onClick(e); }}
-            style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', background: btnCfg.bg, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+            onClick={e => {
+              e.stopPropagation();
+              if (mode === 'sniper') { if (!inSniper) onAddToSniper && onAddToSniper(); }
+              else if (!bulkMode) onClick && onClick(e);
+            }}
+            style={{
+              flex: 1, padding: '7px 0', borderRadius: 7, fontSize: 11, fontWeight: 600,
+              cursor: mode === 'sniper' && inSniper ? 'default' : 'pointer',
+              border: mode === 'sniper' && inSniper ? '1px solid #14b8a640' : 'none',
+              background: mode === 'sniper' ? (inSniper ? '#14b8a615' : '#14b8a6') : btnCfg.bg,
+              color: mode === 'sniper' && inSniper ? '#14b8a6' : '#fff',
+            }}
           >
-            {btnCfg.label}
+            {mode === 'sniper' ? (inSniper ? '✓ In SNIPER' : 'Add to SNIPER') : btnCfg.label}
           </button>
-          {mode === 'hunter' ? (
+          {mode === 'sniper' ? (
+            contact.linkedin_url ? (
+              <button
+                onClick={e => { e.stopPropagation(); window.open(contact.linkedin_url, '_blank'); }}
+                style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid #0077b540', background: '#0077b510', color: '#0077b5', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              ><Linkedin size={11} /></button>
+            ) : null
+          ) : mode === 'hunter' ? (
             <>
               {/* Mission quick-assign */}
               <div style={{ position: 'relative' }}>
@@ -715,6 +737,20 @@ function AllLeadsCard({
                   </div>
                 )}
               </div>
+              {/* Move to SNIPER */}
+              <button
+                onClick={e => { e.stopPropagation(); if (!inSniper) onAddToSniper && onAddToSniper(); }}
+                title={inSniper ? 'Already in SNIPER pipeline' : 'Move to SNIPER'}
+                style={{
+                  padding: '7px 9px', borderRadius: 7, display: 'flex', alignItems: 'center',
+                  border: inSniper ? '1px solid #14b8a660' : '1px solid #14b8a630',
+                  background: inSniper ? '#14b8a625' : 'transparent',
+                  color: inSniper ? '#14b8a6' : '#14b8a660',
+                  fontSize: 10, cursor: inSniper ? 'default' : 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!inSniper) { e.currentTarget.style.background = '#14b8a618'; e.currentTarget.style.color = '#14b8a6'; e.currentTarget.style.borderColor = '#14b8a650'; } }}
+                onMouseLeave={e => { if (!inSniper) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#14b8a660'; e.currentTarget.style.borderColor = '#14b8a630'; } }}
+              ><Crosshair size={11} /></button>
               <button
                 onClick={e => { e.stopPropagation(); onReturnToScout && onReturnToScout(); }}
                 style={{ padding: '7px 9px', borderRadius: 7, border: '1px solid #9ca3af40', background: 'transparent', color: '#9ca3af', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
@@ -835,6 +871,7 @@ export default function AllLeads({ mode = 'people' }) {
   const [contacts, setContacts] = useState([]);
   const [companies, setCompanies] = useState({});
   const [loading, setLoading] = useState(true);
+  const [sniperIds, setSniperIds] = useState(new Set()); // contactRef IDs already in SNIPER
 
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
@@ -932,13 +969,22 @@ export default function AllLeads({ mode = 'people' }) {
       const user = auth.currentUser;
       if (!user) { navigate('/login'); return; }
       // Load companies and contacts in parallel to halve the round-trip time
-      const [companiesSnapshot, contactsSnapshot] = await Promise.all([
+      const fetches = [
         getDocs(collection(db, 'users', user.uid, 'companies')),
         getDocs(collection(db, 'users', user.uid, 'contacts')),
-      ]);
+      ];
+      if (mode === 'sniper' || mode === 'hunter') fetches.push(getDocs(collection(db, 'users', user.uid, 'sniper_contacts')));
+      const [companiesSnapshot, contactsSnapshot, sniperSnapshot] = await Promise.all(fetches);
+
       const companiesMap = {};
       companiesSnapshot.docs.forEach(d => { companiesMap[d.id] = d.data(); });
       setCompanies(companiesMap);
+
+      if (sniperSnapshot) {
+        const ids = new Set(sniperSnapshot.docs.map(d => d.data().contactRef).filter(Boolean));
+        setSniperIds(ids);
+      }
+
       const contactsList = contactsSnapshot.docs
         .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {
@@ -947,13 +993,35 @@ export default function AllLeads({ mode = 'people' }) {
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
-          return true; // 'people' — show all
+          return true; // 'people' and 'sniper' — show all
         });
       setContacts(contactsList);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load contacts:', error);
       setLoading(false);
+    }
+  }
+
+  async function handleAddToSniper(contact) {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'sniper_contacts'), {
+        contactRef: contact.id,
+        firstName: contact.name?.split(' ')[0] || '',
+        lastName: contact.name?.split(' ').slice(1).join(' ') || '',
+        name: contact.name || '',
+        title: contact.title || '',
+        company: contact.company_name || companies[contact.company_id]?.name || '',
+        email: contact.email || contact.work_email || '',
+        stage: 'demo_done',
+        createdAt: serverTimestamp(),
+        lastTouchAt: serverTimestamp(),
+      });
+      setSniperIds(prev => new Set([...prev, contact.id]));
+    } catch (err) {
+      console.error('Error adding contact to SNIPER:', err);
     }
   }
 
@@ -1135,6 +1203,8 @@ export default function AllLeads({ mode = 'people' }) {
   if (contacts.length === 0) {
     const emptyMsg = mode === 'hunter'
       ? { title: 'No Active Missions', body: 'Engage contacts in Scout to start outreach missions.', cta: null }
+      : mode === 'sniper'
+      ? { title: 'No Contacts Yet', body: 'Add contacts to Scout first, then use "Add to SNIPER" to move them into your conversion pipeline.', cta: null }
       : mode === 'scout'
       ? { title: 'No Unengaged Contacts', body: 'All contacts are in active missions, or add new ones via Daily Leads.', cta: null }
       : { title: 'No Contacts Yet', body: 'Accept companies in Daily Leads to start building your contact pipeline.', cta: 'View Saved Companies' };
@@ -1161,11 +1231,13 @@ export default function AllLeads({ mode = 'people' }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>
-              {mode === 'hunter' ? 'Active Contacts' : 'People'}
+              {mode === 'hunter' ? 'Active Contacts' : mode === 'sniper' ? 'People' : 'People'}
             </h2>
             <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
               {mode === 'hunter'
                 ? 'Contacts with active missions.'
+                : mode === 'sniper'
+                ? 'Add contacts to your SNIPER conversion pipeline.'
                 : mode === 'scout'
                 ? 'Ready for first contact.'
                 : 'Every relationship — one place.'}
@@ -1340,6 +1412,8 @@ export default function AllLeads({ mode = 'people' }) {
                   bulkMode={bulkMode}
                   onSelect={toggleSelect}
                   onBrigadeUpdate={updateContactBrigade}
+                  inSniper={sniperIds.has(c.id)}
+                  onAddToSniper={() => handleAddToSniper(c)}
                 />
               ))}
             </div>

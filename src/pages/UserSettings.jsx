@@ -34,6 +34,8 @@ import {
 } from '../utils/mfa';
 import { useT, useThemeCtx } from '../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../theme/tokens';
+import BottomNav from '../components/layout/BottomNav';
+import MoreSheet from '../components/layout/MoreSheet';
 import './UserSettings.css';
 
 /* ─── accent ─────────────────────────────────────────────────────────────── */
@@ -207,12 +209,15 @@ export default function UserSettings() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const mql = window.matchMedia('(max-width: 768px)');
+  const [isMobile, setIsMobile] = useState(() => mql.matches);
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+    const handler = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState('account');
   const [subNavOpen, setSubNavOpen] = useState(
@@ -951,7 +956,6 @@ export default function UserSettings() {
         color: T.text, overflow: 'hidden',
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
           * { box-sizing: border-box; }
           button, input { font-family: Inter, system-ui, sans-serif; }
           ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -1025,10 +1029,14 @@ export default function UserSettings() {
           })}
         </div>
 
-        {/* Mobile main content */}
-        <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1 }}>
+        {/* Mobile main content — paddingBottom leaves room for BottomNav */}
+        <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
           {renderPanel()}
         </div>
+
+        {/* Cross-module bottom nav */}
+        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
       </div>
     );
   }
@@ -1042,7 +1050,6 @@ export default function UserSettings() {
       transition: 'background 0.25s, color 0.25s',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         button, input { font-family: Inter, system-ui, sans-serif; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }

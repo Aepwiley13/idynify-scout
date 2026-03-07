@@ -23,6 +23,8 @@ import {
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import { auth } from '../../firebase/config';
+import BottomNav from '../../components/layout/BottomNav';
+import MoreSheet from '../../components/layout/MoreSheet';
 
 // Sniper sections
 import PipelineSection         from './sections/PipelineSection';
@@ -196,12 +198,15 @@ function SniperShellInner({ user }) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const mql = window.matchMedia('(max-width: 768px)');
+  const [isMobile, setIsMobile] = useState(() => mql.matches);
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+    const handler = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const tabParam = searchParams.get('tab') || location.state?.activeTab || 'pipeline';
   const initialTab = TAB_MAP[tabParam] || 'pipeline';
@@ -246,7 +251,6 @@ function SniperShellInner({ user }) {
         color: T.text, overflow: 'hidden', position: 'relative',
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
           * { box-sizing: border-box; }
           button, input, select, textarea { font-family: Inter, system-ui, sans-serif; }
           ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -326,10 +330,14 @@ function SniperShellInner({ user }) {
           })}
         </div>
 
-        {/* Mobile main content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+        {/* Mobile main content — paddingBottom leaves room for BottomNav */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
           {renderMain()}
         </div>
+
+        {/* Cross-module bottom nav */}
+        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
       </div>
     );
   }
@@ -343,7 +351,6 @@ function SniperShellInner({ user }) {
       transition: 'background 0.25s, color 0.25s',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         button, input, select, textarea { font-family: Inter, system-ui, sans-serif; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }

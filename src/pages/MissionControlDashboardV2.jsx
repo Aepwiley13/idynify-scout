@@ -12,8 +12,7 @@ import MissionCardDeck from '../components/dashboard/MissionCardDeck';
 import AttentionCarousel from '../components/dashboard/AttentionCarousel';
 import ModuleNavigationGrid from '../components/dashboard/ModuleNavigationGrid';
 import BottomNav from '../components/layout/BottomNav';
-import { useThemeCtx } from '../theme/ThemeContext';
-import { THEMES } from '../theme/tokens';
+import MoreSheet from '../components/layout/MoreSheet';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
@@ -21,8 +20,6 @@ export default function MissionControlDashboardV2() {
   const [userId, setUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
-  const { themeId, setThemeId } = useThemeCtx();
-  const isLightTheme = !THEMES[themeId]?.isDark;
   const [hasCompletedICP, setHasCompletedICP] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [stats, setStats] = useState({
@@ -403,66 +400,7 @@ export default function MissionControlDashboardV2() {
       <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
 
       {/* Mobile More Sheet */}
-      {moreSheetOpen && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-            backdropFilter: 'blur(4px)', zIndex: 300, display: 'flex',
-            alignItems: 'flex-end',
-          }}
-          onClick={() => setMoreSheetOpen(false)}
-        >
-          <div
-            style={{
-              background: '#0f0f14', borderRadius: '1.25rem 1.25rem 0 0',
-              padding: '0 0 env(safe-area-inset-bottom, 0px)',
-              width: '100%', borderTop: '1px solid #1e1e2e',
-              animation: 'mcSheetUp 0.25s cubic-bezier(0.4,0,0.2,1)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ width: 40, height: 4, background: '#2d2d44', borderRadius: 2, margin: '12px auto 0' }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px 8px', borderBottom: '1px solid #1e1e2e' }}>
-              <span style={{ fontSize: '1rem', fontWeight: 600, color: '#f1f5f9' }}>More</span>
-              <button onClick={() => setMoreSheetOpen(false)} style={{ width: 32, height: 32, borderRadius: '50%', background: '#1e1e2e', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>×</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 20px' }}>
-              {[
-                { label: 'People', icon: '👥', action: () => { navigate('/people'); setMoreSheetOpen(false); } },
-                { label: 'Settings', icon: '⚙️', action: () => { navigate('/settings'); setMoreSheetOpen(false); } },
-                { label: isLightTheme ? 'Dark Mode' : 'Light Mode', icon: isLightTheme ? '🌙' : '☀️', action: () => { setThemeId(isLightTheme ? 'mission' : 'workspace'); setMoreSheetOpen(false); } },
-                isAdmin ? { label: 'Admin', icon: '🔧', action: () => { navigate('/admin'); setMoreSheetOpen(false); } } : null,
-              ].filter(Boolean).map(item => (
-                <button
-                  key={item.label}
-                  onClick={item.action}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 6, padding: '16px 8px', background: '#1a1a2e', border: '1px solid #2d2d44',
-                    borderRadius: '1rem', color: '#cbd5e1', fontSize: '0.8125rem', fontWeight: 500,
-                    cursor: 'pointer', minHeight: 80, WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  <span style={{ fontSize: 22 }}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={async () => { setMoreSheetOpen(false); await handleLogout(); }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                width: 'calc(100% - 40px)', margin: '0 20px 20px',
-                padding: '14px', background: '#1f0a0a', border: '1px solid #7f1d1d',
-                borderRadius: '0.75rem', color: '#f87171', fontSize: '0.875rem', fontWeight: 600,
-                cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              👤 Log out
-            </button>
-          </div>
-        </div>
-      )}
+      <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} isAdmin={isAdmin} />
 
       <style>{`
         @keyframes twinkle {
@@ -484,10 +422,6 @@ export default function MissionControlDashboardV2() {
         @keyframes qlBrainPulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.08); }
-        }
-        @keyframes mcSheetUp {
-          from { transform: translateY(100%); opacity: 0; }
-          to   { transform: translateY(0);    opacity: 1; }
         }
         .grayscale {
           filter: grayscale(100%);

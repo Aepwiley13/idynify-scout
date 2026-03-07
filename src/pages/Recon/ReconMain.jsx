@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
+import BottomNav from '../../components/layout/BottomNav';
+import MoreSheet from '../../components/layout/MoreSheet';
 
 // ─── Recon accent color (indigo) ─────────────────────────────────────────────
 const RECON_INDIGO  = '#6366f1';
@@ -177,12 +179,15 @@ function ReconShellInner({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const mql = window.matchMedia('(max-width: 768px)');
+  const [isMobile, setIsMobile] = useState(() => mql.matches);
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+    const handler = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const [subNavOpen, setSubNavOpen] = useState(
     () => localStorage.getItem('recon_subnav_collapsed') !== 'true'
@@ -205,7 +210,6 @@ function ReconShellInner({ user }) {
         color: T.text, overflow: 'hidden', position: 'relative',
       }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
           * { box-sizing: border-box; }
           button, input { font-family: Inter, system-ui, sans-serif; }
           ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -285,10 +289,14 @@ function ReconShellInner({ user }) {
           })}
         </div>
 
-        {/* Mobile main content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', position: 'relative', zIndex: 1 }}>
+        {/* Mobile main content — paddingBottom leaves room for BottomNav */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
           <Outlet />
         </div>
+
+        {/* Cross-module bottom nav */}
+        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
       </div>
     );
   }
@@ -302,7 +310,6 @@ function ReconShellInner({ user }) {
       transition: 'background 0.25s, color 0.25s',
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         button, input { font-family: Inter, system-ui, sans-serif; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }

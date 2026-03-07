@@ -247,26 +247,23 @@ function ContactCard({ contact, T }) {
 
   return (
     <div style={{ borderRadius: 14, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.cardBg }}>
-      {/* Photo hero */}
-      <div style={{ position: 'relative', height: 180, background: `linear-gradient(150deg,#0077b520,${T.cardBg2} 80%)` }}>
-        {photo ? (
-          <img src={photo} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#0077b520', border: '2px solid #0077b540', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Linkedin size={32} color="#0077b5" />
-            </div>
-          </div>
-        )}
-        {/* Gradient overlay */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.4) 50%,transparent 100%)' }} />
-        {/* Name + title over gradient */}
-        <div style={{ position: 'absolute', bottom: 14, left: 16, right: 16 }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.5)', marginBottom: 3 }}>{contact.name}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{contact.title || 'Title not available'}</div>
+      {/* Header row: avatar + name/title + badge */}
+      <div style={{ padding: '16px 16px 14px', display: 'flex', alignItems: 'center', gap: 14, background: `linear-gradient(135deg,#0077b510 0%,${T.cardBg} 100%)`, borderBottom: `1px solid ${T.border}` }}>
+        {/* Avatar */}
+        <div style={{ flexShrink: 0, width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', border: '2.5px solid #0077b540', background: '#0077b515', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {photo ? (
+            <img src={photo} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+          ) : (
+            <Linkedin size={28} color="#0077b5" />
+          )}
         </div>
-        {/* LinkedIn badge */}
-        <div style={{ position: 'absolute', top: 12, right: 12, background: '#0077b5', borderRadius: 6, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+        {/* Name + title */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: T.text, lineHeight: 1.2, marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
+          <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.4 }}>{contact.title || 'Title not available'}</div>
+        </div>
+        {/* EXACT MATCH badge */}
+        <div style={{ flexShrink: 0, background: '#0077b5', borderRadius: 6, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Linkedin size={11} color="#fff" />
           <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>EXACT MATCH</span>
         </div>

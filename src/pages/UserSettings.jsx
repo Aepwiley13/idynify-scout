@@ -237,6 +237,13 @@ export default function UserSettings() {
   const [gmailAction, setGmailAction]     = useState(null);
   const [gmailError, setGmailError]       = useState(null);
 
+  /* ── google calendar ── */
+  const [calStatus, setCalStatus]         = useState(null);
+  const [calEmail, setCalEmail]           = useState('');
+  const [calLoading, setCalLoading]       = useState(true);
+  const [calAction, setCalAction]         = useState(null);
+  const [calError, setCalError]           = useState(null);
+
   /* ── sounds ── */
   const { soundEnabled, setSoundEnabled } = useMissionSounds();
 
@@ -254,8 +261,14 @@ export default function UserSettings() {
 
   useEffect(() => {
     loadGmailStatus();
+    loadCalendarStatus();
     loadBilling();
     refreshMfaStatus();
+    // Auto-switch to integrations tab if redirected from Calendar OAuth
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('calendar_connected') === 'true') {
+      setActiveTab('integrations');
+    }
   }, []);
 
   async function loadBilling() {
@@ -297,6 +310,64 @@ export default function UserSettings() {
       setGmailStatus('disconnected');
     } finally {
       setGmailLoading(false);
+    }
+  }
+
+  async function loadCalendarStatus() {
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid, 'integrations', 'googleCalendar'));
+      if (snap.exists()) {
+        const d = snap.data();
+        setCalStatus(d.status === 'connected' ? 'connected' : 'disconnected');
+        setCalEmail(d.email || '');
+      } else {
+        setCalStatus('disconnected');
+      }
+    } catch (err) {
+      console.error('[UserSettings] loadCalendarStatus error:', err);
+      setCalStatus('disconnected');
+    } finally {
+      setCalLoading(false);
+    }
+  }
+
+  async function handleConnectCalendar() {
+    setCalAction('connecting');
+    setCalError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/calendar-oauth-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken: token }),
+      });
+      if (!res.ok) throw new Error('Failed to initialize Calendar OAuth');
+      const data = await res.json();
+      window.location.href = data.authUrl;
+    } catch (err) {
+      setCalError(err.message);
+      setCalAction(null);
+    }
+  }
+
+  async function handleDisconnectCalendar() {
+    setCalAction('disconnecting');
+    setCalError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/calendar-disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken: token }),
+      });
+      if (!res.ok) throw new Error('Failed to disconnect Google Calendar');
+      setCalStatus('disconnected');
+      setCalEmail('');
+    } catch (err) {
+      setCalError(err.message);
+    } finally {
+      setCalAction(null);
     }
   }
 
@@ -747,6 +818,50 @@ export default function UserSettings() {
                   ) : (
                     <button className="us-action-btn us-action-btn--primary" onClick={handleConnectGmail} disabled={gmailAction !== null}>
                       {gmailAction === 'connecting' ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : 'Connect'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+
+              {/* Google Calendar card */}
+              <div className={`us-card ${calStatus === 'connected' ? '' : 'us-card--action'}`} style={{ marginTop: '12px' }}>
+                <div className="us-card-icon" style={{ background: 'rgba(52,211,153,0.1)', borderColor: 'rgba(52,211,153,0.2)', color: '#6ee7b7' }}>
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div className="us-card-body">
+                  <div className="us-card-label-row">
+                    <span className="us-card-label">Google Calendar</span>
+                    {!calLoading && calStatus === 'connected' && (
+                      <span className="us-status-chip us-status-chip--green"><CheckCircle className="w-3 h-3" /> Connected</span>
+                    )}
+                    {!calLoading && calStatus === 'disconnected' && (
+                      <span className="us-status-chip us-status-chip--gray">Not connected</span>
+                    )}
+                  </div>
+                  <span className="us-card-value us-card-value--muted">
+                    {calLoading ? 'Loading…' : calStatus === 'connected' && calEmail ? calEmail : 'Schedule meetings and view upcoming events with contacts'}
+                  </span>
+                  {calError && (
+                    <span className="us-inline-error"><AlertTriangle className="w-3 h-3" />{calError}</span>
+                  )}
+                </div>
+                <div className="us-gmail-actions">
+                  {calLoading ? (
+                    <Loader className="w-4 h-4 animate-spin" style={{ color: '#6b7280' }} />
+                  ) : calStatus === 'connected' ? (
+                    <>
+                      <button className="us-action-btn" onClick={handleConnectCalendar} disabled={calAction !== null} title="Re-authorize Google Calendar">
+                        {calAction === 'connecting' ? <Loader className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Reconnect
+                      </button>
+                      <button className="us-action-btn us-action-btn--danger-icon" onClick={handleDisconnectCalendar} disabled={calAction !== null} title="Disconnect Google Calendar">
+                        {calAction === 'disconnecting' ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                      </button>
+                    </>
+                  ) : (
+                    <button className="us-action-btn us-action-btn--primary" onClick={handleConnectCalendar} disabled={calAction !== null}>
+                      {calAction === 'connecting' ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Connecting…</> : 'Connect'}
                     </button>
                   )}
                 </div>

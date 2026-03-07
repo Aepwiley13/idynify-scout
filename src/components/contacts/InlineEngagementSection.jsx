@@ -8,7 +8,7 @@ import {
   Zap, Mail, Phone, MessageSquare, Linkedin, Check,
   ArrowLeft, ArrowRight, Sparkles, Send, Loader, RefreshCw,
   ExternalLink, AlertCircle, Plus, ChevronDown, ChevronUp,
-  Clock, Target, Bookmark, BookmarkCheck, History
+  Clock, Target, Bookmark, BookmarkCheck, History, Copy, Edit2
 } from 'lucide-react';
 import {
   executeSendAction,
@@ -72,11 +72,21 @@ function formatEngagementTime(timestamp) {
 
 function EngagementHistoryEntry({ event, index }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const meta = event.metadata || {};
   const channel = meta.channel ? CHANNEL_LABELS[meta.channel] || meta.channel : null;
   const time = formatEngagementTime(event.createdAt || event.timestamp);
   const goal = event.preview || meta.userIntent || 'Engagement';
-  const messagePreview = meta.messagePreview || meta.body || null;
+  const fullMessage = meta.fullMessage || meta.messagePreview || meta.body || null;
+
+  function handleCopy() {
+    if (!fullMessage) return;
+    const textToCopy = meta.subject ? `Subject: ${meta.subject}\n\n${fullMessage}` : fullMessage;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   return (
     <div className="ies-history-entry">
@@ -103,7 +113,7 @@ function EngagementHistoryEntry({ event, index }) {
             {time}
           </span>
         </div>
-        {messagePreview && (
+        {fullMessage && (
           <button
             className="ies-history-expand-btn"
             onClick={() => setExpanded(e => !e)}
@@ -114,9 +124,19 @@ function EngagementHistoryEntry({ event, index }) {
         )}
       </div>
       <p className="ies-history-goal">{goal}</p>
-      {expanded && messagePreview && (
+      {expanded && fullMessage && (
         <div className="ies-history-message-preview">
-          <p>{messagePreview}</p>
+          {meta.subject && (
+            <p className="ies-history-message-subject"><strong>Subject:</strong> {meta.subject}</p>
+          )}
+          <p>{fullMessage}</p>
+          <button
+            className={`ies-history-copy-btn ${copied ? 'ies-history-copy-btn--copied' : ''}`}
+            onClick={handleCopy}
+            title="Copy message to clipboard"
+          >
+            {copied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy message</>}
+          </button>
         </div>
       )}
     </div>
@@ -237,6 +257,10 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [savedMsgIndices, setSavedMsgIndices] = useState(new Set());
   const [savingMsgIdx, setSavingMsgIdx] = useState(null);
 
+  // Goal editing (inline re-generation)
+  const [goalEditing, setGoalEditing] = useState(false);
+  const [editedGoal, setEditedGoal] = useState('');
+
   // Section collapse / full history
   const [sectionCollapsed, setSectionCollapsed] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
@@ -321,6 +345,17 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     setSavedMsgIndices(new Set());
     setSavingMsgIdx(null);
     setPromptSaved(false);
+  }
+
+  function handleGoalRegenerate() {
+    const newGoal = editedGoal.trim();
+    if (!newGoal) return;
+    setGoalEditing(false);
+    setUserIntent(newGoal);
+    setOptionsStep(false);
+    setMessageOptions([]);
+    setGenerationError(null);
+    generateMessageOptions(newGoal, engagementIntent);
   }
 
   async function checkGmailStatus() {
@@ -931,7 +966,36 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
               <div className="ies-step-divider" />
               <div className="ies-submitted-intent">
                 <span className="ies-submitted-label">Your goal:</span>
-                <span className="ies-submitted-text">{userIntent}</span>
+                {goalEditing ? (
+                  <div className="ies-goal-edit-wrap">
+                    <textarea
+                      className="ies-goal-edit-input"
+                      value={editedGoal}
+                      onChange={(e) => setEditedGoal(e.target.value)}
+                      autoFocus
+                      rows={3}
+                    />
+                    <div className="ies-goal-edit-actions">
+                      <button className="ies-goal-regen-btn" onClick={handleGoalRegenerate} disabled={!editedGoal.trim()}>
+                        <RefreshCw className="w-3.5 h-3.5" /> Re-generate
+                      </button>
+                      <button className="ies-goal-cancel-btn" onClick={() => setGoalEditing(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="ies-goal-display-row">
+                    <span className="ies-submitted-text">{userIntent}</span>
+                    <button
+                      className="ies-goal-edit-btn"
+                      onClick={() => { setEditedGoal(userIntent); setGoalEditing(true); }}
+                      title="Edit goal and re-generate"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="ies-barry-row">
                 <div className="ies-barry-avatar">
@@ -1195,7 +1259,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                   <p className="ies-result-desc">{sendResult.message}</p>
                   <p className="ies-result-detail">
                     {selectedWeapon === 'email' && 'Complete the send in your email app.'}
-                    {selectedWeapon === 'text' && 'Complete the send in your SMS app.'}
+                    {selectedWeapon === 'text' && 'Message copied to clipboard — paste it in your SMS app if needed.'}
                     {selectedWeapon === 'call' && 'Complete the call on your phone.'}
                     {selectedWeapon === 'linkedin' && 'Paste your message on LinkedIn.'}
                     {selectedWeapon === 'calendar' && 'Save the event in your calendar.'}

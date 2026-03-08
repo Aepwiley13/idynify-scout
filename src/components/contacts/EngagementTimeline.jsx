@@ -205,6 +205,60 @@ function getStatusBadge(event) {
   return null;
 }
 
+function TimelineEvent({ event, config, time, preview, badge, isLast }) {
+  const [expanded, setExpanded] = useState(false);
+  const Icon = config.icon;
+
+  return (
+    <div className="timeline-event">
+      {/* Vertical connector line */}
+      <div className="timeline-track">
+        <div
+          className="timeline-dot"
+          style={{ backgroundColor: config.bgColor, borderColor: config.color }}
+        >
+          <Icon
+            className="timeline-dot-icon"
+            style={{ color: config.color }}
+          />
+        </div>
+        {!isLast && <div className="timeline-connector" />}
+      </div>
+
+      {/* Event content */}
+      <div className="timeline-event-content">
+        <div className="timeline-event-top">
+          <span className="timeline-event-label" style={{ color: config.color }}>
+            {config.label}
+          </span>
+          {config.actorLabel && (
+            <span className="timeline-actor-badge">{config.actorLabel}</span>
+          )}
+          {badge && (
+            <span className={`timeline-badge ${badge.className}`}>
+              {badge.label}
+            </span>
+          )}
+          {time && (
+            <span className="timeline-event-time" title={time.absolute}>
+              {time.relative}
+            </span>
+          )}
+        </div>
+        {preview && (
+          <p
+            className={`timeline-event-preview${expanded ? ' timeline-event-preview--expanded' : ''}`}
+            onClick={() => setExpanded(e => !e)}
+            title={expanded ? 'Click to collapse' : 'Click to expand'}
+          >
+            {preview}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function EngagementTimeline({ contactId }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -286,53 +340,21 @@ export default function EngagementTimeline({ contactId }) {
             color: '#9ca3af',
             bgColor: 'rgba(156, 163, 175, 0.1)'
           };
-          const Icon = config.icon;
           const time = formatTimestamp(event.createdAt);
           const preview = getPreviewText(event);
           const badge = getStatusBadge(event);
           const isLast = index === events.length - 1;
 
           return (
-            <div key={event.id} className="timeline-event">
-              {/* Vertical connector line */}
-              <div className="timeline-track">
-                <div
-                  className="timeline-dot"
-                  style={{ backgroundColor: config.bgColor, borderColor: config.color }}
-                >
-                  <Icon
-                    className="timeline-dot-icon"
-                    style={{ color: config.color }}
-                  />
-                </div>
-                {!isLast && <div className="timeline-connector" />}
-              </div>
-
-              {/* Event content */}
-              <div className="timeline-event-content">
-                <div className="timeline-event-top">
-                  <span className="timeline-event-label" style={{ color: config.color }}>
-                    {config.label}
-                  </span>
-                  {config.actorLabel && (
-                    <span className="timeline-actor-badge">{config.actorLabel}</span>
-                  )}
-                  {badge && (
-                    <span className={`timeline-badge ${badge.className}`}>
-                      {badge.label}
-                    </span>
-                  )}
-                  {time && (
-                    <span className="timeline-event-time" title={time.absolute}>
-                      {time.relative}
-                    </span>
-                  )}
-                </div>
-                {preview && (
-                  <p className="timeline-event-preview">{preview}</p>
-                )}
-              </div>
-            </div>
+            <TimelineEvent
+              key={event.id}
+              event={event}
+              config={config}
+              time={time}
+              preview={preview}
+              badge={badge}
+              isLast={isLast}
+            />
           );
         })}
       </div>

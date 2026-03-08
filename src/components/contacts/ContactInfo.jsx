@@ -1,4 +1,4 @@
-import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase } from 'lucide-react';
+import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase, Globe } from 'lucide-react';
 import './ContactInfo.css';
 
 export default function ContactInfo({ contact, mode = 'compact' }) {
@@ -67,6 +67,33 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
                   className="info-value-link"
                 >
                   View LinkedIn Profile →
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Address */}
+          {contact.address && (
+            <div className="info-item-compact">
+              <MapPin className="info-icon-compact" />
+              <div className="info-content-compact">
+                <span className="info-value">{contact.address}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Website */}
+          {contact.website && (
+            <div className="info-item-compact">
+              <Globe className="info-icon-compact" />
+              <div className="info-content-compact">
+                <a
+                  href={contact.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="info-value-link"
+                >
+                  {contact.website}
                 </a>
               </div>
             </div>
@@ -174,6 +201,43 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
                 className="info-value-link"
               >
                 View Profile →
+              </a>
+            ) : (
+              <span className="info-value-unavailable">Not available</span>
+            )}
+          </div>
+        </div>
+
+        {/* Address */}
+        <div className="info-item-expanded">
+          <div className="info-icon-wrapper">
+            <MapPin className="info-icon-expanded" />
+          </div>
+          <div className="info-content-expanded">
+            <span className="info-label">Address</span>
+            {contact.address ? (
+              <span className="info-value">{contact.address}</span>
+            ) : (
+              <span className="info-value-unavailable">Not available</span>
+            )}
+          </div>
+        </div>
+
+        {/* Website */}
+        <div className="info-item-expanded">
+          <div className="info-icon-wrapper">
+            <Globe className="info-icon-expanded" />
+          </div>
+          <div className="info-content-expanded">
+            <span className="info-label">Website</span>
+            {contact.website ? (
+              <a
+                href={contact.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="info-value-link"
+              >
+                {contact.website}
               </a>
             ) : (
               <span className="info-value-unavailable">Not available</span>

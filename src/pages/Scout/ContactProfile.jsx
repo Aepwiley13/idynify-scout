@@ -15,6 +15,7 @@ import {
   Link2,
   Star,
   Zap,
+  Archive,
 } from 'lucide-react';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
@@ -30,6 +31,7 @@ import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
 import NextBestStep from '../../components/contacts/NextBestStep';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
+import { archivePerson } from '../../services/peopleService';
 import './ContactProfile.css';
 
 export default function ContactProfile({ contactId: propContactId, onClose, autoEngage } = {}) {
@@ -54,6 +56,9 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
   const [enrichmentSummary, setEnrichmentSummary] = useState(null);
   const [photoRefreshLoading, setPhotoRefreshLoading] = useState(false);
   const [photoRefreshError, setPhotoRefreshError] = useState(null);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('other');
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     loadContactProfile();
@@ -472,6 +477,25 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
     setEnrichmentSummary(null);
   }
 
+  async function handleArchiveContact() {
+    try {
+      setArchiving(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated');
+
+      await archivePerson(user.uid, contact.id, archiveReason);
+
+      setShowArchiveModal(false);
+      if (isPanelMode) {
+        onClose();
+      } else {
+        navigate('/scout', { state: { activeTab: 'all-leads' } });
+      }
+    } catch (err) {
+      console.error('Failed to archive contact:', err);
+      setArchiving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -520,6 +544,12 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
             style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
           >
             {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+          </button>
+          <button
+            onClick={() => setShowArchiveModal(true)}
+            style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 9, padding: '8px 14px', fontSize: 13, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Archive size={13} />Archive
           </button>
           <BarryKnowledgeButton variant="compact" />
         </div>
@@ -708,6 +738,63 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
         {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
         <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
+
+      {/* Archive Confirmation Modal */}
+      {showArchiveModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowArchiveModal(false); }}
+        >
+          <div style={{ background: T.cardBg || T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: 28, maxWidth: 420, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <Archive size={18} color={T.textMuted} />
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.text }}>Archive {contact.name || 'this contact'}?</h3>
+            </div>
+            <p style={{ margin: '0 0 20px', fontSize: 13, color: T.textMuted, lineHeight: 1.5 }}>
+              This contact will be hidden from all views. You can unarchive them later.
+            </p>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Reason</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { value: 'not_relevant', label: 'Not relevant' },
+                  { value: 'duplicate', label: 'Duplicate contact' },
+                  { value: 'spam', label: 'Spam or invalid' },
+                  { value: 'other', label: 'Other' },
+                ].map(opt => (
+                  <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: T.text }}>
+                    <input
+                      type="radio"
+                      name="archive-reason"
+                      value={opt.value}
+                      checked={archiveReason === opt.value}
+                      onChange={() => setArchiveReason(opt.value)}
+                      style={{ accentColor: BRAND.pink }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowArchiveModal(false)}
+                disabled={archiving}
+                style={{ padding: '8px 18px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleArchiveContact}
+                disabled={archiving}
+                style={{ padding: '8px 18px', borderRadius: 9, background: '#dc2626', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: archiving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: archiving ? 0.7 : 1 }}
+              >
+                {archiving ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Archiving...</> : <><Archive size={13} />Archive Contact</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -60,7 +60,7 @@ export const handler = async (event) => {
       console.log('🐻 Hunter read cache hit for:', contact.name);
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
         body: JSON.stringify({ success: true, read: cachedRead, cached: true })
       };
     }
@@ -156,7 +156,7 @@ Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({ success: true, read, cached: false })
     };
 
@@ -176,7 +176,7 @@ Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence
 
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({ success: false, error: error.message })
     };
   }

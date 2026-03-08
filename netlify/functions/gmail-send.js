@@ -1,24 +1,7 @@
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { admin, db } from './firebase-admin.js';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
-
-// Initialize Firebase Admin (only once)
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev',
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey
-    })
-  });
-}
-
-const db = getFirestore();
+import { extractAuthToken } from './utils/extractAuthToken.js';
 
 export const handler = async (event) => {
   // Only allow POST
@@ -29,42 +12,29 @@ export const handler = async (event) => {
     };
   }
 
-  try {
-    const { userId, authToken, campaignId, messageIndex, subject, body, toEmail, toName } = JSON.parse(event.body);
+  // Verify auth token via Admin SDK
+  const authToken = extractAuthToken(event);
+  if (!authToken) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Authentication required' }) };
+  }
 
-    if (!userId || !authToken || !campaignId || messageIndex === undefined || !subject || !body || !toEmail || !toName) {
+  let decodedToken;
+  try {
+    decodedToken = await admin.auth().verifyIdToken(authToken);
+  } catch {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired authentication token' }) };
+  }
+
+  try {
+    const { userId, campaignId, messageIndex, subject, body, toEmail, toName } = JSON.parse(event.body);
+
+    if (!userId || !campaignId || messageIndex === undefined || !subject || !body || !toEmail || !toName) {
       throw new Error('Missing required parameters');
     }
 
-    console.log(`📧 Sending email to ${toName} (${toEmail}) from user ${userId}`);
-
-    // Verify Firebase Auth token
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    if (!firebaseApiKey) {
-      throw new Error('Firebase API key not configured');
+    if (decodedToken.uid !== userId) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden: user ID mismatch' }) };
     }
-
-    const verifyResponse = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: authToken })
-      }
-    );
-
-    if (!verifyResponse.ok) {
-      throw new Error('Invalid authentication token');
-    }
-
-    const verifyData = await verifyResponse.json();
-    const tokenUserId = verifyData.users[0].localId;
-
-    if (tokenUserId !== userId) {
-      throw new Error('Token does not match user ID');
-    }
-
-    console.log('✅ Auth token verified');
 
     // Load Gmail OAuth tokens from Firestore
     const gmailDoc = await db
@@ -220,7 +190,7 @@ export const handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({
         success: true,
@@ -245,7 +215,7 @@ export const handler = async (event) => {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({ error: errorMessage })
     };

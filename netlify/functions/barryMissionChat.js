@@ -560,7 +560,7 @@ Return valid JSON only:
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
         body: JSON.stringify({
           success: true,
           mode: parsed.barry_mode || currentMode,
@@ -658,7 +658,7 @@ Return valid JSON only:
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
         body: JSON.stringify({ success: true, updatedHistory: updatedIcpHistory, ...icpParsed }),
       };
 
@@ -738,7 +738,7 @@ Return valid JSON only:
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
         body: JSON.stringify({
           success: true,
           // Legacy field
@@ -764,7 +764,7 @@ Return valid JSON only:
 
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({ success: false, error: error.message })
     };
   }

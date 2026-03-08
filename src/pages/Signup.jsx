@@ -9,6 +9,7 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -51,6 +52,7 @@ export default function Signup() {
     }
 
     setError(''); // Clear any previous errors
+    setLoading(true);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -88,6 +90,7 @@ export default function Signup() {
       // Redirect to checkout with tier parameter
       navigate(`/checkout?tier=${tier}`);
     } catch (error) {
+      setLoading(false);
       // Map Firebase error codes to user-friendly messages
       switch (error.code) {
         case 'auth/email-already-in-use':
@@ -292,11 +295,14 @@ export default function Signup() {
                 </div>
               )}
               
-              <button 
+              <button
                 type="submit"
-                className="w-full relative overflow-hidden bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-600 text-white p-5 rounded-xl font-black text-xl hover:scale-105 transition-all shadow-2xl shadow-cyan-500/50 group"
+                disabled={loading}
+                className="w-full relative overflow-hidden bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-600 text-white p-5 rounded-xl font-black text-xl hover:scale-105 transition-all shadow-2xl shadow-cyan-500/50 group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                <span className="relative z-10">🚀 ACCEPT MISSION & START</span>
+                <span className="relative z-10">
+                  {loading ? '⏳ INITIALIZING MISSION...' : '🚀 ACCEPT MISSION & START'}
+                </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </button>
             </form>

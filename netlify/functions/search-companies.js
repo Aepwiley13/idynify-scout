@@ -380,7 +380,7 @@ export const handler = async (event) => {
         statusCode: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com',
           'Access-Control-Allow-Headers': 'Content-Type'
         },
         body: JSON.stringify({
@@ -426,7 +426,7 @@ export const handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com',
         'Access-Control-Allow-Headers': 'Content-Type'
       },
       body: JSON.stringify({
@@ -469,7 +469,7 @@ export const handler = async (event) => {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com',
         'Access-Control-Allow-Headers': 'Content-Type'
       },
       body: JSON.stringify({

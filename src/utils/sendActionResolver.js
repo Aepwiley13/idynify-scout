@@ -152,10 +152,9 @@ export async function sendEmailViaGmail({ userId, contact, subject, body }) {
 
     const response = await fetch('/.netlify/functions/gmail-send-quick', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({
         userId,
-        authToken,
         toEmail: contact.email,
         toName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
         subject,

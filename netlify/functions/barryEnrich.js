@@ -632,7 +632,7 @@ export const handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({
         success: true,
@@ -664,7 +664,7 @@ export const handler = async (event) => {
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({
         success: false,

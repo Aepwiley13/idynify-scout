@@ -46,7 +46,7 @@ export const handler = async (event) => {
     return {
       statusCode: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
       },
@@ -57,7 +57,7 @@ export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -382,7 +382,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({
         success: true,
@@ -424,7 +424,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({
         success: false,

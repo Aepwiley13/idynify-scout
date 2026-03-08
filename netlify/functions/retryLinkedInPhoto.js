@@ -211,7 +211,7 @@ export const handler = async (event) => {
         });
         return {
           statusCode: 429,
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
           body: JSON.stringify({
             success: false,
             error: 'Retry limit exceeded. Please try again later.',
@@ -435,7 +435,7 @@ export const handler = async (event) => {
       console.log(`✅ Photo found via ${searchSource}: ${validPhotoUrl}`);
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
         body: JSON.stringify({
           success: true,
           photo_url: validPhotoUrl,
@@ -449,7 +449,7 @@ export const handler = async (event) => {
     console.log(`⚠️ No valid photo after all strategies. Tried ${triedUrls.size} URLs.`);
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({
         success: false,
         photo_url: null,
@@ -474,7 +474,7 @@ export const handler = async (event) => {
 
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({ success: false, error: error.message, failure_reason: 'server_error' })
     };
   }

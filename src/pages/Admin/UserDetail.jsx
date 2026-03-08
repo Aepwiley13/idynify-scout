@@ -97,10 +97,10 @@ export default function UserDetail() {
       const response = await fetch('/.netlify/functions/adminStartImpersonation', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          authToken,
           targetUserId: uid,
           reason: reason.trim()
         })
@@ -201,10 +201,10 @@ export default function UserDetail() {
       const response = await fetch('/.netlify/functions/adminSuspendAccount', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          authToken,
           targetUserId: uid,
           reason: reason.trim()
         })
@@ -254,10 +254,10 @@ export default function UserDetail() {
       const response = await fetch('/.netlify/functions/adminReactivateAccount', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          authToken,
           targetUserId: uid,
           reason: reason.trim()
         })

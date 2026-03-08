@@ -140,7 +140,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({ icpBrief })
     };
@@ -152,7 +152,7 @@ Return ONLY valid JSON, no markdown formatting.`;
       statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({ 
         error: error.message,

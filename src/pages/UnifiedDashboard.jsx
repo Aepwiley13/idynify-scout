@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth, db } from "../firebase/config";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { Users, Target, TrendingUp, Building2, Brain, MessageSquare, Zap, Loader, CheckCircle, XCircle, Sparkles, Filter } from "lucide-react";
 
 export default function UnifiedDashboard() {
@@ -60,11 +60,7 @@ export default function UnifiedDashboard() {
       if (!user) return;
 
       setIcpApproved(true);
-      
-      // TODO: Save approval to Firebase
-      // await updateDoc(doc(db, "users", user.uid), { icpApproved: true });
-      
-      console.log("✅ ICP Approved!");
+      await updateDoc(doc(db, "users", user.uid), { icpApproved: true });
     } catch (err) {
       console.error("Error approving ICP:", err);
     }
@@ -100,6 +96,24 @@ export default function UnifiedDashboard() {
         <div className="text-center">
           <Loader className="w-16 h-16 text-cyan-400 animate-spin mx-auto mb-4" />
           <div className="text-white text-2xl">Loading Mission Control...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <div className="text-white text-2xl mb-2">Something went wrong</div>
+          <div className="text-slate-400">{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

@@ -99,10 +99,9 @@ export default function CampaignDetail() {
 
       const response = await fetch('/.netlify/functions/gmail-send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({
           userId: user.uid,
-          authToken,
           campaignId: campaign.id,
           messageIndex: index,
           subject: message.subject,

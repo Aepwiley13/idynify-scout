@@ -77,9 +77,10 @@ const ImpersonationBanner = ({ session, onEndSession }) => {
       const response = await fetch('/.netlify/functions/adminEndImpersonation', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ authToken })
+        body: JSON.stringify({})
       });
 
       if (!response.ok) {

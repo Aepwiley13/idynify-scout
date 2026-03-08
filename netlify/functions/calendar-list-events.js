@@ -23,7 +23,7 @@ export const handler = async (event) => {
     return {
       statusCode: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'POST'
       },
@@ -155,7 +155,7 @@ export const handler = async (event) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com'
       },
       body: JSON.stringify({
         events: formattedEvents,
@@ -181,14 +181,14 @@ export const handler = async (event) => {
 
       return {
         statusCode: 401,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
         body: JSON.stringify({ error: 'Calendar session expired. Please reconnect.', code: 'NEEDS_RECONNECT' })
       };
     }
 
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://idynify.com' },
       body: JSON.stringify({ error: error.message })
     };
   }

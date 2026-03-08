@@ -12,6 +12,7 @@
 // ─── BRAND (primary palette — from logo assets) ───────────────────────────────
 export const BRAND = {
   pink:    "#e8197d",   // Primary CTA, active states, highlights
+  purple:  "#7c3aed",   // Hunter module accent color
   cyan:    "#00c4cc",   // Secondary — borders, hover glows, tags
   navy:    "#1a1040",   // Deep base — dark backgrounds, depth layers
   black:   "#000000",   // Pure backgrounds on dark theme

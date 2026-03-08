@@ -312,7 +312,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       <nav className="sidebar-nav">
         {renderPillar('people', 'PEOPLE', Users, 'pillar-cyan', peopleItems)}
         {renderPillar('scout', 'SCOUT', Search, 'pillar-cyan', scoutItems)}
-        {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-pink', hunterItems)}
+        {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-purple', hunterItems)}
         {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
       </nav>
 

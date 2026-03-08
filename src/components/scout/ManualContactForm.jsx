@@ -11,7 +11,9 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
     phone: '',
     company: '',
     title: '',
-    linkedin_url: ''
+    linkedin_url: '',
+    address: '',
+    website: ''
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -61,6 +63,8 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         company: formData.company.trim() || null,
         title: formData.title.trim() || null,
         linkedin_url: formData.linkedin_url.trim() || null,
+        address: formData.address.trim() || null,
+        website: formData.website.trim() || null,
 
         // Source tracking
         source: 'manual',
@@ -218,6 +222,36 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         {errors.linkedin_url && (
           <p className="text-red-600 text-xs mt-1">⚠️ {errors.linkedin_url}</p>
         )}
+      </div>
+
+      {/* Address (Optional) */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-900 mb-2">
+          Address
+        </label>
+        <input
+          type="text"
+          value={formData.address}
+          onChange={(e) => handleChange('address', e.target.value)}
+          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          placeholder="123 Main St, City, State"
+          disabled={saving}
+        />
+      </div>
+
+      {/* Website (Optional) */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-900 mb-2">
+          Website
+        </label>
+        <input
+          type="url"
+          value={formData.website}
+          onChange={(e) => handleChange('website', e.target.value)}
+          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          placeholder="https://example.com"
+          disabled={saving}
+        />
       </div>
 
       {/* Action Buttons */}

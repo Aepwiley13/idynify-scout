@@ -21,6 +21,8 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     company: contact.company_name || contact.company || '',
     title: contact.title || '',
     linkedin_url: contact.linkedin_url || '',
+    address: contact.address || '',
+    website: contact.website || '',
     event_name: contact.networking_context?.event_name || '',
     date_met: contact.networking_context?.date_met || ''
   });
@@ -109,6 +111,8 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
         phone: formData.phone.trim() || null,
         title: formData.title.trim() || null,
         linkedin_url: formData.linkedin_url.trim() || null,
+        address: formData.address.trim() || null,
+        website: formData.website.trim() || null,
         updated_at: new Date().toISOString()
       };
 
@@ -482,6 +486,55 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
                   <p className="info-value">Not provided</p>
                 )}
               </div>
+
+              {/* Address */}
+              <div className="info-field">
+                <label className="info-label">
+                  <MapPin className="w-4 h-4" />
+                  <span>Address</span>
+                </label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    className="info-input"
+                    placeholder="123 Main St, City, State"
+                  />
+                ) : (
+                  <p className="info-value">{contact.address || 'Not provided'}</p>
+                )}
+              </div>
+
+              {/* Website */}
+              <div className="info-field">
+                <label className="info-label">
+                  <Globe className="w-4 h-4" />
+                  <span>Website</span>
+                </label>
+                {isEditing ? (
+                  <input
+                    type="url"
+                    name="website"
+                    value={formData.website}
+                    onChange={handleChange}
+                    className="info-input"
+                    placeholder="https://example.com"
+                  />
+                ) : contact.website ? (
+                  <a
+                    href={contact.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="info-link"
+                  >
+                    {contact.website}
+                  </a>
+                ) : (
+                  <p className="info-value">Not provided</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -680,6 +733,8 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
                     company: contact.company_name || contact.company || '',
                     title: contact.title || '',
                     linkedin_url: contact.linkedin_url || '',
+                    address: contact.address || '',
+                    website: contact.website || '',
                     event_name: contact.networking_context?.event_name || '',
                     date_met: contact.networking_context?.date_met || ''
                   });

@@ -61,7 +61,7 @@ function BarryAvatar({ size = 28, style = {} }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+      background: `linear-gradient(135deg,${BRAND.purple},${BRAND.cyan})`,
       border: `2px solid ${BRAND.cyan}50`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.46, flexShrink: 0, boxShadow: glow, overflow: 'hidden', ...style,
@@ -92,7 +92,7 @@ function ThemePicker() {
           justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s',
         }}
       >
-        <Palette size={16} color={BRAND.pink} />
+        <Palette size={16} color={BRAND.purple} />
       </div>
       {open && (
         <div
@@ -127,12 +127,12 @@ function ThemePicker() {
                 background: theme.swatchBg, border: `1px solid ${T.border2}`, flexShrink: 0,
               }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: themeId === theme.id ? BRAND.pink : T.text }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: themeId === theme.id ? BRAND.purple : T.text }}>
                   {theme.label}
                 </div>
                 <div style={{ fontSize: 10, color: T.textFaint }}>{theme.icon}</div>
               </div>
-              {themeId === theme.id && <Check size={14} color={BRAND.pink} />}
+              {themeId === theme.id && <Check size={14} color={BRAND.purple} />}
             </div>
           ))}
         </div>
@@ -142,7 +142,7 @@ function ThemePicker() {
 }
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
-function Av({ initials, color = BRAND.pink, size = 24 }) {
+function Av({ initials, color = BRAND.purple, size = 24 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -285,7 +285,7 @@ function HunterShellInner({ user }) {
       return (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
           <div style={{ textAlign: 'center', color: T.textFaint }}>
-            <Crosshair size={32} color={BRAND.pink} style={{ marginBottom: 10, opacity: 0.6 }} />
+            <Crosshair size={32} color={BRAND.purple} style={{ marginBottom: 10, opacity: 0.6 }} />
             <div style={{ fontSize: 12, color: T.textMuted }}>Loading Hunter...</div>
           </div>
         </div>
@@ -304,7 +304,7 @@ function HunterShellInner({ user }) {
             borderRadius: 10,
             display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
           }}>
-            <Mail size={18} color={BRAND.pink} style={{ flexShrink: 0 }} />
+            <Mail size={18} color={BRAND.purple} style={{ flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Connect Gmail to Send Emails</div>
               <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>
@@ -315,7 +315,7 @@ function HunterShellInner({ user }) {
               onClick={handleConnectGmail}
               style={{
                 padding: '6px 14px', borderRadius: 7, border: 'none',
-                background: BRAND.pink, color: '#fff', fontSize: 12, fontWeight: 600,
+                background: BRAND.purple, color: '#fff', fontSize: 12, fontWeight: 600,
                 cursor: 'pointer', flexShrink: 0,
               }}
             >
@@ -380,10 +380,10 @@ function HunterShellInner({ user }) {
             title="Mission Control"
             style={{
               width: 28, height: 28, borderRadius: 7,
-              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+              background: `linear-gradient(135deg,${BRAND.purple},${BRAND.cyan})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
-              boxShadow: `0 2px 10px ${BRAND.pink}40`,
+              boxShadow: `0 2px 10px ${BRAND.purple}40`,
             }}
           >
             <img src={ASSETS.logoMark} alt="Mission Control"
@@ -427,8 +427,8 @@ function HunterShellInner({ user }) {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? BRAND.pink : 'transparent'}`,
-                  color: active ? BRAND.pink : T.textMuted,
+                  borderBottom: `2px solid ${active ? BRAND.purple : 'transparent'}`,
+                  color: active ? BRAND.purple : T.textMuted,
                   fontSize: 12, fontWeight: active ? 600 : 400,
                   cursor: 'pointer', whiteSpace: 'nowrap',
                   transition: 'all 0.12s', position: 'relative',
@@ -440,7 +440,7 @@ function HunterShellInner({ user }) {
                   <span style={{
                     position: 'absolute', top: 6, right: 4,
                     width: 14, height: 14, borderRadius: '50%',
-                    background: BRAND.pink, color: '#fff',
+                    background: BRAND.purple, color: '#fff',
                     fontSize: 8, fontWeight: 700,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
@@ -500,14 +500,14 @@ function HunterShellInner({ user }) {
           title="Mission Control"
           style={{
             width: 34, height: 34, borderRadius: 9,
-            background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+            background: `linear-gradient(135deg,${BRAND.purple},${BRAND.cyan})`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 17, marginBottom: 16,
-            boxShadow: `0 4px 18px ${BRAND.pink}50`, flexShrink: 0, overflow: 'hidden',
+            boxShadow: `0 4px 18px ${BRAND.purple}50`, flexShrink: 0, overflow: 'hidden',
             cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = `0 6px 22px ${BRAND.pink}70`; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = `0 4px 18px ${BRAND.pink}50`; }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = `0 6px 22px ${BRAND.purple}70`; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = `0 4px 18px ${BRAND.purple}50`; }}
         >
           <img
             src={ASSETS.logoMark}
@@ -540,8 +540,8 @@ function HunterShellInner({ user }) {
               onMouseEnter={e => { if (!active && !mod.locked) e.currentTarget.style.background = T.surface; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
-              <mod.Icon size={14} color={active ? BRAND.pink : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? BRAND.pink : T.textFaint, marginTop: 1 }}>
+              <mod.Icon size={14} color={active ? BRAND.purple : T.textFaint} />
+              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? BRAND.purple : T.textFaint, marginTop: 1 }}>
                 {mod.label}
               </span>
             </div>
@@ -561,7 +561,7 @@ function HunterShellInner({ user }) {
               background: 'transparent',
               border: '1px solid transparent',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${BRAND.pink}40`; }}
+            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${BRAND.purple}40`; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
           >
             <Home size={14} color={T.textFaint} />
@@ -614,7 +614,7 @@ function HunterShellInner({ user }) {
             flexShrink: 0,
           }}>
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700, marginBottom: 1 }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.purple, fontWeight: 700, marginBottom: 1 }}>
                 HUNTER
               </div>
               <div style={{ fontSize: 9, color: T.textFaint }}>{HUNTER_ITEMS.length} modules</div>
@@ -645,17 +645,17 @@ function HunterShellInner({ user }) {
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 8, cursor: 'pointer', marginBottom: 1,
                     background: active ? T.accentBg : 'transparent',
-                    borderLeft: `2px solid ${active ? BRAND.pink : 'transparent'}`,
+                    borderLeft: `2px solid ${active ? BRAND.purple : 'transparent'}`,
                     transition: 'all 0.12s', position: 'relative',
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <it.Icon size={13} color={active ? BRAND.pink : T.textFaint} style={{ flexShrink: 0 }} />
+                  <it.Icon size={13} color={active ? BRAND.purple : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? BRAND.pink : T.textMuted,
+                      color: active ? BRAND.purple : T.textMuted,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.label}
@@ -666,7 +666,7 @@ function HunterShellInner({ user }) {
                   {it.id === 'missions' && activeMissionsCount > 0 && (
                     <span style={{
                       minWidth: 16, height: 16, borderRadius: 8,
-                      background: BRAND.pink, color: '#fff',
+                      background: BRAND.purple, color: '#fff',
                       fontSize: 9, fontWeight: 700, padding: '0 4px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0,
@@ -684,7 +684,7 @@ function HunterShellInner({ user }) {
             padding: '9px 11px', borderTop: `1px solid ${T.border}`,
             display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
           }}>
-            <Av initials={userInitials} color={BRAND.pink} size={24} />
+            <Av initials={userInitials} color={BRAND.purple} size={24} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.email || 'user@idynify.com'}

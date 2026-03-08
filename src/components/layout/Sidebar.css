@@ -312,9 +312,9 @@
 }
 
 [data-pillar="hunter"] .nav-item.active {
-  background: #fdf2f8;
-  border-left-color: #db2777;
-  color: #db2777;
+  background: #f3e8ff;
+  border-left-color: #7c3aed;
+  color: #7c3aed;
   font-weight: 600;
 }
 

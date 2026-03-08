@@ -21,7 +21,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Mail, Phone, Building2, Pencil,
   Copy, Check, Linkedin, Camera, Link2,
-  Loader, ChevronDown, RefreshCw,
+  Loader, ChevronDown, RefreshCw, X, Plus,
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
@@ -90,6 +90,138 @@ function getAvatarColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ─── Multi-field (email / phone) constants ────────────────────────────────────
+
+const EMAIL_LABELS = ['work', 'personal', 'other'];
+const PHONE_LABELS = ['mobile', 'work', 'home', 'other'];
+
+const FIELD_LABEL_COLORS = {
+  work:     { color: '#3b82f6', bg: 'rgba(59,130,246,0.10)' },
+  personal: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)' },
+  mobile:   { color: '#10b981', bg: 'rgba(16,185,129,0.10)' },
+  home:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)'  },
+  other:    { color: '#6b7280', bg: 'rgba(107,114,128,0.10)' },
+};
+
+// ─── ContactFieldEntry — one row in the multi-field list ─────────────────────
+
+function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
+  const [editing, setEditing]   = useState(!entry.value);
+  const [editVal, setEditVal]   = useState(entry.value || '');
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const inputRef  = useRef(null);
+  const labelRef  = useRef(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!labelOpen) return;
+    const h = (e) => { if (labelRef.current && !labelRef.current.contains(e.target)) setLabelOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [labelOpen]);
+
+  function confirmEdit() {
+    const trimmed = editVal.trim();
+    if (!trimmed) { onDelete(); return; }
+    if (trimmed !== entry.value) onUpdate({ ...entry, value: trimmed });
+    setEditing(false);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmEdit(); }
+    if (e.key === 'Escape') { if (!entry.value) { onDelete(); } else { setEditVal(entry.value); setEditing(false); } }
+  }
+
+  async function copyValue() {
+    try { await navigator.clipboard.writeText(entry.value); } catch {}
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  const labels     = type === 'email' ? EMAIL_LABELS : PHONE_LABELS;
+  const labelColor = FIELD_LABEL_COLORS[entry.label] || FIELD_LABEL_COLORS.other;
+  const href       = type === 'email' ? `mailto:${entry.value}` : `tel:${entry.value}`;
+
+  return (
+    <div className="idc-field-entry">
+      {/* Label picker */}
+      <div className="idc-label-wrap" ref={labelRef}>
+        <button
+          className="idc-label-btn"
+          style={{ color: labelColor.color, background: labelColor.bg }}
+          onClick={() => setLabelOpen(v => !v)}
+        >
+          {entry.label}
+        </button>
+        {labelOpen && (
+          <div className="idc-label-panel" style={{ background: T.cardBg, border: `1px solid ${T.border}`, boxShadow: `0 6px 20px ${T.isDark ? '#00000070' : '#00000015'}` }}>
+            {labels.map(l => {
+              const lc = FIELD_LABEL_COLORS[l] || FIELD_LABEL_COLORS.other;
+              return (
+                <button
+                  key={l}
+                  className="idc-label-opt"
+                  style={{ color: entry.label === l ? lc.color : T.textMuted, background: entry.label === l ? lc.bg : 'transparent' }}
+                  onClick={() => { onUpdate({ ...entry, label: l }); setLabelOpen(false); }}
+                >
+                  {entry.label === l && <Check size={10} style={{ flexShrink: 0 }} />}
+                  <span style={{ textTransform: 'capitalize' }}>{l}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Value */}
+      {editing ? (
+        <input
+          ref={inputRef}
+          className="idc-entry-input"
+          style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+          value={editVal}
+          onChange={e => setEditVal(e.target.value)}
+          onBlur={confirmEdit}
+          onKeyDown={handleKeyDown}
+          type={type === 'email' ? 'email' : 'tel'}
+          placeholder={type === 'email' ? 'Email address' : 'Phone number'}
+        />
+      ) : (
+        <a
+          href={href}
+          className="idc-entry-val"
+          style={{ color: T.text }}
+          onDoubleClick={e => { e.preventDefault(); setEditing(true); }}
+        >
+          {entry.value}
+        </a>
+      )}
+
+      {/* Action buttons — visible on hover */}
+      {!editing && entry.value && (
+        <div className="idc-entry-actions">
+          <button className="idc-icon-btn" onClick={copyValue} title="Copy">
+            {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
+          </button>
+          <button className="idc-icon-btn" onClick={() => setEditing(true)} title="Edit">
+            <Pencil size={11} color={T.textFaint} />
+          </button>
+          <button className="idc-entry-delete" onClick={onDelete} title="Remove">
+            <X size={11} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Shared mini-popover for any classification chip ─────────────────────────
@@ -182,6 +314,10 @@ export default function IdentityCard({
   const [copiedField, setCopiedField] = useState(null);
   const inputRef = useRef(null);
 
+  // Multi-field lists (email / phone)
+  const [emailsList, setEmailsList] = useState([]);
+  const [phonesList, setPhonesList] = useState([]);
+
   // Photo menu
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
   const [photoUrlMode, setPhotoUrlMode] = useState(false);
@@ -203,8 +339,8 @@ export default function IdentityCard({
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
   const canSearch = !!contact.linkedin_url || (!!contact.name && !!contact.company_name);
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
-  const email = contact.email || contact.work_email;
-  const phone = contact.phone_mobile || contact.phone_direct || contact.phone;
+  const email = emailsList[0]?.value || contact.email || contact.work_email;
+  const phone = phonesList[0]?.value || contact.phone_mobile || contact.phone_direct || contact.phone;
   const emailVerified = contact.email_status === 'verified';
   const emailLikely = contact.email_status === 'likely';
 
@@ -248,6 +384,26 @@ export default function IdentityCard({
     }
   }, [editingField]);
 
+  // Sync email list from contact data
+  useEffect(() => {
+    if (contact.emails && contact.emails.length > 0) {
+      setEmailsList(contact.emails.map((e, i) => ({ ...e, id: e.id || String(i) })));
+    } else {
+      const primary = contact.email || contact.work_email;
+      setEmailsList(primary ? [{ id: '0', value: primary, label: 'work' }] : []);
+    }
+  }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync phone list from contact data
+  useEffect(() => {
+    if (contact.phones && contact.phones.length > 0) {
+      setPhonesList(contact.phones.map((p, i) => ({ ...p, id: p.id || String(i) })));
+    } else {
+      const primary = contact.phone_mobile || contact.phone_direct || contact.phone;
+      setPhonesList(primary ? [{ id: '0', value: primary, label: 'mobile' }] : []);
+    }
+  }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Editing ─────────────────────────────────────────────────────────────────
   function startEdit(field, val) { setEditingField(field); setEditValue(val || ''); }
   function cancelEdit() { setEditingField(null); setEditValue(''); }
@@ -290,6 +446,57 @@ export default function IdentityCard({
     }
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  // ── Multi-field (email / phone) mutations ────────────────────────────────────
+
+  async function persistFields(fieldName, list) {
+    const user = auth.currentUser;
+    if (!user) return;
+    const updateData = {
+      [fieldName]: list,
+      updated_at: new Date().toISOString(),
+    };
+    // Keep primary single-value field in sync for backward compat
+    if (fieldName === 'emails') updateData.email = list[0]?.value || null;
+    if (fieldName === 'phones') updateData.phone = list[0]?.value || null;
+    onUpdate?.({ ...contact, ...updateData });
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), updateData);
+    } catch (err) {
+      console.error(`[IdentityCard] Save ${fieldName} failed:`, err);
+      onUpdate?.(contact);
+    }
+  }
+
+  function handleEmailUpdate(updated) {
+    const next = emailsList.map(e => e.id === updated.id ? updated : e);
+    setEmailsList(next);
+    persistFields('emails', next);
+  }
+  function handleEmailDelete(id) {
+    const next = emailsList.filter(e => e.id !== id);
+    setEmailsList(next);
+    persistFields('emails', next);
+  }
+  function handleAddEmail() {
+    const newEntry = { id: Date.now().toString(), value: '', label: 'work' };
+    setEmailsList(prev => [...prev, newEntry]);
+  }
+
+  function handlePhoneUpdate(updated) {
+    const next = phonesList.map(p => p.id === updated.id ? updated : p);
+    setPhonesList(next);
+    persistFields('phones', next);
+  }
+  function handlePhoneDelete(id) {
+    const next = phonesList.filter(p => p.id !== id);
+    setPhonesList(next);
+    persistFields('phones', next);
+  }
+  function handleAddPhone() {
+    const newEntry = { id: Date.now().toString(), value: '', label: 'mobile' };
+    setPhonesList(prev => [...prev, newEntry]);
   }
 
   async function saveManualPhotoUrl() {
@@ -675,87 +882,65 @@ export default function IdentityCard({
         {/* ── Contact details ── */}
         <div className="idc-contact-details">
 
-          {/* Email */}
-          {editingField === 'email' ? (
-            <div className="idc-edit-row">
-              <input
-                ref={inputRef}
-                className="idc-edit-input idc-contact-input"
-                style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onBlur={saveEdit}
-                onKeyDown={handleKeyDown}
-                placeholder="Email address"
-                type="email"
-              />
-              <span className="idc-edit-hint" style={{ color: T.textFaint }}>Enter · Esc</span>
-            </div>
-          ) : email ? (
-            <div className="idc-detail-row">
+          {/* Emails — multi-entry, iOS style */}
+          <div className="idc-multi-section">
+            <div className="idc-multi-header">
               <div className="idc-detail-icon" style={{ background: '#3b82f612', color: '#3b82f6' }}>
                 <Mail size={13} />
               </div>
-              <div className="idc-detail-info">
-                <a href={`mailto:${email}`} className="idc-detail-val" style={{ color: T.text }}>{email}</a>
-                {emailVerified && <span className="idc-badge idc-badge--ok">✓ Verified</span>}
-                {emailLikely && !emailVerified && <span className="idc-badge idc-badge--warn">~ Likely</span>}
-              </div>
-              <button className="idc-icon-btn" onClick={() => copyToClipboard(email, 'email')} title="Copy">
-                {copiedField === 'email' ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
-              </button>
-              <button className="idc-icon-btn" onClick={() => startEdit('email', email)} title="Edit">
-                <Pencil size={11} color={T.textFaint} />
-              </button>
+              <span className="idc-multi-label" style={{ color: T.textMuted }}>Email</span>
+              {emailVerified && <span className="idc-badge idc-badge--ok">✓ Verified</span>}
+              {emailLikely && !emailVerified && <span className="idc-badge idc-badge--warn">~ Likely</span>}
             </div>
-          ) : (
+            <div className="idc-multi-entries">
+              {emailsList.map(entry => (
+                <ContactFieldEntry
+                  key={entry.id}
+                  entry={entry}
+                  type="email"
+                  onUpdate={handleEmailUpdate}
+                  onDelete={() => handleEmailDelete(entry.id)}
+                  T={T}
+                />
+              ))}
+            </div>
             <button
-              className="idc-add-field"
-              style={{ color: T.textFaint, borderColor: T.border }}
-              onClick={() => startEdit('email', '')}
+              className="idc-add-entry"
+              style={{ color: T.textFaint }}
+              onClick={handleAddEmail}
             >
-              <Mail size={12} /><span>Add email</span>
+              <Plus size={12} /><span>add email</span>
             </button>
-          )}
+          </div>
 
-          {/* Phone */}
-          {editingField === 'phone' ? (
-            <div className="idc-edit-row">
-              <input
-                ref={inputRef}
-                className="idc-edit-input idc-contact-input"
-                style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onBlur={saveEdit}
-                onKeyDown={handleKeyDown}
-                placeholder="Phone number"
-                type="tel"
-              />
-              <span className="idc-edit-hint" style={{ color: T.textFaint }}>Enter · Esc</span>
-            </div>
-          ) : phone ? (
-            <div className="idc-detail-row">
+          {/* Phones — multi-entry, iOS style */}
+          <div className="idc-multi-section">
+            <div className="idc-multi-header">
               <div className="idc-detail-icon" style={{ background: '#10b98112', color: '#10b981' }}>
                 <Phone size={13} />
               </div>
-              <a href={`tel:${phone}`} className="idc-detail-val" style={{ color: T.text, flex: 1 }}>{phone}</a>
-              <button className="idc-icon-btn" onClick={() => copyToClipboard(phone, 'phone')} title="Copy">
-                {copiedField === 'phone' ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
-              </button>
-              <button className="idc-icon-btn" onClick={() => startEdit('phone', phone)} title="Edit">
-                <Pencil size={11} color={T.textFaint} />
-              </button>
+              <span className="idc-multi-label" style={{ color: T.textMuted }}>Phone</span>
             </div>
-          ) : (
+            <div className="idc-multi-entries">
+              {phonesList.map(entry => (
+                <ContactFieldEntry
+                  key={entry.id}
+                  entry={entry}
+                  type="phone"
+                  onUpdate={handlePhoneUpdate}
+                  onDelete={() => handlePhoneDelete(entry.id)}
+                  T={T}
+                />
+              ))}
+            </div>
             <button
-              className="idc-add-field"
-              style={{ color: T.textFaint, borderColor: T.border }}
-              onClick={() => startEdit('phone', '')}
+              className="idc-add-entry"
+              style={{ color: T.textFaint }}
+              onClick={handleAddPhone}
             >
-              <Phone size={12} /><span>Add phone</span>
+              <Plus size={12} /><span>add phone</span>
             </button>
-          )}
+          </div>
 
           {/* LinkedIn */}
           {contact.linkedin_url && (

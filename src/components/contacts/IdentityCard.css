@@ -508,6 +508,199 @@
   background: rgba(59, 130, 246, 0.05);
 }
 
+/* ── Multi-field (email / phone) iOS-style list ─────────────────── */
+
+.idc-multi-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.idc-multi-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 6px;
+}
+
+.idc-multi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  flex: 1;
+}
+
+.idc-multi-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 39px; /* align with icon offset */
+}
+
+/* Single entry row */
+.idc-field-entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 8px;
+  padding: 3px 4px 3px 0;
+  transition: background 0.12s ease;
+  min-width: 0;
+}
+
+.idc-field-entry:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.idc-field-entry:hover .idc-entry-actions {
+  opacity: 1;
+}
+
+/* Label badge (clickable) */
+.idc-label-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.idc-label-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  text-transform: capitalize;
+  transition: filter 0.12s ease;
+}
+
+.idc-label-btn:hover {
+  filter: brightness(0.9);
+}
+
+/* Label picker dropdown */
+.idc-label-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 110px;
+  border-radius: 10px;
+  padding: 4px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.idc-label-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  text-transform: capitalize;
+  transition: background 0.1s ease;
+}
+
+.idc-label-opt:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Entry value */
+.idc-entry-val {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.12s ease;
+  min-width: 0;
+}
+
+.idc-entry-val:hover {
+  color: #3b82f6 !important;
+}
+
+/* Entry edit input */
+.idc-entry-input {
+  flex: 1;
+  border-radius: 6px;
+  outline: none;
+  padding: 3px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 0;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+  transition: box-shadow 0.15s ease;
+}
+
+.idc-entry-input:focus {
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.22);
+}
+
+/* Action buttons (shown on hover) */
+.idc-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+  flex-shrink: 0;
+}
+
+/* Red delete button */
+.idc-entry-delete {
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #ef4444;
+  opacity: 0.7;
+  transition: all 0.14s ease;
+  flex-shrink: 0;
+}
+
+.idc-entry-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  opacity: 1;
+}
+
+/* "add email / add phone" button */
+.idc-add-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 4px 4px 4px 39px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.14s ease;
+  align-self: flex-start;
+  text-transform: lowercase;
+}
+
+.idc-add-entry:hover {
+  color: #3b82f6 !important;
+}
+
 /* ── Inline edit inputs ─────────────────────────────────────────── */
 .idc-edit-input {
   border-radius: 7px;

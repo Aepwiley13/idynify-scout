@@ -1,7 +1,42 @@
 import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase } from 'lucide-react';
 import './ContactInfo.css';
 
+const LABEL_PILL_COLORS = {
+  work:     { color: '#3b82f6', bg: 'rgba(59,130,246,0.10)' },
+  personal: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)' },
+  mobile:   { color: '#10b981', bg: 'rgba(16,185,129,0.10)' },
+  home:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)'  },
+  other:    { color: '#6b7280', bg: 'rgba(107,114,128,0.10)' },
+};
+
+function LabelPill({ label }) {
+  const c = LABEL_PILL_COLORS[label] || LABEL_PILL_COLORS.other;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '1px 7px', borderRadius: 20,
+      fontSize: 10, fontWeight: 600,
+      color: c.color, background: c.bg,
+      textTransform: 'capitalize', flexShrink: 0,
+    }}>{label}</span>
+  );
+}
+
 export default function ContactInfo({ contact, mode = 'compact' }) {
+  // Build email entries from multi-field array or primary field
+  const emailEntries = (contact.emails && contact.emails.length > 0)
+    ? contact.emails
+    : (contact.email || contact.work_email)
+      ? [{ value: contact.email || contact.work_email, label: 'work' }]
+      : [];
+
+  // Build phone entries from multi-field array or primary field
+  const phoneEntries = (contact.phones && contact.phones.length > 0)
+    ? contact.phones
+    : (contact.phone || contact.phone_mobile || contact.phone_direct)
+      ? [{ value: contact.phone || contact.phone_mobile || contact.phone_direct, label: 'mobile' }]
+      : [];
+
   function getEmailStatusBadge() {
     if (!contact.email_status) return null;
 
@@ -24,32 +59,32 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
         <h3 className="info-section-title">Contact Information</h3>
 
         <div className="info-items-compact">
-          {/* Email */}
+          {/* Emails */}
           <div className="info-item-compact">
             <Mail className="info-icon-compact" />
-            <div className="info-content-compact">
-              {contact.email ? (
-                <>
-                  <a href={`mailto:${contact.email}`} className="info-value-link">
-                    {contact.email}
-                  </a>
-                  {getEmailStatusBadge()}
-                </>
-              ) : (
+            <div className="info-content-compact" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+              {emailEntries.length > 0 ? emailEntries.map((e, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <LabelPill label={e.label} />
+                  <a href={`mailto:${e.value}`} className="info-value-link">{e.value}</a>
+                  {i === 0 && getEmailStatusBadge()}
+                </div>
+              )) : (
                 <span className="info-value-unavailable">Email not available</span>
               )}
             </div>
           </div>
 
-          {/* Phone */}
+          {/* Phones */}
           <div className="info-item-compact">
             <Phone className="info-icon-compact" />
-            <div className="info-content-compact">
-              {contact.phone ? (
-                <a href={`tel:${contact.phone}`} className="info-value-link">
-                  {contact.phone}
-                </a>
-              ) : (
+            <div className="info-content-compact" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+              {phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <LabelPill label={p.label} />
+                  <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
+                </div>
+              )) : (
                 <span className="info-value-unavailable">Phone not available</span>
               )}
             </div>
@@ -122,38 +157,38 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
       <h3 className="info-section-title">Contact Information</h3>
 
       <div className="info-items-expanded">
-        {/* Email */}
+        {/* Emails */}
         <div className="info-item-expanded">
           <div className="info-icon-wrapper">
             <Mail className="info-icon-expanded" />
           </div>
           <div className="info-content-expanded">
             <span className="info-label">Email</span>
-            {contact.email ? (
-              <>
-                <a href={`mailto:${contact.email}`} className="info-value-link">
-                  {contact.email}
-                </a>
-                {getEmailStatusBadge()}
-              </>
-            ) : (
+            {emailEntries.length > 0 ? emailEntries.map((e, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                <LabelPill label={e.label} />
+                <a href={`mailto:${e.value}`} className="info-value-link">{e.value}</a>
+                {i === 0 && getEmailStatusBadge()}
+              </div>
+            )) : (
               <span className="info-value-unavailable">Not available</span>
             )}
           </div>
         </div>
 
-        {/* Phone */}
+        {/* Phones */}
         <div className="info-item-expanded">
           <div className="info-icon-wrapper">
             <Phone className="info-icon-expanded" />
           </div>
           <div className="info-content-expanded">
             <span className="info-label">Phone</span>
-            {contact.phone ? (
-              <a href={`tel:${contact.phone}`} className="info-value-link">
-                {contact.phone}
-              </a>
-            ) : (
+            {phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <LabelPill label={p.label} />
+                <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
+              </div>
+            )) : (
               <span className="info-value-unavailable">Not available</span>
             )}
           </div>

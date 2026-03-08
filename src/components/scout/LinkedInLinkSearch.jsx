@@ -250,17 +250,17 @@ function ContactCard({ contact, T }) {
       {/* Header row: avatar + name/title + badge */}
       <div style={{ padding: '16px 16px 14px', display: 'flex', alignItems: 'center', gap: 14, background: `linear-gradient(135deg,#0077b510 0%,${T.cardBg} 100%)`, borderBottom: `1px solid ${T.border}` }}>
         {/* Avatar */}
-        <div style={{ flexShrink: 0, width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', border: '2.5px solid #0077b540', background: '#0077b515', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ flexShrink: 0, width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', border: '2.5px solid #0077b540', background: '#0077b515', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {photo ? (
             <img src={photo} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
           ) : (
-            <Linkedin size={28} color="#0077b5" />
+            <Linkedin size={36} color="#0077b5" />
           )}
         </div>
         {/* Name + title */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: T.text, lineHeight: 1.2, marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
-          <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.4 }}>{contact.title || 'Title not available'}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: T.text, lineHeight: 1.2, marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
+          <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.4 }}>{contact.title || 'Title not available'}</div>
         </div>
         {/* EXACT MATCH badge */}
         <div style={{ flexShrink: 0, background: '#0077b5', borderRadius: 6, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>

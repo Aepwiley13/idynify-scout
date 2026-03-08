@@ -1,24 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './MeetSection.css';
 
+const EMAIL_TYPES = [
+  { label: 'Introduction', intent: 'cold' },
+  { label: 'Follow-up', intent: 'followup' },
+  { label: 'Check-in', intent: 'warm' },
+];
+
 export default function MeetSection({ barryContext, contact }) {
   const navigate = useNavigate();
+  const [selectedIndex, setSelectedIndex] = useState(null);
 
   if (!barryContext) {
     return null;
   }
 
-  // Extract first name from full name
   const firstName = contact.name ? contact.name.split(' ')[0] : 'This Contact';
 
-  // Handle conversation starter click - draft email via Hunter
-  const handleDraftEmail = (starter) => {
-    // Navigate to Hunter campaign with pre-filled conversation starter
+  const handleStarterClick = (index) => {
+    setSelectedIndex(selectedIndex === index ? null : index);
+  };
+
+  const handleDraftEmail = (starter, intent) => {
     navigate('/hunter/campaign/new', {
       state: {
         contactIds: [contact.id],
         conversationStarter: starter,
+        engagementIntent: intent,
         contact: contact
       }
     });
@@ -52,12 +61,27 @@ export default function MeetSection({ barryContext, contact }) {
         <div className="conversation-starters">
           <h3>Ways a conversation could naturally begin</h3>
           {barryContext.conversationStarters.map((starter, index) => (
-            <div
-              key={index}
-              className="conversation-option"
-              onClick={() => handleDraftEmail(starter)}
-            >
-              {starter}
+            <div key={index} className="conversation-option-wrapper">
+              <div
+                className={`conversation-option${selectedIndex === index ? ' conversation-option--active' : ''}`}
+                onClick={() => handleStarterClick(index)}
+              >
+                {starter}
+              </div>
+              {selectedIndex === index && (
+                <div className="email-type-picker">
+                  <span className="email-type-label">Draft as:</span>
+                  {EMAIL_TYPES.map(({ label, intent }) => (
+                    <button
+                      key={intent}
+                      className="email-type-btn"
+                      onClick={() => handleDraftEmail(starter, intent)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -67,7 +91,11 @@ export default function MeetSection({ barryContext, contact }) {
       {barryContext.conversationStarters && barryContext.conversationStarters.length > 0 && (
         <div className="engagement-helper">
           <span>💬</span>
-          <span>Click any option above to draft an email via Hunter</span>
+          <span>
+            {selectedIndex !== null
+              ? 'Choose a message type to draft via Hunter'
+              : 'Click any option above to draft an email via Hunter'}
+          </span>
         </div>
       )}
 

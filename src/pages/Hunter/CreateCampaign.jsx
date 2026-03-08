@@ -24,6 +24,13 @@ export default function CreateCampaign() {
   const [reconSectionsUsed, setReconSectionsUsed] = useState({}); // NEW: Track which sections were actually used
 
   useEffect(() => {
+    // Pre-fill from MeetSection navigation state
+    if (location.state?.contactIds) {
+      setSelectedContactIds(location.state.contactIds);
+    }
+    if (location.state?.engagementIntent) {
+      setEngagementIntent(location.state.engagementIntent);
+    }
     checkGmailAndLoadContacts();
   }, []);
 

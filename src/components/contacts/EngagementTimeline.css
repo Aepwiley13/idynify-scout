@@ -188,6 +188,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  cursor: pointer;
+}
+
+.timeline-event-preview--expanded {
+  white-space: pre-wrap;
+  overflow: visible;
+  text-overflow: unset;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.5rem 0.625rem;
+  color: #374151;
 }
 
 /* Actor Badge (e.g. "Barry") */

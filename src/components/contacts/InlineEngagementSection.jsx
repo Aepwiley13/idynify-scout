@@ -240,13 +240,15 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   }, [userIntent]);
 
   // Auto-resize message textarea (weapon step & review step share same state)
+  // Also re-run when weaponStep/reviewStep become true so the textarea resizes
+  // as soon as it mounts — not just when message content changes.
   useEffect(() => {
     [weaponMessageRef.current, reviewMessageRef.current].forEach(el => {
       if (!el) return;
       el.style.height = 'auto';
       el.style.height = `${el.scrollHeight}px`;
     });
-  }, [message]);
+  }, [message, weaponStep, reviewStep]);
 
   // Saved prompts
   const [savedPrompts, setSavedPrompts] = useState([]);

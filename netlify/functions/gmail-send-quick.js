@@ -56,7 +56,8 @@ export const handler = async (event) => {
     // existingThreadId: optional — when provided the message is attached to an
     // existing Gmail thread (follow-up reply). gmail_thread_id in Firestore is
     // preserved; only gmail_last_message_id and last_sent_at are updated.
-    const { userId, authToken, toEmail, toName, subject, body, contactId, existingThreadId } = JSON.parse(event.body);
+    // ccEmails: optional array of { name, email } objects to CC.
+    const { userId, authToken, toEmail, toName, subject, body, contactId, existingThreadId, ccEmails } = JSON.parse(event.body);
 
     // Validate required fields
     if (!userId || !authToken || !toEmail || !subject || !body) {
@@ -200,14 +201,21 @@ export const handler = async (event) => {
 
     // Create email in RFC 2822 format
     const recipientName = toName || toEmail;
-    const email = [
+    const emailLines = [
       `To: ${recipientName} <${toEmail}>`,
+    ];
+    if (ccEmails && ccEmails.length > 0) {
+      const ccHeader = ccEmails.map(r => r.name && r.name !== r.email ? `${r.name} <${r.email}>` : r.email).join(', ');
+      emailLines.push(`Cc: ${ccHeader}`);
+    }
+    emailLines.push(
       `Subject: ${subject}`,
       'Content-Type: text/plain; charset=utf-8',
       'MIME-Version: 1.0',
       '',
       bodyWithSignature
-    ].join('\n');
+    );
+    const email = emailLines.join('\n');
 
     // Encode email in base64url format (required by Gmail API)
     const encodedEmail = Buffer.from(email)
@@ -273,7 +281,8 @@ export const handler = async (event) => {
         gmailThreadId: gmailThreadId || null,
         status: 'sent',
         sentAt,
-        source: 'quick_engage'
+        source: 'quick_engage',
+        ...(ccEmails && ccEmails.length > 0 && { ccEmails: ccEmails.map(r => r.email) })
       });
     } catch (logError) {
       console.warn('Failed to log email, non-blocking:', logError);

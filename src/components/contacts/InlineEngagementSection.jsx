@@ -263,6 +263,13 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [goalEditing, setGoalEditing] = useState(false);
   const [editedGoal, setEditedGoal] = useState('');
 
+  // CC recipients
+  const [ccRecipients, setCcRecipients] = useState([]);
+  const [ccInput, setCcInput] = useState('');
+  const [ccSuggestions, setCcSuggestions] = useState([]);
+  const [ccContactsCache, setCcContactsCache] = useState(null);
+  const ccInputRef = useRef(null);
+
   // Section collapse / full history
   const [sectionCollapsed, setSectionCollapsed] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
@@ -347,6 +354,9 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     setSavedMsgIndices(new Set());
     setSavingMsgIdx(null);
     setPromptSaved(false);
+    setCcRecipients([]);
+    setCcInput('');
+    setCcSuggestions([]);
   }
 
   function handleGoalRegenerate() {
@@ -465,6 +475,82 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
         })
       }).catch(() => {});
     }).catch(() => {});
+  }
+
+  // === CC Recipients ===
+  async function loadCcContactsCache() {
+    if (ccContactsCache !== null) return ccContactsCache;
+    const user = auth.currentUser;
+    if (!user) return [];
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'users', user.uid, 'contacts'), orderBy('name'), limit(80))
+      );
+      const contacts = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => c.email && c.email.trim());
+      setCcContactsCache(contacts);
+      return contacts;
+    } catch {
+      return [];
+    }
+  }
+
+  async function handleCcInputChange(value) {
+    setCcInput(value);
+    if (!value.trim()) {
+      setCcSuggestions([]);
+      return;
+    }
+    const lower = value.toLowerCase();
+    const allContacts = await loadCcContactsCache();
+    const filtered = allContacts
+      .filter(c => {
+        const alreadyAdded = ccRecipients.some(r => r.email === c.email);
+        if (alreadyAdded) return false;
+        const name = (c.name || `${c.firstName || ''} ${c.lastName || ''}`).toLowerCase();
+        const email = (c.email || '').toLowerCase();
+        return name.includes(lower) || email.includes(lower);
+      })
+      .slice(0, 5);
+    setCcSuggestions(filtered);
+  }
+
+  function handleCcSelectContact(c) {
+    const name = c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email;
+    setCcRecipients(prev => [...prev, { name, email: c.email }]);
+    setCcInput('');
+    setCcSuggestions([]);
+    ccInputRef.current?.focus();
+  }
+
+  function handleCcAddRaw() {
+    const raw = ccInput.trim();
+    if (!raw || !raw.includes('@')) return;
+    if (ccRecipients.some(r => r.email === raw)) {
+      setCcInput('');
+      return;
+    }
+    setCcRecipients(prev => [...prev, { name: raw, email: raw }]);
+    setCcInput('');
+    setCcSuggestions([]);
+  }
+
+  function handleCcKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (ccSuggestions.length > 0) {
+        handleCcSelectContact(ccSuggestions[0]);
+      } else {
+        handleCcAddRaw();
+      }
+    } else if (e.key === 'Backspace' && !ccInput && ccRecipients.length > 0) {
+      setCcRecipients(prev => prev.slice(0, -1));
+    }
+  }
+
+  function handleCcRemove(email) {
+    setCcRecipients(prev => prev.filter(r => r.email !== email));
   }
 
   // === STEP 1: Intent Submission ===
@@ -627,7 +713,8 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
         body: message,
         userIntent,
         engagementIntent,
-        strategy: selectedMessage?.strategy
+        strategy: selectedMessage?.strategy,
+        ccRecipients: selectedWeapon === 'email' ? ccRecipients : []
       });
 
       setSendResult(result);
@@ -1178,6 +1265,74 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                       onChange={(e) => setSubject(e.target.value)}
                     />
                   </>
+                )}
+                {selectedWeapon === 'email' && (
+                  <div className="ies-cc-field">
+                    <label className="ies-preview-label">CC <span className="ies-cc-hint">(optional)</span></label>
+                    <div className="ies-cc-input-wrap">
+                      {ccRecipients.map(r => (
+                        <span key={r.email} className="ies-cc-chip">
+                          <span className="ies-cc-chip-name">{r.name !== r.email ? r.name : r.email}</span>
+                          <button
+                            className="ies-cc-chip-remove"
+                            onClick={() => handleCcRemove(r.email)}
+                            type="button"
+                            aria-label={`Remove ${r.name}`}
+                          >×</button>
+                        </span>
+                      ))}
+                      <input
+                        ref={ccInputRef}
+                        type="text"
+                        className="ies-cc-input"
+                        value={ccInput}
+                        onChange={(e) => handleCcInputChange(e.target.value)}
+                        onKeyDown={handleCcKeyDown}
+                        onBlur={() => setTimeout(() => setCcSuggestions([]), 150)}
+                        placeholder={ccRecipients.length === 0 ? 'Search contacts or type email…' : ''}
+                      />
+                    </div>
+                    {ccSuggestions.length > 0 && (
+                      <div className="ies-cc-suggestions">
+                        {ccSuggestions.map(c => {
+                          const name = c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim();
+                          return (
+                            <button
+                              key={c.id}
+                              className="ies-cc-suggestion-item"
+                              type="button"
+                              onMouseDown={() => handleCcSelectContact(c)}
+                            >
+                              <span className="ies-cc-suggestion-name">{name}</span>
+                              <span className="ies-cc-suggestion-email">{c.email}</span>
+                            </button>
+                          );
+                        })}
+                        {ccInput.includes('@') && !ccSuggestions.some(c => c.email === ccInput) && (
+                          <button
+                            className="ies-cc-suggestion-item ies-cc-suggestion-raw"
+                            type="button"
+                            onMouseDown={handleCcAddRaw}
+                          >
+                            <span className="ies-cc-suggestion-name">Add</span>
+                            <span className="ies-cc-suggestion-email">{ccInput}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {ccInput.includes('@') && ccSuggestions.length === 0 && (
+                      <div className="ies-cc-suggestions">
+                        <button
+                          className="ies-cc-suggestion-item ies-cc-suggestion-raw"
+                          type="button"
+                          onMouseDown={handleCcAddRaw}
+                        >
+                          <span className="ies-cc-suggestion-name">Add email</span>
+                          <span className="ies-cc-suggestion-email">{ccInput}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <label className="ies-preview-label">Message</label>
                 <textarea

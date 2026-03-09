@@ -143,12 +143,14 @@ export async function resolveSendMethod(channel, userId, contact) {
 /**
  * OPTION A: Send email via Gmail API
  */
-export async function sendEmailViaGmail({ userId, contact, subject, body }) {
+export async function sendEmailViaGmail({ userId, contact, subject, body, ccRecipients }) {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('Not authenticated');
 
     const authToken = await user.getIdToken();
+
+    const ccEmails = (ccRecipients || []).map(r => ({ name: r.name, email: r.email }));
 
     const response = await fetch('/.netlify/functions/gmail-send-quick', {
       method: 'POST',
@@ -163,6 +165,7 @@ export async function sendEmailViaGmail({ userId, contact, subject, body }) {
         contactId: contact.id,
         // Preserve the existing Gmail thread for follow-ups (Sprint 3)
         existingThreadId: contact.gmail_thread_id || null,
+        ccEmails: ccEmails.length > 0 ? ccEmails : undefined,
       })
     });
 
@@ -191,9 +194,14 @@ export async function sendEmailViaGmail({ userId, contact, subject, body }) {
 /**
  * OPTION B: Open native email app with mailto:
  */
-export function openNativeEmail({ contact, subject, body }) {
+export function openNativeEmail({ contact, subject, body, ccRecipients }) {
   const to = contact.email;
-  const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject || '')}&body=${encodeURIComponent(body || '')}`;
+  const ccString = (ccRecipients || []).map(r => r.email).join(',');
+  const params = new URLSearchParams();
+  if (subject) params.set('subject', subject);
+  if (body) params.set('body', body);
+  if (ccString) params.set('cc', ccString);
+  const mailtoUrl = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
 
   window.location.href = mailtoUrl;
 
@@ -384,6 +392,7 @@ export async function executeSendAction({
   userIntent,
   engagementIntent,
   strategy,
+  ccRecipients,
   // Calendar-specific params
   startDateTime,
   endDateTime,
@@ -407,11 +416,11 @@ export async function executeSendAction({
     case CHANNELS.EMAIL:
       if (resolution.method === 'real') {
         // Option A: Real Gmail send
-        sendResult = await sendEmailViaGmail({ userId, contact, subject, body });
+        sendResult = await sendEmailViaGmail({ userId, contact, subject, body, ccRecipients });
         activityType = sendResult.result === SEND_RESULT.SENT ? 'email_sent' : 'email_failed';
       } else {
         // Option B: Native mailto
-        sendResult = openNativeEmail({ contact, subject, body });
+        sendResult = openNativeEmail({ contact, subject, body, ccRecipients });
         activityType = 'email_opened';
       }
       break;
@@ -500,6 +509,7 @@ export async function executeSendAction({
       strategy: strategy || null,
       subject: subject || null,
       fullMessage: body || null,
+      ...(ccRecipients && ccRecipients.length > 0 && { ccRecipients: ccRecipients.map(r => r.email) }),
       ...(sendResult.gmailMessageId && { gmailMessageId: sendResult.gmailMessageId })
     }
   });

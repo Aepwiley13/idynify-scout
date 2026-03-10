@@ -710,8 +710,12 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
               const el = document.getElementById('engagement-section');
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               requestAnimationFrame(() => requestAnimationFrame(() => {
-                if (engagementSectionRef.current?.startWithIntent) {
-                  engagementSectionRef.current.startWithIntent(starter, intentId);
+                const ref = engagementSectionRef.current;
+                if (ref?.startWithIntent) {
+                  ref.startWithIntent(starter, intentId);
+                } else if (ref?.triggerFlow) {
+                  // Fallback: open the engagement flow so the user can type manually
+                  ref.triggerFlow();
                 }
               }));
             }}

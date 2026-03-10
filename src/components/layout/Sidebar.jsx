@@ -79,8 +79,8 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const peopleItems = [
     {
       icon: Users,
-      label: 'All Contacts',
-      sublabel: 'Full view',
+      label: 'All People',
+      sublabel: 'Overview',
       path: '/people',
       isPrimary: true
     }
@@ -310,7 +310,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
       {/* Navigation Pillars */}
       <nav className="sidebar-nav">
-        {renderPillar('people', 'PEOPLE', Users, 'pillar-cyan', peopleItems)}
+        {renderPillar('people', 'COMMAND CENTER', Users, 'pillar-cyan', peopleItems)}
         {renderPillar('scout', 'SCOUT', Search, 'pillar-cyan', scoutItems)}
         {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-purple', hunterItems)}
         {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}

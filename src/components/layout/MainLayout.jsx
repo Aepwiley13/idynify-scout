@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
-import { User, Menu, Settings } from 'lucide-react';
+import { User, Menu, Settings, LogOut } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './MainLayout.css';
 

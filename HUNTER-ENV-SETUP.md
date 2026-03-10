@@ -38,11 +38,12 @@ FIREBASE_API_KEY=your_firebase_api_key_here
 
 ---
 
-## 🔧 Step 2: Enable Gmail API
+## 🔧 Step 2: Enable Required APIs
 
 1. In Google Cloud Console, go to **APIs & Services** → **Library**
-2. Search for "Gmail API"
-3. Click **Enable**
+2. Search for and **Enable** each of the following:
+   - **Gmail API** (required for email sending)
+   - **Google Calendar API** (required for calendar integration)
 
 ---
 
@@ -54,9 +55,11 @@ FIREBASE_API_KEY=your_firebase_api_key_here
    - **App name**: Idynify Hunter
    - **User support email**: your email
    - **Developer contact**: your email
-4. **Scopes**: Add the following scope:
+4. **Scopes**: Add the following scopes:
    ```
    https://www.googleapis.com/auth/gmail.send
+   https://www.googleapis.com/auth/calendar.events
+   https://www.googleapis.com/auth/calendar.readonly
    ```
 5. **Test users** (for development): Add your Gmail address
 6. Click **Save and Continue**
@@ -74,11 +77,14 @@ FIREBASE_API_KEY=your_firebase_api_key_here
    https://your-site.netlify.app
    http://localhost:5173  (for local development)
    ```
-6. **Authorized redirect URIs**:
+6. **Authorized redirect URIs** — you must add **all four** of these:
    ```
    https://your-site.netlify.app/.netlify/functions/gmail-oauth-callback
-   http://localhost:8888/.netlify/functions/gmail-oauth-callback  (for local development)
+   https://your-site.netlify.app/.netlify/functions/calendar-oauth-callback
+   http://localhost:8888/.netlify/functions/gmail-oauth-callback
+   http://localhost:8888/.netlify/functions/calendar-oauth-callback
    ```
+   ⚠️ **Missing the `calendar-oauth-callback` URI causes `Error 400: redirect_uri_mismatch` when connecting Google Calendar.**
 7. Click **Create**
 8. **Copy the Client ID and Client Secret** (you'll need these next)
 
@@ -107,6 +113,13 @@ FIREBASE_API_KEY=your_firebase_api_key_here
 - **Value**: `https://your-site.netlify.app/.netlify/functions/gmail-oauth-callback`
 - **Scopes**: All scopes
 - **Replace `your-site.netlify.app` with your actual Netlify domain**
+
+### GOOGLE_CALENDAR_REDIRECT_URI
+- **Key**: `GOOGLE_CALENDAR_REDIRECT_URI`
+- **Value**: `https://your-site.netlify.app/.netlify/functions/calendar-oauth-callback`
+- **Scopes**: All scopes
+- **Replace `your-site.netlify.app` with your actual Netlify domain**
+- **Note**: If not set, the app will derive this from `GOOGLE_REDIRECT_URI` automatically, but setting it explicitly avoids any ambiguity.
 
 ---
 
@@ -203,13 +216,16 @@ After adding environment variables:
 
 ### Error: "redirect_uri_mismatch"
 
-**Cause**: Redirect URI in code doesn't match Google Cloud Console
+**Cause**: The redirect URI sent to Google doesn't match any authorized URI in Google Cloud Console.
 
-**Solution**:
-1. Check `GOOGLE_REDIRECT_URI` in Netlify
-2. Verify it matches exactly in Google Cloud Console → Credentials
-3. Make sure it includes `https://` and the exact domain
-4. No trailing slash!
+**For Gmail (`gmail-oauth-callback`):**
+1. Check `GOOGLE_REDIRECT_URI` in Netlify matches exactly what's in Google Cloud Console
+2. Make sure it includes `https://` and the exact domain — no trailing slash
+
+**For Google Calendar (`calendar-oauth-callback`) — most common cause:**
+1. You must add `https://your-site.netlify.app/.netlify/functions/calendar-oauth-callback` to **Authorized redirect URIs** in Google Cloud Console → Credentials → your OAuth client
+2. Optionally set `GOOGLE_CALENDAR_REDIRECT_URI` in Netlify to make this explicit
+3. Also ensure the **Google Calendar API** is enabled and **Calendar scopes** are added to the OAuth consent screen
 
 ### Error: "invalid_client"
 
@@ -255,15 +271,18 @@ Use this checklist to verify all variables are set:
 
 - [ ] `GOOGLE_CLIENT_ID` - Added to Netlify
 - [ ] `GOOGLE_CLIENT_SECRET` - Added to Netlify (keep secret!)
-- [ ] `GOOGLE_REDIRECT_URI` - Added to Netlify (correct domain!)
+- [ ] `GOOGLE_REDIRECT_URI` - Added to Netlify (Gmail callback, correct domain!)
+- [ ] `GOOGLE_CALENDAR_REDIRECT_URI` - Added to Netlify (Calendar callback, correct domain!)
 - [ ] `FIREBASE_PRIVATE_KEY` - Already exists
 - [ ] `FIREBASE_CLIENT_EMAIL` - Already exists
 - [ ] `FIREBASE_PROJECT_ID` - Already exists
 - [ ] `ANTHROPIC_API_KEY` - Already exists
 - [ ] `FIREBASE_API_KEY` - Already exists
 - [ ] Gmail API - Enabled in Google Cloud
-- [ ] OAuth Consent Screen - Configured
-- [ ] Redirect URIs - Authorized in Google Cloud
+- [ ] Google Calendar API - Enabled in Google Cloud
+- [ ] OAuth Consent Screen - Configured with Gmail + Calendar scopes
+- [ ] Gmail redirect URI authorized in Google Cloud (`/gmail-oauth-callback`)
+- [ ] Calendar redirect URI authorized in Google Cloud (`/calendar-oauth-callback`)
 - [ ] Site - Redeployed after adding variables
 
 ---

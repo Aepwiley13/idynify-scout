@@ -48,7 +48,7 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
           </button>
           <button className="more-sheet-item" onClick={() => go('/people')}>
             <Users size={22} />
-            <span>People</span>
+            <span>All People</span>
           </button>
           <button className="more-sheet-item" onClick={() => go('/settings')}>
             <Settings size={22} />

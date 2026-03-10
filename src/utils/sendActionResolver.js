@@ -192,22 +192,41 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
 }
 
 /**
- * OPTION B: Open native email app with mailto:
+ * OPTION B: Open Gmail web compose + copy draft to clipboard.
+ * Used when Gmail is not integrated. Opens Gmail in a new tab with
+ * To/Subject pre-filled and copies the full draft to clipboard so
+ * the user can paste the body without relying on URL length limits.
+ * Does NOT use mailto: to avoid triggering Apple Mail or other
+ * native mail clients set as the OS default.
  */
 export function openNativeEmail({ contact, subject, body, ccRecipients }) {
-  const to = contact.email;
-  const ccString = (ccRecipients || []).map(r => r.email).join(',');
-  const params = new URLSearchParams();
-  if (subject) params.set('subject', subject);
-  if (body) params.set('body', body);
-  if (ccString) params.set('cc', ccString);
-  const mailtoUrl = `mailto:${encodeURIComponent(to)}?${params.toString()}`;
+  const to = contact.email || '';
 
-  window.location.href = mailtoUrl;
+  // Build Gmail compose URL (web-based, works without integration)
+  const gmailParams = new URLSearchParams({ view: 'cm', fs: '1' });
+  if (to) gmailParams.set('to', to);
+  if (subject) gmailParams.set('su', subject);
+  // Body is intentionally omitted from the URL — Gmail truncates long URLs.
+  // The full draft is copied to clipboard instead (see below).
+  const ccString = (ccRecipients || []).map(r => r.email).join(',');
+  if (ccString) gmailParams.set('cc', ccString);
+
+  window.open(`https://mail.google.com/mail/?${gmailParams.toString()}`, '_blank');
+
+  // Copy the full draft to clipboard so user can paste the body
+  const fullDraft = [
+    to ? `To: ${to}` : '',
+    subject ? `Subject: ${subject}` : '',
+    '',
+    body || ''
+  ].filter((line, i) => i >= 2 || line !== '').join('\n');
+
+  navigator.clipboard.writeText(fullDraft).catch(() => {});
 
   return {
     result: SEND_RESULT.OPENED,
-    message: 'Email draft opened in your email app'
+    message: 'Gmail opened — full draft copied to clipboard. Paste the body to send.',
+    clipboardCopied: true
   };
 }
 
@@ -546,7 +565,7 @@ export function getActionLabels(channel, method) {
   const labels = {
     email: {
       real: { button: 'Send Email', success: 'Email sent', icon: 'Mail' },
-      native: { button: 'Open Email Draft', success: 'Email draft opened', icon: 'ExternalLink' }
+      native: { button: 'Open in Gmail', success: 'Gmail opened — draft copied to clipboard', icon: 'ExternalLink' }
     },
     text: {
       native: { button: 'Open Text Message', success: 'SMS app opened', icon: 'ExternalLink' }

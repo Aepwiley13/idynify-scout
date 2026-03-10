@@ -703,7 +703,19 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
         {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
         {barryContext ? (
-          <MeetSection barryContext={barryContext} contact={contact} />
+          <MeetSection
+            barryContext={barryContext}
+            contact={contact}
+            onStarterDraft={(starter, intentId) => {
+              const el = document.getElementById('engagement-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (engagementSectionRef.current?.startWithIntent) {
+                  engagementSectionRef.current.startWithIntent(starter, intentId);
+                }
+              }));
+            }}
+          />
         ) : generatingContext ? (
           <div className="barry-loading-state">
             <Loader className="loading-icon" />

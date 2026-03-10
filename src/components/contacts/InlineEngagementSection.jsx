@@ -280,6 +280,32 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   useImperativeHandle(ref, () => ({
     triggerFlow() {
       activateFlow();
+    },
+    startWithIntent(intentText, intentId) {
+      resetFlow();
+      setFlowActive(true);
+      loadSavedPrompts();
+      checkGmailStatus();
+      // Pre-populate intent and skip straight to message generation
+      setUserIntent(intentText);
+      setEngagementIntent(intentId || 'prospect');
+      setIntentSubmitted(true);
+      generateMessageOptions(intentText, intentId || 'prospect');
+      // Update contact status
+      const user = auth.currentUser;
+      if (user && contact?.id) {
+        updateContactStatus({
+          userId: user.uid,
+          contactId: contact.id,
+          trigger: STATUS_TRIGGERS.ENGAGE_CLICKED,
+          currentStatus: getContactStatus(contact)
+        });
+        updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+          hunter_status: 'engaged_pending',
+          hunter_engaged_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
     }
   }));
 

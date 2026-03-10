@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './MeetSection.css';
 
 const EMAIL_TYPES = [
-  { label: 'Introduction', intent: 'cold' },
-  { label: 'Follow-up', intent: 'followup' },
+  { label: 'Introduction', intent: 'prospect' },
+  { label: 'Follow-up', intent: 'warm' },
   { label: 'Check-in', intent: 'warm' },
 ];
 
-export default function MeetSection({ barryContext, contact }) {
-  const navigate = useNavigate();
+export default function MeetSection({ barryContext, contact, onStarterDraft }) {
   const [selectedIndex, setSelectedIndex] = useState(null);
 
   if (!barryContext) {
@@ -22,15 +20,11 @@ export default function MeetSection({ barryContext, contact }) {
     setSelectedIndex(selectedIndex === index ? null : index);
   };
 
-  const handleDraftEmail = (starter, intent) => {
-    navigate('/hunter/campaign/new', {
-      state: {
-        contactIds: [contact.id],
-        conversationStarter: starter,
-        engagementIntent: intent,
-        contact: contact
-      }
-    });
+  const handleDraftEmail = (starter, intentId) => {
+    if (onStarterDraft) {
+      onStarterDraft(starter, intentId);
+      setSelectedIndex(null);
+    }
   };
 
   return (
@@ -73,7 +67,7 @@ export default function MeetSection({ barryContext, contact }) {
                   <span className="email-type-label">Draft as:</span>
                   {EMAIL_TYPES.map(({ label, intent }) => (
                     <button
-                      key={intent}
+                      key={label}
                       className="email-type-btn"
                       onClick={() => handleDraftEmail(starter, intent)}
                     >
@@ -93,8 +87,8 @@ export default function MeetSection({ barryContext, contact }) {
           <span>💬</span>
           <span>
             {selectedIndex !== null
-              ? 'Choose a message type to draft via Hunter'
-              : 'Click any option above to draft an email via Hunter'}
+              ? 'Choose a message type — Barry will generate it below'
+              : 'Click any starter above to begin drafting a message'}
           </span>
         </div>
       )}

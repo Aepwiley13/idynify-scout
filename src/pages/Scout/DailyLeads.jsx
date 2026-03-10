@@ -738,6 +738,21 @@ function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
   );
 }
 
+// ─── buildInstantGreeting ─────────────────────────────────────────────────────
+// Returns a context-aware greeting immediately without an API call.
+function buildInstantGreeting(icpProfile) {
+  if (!icpProfile || !icpProfile.industries?.length) {
+    return "Who are you hunting? Tell me about your ideal customer — industry, company size, location, and who you sell to — and I'll find the right companies for you.";
+  }
+  const parts = [];
+  if (icpProfile.industries?.length) parts.push(icpProfile.industries.slice(0, 2).join(' / '));
+  if (icpProfile.companySizes?.length) parts.push(icpProfile.companySizes.slice(0, 2).join(', ') + ' employees');
+  if (icpProfile.isNationwide) parts.push('nationwide');
+  else if (icpProfile.locations?.length) parts.push(icpProfile.locations.slice(0, 2).join(', '));
+  const summary = parts.join(' · ');
+  return `I'm currently finding ${summary} companies for you. Want to refine your targeting, or should I keep looking?`;
+}
+
 // ─── BarryICPPanel ────────────────────────────────────────────────────────────
 // Side panel version of ICP chat — user can see the card while chatting
 function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
@@ -752,45 +767,78 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // On mount: load prior conversation from Firestore, then open a fresh Barry turn
+  // On mount: load prior conversation from Firestore, then show instant greeting.
+  // Loads from 'icpChat' (panel) first, then falls back to 'icp' (onboarding) so
+  // the panel picks up exactly where the user left off — whether they came from
+  // /onboarding/barry or used the panel directly before.
   useEffect(() => {
     let cancelled = false;
     async function init() {
       const user = auth.currentUser;
-      if (!user) { setHistoryLoaded(true); sendToBarry('__ICP_RECLARIFICATION__', [], icpProfile); return; }
+      if (!user) {
+        setMessages([{ role: 'barry', content: buildInstantGreeting(icpProfile) }]);
+        setHistoryLoaded(true);
+        return;
+      }
 
       try {
-        const convRef = doc(db, 'users', user.uid, 'barryConversations', 'icpChat');
-        const convDoc = await getDoc(convRef);
-        if (!cancelled && convDoc.exists()) {
-          const saved = convDoc.data();
-          const priorHistory = saved.messages || [];
-          if (priorHistory.length > 0) {
-            // Rebuild display messages from history
-            const displayMsgs = priorHistory.map(h => ({
-              role: h.role === 'assistant' ? 'barry' : 'user',
-              content: h.content,
-            }));
-            const sessionLabel = saved.updatedAt?.toDate
+        let priorHistory = null;
+        let sessionLabel = null;
+
+        // 1. Try the panel's own conversation first
+        const chatRef = doc(db, 'users', user.uid, 'barryConversations', 'icpChat');
+        const chatDoc = await getDoc(chatRef);
+        if (!cancelled && chatDoc.exists()) {
+          const saved = chatDoc.data();
+          if ((saved.messages || []).length > 0) {
+            priorHistory = saved.messages;
+            sessionLabel = saved.updatedAt?.toDate
               ? saved.updatedAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
               : 'previous session';
-            setMessages([
-              { role: 'system', content: `— Resumed from ${sessionLabel} —` },
-              ...displayMsgs,
-            ]);
-            setConversationHistory(priorHistory);
-            setHistoryLoaded(true);
-            // Don't re-open — just let Barry pick up where they left off
-            return;
           }
+        }
+
+        // 2. Fall back to the /onboarding/barry conversation ('icp' doc) so both
+        //    surfaces share the same context.
+        if (!priorHistory) {
+          const icpRef = doc(db, 'users', user.uid, 'barryConversations', 'icp');
+          const icpDoc = await getDoc(icpRef);
+          if (!cancelled && icpDoc.exists()) {
+            const saved = icpDoc.data();
+            if ((saved.messages || []).length > 0) {
+              priorHistory = saved.messages;
+              sessionLabel = 'ICP setup';
+            }
+          }
+        }
+
+        if (!cancelled && priorHistory) {
+          // Normalise roles for display (barry/assistant → 'barry')
+          const displayMsgs = priorHistory.map(h => ({
+            role: (h.role === 'assistant' || h.role === 'barry') ? 'barry' : 'user',
+            content: h.content,
+          }));
+          // Normalise roles for the API (barry → 'assistant')
+          const apiHistory = priorHistory.map(h => ({
+            role: h.role === 'user' ? 'user' : 'assistant',
+            content: h.content,
+          }));
+          setMessages([
+            { role: 'system', content: `— Resumed from ${sessionLabel} —` },
+            ...displayMsgs,
+          ]);
+          setConversationHistory(apiHistory);
+          setHistoryLoaded(true);
+          return;
         }
       } catch (err) {
         console.warn('Could not load Barry conversation history:', err);
       }
 
       if (!cancelled) {
+        // No prior history — show instant context-aware greeting (no API call needed)
+        setMessages([{ role: 'barry', content: buildInstantGreeting(icpProfile) }]);
         setHistoryLoaded(true);
-        sendToBarry('__ICP_RECLARIFICATION__', [], icpProfile);
       }
     }
     init();
@@ -859,7 +907,14 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
         ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
         ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
         ...(icpParams.companyKeywords?.length > 0 && { companyKeywords: icpParams.companyKeywords }),
+        updatedAt: new Date().toISOString(),
+        managedByBarry: true,
       };
+      // Persist the refined ICP so it survives page refreshes and shows in ICP Settings
+      await setDoc(
+        doc(db, 'users', user.uid, 'companyProfile', 'current'),
+        mergedProfile
+      );
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -966,15 +1021,15 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
           </div>
         )}
 
-        {/* Input */}
+        {/* Input — never disabled while Barry is typing so users can type ahead */}
         <div style={{ padding: hasEnoughContext ? '0 20px 16px' : '12px 20px', borderTop: hasEnoughContext ? 'none' : `1px solid ${T.border}`, display: 'flex', gap: 8, flexShrink: 0 }}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder={hasEnoughContext ? 'Anything else to add…' : "Tell Barry who you're targeting…"}
-            disabled={loading || isSearching}
-            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border2}`, background: T.surface, color: T.text, fontSize: 13, outline: 'none' }}
+            placeholder={loading ? 'Barry is thinking…' : hasEnoughContext ? 'Anything else to add…' : "Tell Barry who you're targeting…"}
+            disabled={isSearching}
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border2}`, background: T.surface, color: T.text, fontSize: 13, outline: 'none', opacity: isSearching ? 0.5 : 1 }}
           />
           <button
             onClick={sendMessage}
@@ -1061,7 +1116,11 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
         ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
         ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
         ...(icpParams.companyKeywords?.length > 0 && { companyKeywords: icpParams.companyKeywords }),
+        updatedAt: new Date().toISOString(),
+        managedByBarry: true,
       };
+      // Persist the refined ICP so it shows in ICP Settings and survives page refreshes
+      await setDoc(profileRef, mergedProfile);
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1160,19 +1219,20 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
           </div>
         )}
 
-        {/* Input */}
+        {/* Input — never disabled while Barry is typing so users can type ahead */}
         <div style={{ padding: hasEnoughContext ? '0 20px 16px' : '12px 20px', borderTop: hasEnoughContext ? 'none' : `1px solid ${T.border}`, display: 'flex', gap: 8, flexShrink: 0 }}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder={hasEnoughContext ? 'Anything else to add...' : 'Tell Barry who you\'re targeting...'}
-            disabled={loading || isSearching}
+            placeholder={loading ? 'Barry is thinking…' : hasEnoughContext ? 'Anything else to add...' : 'Tell Barry who you\'re targeting...'}
+            disabled={isSearching}
             style={{
               flex: 1, padding: '10px 14px',
               borderRadius: 10, border: `1px solid ${T.border2}`,
               background: T.surface, color: T.text,
               fontSize: 13, outline: 'none',
+              opacity: isSearching ? 0.5 : 1,
             }}
           />
           <button

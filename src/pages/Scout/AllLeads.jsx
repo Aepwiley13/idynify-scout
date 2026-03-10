@@ -980,9 +980,11 @@ export default function AllLeads({ mode = 'people' }) {
       companiesSnapshot.docs.forEach(d => { companiesMap[d.id] = d.data(); });
       setCompanies(companiesMap);
 
+      // Build sniperIdsLocal synchronously so the .filter() below can use it
+      let sniperIdsLocal = new Set();
       if (sniperSnapshot) {
-        const ids = new Set(sniperSnapshot.docs.map(d => d.data().contactRef).filter(Boolean));
-        setSniperIds(ids);
+        sniperIdsLocal = new Set(sniperSnapshot.docs.map(d => d.data().contactRef).filter(Boolean));
+        setSniperIds(sniperIdsLocal);
       }
 
       const contactsList = contactsSnapshot.docs
@@ -993,7 +995,8 @@ export default function AllLeads({ mode = 'people' }) {
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
-          return true; // 'people' and 'sniper' — show all
+          if (mode === 'sniper') return sniperIdsLocal.has(c.id); // Only contacts explicitly added to Sniper
+          return true; // 'people' — show all
         });
       setContacts(contactsList);
       setLoading(false);
@@ -1204,7 +1207,7 @@ export default function AllLeads({ mode = 'people' }) {
     const emptyMsg = mode === 'hunter'
       ? { title: 'No Active Missions', body: 'Engage contacts in Scout to start outreach missions.', cta: null }
       : mode === 'sniper'
-      ? { title: 'No Contacts Yet', body: 'Add contacts to Scout first, then use "Add to SNIPER" to move them into your conversion pipeline.', cta: null }
+      ? { title: 'No Pipeline Contacts', body: 'Add warm contacts to your pipeline from Scout or Hunter using "Add to SNIPER".', cta: null }
       : mode === 'scout'
       ? { title: 'No Unengaged Contacts', body: 'All contacts are in active missions, or add new ones via Daily Leads.', cta: null }
       : { title: 'No Contacts Yet', body: 'Accept companies in Daily Leads to start building your contact pipeline.', cta: 'View Saved Companies' };
@@ -1231,13 +1234,13 @@ export default function AllLeads({ mode = 'people' }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>
-              {mode === 'hunter' ? 'Active Contacts' : mode === 'sniper' ? 'People' : 'People'}
+              {mode === 'hunter' ? 'Active Contacts' : mode === 'sniper' ? 'My Pipeline' : mode === 'scout' ? 'People' : 'All People'}
             </h2>
             <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
               {mode === 'hunter'
                 ? 'Contacts with active missions.'
                 : mode === 'sniper'
-                ? 'Add contacts to your SNIPER conversion pipeline.'
+                ? 'Warm contacts you\'ve moved into your conversion pipeline.'
                 : mode === 'scout'
                 ? 'Ready for first contact.'
                 : 'Every relationship — one place.'}

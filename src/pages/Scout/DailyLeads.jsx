@@ -880,17 +880,20 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
       {/* Side panel */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, zIndex: 499,
-        background: T.cardBg, borderLeft: `1px solid ${T.border}`,
+        background: T.cardBg, borderLeft: `3px solid ${BRAND.pink}`,
         display: 'flex', flexDirection: 'column',
-        boxShadow: `-8px 0 40px rgba(0,0,0,0.3)`,
+        boxShadow: `-8px 0 40px rgba(0,0,0,0.3), -2px 0 20px ${BRAND.pink}22`,
         animation: 'slideIn 0.22s ease',
       }}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.border2}`, background: T.accentBg, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <BarryAvatar size={36} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: T.text }}>Barry</div>
-            <div style={{ fontSize: 11, color: T.textFaint }}>ICP-aware targeting assistant</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 15, color: T.text }}>Barry</span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: '2px 7px', borderRadius: 20, background: T.accentBdr, color: T.accent, border: `1px solid ${T.accentBdr}` }}>ICP CHAT</span>
+            </div>
+            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>ICP-aware targeting assistant</div>
           </div>
           {messages.length > 0 && (
             <button
@@ -905,13 +908,13 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
                 setIcpParams(null);
                 sendToBarry('__ICP_RECLARIFICATION__', [], icpProfile);
               }}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 11, padding: '4px 8px', borderRadius: 6 }}
+              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 11, padding: '4px 8px', borderRadius: 6 }}
               title="Start over"
             >
               Start over
             </button>
           )}
-          <button onClick={onClose} style={{ marginLeft: messages.length > 0 ? 0 : 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
+          <button onClick={onClose} style={{ marginLeft: messages.length > 0 ? 0 : 'auto', background: 'none', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
         </div>
 
         {/* Messages */}
@@ -931,10 +934,11 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
               <div style={{
                 maxWidth: '82%', padding: '10px 14px',
                 borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                background: msg.role === 'user' ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface,
+                background: msg.role === 'user' ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface2,
                 color: msg.role === 'user' ? '#fff' : T.text,
                 fontSize: 13, lineHeight: 1.55,
                 border: msg.role === 'barry' ? `1px solid ${T.border2}` : 'none',
+                borderLeft: msg.role === 'barry' ? `3px solid ${BRAND.pink}60` : undefined,
               }}>
                 {msg.content}
               </div>
@@ -967,14 +971,14 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
         )}
 
         {/* Input */}
-        <div style={{ padding: hasEnoughContext ? '0 20px 16px' : '12px 20px', borderTop: hasEnoughContext ? 'none' : `1px solid ${T.border}`, display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ padding: hasEnoughContext ? '0 20px 16px' : '12px 20px', borderTop: `1px solid ${T.border2}`, display: 'flex', gap: 8, flexShrink: 0 }}>
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
             placeholder={hasEnoughContext ? 'Anything else to add…' : "Tell Barry who you're targeting…"}
             disabled={loading || isSearching}
-            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border2}`, background: T.surface, color: T.text, fontSize: 13, outline: 'none' }}
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${T.border2}`, background: T.surface, color: T.text, fontSize: 13, outline: 'none' }}
           />
           <button
             onClick={sendMessage}

@@ -161,6 +161,7 @@ function Av({ initials, color = SNIPER_TEAL, size = 24 }) {
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
+  { id: 'people', label: 'PEOPLE', Icon: Users,     route: '/people' },
   { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
   { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
   { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon'  },

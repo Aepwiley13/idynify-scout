@@ -528,6 +528,30 @@ export async function getLensCounts(userId) {
   }
 }
 
+/**
+ * Get all unique tags used across a user's contacts.
+ * Used for tag autocomplete in the profile editor and tag filter in the list.
+ *
+ * @param {string} userId
+ * @returns {Promise<string[]>} Sorted array of unique tag strings
+ */
+export async function getUniqueTags(userId) {
+  try {
+    const peopleRef = collection(db, PEOPLE_PATHS.allPeople(userId));
+    const q = query(peopleRef, where('is_archived', '==', false), limit(500));
+    const snap = await getDocs(q);
+    const tagSet = new Set();
+    snap.docs.forEach(d => {
+      const tags = d.data().tags;
+      if (Array.isArray(tags)) tags.forEach(t => { if (t) tagSet.add(t); });
+    });
+    return [...tagSet].sort((a, b) => a.localeCompare(b));
+  } catch (err) {
+    console.error('[PeopleService] Failed to get unique tags:', err);
+    return [];
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────
 
 function matchesSearch(person, term) {

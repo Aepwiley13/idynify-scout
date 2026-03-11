@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
-  Target, Plus, Loader, ArrowUpDown, Crosshair,
+  Target, Plus, Loader, ArrowUpDown, Crosshair, Tag, ChevronDown,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -589,6 +589,30 @@ function AllLeadsCard({
           {mode === 'hunter' ? getHunterLastAction(contact) : getLastAction(contact)}
         </div>
 
+        {/* Tags */}
+        {Array.isArray(contact.tags) && contact.tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+            {contact.tags.slice(0, 3).map(tag => {
+              const tc = getTagColor(tag);
+              return (
+                <span
+                  key={tag}
+                  style={{
+                    fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 20,
+                    background: tc.bg, color: tc.color,
+                    border: `1px solid ${tc.border}`, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {tag}
+                </span>
+              );
+            })}
+            {contact.tags.length > 3 && (
+              <span style={{ fontSize: 9, color: T.textFaint }}>+{contact.tags.length - 3}</span>
+            )}
+          </div>
+        )}
+
         {/* Inline brigade pill */}
         <div style={{ position: 'relative', marginBottom: 7 }}>
           <button
@@ -791,8 +815,16 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick }) {
           style={{ fontSize: 9, color, fontWeight: 700, cursor: onCompanyClick ? 'pointer' : 'default', textDecoration: onCompanyClick ? 'underline' : 'none', textDecorationColor: `${color}60` }}
         >{company?.name || contact.company_name || ''}</div>
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', whiteSpace: 'nowrap' }}>{contact.title}</span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
+        <span style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>{contact.title}</span>
+        {Array.isArray(contact.tags) && contact.tags.slice(0, 2).map(tag => {
+          const tc = getTagColor(tag);
+          return (
+            <span key={tag} style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 20, background: tc.bg, color: tc.color, border: `1px solid ${tc.border}`, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {tag}
+            </span>
+          );
+        })}
       </div>
       <StatusBadge status={status} small />
       <div style={{ width: 52, flexShrink: 0, textAlign: 'right' }}>
@@ -803,6 +835,24 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick }) {
       </div>
     </div>
   );
+}
+
+// ─── Tag color helper (same palette as IdentityCard) ─────────────────────────
+const TAG_PALETTE = [
+  { color: '#7c3aed', bg: 'rgba(124,58,237,0.12)',  border: 'rgba(124,58,237,0.28)' },
+  { color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.28)' },
+  { color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.28)' },
+  { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.28)'  },
+  { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.28)'   },
+  { color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.28)'  },
+  { color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.28)'   },
+  { color: '#e85d7a', bg: 'rgba(232,93,122,0.12)',  border: 'rgba(232,93,122,0.28)'  },
+];
+function getTagColor(tag) {
+  if (!tag) return TAG_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
 }
 
 // ─── Brigade config ───────────────────────────────────────────────────────────
@@ -878,6 +928,9 @@ export default function AllLeads({ mode = 'people' }) {
   const [brigadeFilter, setBrigadeFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
+  const [tagFilter, setTagFilter] = useState(null); // selected tag string or null
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const tagPickerRef = useRef(null);
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('al_sortOrder') || 'newest');
 
   // Bulk selection
@@ -910,6 +963,16 @@ export default function AllLeads({ mode = 'people' }) {
   // Touch tracking for swipe-left-to-close gesture.
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+
+  // Close tag picker on outside click
+  useEffect(() => {
+    if (!tagPickerOpen) return;
+    const h = (e) => {
+      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target)) setTagPickerOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [tagPickerOpen]);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768);
@@ -1148,6 +1211,12 @@ export default function AllLeads({ mode = 'people' }) {
   else if (dataFilter === 'needs-email') filtered = filtered.filter(c => !(c.email || c.work_email));
   else if (dataFilter === 'needs-phone') filtered = filtered.filter(c => !(c.phone_mobile || c.phone_direct || c.phone));
 
+  // Tag filter
+  if (tagFilter) filtered = filtered.filter(c => Array.isArray(c.tags) && c.tags.includes(tagFilter));
+
+  // All unique tags across loaded contacts (for the tag picker)
+  const allContactTags = [...new Set(contacts.flatMap(c => Array.isArray(c.tags) ? c.tags : []))].sort();
+
   // Search — name, title, company, email, phone, LinkedIn URL
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
@@ -1159,7 +1228,8 @@ export default function AllLeads({ mode = 'people' }) {
         (co?.name || c.company_name || '').toLowerCase().includes(lower) ||
         (c.email || c.work_email || '').toLowerCase().includes(lower) ||
         (digitsOnly && (c.phone_mobile || c.phone_direct || c.phone || '').replace(/\D/g, '').includes(digitsOnly)) ||
-        (c.linkedin_url || '').toLowerCase().includes(lower);
+        (c.linkedin_url || '').toLowerCase().includes(lower) ||
+        (Array.isArray(c.tags) && c.tags.some(t => t.toLowerCase().includes(lower)));
     });
   }
 
@@ -1346,6 +1416,43 @@ export default function AllLeads({ mode = 'people' }) {
             style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter === id ? T.accentBdr : T.border}`, background: dataFilter === id ? T.accentBg : 'transparent', color: dataFilter === id ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >{label}</button>
         ))}
+        {/* Tag filter picker */}
+        <div style={{ position: 'relative', flexShrink: 0 }} ref={tagPickerRef}>
+          <button
+            onClick={() => setTagPickerOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 20, border: `1px solid ${tagFilter ? T.accentBdr : T.border}`, background: tagFilter ? T.accentBg : 'transparent', color: tagFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            <Tag size={10} />
+            {tagFilter ? tagFilter : 'Tag'}
+            {tagFilter
+              ? <X size={9} style={{ marginLeft: 2 }} onClick={e => { e.stopPropagation(); setTagFilter(null); setTagPickerOpen(false); }} />
+              : <ChevronDown size={9} style={{ opacity: 0.6 }} />
+            }
+          </button>
+          {tagPickerOpen && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, minWidth: 170, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 11, padding: 5, zIndex: 50, boxShadow: `0 8px 28px ${T.isDark ? '#00000080' : '#0000001a'}`, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: T.textFaint, textTransform: 'uppercase', padding: '4px 9px 6px' }}>Filter by Tag</div>
+              {allContactTags.length === 0 ? (
+                <div style={{ fontSize: 11, color: T.textFaint, padding: '6px 10px', fontStyle: 'italic' }}>No tags yet</div>
+              ) : allContactTags.map(tag => {
+                const isActive = tagFilter === tag;
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => { setTagFilter(isActive ? null : tag); setTagPickerOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, background: isActive ? T.accentBg : 'transparent', color: isActive ? BRAND.pink : T.textMuted, border: 'none', borderLeft: `3px solid ${isActive ? BRAND.pink : 'transparent'}`, borderRadius: 7, padding: '6px 10px', fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <Tag size={10} style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{tag}</span>
+                    <span style={{ fontSize: 10, color: T.textFaint }}>
+                      {contacts.filter(c => Array.isArray(c.tags) && c.tags.includes(tag)).length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
         {/* Sort selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: '5px 10px', flexShrink: 0 }}>
           <ArrowUpDown size={11} color={T.textFaint} />

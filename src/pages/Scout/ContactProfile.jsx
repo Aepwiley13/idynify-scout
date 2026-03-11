@@ -529,144 +529,149 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       {!isPanelMode && (
       <div
         className="profile-nav"
-        style={{ padding: '12px 22px', borderBottom: `1px solid ${T.border}`, background: T.navBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        style={{ borderBottom: `1px solid ${T.border}`, background: T.navBg }}
       >
-        <button
-          onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
-          style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 8, padding: '7px 14px', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          <ArrowLeft size={13} />Back to People
-        </button>
-        <div style={{ display: 'flex', gap: 9 }}>
+        <div className="profile-nav-inner">
           <button
-            onClick={handleEnrichContact}
-            disabled={enriching}
-            style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
+            onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+            style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 8, padding: '7px 14px', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+            <ArrowLeft size={13} />Back to People
           </button>
-          <button
-            onClick={() => setShowArchiveModal(true)}
-            style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 9, padding: '8px 14px', fontSize: 13, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <Archive size={13} />Archive
-          </button>
-          <BarryKnowledgeButton variant="compact" />
+          <div style={{ display: 'flex', gap: 9 }}>
+            <button
+              onClick={handleEnrichContact}
+              disabled={enriching}
+              style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
+            >
+              {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+            </button>
+            <button
+              onClick={() => setShowArchiveModal(true)}
+              style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 9, padding: '8px 14px', fontSize: 13, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <Archive size={13} />Archive
+            </button>
+            <BarryKnowledgeButton variant="compact" />
+          </div>
         </div>
       </div>
       )}
 
-      {/* Success Banner */}
-      {enrichSuccess && (
-        <div className="enrich-success-banner">
-          <CheckCircle className="w-5 h-5" />
-          <span>Contact enriched successfully.</span>
-        </div>
-      )}
-
-      {/* Error Banner */}
-      {enrichError && (
-        <div className="enrich-error-banner">
-          <AlertCircle className="w-5 h-5" />
-          <span>{enrichError}</span>
-        </div>
-      )}
-
-      {/* Manual LinkedIn URL Input - Shows when enrichment couldn't find LinkedIn */}
-      {needsManualLinkedIn && (
-        <div className="manual-linkedin-banner">
-          <div className="manual-linkedin-header">
-            <Linkedin className="w-5 h-5 text-blue-600" />
-            <div className="manual-linkedin-text">
-              <span className="manual-linkedin-title">LinkedIn Profile Not Found</span>
-              <span className="manual-linkedin-desc">
-                Barry couldn't automatically find a LinkedIn profile for this contact.
-                Paste the LinkedIn URL below to continue enrichment.
-              </span>
-            </div>
-          </div>
-          <div className="manual-linkedin-input-row">
-            <div className="manual-linkedin-input-wrapper">
-              <Link2 className="w-4 h-4 text-gray-400" />
-              <input
-                type="url"
-                placeholder="https://linkedin.com/in/username"
-                value={manualLinkedInUrl}
-                onChange={(e) => setManualLinkedInUrl(e.target.value)}
-                className="manual-linkedin-input"
-                disabled={enriching}
-              />
-            </div>
-            <button
-              className="manual-linkedin-submit-btn"
-              onClick={handleManualLinkedInSubmit}
-              disabled={enriching || !manualLinkedInUrl.trim()}
-            >
-              {enriching ? (
-                <Loader className="w-4 h-4 spinner" />
-              ) : (
-                <>
-                  <span>Enrich with LinkedIn</span>
-                </>
-              )}
-            </button>
-            <button
-              className="manual-linkedin-cancel-btn"
-              onClick={handleCancelManualLinkedIn}
-              disabled={enriching}
-            >
-              Skip
-            </button>
-          </div>
-          {enrichmentSummary && (
-            <div className="manual-linkedin-details">
-              <span className="detail-label">What Barry tried:</span>
-              <ul className="detail-list">
-                {enrichmentSummary.sources_used?.map((source, i) => (
-                  <li key={i}>{source} search</li>
-                ))}
-                {enrichmentSummary.sources_used?.length === 0 && (
-                  <li>Apollo search (no match found)</li>
-                )}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Stale Intelligence Warning - Shows when RECON training is low */}
-      {reconStatus.loaded && reconStatus.progress < 40 && !staleDismissed && (
-        <div className="stale-intel-warning">
-          <div className="stale-intel-content">
-            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-            <div className="stale-intel-text">
-              <span className="stale-intel-title">Limited Intelligence</span>
-              <span className="stale-intel-desc">
-                Barry's training is only {reconStatus.progress}% complete. Context generation may be generic.
-              </span>
-            </div>
-          </div>
-          <div className="stale-intel-actions">
-            <button
-              className="stale-intel-train-btn"
-              onClick={() => navigate('/recon')}
-            >
-              <Brain className="w-4 h-4" />
-              <span>Train Barry</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
-            <button
-              className="stale-intel-dismiss-btn"
-              onClick={() => setStaleDismissed(true)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* "Meet [FirstName]" Structure */}
       <div className="contact-profile-container">
+
+        {/* Banners — inside container so they align with centered content on desktop */}
+
+        {/* Success Banner */}
+        {enrichSuccess && (
+          <div className="enrich-success-banner">
+            <CheckCircle className="w-5 h-5" />
+            <span>Contact enriched successfully.</span>
+          </div>
+        )}
+
+        {/* Error Banner */}
+        {enrichError && (
+          <div className="enrich-error-banner">
+            <AlertCircle className="w-5 h-5" />
+            <span>{enrichError}</span>
+          </div>
+        )}
+
+        {/* Manual LinkedIn URL Input - Shows when enrichment couldn't find LinkedIn */}
+        {needsManualLinkedIn && (
+          <div className="manual-linkedin-banner">
+            <div className="manual-linkedin-header">
+              <Linkedin className="w-5 h-5 text-blue-600" />
+              <div className="manual-linkedin-text">
+                <span className="manual-linkedin-title">LinkedIn Profile Not Found</span>
+                <span className="manual-linkedin-desc">
+                  Barry couldn't automatically find a LinkedIn profile for this contact.
+                  Paste the LinkedIn URL below to continue enrichment.
+                </span>
+              </div>
+            </div>
+            <div className="manual-linkedin-input-row">
+              <div className="manual-linkedin-input-wrapper">
+                <Link2 className="w-4 h-4 text-gray-400" />
+                <input
+                  type="url"
+                  placeholder="https://linkedin.com/in/username"
+                  value={manualLinkedInUrl}
+                  onChange={(e) => setManualLinkedInUrl(e.target.value)}
+                  className="manual-linkedin-input"
+                  disabled={enriching}
+                />
+              </div>
+              <button
+                className="manual-linkedin-submit-btn"
+                onClick={handleManualLinkedInSubmit}
+                disabled={enriching || !manualLinkedInUrl.trim()}
+              >
+                {enriching ? (
+                  <Loader className="w-4 h-4 spinner" />
+                ) : (
+                  <>
+                    <span>Enrich with LinkedIn</span>
+                  </>
+                )}
+              </button>
+              <button
+                className="manual-linkedin-cancel-btn"
+                onClick={handleCancelManualLinkedIn}
+                disabled={enriching}
+              >
+                Skip
+              </button>
+            </div>
+            {enrichmentSummary && (
+              <div className="manual-linkedin-details">
+                <span className="detail-label">What Barry tried:</span>
+                <ul className="detail-list">
+                  {enrichmentSummary.sources_used?.map((source, i) => (
+                    <li key={i}>{source} search</li>
+                  ))}
+                  {enrichmentSummary.sources_used?.length === 0 && (
+                    <li>Apollo search (no match found)</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stale Intelligence Warning - Shows when RECON training is low */}
+        {reconStatus.loaded && reconStatus.progress < 40 && !staleDismissed && (
+          <div className="stale-intel-warning">
+            <div className="stale-intel-content">
+              <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+              <div className="stale-intel-text">
+                <span className="stale-intel-title">Limited Intelligence</span>
+                <span className="stale-intel-desc">
+                  Barry's training is only {reconStatus.progress}% complete. Context generation may be generic.
+                </span>
+              </div>
+            </div>
+            <div className="stale-intel-actions">
+              <button
+                className="stale-intel-train-btn"
+                onClick={() => navigate('/recon')}
+              >
+                <Brain className="w-4 h-4" />
+                <span>Train Barry</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+              <button
+                className="stale-intel-dismiss-btn"
+                onClick={() => setStaleDismissed(true)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 1. IDENTITY CARD - TOP */}
         <IdentityCard
           key={contact.photo_url || 'no-photo'}

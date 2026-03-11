@@ -78,10 +78,17 @@
 
 /* Navigation Bar */
 .profile-nav {
+  width: 100%;
+}
+
+/* Nav inner — centers content to match the profile container width */
+.profile-nav-inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  padding: 12px 22px;
+  max-width: 840px;
+  margin: 0 auto;
 }
 
 .btn-back-nav {
@@ -1835,4 +1842,54 @@
   background: #f8fafc;
   color: #64748b;
   border: 1px solid #cbd5e1;
+}
+
+/* =========================================================
+   DESKTOP — Centered & Spaced Profile Layout
+   Removes double-padding and improves spacing on large screens.
+   The profile nav and all content align to the same centered
+   column so nothing appears "all the way to the side".
+   ========================================================= */
+
+/* Base desktop (1024px+):
+   - Remove double-padding (page-content in MainLayout already provides outer spacing)
+   - Scale nav-inner padding to match container edges */
+@media (min-width: 1024px) {
+  .contact-profile-page {
+    padding: 0;
+  }
+
+  .contact-profile-container {
+    padding: 36px 40px;
+  }
+
+  .profile-nav-inner {
+    padding: 14px 40px;
+  }
+}
+
+/* Mid desktop (1280px+) — wider container for breathing room */
+@media (min-width: 1280px) {
+  .contact-profile-container {
+    max-width: 900px;
+    padding: 40px 48px;
+  }
+
+  .profile-nav-inner {
+    max-width: 900px;
+    padding: 14px 48px;
+  }
+}
+
+/* Large desktop (1536px+) — generous spacing */
+@media (min-width: 1536px) {
+  .contact-profile-container {
+    max-width: 960px;
+    padding: 48px 56px;
+  }
+
+  .profile-nav-inner {
+    max-width: 960px;
+    padding: 14px 56px;
+  }
 }

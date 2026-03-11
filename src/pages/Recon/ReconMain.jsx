@@ -16,7 +16,7 @@ import { auth } from '../../firebase/config';
 import {
   Radar, Crosshair, Eye, Target,
   Brain, MessageSquare, Shield, Swords, Zap, LayoutDashboard,
-  Palette, Check, ChevronLeft, ChevronRight, Home, Settings,
+  Palette, Check, ChevronLeft, ChevronRight, Home, Settings, Users,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -155,10 +155,11 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
+  { id: 'people', label: 'PEOPLE', Icon: Users,     route: '/people'  },
   { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'   },
   { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter'  },
   { id: 'recon',  label: 'RECON',  Icon: Eye,       route: null       }, // active module
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper'  },
 ];
 
 // ─── Recon sub-nav items ──────────────────────────────────────────────────────

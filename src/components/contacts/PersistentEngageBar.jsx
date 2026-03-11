@@ -23,6 +23,7 @@ import { collection, query, orderBy, limit, getDocs, doc, updateDoc } from 'fire
 import { db, auth } from '../../firebase/config';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
+import { updateContactMemory } from '../../services/barryMemoryService';
 import './PersistentEngageBar.css';
 
 // ── Engagement state derived from timeline ───────────────
@@ -224,12 +225,19 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
   const [expanded, setExpanded] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
 
-  // Log-reply modal state
+  // Log external reply state (they replied to us)
   const [showLogReply, setShowLogReply] = useState(false);
   const [replyChannel, setReplyChannel] = useState(null);
   const [replyNote, setReplyNote] = useState('');
   const [loggingReply, setLoggingReply] = useState(false);
   const [replyLogged, setReplyLogged] = useState(false);
+
+  // Brief Barry state (I reached out, mark done + save context)
+  const [showBriefBarry, setShowBriefBarry] = useState(false);
+  const [briefChannel, setBriefChannel] = useState(null);
+  const [briefContext, setBriefContext] = useState('');
+  const [briefingSaving, setBriefingSaving] = useState(false);
+  const [briefSaved, setBriefSaved] = useState(false);
 
   useEffect(() => {
     if (contact?.id) {
@@ -328,6 +336,47 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
     } catch (err) {
       console.error('[PersistentEngageBar] Failed to log reply:', err);
       setLoggingReply(false);
+    }
+  }
+
+  async function handleBriefBarry() {
+    const user = auth.currentUser;
+    if (!user || !contact?.id || !briefChannel || !briefContext.trim()) return;
+
+    try {
+      setBriefingSaving(true);
+
+      // Save context into Barry's memory
+      await updateContactMemory(user.uid, contact.id, {
+        channel: briefChannel,
+        outcome: 'message_sent',
+        summary: briefContext.trim(),
+        newFacts: [briefContext.trim()],
+        gotReply: false,
+        replyValence: null
+      });
+
+      // Log a timeline event for the external outreach
+      await logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.id,
+        type: 'outreach_logged',
+        actor: ACTORS.USER,
+        preview: briefContext.trim(),
+        metadata: {
+          channel: briefChannel,
+          context: briefContext.trim()
+        }
+      });
+
+      setBriefSaved(true);
+      setBriefingSaving(false);
+      setShowBriefBarry(false);
+      setBriefChannel(null);
+      setBriefContext('');
+    } catch (err) {
+      console.error('[PersistentEngageBar] Failed to brief Barry:', err);
+      setBriefingSaving(false);
     }
   }
 
@@ -468,23 +517,83 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
         <div className="peb-expanded">
           <div className="peb-expanded-inner">
 
-            {/* Got a Reply — shown when awaiting reply */}
-            {engageState === 'awaiting_reply' && !replyLogged && (
-              <div className="peb-log-reply-section">
-                <div className="peb-log-reply-header">
-                  <Reply className="w-4 h-4" />
-                  <span>Did they reply outside the app?</span>
-                </div>
-                {!showLogReply ? (
-                  <button
-                    className="peb-log-reply-trigger"
-                    onClick={() => setShowLogReply(true)}
-                  >
-                    Log a reply &amp; set next step
-                  </button>
-                ) : (
+            {/* Off-platform actions — shown when awaiting reply */}
+            {engageState === 'awaiting_reply' && !replyLogged && !briefSaved && (
+              <div className="peb-offplatform-section">
+                <span className="peb-expanded-label">Something happen outside the app?</span>
+
+                {/* Option A: I reached out — Brief Barry */}
+                {!showBriefBarry && !showLogReply && (
+                  <div className="peb-offplatform-options">
+                    <button
+                      className="peb-offplatform-btn peb-offplatform-outreach"
+                      onClick={() => setShowBriefBarry(true)}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      I reached out — brief Barry
+                    </button>
+                    <button
+                      className="peb-offplatform-btn peb-offplatform-reply"
+                      onClick={() => setShowLogReply(true)}
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      They replied — log it
+                    </button>
+                  </div>
+                )}
+
+                {/* Brief Barry form */}
+                {showBriefBarry && (
                   <div className="peb-log-reply-form">
-                    <span className="peb-log-reply-label">Which channel?</span>
+                    <span className="peb-log-reply-label">Which channel did you use?</span>
+                    <div className="peb-reply-channels">
+                      {REPLY_CHANNELS.map(ch => {
+                        const ChIcon = ch.icon;
+                        return (
+                          <button
+                            key={ch.id}
+                            className={`peb-reply-ch-btn ${briefChannel === ch.id ? 'peb-reply-ch-active' : ''}`}
+                            onClick={() => setBriefChannel(ch.id)}
+                          >
+                            <ChIcon className="w-3.5 h-3.5" />
+                            {ch.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <textarea
+                      className="peb-reply-note"
+                      placeholder="What happened? Barry will remember this. (e.g. 'Texted Rod, he seemed interested and open to a follow-up email — mentioned he's busy this week')"
+                      value={briefContext}
+                      onChange={e => setBriefContext(e.target.value)}
+                      rows={3}
+                    />
+                    <div className="peb-log-reply-actions">
+                      <button
+                        className="peb-log-confirm-btn"
+                        onClick={handleBriefBarry}
+                        disabled={!briefChannel || !briefContext.trim() || briefingSaving}
+                      >
+                        {briefingSaving ? (
+                          <><Loader className="w-3.5 h-3.5 peb-spin" /> Saving...</>
+                        ) : (
+                          <><CheckCircle className="w-3.5 h-3.5" /> Save &amp; Brief Barry</>
+                        )}
+                      </button>
+                      <button
+                        className="peb-log-cancel-btn"
+                        onClick={() => { setShowBriefBarry(false); setBriefChannel(null); setBriefContext(''); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Log Reply form */}
+                {showLogReply && (
+                  <div className="peb-log-reply-form">
+                    <span className="peb-log-reply-label">Which channel did they reply on?</span>
                     <div className="peb-reply-channels">
                       {REPLY_CHANNELS.map(ch => {
                         const ChIcon = ch.icon;
@@ -528,6 +637,13 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {briefSaved && (
+              <div className="peb-reply-logged-confirm">
+                <CheckCircle className="w-4 h-4" />
+                <span>Saved — Barry has your context for next time</span>
               </div>
             )}
 

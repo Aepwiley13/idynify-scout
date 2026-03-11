@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { createMessageWithRetry } from './utils/anthropicRetry.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -336,7 +337,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
 
     console.log('🤖 Calling Claude API...');
 
-    const claudeResponse = await anthropic.messages.create({
+    const claudeResponse = await createMessageWithRetry(anthropic, {
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }]

@@ -21,7 +21,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Mail, Phone, Building2, Pencil,
   Copy, Check, Linkedin, Camera, Link2,
-  Loader, ChevronDown, RefreshCw, X, Plus,
+  Loader, ChevronDown, RefreshCw, X, Plus, Tag,
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
@@ -35,6 +35,7 @@ import {
 import CompanyDetailModal from '../scout/CompanyDetailModal';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
+import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
 
 // ─── Color maps for classification chips ─────────────────────────────────────
@@ -64,6 +65,26 @@ const VALUE_COLORS = {
   high:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.09)', border: 'rgba(245,158,11,0.22)'  },
   critical: { color: '#ef4444', bg: 'rgba(239,68,68,0.09)', border: 'rgba(239,68,68,0.22)'   },
 };
+
+// ─── Tag colors ──────────────────────────────────────────────────────────────
+
+const TAG_PALETTE = [
+  { color: '#7c3aed', bg: 'rgba(124,58,237,0.12)',  border: 'rgba(124,58,237,0.30)' },
+  { color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.30)' },
+  { color: '#10b981', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.30)' },
+  { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.30)'  },
+  { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.30)'   },
+  { color: '#8b5cf6', bg: 'rgba(139,92,246,0.12)',  border: 'rgba(139,92,246,0.30)'  },
+  { color: '#06b6d4', bg: 'rgba(6,182,212,0.12)',   border: 'rgba(6,182,212,0.30)'   },
+  { color: '#e85d7a', bg: 'rgba(232,93,122,0.12)',  border: 'rgba(232,93,122,0.30)'  },
+];
+
+function getTagColor(tag) {
+  if (!tag) return TAG_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -336,6 +357,15 @@ export default function IdentityCard({
   // Structured field saving indicator
   const [fieldSaving, setFieldSaving] = useState(false);
 
+  // Tags
+  const [tagInput, setTagInput] = useState('');
+  const [tagInputOpen, setTagInputOpen] = useState(false);
+  const [tagSuggestions, setTagSuggestions] = useState([]);
+  const [allTags, setAllTags] = useState([]);
+  const [tagSaving, setTagSaving] = useState(false);
+  const tagInputRef = useRef(null);
+  const tagWrapRef = useRef(null);
+
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
   const canSearch = !!contact.linkedin_url || (!!contact.name && !!contact.company_name);
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
@@ -557,6 +587,102 @@ export default function IdentityCard({
     } finally {
       setFieldSaving(false);
     }
+  }
+
+  // ── Tags ─────────────────────────────────────────────────────────────────────
+
+  // Close tag input on outside click
+  useEffect(() => {
+    if (!tagInputOpen) return;
+    const h = (e) => {
+      if (tagWrapRef.current && !tagWrapRef.current.contains(e.target)) {
+        setTagInputOpen(false);
+        setTagInput('');
+        setTagSuggestions([]);
+      }
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [tagInputOpen]);
+
+  // Focus input when opened
+  useEffect(() => {
+    if (tagInputOpen && tagInputRef.current) tagInputRef.current.focus();
+  }, [tagInputOpen]);
+
+  // Lazy-load all tags when input opens
+  async function openTagInput() {
+    setTagInputOpen(true);
+    if (allTags.length === 0) {
+      const user = auth.currentUser;
+      if (!user) return;
+      const tags = await getUniqueTags(user.uid);
+      setAllTags(tags);
+      setTagSuggestions(tags.filter(t => !(contact.tags || []).includes(t)));
+    } else {
+      setTagSuggestions(allTags.filter(t => !(contact.tags || []).includes(t)));
+    }
+  }
+
+  function handleTagInputChange(e) {
+    const val = e.target.value;
+    setTagInput(val);
+    const existing = contact.tags || [];
+    if (val.trim()) {
+      const lower = val.toLowerCase();
+      setTagSuggestions(allTags.filter(t => t.toLowerCase().includes(lower) && !existing.includes(t)));
+    } else {
+      setTagSuggestions(allTags.filter(t => !existing.includes(t)));
+    }
+  }
+
+  async function addTag(tagValue) {
+    const trimmed = (tagValue || tagInput).trim();
+    if (!trimmed) return;
+    const currentTags = contact.tags || [];
+    if (currentTags.includes(trimmed)) {
+      setTagInput('');
+      return;
+    }
+    const newTags = [...currentTags, trimmed];
+    onUpdate?.({ ...contact, tags: newTags });
+    setTagInput('');
+    setTagInputOpen(false);
+    setTagSuggestions([]);
+    if (!allTags.includes(trimmed)) setAllTags(prev => [...prev, trimmed].sort());
+    try {
+      setTagSaving(true);
+      const user = auth.currentUser;
+      if (!user) return;
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        tags: newTags, updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[IdentityCard] Tag add failed:', err);
+      onUpdate?.(contact);
+    } finally {
+      setTagSaving(false);
+    }
+  }
+
+  async function removeTag(tag) {
+    const newTags = (contact.tags || []).filter(t => t !== tag);
+    onUpdate?.({ ...contact, tags: newTags });
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        tags: newTags, updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[IdentityCard] Tag remove failed:', err);
+      onUpdate?.(contact);
+    }
+  }
+
+  function handleTagKeyDown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+    if (e.key === 'Escape') { setTagInputOpen(false); setTagInput(''); setTagSuggestions([]); }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -874,6 +1000,79 @@ export default function IdentityCard({
             saving={fieldSaving}
             T={T}
           />
+        </div>
+
+        {/* ── Tags section ── */}
+        <div className="idc-tags-section" ref={tagWrapRef}>
+          <div className="idc-tags-row">
+            {/* Existing tags */}
+            {(contact.tags || []).map(tag => {
+              const tc = getTagColor(tag);
+              return (
+                <span
+                  key={tag}
+                  className="idc-tag-pill"
+                  style={{ color: tc.color, background: tc.bg, border: `1.5px solid ${tc.border}` }}
+                >
+                  <Tag size={9} style={{ flexShrink: 0 }} />
+                  <span>{tag}</span>
+                  <button
+                    className="idc-tag-remove"
+                    onClick={() => removeTag(tag)}
+                    title={`Remove tag "${tag}"`}
+                  >
+                    <X size={9} />
+                  </button>
+                </span>
+              );
+            })}
+
+            {/* Add tag button / input */}
+            {tagInputOpen ? (
+              <div className="idc-tag-input-wrap">
+                <input
+                  ref={tagInputRef}
+                  className="idc-tag-input"
+                  style={{ background: T.input, border: `1.5px solid ${BRAND.pink}`, color: T.text }}
+                  value={tagInput}
+                  onChange={handleTagInputChange}
+                  onKeyDown={handleTagKeyDown}
+                  placeholder="Tag name..."
+                />
+                {tagSuggestions.length > 0 && (
+                  <div
+                    className="idc-tag-suggestions"
+                    style={{ background: T.cardBg, border: `1px solid ${T.border}`, boxShadow: `0 6px 20px ${T.isDark ? '#00000070' : '#00000015'}` }}
+                  >
+                    {tagSuggestions.slice(0, 8).map(sug => {
+                      const tc = getTagColor(sug);
+                      return (
+                        <button
+                          key={sug}
+                          className="idc-tag-sug-item"
+                          style={{ color: T.textMuted }}
+                          onMouseDown={e => { e.preventDefault(); addTag(sug); }}
+                        >
+                          <Tag size={10} style={{ color: tc.color, flexShrink: 0 }} />
+                          <span>{sug}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                className="idc-tag-add-btn"
+                style={{ color: T.textFaint, border: `1.5px dashed ${T.border}` }}
+                onClick={openTagInput}
+                title="Add tag"
+              >
+                {tagSaving ? <Loader size={10} className="idc-spin" /> : <Plus size={10} />}
+                <span>Add tag</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── Divider ── */}

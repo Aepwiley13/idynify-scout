@@ -390,6 +390,125 @@
   flex: 1;
 }
 
+/* ── Tags section ───────────────────────────────────────────────── */
+.idc-tags-section {
+  margin-top: 10px;
+  position: relative;
+}
+
+.idc-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Individual tag pill */
+.idc-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 7px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+}
+
+/* Remove button inside pill */
+.idc-tag-remove {
+  background: none;
+  border: none;
+  padding: 1px 0 1px 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.idc-tag-remove:hover {
+  opacity: 1;
+}
+
+/* "Add tag" dashed button */
+.idc-tag-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  background: none;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+}
+
+.idc-tag-add-btn:hover {
+  color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.06);
+}
+
+/* Tag input wrapper (relative anchor for suggestions) */
+.idc-tag-input-wrap {
+  position: relative;
+}
+
+.idc-tag-input {
+  border-radius: 20px;
+  outline: none;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: inherit;
+  width: 130px;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+  transition: box-shadow 0.15s ease;
+}
+
+.idc-tag-input:focus {
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.22);
+}
+
+/* Tag suggestions dropdown */
+.idc-tag-suggestions {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 160px;
+  border-radius: 11px;
+  padding: 4px;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.idc-tag-sug-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.idc-tag-sug-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
 /* ── Divider ────────────────────────────────────────────────────── */
 .idc-divider {
   height: 1px;

@@ -17,10 +17,12 @@ import { useState, useEffect } from 'react';
 import {
   Zap, Mail, Phone, Linkedin, MessageSquare, Calendar,
   Clock, CheckCircle, AlertCircle, ArrowRight, ChevronDown,
-  ChevronUp, RefreshCw, Send, Target, Loader
+  ChevronUp, RefreshCw, Send, Target, Loader, Reply
 } from 'lucide-react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
 import './PersistentEngageBar.css';
 
 // ── Engagement state derived from timeline ───────────────
@@ -207,12 +209,27 @@ function getLastEventLabel(events) {
 
 // ── Component ────────────────────────────────────────────
 
+const REPLY_CHANNELS = [
+  { id: 'text', icon: MessageSquare, label: 'Text / SMS' },
+  { id: 'email', icon: Mail, label: 'Email' },
+  { id: 'phone', icon: Phone, label: 'Phone Call' },
+  { id: 'linkedin', icon: Linkedin, label: 'LinkedIn' },
+  { id: 'other', icon: RefreshCw, label: 'Other' }
+];
+
 export default function PersistentEngageBar({ contact, onEngageClick }) {
   const [engageState, setEngageState] = useState('not_started');
   const [lastEvents, setLastEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
+
+  // Log-reply modal state
+  const [showLogReply, setShowLogReply] = useState(false);
+  const [replyChannel, setReplyChannel] = useState(null);
+  const [replyNote, setReplyNote] = useState('');
+  const [loggingReply, setLoggingReply] = useState(false);
+  const [replyLogged, setReplyLogged] = useState(false);
 
   useEffect(() => {
     if (contact?.id) {
@@ -245,6 +262,72 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
       console.error('[PersistentEngageBar] Failed to load timeline:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLogReply() {
+    const user = auth.currentUser;
+    if (!user || !contact?.id || !replyChannel) return;
+
+    try {
+      setLoggingReply(true);
+
+      // Update contact status → In Conversation
+      await updateContactStatus({
+        userId: user.uid,
+        contactId: contact.id,
+        trigger: STATUS_TRIGGERS.POSITIVE_REPLY,
+        currentStatus: contact.contact_status
+      });
+
+      // Log reply_received timeline event
+      await logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.id,
+        type: 'reply_received',
+        actor: ACTORS.USER,
+        preview: replyNote || `Reply received via ${replyChannel}`,
+        metadata: {
+          channel: replyChannel,
+          note: replyNote || null
+        }
+      });
+
+      // Queue a follow-up email next step
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 3);
+
+      await logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.id,
+        type: 'next_step_queued',
+        actor: ACTORS.BARRY,
+        preview: 'Send a check-in email to keep the conversation going.',
+        metadata: {
+          stepType: 'follow_up',
+          stepLabel: 'Follow Up via Email',
+          channel: 'email',
+          dueDate: dueDate.toISOString(),
+          timing: '3d',
+          message: `${contact.firstName || 'They'} replied via ${replyChannel} — follow up with a check-in email.`,
+          status: 'pending'
+        }
+      });
+
+      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+      await updateDoc(contactRef, {
+        next_step_due: dueDate.toISOString(),
+        next_step_type: 'follow_up',
+        updated_at: new Date().toISOString()
+      });
+
+      setReplyLogged(true);
+      setLoggingReply(false);
+      setShowLogReply(false);
+      setEngageState('in_progress');
+    } catch (err) {
+      console.error('[PersistentEngageBar] Failed to log reply:', err);
+      setLoggingReply(false);
     }
   }
 
@@ -326,13 +409,13 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
             </div>
           )}
           {messageCount > 0 && (
-            <div className="peb-stat">
+            <div className="peb-stat peb-stat-hidden-sm">
               <Send className="peb-stat-icon" />
               <span className="peb-stat-label">{messageCount} sent</span>
             </div>
           )}
           {contact?.next_step_due && (
-            <div className="peb-stat peb-stat-due">
+            <div className="peb-stat peb-stat-due peb-stat-hidden-sm">
               <Clock className="peb-stat-icon" />
               <span className="peb-stat-label">
                 Due {new Date(contact.next_step_due).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -384,6 +467,76 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
       {expanded && (
         <div className="peb-expanded">
           <div className="peb-expanded-inner">
+
+            {/* Got a Reply — shown when awaiting reply */}
+            {engageState === 'awaiting_reply' && !replyLogged && (
+              <div className="peb-log-reply-section">
+                <div className="peb-log-reply-header">
+                  <Reply className="w-4 h-4" />
+                  <span>Did they reply outside the app?</span>
+                </div>
+                {!showLogReply ? (
+                  <button
+                    className="peb-log-reply-trigger"
+                    onClick={() => setShowLogReply(true)}
+                  >
+                    Log a reply &amp; set next step
+                  </button>
+                ) : (
+                  <div className="peb-log-reply-form">
+                    <span className="peb-log-reply-label">Which channel?</span>
+                    <div className="peb-reply-channels">
+                      {REPLY_CHANNELS.map(ch => {
+                        const ChIcon = ch.icon;
+                        return (
+                          <button
+                            key={ch.id}
+                            className={`peb-reply-ch-btn ${replyChannel === ch.id ? 'peb-reply-ch-active' : ''}`}
+                            onClick={() => setReplyChannel(ch.id)}
+                          >
+                            <ChIcon className="w-3.5 h-3.5" />
+                            {ch.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <textarea
+                      className="peb-reply-note"
+                      placeholder="Optional note (e.g. 'He texted back, interested — wants a follow-up email')"
+                      value={replyNote}
+                      onChange={e => setReplyNote(e.target.value)}
+                      rows={2}
+                    />
+                    <div className="peb-log-reply-actions">
+                      <button
+                        className="peb-log-confirm-btn"
+                        onClick={handleLogReply}
+                        disabled={!replyChannel || loggingReply}
+                      >
+                        {loggingReply ? (
+                          <><Loader className="w-3.5 h-3.5 peb-spin" /> Logging...</>
+                        ) : (
+                          <><CheckCircle className="w-3.5 h-3.5" /> Log Reply &amp; Queue Email Follow-Up</>
+                        )}
+                      </button>
+                      <button
+                        className="peb-log-cancel-btn"
+                        onClick={() => { setShowLogReply(false); setReplyChannel(null); setReplyNote(''); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {replyLogged && (
+              <div className="peb-reply-logged-confirm">
+                <CheckCircle className="w-4 h-4" />
+                <span>Reply logged — email follow-up queued for 3 days</span>
+              </div>
+            )}
 
             {/* Channel Status */}
             <div className="peb-expanded-section">
@@ -453,7 +606,7 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
                 onEngageClick && onEngageClick();
               }}
             >
-              Start Engagement with Barry
+              {engageState === 'awaiting_reply' ? 'Follow Up with Barry' : 'Start Engagement with Barry'}
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

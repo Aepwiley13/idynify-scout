@@ -116,15 +116,18 @@
 .peb-stats {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .peb-stat {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .peb-stat-icon {
@@ -139,6 +142,16 @@
   color: #6b7280;
   font-weight: 400;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* Hide secondary stats when row gets cramped */
+@media (max-width: 900px) {
+  .peb-stat-hidden-sm {
+    display: none;
+  }
 }
 
 .peb-stat-due .peb-stat-icon,
@@ -261,8 +274,8 @@
 /* ── Expanded Section ── */
 
 .peb-expanded {
-  border-top: 1px solid rgba(107, 114, 128, 0.1);
-  background: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid rgba(107, 114, 128, 0.15);
+  background: rgba(10, 10, 16, 0.55);
   animation: peb-expand 0.2s ease;
 }
 
@@ -289,7 +302,7 @@
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 /* Channel list in expanded */
@@ -360,7 +373,7 @@
 
 .peb-recent-text {
   font-size: 12px;
-  color: #4b5563;
+  color: #9ca3af;
   font-weight: 400;
   flex: 1;
   text-transform: capitalize;
@@ -377,7 +390,7 @@
 
 .peb-pivot-hint {
   font-size: 12.5px;
-  color: #6b7280;
+  color: #9ca3af;
   line-height: 1.5;
   font-weight: 400;
 }
@@ -431,6 +444,182 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Spin utility ── */
+
+.peb-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Log Reply Section ── */
+
+.peb-log-reply-section {
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.peb-log-reply-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.peb-log-reply-trigger {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 7px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.peb-log-reply-trigger:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.peb-log-reply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.peb-log-reply-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.peb-reply-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.peb-reply-ch-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  background: rgba(107, 114, 128, 0.06);
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.peb-reply-ch-btn:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+}
+
+.peb-reply-ch-active {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
+.peb-reply-note {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  border-radius: 7px;
+  color: #d1d5db;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.peb-reply-note::placeholder {
+  color: #6b7280;
+}
+
+.peb-reply-note:focus {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.peb-log-reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.peb-log-confirm-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #d97706;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex: 1;
+  justify-content: center;
+}
+
+.peb-log-confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.peb-log-confirm-btn:not(:disabled):hover {
+  background: #b45309;
+}
+
+.peb-log-cancel-btn {
+  font-size: 12px;
+  color: #6b7280;
+  background: transparent;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.peb-log-cancel-btn:hover {
+  color: #9ca3af;
+  border-color: rgba(107, 114, 128, 0.35);
+}
+
+/* Reply logged confirmation */
+
+.peb-reply-logged-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 10px;
+  color: #10b981;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 /* ── Responsive ── */

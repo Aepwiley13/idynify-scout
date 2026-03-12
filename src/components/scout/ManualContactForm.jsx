@@ -3,6 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, addDoc } from 'firebase/firestore';
 import { UserPlus } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [formData, setFormData] = useState({
@@ -46,7 +47,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       alert('You must be logged in to add contacts');
       return;

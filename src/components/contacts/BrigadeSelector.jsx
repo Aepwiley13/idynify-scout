@@ -21,6 +21,7 @@ import {
   Archive, ChevronDown, ChevronUp, Info
 } from 'lucide-react';
 import './BrigadeSelector.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── Brigade Definitions ──────────────────────────────────
 
@@ -109,7 +110,7 @@ export default function BrigadeSelector({ contact, onUpdate }) {
     : null;
 
   async function handleBrigadeSelect(brigadeId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) return;
 
     // Toggle off if already selected

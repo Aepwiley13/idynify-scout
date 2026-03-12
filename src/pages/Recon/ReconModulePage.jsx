@@ -7,6 +7,7 @@ import { initializeDashboard } from '../../utils/dashboardUtils';
 import SectionOutputModal from '../../components/recon/SectionOutputModal';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import './ReconModulePage.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // Contextual tips based on module completion state
 const CONTEXTUAL_TIPS = {
@@ -203,7 +204,7 @@ export default function ReconModulePage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;

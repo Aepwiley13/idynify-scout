@@ -3,6 +3,7 @@ import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Trash2, Edit2, Check, X, StickyNote as StickyNoteIcon } from 'lucide-react';
 import './StickyNotes.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function StickyNotes({ contact, onUpdate }) {
   const [notes, setNotes] = useState(contact.notes || []);
@@ -38,7 +39,7 @@ export default function StickyNotes({ contact, onUpdate }) {
     if (!newNoteText.trim()) return;
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const note = {
@@ -78,7 +79,7 @@ export default function StickyNotes({ contact, onUpdate }) {
     if (!editText.trim()) return;
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const updatedNotes = notes.map(note =>
@@ -115,7 +116,7 @@ export default function StickyNotes({ contact, onUpdate }) {
 
   const handleDeleteNote = async (noteToDelete) => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const updatedNotes = notes.filter(note => note.id !== noteToDelete.id);

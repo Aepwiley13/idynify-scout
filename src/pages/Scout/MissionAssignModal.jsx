@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getActiveMissions, assignCompanyToMission } from '../../services/missionService';
 import { auth } from '../../firebase/config';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function MissionAssignModal({ company, onClose, onSuccess }) {
   const [missions, setMissions] = useState([]);
@@ -23,7 +24,7 @@ export default function MissionAssignModal({ company, onClose, onSuccess }) {
   }, [onClose]);
 
   async function loadMissions() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setLoading(true);
     const list = await getActiveMissions(user.uid);
@@ -33,7 +34,7 @@ export default function MissionAssignModal({ company, onClose, onSuccess }) {
 
   async function handleAssign() {
     if (!selected) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setAssigning(true);
     setError(null);

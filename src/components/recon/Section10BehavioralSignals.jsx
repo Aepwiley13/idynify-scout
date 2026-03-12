@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import './ReconEnterprise.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_10_QUESTIONS = [
   {
@@ -116,7 +117,7 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       navigate('/login');
       return;

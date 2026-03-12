@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import './ReconEnterprise.css';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_5_QUESTIONS = [
   {
@@ -136,7 +137,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
   }, [answers]);
 
   const saveAnswers = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {
@@ -196,7 +197,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       navigate('/login');
       return;

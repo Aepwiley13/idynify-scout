@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import CompanyLogo from '../../../components/scout/CompanyLogo';
 import './CompaniesSection.css';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ export default function CompaniesSection() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) { navigate('/login'); return; }
 
     try {

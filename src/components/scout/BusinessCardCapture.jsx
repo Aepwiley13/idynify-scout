@@ -3,6 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, addDoc, doc, setDoc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const [image, setImage] = useState(null);
@@ -29,7 +30,7 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     setError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         throw new Error('You must be logged in');
       }
@@ -119,7 +120,7 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       setError('You must be logged in to add contacts');
       return;

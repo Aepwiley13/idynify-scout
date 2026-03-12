@@ -29,7 +29,7 @@ const ImpersonationBanner = ({ session, onEndSession }) => {
       if (remaining <= 0) {
         setRemainingTime('Expired');
         setIsExpiringSoon(true);
-        // Auto-refresh to end session
+        // Session expired — notify parent which redirects to /admin
         if (onEndSession) {
           onEndSession();
         }
@@ -87,13 +87,12 @@ const ImpersonationBanner = ({ session, onEndSession }) => {
         throw new Error(errorData.error || 'Failed to end impersonation session');
       }
 
-      // Notify parent component
+      // Notify parent (clears impersonationSession state in App.jsx)
       if (onEndSession) {
         onEndSession();
       }
-
-      // Reload page to clear impersonation state
-      window.location.reload();
+      // onEndSession in App.jsx already does window.location.href = '/admin'
+      // so no separate reload needed here
 
     } catch (error) {
       console.error('Error ending impersonation:', error);

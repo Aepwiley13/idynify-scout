@@ -22,6 +22,7 @@ import { auth } from '../../firebase/config';
 import { getCTAForContact } from '../../constants/structuredFields';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import './HunterContactCard.css';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 // ── RECON confidence dot ────────────────────────────────
 // Accepts reconConfidencePct (0-100) — the new interface from reconConfidence.js.
@@ -129,7 +130,7 @@ function BarryRead({ contact }) {
     async function fetchRead() {
       setLoading(true);
       try {
-        const user = auth.currentUser;
+        const user = getEffectiveUser();
         if (!user) return;
         const authToken = await user.getIdToken();
         const res = await fetch('/.netlify/functions/barryHunterCardRead', {

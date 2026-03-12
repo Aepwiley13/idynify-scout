@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import './ReconEnterprise.css';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_9_QUESTIONS = [
   {
@@ -176,7 +177,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
   }, [answers]);
 
   const saveAnswers = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {
@@ -261,7 +262,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       navigate('/login');
       return;

@@ -25,6 +25,7 @@ import { auth } from '../../firebase/config';
 import { buildContextStack } from '../../utils/barryContextStack';
 import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── ICP intent helpers (pure, outside component) ───────────────────────────────
 
@@ -130,7 +131,7 @@ export default function BarryChatPanel({ userId }) {
   // ── Init: build context stack, then load opening brief ────────────────────
 
   async function initPanel() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) { setLoading(false); return; }
 
     // Build context stack first (non-blocking for brief load)
@@ -195,7 +196,7 @@ export default function BarryChatPanel({ userId }) {
 
   async function processIcpUpdate(originalMessage, action) {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { setSending(false); return; }
       const authToken = await user.getIdToken();
 
@@ -304,7 +305,7 @@ export default function BarryChatPanel({ userId }) {
     }, 0);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { setSending(false); return; }
 
       const authToken = await user.getIdToken();

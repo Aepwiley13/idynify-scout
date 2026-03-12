@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { ArrowLeft, Target, Users, Sparkles, Rocket, CheckCircle, Edit2, Trash2, Crosshair, Clock, Zap, ArrowRight, Loader2 } from 'lucide-react';
 import { getAllGoals, createMissionFromTemplate } from '../../utils/missionTemplates';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
@@ -35,6 +36,16 @@ import './CreateMission.css';
 export default function CreateMission() {
   const navigate = useNavigate();
   const location = useLocation();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating } = useImpersonation();
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [missionData, setMissionData] = useState(null);
@@ -86,7 +97,7 @@ export default function CreateMission() {
 
   async function loadContacts() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const contactsSnapshot = await getDocs(collection(db, 'users', user.uid, 'contacts'));
@@ -137,7 +148,7 @@ export default function CreateMission() {
     setSequenceError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.getIdToken();
@@ -248,7 +259,7 @@ export default function CreateMission() {
     setLoading(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       // Get selected contacts with full data

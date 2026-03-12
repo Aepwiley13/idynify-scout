@@ -16,6 +16,7 @@ import Section7DecisionProcess from '../../components/recon/Section7DecisionProc
 import Section8CompetitiveLandscape from '../../components/recon/Section8CompetitiveLandscape';
 import Section9Messaging from '../../components/recon/Section9Messaging';
 import Section10BehavioralSignals from '../../components/recon/Section10BehavioralSignals';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // Map sections to their parent modules for back-navigation
 const SECTION_TO_MODULE = {
@@ -70,7 +71,7 @@ export default function ReconSectionEditor() {
   const loadSection = async () => {
     let navigatedAway = false;
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigatedAway = true;
         navigate('/login');
@@ -111,7 +112,7 @@ export default function ReconSectionEditor() {
     setCoachingLoading(true);
     setCoaching(null);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const authToken = await user.getIdToken();
 
@@ -139,7 +140,7 @@ export default function ReconSectionEditor() {
 
   const handleSave = async (data) => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const dataToSave = data || formData;
@@ -160,7 +161,7 @@ export default function ReconSectionEditor() {
 
   const handleComplete = async (data) => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const dataToSave = data || formData;

@@ -5,6 +5,7 @@ import { db, auth } from '../../../firebase/config';
 import { Users, Target, Sparkles, FileText, Send, Loader, AlertCircle, Copy, Check } from 'lucide-react';
 import EngagementIntentSelector from '../../../components/hunter/EngagementIntentSelector';
 import './TextWeapon.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * HUNTER WEAPON - Text Message Builder
@@ -44,7 +45,7 @@ export default function TextWeapon({ onBack }) {
 
   async function loadContacts() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const contactsSnapshot = await getDocs(collection(db, 'users', user.uid, 'contacts'));
@@ -84,7 +85,7 @@ export default function TextWeapon({ onBack }) {
     setLoading(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/generate-text-messages', {
@@ -117,7 +118,7 @@ export default function TextWeapon({ onBack }) {
     setLoading(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
 
       const contacts = messages.map(msg => ({
         contactId: msg.contactId,

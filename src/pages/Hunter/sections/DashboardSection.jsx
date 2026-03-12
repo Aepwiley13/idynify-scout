@@ -40,6 +40,7 @@ import {
   STRATEGIC_PRIORITIES
 } from '../../../constants/structuredFields';
 import './DashboardSection.css';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 /**
  * DASHBOARD SECTION (Step 6)
@@ -80,7 +81,7 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
   // Step 6: One-time backfill for missions missing firstName/lastName
   useEffect(() => {
     if (backfillRan.current) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || missions.length === 0) return;
 
     // Check if any mission contacts are missing firstName
@@ -195,7 +196,7 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
 
   // "Move on" — remove from mission
   async function handleMoveOn(item) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || checkinSaving) return;
     const key = `${item.missionId}-${item.contactId}`;
     setCheckinSaving(key);

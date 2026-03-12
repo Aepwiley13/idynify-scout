@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, getDocs, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { ArrowLeft, Mail, Users, Sparkles, Loader, AlertCircle, CheckCircle, ChevronRight } from 'lucide-react';
 import MissionSetup from '../../components/hunter/MissionSetup';
 import TemplateLibrary from '../../components/hunter/TemplateLibrary';
@@ -11,6 +12,16 @@ import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMa
 export default function CreateCampaign() {
   const navigate = useNavigate();
   const location = useLocation();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating } = useImpersonation();
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
   const [step, setStep] = useState(1);
   const [campaignName, setCampaignName] = useState('');
   const [engagementIntent, setEngagementIntent] = useState(''); // NEW: Engagement intent
@@ -36,7 +47,7 @@ export default function CreateCampaign() {
 
   async function checkGmailAndLoadContacts() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;
@@ -82,7 +93,7 @@ export default function CreateCampaign() {
     setError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/generate-campaign-messages', {
@@ -119,7 +130,7 @@ export default function CreateCampaign() {
     setError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
 
       // Transform messages into contacts array with outcome tracking fields
       const contacts = messages.map(msg => ({

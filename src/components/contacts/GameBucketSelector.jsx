@@ -4,6 +4,7 @@ import { db, auth } from '../../firebase/config';
 import { Target, Users, RefreshCw, UserPlus, Zap } from 'lucide-react';
 import { GAME_BUCKET_LIST } from '../../utils/buildAutoIntent';
 import './GameBucketSelector.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const BUCKET_ICONS = {
   Target,
@@ -21,7 +22,7 @@ export default function GameBucketSelector({ contact, onUpdate }) {
   const [saving, setSaving] = useState(false);
 
   async function handleBucketSelect(bucketId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) return;
 
     // Toggle: if already selected, unassign

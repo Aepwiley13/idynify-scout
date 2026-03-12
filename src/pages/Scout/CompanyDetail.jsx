@@ -6,6 +6,7 @@ import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Awa
 import './ScoutMain.css';
 import './CompanyDetail.css';
 import { searchPeople, updatePerson } from '../../services/peopleService';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function CompanyDetail() {
   const { companyId } = useParams();
@@ -45,7 +46,7 @@ export default function CompanyDetail() {
   // Load company data and selected titles
   async function loadCompanyData() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;
@@ -122,7 +123,7 @@ export default function CompanyDetail() {
   // Load approved and suggested contacts for this company
   async function loadApprovedContacts() {
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
 
       const contactsQuery = query(
         collection(db, 'users', userId, 'contacts'),
@@ -220,7 +221,7 @@ export default function CompanyDetail() {
     setSavingBulkContacts(true);
 
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       const contactsToApprove = contacts.filter(c => selectedContactIds.has(c.id));
 
       console.log(`📦 Bulk approving ${contactsToApprove.length} contacts...`);
@@ -259,7 +260,7 @@ export default function CompanyDetail() {
     setSearchingContacts(true);
 
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       const idToken = await auth.currentUser.getIdToken();
 
       // Use ALL titles (no 3-title limit!)
@@ -318,7 +319,7 @@ export default function CompanyDetail() {
     setApprovingContactIds(prev => new Set(prev).add(contact.id));
 
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
 
       // Save basic contact info
       await saveContact(userId, contact);
@@ -487,7 +488,7 @@ export default function CompanyDetail() {
 
     try {
       setSavingDecisionMakers(true);
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       // Save each selected decision maker as a contact/lead
@@ -571,7 +572,7 @@ export default function CompanyDetail() {
     setApprovingSuggested(true);
 
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       const toApprove = suggestedContacts.filter(c => selectedSuggestedIds.has(c.id));
 
       for (const contact of toApprove) {
@@ -612,7 +613,7 @@ export default function CompanyDetail() {
   async function enrichCompanyData(forceRefresh = false) {
     try {
       setEnriching(true);
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const companyRef = doc(db, 'users', user.uid, 'companies', companyId);
@@ -693,7 +694,7 @@ export default function CompanyDetail() {
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingPeople(true);
       try {
-        const user = auth.currentUser;
+        const user = getEffectiveUser();
         if (!user) return;
         const results = await searchPeople(user.uid, query);
         setPeopleResults(results);
@@ -716,7 +717,7 @@ export default function CompanyDetail() {
 
     setAddingPeopleToCompany(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       for (const person of selectedPeopleToAdd) {
@@ -758,7 +759,7 @@ export default function CompanyDetail() {
 
     setArchiving(true);
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       const companyRef = doc(db, 'users', userId, 'companies', companyId);
 
       await updateDoc(companyRef, {
@@ -785,7 +786,7 @@ export default function CompanyDetail() {
   async function handleRestoreCompany() {
     setArchiving(true);
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       const companyRef = doc(db, 'users', userId, 'companies', companyId);
 
       await updateDoc(companyRef, {

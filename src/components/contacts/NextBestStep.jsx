@@ -26,6 +26,7 @@ import {
 import { db, auth } from '../../firebase/config';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import './NextBestStep.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── Step Types ───────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export default function NextBestStep({ contact, onEngageClick, onStepConfirmed }
   }, [contact?.id]);
 
   async function loadData() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) {
       setLoading(false);
       return;
@@ -215,7 +216,7 @@ export default function NextBestStep({ contact, onEngageClick, onStepConfirmed }
   }
 
   async function handleConfirm() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id || !proposal) return;
 
     try {

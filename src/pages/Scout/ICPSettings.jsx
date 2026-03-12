@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare } from 'lucide-react';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ export default function ICPSettings() {
 
   async function loadICPProfile() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;
@@ -83,7 +84,7 @@ export default function ICPSettings() {
   async function handleSaveChanges() {
     try {
       setSaving(true);
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
 
       // Validate weights if they exist
       if (profile.scoringWeights && totalWeight !== 100) {
@@ -153,7 +154,7 @@ export default function ICPSettings() {
       setRefreshing(true);
       setRefreshResult(null);
 
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/search-companies', {

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import './BarryTraining.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const TRAINING_DIMENSIONS = [
   {
@@ -97,7 +98,7 @@ export default function BarryTraining() {
 
   const loadData = async () => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;

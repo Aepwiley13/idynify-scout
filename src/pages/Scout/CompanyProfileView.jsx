@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import {
   ArrowLeft, Building2, Users, Globe, Linkedin, MapPin, Calendar,
   DollarSign, Briefcase, Target, Search, X, UserPlus, CheckCircle,
@@ -26,6 +27,18 @@ import { searchPeople, updatePerson } from '../../services/peopleService';
 export default function CompanyProfileView({ companyId, onBack }) {
   const T = useT();
   const navigate = useNavigate();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating } = useImpersonation();
+
+  // Helper: get effective user for data queries (respects impersonation)
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
 
   // ── Company state ──────────────────────────────────────────────────────────
   const [company, setCompany] = useState(null);
@@ -82,7 +95,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
   async function loadCompany() {
     setLoadingCompany(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
       const companyDoc = await getDoc(doc(db, 'users', user.uid, 'companies', companyId));
       if (!companyDoc.exists()) { onBack(); return; }
@@ -123,7 +136,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
 
   async function loadContacts() {
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       const snap = await getDocs(
         query(collection(db, 'users', userId, 'contacts'), where('company_id', '==', companyId))
       );
@@ -138,7 +151,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
   async function enrichCompany(companyData, forceRefresh = false) {
     setEnriching(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       // Check cache (14 days) unless force-refreshing
@@ -188,7 +201,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     setSearchingContacts(true);
     setSearchResults([]);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
       const res = await fetch('/.netlify/functions/searchPeople', {
         method: 'POST',
@@ -232,7 +245,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     if (approvedContacts.some(c => c.apollo_person_id === contact.id)) return;
     setApprovingContactIds(prev => new Set(prev).add(contact.id));
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const contactDocId = `${companyId}_${contact.id}`;
       await setDoc(doc(db, 'users', user.uid, 'contacts', contactDocId), {
         apollo_person_id: contact.id,
@@ -258,7 +271,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     if (!selectedContactIds.size) return;
     setSavingBulk(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const toApprove = searchResults.filter(c => selectedContactIds.has(c.id));
       for (const c of toApprove) {
         const id = `${companyId}_${c.id}`;
@@ -313,7 +326,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     if (!selectedDecisionMakers.length) return;
     setSavingDMs(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       for (const person of selectedDecisionMakers) {
         const id = `${companyId}_${person.id}`;
         await setDoc(doc(db, 'users', user.uid, 'contacts', id), {
@@ -344,7 +357,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     if (!window.confirm(`Archive ${company?.name}? You can restore it later.`)) return;
     setArchiving(true);
     try {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'companies', companyId), {
+      await updateDoc(doc(db, 'users', getEffectiveUser()?.uid, 'companies', companyId), {
         status: 'archived', archived_at: new Date().toISOString(),
         activity_log: arrayUnion({ type: 'status_changed', from: 'accepted', to: 'archived', timestamp: new Date().toISOString() }),
       });
@@ -358,7 +371,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
   async function handleRestore() {
     setArchiving(true);
     try {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'companies', companyId), {
+      await updateDoc(doc(db, 'users', getEffectiveUser()?.uid, 'companies', companyId), {
         status: 'accepted', archived_at: null,
         activity_log: arrayUnion({ type: 'status_changed', from: 'archived', to: 'accepted', timestamp: new Date().toISOString() }),
       });
@@ -379,7 +392,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingPeople(true);
       try {
-        const user = auth.currentUser;
+        const user = getEffectiveUser();
         if (!user) return;
         const results = await searchPeople(user.uid, q);
         setPeopleResults(results);
@@ -400,7 +413,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     if (!selectedPeopleToAdd.length) return;
     setAddingPeopleToCompany(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       for (const person of selectedPeopleToAdd) {
         await updatePerson(user.uid, person.id, {

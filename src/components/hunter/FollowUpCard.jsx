@@ -3,6 +3,7 @@ import { doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
 import { EmailDraftCard } from '../shared/EmailDraftCard';
 import './FollowUpCard.css';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 /**
  * FollowUpCard — renders a single follow_up_due notification from
@@ -46,7 +47,7 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
     setDraftError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       const idToken = await user.getIdToken();

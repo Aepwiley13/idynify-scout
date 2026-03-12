@@ -14,6 +14,7 @@ import { auth } from '../../firebase/config';
 import { generateContactRecommendations, dismissRecommendation } from '../../utils/recommendationEngine';
 import BarryRecommendationCard from '../hunter/BarryRecommendationCard';
 import './BarryInsightPanel.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function BarryInsightPanel({ contactId, onAction }) {
   const [recommendations, setRecommendations] = useState([]);
@@ -26,7 +27,7 @@ export default function BarryInsightPanel({ contactId, onAction }) {
   }, [contactId]);
 
   async function loadRecommendations() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contactId) {
       setLoading(false);
       return;
@@ -44,7 +45,7 @@ export default function BarryInsightPanel({ contactId, onAction }) {
   }
 
   async function handleDismiss(recommendationId, reason) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const success = await dismissRecommendation(user.uid, recommendationId, reason);
     if (success) {

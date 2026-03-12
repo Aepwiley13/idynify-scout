@@ -20,6 +20,7 @@ import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import LearningToast from '../LearningToast';
 import './InlineEngagementSection.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * INLINE ENGAGEMENT SECTION
@@ -292,7 +293,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
       setIntentSubmitted(true);
       generateMessageOptions(intentText, intentId || 'prospect');
       // Update contact status
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (user && contact?.id) {
         updateContactStatus({
           userId: user.uid,
@@ -311,7 +312,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
   // Real-time listener: load message_sent events for history
   useEffect(() => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) {
       setHistoryLoading(false);
       return;
@@ -337,7 +338,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     setFlowActive(true);
     loadSavedPrompts();
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (user && contact?.id) {
       // State Machine: contact_status → Engaged
       updateContactStatus({
@@ -398,7 +399,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
   async function checkGmailStatus() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const status = await checkGmailConnection(user.uid);
       setGmailConnected(status.connected);
@@ -409,7 +410,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
   // === Prompt Templates ===
   async function loadSavedPrompts() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const promptsRef = collection(db, 'users', user.uid, 'promptTemplates');
@@ -423,7 +424,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     if (!userIntent.trim() || savingPrompt) return;
     setSavingPrompt(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       await addDoc(collection(db, 'users', user.uid, 'promptTemplates'), {
         text: userIntent.trim(),
@@ -441,7 +442,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     if (savingMsgIdx !== null || savedMsgIndices.has(idx)) return;
     setSavingMsgIdx(idx);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const idToken = await user.getIdToken();
       const label = option.label || option.strategy || 'Barry Message';
@@ -468,7 +469,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   async function loadAllHistory() {
     if (allHistoryLoading) return;
     setAllHistoryLoading(true);
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) { setAllHistoryLoading(false); return; }
     try {
       const timelineRef = collection(db, 'users', user.uid, 'contacts', contact.id, 'timeline');
@@ -481,7 +482,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
   // === Barry Auto-Context Refresh (fire-and-forget) ===
   function triggerBarryContextRefresh() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) return;
     user.getIdToken().then(authToken => {
       fetch('/.netlify/functions/barryGenerateContext', {
@@ -506,7 +507,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   // === CC Recipients ===
   async function loadCcContactsCache() {
     if (ccContactsCache !== null) return ccContactsCache;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return [];
     try {
       const snap = await getDocs(
@@ -614,7 +615,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
   async function saveIntentToContact(intentId) {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         engagementIntent: intentId,
@@ -631,7 +632,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     setGenerationError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/generate-engagement-message', {
@@ -717,7 +718,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     setSendResult(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       const channelMap = {

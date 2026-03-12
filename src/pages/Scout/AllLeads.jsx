@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
@@ -375,7 +376,7 @@ function AllLeadsCard({
   async function openMissionPicker(e) {
     e.stopPropagation();
     if (missionPickerOpen) { setMissionPickerOpen(false); return; }
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setMissionsLoading(true);
     setMissionPickerOpen(true);
@@ -394,7 +395,7 @@ function AllLeadsCard({
 
   async function assignToMission(missionId, missionName, e) {
     e.stopPropagation();
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setMissionAssigning(true);
     try {
@@ -440,7 +441,7 @@ function AllLeadsCard({
   async function handleBrigadeClick(brigadeId, e) {
     e.stopPropagation();
     if (brigadeSaving) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const newValue = contact.brigade === brigadeId ? null : brigadeId;
     setBrigadeOpen(false);
@@ -873,7 +874,7 @@ function ContactProfileView({ contactId, onBack }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const user = auth.currentUser;
+        const user = getEffectiveUser();
         if (!user) return;
         // Try to get from Firestore
         const { doc: docFn, getDoc } = await import('firebase/firestore');
@@ -916,6 +917,20 @@ function ContactProfileView({ contactId, onBack }) {
 export default function AllLeads({ mode = 'people' }) {
   const T = useT();
   const navigate = useNavigate();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating, isReadOnly } = useImpersonation();
+
+  // Helper: get the effective user object for data queries
+  // When impersonating, returns an object with the target user's uid
+  // but delegates getIdToken to the real admin auth.
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
 
   // Data
   const [contacts, setContacts] = useState([]);
@@ -1029,7 +1044,7 @@ export default function AllLeads({ mode = 'people' }) {
 
   async function loadAllContacts() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
       // Load companies and contacts in parallel to halve the round-trip time
       const fetches = [
@@ -1070,7 +1085,8 @@ export default function AllLeads({ mode = 'people' }) {
   }
 
   async function handleAddToSniper(contact) {
-    const user = auth.currentUser;
+    if (isReadOnly) { alert('Read-only mode: Cannot add contacts to Sniper while viewing another user\'s account.'); return; }
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await addDoc(collection(db, 'users', user.uid, 'sniper_contacts'), {
@@ -1092,7 +1108,7 @@ export default function AllLeads({ mode = 'people' }) {
   }
 
   async function resetContactToScout(contactId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
@@ -1108,7 +1124,7 @@ export default function AllLeads({ mode = 'people' }) {
 
   // Sprint 3: Poll Gmail for replies and auto-transition contacts
   async function syncGmailReplies() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setSyncStatus('syncing');
     setSyncResult(null);
@@ -1153,7 +1169,8 @@ export default function AllLeads({ mode = 'people' }) {
 
   // Bulk: assign brigade to all selected contacts
   async function handleBulkBrigadeAssign(brigadeId) {
-    const user = auth.currentUser;
+    if (isReadOnly) { alert('Read-only mode: Cannot modify contacts while viewing another user\'s account.'); return; }
+    const user = getEffectiveUser();
     if (!user || selectedIds.size === 0) return;
     setBulkBrigadeOpen(false);
     const ids = [...selectedIds];

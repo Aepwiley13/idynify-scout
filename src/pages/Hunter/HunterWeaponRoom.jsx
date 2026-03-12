@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard, Users, Home } from 'lucide-react';
 import DashboardSection from './sections/DashboardSection';
 import WeaponsSection from './sections/WeaponsSection';
@@ -29,6 +30,16 @@ export default function HunterWeaponRoom() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating } = useImpersonation();
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
 
   // Read active tab from URL (?tab=missions) with fallback to legacy location.state
   const tabFromUrl = searchParams.get('tab') || location.state?.activeTab || 'dashboard';
@@ -57,7 +68,7 @@ export default function HunterWeaponRoom() {
 
   async function loadData() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;
@@ -102,7 +113,7 @@ export default function HunterWeaponRoom() {
   }
 
   async function handleConnectGmail() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     const authToken = await user.getIdToken();
 
     const response = await fetch('/.netlify/functions/gmail-oauth-init', {

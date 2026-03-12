@@ -3,6 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, writeBatch, doc } from 'firebase/firestore';
 import { Upload, AlertTriangle, CheckCircle, Users, Building2 } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function CSVUpload({ onContactsAdded, onCancel }) {
   const [uploadType, setUploadType] = useState(null); // 'leads' or 'companies'
@@ -218,7 +219,7 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       alert('You must be logged in to upload');
       return;

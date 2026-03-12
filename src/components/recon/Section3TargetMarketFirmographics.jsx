@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import './ReconEnterprise.css';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_3_QUESTIONS = [
   {
@@ -195,7 +196,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
   }, [answers]);
 
   const saveAnswers = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {
@@ -280,7 +281,7 @@ export default function Section3TargetMarketFirmographics({ initialData = {}, on
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       navigate('/login');
       return;

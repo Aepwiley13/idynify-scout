@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Loader } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './FollowUpComposer.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * HUNTER PHASE 2: Follow-Up Composer
@@ -48,7 +49,7 @@ export default function FollowUpComposer({
   async function handleGenerateSuggestion() {
     setGenerating(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const idToken = await user.getIdToken();
@@ -80,7 +81,7 @@ export default function FollowUpComposer({
 
     setSending(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const idToken = await user.getIdToken();

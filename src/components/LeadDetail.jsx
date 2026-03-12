@@ -7,6 +7,7 @@ import { getPath } from '../firebase/schema';
 import { callNetlifyFunction } from '../utils/apiClient';
 import LearningToast from './LearningToast';
 import Papa from 'papaparse';
+import { getEffectiveUser } from './context/ImpersonationContext';
 
 export default function LeadDetail({ lead, onClose }) {
   const [processing, setProcessing] = useState(false);
@@ -14,7 +15,7 @@ export default function LeadDetail({ lead, onClose }) {
   const [toastMessage, setToastMessage] = useState('');
 
   const handleAccurate = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     setProcessing(true);
@@ -70,7 +71,7 @@ export default function LeadDetail({ lead, onClose }) {
   };
 
   const handleInaccurate = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     setProcessing(true);
@@ -126,7 +127,7 @@ export default function LeadDetail({ lead, onClose }) {
   };
 
   const handleStillWorking = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     setProcessing(true);

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, FileText, X } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './TemplateLibrary.css';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 /**
  * HUNTER PHASE 2: Template Library
@@ -36,7 +37,7 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
 
   async function loadTemplates() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const idToken = await user.getIdToken();
@@ -64,7 +65,7 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
 
     setSaving(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const idToken = await user.getIdToken();
@@ -98,7 +99,7 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
     if (!confirm('Delete this template?')) return;
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const idToken = await user.getIdToken();

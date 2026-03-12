@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
+import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 // Pages
@@ -184,6 +185,8 @@ function App() {
   const handleEndImpersonation = () => {
     setImpersonationSession(null);
     document.body.classList.remove('impersonating');
+    // Redirect back to admin dashboard and reload so all components re-fetch admin's own data
+    window.location.href = '/admin';
   };
 
   // Protected Route Component - Requires both auth AND payment
@@ -246,6 +249,7 @@ function App() {
   }
 
   return (
+    <ImpersonationProvider session={impersonationSession}>
     <BrowserRouter>
       {updateAvailable && <UpdateBanner />}
       {impersonationSession && (
@@ -701,6 +705,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
+    </ImpersonationProvider>
   );
 }
 

@@ -156,6 +156,7 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
+  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users, directTo: { section: 'scout', item: 'all' }, items: [] },
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
@@ -169,7 +170,6 @@ const NAV_SECTIONS = [
   { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
   { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
   { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: '/sniper', items: [] },
-  { id: 'allpeople', label: 'PEOPLE',  Icon: Users,     directTo: { section: 'scout', item: 'all' }, items: [] },
 ];
 
 // ─── ScoutShellInner ─────────────────────────────────────────────────────────
@@ -337,7 +337,7 @@ function ScoutShellInner({ user }) {
           {/* Section nav icons */}
           <div style={{ flex: 1, display: 'flex', gap: 3, overflowX: 'auto' }}>
             {NAV_SECTIONS.map(sec => {
-              // PEOPLE (directTo) is active when its target item is selected
+              // COMMAND CENTER (directTo) is active when its target item is selected
               // SCOUT is active only when not in a directTo sub-view
               const hasActiveDirectTo = NAV_SECTIONS.some(
                 s => s.directTo && s.directTo.section === 'scout' && activeItem === s.directTo.item

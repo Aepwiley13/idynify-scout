@@ -2,32 +2,56 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 /**
- * Check if a user is an admin
- * Checks both environment variable (ADMIN_USER_IDS) and Firestore role
+ * Check if a user is an admin (role === 'admin' or 'super_admin')
  *
  * @param {string} uid - User ID to check
- * @returns {Promise<boolean>} - True if user is admin
+ * @returns {Promise<boolean>} - True if user is admin or super_admin
  */
 export async function isUserAdmin(uid) {
   if (!uid) return false;
 
   try {
-    // Check Firestore for admin role
     const userRef = doc(db, 'users', uid);
     const userDoc = await getDoc(userRef);
 
     if (userDoc.exists()) {
       const role = userDoc.data().role;
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'super_admin') {
         return true;
       }
     }
 
     // Note: Environment variable check happens server-side only
-    // Client-side can only check Firestore
     return false;
   } catch (error) {
     console.error('Error checking admin status:', error);
+    return false;
+  }
+}
+
+/**
+ * Check if a user is a super admin (role === 'super_admin')
+ *
+ * @param {string} uid - User ID to check
+ * @returns {Promise<boolean>}
+ */
+export async function isSuperAdmin(uid) {
+  if (!uid) return false;
+
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      const role = userDoc.data().role;
+      if (role === 'super_admin') {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking super admin status:', error);
     return false;
   }
 }

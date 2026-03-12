@@ -502,7 +502,7 @@ function ScoutShellInner({ user }) {
               onClick={() => handleSectionClick(sec)}
               title={sec.label}
               style={{
-                width: 40, height: 40, borderRadius: 10,
+                width: 52, height: 46, borderRadius: 10,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: sec.locked ? 'not-allowed' : 'pointer',
                 background: active ? T.accentBg : 'transparent',
@@ -514,7 +514,7 @@ function ScoutShellInner({ user }) {
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <sec.Icon size={14} color={active ? BRAND.pink : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? BRAND.pink : T.textFaint, marginTop: 1 }}>
+              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? BRAND.pink : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
                 {sec.label}
               </span>
             </div>

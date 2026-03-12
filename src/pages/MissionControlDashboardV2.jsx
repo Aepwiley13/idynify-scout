@@ -178,8 +178,8 @@ export default function MissionControlDashboardV2() {
   };
 
   const handleScoutClick = () => {
-    // Always route to Daily Leads (default tab)
-    navigate('/scout?tab=daily-leads');
+    // Always route to People (default tab)
+    navigate('/scout?tab=all-leads');
   };
 
   if (loading) {
@@ -281,7 +281,7 @@ export default function MissionControlDashboardV2() {
             {/* Module Quick-Nav Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               {[
-                { label: 'SCOUT',          path: '/scout?tab=daily-leads', color: 'cyan'   },
+                { label: 'SCOUT',          path: '/scout?tab=all-leads', color: 'cyan'   },
                 { label: 'HUNTER',         path: '/hunter',                color: 'pink'   },
                 { label: 'RECON',          path: '/recon',                 color: 'purple' },
                 { label: 'SNIPER',         path: '/sniper',                color: 'green'  },

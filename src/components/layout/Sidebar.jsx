@@ -62,7 +62,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const isActive = (path, tabName) => {
     if (path === '/scout' && tabName) {
-      const urlTab = new URLSearchParams(location.search).get('tab') || 'daily-leads';
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'all-leads';
       return location.pathname === '/scout' && urlTab === tabName;
     }
     if (path === '/hunter' && tabName) {

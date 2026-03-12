@@ -49,12 +49,17 @@ import AdminPingTest from './pages/Admin/AdminPingTest';
 import ApiActivity from './pages/Admin/ApiActivity';
 import AuditLogs from './pages/Admin/AuditLogs';
 import EmailInsights from './pages/Admin/EmailInsights';
+import SuperAdminDashboard from './pages/Admin/SuperAdminDashboard';
+import TenantHealth from './pages/Admin/TenantHealth';
+import RepairTools from './pages/Admin/RepairTools';
+import SuperAdminAuditLogs from './pages/Admin/SuperAdminAuditLogs';
 import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
 import CrispChat from './components/CrispChat';
 import UpdateBanner from './components/UpdateBanner';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
+import ProtectedSuperAdminRoute from './components/ProtectedSuperAdminRoute';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import LaunchSequence from './components/LaunchSequence';
 import Phase1Discovery from './components/Phase1Discovery';
@@ -132,7 +137,7 @@ function App() {
   // Check for active impersonation session
   useEffect(() => {
     const checkImpersonation = async () => {
-      if (!user || !userData?.role || userData.role !== 'admin') {
+      if (!user || !userData?.role || (userData.role !== 'admin' && userData.role !== 'super_admin')) {
         setImpersonationSession(null);
         return;
       }
@@ -556,6 +561,40 @@ function App() {
             <ProtectedAdminRoute>
               <EmailInsights />
             </ProtectedAdminRoute>
+          }
+        />
+
+        {/* Super Admin Routes */}
+        <Route
+          path="/super-admin"
+          element={
+            <ProtectedSuperAdminRoute>
+              <SuperAdminDashboard />
+            </ProtectedSuperAdminRoute>
+          }
+        />
+        <Route
+          path="/super-admin/tenant/:tenantUserId"
+          element={
+            <ProtectedSuperAdminRoute>
+              <TenantHealth />
+            </ProtectedSuperAdminRoute>
+          }
+        />
+        <Route
+          path="/super-admin/repair/:tenantUserId"
+          element={
+            <ProtectedSuperAdminRoute>
+              <RepairTools />
+            </ProtectedSuperAdminRoute>
+          }
+        />
+        <Route
+          path="/super-admin/audit-logs"
+          element={
+            <ProtectedSuperAdminRoute>
+              <SuperAdminAuditLogs />
+            </ProtectedSuperAdminRoute>
           }
         />
 

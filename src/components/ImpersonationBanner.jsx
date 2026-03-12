@@ -120,7 +120,11 @@ const ImpersonationBanner = ({ session, onEndSession }) => {
 
         <div className="banner-info">
           <div className="banner-title">
-            {isExpiringSoon ? 'Impersonation Session Expiring Soon!' : 'Viewing as User'}
+            {isExpiringSoon
+              ? 'Support Session Expiring Soon!'
+              : session.sessionType === 'super_admin_support'
+                ? `⚠️ You are in Support Mode — impersonating ${session.targetUserEmail}`
+                : 'Viewing as User'}
           </div>
           <div className="banner-details">
             <span className="target-user">{session.targetUserEmail}</span>

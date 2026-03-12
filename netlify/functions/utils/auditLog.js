@@ -120,6 +120,17 @@ export function getUserAgent(event) {
  * Action name constants for consistency across the application
  */
 export const AUDIT_ACTIONS = {
+  // Super Admin actions
+  SUPER_ADMIN_SEARCH_TENANTS: 'super_admin_search_tenants',
+  SUPER_ADMIN_VIEW_TENANT_HEALTH: 'super_admin_view_tenant_health',
+  SUPER_ADMIN_START_SUPPORT_SESSION: 'super_admin_start_support_session',
+  SUPER_ADMIN_END_SUPPORT_SESSION: 'super_admin_end_support_session',
+  SUPER_ADMIN_REPAIR_REINDEX_COMPANIES: 'super_admin_repair_reindex_companies',
+  SUPER_ADMIN_REPAIR_RESYNC_CRM: 'super_admin_repair_resync_crm',
+  SUPER_ADMIN_REPAIR_RESET_PERMISSIONS: 'super_admin_repair_reset_permissions',
+  SUPER_ADMIN_REPAIR_FLUSH_CACHE: 'super_admin_repair_flush_cache',
+  SUPER_ADMIN_VIEW_AUDIT_LOGS: 'super_admin_view_audit_logs',
+
   // Admin actions
   VIEW_USER_DETAIL: 'view_user_detail',
   VIEW_USER_CONTACTS: 'view_user_contacts',
@@ -170,6 +181,15 @@ export const AUDIT_ACTIONS = {
  * Human-readable labels for actions (for UI display)
  */
 export const ACTION_LABELS = {
+  [AUDIT_ACTIONS.SUPER_ADMIN_SEARCH_TENANTS]: 'Searched Tenants',
+  [AUDIT_ACTIONS.SUPER_ADMIN_VIEW_TENANT_HEALTH]: 'Viewed Tenant Health',
+  [AUDIT_ACTIONS.SUPER_ADMIN_START_SUPPORT_SESSION]: 'Started Support Session',
+  [AUDIT_ACTIONS.SUPER_ADMIN_END_SUPPORT_SESSION]: 'Ended Support Session',
+  [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_REINDEX_COMPANIES]: 'Repaired: Re-indexed Companies',
+  [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_RESYNC_CRM]: 'Repaired: Resynced CRM',
+  [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_RESET_PERMISSIONS]: 'Repaired: Reset Permissions',
+  [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_FLUSH_CACHE]: 'Repaired: Flushed Cache',
+  [AUDIT_ACTIONS.SUPER_ADMIN_VIEW_AUDIT_LOGS]: 'Viewed Audit Logs (Super Admin)',
   [AUDIT_ACTIONS.VIEW_USER_DETAIL]: 'Viewed User',
   [AUDIT_ACTIONS.VIEW_USER_CONTACTS]: 'Viewed User Contacts',
   [AUDIT_ACTIONS.VIEW_CONTACT_DETAIL]: 'Viewed Contact Detail',

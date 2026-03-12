@@ -156,7 +156,7 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
-  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users, directTo: { section: 'scout', item: 'all' }, items: [] },
+  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users, route: '/people', items: [] },
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [

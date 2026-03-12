@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { Users, TrendingUp, Database, Building2, Filter, Search, FileText, Mail } from 'lucide-react';
+import { Users, TrendingUp, Database, Building2, Filter, Search, FileText, Mail, LayoutDashboard } from 'lucide-react';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -174,6 +174,13 @@ export default function AdminDashboard() {
           <p className="page-subtitle">Platform-wide user management and monitoring</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={() => navigate('/mission-control-v2')}
+            className="api-activity-btn mission-control-btn"
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Mission Control</span>
+          </button>
           <button
             onClick={() => navigate('/admin/api-activity')}
             className="api-activity-btn"

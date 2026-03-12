@@ -160,9 +160,9 @@ const NAV_SECTIONS = [
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
-      { id: 'daily',     label: 'Daily Discoveries', Icon: Zap,       desc: 'Review Queue'       },
-      { id: 'saved',     label: 'Saved Companies',   Icon: Building2, desc: 'Hunt list'          },
       { id: 'all',       label: 'People',             Icon: Users,     desc: 'Your network'      },
+      { id: 'saved',     label: 'Saved Companies',   Icon: Building2, desc: 'Hunt list'          },
+      { id: 'daily',     label: 'Daily Discoveries', Icon: Zap,       desc: 'Review Queue'       },
       { id: 'scoutplus',   label: 'Scout+',           Icon: Plus,     desc: 'Add contacts'       },
       { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
     ],

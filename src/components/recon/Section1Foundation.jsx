@@ -119,6 +119,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   const [errors, setErrors] = useState({});
   const [showOutput, setShowOutput] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [inlineError, setInlineError] = useState(null);
 
   // Initialize answers from initialData
   useEffect(() => {
@@ -163,11 +164,12 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     try {
       const user = getEffectiveUser();
       if (!user) {
-        alert('❌ You must be logged in to save');
+        setInlineError('You must be logged in to save.');
         return;
       }
 
       setSaving(true);
+      setInlineError(null);
 
       if (onSave) {
         await onSave(answers);
@@ -179,10 +181,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
       }
 
       setHasUnsavedChanges(false);
-      console.log('✅ Progress saved');
     } catch (error) {
       console.error('Save error:', error);
-      alert('❌ Failed to save progress. Please try again.');
+      setInlineError('Failed to save progress. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -249,9 +250,10 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
   const handleGenerate = async () => {
     if (!validateAllFields()) {
-      alert('⚠️ Please fix all validation errors before generating');
+      setInlineError('Please fix all validation errors before generating.');
       return;
     }
+    setInlineError(null);
 
     // Save before generating
     await handleManualSave();
@@ -300,7 +302,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
       }
     } catch (error) {
       console.error('Generation error:', error);
-      alert(`❌ Generation failed: ${error.message}`);
+      setInlineError(`Generation failed: ${error.message}`);
     } finally {
       setGenerating(false);
     }
@@ -614,6 +616,14 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
           Mission Control
         </button>
       </div>
+
+      {/* Inline error banner */}
+      {inlineError && (
+        <div className="recon-card" style={{ background: '#fef2f2', border: '1.5px solid #fecaca', color: '#b91c1c', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⚠</span> {inlineError}
+          <button onClick={() => setInlineError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', fontWeight: 700 }}>✕</button>
+        </div>
+      )}
 
       {/* Questions */}
       <div className="recon-card">

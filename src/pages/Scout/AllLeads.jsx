@@ -877,6 +877,14 @@ const ACTION_LENSES = [
   { id: 'all',           label: 'All People',       Icon: Users,         color: null },
 ];
 
+// Scout-specific lenses — Scout is about discovery, not engagement workflow.
+// Only show tabs relevant to finding and managing new leads.
+const SCOUT_LENSES = [
+  { id: 'new',           label: 'New (Unengaged)',   Icon: Sparkles,      color: '#10b981' },
+  { id: 'in_mission',    label: 'Active',           Icon: Zap,           color: '#7c3aed' },
+  { id: 'all',           label: 'All People',       Icon: Users,         color: null },
+];
+
 // Legacy: keep BRIGADE_LENSES available for backward compat if needed elsewhere
 const BRIGADE_LENSES = [
   { id: 'all', label: 'All People', Icon: Users },
@@ -959,7 +967,7 @@ export default function AllLeads({ mode = 'people' }) {
 
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
-  const [actionFilter, setActionFilter] = useState('today'); // action-oriented lens
+  const [actionFilter, setActionFilter] = useState(mode === 'scout' ? 'new' : 'today'); // action-oriented lens
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
   const [tagFilter, setTagFilter] = useState(null); // selected tag string or null
@@ -1509,7 +1517,7 @@ export default function AllLeads({ mode = 'people' }) {
 
         {/* Action-oriented tabs */}
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginBottom: -1 }}>
-          {ACTION_LENSES.map(lens => {
+          {(mode === 'scout' ? SCOUT_LENSES : ACTION_LENSES).map(lens => {
             const active = actionFilter === lens.id;
             const count = actionCounts[lens.id] || 0;
             const LensIcon = lens.Icon;
@@ -1545,18 +1553,22 @@ export default function AllLeads({ mode = 'people' }) {
 
       {/* ── Engagement Dashboard (replaces stats row) ── */}
       <div style={{ padding: '10px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 9, overflowX: 'auto' }}>
-        {[
+        {(mode === 'scout' ? [
+          { label: 'Unengaged',      value: actionCounts.new || 0, icon: Sparkles,      color: '#10b981',  filter: 'new' },
+          { label: 'Added This Week', value: newThisWeekCount,      icon: CalendarCheck, color: '#0ea5e9',  filter: null },
+          { label: 'Total Leads',    value: contacts.length,       icon: Users,         color: '#7c3aed',  filter: 'all' },
+        ] : [
           { label: 'Due Today',     value: dueTodayCount,    icon: CalendarCheck, color: '#e8197d',  filter: 'today' },
           { label: 'Overdue',        value: overdueCount,     icon: AlertTriangle, color: '#dc2626',  filter: 'follow_up_due' },
           { label: 'Replies',        value: repliedCount,     icon: Inbox,         color: '#0ea5e9',  filter: 'replied' },
           { label: 'Active',         value: activeCount,      icon: Zap,           color: '#7c3aed',  filter: 'in_mission' },
           { label: 'New This Week',  value: newThisWeekCount, icon: Sparkles,      color: '#10b981',  filter: null },
-        ].map(({ label, value, icon: Icon, color, filter }) => {
+        ]).map(({ label, value, icon: Icon, color, filter }) => {
           const active = filter && actionFilter === filter;
           return (
             <div
               key={label}
-              onClick={() => { if (filter) setActionFilter(f => f === filter ? 'all' : filter); }}
+              onClick={() => { if (filter) setActionFilter(f => f === filter ? (mode === 'scout' ? 'new' : 'all') : filter); }}
               style={{
                 background: active ? `${color}12` : T.statBg,
                 border: `1px solid ${active ? `${color}40` : T.border}`,

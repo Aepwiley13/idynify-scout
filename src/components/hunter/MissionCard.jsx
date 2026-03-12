@@ -29,6 +29,7 @@ import HunterOutcomeOverlay from './HunterOutcomeOverlay';
 import HunterMicroIntake from './HunterMicroIntake';
 import { predictNextOutcomeGoal } from '../../utils/nextOutcomeGoal';
 import './MissionCard.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── CTA labels for the Send button (dynamic by outcome_goal) ────────────────
 const MISSION_CTA_LABELS = {
@@ -87,7 +88,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
 
   // ── Subscribe to mission document ─────────────────────────────────────────
   useEffect(() => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !missionId) {
       setMissionLoading(false);
       return;
@@ -151,7 +152,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
 
   // ── Handle "Send" — record step as sent ───────────────────────────────────
   const handleSend = useCallback(async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !missionId) return;
 
     const step = mission?.steps?.[currentStepIndex];
@@ -174,7 +175,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
 
   // ── Handle outcome recording → generate next step ─────────────────────────
   const handleOutcomeRecorded = useCallback(async (outcomeId, newRelationshipState) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !missionId) return;
     setShowOutcome(false);
 
@@ -245,7 +246,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
   // ── Handle next goal adoption ──────────────────────────────────────────────
   const handleAdoptNextGoal = useCallback(async () => {
     if (!nextGoalSuggestion) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {
@@ -266,7 +267,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
 
   const handleDismissNextGoal = useCallback(async () => {
     setNextGoalSuggestion(null);
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !missionId) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'missions', missionId), {
@@ -278,7 +279,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
 
   // ── Handle retry (processing_error) ───────────────────────────────────────
   const handleRetry = useCallback(async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {

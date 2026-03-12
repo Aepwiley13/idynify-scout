@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { BRAND } from '../../../theme/tokens';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -160,7 +161,7 @@ export default function OutcomesSection() {
 
   useEffect(() => {
     async function load() {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       try {
         const [contactSnap, touchSnap] = await Promise.all([

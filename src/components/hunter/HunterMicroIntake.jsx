@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import './HunterMicroIntake.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const REASON_OPTIONS = [
   { id: 'reconnect', label: 'Reconnect with someone I know' },
@@ -60,7 +61,7 @@ export default function HunterMicroIntake({
     setSaving(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (user && contact?.id) {
         await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
           hunter_intake: {
@@ -84,7 +85,7 @@ export default function HunterMicroIntake({
 
   async function handleSkip() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (user && contact?.id) {
         await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
           hunter_intake: {

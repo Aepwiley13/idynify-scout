@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../../firebase/config';
+import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight, Home,
@@ -510,12 +511,17 @@ function PeopleShellInner({ user }) {
 
 // ─── PeopleMain (public export) ───────────────────────────────────────────────
 export default function PeopleMain() {
-  const [user, setUser] = useState(auth.currentUser);
+  const activeUser = useActiveUser();
+  const [user, setUser] = useState(activeUser || auth.currentUser);
 
   useEffect(() => {
+    if (activeUser?._isImpersonated) {
+      setUser(activeUser);
+      return;
+    }
     const unsub = auth.onAuthStateChanged(u => setUser(u));
     return unsub;
-  }, []);
+  }, [activeUser]);
 
   return <PeopleShellInner user={user} />;
 }

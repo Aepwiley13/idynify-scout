@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, onSnapshot, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import {
   ArrowLeft,
   Target,
@@ -75,6 +76,16 @@ const STATUS_STYLES = {
 export default function MissionDetail() {
   const navigate = useNavigate();
   const { missionId } = useParams();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating } = useImpersonation();
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
   const [mission, setMission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -93,7 +104,7 @@ export default function MissionDetail() {
   const [contactSaving, setContactSaving] = useState(null); // contactId being pause/remove/converted
 
   useEffect(() => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       navigate('/login');
       return;
@@ -147,7 +158,7 @@ export default function MissionDetail() {
 
   async function handleApproveStep(contactId, stepIndex) {
     setApprovalSaving(true);
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
@@ -172,7 +183,7 @@ export default function MissionDetail() {
 
   async function handleApproveAllForContact(contactId) {
     setApprovalSaving(true);
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
@@ -196,7 +207,7 @@ export default function MissionDetail() {
 
   async function handleSaveStepEdit(contactId, stepIndex) {
     setApprovalSaving(true);
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
@@ -222,7 +233,7 @@ export default function MissionDetail() {
 
   // ── Task 3.2: Load all user contacts for the add-contact modal ─────────────
   async function loadAllContacts() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const snap = await getDocs(collection(db, 'users', user.uid, 'contacts'));
@@ -234,7 +245,7 @@ export default function MissionDetail() {
 
   // Add a contact to the mission + fire Barry personalization
   async function handleAddContact(contact) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || addingContactId) return;
     setAddingContactId(contact.id);
     try {
@@ -306,7 +317,7 @@ export default function MissionDetail() {
 
   // Remove a contact from the mission
   async function handleRemoveContact(contactId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || contactSaving) return;
     setContactSaving(contactId);
     try {
@@ -324,7 +335,7 @@ export default function MissionDetail() {
 
   // Pause/unpause a contact in the mission
   async function handleTogglePauseContact(contactId, currentStatus) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || contactSaving) return;
     setContactSaving(contactId);
     try {
@@ -344,7 +355,7 @@ export default function MissionDetail() {
 
   // Mark contact as converted
   async function handleMarkConverted(contactId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || contactSaving) return;
     setContactSaving(contactId);
     try {

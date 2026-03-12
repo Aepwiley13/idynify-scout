@@ -26,6 +26,7 @@ import SequencePanel from './SequencePanel';
 import LearningToast from '../LearningToast';
 import { EmailDraftCard } from '../shared/EmailDraftCard';
 import './HunterContactDrawer.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * HUNTER CONTACT DRAWER - Intent-Driven Engagement (v3)
@@ -120,7 +121,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       setEngagementIntent(contact?.engagementIntent || 'prospect');
 
       // State Machine: Engage clicked → Engaged
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (user && contact?.id) {
         updateContactStatus({
           userId: user.uid,
@@ -147,7 +148,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // Check Gmail connection status
   async function checkGmailStatus() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       setGmailChecking(true);
@@ -163,7 +164,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   async function checkCalendarStatus() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const status = await checkCalendarConnection(user.uid);
       setCalendarConnected(status.connected);
@@ -176,7 +177,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   async function loadData() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       // Load missions
@@ -219,7 +220,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   // Sprint 2.2: Load Gmail thread so the reply is readable inside the app
   async function loadReplyThread(threadId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !threadId) return;
     setThreadLoading(true);
     setThreadError(null);
@@ -246,7 +247,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   }
 
   async function handleDrawerDismissRecommendation(recommendationId, reason) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const success = await dismissRecommendation(user.uid, recommendationId, reason);
     if (success) {
@@ -295,7 +296,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   async function saveIntentToContact(intentId) {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
@@ -316,7 +317,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     setActiveView('options');
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       // Call Barry AI to generate 3 message strategies
@@ -407,7 +408,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     setSendResult(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       // Map weapon to channel
@@ -461,7 +462,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   function getSendButtonLabel() {
     if (!selectedWeapon) return 'Send';
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return 'Send';
 
     // Determine if this will be a real send or native handoff
@@ -494,7 +495,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     if (loading) return; // prevent double-click while in flight
     setLoading(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const mission = missions.find(m => m.id === missionId);
       if (!mission) {
         setToastMessage('Mission not found. Please try again.');
@@ -676,7 +677,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   }
 
   async function handleApproveAllSteps() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !personalizingMissionId) return;
     try {
       const missionRef = doc(db, 'users', user.uid, 'missions', personalizingMissionId);
@@ -708,7 +709,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   async function handleSaveContactInfo() {
     setLoading(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         email: editedContact.email,
         phone: editedContact.phone,

@@ -6,6 +6,7 @@ import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Li
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CompanyDetailModal({ company, onClose, onFindMoreContacts }) {
   const navigate = useNavigate();
@@ -80,7 +81,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
     try {
       setError(null);
 
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -228,7 +229,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
 
     try {
       setSavingContacts(true);
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       // Save each selected decision maker as a contact
@@ -312,7 +313,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
     searchTimeoutRef.current = setTimeout(async () => {
       setSearchingPeople(true);
       try {
-        const user = auth.currentUser;
+        const user = getEffectiveUser();
         if (!user) return;
         const results = await searchPeople(user.uid, query);
         setPeopleResults(results);
@@ -335,7 +336,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
 
     setAddingPeopleToCompany(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       for (const person of selectedPeopleToAdd) {

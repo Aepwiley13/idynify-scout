@@ -35,6 +35,7 @@ import QuickMissionAssignModal from '../../components/hunter/QuickMissionAssignM
 import { bootstrapContactsForUser } from '../../utils/hunterBootstrap';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import './HunterDashboard.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // Contacts stuck in engaged_pending for more than 30s get auto-recovered
 const STUCK_TIMEOUT_MS = 30_000;
@@ -71,7 +72,7 @@ export default function HunterDashboard() {
 
   // ── Stuck contact recovery ────────────────────────────────────────────────
   useEffect(() => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     const now = Date.now();
@@ -102,7 +103,7 @@ export default function HunterDashboard() {
   }
 
   async function initHunter() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) { navigate('/login'); return; }
 
     // Load RECON confidence score (non-fatal)
@@ -171,7 +172,7 @@ export default function HunterDashboard() {
 
   // ── Engage handler ────────────────────────────────────────────────────────
   const handleEngage = useCallback(async (contact) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     setCurrentIndex(prev => prev + 1);
@@ -219,7 +220,7 @@ export default function HunterDashboard() {
 
   // ── Archive handler ──────────────────────────────────────────────────────
   const handleArchive = useCallback(async (contact) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setCurrentIndex(prev => prev + 1);
     try {
@@ -240,7 +241,7 @@ export default function HunterDashboard() {
 
   // ── Restore from archive ─────────────────────────────────────────────────
   const handleRestore = useCallback(async (contact) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {

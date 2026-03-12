@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { BRAND } from '../../../theme/tokens';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -65,7 +66,7 @@ function LogTouchModal({ contact, onClose, onLogged }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setSaving(true);
     try {
@@ -185,7 +186,7 @@ export default function TargetsSection() {
   const [expandedId, setExpandedId] = useState(null);
 
   const loadContacts = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const snap = await getDocs(query(
@@ -203,7 +204,7 @@ export default function TargetsSection() {
   useEffect(() => { loadContacts(); }, []);
 
   const handleStageChange = async (contactId, newStage) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'sniper_contacts', contactId), { stage: newStage });
@@ -215,7 +216,7 @@ export default function TargetsSection() {
 
   const handleDelete = async (contactId) => {
     if (!window.confirm('Remove this contact from SNIPER?')) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'sniper_contacts', contactId));

@@ -32,6 +32,7 @@ import {
 import StepApprovalCard from './StepApprovalCard';
 import OutcomePrompt from './OutcomePrompt';
 import './SequencePanel.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * SEQUENCE PANEL (Step 5)
@@ -78,7 +79,7 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
   // Refresh mission data from Firestore
   async function refreshMission() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const missionRef = doc(db, 'users', user.uid, 'missions', missionId);
       const snap = await getDoc(missionRef);
@@ -97,7 +98,7 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
     setGeneratedContent(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.getIdToken();
@@ -174,7 +175,7 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
   // Record that a step was sent
   async function handleStepSent(stepIndex) {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       await recordStepSent({
@@ -196,7 +197,7 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
   // Skip a step
   async function handleSkipStep(stepIndex) {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       setLoading(true);
@@ -219,7 +220,7 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
   // Record outcome for previous step
   async function handleOutcomeRecorded(stepIndex, outcome) {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       setLoading(true);

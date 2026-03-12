@@ -37,6 +37,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── Color maps for classification chips ─────────────────────────────────────
 
@@ -448,7 +449,7 @@ export default function IdentityCard({
     setSavedField(field);
     setTimeout(() => setSavedField(null), 2000);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         [field]: trimmed, updated_at: new Date().toISOString(),
@@ -481,7 +482,7 @@ export default function IdentityCard({
   // ── Multi-field (email / phone) mutations ────────────────────────────────────
 
   async function persistFields(fieldName, list) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const updateData = {
       [fieldName]: list,
@@ -538,7 +539,7 @@ export default function IdentityCard({
     setPhotoUrlInput('');
     setImgBroken(false);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         photo_url: url, photo_source: 'manual_url', updated_at: new Date().toISOString(),
@@ -551,7 +552,7 @@ export default function IdentityCard({
 
   // ── Brigade ─────────────────────────────────────────────────────────────────
   async function handleBrigadeSelect(brigadeId) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) return;
     const newValue = contact.brigade === brigadeId ? null : brigadeId;
     onUpdate({ ...contact, brigade: newValue });
@@ -573,7 +574,7 @@ export default function IdentityCard({
 
   // ── Structured field save ────────────────────────────────────────────────────
   async function handleFieldSave(fieldName, value) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) return;
     onUpdate({ ...contact, [fieldName]: value });
     try {
@@ -614,7 +615,7 @@ export default function IdentityCard({
   async function openTagInput() {
     setTagInputOpen(true);
     if (allTags.length === 0) {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const tags = await getUniqueTags(user.uid);
       setAllTags(tags);
@@ -652,7 +653,7 @@ export default function IdentityCard({
     if (!allTags.includes(trimmed)) setAllTags(prev => [...prev, trimmed].sort());
     try {
       setTagSaving(true);
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         tags: newTags, updated_at: new Date().toISOString(),
@@ -669,7 +670,7 @@ export default function IdentityCard({
     const newTags = (contact.tags || []).filter(t => t !== tag);
     onUpdate?.({ ...contact, tags: newTags });
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
         tags: newTags, updated_at: new Date().toISOString(),

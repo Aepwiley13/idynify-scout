@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import './CompanyLeads.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CompanyLeads() {
   const { companyId } = useParams();
@@ -17,7 +18,7 @@ export default function CompanyLeads() {
 
   async function loadCompanyLeads() {
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
 
       // Load company info
       const companyDoc = await getDoc(

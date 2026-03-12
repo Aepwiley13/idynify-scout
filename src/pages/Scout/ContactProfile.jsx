@@ -33,6 +33,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { archivePerson } from '../../services/peopleService';
 import './ContactProfile.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function ContactProfile({ contactId: propContactId, onClose, autoEngage } = {}) {
   const { contactId: paramContactId } = useParams();
@@ -88,7 +89,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
   async function loadContactProfile() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         if (isPanelMode) { onClose(); return; }
         navigate('/login');
@@ -227,7 +228,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       setEnrichError(null);
       setEnrichSuccess(false);
 
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       // Enrichment works with any contact (LinkedIn URL, Apollo ID, or name+company)
@@ -328,7 +329,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       setEnrichError(null);
       setNeedsManualLinkedIn(false);
 
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       // First, save the LinkedIn URL to the contact
@@ -407,7 +408,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       setPhotoRefreshLoading(true);
       setPhotoRefreshError(null);
 
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       const authToken = await user.getIdToken();
@@ -480,7 +481,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
   async function handleArchiveContact() {
     try {
       setArchiving(true);
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       await archivePerson(user.uid, contact.id, archiveReason);

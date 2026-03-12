@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function FindContact({ onContactAdded, onCancel, initialSearchParams }) {
   const [searchParams, setSearchParams] = useState({
@@ -39,7 +40,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
     setBarryRecommendation(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         throw new Error('You must be logged in');
       }
@@ -93,7 +94,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
 
     try {
       // Call Claude API for Barry's validation
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/barryValidateContact', {
@@ -139,7 +140,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
     setError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         throw new Error('You must be logged in');
       }

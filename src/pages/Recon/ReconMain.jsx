@@ -13,6 +13,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { auth } from '../../firebase/config';
+import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target,
   Brain, MessageSquare, Shield, Swords, Zap, LayoutDashboard,
@@ -551,12 +552,17 @@ function ReconShellInner({ user }) {
 
 // ─── ReconMain (public export) ────────────────────────────────────────────────
 export default function ReconMain() {
-  const [user, setUser] = useState(auth.currentUser);
+  const activeUser = useActiveUser();
+  const [user, setUser] = useState(activeUser || auth.currentUser);
 
   useEffect(() => {
+    if (activeUser?._isImpersonated) {
+      setUser(activeUser);
+      return;
+    }
     const unsub = auth.onAuthStateChanged(u => setUser(u));
     return unsub;
-  }, []);
+  }, [activeUser]);
 
   return <ReconShellInner user={user} />;
 }

@@ -4,6 +4,7 @@ import { auth, db } from '../firebase/config';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { isUserAdmin } from '../utils/adminAuth';
+import { useActiveUserId, useImpersonation } from '../context/ImpersonationContext';
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
 import { generateDashboardRecommendations, dismissRecommendation } from '../utils/recommendationEngine';
 import BarryChatPanel from '../components/dashboard/BarryChatPanel';
@@ -16,6 +17,8 @@ import MoreSheet from '../components/layout/MoreSheet';
 
 export default function MissionControlDashboardV2() {
   const navigate = useNavigate();
+  const activeUserId = useActiveUserId();
+  const { isImpersonating, isReadOnly } = useImpersonation();
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -34,7 +37,7 @@ export default function MissionControlDashboardV2() {
 
   useEffect(() => {
     loadDashboardStats();
-  }, []);
+  }, [activeUserId]);
 
   const loadDashboardStats = async () => {
     try {
@@ -44,11 +47,12 @@ export default function MissionControlDashboardV2() {
         return;
       }
 
-      const userId = user.uid;
+      // Use activeUserId (target user when impersonating, real user otherwise)
+      const userId = activeUserId || user.uid;
       setUserId(userId);
 
-      // Check if user is admin
-      const adminStatus = await isUserAdmin(userId);
+      // Check if real user is admin (not the impersonated user)
+      const adminStatus = await isUserAdmin(user.uid);
       setIsAdmin(adminStatus);
 
       // Initialize dashboard if it doesn't exist

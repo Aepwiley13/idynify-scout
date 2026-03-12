@@ -22,6 +22,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import './UserContacts.css';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 const UserContacts = ({ userId, userEmail }) => {
   const [contacts, setContacts] = useState([]);
@@ -57,7 +58,7 @@ const UserContacts = ({ userId, userEmail }) => {
       setLoading(true);
       setError(null);
 
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         throw new Error('Not authenticated');
       }
@@ -108,7 +109,7 @@ const UserContacts = ({ userId, userEmail }) => {
   // View contact detail
   const handleViewDetail = async (contactId) => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const authToken = await user.getIdToken();

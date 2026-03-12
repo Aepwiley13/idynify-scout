@@ -27,6 +27,7 @@ import GameReviewSend from '../../components/scout-game/GameReviewSend';
 import GameSessionSummary from '../../components/scout-game/GameSessionSummary';
 import { Loader, ArrowLeft } from 'lucide-react';
 import './ScoutGame.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * SCOUT GAME — Main Page Component (PIVOTED)
@@ -74,7 +75,7 @@ export default function ScoutGame() {
   // Check Gmail connection on mount
   useEffect(() => {
     const check = async () => {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       try {
         const status = await checkGmailConnection(user.uid);
@@ -122,7 +123,7 @@ export default function ScoutGame() {
    * Ordered by: created_at desc (newest saved leads first)
    */
   const loadCards = useCallback(async (bucketId) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     setLoadingCards(true);
@@ -256,7 +257,7 @@ export default function ScoutGame() {
     setSendLoading(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
       const channelMap = {
@@ -322,7 +323,7 @@ export default function ScoutGame() {
    * Increments skip_count on the contact for analytics.
    */
   const handleSkip = async (card) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {

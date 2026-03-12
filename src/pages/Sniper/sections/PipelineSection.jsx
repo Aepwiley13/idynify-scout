@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { BRAND } from '../../../theme/tokens';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -269,7 +270,7 @@ export default function PipelineSection() {
   const [selectedContact, setSelectedContact] = useState(null);
 
   const loadContacts = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const snap = await getDocs(query(
@@ -287,7 +288,7 @@ export default function PipelineSection() {
   useEffect(() => { loadContacts(); }, []);
 
   const handleAdd = async (form) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const docRef = await addDoc(collection(db, 'users', user.uid, 'sniper_contacts'), {
@@ -302,7 +303,7 @@ export default function PipelineSection() {
   };
 
   const handleStageChange = async (contactId, newStage) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'sniper_contacts', contactId), { stage: newStage });

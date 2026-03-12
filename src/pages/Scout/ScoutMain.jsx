@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
+import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target,
   Zap, Building2, Users, Plus,
@@ -674,12 +675,17 @@ function ScoutShellInner({ user }) {
 
 // ─── ScoutMain (public export) ────────────────────────────────────────────────
 export default function ScoutMain() {
-  const [user, setUser] = useState(auth.currentUser);
+  const activeUser = useActiveUser();
+  const [user, setUser] = useState(activeUser || auth.currentUser);
 
   useEffect(() => {
+    if (activeUser?._isImpersonated) {
+      setUser(activeUser);
+      return;
+    }
     const unsub = auth.onAuthStateChanged(u => setUser(u));
     return unsub;
-  }, []);
+  }, [activeUser]);
 
   return (
     <ScoutShellInner user={user} />

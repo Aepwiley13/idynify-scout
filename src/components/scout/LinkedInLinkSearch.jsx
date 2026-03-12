@@ -4,6 +4,7 @@ import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } fro
 import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const T = useT();
@@ -27,7 +28,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
     setError(null);
     setContact(null);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('You must be logged in');
       const authToken = await user.getIdToken();
       const response = await fetch('/.netlify/functions/findContactByLinkedInUrl', {
@@ -51,7 +52,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
     setSaving(true);
     setError(null);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('You must be logged in');
       const companyId = await ensureCompanyExists(contact, user.uid);
       const contactId = contact.id || `apollo_${Date.now()}`;

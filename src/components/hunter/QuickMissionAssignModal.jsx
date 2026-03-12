@@ -20,6 +20,7 @@ import { db, auth } from '../../firebase/config';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import './QuickMissionAssignModal.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function QuickMissionAssignModal({ contact, onClose, onNavigateCreate }) {
   const [missions, setMissions] = useState([]);
@@ -35,7 +36,7 @@ export default function QuickMissionAssignModal({ contact, onClose, onNavigateCr
 
   async function loadMissions() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const snap = await getDocs(collection(db, 'users', user.uid, 'missions'));
       const list = snap.docs
@@ -54,7 +55,7 @@ export default function QuickMissionAssignModal({ contact, onClose, onNavigateCr
     setAssigning(mission.id);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const newEntry = {

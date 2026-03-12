@@ -4,6 +4,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Target, Zap, Mail, MessageSquare, Calendar, ArrowRight } from 'lucide-react';
 import './ContactHunterActivity.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * CONTACT HUNTER ACTIVITY
@@ -23,7 +24,7 @@ export default function ContactHunterActivity({ contactId }) {
 
   async function loadHunterActivity() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       // Load missions where this contact is involved

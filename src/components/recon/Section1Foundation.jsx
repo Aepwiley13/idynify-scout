@@ -4,6 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import ReconTooltip from './ReconTooltip';
 import './ReconEnterprise.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_1_QUESTIONS = [
   {
@@ -123,7 +124,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   useEffect(() => {
     const loadSavedData = async () => {
       try {
-        const user = auth.currentUser;
+        const user = getEffectiveUser();
         if (!user) return;
 
         if (initialData && Object.keys(initialData).length > 0) {
@@ -160,7 +161,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
   const handleManualSave = async () => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         alert('❌ You must be logged in to save');
         return;
@@ -258,7 +259,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     setGenerating(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) throw new Error('User not authenticated');
 
       const authToken = await user.getIdToken();

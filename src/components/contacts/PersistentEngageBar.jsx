@@ -25,6 +25,7 @@ import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
 import { updateContactMemory } from '../../services/barryMemoryService';
 import './PersistentEngageBar.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── Engagement state derived from timeline ───────────────
 
@@ -246,7 +247,7 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
   }, [contact?.id]);
 
   async function loadEngagementState() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id) {
       setLoading(false);
       return;
@@ -274,7 +275,7 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
   }
 
   async function handleLogReply() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id || !replyChannel) return;
 
     try {
@@ -340,7 +341,7 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
   }
 
   async function handleBriefBarry() {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contact?.id || !briefChannel || !briefContext.trim()) return;
 
     try {

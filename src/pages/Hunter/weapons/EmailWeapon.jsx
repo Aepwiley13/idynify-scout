@@ -6,6 +6,7 @@ import { Users, Target, Sparkles, FileText, Send, Loader } from 'lucide-react';
 import EngagementIntentSelector from '../../../components/hunter/EngagementIntentSelector';
 import TemplateLibrary from '../../../components/hunter/TemplateLibrary';
 import './EmailWeapon.css';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 /**
  * HUNTER WEAPON - Email Builder
@@ -43,7 +44,7 @@ export default function EmailWeapon({ onBack }) {
 
   async function loadContacts() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
 
       const contactsSnapshot = await getDocs(collection(db, 'users', user.uid, 'contacts'));
@@ -70,7 +71,7 @@ export default function EmailWeapon({ onBack }) {
     setBuildMethod('ai');
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/generate-campaign-messages', {
@@ -124,7 +125,7 @@ export default function EmailWeapon({ onBack }) {
     setLoading(true);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
 
       const contacts = messages.map(msg => ({
         contactId: msg.contactId,

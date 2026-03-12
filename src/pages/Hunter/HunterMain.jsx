@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { useActiveUser, useImpersonation } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target,
   LayoutDashboard, Zap, Archive, BarChart3, Users, Building2,
@@ -233,14 +234,14 @@ function HunterShellInner({ user }) {
     setSearchParams({ tab: tabId }, { replace: true });
   };
 
-  // Load Hunter data
+  // Load Hunter data — uses user.uid which respects impersonation
   useEffect(() => {
     async function loadData() {
       try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) { navigate('/login'); return; }
+        if (!user?.uid) { navigate('/login'); return; }
+        const uid = user.uid;
 
-        const gmailDoc = await getDoc(doc(db, 'users', currentUser.uid, 'integrations', 'gmail'));
+        const gmailDoc = await getDoc(doc(db, 'users', uid, 'integrations', 'gmail'));
         if (gmailDoc.exists()) {
           const d = gmailDoc.data();
           setGmailConnected(d.status === 'connected');
@@ -248,13 +249,13 @@ function HunterShellInner({ user }) {
         }
 
         const missionsSnap = await getDocs(query(
-          collection(db, 'users', currentUser.uid, 'missions'),
+          collection(db, 'users', uid, 'missions'),
           orderBy('createdAt', 'desc')
         ));
         setMissions(missionsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         const campaignsSnap = await getDocs(query(
-          collection(db, 'users', currentUser.uid, 'campaigns'),
+          collection(db, 'users', uid, 'campaigns'),
           orderBy('createdAt', 'desc')
         ));
         setCampaigns(campaignsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -265,7 +266,7 @@ function HunterShellInner({ user }) {
       }
     }
     loadData();
-  }, [navigate]);
+  }, [user?.uid, navigate]);
 
   async function handleConnectGmail() {
     const currentUser = auth.currentUser;
@@ -729,12 +730,18 @@ function HunterShellInner({ user }) {
 
 // ─── HunterMain (public export) ───────────────────────────────────────────────
 export default function HunterMain() {
-  const [user, setUser] = useState(auth.currentUser);
+  const activeUser = useActiveUser();
+  const [user, setUser] = useState(activeUser || auth.currentUser);
 
   useEffect(() => {
+    // When impersonating, activeUser already has the right uid
+    if (activeUser?._isImpersonated) {
+      setUser(activeUser);
+      return;
+    }
     const unsub = auth.onAuthStateChanged(u => setUser(u));
     return unsub;
-  }, []);
+  }, [activeUser]);
 
   return <HunterShellInner user={user} />;
 }

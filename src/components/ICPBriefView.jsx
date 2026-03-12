@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { getPath } from '../firebase/schema';
 import jsPDF from 'jspdf';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function ICPBriefView() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function ICPBriefView() {
   }, []);
 
   const loadBrief = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       setError('No authenticated user');
       setLoading(false);

@@ -4,6 +4,7 @@ import { auth, db } from '../../firebase/config';
 import ReconTooltip from './ReconTooltip';
 import './ReconEnterprise.css';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_2_QUESTIONS = [
   {
@@ -191,7 +192,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
   }, [answers]);
 
   const saveAnswers = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
 
     try {
@@ -301,7 +302,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       navigate('/login');
       return;

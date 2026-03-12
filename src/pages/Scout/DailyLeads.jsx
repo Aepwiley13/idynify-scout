@@ -16,6 +16,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import { getScoreBreakdown, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 20, style = {} }) {
@@ -774,7 +775,7 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         setMessages([{ role: 'barry', content: buildInstantGreeting(icpProfile) }]);
         setHistoryLoaded(true);
@@ -850,7 +851,7 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
   const sendToBarry = async (msg, history, profileOverride) => {
     setLoading(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const authToken = await user.getIdToken();
       const profileToSend = profileOverride !== undefined ? profileOverride : icpProfile;
@@ -898,7 +899,7 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
     if (!icpParams || isSearching) return;
     setIsSearching(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { onSearchComplete(); return; }
       const authToken = await user.getIdToken();
       const mergedProfile = {
@@ -950,7 +951,7 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
           {messages.length > 0 && (
             <button
               onClick={async () => {
-                const user = auth.currentUser;
+                const user = getEffectiveUser();
                 if (user) {
                   try { await deleteDoc(doc(db, 'users', user.uid, 'barryConversations', 'icpChat')); } catch (_) {}
                 }
@@ -1063,7 +1064,7 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
   const sendToBarry = async (msg, history) => {
     setLoading(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) return;
       const authToken = await user.getIdToken();
       const res = await fetch('/.netlify/functions/barryMissionChat', {
@@ -1104,7 +1105,7 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
     if (!icpParams || isSearching) return;
     setIsSearching(true);
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { onSearchComplete(); return; }
       const authToken = await user.getIdToken();
       const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
@@ -1377,7 +1378,7 @@ export default function DailyLeads({ onNavigate }) {
 
   const loadTodayLeads = async () => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
 
       // Load ICP profile (for score breakdown + Barry panel)
@@ -1442,7 +1443,7 @@ export default function DailyLeads({ onNavigate }) {
   };
 
   const handleManualRefresh = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || isRefreshing) return;
     setIsRefreshing(true);
     setRefreshMessage('Barry is finding new targets...');
@@ -1483,7 +1484,7 @@ export default function DailyLeads({ onNavigate }) {
   };
 
   const handleSwipe = async (direction, feedback = null) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     if (direction === 'right' && dailySwipeCount >= DAILY_SWIPE_LIMIT && lastSwipeDate === today) {
@@ -1638,7 +1639,7 @@ export default function DailyLeads({ onNavigate }) {
     // Pop from history (last item is the most recent)
     const entry = swipeHistory.length > 0 ? swipeHistory[swipeHistory.length - 1] : lastSwipe;
     if (!entry) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     try {
@@ -1686,7 +1687,7 @@ export default function DailyLeads({ onNavigate }) {
 
   const triggerAdaptiveSearch = async (savedCompanies) => {
     if (!savedCompanies || savedCompanies.length === 0) return;
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       const authToken = await user.getIdToken();
@@ -1737,7 +1738,7 @@ export default function DailyLeads({ onNavigate }) {
   };
 
   const loadPeopleMode = async () => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     setPeopleLoading(true);
     setPeopleModeEmpty(null);
@@ -1818,7 +1819,7 @@ export default function DailyLeads({ onNavigate }) {
   };
 
   const handlePersonSwipe = async (direction, feedback = null) => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     const today = todayRef.current;
     const personItem = peopleQueue[currentPersonIdx];

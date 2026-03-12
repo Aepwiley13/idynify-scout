@@ -17,6 +17,7 @@ import {
   Flag
 } from 'lucide-react';
 import './EngagementTimeline.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * ENGAGEMENT TIMELINE
@@ -264,7 +265,7 @@ export default function EngagementTimeline({ contactId }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user || !contactId) {
       setLoading(false);
       return;

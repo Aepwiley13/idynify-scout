@@ -13,6 +13,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
 export default function SavedCompanies({ onSelectCompany }) {
@@ -37,7 +38,7 @@ export default function SavedCompanies({ onSelectCompany }) {
 
   async function loadSavedCompanies() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
       const userId = user.uid;
 
@@ -95,7 +96,7 @@ export default function SavedCompanies({ onSelectCompany }) {
 
   async function handleArchiveCompany(company) {
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       await updateDoc(doc(db, 'users', userId, 'companies', company.id), {
         status: 'archived', archived_at: new Date().toISOString(),
         activity_log: arrayUnion({ type: 'status_changed', from: 'accepted', to: 'archived', timestamp: new Date().toISOString() }),
@@ -109,7 +110,7 @@ export default function SavedCompanies({ onSelectCompany }) {
 
   async function handleRestoreCompany(company) {
     try {
-      const userId = auth.currentUser.uid;
+      const userId = getEffectiveUser()?.uid;
       await updateDoc(doc(db, 'users', userId, 'companies', company.id), {
         status: 'accepted', archived_at: null,
         activity_log: arrayUnion({ type: 'status_changed', from: 'archived', to: 'accepted', timestamp: new Date().toISOString() }),

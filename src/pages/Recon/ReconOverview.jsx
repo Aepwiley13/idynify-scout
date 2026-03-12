@@ -29,6 +29,7 @@ import LiveOutputPreview from '../../components/recon/LiveOutputPreview';
 import { computeReconHealth, getTrainNextRecommendation } from '../../shared/reconHealth';
 import { TRAINING_DIMENSIONS, DIMENSION_MODULE_PATH } from '../../shared/reconHealthConstants';
 import './ReconOverview.css';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── RECON modules (unchanged — entry points into training workflows) ─────────
 const RECON_MODULES = [
@@ -253,7 +254,7 @@ export default function ReconOverview() {
 
   const loadReconData = async () => {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
 
       await initializeDashboard(user.uid);

@@ -22,6 +22,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import CompanyLogo from '../scout/CompanyLogo';
 import CompanyDetailModal from '../scout/CompanyDetailModal';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── Source badge config ──────────────────────────────────────────────────────
 const SOURCE_CFG = {
@@ -293,7 +294,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
 
   useEffect(() => {
     async function load() {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
       try {
         const result = await loadCompanies(mode, user.uid);
@@ -310,7 +311,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
 
   // Archive / restore (Scout & Command Center modes)
   async function handleArchive(company) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'companies', company.id), {
@@ -323,7 +324,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
   }
 
   async function handleRestore(company) {
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) return;
     try {
       await updateDoc(doc(db, 'users', user.uid, 'companies', company.id), {

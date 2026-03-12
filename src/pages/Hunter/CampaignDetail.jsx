@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { ArrowLeft, Mail, Send, CheckCircle, Clock, Edit3, Save, X, Loader, AlertCircle, Sparkles } from 'lucide-react';
 import OutcomeTracker from '../../components/hunter/OutcomeTracker';
 import FollowUpComposer from '../../components/hunter/FollowUpComposer';
@@ -10,6 +11,16 @@ import OutcomeSuggestions from '../../components/hunter/OutcomeSuggestions';
 export default function CampaignDetail() {
   const navigate = useNavigate();
   const { campaignId } = useParams();
+  const impersonatedUserId = useActiveUserId();
+  const { isImpersonating } = useImpersonation();
+  const getEffectiveUser = () => {
+    const realUser = auth.currentUser;
+    if (!realUser) return null;
+    if (isImpersonating && impersonatedUserId) {
+      return { uid: impersonatedUserId, getIdToken: () => realUser.getIdToken() };
+    }
+    return realUser;
+  };
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -25,7 +36,7 @@ export default function CampaignDetail() {
 
   async function loadCampaign() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       if (!user) {
         navigate('/login');
         return;
@@ -59,7 +70,7 @@ export default function CampaignDetail() {
 
   async function saveEdit() {
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const items = campaign.contacts || campaign.messages;
       const updatedItems = [...items];
       updatedItems[editingIndex] = {
@@ -92,7 +103,7 @@ export default function CampaignDetail() {
     setError(null);
 
     try {
-      const user = auth.currentUser;
+      const user = getEffectiveUser();
       const authToken = await user.getIdToken();
       const items = campaign.contacts || campaign.messages;
       const message = items[index];

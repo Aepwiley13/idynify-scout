@@ -34,6 +34,7 @@ import PlaybooksSection        from './sections/PlaybooksSection';
 import OutcomesSection         from './sections/OutcomesSection';
 import SniperCompaniesSection  from './sections/SniperCompaniesSection';
 import AllLeads                from '../Scout/AllLeads';
+import { useActiveUser } from '../../context/ImpersonationContext';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -586,12 +587,17 @@ function SniperShellInner({ user }) {
 
 // ─── SniperMain (public export) ───────────────────────────────────────────────
 export default function SniperMain() {
-  const [user, setUser] = useState(auth.currentUser);
+  const activeUser = useActiveUser();
+  const [user, setUser] = useState(activeUser || auth.currentUser);
 
   useEffect(() => {
+    if (activeUser?._isImpersonated) {
+      setUser(activeUser);
+      return;
+    }
     const unsub = auth.onAuthStateChanged(u => setUser(u));
     return unsub;
-  }, []);
+  }, [activeUser]);
 
   return <SniperShellInner user={user} />;
 }

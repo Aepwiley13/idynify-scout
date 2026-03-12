@@ -217,3 +217,83 @@
     font-size: 15px;
   }
 }
+
+/* ── Dark Mode Overrides ─────────────────────────────────────── */
+body.theme-dark .meet-section {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark .meet-section > h2 {
+  color: #f0eaff;
+}
+
+body.theme-dark .barry-summary {
+  color: #d4cae8;
+}
+
+body.theme-dark .role-priorities,
+body.theme-dark .conversation-starters {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark .meet-section h3 {
+  color: #9080b0;
+}
+
+body.theme-dark .role-priorities li {
+  color: #c8bce0;
+}
+
+body.theme-dark .conversation-option {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #d4cae8;
+}
+
+body.theme-dark .conversation-option:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-dark .conversation-option--active {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.35);
+}
+
+body.theme-dark .email-type-picker {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark .email-type-label {
+  color: #9080b0;
+}
+
+body.theme-dark .email-type-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #d4cae8;
+}
+
+body.theme-dark .email-type-btn:hover {
+  background: #f0eaff;
+  color: #110e1e;
+  border-color: #f0eaff;
+}
+
+body.theme-dark .engagement-helper {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+body.theme-dark .calm-reframe {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark .calm-reframe p {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.1);
+}

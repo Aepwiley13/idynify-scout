@@ -13,6 +13,8 @@ import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
   Target, Plus, Loader, ArrowUpDown, Crosshair, Tag, ChevronDown,
+  CalendarCheck, AlertTriangle, Inbox, Sparkles, Clock, Flame, TrendingUp,
+  Factory, MapPin, Filter, MoreHorizontal,
 } from 'lucide-react';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
@@ -856,9 +858,19 @@ function getTagColor(tag) {
   return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
 }
 
-// ─── Brigade config ───────────────────────────────────────────────────────────
-// Derived from the single source of truth in BrigadeSelector — adding a new
-// brigade there will automatically add it here as a filter tab.
+// ─── Action-oriented lenses ──────────────────────────────────────────────────
+// Replaces brigade-based tabs with engagement-driven workflow tabs.
+// Each lens filters contacts by engagement state so users see what to do TODAY.
+const ACTION_LENSES = [
+  { id: 'today',         label: "Today's Actions",  Icon: CalendarCheck, color: '#e8197d' },
+  { id: 'follow_up_due', label: 'Follow Up Now',    Icon: AlertTriangle, color: '#dc2626' },
+  { id: 'replied',       label: 'Replied',          Icon: Inbox,         color: '#0ea5e9' },
+  { id: 'in_mission',    label: 'Active',           Icon: Zap,           color: '#7c3aed' },
+  { id: 'new',           label: 'New (Unengaged)',   Icon: Sparkles,      color: '#10b981' },
+  { id: 'all',           label: 'All People',       Icon: Users,         color: null },
+];
+
+// Legacy: keep BRIGADE_LENSES available for backward compat if needed elsewhere
 const BRIGADE_LENSES = [
   { id: 'all', label: 'All People', Icon: Users },
   ...BRIGADES.map(b => ({ id: b.id, label: b.label, Icon: b.icon })),
@@ -940,13 +952,22 @@ export default function AllLeads({ mode = 'people' }) {
 
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
-  const [brigadeFilter, setBrigadeFilter] = useState('all');
+  const [actionFilter, setActionFilter] = useState('today'); // action-oriented lens
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
   const [tagFilter, setTagFilter] = useState(null); // selected tag string or null
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const tagPickerRef = useRef(null);
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('al_sortOrder') || 'newest');
+
+  // Smart filters
+  const [industryFilter, setIndustryFilter] = useState(null);
+  const [industryPickerOpen, setIndustryPickerOpen] = useState(false);
+  const industryPickerRef = useRef(null);
+  const [warmthFilter, setWarmthFilter] = useState(null); // 'cold' | 'warm' | 'hot'
+  const [sourceFilter, setSourceFilter] = useState(null);  // addedFrom value
+  const [smartFilter, setSmartFilter] = useState(null);    // 'has_replied' | 'going_cold'
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false); // data quality filters dropdown
 
   // Bulk selection
   const [bulkMode, setBulkMode] = useState(false);
@@ -988,6 +1009,16 @@ export default function AllLeads({ mode = 'people' }) {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, [tagPickerOpen]);
+
+  // Close industry picker on outside click
+  useEffect(() => {
+    if (!industryPickerOpen) return;
+    const h = (e) => {
+      if (industryPickerRef.current && !industryPickerRef.current.contains(e.target)) setIndustryPickerOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [industryPickerOpen]);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768);
@@ -1218,21 +1249,91 @@ export default function AllLeads({ mode = 'people' }) {
   }
 
   // ── Computed ─────────────────────────────────────────────────────────────────
+
+  // Pre-compute engagement states once (used by tabs, stats, and sort)
+  const contactStates = new Map();
+  contacts.forEach(c => contactStates.set(c.id, deriveCardEngageState(c)));
+
+  // Helper: is NBS due today or earlier?
+  const isNBSDueToday = (c) => {
+    const due = c.next_best_step?.due_at;
+    if (!due) return false;
+    const dueDate = new Date(due);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return dueDate <= today && c.next_best_step?.status !== 'completed' && c.next_best_step?.status !== 'dismissed';
+  };
+
+  // Helper: added in last 7 days
+  const isNewThisWeek = (c) => {
+    const added = c.saved_at || c.addedAt;
+    if (!added) return false;
+    const addedDate = new Date(typeof added === 'object' && added.toDate ? added.toDate() : added);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    return addedDate >= weekAgo;
+  };
+
   let filtered = contacts;
 
-  // Brigade filter
-  if (brigadeFilter !== 'all') filtered = filtered.filter(c => getBrigadeType(c) === brigadeFilter);
+  // Action-oriented lens filter
+  if (actionFilter === 'today') {
+    filtered = filtered.filter(c => {
+      const state = contactStates.get(c.id);
+      return isNBSDueToday(c) || state === 'follow_up_due' || state === 'replied';
+    });
+  } else if (actionFilter === 'follow_up_due') {
+    filtered = filtered.filter(c => contactStates.get(c.id) === 'follow_up_due');
+  } else if (actionFilter === 'replied') {
+    filtered = filtered.filter(c => contactStates.get(c.id) === 'replied');
+  } else if (actionFilter === 'in_mission') {
+    filtered = filtered.filter(c => contactStates.get(c.id) === 'in_mission');
+  } else if (actionFilter === 'new') {
+    filtered = filtered.filter(c => contactStates.get(c.id) === 'not_started');
+  }
+  // 'all' — no engagement filter
 
-  // Data filter
+  // Data quality filter (from "More" dropdown)
   if (dataFilter === 'has-email') filtered = filtered.filter(c => !!(c.email || c.work_email));
   else if (dataFilter === 'needs-email') filtered = filtered.filter(c => !(c.email || c.work_email));
   else if (dataFilter === 'needs-phone') filtered = filtered.filter(c => !(c.phone_mobile || c.phone_direct || c.phone));
+
+  // Industry filter
+  if (industryFilter) {
+    filtered = filtered.filter(c => {
+      const co = companies[c.company_id];
+      const ind = c.industry || co?.industry || '';
+      return ind.toLowerCase() === industryFilter.toLowerCase();
+    });
+  }
+
+  // Warmth filter
+  if (warmthFilter) filtered = filtered.filter(c => (c.warmth_level || 'cold') === warmthFilter);
+
+  // Source filter
+  if (sourceFilter) filtered = filtered.filter(c => (c.addedFrom || 'manual') === sourceFilter);
+
+  // Smart filters
+  if (smartFilter === 'has_replied') {
+    filtered = filtered.filter(c => (c.engagement_summary?.replies_received || 0) > 0);
+  } else if (smartFilter === 'going_cold') {
+    filtered = filtered.filter(c => (c.engagement_summary?.consecutive_no_replies || 0) >= 3);
+  }
 
   // Tag filter
   if (tagFilter) filtered = filtered.filter(c => Array.isArray(c.tags) && c.tags.includes(tagFilter));
 
   // All unique tags across loaded contacts (for the tag picker)
   const allContactTags = [...new Set(contacts.flatMap(c => Array.isArray(c.tags) ? c.tags : []))].sort();
+
+  // All unique industries
+  const allIndustries = [...new Set(contacts.map(c => {
+    const co = companies[c.company_id];
+    return c.industry || co?.industry || '';
+  }).filter(Boolean))].sort();
+
+  // All unique sources
+  const allSources = [...new Set(contacts.map(c => c.addedFrom || 'manual'))].sort();
 
   // Search — name, title, company, email, phone, LinkedIn URL
   if (searchTerm) {
@@ -1254,9 +1355,21 @@ export default function AllLeads({ mode = 'people' }) {
   const finalContacts = [...filtered].sort((a, b) => {
     if (sortOrder === 'name') return (a.name || '').localeCompare(b.name || '');
     if (sortOrder === 'status') {
-      const orderA = ENGAGE_SORT_ORDER[deriveCardEngageState(a)] ?? 2;
-      const orderB = ENGAGE_SORT_ORDER[deriveCardEngageState(b)] ?? 2;
+      const orderA = ENGAGE_SORT_ORDER[contactStates.get(a.id)] ?? 2;
+      const orderB = ENGAGE_SORT_ORDER[contactStates.get(b.id)] ?? 2;
       return orderA - orderB;
+    }
+    if (sortOrder === 'icp') {
+      return (b.icp_score || 0) - (a.icp_score || 0);
+    }
+    if (sortOrder === 'last_interaction') {
+      const aTime = a.engagement_summary?.last_contact_at || a.saved_at || a.addedAt || '';
+      const bTime = b.engagement_summary?.last_contact_at || b.saved_at || b.addedAt || '';
+      return String(aTime).localeCompare(String(bTime)); // oldest interaction first (most stale)
+    }
+    if (sortOrder === 'warmth') {
+      const warmthOrder = { hot: 0, warm: 1, cold: 2 };
+      return (warmthOrder[a.warmth_level] ?? 2) - (warmthOrder[b.warmth_level] ?? 2);
     }
     // newest / oldest — sort by saved_at / addedAt timestamp
     const dA = a.saved_at || a.addedAt || '';
@@ -1266,19 +1379,28 @@ export default function AllLeads({ mode = 'people' }) {
       : String(dB).localeCompare(String(dA)); // default: newest first
   });
 
-  // Stats
-  const totalPipeline = contacts.length;
-  const uniqueCompanies = new Set(contacts.map(c => c.company_id)).size;
-  const withEmail = contacts.filter(c => c.email || c.work_email).length;
-  const withPhone = contacts.filter(c => c.phone_mobile || c.phone_direct || c.phone).length;
-  const emailRate = totalPipeline > 0 ? Math.round((withEmail / totalPipeline) * 100) : 0;
-  const phoneRate = totalPipeline > 0 ? Math.round((withPhone / totalPipeline) * 100) : 0;
+  // ── Engagement Stats (action-oriented dashboard) ───────────────────────────
+  const dueTodayCount = contacts.filter(c => isNBSDueToday(c)).length;
+  const overdueCount = contacts.filter(c => contactStates.get(c.id) === 'follow_up_due').length;
+  const repliedCount = contacts.filter(c => contactStates.get(c.id) === 'replied').length;
+  const activeCount = contacts.filter(c => contactStates.get(c.id) === 'in_mission').length;
+  const newThisWeekCount = contacts.filter(c => isNewThisWeek(c)).length;
 
-  // Brigade counts
-  const brigadeCounts = BRIGADE_LENSES.reduce((acc, lens) => {
-    acc[lens.id] = lens.id === 'all' ? contacts.length : contacts.filter(c => getBrigadeType(c) === lens.id).length;
-    return acc;
-  }, {});
+  // Action lens counts
+  const actionCounts = {
+    today: contacts.filter(c => {
+      const state = contactStates.get(c.id);
+      return isNBSDueToday(c) || state === 'follow_up_due' || state === 'replied';
+    }).length,
+    follow_up_due: overdueCount,
+    replied: repliedCount,
+    in_mission: activeCount,
+    new: contacts.filter(c => contactStates.get(c.id) === 'not_started').length,
+    all: contacts.length,
+  };
+
+  // Count active filters for badge
+  const activeFilterCount = [industryFilter, warmthFilter, sourceFilter, smartFilter, dataFilter, tagFilter].filter(Boolean).length;
 
   if (loading) {
     return (
@@ -1330,7 +1452,7 @@ export default function AllLeads({ mode = 'people' }) {
                 ? 'Warm contacts you\'ve moved into your conversion pipeline.'
                 : mode === 'scout'
                 ? 'Ready for first contact.'
-                : 'Every relationship — one place.'}
+                : 'Your daily engagement hub — focus on what matters today.'}
             </div>
           </div>
           {/* Sprint 3: Sync Replies button — hunter mode only */}
@@ -1378,45 +1500,82 @@ export default function AllLeads({ mode = 'people' }) {
           </div>
         </div>
 
-        {/* Brigade tabs */}
+        {/* Action-oriented tabs */}
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginBottom: -1 }}>
-          {BRIGADE_LENSES.map(lens => (
-            <div
-              key={lens.id}
-              onClick={() => setBrigadeFilter(lens.id)}
-              style={{ padding: '7px 13px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: `2px solid ${brigadeFilter === lens.id ? BRAND.pink : 'transparent'}`, color: brigadeFilter === lens.id ? BRAND.pink : T.textMuted, background: brigadeFilter === lens.id ? T.accentBg : 'transparent' }}
-            >
-              {lens.label} {brigadeCounts[lens.id] > 0 ? brigadeCounts[lens.id] : ''}
-            </div>
-          ))}
+          {ACTION_LENSES.map(lens => {
+            const active = actionFilter === lens.id;
+            const count = actionCounts[lens.id] || 0;
+            const LensIcon = lens.Icon;
+            return (
+              <div
+                key={lens.id}
+                onClick={() => setActionFilter(lens.id)}
+                style={{
+                  padding: '7px 14px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+                  borderBottom: `2px solid ${active ? (lens.color || BRAND.pink) : 'transparent'}`,
+                  color: active ? (lens.color || BRAND.pink) : T.textMuted,
+                  background: active ? `${lens.color || BRAND.pink}10` : 'transparent',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <LensIcon size={12} />
+                {lens.label}
+                {count > 0 && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+                    background: active ? `${lens.color || BRAND.pink}20` : T.surface,
+                    color: active ? (lens.color || BRAND.pink) : T.textFaint,
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Stats row ── */}
+      {/* ── Engagement Dashboard (replaces stats row) ── */}
       <div style={{ padding: '10px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', gap: 9, overflowX: 'auto' }}>
         {[
-          ['Pipeline', totalPipeline, null],
-          ['Companies', uniqueCompanies, null],
-          ['Email Coverage', `${emailRate}%`, dataFilter === 'has-email'],
-          ['Phone Coverage', `${phoneRate}%`, dataFilter === 'needs-phone'],
-        ].map(([l, v, active]) => (
-          <div
-            key={l}
-            onClick={() => {
-              if (l === 'Email Coverage') setDataFilter(d => d === 'has-email' ? null : 'has-email');
-              if (l === 'Phone Coverage') setDataFilter(d => d === 'needs-phone' ? null : 'needs-phone');
-            }}
-            style={{ background: active ? T.accentBg : T.statBg, border: `1px solid ${active ? T.accentBdr : T.border}`, borderRadius: 9, padding: '9px 13px', flexShrink: 0, minWidth: 108, cursor: l.includes('Coverage') ? 'pointer' : 'default' }}
-          >
-            <div style={{ fontSize: 9, color: T.textFaint }}>{l}</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: active ? BRAND.pink : T.text }}>{v}</div>
-          </div>
-        ))}
+          { label: 'Due Today',     value: dueTodayCount,    icon: CalendarCheck, color: '#e8197d',  filter: 'today' },
+          { label: 'Overdue',        value: overdueCount,     icon: AlertTriangle, color: '#dc2626',  filter: 'follow_up_due' },
+          { label: 'Replies',        value: repliedCount,     icon: Inbox,         color: '#0ea5e9',  filter: 'replied' },
+          { label: 'Active',         value: activeCount,      icon: Zap,           color: '#7c3aed',  filter: 'in_mission' },
+          { label: 'New This Week',  value: newThisWeekCount, icon: Sparkles,      color: '#10b981',  filter: null },
+        ].map(({ label, value, icon: Icon, color, filter }) => {
+          const active = filter && actionFilter === filter;
+          return (
+            <div
+              key={label}
+              onClick={() => { if (filter) setActionFilter(f => f === filter ? 'all' : filter); }}
+              style={{
+                background: active ? `${color}12` : T.statBg,
+                border: `1px solid ${active ? `${color}40` : T.border}`,
+                borderRadius: 9, padding: '9px 13px', flexShrink: 0, minWidth: 108,
+                cursor: filter ? 'pointer' : 'default',
+                transition: 'all 0.15s',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                <Icon size={11} color={active ? color : T.textFaint} />
+                <span style={{ fontSize: 9, color: active ? color : T.textFaint }}>{label}</span>
+              </div>
+              <div style={{
+                fontSize: 17, fontWeight: 700,
+                color: active ? color : value > 0 && (label === 'Overdue' || label === 'Replies') ? color : T.text,
+              }}>
+                {value}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* ── Search + filter chips + export ── */}
-      <div style={{ padding: '9px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 9 }}>
-        <div style={{ flex: 1, background: T.input, border: `1px solid ${T.border}`, borderRadius: 7, padding: '6px 11px', display: 'flex', gap: 7, alignItems: 'center' }}>
+      {/* ── Search + smart filters + sort + export ── */}
+      <div style={{ padding: '9px 22px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 180, background: T.input, border: `1px solid ${T.border}`, borderRadius: 7, padding: '6px 11px', display: 'flex', gap: 7, alignItems: 'center' }}>
           <Search size={13} color={T.textFaint} />
           <input
             placeholder="Search name, title, company, email, phone, or LinkedIn..."
@@ -1425,15 +1584,68 @@ export default function AllLeads({ mode = 'people' }) {
             style={{ background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 11, flex: 1 }}
           />
         </div>
-        {/* Filter chips */}
-        {[['Has Email', 'has-email'], ['Needs Email', 'needs-email'], ['Needs Phone', 'needs-phone']].map(([label, id]) => (
+
+        {/* ── Industry filter ── */}
+        {allIndustries.length > 0 && (
+          <div style={{ position: 'relative', flexShrink: 0 }} ref={industryPickerRef}>
+            <button
+              onClick={() => setIndustryPickerOpen(o => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 20, border: `1px solid ${industryFilter ? T.accentBdr : T.border}`, background: industryFilter ? T.accentBg : 'transparent', color: industryFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              <Factory size={10} />
+              {industryFilter || 'Industry'}
+              {industryFilter
+                ? <X size={9} style={{ marginLeft: 2 }} onClick={e => { e.stopPropagation(); setIndustryFilter(null); setIndustryPickerOpen(false); }} />
+                : <ChevronDown size={9} style={{ opacity: 0.6 }} />
+              }
+            </button>
+            {industryPickerOpen && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, minWidth: 200, maxHeight: 260, overflowY: 'auto', background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 11, padding: 5, zIndex: 50, boxShadow: `0 8px 28px ${T.isDark ? '#00000080' : '#0000001a'}`, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: T.textFaint, textTransform: 'uppercase', padding: '4px 9px 6px' }}>Filter by Industry</div>
+                {allIndustries.map(ind => {
+                  const isActive = industryFilter === ind;
+                  const count = contacts.filter(c => {
+                    const co = companies[c.company_id];
+                    return (c.industry || co?.industry || '') === ind;
+                  }).length;
+                  return (
+                    <button
+                      key={ind}
+                      onClick={() => { setIndustryFilter(isActive ? null : ind); setIndustryPickerOpen(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 7, background: isActive ? T.accentBg : 'transparent', color: isActive ? BRAND.pink : T.textMuted, border: 'none', borderLeft: `3px solid ${isActive ? BRAND.pink : 'transparent'}`, borderRadius: 7, padding: '6px 10px', fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <Factory size={10} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ind}</span>
+                      <span style={{ fontSize: 10, color: T.textFaint }}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Warmth filter ── */}
+        {[['cold', '❄ Cold', '#6b7280'], ['warm', '☀ Warm', '#f59e0b'], ['hot', '🔥 Hot', '#dc2626']].map(([id, label, color]) => (
           <button
             key={id}
-            onClick={() => setDataFilter(d => d === id ? null : id)}
-            style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter === id ? T.accentBdr : T.border}`, background: dataFilter === id ? T.accentBg : 'transparent', color: dataFilter === id ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            onClick={() => setWarmthFilter(w => w === id ? null : id)}
+            style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${warmthFilter === id ? `${color}60` : T.border}`, background: warmthFilter === id ? `${color}15` : 'transparent', color: warmthFilter === id ? color : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >{label}</button>
         ))}
-        {/* Tag filter picker */}
+
+        {/* ── Smart engagement filters ── */}
+        <button
+          onClick={() => setSmartFilter(s => s === 'has_replied' ? null : 'has_replied')}
+          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${smartFilter === 'has_replied' ? '#0ea5e960' : T.border}`, background: smartFilter === 'has_replied' ? '#0ea5e915' : 'transparent', color: smartFilter === 'has_replied' ? '#0ea5e9' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+        ><MessageSquare size={9} />Has Replied</button>
+
+        <button
+          onClick={() => setSmartFilter(s => s === 'going_cold' ? null : 'going_cold')}
+          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${smartFilter === 'going_cold' ? '#dc262660' : T.border}`, background: smartFilter === 'going_cold' ? '#dc262615' : 'transparent', color: smartFilter === 'going_cold' ? '#dc2626' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+        ><Flame size={9} />Going Cold</button>
+
+        {/* ── Tag filter picker ── */}
         <div style={{ position: 'relative', flexShrink: 0 }} ref={tagPickerRef}>
           <button
             onClick={() => setTagPickerOpen(o => !o)}
@@ -1470,6 +1682,57 @@ export default function AllLeads({ mode = 'people' }) {
             </div>
           )}
         </div>
+
+        {/* ── More filters (data quality — secondary) ── */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            onClick={() => setMoreFiltersOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter ? T.accentBdr : T.border}`, background: dataFilter ? T.accentBg : 'transparent', color: dataFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            <MoreHorizontal size={10} />
+            {dataFilter ? (dataFilter === 'has-email' ? 'Has Email' : dataFilter === 'needs-email' ? 'Needs Email' : 'Needs Phone') : 'More'}
+            {dataFilter && <X size={9} style={{ marginLeft: 2 }} onClick={e => { e.stopPropagation(); setDataFilter(null); setMoreFiltersOpen(false); }} />}
+          </button>
+          {moreFiltersOpen && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 160, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 11, padding: 5, zIndex: 50, boxShadow: `0 8px 28px ${T.isDark ? '#00000080' : '#0000001a'}`, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: T.textFaint, textTransform: 'uppercase', padding: '4px 9px 6px' }}>Data Quality</div>
+              {[['Has Email', 'has-email'], ['Needs Email', 'needs-email'], ['Needs Phone', 'needs-phone']].map(([label, id]) => (
+                <button
+                  key={id}
+                  onClick={() => { setDataFilter(d => d === id ? null : id); setMoreFiltersOpen(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, background: dataFilter === id ? T.accentBg : 'transparent', color: dataFilter === id ? BRAND.pink : T.textMuted, border: 'none', borderLeft: `3px solid ${dataFilter === id ? BRAND.pink : 'transparent'}`, borderRadius: 7, padding: '6px 10px', fontSize: 12, fontWeight: dataFilter === id ? 600 : 400, cursor: 'pointer', textAlign: 'left' }}
+                >{label}</button>
+              ))}
+              {allSources.length > 1 && (
+                <>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: T.textFaint, textTransform: 'uppercase', padding: '8px 9px 6px', borderTop: `1px solid ${T.border}`, marginTop: 4 }}>Source</div>
+                  {allSources.map(src => {
+                    const isActive = sourceFilter === src;
+                    const srcLabel = { manual: 'Manual', csv: 'CSV Import', linkedin_import: 'LinkedIn', apollo: 'Apollo', business_card: 'Business Card', referral: 'Referral' }[src] || src;
+                    return (
+                      <button
+                        key={src}
+                        onClick={() => { setSourceFilter(isActive ? null : src); setMoreFiltersOpen(false); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 7, background: isActive ? T.accentBg : 'transparent', color: isActive ? BRAND.pink : T.textMuted, border: 'none', borderLeft: `3px solid ${isActive ? BRAND.pink : 'transparent'}`, borderRadius: 7, padding: '6px 10px', fontSize: 12, fontWeight: isActive ? 600 : 400, cursor: 'pointer', textAlign: 'left' }}
+                      >{srcLabel}</button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Active filter count badge */}
+        {activeFilterCount > 0 && (
+          <button
+            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); }}
+            style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            <X size={9} />{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} — Clear
+          </button>
+        )}
+
         {/* Sort selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: '5px 10px', flexShrink: 0 }}>
           <ArrowUpDown size={11} color={T.textFaint} />
@@ -1482,6 +1745,9 @@ export default function AllLeads({ mode = 'people' }) {
             <option value="oldest">Oldest First</option>
             <option value="name">A–Z Name</option>
             <option value="status">By Status</option>
+            <option value="icp">ICP Score</option>
+            <option value="last_interaction">Most Stale</option>
+            <option value="warmth">By Warmth</option>
           </select>
         </div>
         {/* Select mode toggle */}

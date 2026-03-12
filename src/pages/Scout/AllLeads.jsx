@@ -268,16 +268,23 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engag
         onClick={e => e.stopPropagation()}
         style={{ background: T.modalBg, borderRadius: 22, overflow: 'hidden', width: '100%', maxWidth: 480, boxShadow: `0 40px 100px ${T.isDark ? '#000000cc' : '#00000030'}`, animation: 'slideUp 0.2s ease' }}
       >
-        {/* Hero header */}
-        <div style={{ position: 'relative', height: 188, background: `linear-gradient(150deg,${color}44,${T.cardBg2} 80%)`, display: 'flex', alignItems: 'flex-end', padding: '0 22px 16px' }}>
+        {/* Hero photo */}
+        <div style={{ position: 'relative', width: '100%', paddingTop: '90%', overflow: 'hidden' }}>
+          {contact.photo_url ? (
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${contact.photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(155deg,${color}30,${T.cardBg2} 80%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 90, height: 90, borderRadius: '50%', background: `${color}20`, border: `2px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34, fontWeight: 700, color }}>{getInitials(contact.name)}</div>
+            </div>
+          )}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', background: 'linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.55) 50%,transparent 100%)' }} />
           <button
             onClick={onClose}
-            style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: '50%', background: '#00000060', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: '50%', background: '#00000060', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
           ><X size={15} /></button>
-          <Av initials={getInitials(contact.name)} color={color} size={60} src={contact.photo_url} />
-          <div style={{ marginLeft: 14 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{contact.name}</div>
-            <div style={{ fontSize: 13, color: '#ffffff90' }}>{contact.title}{company?.name ? ` · ${company.name}` : ''}</div>
+          <div style={{ position: 'absolute', bottom: 16, left: 22, right: 22 }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.9)', lineHeight: 1.2 }}>{contact.name}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 6px rgba(0,0,0,0.9)', marginTop: 4 }}>{contact.title}{company?.name ? ` · ${company.name}` : ''}</div>
           </div>
         </div>
 

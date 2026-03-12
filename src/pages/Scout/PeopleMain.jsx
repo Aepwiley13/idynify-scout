@@ -11,17 +11,19 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { auth } from '../../firebase/config';
+import { collection, getDocs } from 'firebase/firestore';
+import { db, auth } from '../../firebase/config';
 import {
-  Radar, Crosshair, Eye, Target, Users,
+  Radar, Crosshair, Eye, Target, Users, Building2, Search,
   Palette, Check, ChevronLeft, ChevronRight, Home,
-  Settings as SettingsIcon,
+  Settings as SettingsIcon, Globe, Linkedin,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
 import AllLeads from './AllLeads';
+import CompanyLogo from '../../components/scout/CompanyLogo';
 
 // People/Command Center accent color
 const PEOPLE_CYAN = BRAND.cyan;
@@ -152,6 +154,284 @@ function Av({ initials, color = PEOPLE_CYAN, size = 24 }) {
   );
 }
 
+// ─── AllCompaniesSection ──────────────────────────────────────────────────────
+function AllCompaniesSection() {
+  const T = useT();
+  const navigate = useNavigate();
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all'); // 'all' | 'scout' | 'hunter' | 'sniper'
+
+  useEffect(() => {
+    async function load() {
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        const [companiesSnap, contactsSnap, sniperSnap] = await Promise.all([
+          getDocs(collection(db, 'users', user.uid, 'companies')),
+          getDocs(collection(db, 'users', user.uid, 'contacts')),
+          getDocs(collection(db, 'users', user.uid, 'sniper_contacts')),
+        ]);
+
+        // Build contact count per company
+        const contactCountMap = {};
+        contactsSnap.docs.forEach(d => {
+          const cid = d.data().company_id;
+          if (cid) contactCountMap[cid] = (contactCountMap[cid] || 0) + 1;
+        });
+
+        // Collect company IDs referenced by sniper contacts
+        const sniperCompanyNames = new Set();
+        sniperSnap.docs.forEach(d => {
+          const co = d.data().company;
+          if (co) sniperCompanyNames.add(co.toLowerCase());
+        });
+
+        // Collect company IDs that have engaged/active contacts (Hunter)
+        const ENGAGED_STATUSES = new Set([
+          'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation',
+          'Engaged', 'Awaiting Reply', 'In Conversation', 'In Campaign', 'Active Mission',
+        ]);
+        const hunterCompanyIds = new Set();
+        contactsSnap.docs.forEach(d => {
+          const data = d.data();
+          const hs = data.hunter_status;
+          const cs = data.contact_status || data.lead_status || data.status;
+          if (ENGAGED_STATUSES.has(hs) || ENGAGED_STATUSES.has(cs)) {
+            if (data.company_id) hunterCompanyIds.add(data.company_id);
+          }
+        });
+
+        const list = companiesSnap.docs.map(d => {
+          const data = { id: d.id, ...d.data() };
+          const contactCount = contactCountMap[d.id] || 0;
+          const inSniper = sniperCompanyNames.has((data.name || '').toLowerCase());
+          const inHunter = hunterCompanyIds.has(d.id);
+          const source = inSniper ? 'sniper' : inHunter ? 'hunter' : 'scout';
+          return { ...data, contactCount, source };
+        });
+
+        // Sort: companies with contacts first, then by name
+        list.sort((a, b) => {
+          if (b.contactCount !== a.contactCount) return b.contactCount - a.contactCount;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+
+        setCompanies(list);
+      } catch (err) {
+        console.error('[AllCompaniesSection] load error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const filtered = companies.filter(co => {
+    if (sourceFilter !== 'all' && co.source !== sourceFilter) return false;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      return (co.name || '').toLowerCase().includes(q) || (co.industry || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const totalContacts = companies.reduce((s, c) => s + c.contactCount, 0);
+  const scoutCount = companies.filter(c => c.source === 'scout').length;
+  const hunterCount = companies.filter(c => c.source === 'hunter').length;
+  const sniperCount = companies.filter(c => c.source === 'sniper').length;
+
+  const SOURCE_COLORS = {
+    scout:  { bg: '#e879f920', color: '#e879f9', border: '#e879f940', label: 'SCOUT' },
+    hunter: { bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40', label: 'HUNTER' },
+    sniper: { bg: '#14b8a620', color: '#14b8a6', border: '#14b8a640', label: 'SNIPER' },
+  };
+
+  if (loading) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: T.textMuted }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${PEOPLE_CYAN}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+        <p style={{ fontSize: 13, margin: 0 }}>Loading companies…</p>
+        <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+      </div>
+    );
+  }
+
+  if (companies.length === 0) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, color: T.textMuted }}>
+        <Building2 size={48} color={T.textFaint} />
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>No Companies Yet</h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
+          Accept companies in Daily Leads to start building your pipeline.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+      {/* Header */}
+      <div style={{ padding: '18px 22px 0', background: T.navBg, borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>All Companies</h2>
+            <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>Every company — Scout, Hunter &amp; Sniper.</div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'flex', gap: 9, overflowX: 'auto', marginBottom: 11 }}>
+          {[
+            ['Total', companies.length, null],
+            ['Total Contacts', totalContacts, null],
+            ['Scout', scoutCount, 'scout'],
+            ['Hunter', hunterCount, 'hunter'],
+            ['Sniper', sniperCount, 'sniper'],
+          ].map(([l, v, src]) => (
+            <div
+              key={l}
+              onClick={() => src && setSourceFilter(f => f === src ? 'all' : src)}
+              style={{
+                background: (src && sourceFilter === src) ? T.accentBg : T.statBg,
+                border: `1px solid ${(src && sourceFilter === src) ? T.accentBdr : T.border}`,
+                borderRadius: 9, padding: '9px 13px', flexShrink: 0, minWidth: 90,
+                cursor: src ? 'pointer' : 'default',
+              }}
+            >
+              <div style={{ fontSize: 9, color: T.textFaint }}>{l}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: (src && sourceFilter === src) ? PEOPLE_CYAN : T.text }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Source filter tabs */}
+        <div style={{ display: 'flex', gap: 0, marginBottom: -1 }}>
+          {[['all', 'All Companies', companies.length], ['scout', 'Scout', scoutCount], ['hunter', 'Hunter', hunterCount], ['sniper', 'Sniper', sniperCount]].map(([id, label, cnt]) => (
+            <div
+              key={id}
+              onClick={() => setSourceFilter(id)}
+              style={{
+                padding: '7px 13px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+                borderBottom: `2px solid ${sourceFilter === id ? PEOPLE_CYAN : 'transparent'}`,
+                color: sourceFilter === id ? PEOPLE_CYAN : T.textMuted,
+                background: sourceFilter === id ? T.accentBg : 'transparent',
+              }}
+            >
+              {label} {cnt > 0 ? cnt : ''}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={{ padding: '9px 22px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+        <div style={{ background: T.input, border: `1px solid ${T.border}`, borderRadius: 7, padding: '6px 11px', display: 'flex', gap: 7, alignItems: 'center' }}>
+          <Search size={13} color={T.textFaint} />
+          <input
+            placeholder="Search companies by name or industry…"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{ background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 11, flex: 1 }}
+          />
+        </div>
+      </div>
+
+      {/* Company grid */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px' }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint, fontSize: 13 }}>
+            No companies match your search.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(258px,1fr))', gap: 12 }}>
+            {filtered.map(company => {
+              const srcCfg = SOURCE_COLORS[company.source] || SOURCE_COLORS.scout;
+              return (
+                <div
+                  key={company.id}
+                  onClick={() => navigate(`/scout/company/${company.id}`)}
+                  style={{
+                    background: T.cardBg, border: `1px solid ${T.border}`,
+                    borderRadius: 14, padding: '14px 16px', cursor: 'pointer',
+                    transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 10,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = T.borderHov; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = T.border; }}
+                >
+                  {/* Top row: logo + name + source badge */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: T.surface, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                      <CompanyLogo company={company} size="small" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {company.name || 'Unnamed Company'}
+                      </div>
+                      {company.industry && (
+                        <div style={{ fontSize: 10, color: T.textFaint, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {company.industry}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: srcCfg.bg, color: srcCfg.color, border: `1px solid ${srcCfg.border}`, flexShrink: 0 }}>
+                      {srcCfg.label}
+                    </span>
+                  </div>
+
+                  {/* Meta row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 10, color: T.textFaint }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Users size={10} color={company.contactCount > 0 ? PEOPLE_CYAN : T.textFaint} />
+                      <span style={{ color: company.contactCount > 0 ? PEOPLE_CYAN : T.textFaint, fontWeight: company.contactCount > 0 ? 700 : 400 }}>
+                        {company.contactCount} {company.contactCount === 1 ? 'contact' : 'contacts'}
+                      </span>
+                    </span>
+                    {company.size && <span>{company.size}</span>}
+                    {company.website && (
+                      <Globe
+                        size={10}
+                        color={T.textFaint}
+                        style={{ cursor: 'pointer' }}
+                        onClick={e => { e.stopPropagation(); window.open(company.website.startsWith('http') ? company.website : `https://${company.website}`, '_blank'); }}
+                      />
+                    )}
+                    {company.linkedin_url && (
+                      <Linkedin
+                        size={10}
+                        color={T.textFaint}
+                        style={{ cursor: 'pointer' }}
+                        onClick={e => { e.stopPropagation(); window.open(company.linkedin_url, '_blank'); }}
+                      />
+                    )}
+                  </div>
+
+                  {/* CTA */}
+                  <button
+                    onClick={e => { e.stopPropagation(); navigate(`/scout/company/${company.id}`); }}
+                    style={{
+                      width: '100%', padding: '8px 0', borderRadius: 8, border: 'none',
+                      background: company.contactCount > 0
+                        ? `linear-gradient(135deg,${PEOPLE_CYAN},#0891b2)`
+                        : `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                      color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    <Users size={11} />
+                    {company.contactCount > 0 ? `View ${company.contactCount} Contact${company.contactCount !== 1 ? 's' : ''}` : 'Find Contacts'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
   { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
@@ -163,7 +443,8 @@ const MODULE_RAIL = [
 
 // ─── People sub-nav items ─────────────────────────────────────────────────────
 const PEOPLE_ITEMS = [
-  { id: 'all', label: 'All People', Icon: Users, desc: 'Every relationship — one place.' },
+  { id: 'all',       label: 'All People',     Icon: Users,     desc: 'Every relationship — one place.' },
+  { id: 'companies', label: 'All Companies',  Icon: Building2, desc: 'Scout, Hunter & Sniper companies.' },
 ];
 
 // ─── PeopleShellInner ─────────────────────────────────────────────────────────
@@ -183,6 +464,7 @@ function PeopleShellInner({ user }) {
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('people_subnav_collapsed') !== 'true');
+  const [activeSection, setActiveSection] = useState(() => localStorage.getItem('people_active_section') || 'all');
 
   const userInitials = (user?.email || 'CC').slice(0, 2).toUpperCase();
 
@@ -228,7 +510,7 @@ function PeopleShellInner({ user }) {
             />
           </div>
           <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            All People
+            {activeSection === 'companies' ? 'All Companies' : 'All People'}
           </div>
           <div
             onClick={() => navigate('/settings')}
@@ -247,7 +529,7 @@ function PeopleShellInner({ user }) {
 
         {/* Mobile main content — paddingBottom leaves room for BottomNav */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
-          <AllLeads mode="people" />
+          {activeSection === 'companies' ? <AllCompaniesSection /> : <AllLeads mode="people" />}
         </div>
 
         {/* Cross-module bottom nav */}
@@ -403,7 +685,7 @@ function PeopleShellInner({ user }) {
               <div style={{ fontSize: 9, letterSpacing: 2, color: PEOPLE_CYAN, fontWeight: 700, marginBottom: 1 }}>
                 COMMAND CENTER
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{PEOPLE_ITEMS.length} module</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>{PEOPLE_ITEMS.length} views</div>
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('people_subnav_collapsed', 'true'); }}
@@ -422,16 +704,20 @@ function PeopleShellInner({ user }) {
           {/* Sub-nav items */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
             {PEOPLE_ITEMS.map(it => {
-              const active = true; // Only one item — always active
+              const active = activeSection === it.id;
               return (
                 <div
                   key={it.id}
+                  onClick={() => { setActiveSection(it.id); localStorage.setItem('people_active_section', it.id); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
-                    borderRadius: 8, marginBottom: 1,
+                    borderRadius: 8, marginBottom: 1, cursor: 'pointer',
                     background: active ? T.accentBg : 'transparent',
                     borderLeft: `2px solid ${active ? PEOPLE_CYAN : 'transparent'}`,
+                    transition: 'all 0.12s',
                   }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
                   <it.Icon size={13} color={active ? PEOPLE_CYAN : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -490,7 +776,7 @@ function PeopleShellInner({ user }) {
         overflow: 'hidden', position: 'relative', zIndex: 1,
         transition: 'background 0.25s',
       }}>
-        <AllLeads mode="people" />
+        {activeSection === 'companies' ? <AllCompaniesSection /> : <AllLeads mode="people" />}
       </div>
     </div>
   );

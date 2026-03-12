@@ -54,8 +54,8 @@ const MainLayout = ({ children, user }) => {
 
     // Scout main pages with tabs
     if (pathname === '/scout') {
-      if (activeTab === 'daily-leads' || !activeTab) {
-        return 'Daily Discoveries';
+      if (activeTab === 'all-leads' || !activeTab) {
+        return 'People';
       }
       if (activeTab === 'company-search') return 'Company Search';
       if (activeTab === 'saved-companies') return 'Saved Companies';

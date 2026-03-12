@@ -161,7 +161,7 @@ const NAV_SECTIONS = [
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
-      { id: 'all',       label: 'People',             Icon: Users,     desc: 'Your network'      },
+      { id: 'all',       label: 'People',             Icon: Users,     desc: 'My Leads'      },
       { id: 'saved',     label: 'Saved Companies',   Icon: Building2, desc: 'Hunt list'          },
       { id: 'daily',     label: 'Daily Discoveries', Icon: Zap,       desc: 'Review Queue'       },
       { id: 'scoutplus',   label: 'Scout+',           Icon: Plus,     desc: 'Add contacts'       },
@@ -211,8 +211,8 @@ function ScoutShellInner({ user }) {
   };
 
   // Read tab from URL (?tab=company-search) with fallback to legacy location.state
-  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'daily-leads';
-  const initialItem = TAB_TO_ITEM[tabParam] || 'daily';
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'all-leads';
+  const initialItem = TAB_TO_ITEM[tabParam] || 'all';
 
   const [activeSection, setActiveSection] = useState('scout');
   const [activeItem, setActiveItem] = useState(initialItem);
@@ -233,7 +233,7 @@ function ScoutShellInner({ user }) {
   const switchItem = (itemId) => {
     setDrillCompanyId(null);
     setActiveItem(itemId);
-    const tab = ITEM_TO_TAB[itemId] || 'daily-leads';
+    const tab = ITEM_TO_TAB[itemId] || 'all-leads';
     setSearchParams({ tab }, { replace: true });
   };
 
@@ -246,7 +246,7 @@ function ScoutShellInner({ user }) {
       setDrillCompanyId(null);
       setActiveSection(sec.directTo.section);
       setActiveItem(sec.directTo.item);
-      const tab = ITEM_TO_TAB[sec.directTo.item] || 'daily-leads';
+      const tab = ITEM_TO_TAB[sec.directTo.item] || 'all-leads';
       setSearchParams({ tab }, { replace: true });
       return;
     }

@@ -25,7 +25,7 @@ const NAV_ITEMS = [
     label: 'Discover',
     icon: Star,
     path: '/scout',
-    search: '?tab=daily-leads',
+    search: '?tab=all-leads',
   },
   {
     id: 'hunter',

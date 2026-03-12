@@ -14,7 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target, Users,
+  Radar, Crosshair, Eye, Target, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight, Home,
   Settings as SettingsIcon,
 } from 'lucide-react';
@@ -23,6 +23,7 @@ import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
 import AllLeads from './AllLeads';
+import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
 
 // People/Command Center accent color
 const PEOPLE_CYAN = BRAND.cyan;
@@ -153,18 +154,24 @@ function Av({ initials, color = PEOPLE_CYAN, size = 24 }) {
   );
 }
 
+// ─── AllCompaniesSection — delegates to the shared consistent view ────────────
+function AllCompaniesSection() {
+  return <SharedCompaniesView mode="all" />;
+}
+
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
+  { id: 'people', label: 'COMMAND CENTER', Icon: Users, route: null      }, // active module
   { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
   { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
   { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon'  },
   { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper' },
-  { id: 'people', label: 'PEOPLE', Icon: Users,     route: null      }, // active module
 ];
 
 // ─── People sub-nav items ─────────────────────────────────────────────────────
 const PEOPLE_ITEMS = [
-  { id: 'all', label: 'All People', Icon: Users, desc: 'Every relationship — one place.' },
+  { id: 'all',       label: 'All People',     Icon: Users,     desc: 'Every relationship — one place.' },
+  { id: 'companies', label: 'All Companies',  Icon: Building2, desc: 'Scout, Hunter & Sniper companies.' },
 ];
 
 // ─── PeopleShellInner ─────────────────────────────────────────────────────────
@@ -184,6 +191,7 @@ function PeopleShellInner({ user }) {
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('people_subnav_collapsed') !== 'true');
+  const [activeSection, setActiveSection] = useState(() => localStorage.getItem('people_active_section') || 'all');
 
   const userInitials = (user?.email || 'CC').slice(0, 2).toUpperCase();
 
@@ -229,7 +237,7 @@ function PeopleShellInner({ user }) {
             />
           </div>
           <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            All People
+            {activeSection === 'companies' ? 'All Companies' : 'All People'}
           </div>
           <div
             onClick={() => navigate('/settings')}
@@ -248,7 +256,7 @@ function PeopleShellInner({ user }) {
 
         {/* Mobile main content — paddingBottom leaves room for BottomNav */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
-          <AllLeads mode="people" />
+          {activeSection === 'companies' ? <AllCompaniesSection /> : <AllLeads mode="people" />}
         </div>
 
         {/* Cross-module bottom nav */}
@@ -320,7 +328,7 @@ function PeopleShellInner({ user }) {
               onClick={() => { if (mod.route) navigate(mod.route); }}
               title={mod.label}
               style={{
-                width: 40, height: 40, borderRadius: 10,
+                width: 52, height: 46, borderRadius: 10,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: mod.route ? 'pointer' : 'default',
                 background: active ? T.accentBg : 'transparent',
@@ -331,7 +339,7 @@ function PeopleShellInner({ user }) {
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <mod.Icon size={14} color={active ? PEOPLE_CYAN : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? PEOPLE_CYAN : T.textFaint, marginTop: 1 }}>
+              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? PEOPLE_CYAN : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
                 {mod.label}
               </span>
             </div>
@@ -404,7 +412,7 @@ function PeopleShellInner({ user }) {
               <div style={{ fontSize: 9, letterSpacing: 2, color: PEOPLE_CYAN, fontWeight: 700, marginBottom: 1 }}>
                 COMMAND CENTER
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{PEOPLE_ITEMS.length} module</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>{PEOPLE_ITEMS.length} views</div>
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('people_subnav_collapsed', 'true'); }}
@@ -423,16 +431,20 @@ function PeopleShellInner({ user }) {
           {/* Sub-nav items */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
             {PEOPLE_ITEMS.map(it => {
-              const active = true; // Only one item — always active
+              const active = activeSection === it.id;
               return (
                 <div
                   key={it.id}
+                  onClick={() => { setActiveSection(it.id); localStorage.setItem('people_active_section', it.id); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
-                    borderRadius: 8, marginBottom: 1,
+                    borderRadius: 8, marginBottom: 1, cursor: 'pointer',
                     background: active ? T.accentBg : 'transparent',
                     borderLeft: `2px solid ${active ? PEOPLE_CYAN : 'transparent'}`,
+                    transition: 'all 0.12s',
                   }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
                   <it.Icon size={13} color={active ? PEOPLE_CYAN : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -491,7 +503,7 @@ function PeopleShellInner({ user }) {
         overflow: 'hidden', position: 'relative', zIndex: 1,
         transition: 'background 0.25s',
       }}>
-        <AllLeads mode="people" />
+        {activeSection === 'companies' ? <AllCompaniesSection /> : <AllLeads mode="people" />}
       </div>
     </div>
   );

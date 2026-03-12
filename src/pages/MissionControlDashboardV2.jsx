@@ -277,6 +277,44 @@ export default function MissionControlDashboardV2() {
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span>System ready for deployment</span>
             </div>
+
+            {/* Module Quick-Nav Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+              {[
+                { label: 'SCOUT',          path: '/scout?tab=daily-leads', color: 'cyan'   },
+                { label: 'HUNTER',         path: '/hunter',                color: 'pink'   },
+                { label: 'RECON',          path: '/recon',                 color: 'purple' },
+                { label: 'SNIPER',         path: '/sniper',                color: 'green'  },
+                { label: 'COMMAND CENTER', path: '/people',                color: 'cyan'   },
+                { label: 'ALL PEOPLE',     path: '/people',                color: 'pink'   },
+              ].map(({ label, path, color }) => (
+                <button
+                  key={label}
+                  onClick={() => navigate(path)}
+                  className={`px-4 py-1.5 rounded-lg font-mono text-xs font-semibold tracking-widest border transition-all hover:scale-105 active:scale-95`}
+                  style={{
+                    background: color === 'cyan'   ? 'rgba(6,182,212,0.12)'   :
+                                color === 'pink'   ? 'rgba(236,72,153,0.12)'  :
+                                color === 'purple' ? 'rgba(139,92,246,0.12)'  :
+                                                     'rgba(34,197,94,0.12)',
+                    borderColor: color === 'cyan'   ? 'rgba(6,182,212,0.5)'   :
+                                 color === 'pink'   ? 'rgba(236,72,153,0.5)'  :
+                                 color === 'purple' ? 'rgba(139,92,246,0.5)'  :
+                                                      'rgba(34,197,94,0.5)',
+                    color: color === 'cyan'   ? '#67e8f9' :
+                           color === 'pink'   ? '#f9a8d4' :
+                           color === 'purple' ? '#c4b5fd' :
+                                                '#86efac',
+                    boxShadow: color === 'cyan'   ? '0 0 8px rgba(6,182,212,0.2)'   :
+                               color === 'pink'   ? '0 0 8px rgba(236,72,153,0.2)'  :
+                               color === 'purple' ? '0 0 8px rgba(139,92,246,0.2)'  :
+                                                    '0 0 8px rgba(34,197,94,0.2)',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </header>

@@ -157,6 +157,7 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
+  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users, route: '/people', items: [] },
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
@@ -170,7 +171,6 @@ const NAV_SECTIONS = [
   { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
   { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
   { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: '/sniper', items: [] },
-  { id: 'allpeople', label: 'PEOPLE',  Icon: Users,     directTo: { section: 'scout', item: 'all' }, items: [] },
 ];
 
 // ─── ScoutShellInner ─────────────────────────────────────────────────────────
@@ -338,7 +338,7 @@ function ScoutShellInner({ user }) {
           {/* Section nav icons */}
           <div style={{ flex: 1, display: 'flex', gap: 3, overflowX: 'auto' }}>
             {NAV_SECTIONS.map(sec => {
-              // PEOPLE (directTo) is active when its target item is selected
+              // COMMAND CENTER (directTo) is active when its target item is selected
               // SCOUT is active only when not in a directTo sub-view
               const hasActiveDirectTo = NAV_SECTIONS.some(
                 s => s.directTo && s.directTo.section === 'scout' && activeItem === s.directTo.item
@@ -503,7 +503,7 @@ function ScoutShellInner({ user }) {
               onClick={() => handleSectionClick(sec)}
               title={sec.label}
               style={{
-                width: 40, height: 40, borderRadius: 10,
+                width: 52, height: 46, borderRadius: 10,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: sec.locked ? 'not-allowed' : 'pointer',
                 background: active ? T.accentBg : 'transparent',
@@ -515,7 +515,7 @@ function ScoutShellInner({ user }) {
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <sec.Icon size={14} color={active ? BRAND.pink : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? BRAND.pink : T.textFaint, marginTop: 1 }}>
+              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? BRAND.pink : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
                 {sec.label}
               </span>
             </div>

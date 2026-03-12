@@ -1624,3 +1624,338 @@
   line-height: 1.4;
   white-space: pre-wrap;
 }
+
+/* ── Dark Mode Overrides ─────────────────────────────────────── */
+body.theme-dark .ies-section {
+  background: #110e1e;
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+body.theme-dark .ies-section-header {
+  background: rgba(124, 58, 237, 0.07);
+  border-bottom-color: rgba(124, 58, 237, 0.18);
+}
+
+body.theme-dark .ies-section-title {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-history-empty-title {
+  color: #d4cae8;
+}
+
+body.theme-dark .ies-history-entry {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-dark .ies-history-entry:hover {
+  border-color: rgba(124, 58, 237, 0.35);
+}
+
+body.theme-dark .ies-history-goal {
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-history-channel-badge {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-history-message-preview {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-history-message-subject {
+  color: #d4cae8 !important;
+}
+
+body.theme-dark .ies-history-copy-btn {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-flow-header {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+body.theme-dark .ies-flow-contact-name {
+  color: #d4cae8;
+}
+
+body.theme-dark .ies-collapse-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d4cae8;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.theme-dark .ies-barry-question {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-intent-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-intent-input::placeholder {
+  color: #4a3870;
+}
+
+body.theme-dark .ies-intent-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+body.theme-dark .ies-chip-ok {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-intent-option {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-dark .ies-intent-option:hover {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.4);
+}
+
+body.theme-dark .ies-intent-option-label {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-submitted-intent {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-dark .ies-submitted-text {
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-generating-text {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-error-text {
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-retry-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #d4cae8;
+}
+
+body.theme-dark .ies-retry-btn:hover {
+  border-color: #7c3aed;
+  color: #a78bfa;
+}
+
+body.theme-dark .ies-option-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-dark .ies-option-card:hover {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.theme-dark .ies-option-strategy {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-option-subject {
+  color: #9080b0;
+}
+
+body.theme-dark .ies-option-preview {
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-message-preview {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-dark .ies-subject-input,
+body.theme-dark .ies-message-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-subject-input:focus,
+body.theme-dark .ies-message-textarea:focus {
+  border-color: #7c3aed;
+}
+
+body.theme-dark .ies-cc-input-wrap {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+body.theme-dark .ies-cc-input {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-cc-suggestions {
+  background: #1e1450;
+  border-color: rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+body.theme-dark .ies-cc-suggestion-item:hover {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+body.theme-dark .ies-cc-suggestion-name {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-weapon-prompt {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-weapon-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-dark .ies-weapon-btn span:first-of-type {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-weapon-btn:hover:not(:disabled):not(.ies-weapon-disabled) {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.4);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+body.theme-dark .ies-weapon-badge-alt {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-review-title {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-review-via {
+  color: #9080b0;
+}
+
+body.theme-dark .ies-handoff-notice span {
+  color: #fbbf24;
+}
+
+body.theme-dark .ies-gmail-notice {
+  color: #6ee7b7;
+}
+
+body.theme-dark .ies-result-title {
+  color: #f0eaff;
+}
+
+body.theme-dark .ies-result-desc {
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-another-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #d4cae8;
+}
+
+body.theme-dark .ies-another-btn:hover {
+  border-color: #7c3aed;
+  color: #a78bfa;
+}
+
+body.theme-dark .ies-save-prompt-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-save-prompt-btn:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.1);
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #a78bfa;
+}
+
+body.theme-dark .ies-save-template-btn {
+  background: rgba(17, 14, 30, 0.9);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-save-template-btn:hover:not(:disabled) {
+  border-color: rgba(124, 58, 237, 0.5);
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+body.theme-dark .ies-history-footer {
+  border-top-color: rgba(255, 255, 255, 0.07);
+}
+
+body.theme-dark .ies-all-history-entry:not(:last-child) {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+body.theme-dark .ies-all-history-label {
+  color: #c8bce0;
+}
+
+body.theme-dark .ies-all-history-preview {
+  color: #9080b0;
+}
+
+body.theme-dark .ies-section-collapse-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-section-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d4cae8;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.theme-dark .ies-goal-edit-input {
+  background: rgba(255, 255, 255, 0.05);
+  color: #d4cae8;
+}
+
+body.theme-dark .ies-goal-cancel-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9080b0;
+}
+
+body.theme-dark .ies-prompt-chip {
+  color: #c4b5fd;
+}
+
+body.theme-dark .ies-selected-reasoning span {
+  color: #9080b0;
+}
+
+body.theme-dark .ies-history-entry-index {
+  color: #4a3870;
+}

@@ -156,7 +156,7 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'people', label: 'PEOPLE', Icon: Users,     route: '/people'  },
+  { id: 'people', label: 'COMMAND CENTER', Icon: Users, route: '/people'  },
   { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'   },
   { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter'  },
   { id: 'recon',  label: 'RECON',  Icon: Eye,       route: null       }, // active module
@@ -368,7 +368,7 @@ function ReconShellInner({ user }) {
               }}
               title={mod.label}
               style={{
-                width: 40, height: 40, borderRadius: 10,
+                width: 52, height: 46, borderRadius: 10,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: mod.locked ? 'not-allowed' : 'pointer',
                 background: active ? `${RECON_INDIGO}18` : 'transparent',
@@ -380,7 +380,7 @@ function ReconShellInner({ user }) {
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <mod.Icon size={14} color={active ? RECON_INDIGO : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0.5, color: active ? RECON_INDIGO : T.textFaint, marginTop: 1 }}>
+              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? RECON_INDIGO : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
                 {mod.label}
               </span>
             </div>

@@ -1,12 +1,10 @@
 /**
- * SniperCompaniesSection.jsx — Companies view for SNIPER.
- *
- * Shows all saved companies (status=accepted) from Scout, with SNIPER
- * context: highlights companies that have contacts already in the pipeline.
- * Reuses SavedCompanies component directly.
+ * SniperCompaniesSection — Companies view in Sniper.
+ * Uses SharedCompaniesView with mode='sniper' to show only companies
+ * associated with Sniper pipeline contacts, in the consistent card design.
  */
-import SavedCompanies from '../../Scout/SavedCompanies';
+import SharedCompaniesView from '../../../components/shared/SharedCompaniesView';
 
 export default function SniperCompaniesSection() {
-  return <SavedCompanies />;
+  return <SharedCompaniesView mode="sniper" />;
 }

@@ -11,3 +11,44 @@
 .mission-assign-spin {
   animation: spin 1s linear infinite;
 }
+
+/* ── Theme transition: smooth color changes on all elements ── */
+*, *::before, *::after {
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    color 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+/* Exclude interactive transitions from the global rule so buttons feel instant */
+button, a, [role="button"] {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+
+/* Orbitron font utility */
+.font-orbitron {
+  font-family: 'Orbitron', sans-serif;
+}
+
+/* WithTheForce button keyframes */
+@keyframes forceGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(0, 196, 212, 0.6), 0 4px 20px rgba(0, 0, 0, 0.4); }
+  50%       { box-shadow: 0 0 22px rgba(0, 196, 212, 0.9), 0 4px 28px rgba(0, 0, 0, 0.5); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

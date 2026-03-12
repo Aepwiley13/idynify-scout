@@ -60,6 +60,18 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+.mission-control-btn {
+  background: #0f172a;
+  border: 1px solid #06b6d4;
+  color: #06b6d4;
+}
+
+.mission-control-btn:hover {
+  background: #1e293b;
+  border-color: #22d3ee;
+  color: #22d3ee;
+}
+
 /* ========================================
    PLATFORM STATS
    ======================================== */

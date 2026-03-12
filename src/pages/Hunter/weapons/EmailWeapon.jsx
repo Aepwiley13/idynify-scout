@@ -6,7 +6,7 @@ import { Users, Target, Sparkles, FileText, Send, Loader } from 'lucide-react';
 import EngagementIntentSelector from '../../../components/hunter/EngagementIntentSelector';
 import TemplateLibrary from '../../../components/hunter/TemplateLibrary';
 import './EmailWeapon.css';
-import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 /**
  * HUNTER WEAPON - Email Builder

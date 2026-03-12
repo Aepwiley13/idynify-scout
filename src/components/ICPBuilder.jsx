@@ -10,7 +10,7 @@ import ICPStep1 from './ICPStep1';
 import ICPStep2 from './ICPStep2';
 import ICPStep3 from './ICPStep3';
 import ICPStep4 from './ICPStep4';
-import { getEffectiveUser } from './context/ImpersonationContext';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function ICPBuilder() {
   const navigate = useNavigate();

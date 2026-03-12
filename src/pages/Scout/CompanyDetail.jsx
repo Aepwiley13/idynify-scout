@@ -6,7 +6,7 @@ import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Awa
 import './ScoutMain.css';
 import './CompanyDetail.css';
 import { searchPeople, updatePerson } from '../../services/peopleService';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CompanyDetail() {
   const { companyId } = useParams();

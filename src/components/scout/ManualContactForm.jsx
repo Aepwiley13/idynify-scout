@@ -3,7 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, addDoc } from 'firebase/firestore';
 import { UserPlus } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [formData, setFormData] = useState({

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, FileText, X } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './TemplateLibrary.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * HUNTER PHASE 2: Template Library

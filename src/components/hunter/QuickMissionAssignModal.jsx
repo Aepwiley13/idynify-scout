@@ -20,7 +20,7 @@ import { db, auth } from '../../firebase/config';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import './QuickMissionAssignModal.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function QuickMissionAssignModal({ contact, onClose, onNavigateCreate }) {
   const [missions, setMissions] = useState([]);

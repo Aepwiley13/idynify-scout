@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function FindContact({ onContactAdded, onCancel, initialSearchParams }) {
   const [searchParams, setSearchParams] = useState({

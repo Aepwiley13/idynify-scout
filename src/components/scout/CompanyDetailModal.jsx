@@ -6,7 +6,7 @@ import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Li
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CompanyDetailModal({ company, onClose, onFindMoreContacts }) {
   const navigate = useNavigate();

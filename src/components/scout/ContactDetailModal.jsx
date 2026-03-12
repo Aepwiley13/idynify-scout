@@ -6,7 +6,7 @@ import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, Ale
 import { downloadVCard } from '../../utils/vcard';
 import FindContact from './FindContact';
 import './ContactDetailModal.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function ContactDetailModal({ contact, onClose, onUpdate }) {
   const navigate = useNavigate();

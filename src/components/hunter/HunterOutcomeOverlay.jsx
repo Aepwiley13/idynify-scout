@@ -20,7 +20,7 @@ import { db, auth } from '../../firebase/config';
 import { Sparkles } from 'lucide-react';
 import { getStateTransition } from '../../utils/hunterOutcomeLogic';
 import './HunterOutcomeOverlay.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const OUTCOME_OPTIONS = [
   { id: 'no_reply',        label: 'No reply yet',      emoji: '⏳', color: '#9ca3af', description: 'Still waiting — normal' },

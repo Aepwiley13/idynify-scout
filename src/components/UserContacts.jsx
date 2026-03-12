@@ -22,7 +22,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import './UserContacts.css';
-import { getEffectiveUser } from './context/ImpersonationContext';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 const UserContacts = ({ userId, userEmail }) => {
   const [contacts, setContacts] = useState([]);

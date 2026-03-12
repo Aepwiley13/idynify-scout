@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getActiveMissions, assignCompanyToMission } from '../../services/missionService';
 import { auth } from '../../firebase/config';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function MissionAssignModal({ company, onClose, onSuccess }) {
   const [missions, setMissions] = useState([]);

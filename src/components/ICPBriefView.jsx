@@ -6,7 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { getPath } from '../firebase/schema';
 import jsPDF from 'jspdf';
-import { getEffectiveUser } from './context/ImpersonationContext';
+import { getEffectiveUser } from '../context/ImpersonationContext';
 
 export default function ICPBriefView() {
   const navigate = useNavigate();

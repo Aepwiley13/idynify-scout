@@ -29,7 +29,7 @@ import HunterOutcomeOverlay from './HunterOutcomeOverlay';
 import HunterMicroIntake from './HunterMicroIntake';
 import { predictNextOutcomeGoal } from '../../utils/nextOutcomeGoal';
 import './MissionCard.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── CTA labels for the Send button (dynamic by outcome_goal) ────────────────
 const MISSION_CTA_LABELS = {

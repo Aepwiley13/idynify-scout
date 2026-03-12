@@ -4,7 +4,7 @@ import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } fro
 import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const T = useT();

@@ -3,7 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { collection, writeBatch, doc } from 'firebase/firestore';
 import { Upload, AlertTriangle, CheckCircle, Users, Building2 } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CSVUpload({ onContactsAdded, onCancel }) {
   const [uploadType, setUploadType] = useState(null); // 'leads' or 'companies'

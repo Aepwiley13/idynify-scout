@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import './CompanyLeads.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CompanyLeads() {
   const { companyId } = useParams();

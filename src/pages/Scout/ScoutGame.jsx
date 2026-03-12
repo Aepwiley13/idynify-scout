@@ -27,7 +27,7 @@ import GameReviewSend from '../../components/scout-game/GameReviewSend';
 import GameSessionSummary from '../../components/scout-game/GameSessionSummary';
 import { Loader, ArrowLeft } from 'lucide-react';
 import './ScoutGame.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 /**
  * SCOUT GAME — Main Page Component (PIVOTED)

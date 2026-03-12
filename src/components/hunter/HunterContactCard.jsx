@@ -22,7 +22,7 @@ import { auth } from '../../firebase/config';
 import { getCTAForContact } from '../../constants/structuredFields';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import './HunterContactCard.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ── RECON confidence dot ────────────────────────────────
 // Accepts reconConfidencePct (0-100) — the new interface from reconConfidence.js.

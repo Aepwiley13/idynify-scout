@@ -5,7 +5,7 @@ import { db, auth } from '../../../firebase/config';
 import { Users, Target, Sparkles, FileText, Send, Loader, AlertCircle, Copy, Check } from 'lucide-react';
 import EngagementIntentSelector from '../../../components/hunter/EngagementIntentSelector';
 import './TextWeapon.css';
-import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
 /**
  * HUNTER WEAPON - Text Message Builder

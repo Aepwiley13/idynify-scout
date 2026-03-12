@@ -35,7 +35,7 @@ import QuickMissionAssignModal from '../../components/hunter/QuickMissionAssignM
 import { bootstrapContactsForUser } from '../../utils/hunterBootstrap';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import './HunterDashboard.css';
-import { getEffectiveUser } from '../context/ImpersonationContext';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // Contacts stuck in engaged_pending for more than 30s get auto-recovered
 const STUCK_TIMEOUT_MS = 30_000;

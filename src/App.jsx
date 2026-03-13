@@ -80,6 +80,9 @@ import HunterMain from './pages/Hunter/HunterMain';
 // Basecamp Pages
 import BasecampMain from './pages/Basecamp/BasecampMain';
 
+// Reinforcements Pages
+import ReinforcementsMain from './pages/Reinforcements/ReinforcementsMain';
+
 // Sniper Pages
 import SniperMain from './pages/Sniper/SniperMain';
 import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
@@ -459,6 +462,16 @@ function App() {
           element={
             <ProtectedRoute>
               <BasecampMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Reinforcements Module — referral intelligence hub (no MainLayout) */}
+        <Route
+          path="/reinforcements"
+          element={
+            <ProtectedRoute>
+              <ReinforcementsMain />
             </ProtectedRoute>
           }
         />

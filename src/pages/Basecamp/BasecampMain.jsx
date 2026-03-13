@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
-  Radar, Crosshair, Eye, Target, Tent,
+  Radar, Crosshair, Eye, Target, Tent, Shield,
   Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home,
@@ -163,6 +163,7 @@ const MODULE_RAIL = [
   { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
   { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
   { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: '/reinforcements' },
 ];
 
 // ─── BASECAMP sub-nav items ─────────────────────────────────────────────────

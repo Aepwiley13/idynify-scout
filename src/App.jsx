@@ -77,6 +77,9 @@ import MainLayout from './components/layout/MainLayout';
 // Hunter Pages
 import HunterMain from './pages/Hunter/HunterMain';
 
+// Basecamp Pages
+import BasecampMain from './pages/Basecamp/BasecampMain';
+
 // Sniper Pages
 import SniperMain from './pages/Sniper/SniperMain';
 import HunterWeaponRoom from './pages/Hunter/HunterWeaponRoom';
@@ -446,6 +449,16 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <ContactProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Basecamp Module — self-contained two-column shell (no MainLayout) */}
+        <Route
+          path="/basecamp"
+          element={
+            <ProtectedRoute>
+              <BasecampMain />
             </ProtectedRoute>
           }
         />

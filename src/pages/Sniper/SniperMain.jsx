@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
-  Radar, Crosshair, Eye, Target,
+  Radar, Crosshair, Eye, Target, Tent,
   LayoutDashboard, Activity, BookOpen, BarChart3, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home, Trophy,
@@ -162,11 +162,12 @@ function Av({ initials, color = SNIPER_TEAL, size = 24 }) {
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'people', label: 'COMMAND CENTER', Icon: Users, route: '/people' },
-  { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon'  },
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: null      }, // active module
+  { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/people' },
+  { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
+  { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
+  { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
+  { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: null      }, // active module
 ];
 
 // ─── SNIPER sub-nav items ─────────────────────────────────────────────────────

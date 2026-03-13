@@ -28,7 +28,7 @@
 
 .reply-thread-time {
   font-size: 10px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .reply-thread-loading,
@@ -38,7 +38,7 @@
   gap: 8px;
   padding: 12px 14px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .reply-thread-error {
@@ -81,7 +81,7 @@
 .thread-message-from {
   font-size: 11px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -90,20 +90,20 @@
 
 .thread-message-date {
   font-size: 10px;
-  color: #9ca3af;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
 .thread-message-subject {
   font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
 .thread-message-body {
   font-size: 12px;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.5;
   margin: 0;
   white-space: pre-wrap;
@@ -171,7 +171,7 @@
 }
 
 .hunter-contact-drawer {
-  background: #ffffff !important;
+  background: var(--bg-card) !important;
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 16px;
   width: 90%;
@@ -223,13 +223,13 @@
 .drawer-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .drawer-subtitle {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -239,14 +239,14 @@
   border-radius: 8px;
   padding: 0.5rem;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .btn-close-drawer:hover {
   background: rgba(168, 85, 247, 0.08);
   border-color: #a855f7;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* Content */
@@ -291,7 +291,7 @@
 .barry-question {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
   padding-top: 0.5rem;
   line-height: 1.4;
@@ -309,10 +309,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 12px;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 1rem;
   font-weight: 500;
@@ -349,7 +349,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border-radius: 8px;
   margin-top: 0.5rem;
 }
@@ -359,7 +359,7 @@
   align-items: center;
   gap: 0.625rem;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .info-row-subtle svg {
@@ -433,7 +433,7 @@
   flex-direction: column;
   gap: 0.25rem;
   padding: 1rem 1.25rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 12px;
   cursor: pointer;
@@ -450,12 +450,12 @@
 .intent-label {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .intent-description {
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Skip Button */
@@ -464,7 +464,7 @@
   padding: 0.625rem 1.25rem;
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -472,7 +472,7 @@
 }
 
 .btn-skip:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* Intent Input Section - PRIMARY INTERFACE */
@@ -485,10 +485,10 @@
 .intent-input {
   width: 100%;
   padding: 1rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.4);
   border-radius: 12px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1rem;
   line-height: 1.5;
   font-family: inherit;
@@ -504,7 +504,7 @@
 }
 
 .intent-input::placeholder {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.9rem;
 }
 
@@ -524,7 +524,7 @@
   flex-direction: column;
   gap: 0.625rem;
   padding: 1.125rem 1.25rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 12px;
   cursor: pointer;
@@ -576,14 +576,14 @@
 
 .option-preview {
   font-size: 0.95rem;
-  color: #111827;
+  color: var(--text-primary);
   line-height: 1.5;
   margin: 0;
 }
 
 .option-reasoning {
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   line-height: 1.4;
   margin: 0;
   padding-top: 0.5rem;
@@ -608,7 +608,7 @@
 
 .loading-state p {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -644,7 +644,7 @@
 
 .error-message {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   max-width: 400px;
 }
@@ -670,13 +670,13 @@
 
 .intent-text-small {
   font-size: 0.9rem;
-  color: #111827;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
 /* Legacy Contact Info Status (keep for backwards compatibility) */
 .contact-info-status {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
   padding: 1rem;
@@ -689,7 +689,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -730,7 +730,7 @@
 .section-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -742,7 +742,7 @@
 }
 
 .mission-item {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
   padding: 1rem;
@@ -760,7 +760,7 @@
 .mission-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .mission-goal {
@@ -776,7 +776,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .mission-item-status svg {
@@ -853,19 +853,19 @@
 .view-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .view-description {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 /* Mission Select Items */
 .mission-select-item {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
   padding: 1rem;
@@ -892,7 +892,7 @@
   display: flex;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Edit Form */
@@ -911,15 +911,15 @@
 .form-group label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .form-input {
   padding: 0.75rem 1rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1rem;
   transition: all 0.2s;
 }
@@ -931,7 +931,7 @@
 }
 
 .form-input::placeholder {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .btn-primary-hunter {
@@ -973,10 +973,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
@@ -1025,7 +1025,7 @@
   background: rgba(168, 85, 247, 0.06);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 10px;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 500;
@@ -1051,14 +1051,14 @@
 .barry-fallback {
   padding: 1.5rem;
   text-align: center;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 10px;
 }
 
 .barry-thinking {
   font-size: 0.9rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -1076,10 +1076,10 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1.5rem 1rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 12px;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
@@ -1104,7 +1104,7 @@
 
 .weapon-disabled {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-weight: 500;
 }
 
@@ -1114,7 +1114,7 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
 }
@@ -1122,17 +1122,17 @@
 .message-preview-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .message-preview-text {
   width: 100%;
   padding: 0.875rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 0.95rem;
   line-height: 1.6;
   font-family: inherit;
@@ -1165,7 +1165,7 @@
 
 .strategy-reasoning span {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.4;
   font-style: italic;
 }
@@ -1174,10 +1174,10 @@
 .subject-input {
   width: 100%;
   padding: 0.75rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-family: inherit;
   transition: all 0.2s;
@@ -1193,10 +1193,10 @@
 .subject-input-review {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 8px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1rem;
   font-family: inherit;
   transition: all 0.2s;
@@ -1240,16 +1240,16 @@
 .message-review label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .message-textarea {
   width: 100%;
   padding: 1rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.3);
   border-radius: 10px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1rem;
   line-height: 1.6;
   font-family: inherit;
@@ -1265,7 +1265,7 @@
 
 .character-count {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-align: right;
 }
 
@@ -1286,7 +1286,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1.5rem 1rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
   cursor: pointer;
@@ -1306,7 +1306,7 @@
 .goal-name-drawer {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   text-align: center;
 }
 
@@ -1320,7 +1320,7 @@
 .message-input-section label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* Suggestions Fallback */
@@ -1329,14 +1329,14 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 10px;
 }
 
 .suggestions-label {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 600;
   margin: 0;
 }
@@ -1346,7 +1346,7 @@
   background: rgba(168, 85, 247, 0.06);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 8px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
@@ -1397,13 +1397,13 @@
 .success-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .success-description {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   max-width: 400px;
 }
@@ -1455,8 +1455,8 @@
 .weapon-badge-alt {
   font-size: 0.65rem;
   font-weight: 600;
-  color: #9ca3af;
-  background: #f3f4f6;
+  color: var(--text-faint);
+  background: var(--bg-secondary);
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
 }
@@ -1481,7 +1481,7 @@
 
 .handoff-notice span {
   font-size: 0.85rem;
-  color: #111827;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
@@ -1504,7 +1504,7 @@
 
 .gmail-connected-notice span {
   font-size: 0.85rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* Success Icon Variants */
@@ -1537,13 +1537,13 @@
 }
 
 .success-icon-unavailable svg {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Success Detail Text */
 .success-detail {
   font-size: 0.85rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0;
   font-style: italic;
 }
@@ -1641,7 +1641,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 11px;
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 }
@@ -1720,7 +1720,7 @@
 
 .personalization-subtitle {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
 }
@@ -1744,7 +1744,7 @@
 
 .skeleton-step-num {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1820,7 +1820,7 @@
 
 .ps-step-channel {
   font-size: 10px;
-  color: #6b7280;
+  color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.05);
   padding: 1px 7px;
   border-radius: 10px;
@@ -1835,7 +1835,7 @@
 
 .ps-step-body {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-faint);
   line-height: 1.5;
   margin-bottom: 4px;
 }
@@ -1845,7 +1845,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -1859,7 +1859,7 @@
 /* ── Mission picker: Create new mission button ── */
 .missions-empty-hint {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-align: center;
   padding: 16px 8px;
   line-height: 1.5;

@@ -4,13 +4,13 @@
 
 .scout-main {
   min-height: 100%;
-  background: #ffffff;
+  background: var(--bg-primary);
 }
 
 /* ========================================
    TAB CONTENT
    ======================================== */
 .tab-content {
-  background: #ffffff;
+  background: var(--bg-card);
   min-height: 100%;
 }

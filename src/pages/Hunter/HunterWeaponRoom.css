@@ -3,8 +3,8 @@
 /* Task 4.3: Mission Control top-bar — matches Scout sidebar style */
 .hunter-mission-control-bar {
   padding: 10px 20px;
-  border-bottom: 1px solid #f3f4f6;
-  background: #fafafa;
+  border-bottom: 1px solid var(--bg-secondary);
+  background: var(--bg-secondary);
 }
 
 .hunter-mc-link {
@@ -13,9 +13,9 @@
   gap: 7px;
   padding: 6px 14px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   background: transparent;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -30,7 +30,7 @@
 
 .hunter-weapon-room {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg-card);
 }
 
 /* Header — Finding 7: Aligned to Scout's centered enterprise-header */
@@ -44,7 +44,7 @@
 .page-title {
   font-size: 2rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.375rem 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   letter-spacing: -0.02em;
@@ -52,7 +52,7 @@
 
 .page-subtitle {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   font-weight: 500;
 }
@@ -63,8 +63,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  background: #ecfdf5;
-  border: 1.5px solid #a7f3d0;
+  background: rgba(16,185,129,0.07);
+  border: 1.5px solid rgba(16,185,129,0.25);
   border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 600;
@@ -79,7 +79,7 @@
   padding: 0 2rem;
   display: flex;
   gap: 0.25rem;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--border);
   padding-bottom: 0;
 }
 
@@ -92,7 +92,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
@@ -101,8 +101,8 @@
 }
 
 .hunter-tab:hover {
-  color: #374151;
-  border-bottom-color: #d1d5db;
+  color: var(--text-primary);
+  border-bottom-color: var(--border);
 }
 
 .hunter-tab.active {
@@ -117,15 +117,15 @@
   min-width: 24px;
   height: 24px;
   padding: 0 0.5rem;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .hunter-tab.active .hunter-tab-badge {
-  background: #ede9fe;
+  background: rgba(124,58,237,0.12);
   color: #7c3aed;
 }
 
@@ -147,13 +147,13 @@
 .section-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .section-description {
   font-size: 0.9375rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0.5rem 0 0 0;
 }
 
@@ -166,8 +166,8 @@
   min-height: 400px;
   text-align: center;
   padding: 3rem 2rem;
-  background: #ffffff;
-  border: 2px dashed #d1d5db;
+  background: var(--bg-card);
+  border: 2px dashed var(--border);
   border-radius: 20px;
   margin: 2rem 0;
 }
@@ -179,12 +179,12 @@
 .hunter-empty-title {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.75rem 0;
 }
 
 .hunter-empty-text {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 1rem;
   margin: 0 0 0.5rem 0;
   line-height: 1.5;
@@ -232,20 +232,20 @@
   justify-content: center;
   min-height: 400px;
   gap: 1.5rem;
-  background: #ffffff;
+  background: var(--bg-card);
 }
 
 .hunter-loading-spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid #e5e7eb;
+  border: 4px solid var(--border);
   border-top-color: #8b5cf6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 .hunter-loading-text {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 1rem;
   font-weight: 500;
 }
@@ -319,13 +319,13 @@
 .gmail-notice-content h3 {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.375rem 0;
 }
 
 .gmail-notice-content p {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 

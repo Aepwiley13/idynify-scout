@@ -7,7 +7,7 @@
 /* ── Section Container ── */
 .ies-section {
   margin-top: 2rem;
-  background: #fff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(124, 58, 237, 0.18);
   border-radius: 14px;
   overflow: hidden;
@@ -37,7 +37,7 @@
 .ies-section-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -87,7 +87,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 1.5rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.875rem;
 }
 
@@ -108,13 +108,13 @@
 .ies-history-empty-title {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .ies-history-empty-desc {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0;
   max-width: 380px;
   line-height: 1.5;
@@ -149,15 +149,15 @@
 }
 
 .ies-history-entry {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.75rem 1rem;
-  background: #fafafa;
+  background: var(--bg-secondary);
   transition: border-color 0.15s;
 }
 
 .ies-history-entry:hover {
-  border-color: #d1d5db;
+  border-color: var(--border);
 }
 
 .ies-history-entry-header {
@@ -178,7 +178,7 @@
 .ies-history-entry-index {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-faint);
   letter-spacing: 0.03em;
 }
 
@@ -188,9 +188,9 @@
   gap: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #4b5563;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.125rem 0.375rem;
 }
@@ -220,13 +220,13 @@
   align-items: center;
   gap: 0.2rem;
   font-size: 0.6875rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .ies-history-expand-btn {
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--text-faint);
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 4px;
@@ -237,12 +237,12 @@
 }
 
 .ies-history-expand-btn:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .ies-history-goal {
   font-size: 0.8125rem;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1.4;
 }
@@ -250,11 +250,11 @@
 .ies-history-message-preview {
   margin-top: 0.625rem;
   padding: 0.625rem 0.75rem;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -265,7 +265,7 @@
 
 .ies-history-message-subject {
   margin: 0 0 0.5rem !important;
-  color: #374151 !important;
+  color: var(--text-primary) !important;
   font-size: 0.8125rem;
 }
 
@@ -275,11 +275,11 @@
   gap: 0.25rem;
   margin-top: 0.625rem;
   background: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.25rem 0.625rem;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -296,7 +296,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 0 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-secondary);
   margin-bottom: 0;
 }
 
@@ -313,24 +313,24 @@
 .ies-flow-contact-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .ies-collapse-btn {
   background: transparent;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .ies-collapse-btn:hover {
-  background: #f9fafb;
-  color: #374151;
-  border-color: #d1d5db;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
 }
 
 /* ── Step Divider ── */
@@ -364,7 +364,7 @@
 .ies-barry-question {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
   padding-top: 0.125rem;
   line-height: 1.4;
@@ -379,11 +379,11 @@
   width: 100%;
   min-height: 84px;
   padding: 0.75rem 0.875rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 0.875rem;
-  color: #111827;
-  background: #fff;
+  color: var(--text-primary);
+  background: var(--bg-card);
   resize: none;
   overflow: hidden;
   font-family: inherit;
@@ -400,7 +400,7 @@
 }
 
 .ies-intent-input::placeholder {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* ── Channel chips ── */
@@ -422,13 +422,13 @@
 }
 
 .ies-chip-ok {
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
 }
 
 .ies-chip-missing {
-  color: #9ca3af;
+  color: var(--text-faint);
   background: rgba(156, 163, 175, 0.08);
   border: 1px solid rgba(156, 163, 175, 0.2);
 }
@@ -480,8 +480,8 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.625rem 0.75rem;
   margin-bottom: 1rem;
@@ -490,14 +490,14 @@
 .ies-submitted-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-faint);
   flex-shrink: 0;
   padding-top: 0.05rem;
 }
 
 .ies-submitted-text {
   font-size: 0.8125rem;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
@@ -515,7 +515,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
+  color: var(--text-faint);
   padding: 0.125rem;
   border-radius: 4px;
   flex-shrink: 0;
@@ -535,7 +535,7 @@
 .ies-goal-edit-input {
   width: 100%;
   font-size: 0.8125rem;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.4;
   border: 1px solid #a855f7;
   border-radius: 6px;
@@ -543,7 +543,7 @@
   resize: none;
   font-family: inherit;
   outline: none;
-  background: #fff;
+  background: var(--bg-card);
 }
 
 .ies-goal-edit-actions {
@@ -570,15 +570,15 @@
 
 .ies-goal-cancel-btn {
   background: none;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.3rem 0.625rem;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: border-color 0.15s;
 }
-.ies-goal-cancel-btn:hover { border-color: #9ca3af; }
+.ies-goal-cancel-btn:hover { border-color: var(--text-faint); }
 
 /* ── Relationship Type Step ── */
 .ies-intent-options {
@@ -594,8 +594,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 0.875rem;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   cursor: pointer;
   text-align: left;
@@ -610,12 +610,12 @@
 .ies-intent-option-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .ies-intent-option-desc {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .ies-intent-arrow {
@@ -626,7 +626,7 @@
 .ies-skip-btn {
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.8125rem;
   cursor: pointer;
   padding: 0.25rem 0;
@@ -637,7 +637,7 @@
 }
 
 .ies-skip-btn:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ── Generating Step ── */
@@ -664,13 +664,13 @@
 .ies-generating-text {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .ies-generating-hint {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* ── Error State ── */
@@ -689,7 +689,7 @@
 
 .ies-error-text {
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -697,13 +697,13 @@
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -724,8 +724,8 @@
   display: block;
   width: 100%;
   text-align: left;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   padding: 1rem;
   cursor: pointer;
@@ -749,7 +749,7 @@
 .ies-option-strategy {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .ies-option-arrow {
@@ -760,13 +760,13 @@
 .ies-option-subject {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 0.375rem;
 }
 
 .ies-option-preview {
   font-size: 0.8125rem;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0 0 0.5rem;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -811,15 +811,15 @@
 
 .ies-selected-reasoning span {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
   line-height: 1.4;
 }
 
 /* ── Message Preview ── */
 .ies-message-preview {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0.875rem;
   margin-bottom: 0.875rem;
@@ -829,7 +829,7 @@
   display: block;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 0.375rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -838,11 +838,11 @@
 .ies-subject-input {
   width: 100%;
   padding: 0.5rem 0.625rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 7px;
   font-size: 0.875rem;
-  color: #111827;
-  background: #fff;
+  color: var(--text-primary);
+  background: var(--bg-card);
   margin-bottom: 0.75rem;
   font-family: inherit;
   box-sizing: border-box;
@@ -864,7 +864,7 @@
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.7rem;
 }
 
@@ -875,9 +875,9 @@
   gap: 0.375rem;
   min-height: 2.25rem;
   padding: 0.3rem 0.625rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 7px;
-  background: #fff;
+  background: var(--bg-card);
   cursor: text;
   transition: border-color 0.15s;
 }
@@ -891,7 +891,7 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.2rem 0.5rem;
-  background: #f3e8ff;
+  background: rgba(124,58,237,0.12);
   border: 1px solid #d8b4fe;
   border-radius: 99px;
   font-size: 0.78rem;
@@ -930,7 +930,7 @@
   outline: none;
   font-size: 0.875rem;
   font-family: inherit;
-  color: #111827;
+  color: var(--text-primary);
   background: transparent;
   padding: 0.1rem 0;
 }
@@ -940,8 +940,8 @@
   top: calc(100% + 2px);
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.10);
   z-index: 100;
@@ -969,7 +969,7 @@
 .ies-cc-suggestion-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -978,7 +978,7 @@
 
 .ies-cc-suggestion-email {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -991,11 +991,11 @@
 .ies-message-textarea {
   width: 100%;
   padding: 0.625rem 0.75rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 7px;
   font-size: 0.875rem;
-  color: #111827;
-  background: #fff;
+  color: var(--text-primary);
+  background: var(--bg-card);
   resize: none;
   overflow: hidden;
   font-family: inherit;
@@ -1013,7 +1013,7 @@
 .ies-weapon-prompt {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.625rem;
 }
 
@@ -1030,8 +1030,8 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.875rem 0.625rem;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.15s;
@@ -1049,7 +1049,7 @@
 .ies-weapon-btn span:first-of-type {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .ies-weapon-btn svg {
@@ -1062,7 +1062,7 @@
 }
 
 .ies-weapon-disabled svg {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .ies-weapon-note {
@@ -1084,9 +1084,9 @@
 .ies-weapon-badge-alt {
   font-size: 0.625rem;
   font-weight: 600;
-  color: #6b7280;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 5px;
   padding: 0.1rem 0.35rem;
 }
@@ -1098,7 +1098,7 @@
   gap: 0.375rem;
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -1108,7 +1108,7 @@
 }
 
 .ies-back-btn:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ── Review Step ── */
@@ -1120,13 +1120,13 @@
   display: block;
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.2rem;
 }
 
 .ies-review-via {
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .ies-handoff-notice {
@@ -1172,7 +1172,7 @@
 
 .ies-char-count {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-top: 0.375rem;
   display: block;
 }
@@ -1251,20 +1251,20 @@
 .ies-result-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .ies-result-desc {
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1.5;
 }
 
 .ies-result-detail {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0;
 }
 
@@ -1302,9 +1302,9 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: #fff;
-  color: #374151;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -1366,18 +1366,18 @@
   width: 30px;
   height: 30px;
   background: transparent;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 7px;
-  color: #9ca3af;
+  color: var(--text-faint);
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s;
 }
 
 .ies-section-collapse-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #d1d5db;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
 }
 
 /* ── Saved Prompts ── */
@@ -1389,7 +1389,7 @@
   display: block;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 0.375rem;
@@ -1443,12 +1443,12 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.75rem 0.875rem;
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 10px;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s;
@@ -1492,11 +1492,11 @@
   right: 0.875rem;
   padding: 0.25rem 0.5rem;
   background: rgba(255,255,255,0.9);
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
   backdrop-filter: blur(4px);
@@ -1525,7 +1525,7 @@
   display: flex;
   justify-content: center;
   padding-top: 0.625rem;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--bg-secondary);
   margin-top: 0.625rem;
 }
 
@@ -1557,7 +1557,7 @@
 
 .ies-all-history-empty {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-align: center;
   padding: 1rem;
   margin: 0;
@@ -1577,14 +1577,14 @@
 }
 
 .ies-all-history-entry:not(:last-child) {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-secondary);
 }
 
 .ies-all-history-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #d1d5db;
+  background: var(--border);
   flex-shrink: 0;
   margin-top: 0.45rem;
 }
@@ -1603,7 +1603,7 @@
 
 .ies-all-history-label {
   font-size: 0.8125rem;
-  color: #374151;
+  color: var(--text-primary);
   font-weight: 500;
   text-transform: capitalize;
 }
@@ -1613,13 +1613,13 @@
   align-items: center;
   gap: 0.2rem;
   font-size: 0.6875rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-left: auto;
 }
 
 .ies-all-history-preview {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0.375rem 0 0;
   line-height: 1.4;
   white-space: pre-wrap;

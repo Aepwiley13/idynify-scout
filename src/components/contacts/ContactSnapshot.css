@@ -26,7 +26,7 @@
 
 /* Modal Container */
 .contact-snapshot-container {
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 16px;
   width: 100%;
   max-width: 800px;
@@ -82,7 +82,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 2rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
 }
 
@@ -101,12 +101,12 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  color: #6b7280;
+  color: var(--text-secondary);
   transition: color 0.2s ease;
 }
 
 .contact-snapshot-header-simple .back-button:hover {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .header-text {
@@ -117,7 +117,7 @@
 .snapshot-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.375rem 0;
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -125,7 +125,7 @@
 
 .snapshot-subtitle {
   font-size: 0.9375rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 500;
   margin: 0;
 }
@@ -162,8 +162,8 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  background: #f0fdf4;
-  border: 1.5px solid #86efac;
+  background: rgba(16,185,129,0.07);
+  border: 1.5px solid rgba(16,185,129,0.35);
   border-radius: 10px;
   color: #15803d;
   font-size: 0.875rem;
@@ -186,8 +186,8 @@
 /* Footer with Open Full Profile Button */
 .snapshot-footer {
   padding: 1.5rem 2rem 2rem 2rem;
-  border-top: 2px solid #f3f4f6;
-  background: #ffffff;
+  border-top: 2px solid var(--bg-secondary);
+  background: var(--bg-card);
 }
 
 .open-full-profile-btn {
@@ -322,7 +322,7 @@
 
 .contact-status-dormant {
   background: rgba(148, 163, 184, 0.2);
-  color: #94a3b8;
+  color: var(--text-faint);
   border: 1px solid rgba(148, 163, 184, 0.35);
 }
 

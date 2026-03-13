@@ -7,8 +7,8 @@
 .structured-fields {
   margin-top: 1.5rem;
   padding: 1rem 1.25rem;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
 }
 
@@ -20,13 +20,13 @@
   margin-bottom: 0.875rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .structured-fields-header svg {
-  color: #9ca3af;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
@@ -34,7 +34,7 @@
   margin-left: auto;
   font-size: 0.75rem;
   font-weight: 400;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-transform: none;
   letter-spacing: normal;
 }
@@ -56,7 +56,7 @@
 .sf-field-label {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
   min-width: 6.5rem;
   flex-shrink: 0;
 }
@@ -72,9 +72,9 @@
   padding: 0.3125rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
   background: white;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 1rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -82,9 +82,9 @@
 }
 
 .sf-option-btn:hover {
-  color: #374151;
-  border-color: #9ca3af;
-  background: #f3f4f6;
+  color: var(--text-primary);
+  border-color: var(--text-faint);
+  background: var(--bg-secondary);
 }
 
 .sf-option-btn.sf-option-active {

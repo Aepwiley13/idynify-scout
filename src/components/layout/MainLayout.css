@@ -2,7 +2,7 @@
 .main-layout {
   display: flex;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--bg-secondary);
 }
 
 /* Main Content Area */
@@ -25,8 +25,8 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
   padding: 1rem 2rem;
   display: flex;
   align-items: center;
@@ -50,19 +50,19 @@
   padding: 0.5rem;
   background: transparent;
   border: none;
-  color: #374151;
+  color: var(--text-primary);
   cursor: pointer;
   border-radius: 0.5rem;
   transition: all 0.2s;
 }
 
 .mobile-menu-trigger:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .mobile-menu-trigger:active {
-  background: #e5e7eb;
+  background: var(--surface);
 }
 
 /* Mobile Menu Backdrop */
@@ -91,7 +91,7 @@
 .page-title {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -106,9 +106,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   border-radius: 0.5rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -117,10 +117,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -128,9 +128,9 @@
 }
 
 .logout-button:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #111827;
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 /* Settings shortcut button in TopBar */
@@ -150,13 +150,13 @@
 }
 
 .topbar-settings-btn:hover {
-  background: #fffbeb;
-  color: #b45309;
+  background: rgba(250,170,32,0.10);
+  color: #d97706;
   box-shadow: 0 0 10px rgba(250, 170, 32, 0.4), 0 0 20px rgba(250, 170, 32, 0.15);
 }
 
 .topbar-settings-btn.active {
-  background: #fffbeb;
+  background: rgba(250,170,32,0.10);
   color: #d97706;
   box-shadow: 0 0 10px rgba(250, 170, 32, 0.5), 0 0 20px rgba(250, 170, 32, 0.2);
 }
@@ -276,7 +276,7 @@
 
   .page-content {
     padding: 0;
-    background: #ffffff;
+    background: var(--bg-card);
     /* Add space so content isn't hidden behind the fixed bottom nav (56px + iOS safe area) */
     padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
@@ -304,7 +304,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 1.25rem 1.25rem 0 0;
   padding: 0 0 env(safe-area-inset-bottom, 0px);
   animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -318,7 +318,7 @@
 .more-sheet-handle {
   width: 40px;
   height: 4px;
-  background: #e5e7eb;
+  background: var(--surface);
   border-radius: 2px;
   margin: 12px auto 0;
 }
@@ -328,13 +328,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px 8px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border);
 }
 
 .more-sheet-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .more-sheet-close {
@@ -344,14 +344,14 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   border: none;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.more-sheet-close:active { background: #e5e7eb; }
+.more-sheet-close:active { background: var(--surface); }
 
 .more-sheet-grid {
   display: grid;
@@ -367,10 +367,10 @@
   justify-content: center;
   gap: 6px;
   padding: 16px 8px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 1rem;
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -380,8 +380,8 @@
 }
 
 .more-sheet-item:active {
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  background: var(--bg-secondary);
+  border-color: var(--border);
 }
 
 .more-sheet-logout {
@@ -392,8 +392,8 @@
   width: calc(100% - 40px);
   margin: 0 20px 20px;
   padding: 14px;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
+  background: rgba(220,38,38,0.08);
+  border: 1px solid rgba(220,38,38,0.20);
   border-radius: 0.75rem;
   color: #dc2626;
   font-size: 0.875rem;
@@ -403,7 +403,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.more-sheet-logout:active { background: #fee2e2; }
+.more-sheet-logout:active { background: rgba(220,38,38,0.14); }
 
 @media (max-width: 768px) {
   .more-sheet-backdrop {
@@ -412,13 +412,12 @@
 }
 
 /* Dark theme overrides for More sheet */
-.theme-dark .more-sheet {
-  background: #0f0f14;
-  border-top: 1px solid #1e1e2e;
+.more-sheet {
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
 }
-.theme-dark .more-sheet-handle { background: #2d2d44; }
-.theme-dark .more-sheet-header { border-bottom-color: #1e1e2e; }
-.theme-dark .more-sheet-title { color: #f1f5f9; }
-.theme-dark .more-sheet-close { background: #1e1e2e; color: #94a3b8; }
-.theme-dark .more-sheet-item { background: #1a1a2e; border-color: #2d2d44; color: #cbd5e1; }
-.theme-dark .more-sheet-logout { background: #1f0a0a; border-color: #7f1d1d; }
+.more-sheet-handle { background: var(--border-2, var(--border)); }
+.more-sheet-header { border-bottom-color: var(--border); }
+.more-sheet-title { color: var(--text-primary); }
+.more-sheet-close { background: var(--surface); color: var(--text-secondary); }
+.more-sheet-item { background: var(--bg-card); border-color: var(--border); color: var(--text-primary); }

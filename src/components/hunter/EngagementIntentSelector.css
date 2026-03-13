@@ -1,18 +1,18 @@
 .engagement-intent-selector {
   padding: 2rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border-radius: 8px;
 }
 
 .engagement-intent-selector h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1.5rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .intent-subtitle {
   margin: 0 0 1.5rem 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -26,7 +26,7 @@
   display: block;
   padding: 1.25rem;
   background: white;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
@@ -39,7 +39,7 @@
 
 .intent-option.selected {
   border-color: #3b82f6;
-  background: #eff6ff;
+  background: rgba(59,130,246,0.08);
 }
 
 .intent-option.disabled {
@@ -69,24 +69,24 @@
 .option-label {
   font-weight: 600;
   font-size: 1.1rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .option-description {
   margin: 0.5rem 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .option-guidance {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.6;
 }
 
 .option-guidance strong {
-  color: #111827;
+  color: var(--text-primary);
 }

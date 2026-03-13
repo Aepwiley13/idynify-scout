@@ -1,8 +1,8 @@
 /* LiveOutputPreview — threshold-gated dynamic Barry output preview */
 
 .live-output-preview {
-  background: #fff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 16px;
   padding: 20px 24px;
   margin-bottom: 2rem;
@@ -23,20 +23,20 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0 0 4px;
 }
 
 .lop-threshold-label {
   font-size: 18px;
   font-weight: 800;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 2px;
 }
 
 .lop-threshold-desc {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -60,8 +60,8 @@
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 14px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   transition: background 0.2s ease, opacity 0.2s ease;
 }
 
@@ -77,7 +77,7 @@
   gap: 6px;
   margin-bottom: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -86,18 +86,18 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .lop-persona-name {
   font-size: 12px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .lop-persona-role {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ── Preview lines ────────────────────────────────────────────────────────── */
@@ -125,7 +125,7 @@
 
 .lop-line-body {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.6;
 }
 
@@ -142,7 +142,7 @@
 
 .lop-annotation {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
   line-height: 1.5;
   margin: 0;
@@ -156,9 +156,9 @@
   flex-direction: column;
   gap: 5px;
   padding: 10px 12px;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   border-radius: 8px;
-  border: 1px dashed #d1d5db;
+  border: 1px dashed var(--border);
 }
 
 .lop-grey-slot {
@@ -170,13 +170,13 @@
 .lop-grey-slot-label {
   font-size: 11px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-faint);
   white-space: nowrap;
 }
 
 .lop-grey-slot-unlock {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -184,11 +184,11 @@
 
 .lop-footnote {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
   text-align: center;
   margin: 8px 0 0;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   padding-top: 10px;
 }
 
@@ -233,7 +233,7 @@
 }
 
 .lop-dot--future {
-  background: #d1d5db;
+  background: var(--border);
 }
 
 .lop-dot--future:hover {
@@ -243,7 +243,7 @@
 
 .lop-progress-hint {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0;
 }
 
@@ -251,7 +251,7 @@
 
 .lop-zero-cta {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin: 12px 0 0;
   text-align: center;

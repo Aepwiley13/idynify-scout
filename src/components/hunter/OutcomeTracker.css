@@ -6,7 +6,7 @@
 
 .outcome-select {
   padding: 0.5rem 0.75rem;
-  border: 2px solid #d1d5db;
+  border: 2px solid var(--border);
   border-radius: 6px;
   font-size: 0.9rem;
   font-weight: 500;
@@ -16,7 +16,7 @@
 }
 
 .outcome-select:hover {
-  border-color: #9ca3af;
+  border-color: var(--text-faint);
 }
 
 .outcome-select:disabled {
@@ -29,8 +29,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: #f3f4f6;
-  border: 2px solid #d1d5db;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border);
   border-radius: 6px;
 }
 
@@ -46,7 +46,7 @@
 
 .outcome-timestamp {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -80,12 +80,12 @@
 .modal-content h3 {
   margin: 0 0 1rem 0;
   font-size: 1.25rem;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .modal-content p {
   margin: 0.5rem 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
@@ -98,8 +98,8 @@
 
 .btn-secondary {
   padding: 0.625rem 1.25rem;
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   border: none;
   border-radius: 6px;
   font-weight: 500;
@@ -108,7 +108,7 @@
 }
 
 .btn-secondary:hover {
-  background: #e5e7eb;
+  background: var(--border);
 }
 
 .btn-primary {

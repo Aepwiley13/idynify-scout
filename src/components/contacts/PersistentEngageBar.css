@@ -91,7 +91,7 @@
 
 .peb-status-sublabel {
   font-size: 11.5px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 400;
   line-height: 1.2;
   white-space: nowrap;
@@ -103,7 +103,7 @@
 /* Sub-state C: Barry is still analyzing — subtle shimmer on sublabel */
 .peb-sublabel-analyzing {
   animation: peb-shimmer 2s ease-in-out infinite;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 @keyframes peb-shimmer {
@@ -133,13 +133,13 @@
 .peb-stat-icon {
   width: 12px;
   height: 12px;
-  color: #9ca3af;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
 .peb-stat-label {
   font-size: 11.5px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
@@ -258,7 +258,7 @@
   border-radius: 7px;
   border: 1px solid rgba(107, 114, 128, 0.2);
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-faint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -268,7 +268,7 @@
 
 .peb-expand-btn:hover {
   background: rgba(107, 114, 128, 0.06);
-  color: #374151;
+  color: var(--text-primary);
 }
 
 /* ── Expanded Section ── */
@@ -302,7 +302,7 @@
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* Channel list in expanded */
@@ -330,7 +330,7 @@
 
 .peb-ch-blocked {
   background: rgba(107, 114, 128, 0.06);
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .peb-ch-badge {
@@ -340,7 +340,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(107, 114, 128, 0.1);
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .peb-ch-badge-ok {
@@ -373,7 +373,7 @@
 
 .peb-recent-text {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-weight: 400;
   flex: 1;
   text-transform: capitalize;
@@ -381,7 +381,7 @@
 
 .peb-recent-time {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-weight: 400;
   white-space: nowrap;
 }
@@ -390,7 +390,7 @@
 
 .peb-pivot-hint {
   font-size: 12.5px;
-  color: #9ca3af;
+  color: var(--text-faint);
   line-height: 1.5;
   font-weight: 400;
 }
@@ -431,7 +431,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 13px;
 }
 
@@ -550,7 +550,7 @@
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .peb-reply-channels {
@@ -567,7 +567,7 @@
   border-radius: 7px;
   border: 1px solid rgba(107, 114, 128, 0.2);
   background: rgba(107, 114, 128, 0.06);
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -601,7 +601,7 @@
 }
 
 .peb-reply-note::placeholder {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .peb-reply-note:focus {
@@ -642,7 +642,7 @@
 
 .peb-log-cancel-btn {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   background: transparent;
   border: 1px solid rgba(107, 114, 128, 0.2);
   border-radius: 8px;
@@ -652,7 +652,7 @@
 }
 
 .peb-log-cancel-btn:hover {
-  color: #9ca3af;
+  color: var(--text-faint);
   border-color: rgba(107, 114, 128, 0.35);
 }
 

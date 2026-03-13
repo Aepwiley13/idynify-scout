@@ -10,8 +10,8 @@
 }
 
 .mission-card {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 16px;
   padding: 1.5rem;
   cursor: pointer;
@@ -21,7 +21,7 @@
 /* Finding 3: Solid hover border, matching Scout pattern */
 .mission-card:hover {
   border-color: #8b5cf6;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
 }
@@ -32,7 +32,7 @@
   justify-content: space-between;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1.5px solid #e5e7eb;
+  border-bottom: 1.5px solid var(--border);
 }
 
 .mission-info {
@@ -42,7 +42,7 @@
 .mission-name {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.75rem 0;
 }
 
@@ -70,7 +70,7 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
-  background: #ede9fe;
+  background: rgba(124,58,237,0.12);
   border-radius: 999px;
   font-size: 0.625rem;
   font-weight: 700;
@@ -80,7 +80,7 @@
 .mission-intent-badge {
   display: inline-flex;
   padding: 0.125rem 0.5rem;
-  background: #dbeafe;
+  background: rgba(59,130,246,0.15);
   border-radius: 999px;
   font-size: 0.625rem;
   font-weight: 700;
@@ -93,7 +93,7 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
-  background: #ede9fe;
+  background: rgba(124,58,237,0.12);
   border-radius: 999px;
   font-size: 0.625rem;
   font-weight: 700;
@@ -101,28 +101,28 @@
 }
 
 .mission-status-badge.status-draft {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .mission-status-badge.status-autopilot {
-  background: #d1fae5;
+  background: rgba(16,185,129,0.12);
   color: #065f46;
 }
 
 .mission-status-badge.status-paused {
-  background: #fef3c7;
+  background: rgba(245,158,11,0.12);
   color: #92400e;
 }
 
 .mission-status-badge.status-completed {
-  background: #dbeafe;
+  background: rgba(59,130,246,0.15);
   color: #1e40af;
 }
 
 .mission-date {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   white-space: nowrap;
 }
 
@@ -138,7 +138,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .mission-stat.success {
@@ -146,7 +146,7 @@
 }
 
 .mission-stat.pending {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .mission-outcomes {
@@ -154,7 +154,7 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   padding-top: 1rem;
-  border-top: 1.5px solid #e5e7eb;
+  border-top: 1.5px solid var(--border);
 }
 
 /* Finding 20: Solid badge backgrounds */
@@ -168,17 +168,17 @@
 }
 
 .outcome-badge.replied {
-  background: #dbeafe;
+  background: rgba(59,130,246,0.15);
   color: #1e40af;
 }
 
 .outcome-badge.meeting {
-  background: #d1fae5;
+  background: rgba(16,185,129,0.12);
   color: #065f46;
 }
 
 .outcome-badge.opportunity {
-  background: #ede9fe;
+  background: rgba(124,58,237,0.12);
   color: #5b21b6;
 }
 

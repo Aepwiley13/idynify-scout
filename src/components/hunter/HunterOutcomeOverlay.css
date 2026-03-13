@@ -68,7 +68,7 @@
 
 .hoo-context {
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 1.25rem;
 }
 
@@ -130,11 +130,11 @@
 
 .hoo-option-desc {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .hoo-option-saving {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   white-space: nowrap;
 }

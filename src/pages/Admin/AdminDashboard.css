@@ -6,7 +6,7 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   min-height: 100vh;
 }
 
@@ -27,14 +27,14 @@
 .page-title {
   font-size: 2rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.5rem 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 .page-subtitle {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -83,8 +83,8 @@
 }
 
 .stat-card {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
   display: flex;
@@ -102,7 +102,7 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: #eff6ff;
+  background: rgba(59,130,246,0.08);
   color: #3b82f6;
   display: flex;
   align-items: center;
@@ -111,17 +111,17 @@
 }
 
 .stat-icon-success {
-  background: #f0fdf4;
+  background: rgba(16,185,129,0.07);
   color: #10b981;
 }
 
 .stat-icon-warning {
-  background: #fef3c7;
+  background: rgba(245,158,11,0.12);
   color: #f59e0b;
 }
 
 .stat-icon-info {
-  background: #ede9fe;
+  background: rgba(124,58,237,0.12);
   color: #8b5cf6;
 }
 
@@ -132,7 +132,7 @@
 .stat-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 0.5rem 0;
@@ -141,14 +141,14 @@
 .stat-value {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1;
 }
 
 .stat-detail {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0.5rem 0 0 0;
 }
 
@@ -156,8 +156,8 @@
    FILTERS & SEARCH
    ======================================== */
 .filters-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
@@ -180,18 +180,18 @@
   transform: translateY(-50%);
   width: 20px;
   height: 20px;
-  color: #9ca3af;
+  color: var(--text-faint);
   pointer-events: none;
 }
 
 .search-input {
   width: 100%;
   padding: 0.75rem 1rem 0.75rem 3rem;
-  background: #f9fafb;
-  border: 1.5px solid #d1d5db;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   font-size: 0.9375rem;
-  color: #111827;
+  color: var(--text-primary);
   transition: all 0.2s ease;
 }
 
@@ -214,17 +214,17 @@
 
 .filter-group select {
   padding: 0.75rem 1rem;
-  background: #f9fafb;
-  border: 1.5px solid #d1d5db;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   font-size: 0.9375rem;
-  color: #111827;
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .filter-group select:hover {
-  border-color: #9ca3af;
+  border-color: var(--text-faint);
 }
 
 .filter-group select:focus {
@@ -237,8 +237,8 @@
    USERS TABLE
    ======================================== */
 .users-table-container {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 1rem;
@@ -250,8 +250,8 @@
 }
 
 .users-table thead {
-  background: #f9fafb;
-  border-bottom: 1.5px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border-bottom: 1.5px solid var(--border);
 }
 
 .users-table th {
@@ -259,7 +259,7 @@
   text-align: left;
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -275,12 +275,12 @@
 }
 
 .users-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-secondary);
   transition: background 0.2s;
 }
 
 .users-table tbody tr:hover {
-  background: #f9fafb;
+  background: var(--bg-secondary);
 }
 
 .users-table td {
@@ -297,13 +297,13 @@
 
 .user-email {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .user-uid {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-family: 'Monaco', 'Courier New', monospace;
   margin: 0;
 }
@@ -319,13 +319,13 @@
 
 .metric-main {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .metric-detail {
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -340,25 +340,25 @@
 }
 
 .badge-success {
-  background: #d1fae5;
+  background: rgba(16,185,129,0.12);
   color: #065f46;
 }
 
 .badge-info {
-  background: #dbeafe;
+  background: rgba(59,130,246,0.15);
   color: #1e40af;
 }
 
 /* Last Login Cell */
 .last-login {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .signup-date {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0.25rem 0 0 0;
 }
 
@@ -387,13 +387,13 @@
 .no-results {
   padding: 3rem 1.5rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .results-count {
   text-align: center;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 1rem;
 }
 
@@ -407,7 +407,7 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   padding: 2rem;
   text-align: center;
 }
@@ -415,7 +415,7 @@
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--border);
   border-top: 3px solid #3b82f6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -429,12 +429,12 @@
 .admin-dashboard-error h2 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
 .admin-dashboard-error p {
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 1.5rem 0;
 }
 

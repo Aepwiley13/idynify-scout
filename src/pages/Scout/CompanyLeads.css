@@ -10,7 +10,7 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 2rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-family: 'Courier New', monospace;
 }
 
@@ -30,7 +30,7 @@
 }
 
 .breadcrumb span {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Company Header */
@@ -72,7 +72,7 @@
 }
 
 .company-info-compact p {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.875rem;
   margin: 0;
   font-family: 'Courier New', monospace;
@@ -118,7 +118,7 @@
 }
 
 .contacts-header p {
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0;
   font-family: 'Courier New', monospace;
 }
@@ -180,7 +180,7 @@
 }
 
 .contact-title {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.875rem;
   margin: 0;
   font-family: 'Courier New', monospace;
@@ -243,7 +243,7 @@
 
 .added-date {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-family: 'Courier New', monospace;
 }
 
@@ -300,7 +300,7 @@
   background: rgba(0, 0, 0, 0.4);
   border-radius: 16px;
   border: 2px dashed rgba(6, 182, 212, 0.3);
-  color: #9ca3af;
+  color: var(--text-faint);
   font-family: 'Courier New', monospace;
 }
 

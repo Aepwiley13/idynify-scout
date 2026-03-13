@@ -46,7 +46,7 @@
 
 .mc-sub {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -72,7 +72,7 @@
 
 .mc-goal-badge {
   font-size: 10px;
-  color: #9ca3af;
+  color: var(--text-faint);
   background: rgba(255, 255, 255, 0.06);
   padding: 3px 8px;
   border-radius: 20px;
@@ -131,7 +131,7 @@
 
 .mc-loading-text {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-align: center;
   line-height: 1.5;
   max-width: 280px;
@@ -171,7 +171,7 @@
 .mc-next-goal-header {
   font-size: 9px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--text-secondary);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -203,7 +203,7 @@
 
 .mc-btn--dismiss-goal {
   background: transparent;
-  color: #6b7280;
+  color: var(--text-secondary);
   border: 1px solid rgba(255,255,255,0.08);
   font-size: 12px;
   padding: 6px 12px;
@@ -258,7 +258,7 @@
 .mc-step-label {
   font-size: 10px;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -304,7 +304,7 @@
 
 .mc-btn--manual {
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-faint);
   border: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -317,7 +317,7 @@
 .mc-outcome-cta {
   background: none;
   border: 1px solid rgba(255,255,255,0.1);
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 12px;
   padding: 8px 14px;
   border-radius: 8px;
@@ -344,14 +344,14 @@
   width: 100%;
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
   padding: 0;
   transition: color 0.15s;
 }
 
-.mc-steps-toggle:hover { color: #9ca3af; }
+.mc-steps-toggle:hover { color: var(--text-faint); }
 
 /* ── AngleSelector (inline styles) ── */
 .as-tabs {
@@ -371,7 +371,7 @@
   cursor: pointer;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.04);
-  color: #9ca3af;
+  color: var(--text-faint);
   transition: all 0.15s;
 }
 
@@ -418,7 +418,7 @@
 .emf-label {
   font-size: 10px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -518,7 +518,7 @@
 
 .msp-step--pending .msp-dot {
   background: rgba(255,255,255,0.06);
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .msp-info {
@@ -545,11 +545,11 @@
 
 .msp-step--pending .msp-label {
   font-weight: 400;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .msp-label-muted {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .msp-current-indicator {
@@ -568,12 +568,12 @@
 
 .msp-time {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .msp-outcome-tag {
   font-size: 10px;
-  color: #9ca3af;
+  color: var(--text-faint);
   background: rgba(255,255,255,0.06);
   padding: 2px 8px;
   border-radius: 10px;

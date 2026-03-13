@@ -45,7 +45,7 @@
 .nbs-header-title {
   font-size: 13px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .nbs-dismiss-btn {
@@ -54,7 +54,7 @@
   border-radius: 6px;
   border: 1px solid rgba(107, 114, 128, 0.15);
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-faint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,7 +64,7 @@
 
 .nbs-dismiss-btn:hover {
   background: rgba(107, 114, 128, 0.06);
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .nbs-overdue-tag {
@@ -121,14 +121,14 @@
 .nbs-proposal-message {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--text-primary);
   line-height: 1.4;
   margin: 0;
 }
 
 .nbs-proposal-suggestion {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.5;
   margin: 0;
   font-weight: 400;
@@ -146,7 +146,7 @@
 .nbs-timing-label {
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -163,7 +163,7 @@
   background: transparent;
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -222,23 +222,23 @@
 
 .nbs-act-secondary {
   background: rgba(255, 255, 255, 0.9);
-  color: #374151;
+  color: var(--text-primary);
   border: 1.5px solid rgba(107, 114, 128, 0.2);
 }
 
 .nbs-act-secondary:hover {
-  background: #ffffff;
+  background: var(--bg-card);
   border-color: rgba(107, 114, 128, 0.35);
 }
 
 .nbs-act-dismiss {
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-faint);
   border: 1px solid transparent;
 }
 
 .nbs-act-dismiss:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
   background: rgba(107, 114, 128, 0.05);
 }
 
@@ -293,7 +293,7 @@
 
 .nbs-active-preview {
   font-size: 13.5px;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.45;
   margin: 0;
   font-weight: 400;
@@ -304,7 +304,7 @@
   align-items: center;
   gap: 4px;
   font-size: 11.5px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -353,7 +353,7 @@
 
 .nbs-confirmed-sub {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 400;
 }
 

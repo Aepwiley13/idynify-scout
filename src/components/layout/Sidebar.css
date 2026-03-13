@@ -5,8 +5,8 @@
   top: 0;
   height: 100vh;
   width: 260px;
-  background: #ffffff;
-  border-right: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border-right: 1.5px solid var(--border);
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
@@ -21,7 +21,7 @@
 /* Sidebar Header */
 .sidebar-header {
   padding: 0.75rem;
-  border-bottom: 1.5px solid #e5e7eb;
+  border-bottom: 1.5px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -31,10 +31,10 @@
   gap: 0.625rem;
   width: 100%;
   padding: 0.625rem 0.75rem;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
   border-radius: 0.5rem;
-  color: #334155;
+  color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.8125rem;
   cursor: pointer;
@@ -43,9 +43,9 @@
 }
 
 .mission-control-link:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #1e293b;
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 .mission-control-link.collapsed {
@@ -70,12 +70,12 @@
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: var(--scrollbar);
   border-radius: 2px;
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--scrollbar);
 }
 
 /* ─── Navigation Pillars ─── */
@@ -84,7 +84,7 @@
 }
 
 .nav-pillar + .nav-pillar {
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--border);
 }
 
 .pillar-header {
@@ -95,7 +95,7 @@
   padding: 0.625rem 0.75rem;
   background: transparent;
   border: none;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -106,8 +106,8 @@
 }
 
 .pillar-header:hover {
-  background: #f8fafc;
-  color: #1e293b;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .pillar-header.collapsed {
@@ -116,7 +116,7 @@
 }
 
 .pillar-active .pillar-header {
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 /* Pillar Icon */
@@ -132,9 +132,9 @@
 }
 
 .pillar-icon.pillar-purple {
-  background: #f3e8ff;
+  background: rgba(124,58,237,0.12);
   color: #7c3aed;
-  border: 1px solid #ddd6fe;
+  border: 1px solid rgba(124,58,237,0.28);
 }
 
 .pillar-active .pillar-icon.pillar-purple {
@@ -145,9 +145,9 @@
 }
 
 .pillar-icon.pillar-cyan {
-  background: #ecfeff;
+  background: rgba(8,145,178,0.12);
   color: #0891b2;
-  border: 1px solid #cffafe;
+  border: 1px solid rgba(8,145,178,0.28);
 }
 
 .pillar-active .pillar-icon.pillar-cyan {
@@ -158,9 +158,9 @@
 }
 
 .pillar-icon.pillar-pink {
-  background: #fdf2f8;
+  background: rgba(219,39,119,0.12);
   color: #db2777;
-  border: 1px solid #fce7f3;
+  border: 1px solid rgba(219,39,119,0.28);
 }
 
 .pillar-active .pillar-icon.pillar-pink {
@@ -172,13 +172,13 @@
 
 /* ── Settings Item (orange, fluorescent glow) ── */
 .nav-item.settings-item {
-  color: #b45309;
+  color: #d97706;
   font-weight: 600;
   border-left-color: transparent;
 }
 
 .nav-item.settings-item:hover {
-  background: #fffbeb;
+  background: rgba(250,170,32,0.10);
   color: #d97706;
   border-left-color: #faaa20;
 }
@@ -189,7 +189,7 @@
 
 [data-pillar="scout"] .nav-item.settings-item.active,
 [data-pillar="hunter"] .nav-item.settings-item.active {
-  background: #fffbeb;
+  background: rgba(250,170,32,0.10);
   border-left-color: #faaa20;
   color: #d97706;
   font-weight: 700;
@@ -210,8 +210,8 @@
   padding: 0.625rem 0.75rem;
   background: transparent;
   border: none;
-  border-top: 1.5px solid #e5e7eb;
-  color: #b45309;
+  border-top: 1.5px solid var(--border);
+  color: #d97706;
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
@@ -221,7 +221,7 @@
 }
 
 .settings-toggle:hover {
-  background: #fffbeb;
+  background: rgba(250,170,32,0.10);
   color: #d97706;
 }
 
@@ -230,7 +230,7 @@
 }
 
 .settings-toggle.active {
-  background: #fffbeb;
+  background: rgba(250,170,32,0.10);
   color: #d97706;
   border-top-color: #faaa20;
 }
@@ -257,7 +257,7 @@
 
 .pillar-chevron {
   transition: transform 0.2s ease;
-  color: #94a3b8;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
@@ -282,7 +282,7 @@
   background: transparent;
   border: none;
   border-left: 2px solid transparent;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   cursor: pointer;
   transition: all 0.15s;
@@ -291,28 +291,28 @@
 }
 
 .nav-item:hover {
-  background: #f8fafc;
-  color: #334155;
-  border-left-color: #e2e8f0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-left-color: var(--border);
 }
 
 /* Active states per pillar */
 [data-pillar="recon"] .nav-item.active {
-  background: #faf5ff;
+  background: rgba(124,58,237,0.12);
   border-left-color: #7c3aed;
   color: #7c3aed;
   font-weight: 600;
 }
 
 [data-pillar="scout"] .nav-item.active {
-  background: #ecfeff;
+  background: rgba(8,145,178,0.12);
   border-left-color: #0891b2;
   color: #0891b2;
   font-weight: 600;
 }
 
 [data-pillar="hunter"] .nav-item.active {
-  background: #f3e8ff;
+  background: rgba(124,58,237,0.12);
   border-left-color: #7c3aed;
   color: #7c3aed;
   font-weight: 600;
@@ -320,7 +320,7 @@
 
 .nav-item.primary-item {
   font-weight: 600;
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .nav-item.collapsed {
@@ -358,8 +358,8 @@
   padding: 0.625rem 0.75rem;
   background: transparent;
   border: none;
-  border-top: 1.5px solid #e5e7eb;
-  color: #64748b;
+  border-top: 1.5px solid var(--border);
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -369,8 +369,8 @@
 }
 
 .theme-toggle:hover {
-  background: #f8fafc;
-  color: #334155;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .theme-toggle.collapsed {
@@ -393,8 +393,8 @@
   padding: 0.75rem;
   background: transparent;
   border: none;
-  border-top: 1.5px solid #e5e7eb;
-  color: #94a3b8;
+  border-top: 1.5px solid var(--border);
+  color: var(--text-faint);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -404,8 +404,8 @@
 }
 
 .collapse-toggle:hover {
-  background: #f8fafc;
-  color: #475569;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 /* ─── Responsive Design ─── */

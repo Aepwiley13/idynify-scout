@@ -522,7 +522,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #FFFFFF;
+  background: var(--bg-card);
   box-shadow: 0 0 8px #00D4FF;
   animation: legendPulse 1.5s ease-in-out infinite;
   flex-shrink: 0;

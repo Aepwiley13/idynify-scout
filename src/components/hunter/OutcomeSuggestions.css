@@ -3,7 +3,7 @@
 .outcome-suggestions {
   margin-top: 1rem;
   padding: 1rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border-left: 3px solid;
   border-radius: 8px;
 }
@@ -18,7 +18,7 @@
 .outcome-suggestions-header h4 {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -31,7 +31,7 @@
 .outcome-suggestions-list li {
   position: relative;
   padding-left: 1.25rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   line-height: 1.6;
   margin-bottom: 0.5rem;
@@ -45,7 +45,7 @@
   content: '→';
   position: absolute;
   left: 0;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-weight: 700;
 }
 

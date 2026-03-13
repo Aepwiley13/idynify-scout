@@ -43,9 +43,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   border: 2px solid rgba(168, 85, 247, 0.3);
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.85rem;
   font-weight: 600;
   transition: all 0.3s;
@@ -96,13 +96,13 @@
 .step-title {
   font-size: 2rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
 .step-description {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* Goals Grid */
@@ -114,7 +114,7 @@
 }
 
 .goal-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.2);
   border-radius: 12px;
   padding: 2rem;
@@ -137,13 +137,13 @@
 .goal-name {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
 .goal-description {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 1rem;
   line-height: 1.5;
 }
@@ -163,7 +163,7 @@
 }
 
 .strategy-field-group {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 12px;
   padding: 1.5rem;
@@ -175,7 +175,7 @@
   gap: 0.5rem;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
@@ -185,7 +185,7 @@
 
 .strategy-field-hint {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 1rem;
 }
 
@@ -204,13 +204,13 @@
   flex-direction: column;
   gap: 0.25rem;
   padding: 0.875rem 1rem;
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .strategy-option:hover {
@@ -226,12 +226,12 @@
 .strategy-option-label {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .strategy-option-desc {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -266,7 +266,7 @@
 .strategy-summary-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -279,7 +279,7 @@
 
 /* Micro-Sequence Section */
 .micro-sequence-section {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 12px;
   padding: 1.5rem;
@@ -292,7 +292,7 @@
   gap: 0.5rem;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 1rem;
 }
 
@@ -301,7 +301,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 2rem 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -325,11 +325,11 @@
 
 .micro-sequence-rationale {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .micro-sequence-steps {
@@ -340,7 +340,7 @@
 }
 
 .micro-step {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 10px;
   padding: 1rem 1.25rem;
@@ -383,7 +383,7 @@
 
 .micro-step-channel {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-left: auto;
   text-transform: capitalize;
 }
@@ -395,13 +395,13 @@
 .micro-step-action {
   font-size: 0.95rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .micro-step-purpose {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -412,12 +412,12 @@
   font-size: 0.75rem;
   color: rgba(34, 197, 94, 0.8);
   padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 .micro-sequence-outcome {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 0.75rem 1rem;
   background: rgba(34, 197, 94, 0.04);
   border: 1px solid rgba(34, 197, 94, 0.15);
@@ -432,7 +432,7 @@
 .orchestration-section-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.75rem;
@@ -440,7 +440,7 @@
 
 /* Orchestration Timeline */
 .orchestration-timeline {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.1);
   border-radius: 12px;
   padding: 2rem;
@@ -516,7 +516,7 @@
 .timeline-label {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .timeline-actions {
@@ -539,7 +539,7 @@
 
 .timeline-description {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 0.75rem;
 }
 
@@ -569,7 +569,7 @@
 
 /* Contacts List */
 .contacts-list {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.1);
   border-radius: 12px;
   max-height: 500px;
@@ -582,7 +582,7 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -613,13 +613,13 @@
 .contact-name {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .contact-meta {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* Mission Summary */
@@ -631,7 +631,7 @@
 }
 
 .summary-card {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 12px;
   padding: 2rem;
@@ -640,7 +640,7 @@
 .summary-card h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin-bottom: 1.5rem;
 }
 
@@ -649,7 +649,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .summary-row:last-child {
@@ -658,13 +658,13 @@
 
 .summary-label {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .summary-value {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .mission-name-input {
@@ -676,15 +676,15 @@
 .mission-name-input label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .form-input {
   padding: 0.75rem 1rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid rgba(168, 85, 247, 0.25);
   border-radius: 8px;
-  color: #111827;
+  color: var(--text-primary);
   font-size: 1rem;
 }
 
@@ -749,7 +749,7 @@
 .empty-state {
   text-align: center;
   padding: 3rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .empty-state svg {
@@ -821,7 +821,7 @@
 
 .step-editor-charcount {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-align: right;
   margin-top: -6px;
 }
@@ -838,7 +838,7 @@
 }
 
 .step-subject-preview {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -888,7 +888,7 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .micro-step-editor-textarea {

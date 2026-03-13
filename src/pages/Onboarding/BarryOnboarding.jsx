@@ -542,11 +542,22 @@ export default function BarryOnboarding() {
       {(step === 'asking' || step === 'clarifying') && !isProcessing && (
         <form onSubmit={handleSubmit} className="barry-input-form">
           <div className="input-wrapper">
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
+              onChange={(e) => {
+                setUserInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (userInput.trim() && !isProcessing) {
+                    handleSubmit(e);
+                  }
+                }
+              }}
               placeholder={
                 conversationHistory.length === 0
                   ? "e.g., Marketing agencies in California, 50-200 employees"
@@ -554,6 +565,7 @@ export default function BarryOnboarding() {
               }
               className="barry-input"
               disabled={isProcessing}
+              rows={1}
             />
             <button
               type="submit"

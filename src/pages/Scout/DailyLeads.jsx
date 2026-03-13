@@ -56,6 +56,73 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
 // ─── Match feedback ───────────────────────────────────────────────────────────
 const MATCH_REASONS = ['Industry fit', 'Right size', 'Good location', 'Revenue match', 'Strong signals', 'Known brand'];
 
+// ─── Rejection feedback ───────────────────────────────────────────────────────
+const REJECTION_REASONS = ['Wrong industry', 'Too large', 'Too small', 'Wrong location', 'Revenue mismatch', 'Already a client', 'Competitor', 'Not the right time'];
+
+function RejectionFeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, onSubmit, T, wide }) {
+  const toggle = (r) => setReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: wide ? '28px 24px 20px' : '22px 18px 16px', gap: 12, animation: 'feedbackFlipIn 0.25s ease' }}>
+      <div style={{ fontSize: 30 }}>🚫</div>
+      <div style={{ fontSize: wide ? 16 : 14, fontWeight: 700, color: T.text, textAlign: 'center' }}>What didn't fit?</div>
+      <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, textAlign: 'center', lineHeight: 1.55 }}>
+        Why isn't <strong>{entityName}</strong> a match?
+        <br />
+        <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry send better leads your way.</span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', width: '100%' }}>
+        {REJECTION_REASONS.map(r => (
+          <button
+            key={r}
+            onClick={e => { e.stopPropagation(); toggle(r); }}
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: wide ? 11 : 10, fontWeight: 600,
+              cursor: 'pointer', border: `1.5px solid`,
+              borderColor: reasons.includes(r) ? '#ef4444' : T.border2,
+              background: reasons.includes(r) ? '#ef444418' : T.surface,
+              color: reasons.includes(r) ? '#ef4444' : T.textMuted,
+              transition: 'all 0.15s',
+            }}
+          >
+            {reasons.includes(r) ? '✕ ' : ''}{r}
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={note}
+        onChange={e => setNote(e.target.value)}
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
+        placeholder="Tell Barry more... (optional)"
+        rows={2}
+        style={{
+          width: '100%', padding: '8px 10px', borderRadius: 9,
+          border: `1.5px solid ${T.border2}`, background: T.surface,
+          color: T.text, fontSize: wide ? 12 : 11, resize: 'none',
+          fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+        <button
+          onClick={e => { e.stopPropagation(); onSkip(); }}
+          onMouseDown={e => e.stopPropagation()}
+          style={{ flex: 1, padding: wide ? 10 : 8, borderRadius: 10, border: `1.5px solid ${T.border2}`, background: T.surface, color: T.textMuted, fontSize: wide ? 12 : 11, fontWeight: 600, cursor: 'pointer' }}
+        >
+          Skip
+        </button>
+        <button
+          onClick={e => { e.stopPropagation(); onSubmit(); }}
+          onMouseDown={e => e.stopPropagation()}
+          style={{ flex: 2, padding: wide ? 10 : 8, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+        >
+          <BarryAvatar size={14} />Tell Barry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, onSubmit, T, wide }) {
   const toggle = (r) => setReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
   return (
@@ -130,6 +197,9 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackReasons, setFeedbackReasons] = useState([]);
   const [feedbackNote, setFeedbackNote] = useState('');
+  const [showRejectionFeedback, setShowRejectionFeedback] = useState(false);
+  const [rejectionReasons, setRejectionReasons] = useState([]);
+  const [rejectionNote, setRejectionNote] = useState('');
   const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
 
@@ -155,6 +225,14 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   };
   const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
   const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
+
+  const handleRejectClick = (e) => {
+    e.stopPropagation();
+    setIsFlipping(true);
+    setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
+  };
+  const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null), 280); };
+  const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   const score = company.fit_score || company.score || 0;
@@ -236,6 +314,18 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
               reasons={feedbackReasons} setReasons={setFeedbackReasons}
               note={feedbackNote} setNote={setFeedbackNote}
               onSkip={handleSkipFeedback} onSubmit={handleSendFeedback}
+              T={T} wide={wide}
+            />
+          </div>
+        )}
+        {/* Rejection feedback overlay — appears after "Not a Match" click */}
+        {showRejectionFeedback && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
+            <RejectionFeedbackFace
+              entityName={company.name}
+              reasons={rejectionReasons} setReasons={setRejectionReasons}
+              note={rejectionNote} setNote={setRejectionNote}
+              onSkip={handleSkipRejectionFeedback} onSubmit={handleSendRejectionFeedback}
               T={T} wide={wide}
             />
           </div>
@@ -381,7 +471,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         {/* Decision buttons */}
         <div style={{ display: 'flex', gap: 8, padding: wide ? '12px 14px 14px' : '10px 12px 12px' }}>
           <button
-            onClick={e => { e.stopPropagation(); setGone('l'); setTimeout(onReject, 280); }}
+            onClick={handleRejectClick}
             style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           ><X size={14} />Not a Match</button>
           <button
@@ -403,6 +493,9 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackReasons, setFeedbackReasons] = useState([]);
   const [feedbackNote, setFeedbackNote] = useState('');
+  const [showRejectionFeedback, setShowRejectionFeedback] = useState(false);
+  const [rejectionReasons, setRejectionReasons] = useState([]);
+  const [rejectionNote, setRejectionNote] = useState('');
   const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
 
@@ -428,6 +521,14 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
   };
   const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
   const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
+
+  const handleRejectClick = (e) => {
+    e.stopPropagation();
+    setIsFlipping(true);
+    setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
+  };
+  const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null), 280); };
+  const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   const initials = (person.name || person.first_name || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -460,6 +561,18 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
               reasons={feedbackReasons} setReasons={setFeedbackReasons}
               note={feedbackNote} setNote={setFeedbackNote}
               onSkip={handleSkipFeedback} onSubmit={handleSendFeedback}
+              T={T} wide={wide}
+            />
+          </div>
+        )}
+        {/* Rejection feedback overlay — appears after "Not a Match" click */}
+        {showRejectionFeedback && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
+            <RejectionFeedbackFace
+              entityName={person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim()}
+              reasons={rejectionReasons} setReasons={setRejectionReasons}
+              note={rejectionNote} setNote={setRejectionNote}
+              onSkip={handleSkipRejectionFeedback} onSubmit={handleSendRejectionFeedback}
               T={T} wide={wide}
             />
           </div>
@@ -505,7 +618,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
         </div>
         <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px 6px' : '11px 12px 6px' }}>
           <button
-            onClick={e => { e.stopPropagation(); setGone('l'); setTimeout(onReject, 280); }}
+            onClick={handleRejectClick}
             style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><X size={15} />Not a Match</button>
           <button
@@ -1501,7 +1614,8 @@ export default function DailyLeads({ onNavigate }) {
         status: direction === 'right' ? 'accepted' : 'rejected',
         swipedAt: new Date().toISOString(),
         swipeDirection: direction,
-        ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
+        ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
+        ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
       });
       const isInterested = direction === 'right';
       const newSwipeCount = isInterested
@@ -1839,7 +1953,7 @@ export default function DailyLeads({ onNavigate }) {
           }
         }
       } else if (direction === 'left') {
-        await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', archived_at: new Date().toISOString() }, { merge: true });
+        await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', archived_at: new Date().toISOString(), ...(feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}) }, { merge: true });
       } else if (direction === 'skip') {
         await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_skipped', source: 'people_mode', skipped_date: today }, { merge: true });
       }
@@ -2156,7 +2270,7 @@ export default function DailyLeads({ onNavigate }) {
                         key={currentCompany.id}
                         company={currentCompany}
                         onAccept={(feedback) => handleSwipe('right', feedback)}
-                        onReject={() => handleSwipe('left')}
+                        onReject={(feedback) => handleSwipe('left', feedback)}
                         wide={isDesktop}
                         icpProfile={icpProfile}
                         icpWeights={icpWeights}
@@ -2240,7 +2354,7 @@ export default function DailyLeads({ onNavigate }) {
                       company={peopleQueue[currentPersonIdx].company}
                       matchText={getBarryText(peopleQueue[currentPersonIdx].person, peopleQueue[currentPersonIdx].company, targetTitles)}
                       onAccept={(feedback) => handlePersonSwipe('right', feedback)}
-                      onReject={() => handlePersonSwipe('left')}
+                      onReject={(feedback) => handlePersonSwipe('left', feedback)}
                       onSkip={() => handlePersonSwipe('skip')}
                       wide={isDesktop}
                     />

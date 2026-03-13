@@ -1,26 +1,32 @@
-/* BarryCoachingResponse — inline coaching feedback after section save */
+/* BarryCoachingResponse — modernized coaching feedback card
+   Used as a standalone fallback. Primary display is via BarryReconGuide panel.
+*/
 
 .barry-coaching-response {
-  margin-top: 24px;
-  border-left: 3px solid #7c3aed;
-  border-radius: 0 10px 10px 0;
-  padding: 14px 16px;
+  margin-top: 20px;
   background: rgba(124,58,237,0.08);
-  animation: bcr-fade-in 0.25s ease;
+  border: 1px solid var(--border);
+  border-left: 3px solid #7c3aed;
+  border-radius: 0 12px 12px 0;
+  padding: 14px 16px;
+  animation: bcr-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: Inter, system-ui, sans-serif;
 }
 
 .barry-coaching-response.bcr--weak {
   border-left-color: #d97706;
   background: rgba(250,170,32,0.08);
+  border-color: var(--border);
 }
 
 .barry-coaching-response.bcr--incomplete {
   border-left-color: #dc2626;
   background: rgba(220,38,38,0.06);
+  border-color: var(--border);
 }
 
 @keyframes bcr-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -28,31 +34,39 @@
 
 .bcr-headline-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
 .bcr-attribution {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #7c3aed;
   flex-shrink: 0;
+  padding: 2px 7px;
+  background: rgba(147,51,234,0.12);
+  border-radius: 4px;
+  border: 1px solid rgba(147,51,234,0.25);
 }
 
 .bcr--weak .bcr-attribution {
   color: #d97706;
+  background: rgba(245,158,11,0.12);
+  border-color: rgba(245,158,11,0.25);
 }
 
 .bcr--incomplete .bcr-attribution {
   color: #dc2626;
+  background: rgba(220,38,38,0.10);
+  border-color: rgba(220,38,38,0.22);
 }
 
 .bcr-headline {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -62,8 +76,8 @@
 .bcr-delta {
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 7px;
+  border-radius: 5px;
   flex-shrink: 0;
 }
 
@@ -82,7 +96,7 @@
 .bcr-mirror {
   font-size: 13px;
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0;
 }
 
@@ -101,10 +115,11 @@
 /* ── Inference ────────────────────────────────────────────────────────────── */
 
 .bcr-inference {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0;
+  font-style: italic;
 }
 
 .bcr-inference--weak {
@@ -121,11 +136,10 @@
 
 .bcr-gap-icon {
   color: #dc2626;
-  flex-shrink: 0;
 }
 
 .bcr-gap-text {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #7f1d1d;
   line-height: 1.6;
   margin: 0;
@@ -142,6 +156,7 @@
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  font-family: Inter, system-ui, sans-serif;
 }
 
 .bcr-gap-link:hover {
@@ -157,19 +172,20 @@
 .bcr-preview-toggle {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 5px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: #7c3aed;
+  color: #00c4cc;
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
   transition: color 0.15s;
+  font-family: Inter, system-ui, sans-serif;
 }
 
 .bcr-preview-toggle:hover {
-  color: #5b21b6;
+  color: #0099a8;
 }
 
 .bcr-preview-card {
@@ -177,7 +193,7 @@
   background: var(--bg-secondary);
   border-radius: 8px;
   padding: 12px 14px;
-  border-left: none;
+  border: 1px solid var(--border);
   animation: bcr-fade-in 0.2s ease;
 }
 

@@ -47,7 +47,7 @@
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.06);
   border: none;
-  color: #9ca3af;
+  color: var(--text-faint);
   cursor: pointer;
   transition: background 0.15s;
   flex-shrink: 0;
@@ -82,7 +82,7 @@
 
 .hunter-subtitle {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1;
 }
 
@@ -105,7 +105,7 @@
   border-radius: 0.4375rem;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
@@ -137,7 +137,7 @@
 
 .hunter-tab-badge--muted {
   background: rgba(107, 114, 128, 0.3);
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* ── Content ─────────────────────────────────── */
@@ -157,7 +157,7 @@
   align-items: center;
   gap: 1rem;
   padding: 4rem 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -182,7 +182,7 @@
 
 .hunter-deck-count {
   font-size: 0.8125rem;
-  color: #4b5563;
+  color: var(--text-secondary);
   text-align: center;
   margin: 0;
 }
@@ -217,7 +217,7 @@
 
 .hunter-empty-sub {
   font-size: 0.875rem;
-  color: #4b5563;
+  color: var(--text-secondary);
   margin: 0;
   max-width: 280px;
 }
@@ -284,7 +284,7 @@
 
 .hunter-list-card-avatar--muted {
   background: #1f2937;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .hunter-list-card-info {
@@ -303,7 +303,7 @@
 
 .hunter-list-card-sub {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-top: 0.125rem;
   white-space: nowrap;
   overflow: hidden;
@@ -343,7 +343,7 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.5rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;

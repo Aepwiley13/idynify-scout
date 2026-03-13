@@ -4,7 +4,7 @@
 
 .user-contacts-section {
   background: white;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
   margin-top: 24px;
@@ -18,13 +18,13 @@
 .contacts-header h2 {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 4px 0;
 }
 
 .contacts-header p {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -34,7 +34,7 @@
   flex-wrap: wrap;
   gap: 16px;
   padding: 16px;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border-radius: 8px;
   margin-bottom: 20px;
 }
@@ -44,11 +44,11 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .stat-item svg {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .stat-label {
@@ -57,7 +57,7 @@
 
 .stat-value {
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* Controls */
@@ -75,7 +75,7 @@
 .search-bar input {
   width: 100%;
   padding: 10px 10px 10px 40px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
   transition: all 0.2s;
@@ -94,7 +94,7 @@
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .filter-toggle {
@@ -105,8 +105,8 @@
 
 /* Filter Panel */
 .filter-panel {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -119,14 +119,14 @@
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   margin-bottom: 6px;
 }
 
 .filter-group select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
   background: white;
@@ -142,7 +142,7 @@
 
 /* Table Container */
 .contacts-table-container {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -154,8 +154,8 @@
 }
 
 .contacts-table thead {
-  background: #f9fafb;
-  border-bottom: 2px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border);
 }
 
 .contacts-table th {
@@ -163,16 +163,16 @@
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .contacts-table td {
   padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   font-size: 14px;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .contacts-table tbody tr {
@@ -180,7 +180,7 @@
 }
 
 .contacts-table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--bg-secondary);
 }
 
 /* Contact Name Cell */
@@ -202,11 +202,11 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
@@ -226,28 +226,28 @@
 }
 
 .email-cell .has-email {
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .email-cell .no-email {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
 }
 
 .date-cell {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .text-muted {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Seniority Badge */
 .seniority-badge {
   display: inline-block;
   padding: 4px 8px;
-  background: #dbeafe;
+  background: rgba(59,130,246,0.15);
   color: #1e40af;
   border-radius: 4px;
   font-size: 12px;
@@ -258,7 +258,7 @@
 /* Action Buttons */
 .btn-icon {
   background: transparent;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px;
   cursor: pointer;
@@ -266,11 +266,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .btn-icon:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border-color: #3b82f6;
   color: #3b82f6;
 }
@@ -286,13 +286,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
 }
 
 .pagination-info {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .pagination-controls {
@@ -303,7 +303,7 @@
 
 .page-indicator {
   font-size: 14px;
-  color: #374151;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -314,7 +314,7 @@
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .loading-spinner {
@@ -359,7 +359,7 @@
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .empty-state svg {
@@ -402,13 +402,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-header h2 {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -423,7 +423,7 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 /* Contact Detail Sections */
@@ -438,7 +438,7 @@
 .contact-detail-section h4 {
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 12px 0;
 }
 
@@ -448,7 +448,7 @@
   gap: 16px;
   margin-bottom: 20px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .contact-avatar-large {
@@ -463,24 +463,24 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #e5e7eb;
+  background: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
 .contact-header-info h3 {
   font-size: 20px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 4px 0;
 }
 
 .contact-title {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 4px 0;
 }
 
@@ -489,7 +489,7 @@
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -508,14 +508,14 @@
 .detail-label {
   font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .detail-value {
   font-size: 14px;
-  color: #111827;
+  color: var(--text-primary);
   word-break: break-word;
 }
 
@@ -555,8 +555,8 @@
 
 .btn-secondary {
   background: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 20px;
   font-size: 14px;
@@ -569,8 +569,8 @@
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #9ca3af;
+  background: var(--bg-secondary);
+  border-color: var(--text-faint);
 }
 
 .btn-secondary:disabled {

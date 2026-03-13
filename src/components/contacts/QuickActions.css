@@ -3,8 +3,8 @@
   display: flex;
   gap: 0.875rem;
   padding: 1.5rem 2rem;
-  background: #ffffff;
-  border-bottom: 2px solid #f3f4f6;
+  background: var(--bg-card);
+  border-bottom: 2px solid var(--bg-secondary);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -78,14 +78,14 @@
 /* Re-enrich Action (subtle - already enriched) */
 .action-button-enrich-subtle {
   background: transparent;
-  border: 2px solid #e5e7eb;
-  color: #6b7280;
+  border: 2px solid var(--border);
+  color: var(--text-secondary);
 }
 
 .action-button-enrich-subtle:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #4b5563;
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-secondary);
   transform: translateY(-1px);
 }
 

@@ -5,8 +5,8 @@
 }
 
 .arsenal-content {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 16px;
   padding: 2rem;
 }

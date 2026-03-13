@@ -1,6 +1,6 @@
 .icp-confirmation-card {
   background: white;
-  border: 1.5px solid #c4b5fd;
+  border: 1.5px solid rgba(124,58,237,0.40);
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(124, 58, 237, 0.08);
@@ -41,32 +41,32 @@
 .strategy-badge {
   color: #7c3aed;
   background: white;
-  border-color: #c4b5fd;
+  border-color: rgba(124,58,237,0.40);
 }
 
 .strategy-badge.strategy-lookalike {
   color: #0891b2;
-  background: #ecfeff;
+  background: rgba(8,145,178,0.08);
   border-color: #67e8f9;
 }
 
 /* Confidence level styling */
 .confidence-badge.confidence-high {
   color: #059669;
-  background: #ecfdf5;
-  border-color: #6ee7b7;
+  background: rgba(16,185,129,0.07);
+  border-color: rgba(16,185,129,0.35);
 }
 
 .confidence-badge.confidence-medium {
   color: #d97706;
-  background: #fffbeb;
+  background: rgba(250,170,32,0.08);
   border-color: #fcd34d;
 }
 
 .confidence-badge.confidence-low {
   color: #dc2626;
-  background: #fef2f2;
-  border-color: #fca5a5;
+  background: rgba(220,38,38,0.06);
+  border-color: rgba(220,38,38,0.30);
 }
 
 /* Low confidence warning banner */
@@ -118,7 +118,7 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.75rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-secondary);
 }
 
 .detail-row:last-child {
@@ -130,7 +130,7 @@
 }
 
 .detail-row.optional .detail-value {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -155,7 +155,7 @@
 .detail-subtext {
   display: block;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-top: 0.25rem;
   font-style: italic;
 }
@@ -181,7 +181,7 @@
   display: block;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 0.25rem;
@@ -190,7 +190,7 @@
 .detail-value {
   display: block;
   font-size: 0.875rem;
-  color: #1f2937;
+  color: var(--text-primary);
   font-weight: 500;
   line-height: 1.4;
 }
@@ -198,14 +198,14 @@
 /* Barry's Note */
 .barry-note {
   padding: 0.875rem 1.25rem;
-  background: #faf5ff;
-  border-top: 1px solid #ede9fe;
+  background: rgba(124,58,237,0.08);
+  border-top: 1px solid rgba(124,58,237,0.12);
 }
 
 .barry-note p {
   margin: 0;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -214,8 +214,8 @@
   display: flex;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  background: #fafafa;
-  border-top: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
 }
 
 .refine-btn,
@@ -236,14 +236,14 @@
 
 .refine-btn {
   background: white;
-  color: #6b7280;
-  border: 1.5px solid #e5e7eb;
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
 }
 
 .refine-btn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #374151;
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 .confirm-btn {
@@ -278,12 +278,12 @@
 }
 
 .detail-row.required-missing .detail-icon {
-  background: #fef2f2;
+  background: rgba(220,38,38,0.06);
   color: #dc2626;
 }
 
 .detail-row.required-missing .detail-value {
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
 }
 

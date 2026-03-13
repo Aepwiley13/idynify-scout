@@ -13,8 +13,8 @@
     right: 0;
     z-index: 200;
 
-    background: #ffffff;
-    border-top: 1px solid #e5e7eb;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
 
     /* Account for iOS home indicator and Android navigation bar */
@@ -37,7 +37,7 @@
     border: none;
     cursor: pointer;
 
-    color: #9ca3af;
+    color: var(--text-faint);
     transition: color 0.15s, background 0.15s;
 
     /* Minimum 44px touch target per Apple HIG */
@@ -46,7 +46,7 @@
   }
 
   .bottom-nav-item:active {
-    background: #f9fafb;
+    background: var(--bg-secondary);
   }
 
   .bottom-nav-item.active {
@@ -70,7 +70,7 @@
   }
 
   .theme-dark .bottom-nav-item {
-    color: #6b7280;
+    color: var(--text-secondary);
   }
 
   .theme-dark .bottom-nav-item:active {

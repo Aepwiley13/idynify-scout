@@ -8,7 +8,7 @@
 .activity-header {
   font-size: 1rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0;
   display: flex;
   align-items: center;
@@ -26,7 +26,7 @@
   background: rgba(0, 0, 0, 0.02);
   border: 1px dashed rgba(0, 0, 0, 0.1);
   border-radius: 8px;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .no-activity svg {
@@ -36,7 +36,7 @@
 
 .no-activity p {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   max-width: 300px;
 }
@@ -103,7 +103,7 @@
 }
 
 .activity-icon.viewed {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .activity-icon.email {
@@ -119,7 +119,7 @@
 }
 
 .activity-icon.default {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Activity Content */
@@ -133,19 +133,19 @@
 .activity-label {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
   line-height: 1.4;
 }
 
 .activity-details {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .activity-timestamp {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-top: 0.125rem;
 }
 

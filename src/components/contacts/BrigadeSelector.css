@@ -5,7 +5,7 @@
 ═══════════════════════════════════════════════════════ */
 
 .brigade-selector {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1.5px solid #f0f0ee;
   border-radius: 14px;
   padding: 16px 18px;
@@ -34,12 +34,12 @@
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .brs-saving {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -49,7 +49,7 @@
   gap: 3px;
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: var(--text-faint);
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 5px;
@@ -57,7 +57,7 @@
 }
 
 .brs-info-btn:hover {
-  color: #6b7280;
+  color: var(--text-secondary);
   background: rgba(107, 114, 128, 0.06);
 }
 
@@ -81,7 +81,7 @@
 
 .brs-info-text {
   font-size: 12.5px;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.55;
   margin: 0;
 }
@@ -97,12 +97,12 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .brs-behavior-text {
   font-size: 12px;
-  color: #4b5563;
+  color: var(--text-secondary);
   line-height: 1.5;
   margin: 0;
 }
@@ -125,7 +125,7 @@
   background: transparent;
   font-size: 12.5px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
@@ -181,6 +181,6 @@
 
 .brs-active-desc {
   font-size: 12.5px;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.4;
 }

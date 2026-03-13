@@ -6,7 +6,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   min-height: 100vh;
 }
 
@@ -26,12 +26,12 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   font-weight: 600;
   font-size: 0.9375rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -261,8 +261,8 @@
 }
 
 .detail-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
 }
@@ -277,7 +277,7 @@
   gap: 0.75rem;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1.5px solid #f3f4f6;
+  border-bottom: 1.5px solid var(--bg-secondary);
 }
 
 .section-icon {
@@ -289,7 +289,7 @@
 .section-header h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -311,7 +311,7 @@
 .info-label {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
@@ -320,14 +320,14 @@
 .info-value {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .info-value-mono {
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ========================================
@@ -341,8 +341,8 @@
 }
 
 .metric-card {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
 }
@@ -350,7 +350,7 @@
 .metric-label {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0 0 0.5rem 0;
@@ -359,7 +359,7 @@
 .metric-value {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
   line-height: 1;
 }
@@ -381,7 +381,7 @@
 }
 
 .breakdown-neutral {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .breakdown-danger {
@@ -391,7 +391,7 @@
 .progress-bar {
   width: 100%;
   height: 6px;
-  background: #e5e7eb;
+  background: var(--border);
   border-radius: 999px;
   overflow: hidden;
   margin-top: 0.5rem;
@@ -408,8 +408,8 @@
    ICP INFO
    ======================================== */
 .icp-info {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
   margin-bottom: 1rem;
@@ -418,7 +418,7 @@
 .icp-info h3 {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 1rem 0;
 }
 
@@ -438,7 +438,7 @@
 .icp-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 0;
@@ -447,7 +447,7 @@
 .icp-value {
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -460,18 +460,18 @@
 }
 
 .status-success {
-  background: #d1fae5;
+  background: rgba(16,185,129,0.12);
   color: #065f46;
 }
 
 .status-warning {
-  background: #fef3c7;
+  background: rgba(245,158,11,0.12);
   color: #92400e;
 }
 
 .status-neutral {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--border);
+  color: var(--text-primary);
 }
 
 /* ========================================
@@ -518,13 +518,13 @@
 .credit-label {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .credit-bar-container {
   height: 8px;
-  background: #e5e7eb;
+  background: var(--border);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -539,17 +539,17 @@
 .credit-count {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0;
   text-align: right;
 }
 
 .last-activity {
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 /* ========================================
@@ -562,7 +562,7 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #f9fafb;
+  background: var(--bg-secondary);
   padding: 2rem;
   text-align: center;
 }
@@ -570,7 +570,7 @@
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--border);
   border-top: 3px solid #3b82f6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -584,12 +584,12 @@
 .user-detail-error h2 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
 .user-detail-error p {
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 1.5rem 0;
 }
 

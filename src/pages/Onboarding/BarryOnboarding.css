@@ -24,7 +24,7 @@
 
 .loading-content p {
   margin-top: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -63,13 +63,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1.5px solid #c4b5fd;
+  border: 1.5px solid rgba(124,58,237,0.40);
 }
 
 /* Messages */
 .barry-message {
   background: white;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 16px;
   border-top-left-radius: 4px;
   padding: 1rem 1.25rem;
@@ -79,7 +79,7 @@
 
 .barry-message p {
   margin: 0;
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.9375rem;
   line-height: 1.6;
 }
@@ -120,7 +120,7 @@
 
 .save-confirmation-card {
   background: white;
-  border: 1.5px solid #c4b5fd;
+  border: 1.5px solid rgba(124,58,237,0.40);
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(124, 58, 237, 0.12);
@@ -163,7 +163,7 @@
 
 .save-confirmation-summary {
   padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--bg-secondary);
 }
 
 .save-summary-row {
@@ -180,16 +180,16 @@
 }
 
 .save-summary-highlight {
-  background: #ecfeff;
+  background: rgba(8,145,178,0.08);
   margin: 0 -1.5rem;
   padding: 0.5rem 1.5rem;
-  border-bottom: 1px solid #a5f3fc !important;
+  border-bottom: 1px solid rgba(8,145,178,0.30) !important;
 }
 
 .save-summary-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.4px;
   white-space: nowrap;
@@ -198,7 +198,7 @@
 
 .save-summary-value {
   font-size: 0.875rem;
-  color: #1f2937;
+  color: var(--text-primary);
   font-weight: 500;
   text-align: right;
 }
@@ -208,8 +208,8 @@
   align-items: center;
   gap: 0.625rem;
   padding: 0.875rem 1.5rem;
-  background: #faf5ff;
-  border-top: 1px solid #ede9fe;
+  background: rgba(124,58,237,0.08);
+  border-top: 1px solid rgba(124,58,237,0.12);
   color: #7c3aed;
   font-size: 0.875rem;
   font-weight: 500;
@@ -219,10 +219,10 @@
   margin: 0;
   padding: 0.625rem 1.5rem;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-align: center;
-  background: #fafafa;
-  border-top: 1px solid #f3f4f6;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--bg-secondary);
 }
 
 @media (max-width: 640px) {
@@ -233,8 +233,8 @@
 
 /* Error Message */
 .error-message {
-  background: #fef2f2;
-  border: 1.5px solid #fecaca;
+  background: rgba(220,38,38,0.06);
+  border: 1.5px solid rgba(220,38,38,0.22);
   border-radius: 12px;
   padding: 1rem;
   margin-top: 1rem;
@@ -250,7 +250,7 @@
 .barry-input-form {
   padding: 1.5rem 2rem;
   background: white;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
 }
 
@@ -265,11 +265,11 @@
 .barry-input {
   flex: 1;
   padding: 1rem 1.25rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   font-size: 1rem;
-  color: #1f2937;
-  background: #f9fafb;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
   transition: all 0.2s;
   resize: none;
   overflow: hidden;
@@ -290,7 +290,7 @@
 }
 
 .barry-input::placeholder {
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 .barry-submit {
@@ -322,7 +322,7 @@
   text-align: center;
   margin-top: 0.75rem;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Responsive */

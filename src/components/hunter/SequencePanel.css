@@ -20,7 +20,7 @@
 .sequence-panel-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   flex: 1;
 }
 
@@ -110,7 +110,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
@@ -129,12 +129,12 @@
 
 .step-approval-barry-text {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
 .step-card {
-  background: #f9fafb;
+  background: var(--bg-secondary);
   border: 1.5px solid rgba(168, 85, 247, 0.15);
   border-radius: 10px;
   padding: 1rem;
@@ -187,21 +187,21 @@
   align-items: center;
   gap: 0.25rem;
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin-left: auto;
 }
 
 .step-card-action {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.375rem;
   line-height: 1.4;
 }
 
 .step-card-purpose {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 0.5rem;
   line-height: 1.4;
 }
@@ -240,18 +240,18 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 1rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-skip-step:hover {
-  border-color: #d1d5db;
-  color: #6b7280;
+  border-color: var(--border);
+  color: var(--text-secondary);
 }
 
 .btn-skip-step:disabled {
@@ -306,13 +306,13 @@
 .outcome-prompt-question {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.25rem;
 }
 
 .outcome-prompt-context {
   font-size: 0.8rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0;
 }
 
@@ -321,7 +321,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   font-size: 0.85rem;
 }
 
@@ -336,10 +336,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 0.75rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
-  background: #f9fafb;
-  color: #6b7280;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -380,7 +380,7 @@
 
 .content-tone-note {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   margin: 0 0 0.375rem;
   font-style: italic;
 }
@@ -400,7 +400,7 @@
   display: block;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.375rem;
@@ -409,10 +409,10 @@
 .content-subject-input {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-size: 0.85rem;
   outline: none;
   box-sizing: border-box;
@@ -425,10 +425,10 @@
 .content-body-textarea {
   width: 100%;
   padding: 0.625rem 0.75rem;
-  border: 1.5px solid #d1d5db;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-size: 0.85rem;
   line-height: 1.5;
   resize: vertical;
@@ -452,18 +452,18 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 1rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid var(--border);
   border-radius: 8px;
   background: transparent;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-secondary-seq:hover {
-  border-color: #d1d5db;
-  color: #111827;
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 .btn-primary-seq {

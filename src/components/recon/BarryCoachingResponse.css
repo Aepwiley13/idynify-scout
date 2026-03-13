@@ -4,8 +4,8 @@
 
 .barry-coaching-response {
   margin-top: 20px;
-  background: #f9f5ff;
-  border: 1px solid #e9d5ff;
+  background: rgba(124,58,237,0.08);
+  border: 1px solid var(--border);
   border-left: 3px solid #7c3aed;
   border-radius: 0 12px 12px 0;
   padding: 14px 16px;
@@ -14,15 +14,15 @@
 }
 
 .barry-coaching-response.bcr--weak {
-  background: #fffbeb;
-  border-color: #fde68a;
   border-left-color: #d97706;
+  background: rgba(250,170,32,0.08);
+  border-color: var(--border);
 }
 
 .barry-coaching-response.bcr--incomplete {
-  background: #fef2f2;
-  border-color: #fecaca;
   border-left-color: #dc2626;
+  background: rgba(220,38,38,0.06);
+  border-color: var(--border);
 }
 
 @keyframes bcr-fade-in {
@@ -48,27 +48,27 @@
   color: #7c3aed;
   flex-shrink: 0;
   padding: 2px 7px;
-  background: #ede9fe;
+  background: rgba(147,51,234,0.12);
   border-radius: 4px;
-  border: 1px solid #ddd6fe;
+  border: 1px solid rgba(147,51,234,0.25);
 }
 
 .bcr--weak .bcr-attribution {
   color: #d97706;
-  background: #fef3c7;
-  border-color: #fde68a;
+  background: rgba(245,158,11,0.12);
+  border-color: rgba(245,158,11,0.25);
 }
 
 .bcr--incomplete .bcr-attribution {
   color: #dc2626;
-  background: #fee2e2;
-  border-color: #fecaca;
+  background: rgba(220,38,38,0.10);
+  border-color: rgba(220,38,38,0.22);
 }
 
 .bcr-headline {
   font-size: 12.5px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
   flex: 1;
   line-height: 1.4;
 }
@@ -83,19 +83,19 @@
 
 .bcr-delta--up {
   color: #065f46;
-  background: #d1fae5;
+  background: rgba(16,185,129,0.12);
 }
 
 .bcr-delta--down {
   color: #92400e;
-  background: #fde68a;
+  background: rgba(245,158,11,0.25);
 }
 
 /* ── Mirror ───────────────────────────────────────────────────────────────── */
 
 .bcr-mirror {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.65;
   margin: 0;
 }
@@ -104,19 +104,19 @@
 
 .bcr-divider {
   height: 1px;
-  background: #ede9fe;
+  background: rgba(147,51,234,0.15);
   margin: 12px 0;
 }
 
 .bcr--weak .bcr-divider {
-  background: #fde68a;
+  background: rgba(245,158,11,0.25);
 }
 
 /* ── Inference ────────────────────────────────────────────────────────────── */
 
 .bcr-inference {
   font-size: 12.5px;
-  color: #4b5563;
+  color: var(--text-secondary);
   line-height: 1.65;
   margin: 0;
   font-style: italic;
@@ -190,16 +190,16 @@
 
 .bcr-preview-card {
   margin-top: 10px;
-  background: #f3f4f6;
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   animation: bcr-fade-in 0.2s ease;
 }
 
 .bcr-preview-text {
   font-size: 12.5px;
-  color: #374151;
+  color: var(--text-primary);
   line-height: 1.65;
   margin: 0;
   font-style: italic;

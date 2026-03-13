@@ -75,7 +75,7 @@
   gap: 0.75rem;
   padding: 3rem 2rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .hcs-empty-icon {
@@ -92,7 +92,7 @@
 
 .hcs-empty-sub {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   max-width: 260px;
 }

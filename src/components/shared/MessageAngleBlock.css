@@ -30,7 +30,7 @@
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: #9ca3af;
+  color: var(--text-faint);
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -78,7 +78,7 @@
 
 .mab-field-label {
   font-size: 0.65rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }

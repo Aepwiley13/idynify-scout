@@ -12,6 +12,216 @@
   animation: spin 1s linear infinite;
 }
 
+/* ─── THEME CSS CUSTOM PROPERTIES ─────────────────────────────────────────────
+   Set on html[data-theme="..."] by ThemeContext.jsx.
+   CSS files reference these vars so all 7 themes work without JS hooks.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Default / workspace (light) */
+:root {
+  --bg-primary:     #f8f7fc;
+  --bg-secondary:   #ede9f8;
+  --bg-nav:         #ffffff;
+  --bg-card:        #ffffff;
+  --bg-card-2:      #f3f0fa;
+  --surface:        #ede9f8;
+  --border:         #e0d8f0;
+  --border-2:       #d0c8e8;
+  --text-primary:   #12082a;
+  --text-secondary: #5a4880;
+  --text-faint:     #9080b0;
+  --input-bg:       #ede9f8;
+  --input-border:   #d0c8e8;
+  --input-focus:    #e8197d;
+  --accent:         #e8197d;
+  --accent-bg:      #e8197d12;
+  --accent-border:  #e8197d30;
+  --shadow-card:    0 2px 8px rgba(0,0,0,0.06);
+  --row-hover:      #f3f0fa;
+  --scrollbar:      #d0c8e8;
+  --scrollbar-track:#f3f0fa;
+}
+
+html[data-theme="workspace"] {
+  --bg-primary:     #f8f7fc;
+  --bg-secondary:   #ede9f8;
+  --bg-nav:         #ffffff;
+  --bg-card:        #ffffff;
+  --bg-card-2:      #f3f0fa;
+  --surface:        #ede9f8;
+  --border:         #e0d8f0;
+  --border-2:       #d0c8e8;
+  --text-primary:   #12082a;
+  --text-secondary: #5a4880;
+  --text-faint:     #9080b0;
+  --input-bg:       #ede9f8;
+  --input-border:   #d0c8e8;
+  --input-focus:    #e8197d;
+  --accent:         #e8197d;
+  --accent-bg:      #e8197d12;
+  --accent-border:  #e8197d30;
+  --shadow-card:    0 2px 8px rgba(0,0,0,0.06);
+  --row-hover:      #f3f0fa;
+  --scrollbar:      #d0c8e8;
+  --scrollbar-track:#f3f0fa;
+}
+
+html[data-theme="mission"] {
+  --bg-primary:     #000000;
+  --bg-secondary:   #06040f;
+  --bg-nav:         #0b0818;
+  --bg-card:        #110e1e;
+  --bg-card-2:      #0b0818;
+  --surface:        rgba(255,255,255,0.031);
+  --border:         rgba(255,255,255,0.051);
+  --border-2:       rgba(255,255,255,0.094);
+  --text-primary:   #f0eaff;
+  --text-secondary: #9080b0;
+  --text-faint:     #4a3870;
+  --input-bg:       rgba(255,255,255,0.031);
+  --input-border:   rgba(255,255,255,0.094);
+  --input-focus:    #e8197d;
+  --accent:         #e8197d;
+  --accent-bg:      #e8197d15;
+  --accent-border:  #e8197d35;
+  --shadow-card:    0 2px 16px rgba(0,0,0,0.6);
+  --row-hover:      rgba(255,255,255,0.012);
+  --scrollbar:      #4a3870;
+  --scrollbar-track:#06040f;
+}
+
+html[data-theme="navy"] {
+  --bg-primary:     #1a1040;
+  --bg-secondary:   #120c30;
+  --bg-nav:         #160e38;
+  --bg-card:        #1e1450;
+  --bg-card-2:      #160e38;
+  --surface:        rgba(255,255,255,0.031);
+  --border:         #2a1870;
+  --border-2:       #3a2880;
+  --text-primary:   #e8e0ff;
+  --text-secondary: #8070c0;
+  --text-faint:     #4030a0;
+  --input-bg:       #1e1450;
+  --input-border:   #3a2880;
+  --input-focus:    #e8197d;
+  --accent:         #e8197d;
+  --accent-bg:      #e8197d15;
+  --accent-border:  #e8197d35;
+  --shadow-card:    0 2px 16px rgba(0,0,0,0.6);
+  --row-hover:      rgba(255,255,255,0.012);
+  --scrollbar:      #3a2880;
+  --scrollbar-track:#120c30;
+}
+
+html[data-theme="sand"] {
+  --bg-primary:     #faf6f0;
+  --bg-secondary:   #f5ece0;
+  --bg-nav:         #fff8f2;
+  --bg-card:        #ffffff;
+  --bg-card-2:      #fdf4ec;
+  --surface:        #f5ece0;
+  --border:         #e8d8c4;
+  --border-2:       #ddc8a8;
+  --text-primary:   #2a1810;
+  --text-secondary: #8a6040;
+  --text-faint:     #b09070;
+  --input-bg:       #f5ece0;
+  --input-border:   #ddc8a8;
+  --input-focus:    #e8197d;
+  --accent:         #e8197d;
+  --accent-bg:      #e8197d10;
+  --accent-border:  #e8197d2a;
+  --shadow-card:    0 2px 8px rgba(0,0,0,0.07);
+  --row-hover:      #fdf4ec;
+  --scrollbar:      #ddc8a8;
+  --scrollbar-track:#faf6f0;
+}
+
+html[data-theme="darkSide"] {
+  --bg-primary:     #000000;
+  --bg-secondary:   #0a0008;
+  --bg-nav:         #0d000c;
+  --bg-card:        #110010;
+  --bg-card-2:      #0d000c;
+  --surface:        #cc000010;
+  --border:         #cc000015;
+  --border-2:       #cc000025;
+  --text-primary:   #f0eaf8;
+  --text-secondary: #9070a0;
+  --text-faint:     #5a3a6a;
+  --input-bg:       #cc000010;
+  --input-border:   #cc000025;
+  --input-focus:    #cc0000;
+  --accent:         #cc0000;
+  --accent-bg:      #cc000018;
+  --accent-border:  #cc000040;
+  --shadow-card:    0 2px 20px rgba(0,0,0,0.8);
+  --row-hover:      #cc000006;
+  --scrollbar:      #5a3a6a;
+  --scrollbar-track:#0a0008;
+}
+
+html[data-theme="lightSide"] {
+  --bg-primary:     #faf8f2;
+  --bg-secondary:   #e8e0d0;
+  --bg-nav:         #fffef8;
+  --bg-card:        #ffffff;
+  --bg-card-2:      #f5f0e8;
+  --surface:        #e8e0d0;
+  --border:         #1a527620;
+  --border-2:       #1a527635;
+  --text-primary:   #0d2235;
+  --text-secondary: #3a5570;
+  --text-faint:     #7a9ab0;
+  --input-bg:       #e8e0d0;
+  --input-border:   #1a527635;
+  --input-focus:    #1a5276;
+  --accent:         #1a5276;
+  --accent-bg:      #1a527615;
+  --accent-border:  #1a527640;
+  --shadow-card:    0 2px 8px rgba(0,0,0,0.07);
+  --row-hover:      #f5f0e8;
+  --scrollbar:      #b8ccd8;
+  --scrollbar-track:#e8e0d0;
+}
+
+html[data-theme="theForce"] {
+  --bg-primary:     #020b18;
+  --bg-secondary:   #041020;
+  --bg-nav:         #051225;
+  --bg-card:        #071830;
+  --bg-card-2:      #051225;
+  --surface:        #00c4d410;
+  --border:         #00c4d415;
+  --border-2:       #00c4d428;
+  --text-primary:   #d0f0ff;
+  --text-secondary: #5090b0;
+  --text-faint:     #284860;
+  --input-bg:       #00c4d410;
+  --input-border:   #00c4d428;
+  --input-focus:    #00c4d4;
+  --accent:         #00c4d4;
+  --accent-bg:      #00c4d415;
+  --accent-border:  #00c4d440;
+  --shadow-card:    0 2px 20px rgba(0,0,0,0.7);
+  --row-hover:      #00c4d406;
+  --scrollbar:      #284860;
+  --scrollbar-track:#041020;
+}
+
+/* ── Global body background follows theme ── */
+html, body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ── Global scrollbar follows theme ── */
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar) var(--scrollbar-track); }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+
 /* ── Theme transition: smooth color changes on all elements ── */
 *, *::before, *::after {
   transition:
@@ -52,3 +262,4 @@ button, a, [role="button"] {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+

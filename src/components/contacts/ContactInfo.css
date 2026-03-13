@@ -2,7 +2,7 @@
 .info-section-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 1rem 0;
   letter-spacing: -0.01em;
 }
@@ -10,7 +10,7 @@
 .info-value {
   font-size: 0.9375rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .info-value-link {
@@ -29,7 +29,7 @@
 .info-value-unavailable {
   font-size: 0.9375rem;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--text-faint);
 }
 
 /* Email Status Badges */
@@ -43,28 +43,28 @@
 }
 
 .email-status.verified {
-  background: #f0fdf4;
+  background: rgba(16,185,129,0.07);
   color: #15803d;
-  border: 1px solid #86efac;
+  border: 1px solid rgba(16,185,129,0.35);
 }
 
 .email-status.likely {
-  background: #fef3c7;
+  background: rgba(245,158,11,0.12);
   color: #92400e;
-  border: 1px solid #fde68a;
+  border: 1px solid rgba(245,158,11,0.25);
 }
 
 .email-status.unverified {
-  background: #f3f4f6;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
 
 /* COMPACT MODE (for snapshot) */
 .contact-info-compact {
   padding: 1.5rem 2rem;
-  background: #ffffff;
-  border-bottom: 1px solid #f3f4f6;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--bg-secondary);
 }
 
 .info-items-compact {
@@ -82,7 +82,7 @@
 .info-icon-compact {
   width: 18px;
   height: 18px;
-  color: #6b7280;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -98,13 +98,13 @@
 .networking-context-compact {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 .networking-title {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 0.75rem 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -112,21 +112,21 @@
 
 .networking-detail {
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--text-primary);
   margin: 0.5rem 0;
 }
 
 .networking-detail strong {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* EXPANDED MODE (for full profile) */
 .contact-info-expanded {
-  background: #ffffff;
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
 }
 
 .info-items-expanded {
@@ -147,7 +147,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: #eff6ff;
+  background: rgba(59,130,246,0.08);
   border-radius: 8px;
   flex-shrink: 0;
 }
@@ -168,7 +168,7 @@
 .info-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: capitalize;
   letter-spacing: 0.02em;
 }
@@ -177,13 +177,13 @@
 .networking-context-expanded {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
 }
 
 .networking-title-expanded {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-primary);
   margin: 0 0 1rem 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -204,7 +204,7 @@
 .networking-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -212,7 +212,7 @@
 .networking-value {
   font-size: 0.9375rem;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 /* Mobile Responsive */

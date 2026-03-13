@@ -27,11 +27,11 @@
 
 .recon-breadcrumb-current {
   font-weight: 600;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .recon-breadcrumb-link {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 500;
   background: none;
   border: none;
@@ -49,6 +49,6 @@
 .recon-breadcrumb-icon {
   display: inline;
   margin-right: 0.25rem;
-  color: #9ca3af;
+  color: var(--text-faint);
   vertical-align: middle;
 }

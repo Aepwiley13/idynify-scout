@@ -3,6 +3,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { createMessageWithRetry } from './utils/anthropicRetry.js';
+import { assembleBarryContext } from './utils/barryContextAssembler.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -169,6 +170,20 @@ export const handler = async (event) => {
       console.log('⚠️ No user profile available');
     }
 
+    // 4. Load Barry's memory context (Sprint 0 — gives Barry history awareness)
+    let barryMemoryContext = '';
+    try {
+      if (contactId) {
+        const { promptContext } = await assembleBarryContext(db, userId, contactId);
+        barryMemoryContext = promptContext || '';
+        if (barryMemoryContext) {
+          console.log('✅ Barry memory context loaded');
+        }
+      }
+    } catch (memoryError) {
+      console.log('⚠️ Barry memory unavailable:', memoryError.message);
+    }
+
     // === BUILD CONTEXT FOR BARRY ===
 
     const firstName = fullContact.firstName || fullContact.name?.split(' ')[0] || 'there';
@@ -279,7 +294,7 @@ Calibrate messaging accordingly:
 ` : ''}
 ${barryContextString}
 ${reconContext}
-
+${barryMemoryContext}
 USER'S COMPANY (if available):
 ${userProfile?.companyName || userProfile?.company || 'Not specified'}
 
@@ -373,7 +388,8 @@ Generate the messages now. Respond ONLY with valid JSON.`;
         contactName: fullName,
         userIntent: userIntent.substring(0, 100),
         engagementIntent,
-        reconUsed: reconLoaded
+        reconUsed: reconLoaded,
+        barryMemoryUsed: !!barryMemoryContext
       }
     });
 

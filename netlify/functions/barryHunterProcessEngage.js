@@ -19,6 +19,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { assembleBarryContext } from './utils/barryContextAssembler.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -95,7 +96,7 @@ function buildMissionSteps(outcomeGoal) {
 }
 
 // ── Step 1 draft generation (4 angles) ──────────────────────────────────────
-async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake) {
+async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '') {
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Contact';
   const firstName = contact.first_name || name.split(' ')[0];
 
@@ -122,7 +123,7 @@ Context:
 - Contact: ${name}, ${contact.title || 'unknown title'} at ${contact.company_name || 'unknown company'}
 - Relationship state: ${contact.relationship_state || 'unaware'}
 - Outcome goal: ${outcomeGoal}
-- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${intakeContext}${limitedContextNote}
+- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${intakeContext}${limitedContextNote}
 
 Rules:
 1. Every message must contain at least one specific detail from the contact or context. No generic templates.
@@ -256,7 +257,19 @@ export const handler = async (event) => {
       console.warn('[barryHunterProcessEngage] RECON load skipped:', err.message);
     }
 
-    // 3. Check mission history (determines isFirstContact)
+    // 3. Load Barry's memory context (Sprint 0 — gives Barry history awareness)
+    let barryMemoryContext = '';
+    try {
+      const { promptContext } = await assembleBarryContext(db, userId, contactId);
+      barryMemoryContext = promptContext || '';
+      if (barryMemoryContext) {
+        console.log(`[barryHunterProcessEngage] Barry memory loaded for contact=${contactId}`);
+      }
+    } catch (memErr) {
+      console.warn('[barryHunterProcessEngage] Barry memory unavailable:', memErr.message);
+    }
+
+    // 4. Check mission history (determines isFirstContact)
     let isFirstContact = true;
     try {
       const historySnap = await db
@@ -275,20 +288,20 @@ export const handler = async (event) => {
       isFirstContact = false;
     }
 
-    // 4. Determine outcome_goal
+    // 5. Determine outcome_goal
     const outcomeGoal = contact.outcome_goal || getDefaultOutcomeGoal(contact.relationship_state);
 
-    // 5. Build mission step structure
+    // 6. Build mission step structure
     const steps = buildMissionSteps(outcomeGoal);
 
-    // 6. Generate step 1 draft (4 angles) — the main AI call
+    // 7. Generate step 1 draft (4 angles) — the main AI call
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const step1Draft = await generateStep1Draft(
-      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake
+      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext
     );
     steps[0].draft = step1Draft;
 
-    // 7. Write mission to Firestore
+    // 8. Write mission to Firestore
     const missionRef = db.collection('users').doc(userId).collection('missions').doc();
     const missionId = missionRef.id;
     await missionRef.set({
@@ -304,7 +317,7 @@ export const handler = async (event) => {
       updated_at: new Date().toISOString()
     });
 
-    // 8. Update contact to active_mission
+    // 9. Update contact to active_mission
     await db.collection('users').doc(userId).collection('contacts').doc(contactId).update({
       hunter_status: 'active_mission',
       active_mission_id: missionId,
@@ -316,7 +329,7 @@ export const handler = async (event) => {
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryHunterProcessEngage', 'success', {
       responseTime,
-      metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, missionId }
+      metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, hasBarryMemory: !!barryMemoryContext, missionId }
     });
 
     console.log(`[barryHunterProcessEngage] ✓ Mission created: ${missionId} (${responseTime}ms)`);

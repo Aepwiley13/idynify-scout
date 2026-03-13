@@ -49,6 +49,7 @@ const TABS = [
   { id: 'billing',      label: 'Billing',       icon: CreditCard },
   { id: 'integrations', label: 'Integrations',  icon: Plug      },
   { id: 'hunter',       label: 'Hunter',        icon: Settings2 },
+  { id: 'appearance',   label: 'Appearance',    icon: Palette   },
 ];
 
 const PLAN_LABELS  = { starter: 'Starter', pro: 'Pro' };
@@ -176,6 +177,182 @@ function ThemePicker() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── AppearancePanel ────────────────────────────────────────────────────── */
+function AppearancePanel() {
+  const T = useT();
+  const { themeId, setThemeId } = useThemeCtx();
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const allThemes = Object.values(THEMES);
+  const coreThemes = allThemes.filter(t => !t.starWars);
+  const swThemes = allThemes.filter(t => t.starWars);
+
+  async function handleSave() {
+    setSaving(true);
+    await setThemeId(themeId); // re-triggers Firestore write
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  function ThemeCard({ theme }) {
+    const active = themeId === theme.id;
+    return (
+      <div
+        onClick={() => setThemeId(theme.id)}
+        style={{
+          position: 'relative',
+          borderRadius: 14,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          border: `2px solid ${active ? SETTINGS_ORANGE : T.border2}`,
+          boxShadow: active
+            ? `0 0 0 3px ${SETTINGS_ORANGE}30, 0 4px 20px ${SETTINGS_ORANGE}20`
+            : `0 2px 8px ${T.isDark ? '#00000040' : '#00000010'}`,
+          transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.15s',
+          transform: active ? 'scale(1.02)' : 'scale(1)',
+          background: T.cardBg,
+        }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = T.border2; }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = T.border2; }}
+      >
+        {/* Swatch preview */}
+        <div style={{
+          height: 72, background: theme.swatchBg,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* Mini color dots */}
+          <div style={{
+            position: 'absolute', bottom: 8, left: 10,
+            display: 'flex', gap: 5, alignItems: 'center',
+          }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', background: theme.accent, boxShadow: `0 0 6px ${theme.accent}80` }} />
+            <div style={{ width: 14, height: 14, borderRadius: '50%', background: theme.cyan,   boxShadow: `0 0 6px ${theme.cyan}60` }} />
+            <div style={{ width: 20, height: 8,  borderRadius: 4,     background: theme.text + '60' }} />
+          </div>
+          {/* Star Wars badge */}
+          {theme.starWars && (
+            <div style={{
+              position: 'absolute', top: 7, right: 7,
+              background: 'linear-gradient(135deg,#cc0000,#8b00cc)',
+              borderRadius: 6, padding: '2px 7px',
+              fontSize: 9, fontWeight: 700, color: '#fff',
+              fontFamily: 'Orbitron, sans-serif',
+              letterSpacing: 0.5,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            }}>
+              ⚡ STAR WARS
+            </div>
+          )}
+          {/* Active check */}
+          {active && (
+            <div style={{
+              position: 'absolute', top: 7, left: 7,
+              width: 20, height: 20, borderRadius: '50%',
+              background: SETTINGS_ORANGE,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 0 8px ${SETTINGS_ORANGE}80`,
+            }}>
+              <Check size={11} color="#000" />
+            </div>
+          )}
+        </div>
+
+        {/* Card body */}
+        <div style={{ padding: '10px 12px 12px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3,
+          }}>
+            <span style={{ fontSize: 14 }}>{theme.icon}</span>
+            <span style={{
+              fontSize: 12, fontWeight: 700,
+              color: active ? SETTINGS_ORANGE : T.text,
+            }}>
+              {theme.label}
+            </span>
+          </div>
+          {theme.description && (
+            <div style={{ fontSize: 10, color: T.textFaint, lineHeight: 1.4 }}>
+              {theme.description}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="us-section-stack">
+      {/* Core themes */}
+      <section className="us-section">
+        <h2 className="us-section-title">Themes</h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+          gap: 12,
+          marginTop: 4,
+        }}>
+          {coreThemes.map(theme => <ThemeCard key={theme.id} theme={theme} />)}
+        </div>
+      </section>
+
+      {/* Star Wars themes */}
+      <section className="us-section">
+        <h2 className="us-section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Star Wars Themes</span>
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: 1,
+            padding: '2px 8px', borderRadius: 5,
+            background: 'linear-gradient(135deg,#cc0000,#8b00cc)',
+            color: '#fff', fontFamily: 'Orbitron, sans-serif',
+          }}>⚡ FORCE</span>
+        </h2>
+        <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 12 }}>
+          May the Force be with your workflow.
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+          gap: 12,
+        }}>
+          {swThemes.map(theme => <ThemeCard key={theme.id} theme={theme} />)}
+        </div>
+      </section>
+
+      {/* Save button */}
+      <section className="us-section">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '10px 22px', borderRadius: 10,
+            background: saved
+              ? `${SETTINGS_ORANGE}20`
+              : `linear-gradient(135deg,${SETTINGS_ORANGE},${SETTINGS_ORANGE2})`,
+            border: `1px solid ${saved ? SETTINGS_ORANGE : 'transparent'}`,
+            color: saved ? SETTINGS_ORANGE : '#000',
+            fontWeight: 700, fontSize: 13, cursor: saving ? 'default' : 'pointer',
+            transition: 'all 0.2s',
+            opacity: saving ? 0.7 : 1,
+          }}
+        >
+          {saved
+            ? <><CheckCircle size={14} /> Preferences saved</>
+            : saving
+              ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+              : <><Palette size={14} /> Save Preferences</>
+          }
+        </button>
+        <div style={{ fontSize: 10, color: T.textFaint, marginTop: 7 }}>
+          Theme choice is saved to your profile and syncs across all devices.
+        </div>
+      </section>
     </div>
   );
 }
@@ -892,6 +1069,11 @@ export default function UserSettings() {
               </div>
             </section>
           </div>
+        )}
+
+        {/* ══ APPEARANCE ══ */}
+        {activeTab === 'appearance' && (
+          <AppearancePanel />
         )}
 
         {/* ══ HUNTER ══ */}

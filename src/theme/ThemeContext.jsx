@@ -2,10 +2,10 @@
  * src/theme/ThemeContext.jsx
  * ─────────────────────────────────────────────────────────────────────────────
  * Global theme context. Provides the active theme token set (T) and a setter.
- * Theme preference persists to localStorage as 'idynify_theme' ('light'|'dark').
+ * Theme preference persists to localStorage as 'idynify_theme' (full theme ID).
  * Firestore is used as secondary persistence (keeps existing user prefs in sync).
  *
- * Default: 'light' (workspace theme) on first visit.
+ * Default: 'workspace' (light) on first visit.
  *
  * Usage:
  *   const T = useT();                              // get current theme token set
@@ -19,15 +19,13 @@ import { THEMES } from "./tokens";
 
 const LS_KEY = "idynify_theme";
 
-/** Map localStorage string ('light'|'dark') → internal themeId */
-function lsToThemeId(lsVal) {
-  if (lsVal === "dark") return "mission";
-  return "workspace"; // 'light' or no value → light default
-}
-
-/** Map internal themeId → localStorage string ('light'|'dark') */
-function themeIdToLs(themeId) {
-  return THEMES[themeId]?.isDark ? "dark" : "light";
+/** Resolve a stored value (full themeId or legacy 'light'/'dark') → valid themeId */
+function resolveThemeId(stored) {
+  if (!stored) return "workspace";
+  if (THEMES[stored]) return stored;
+  // Legacy: 'dark' → mission, 'light' → workspace
+  if (stored === "dark") return "mission";
+  return "workspace";
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -42,21 +40,23 @@ export const useThemeCtx = () => useContext(ThemeCtx);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function ThemeProvider({ children }) {
-  // Initialize from localStorage; fall back to 'workspace' (light) if unset
+  // Initialize from localStorage; fall back to 'workspace' if unset
   const [themeId, setThemeIdState] = useState(() => {
     try {
       const stored = localStorage.getItem(LS_KEY);
-      return lsToThemeId(stored);
+      return resolveThemeId(stored);
     } catch {
       return "workspace";
     }
   });
 
-  // Apply body class whenever theme changes
+  // Apply body class and data-theme attribute whenever theme changes
   useEffect(() => {
-    const isDark = THEMES[themeId]?.isDark ?? false;
+    const theme = THEMES[themeId];
+    const isDark = theme?.isDark ?? false;
     document.body.classList.toggle("theme-dark", isDark);
     document.body.classList.toggle("theme-light", !isDark);
+    document.documentElement.setAttribute("data-theme", themeId);
   }, [themeId]);
 
   // Load from Firestore only when localStorage has no value yet (first-ever visit)
@@ -64,7 +64,7 @@ export function ThemeProvider({ children }) {
     const loadTheme = async () => {
       try {
         const stored = localStorage.getItem(LS_KEY);
-        if (stored) return; // localStorage already set — don't override
+        if (stored && THEMES[resolveThemeId(stored)]) return; // localStorage already set
 
         const user = auth.currentUser;
         if (!user) return;
@@ -74,7 +74,7 @@ export function ThemeProvider({ children }) {
           if (prefs?.theme && THEMES[prefs.theme]) {
             const id = prefs.theme;
             setThemeIdState(id);
-            localStorage.setItem(LS_KEY, themeIdToLs(id));
+            localStorage.setItem(LS_KEY, id);
           }
         }
       } catch (err) {
@@ -89,7 +89,7 @@ export function ThemeProvider({ children }) {
     if (!THEMES[id]) return;
     setThemeIdState(id);
     try {
-      localStorage.setItem(LS_KEY, themeIdToLs(id));
+      localStorage.setItem(LS_KEY, id);
     } catch {
       // ignore storage errors
     }

@@ -206,6 +206,152 @@ export const THEMES = {
     rowHov:     "#fdf4ec",
     rowSel:     `${BRAND.pink}08`,
   },
+
+  // ── STAR WARS THEMES ─────────────────────────────────────────────────────────
+
+  darkSide: {
+    id: "darkSide", label: "Dark Side", icon: "⚡", starWars: true,
+    description: "Sith & Imperial — Power. Control. Darkness.",
+    // Surfaces: pure blacks, deep purples, Sith depth
+    appBg:      "#000000",
+    railBg:     "#0a0008",
+    navBg:      "#0d000c",
+    cardBg:     "#110010",
+    cardBg2:    "#0d000c",
+    surface:    "#cc000010",
+    surface2:   "#cc000018",
+    // Borders: subtle dark red
+    border:     "#cc000015",
+    border2:    "#cc000025",
+    borderHov:  "#cc000060",
+    // Text: cold off-white lavender
+    text:       "#f0eaf8",
+    textMuted:  "#9070a0",
+    textFaint:  "#5a3a6a",
+    textGhost:  "#2e1a3e",
+    // Input
+    input:      "#cc000010",
+    // Accent: Sith red
+    accent:     "#cc0000",
+    accentBg:   "#cc000018",
+    accentBdr:  "#cc000040",
+    // Secondary: deep imperial purple
+    cyan:       "#8b00cc",
+    cyanBg:     "#8b00cc15",
+    cyanBdr:    "#8b00cc35",
+    // Flags
+    isDark:     true,
+    particles:  true,
+    swatchBg:   "linear-gradient(135deg,#000000,#2a0020)",
+    // Modal
+    modalBg:    "#110010",
+    modalText:  "#f0eaf8",
+    modalMuted: "#9070a0",
+    modalBdr:   "#cc000015",
+    modalLine:  "#cc000010",
+    // Misc
+    statBg:     "#cc000008",
+    tagBg:      "#cc000010",
+    tagText:    "#9070a0",
+    rowHov:     "#cc000006",
+    rowSel:     "#cc000015",
+  },
+
+  lightSide: {
+    id: "lightSide", label: "Light Side", icon: "✨", starWars: true,
+    description: "Jedi & Republic — Peace. Wisdom. Balance.",
+    // Surfaces: warm creams and parchment
+    appBg:      "#faf8f2",
+    railBg:     "#fffef8",
+    navBg:      "#fffef8",
+    cardBg:     "#ffffff",
+    cardBg2:    "#f5f0e8",
+    surface:    "#e8e0d0",
+    surface2:   "#ddd5c0",
+    // Borders: warm tan with Jedi blue tint
+    border:     "#1a527620",
+    border2:    "#1a527635",
+    borderHov:  "#c9a22760",
+    // Text: deep navy
+    text:       "#0d2235",
+    textMuted:  "#3a5570",
+    textFaint:  "#7a9ab0",
+    textGhost:  "#b8ccd8",
+    // Input
+    input:      "#e8e0d0",
+    // Accent: Jedi blue
+    accent:     "#1a5276",
+    accentBg:   "#1a527615",
+    accentBdr:  "#1a527640",
+    // Secondary: gold highlights
+    cyan:       "#c9a227",
+    cyanBg:     "#c9a22715",
+    cyanBdr:    "#c9a22738",
+    // Flags
+    isDark:     false,
+    particles:  false,
+    swatchBg:   "linear-gradient(135deg,#faf8f2,#1a527630)",
+    // Modal
+    modalBg:    "#ffffff",
+    modalText:  "#0d2235",
+    modalMuted: "#3a5570",
+    modalBdr:   "#1a527625",
+    modalLine:  "#e8e0d0",
+    // Misc
+    statBg:     "#e8e0d0",
+    tagBg:      "#1a527612",
+    tagText:    "#3a5570",
+    rowHov:     "#f5f0e8",
+    rowSel:     "#c9a22715",
+  },
+
+  theForce: {
+    id: "theForce", label: "The Force", icon: "🌌", starWars: true,
+    description: "Galaxy & Hologram — Deep space energy.",
+    // Surfaces: deep space navy
+    appBg:      "#020b18",
+    railBg:     "#041020",
+    navBg:      "#051225",
+    cardBg:     "#071830",
+    cardBg2:    "#051225",
+    surface:    "#00c4d410",
+    surface2:   "#00c4d418",
+    // Borders: hologram cyan
+    border:     "#00c4d415",
+    border2:    "#00c4d428",
+    borderHov:  "#00c4d460",
+    // Text: pale blue-white
+    text:       "#d0f0ff",
+    textMuted:  "#5090b0",
+    textFaint:  "#284860",
+    textGhost:  "#122030",
+    // Input
+    input:      "#00c4d410",
+    // Accent: hologram cyan
+    accent:     "#00c4d4",
+    accentBg:   "#00c4d415",
+    accentBdr:  "#00c4d440",
+    // Secondary: electric blue
+    cyan:       "#0080ff",
+    cyanBg:     "#0080ff12",
+    cyanBdr:    "#0080ff35",
+    // Flags
+    isDark:     true,
+    particles:  true,
+    swatchBg:   "linear-gradient(135deg,#020b18,#00c4d430)",
+    // Modal
+    modalBg:    "#071830",
+    modalText:  "#d0f0ff",
+    modalMuted: "#5090b0",
+    modalBdr:   "#00c4d415",
+    modalLine:  "#00c4d410",
+    // Misc
+    statBg:     "#00c4d408",
+    tagBg:      "#00c4d410",
+    tagText:    "#5090b0",
+    rowHov:     "#00c4d406",
+    rowSel:     "#00c4d415",
+  },
 };
 
 // ─── STATUS BADGE MAP (component-ready) ───────────────────────────────────────

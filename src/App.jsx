@@ -91,6 +91,9 @@ import BarryOnboarding from './pages/Onboarding/BarryOnboarding';
 // User Settings
 import UserSettings from './pages/UserSettings';
 
+// Theme
+import WithTheForce from './components/WithTheForce';
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -259,6 +262,7 @@ function App() {
         />
       )}
       {user && <CrispChat user={user} />}
+      {user && <WithTheForce />}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />

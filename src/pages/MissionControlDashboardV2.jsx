@@ -281,13 +281,12 @@ export default function MissionControlDashboardV2() {
             {/* Module Quick-Nav Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               {[
-                { label: 'BASECAMP',       path: '/basecamp',              color: 'green'  },
-                { label: 'SCOUT',          path: '/scout?tab=all-leads', color: 'cyan'   },
-                { label: 'HUNTER',         path: '/hunter',                color: 'pink'   },
-                { label: 'RECON',          path: '/recon',                 color: 'purple' },
-                { label: 'SNIPER',         path: '/sniper',                color: 'green'  },
-                { label: 'COMMAND CENTER', path: '/people',                color: 'cyan'   },
-                { label: 'ALL PEOPLE',     path: '/people',                color: 'pink'   },
+                { label: 'COMMAND CENTER',  path: '/people',              color: 'cyan'   },
+                { label: 'SCOUT',           path: '/scout?tab=all-leads', color: 'cyan'   },
+                { label: 'HUNTER',          path: '/hunter',              color: 'pink'   },
+                { label: 'SNIPER',          path: '/sniper',              color: 'green'  },
+                { label: 'BASECAMP',        path: '/basecamp',            color: 'green'  },
+                { label: 'REINFORCEMENTS',  path: '/reinforcements',      color: 'pink'   },
               ].map(({ label, path, color }) => (
                 <button
                   key={label}

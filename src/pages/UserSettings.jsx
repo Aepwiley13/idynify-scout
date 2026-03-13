@@ -378,6 +378,7 @@ const MODULE_RAIL = [
   { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
   { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
   { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: '/reinforcements' },
 ];
 
 /* ─── Main component ─────────────────────────────────────────────────────── */

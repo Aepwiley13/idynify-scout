@@ -17,7 +17,7 @@ import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/fires
 import { db, auth } from '../../firebase/config';
 import { useActiveUser, useImpersonation } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target, Tent,
+  Radar, Crosshair, Eye, Target, Tent, Shield,
   LayoutDashboard, Zap, Archive, BarChart3, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight,
   Mail, CheckCircle, Settings as SettingsIcon, Home,
@@ -164,6 +164,7 @@ const MODULE_RAIL = [
   { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: null      }, // active module
   { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
   { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: '/reinforcements' },
 ];
 
 // ─── Hunter sub-nav items ─────────────────────────────────────────────────────

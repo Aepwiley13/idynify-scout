@@ -15,7 +15,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target,
+  Radar, Crosshair, Eye, Target, Tent,
   Brain, MessageSquare, Shield, Swords, Zap, LayoutDashboard,
   Palette, Check, ChevronLeft, ChevronRight, Home, Settings, Users,
 } from 'lucide-react';
@@ -156,11 +156,12 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'people', label: 'COMMAND CENTER', Icon: Users, route: '/people'  },
-  { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'   },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter'  },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: null       }, // active module
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper'  },
+  { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/people'  },
+  { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'   },
+  { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter'  },
+  { id: 'recon',    label: 'RECON',  Icon: Eye,       route: null       }, // active module
+  { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper'  },
 ];
 
 // ─── Recon sub-nav items ──────────────────────────────────────────────────────

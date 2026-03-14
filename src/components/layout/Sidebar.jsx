@@ -39,6 +39,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     scout: true,
     hunter: true,
     sniper: true,
+    basecamp: true,
     reinforcements: true,
   });
   const navigate = useNavigate();
@@ -240,6 +241,16 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     }
   ];
 
+  const basecampItems = [
+    {
+      icon: Home,
+      label: 'Basecamp',
+      sublabel: 'Mission command',
+      path: '/basecamp',
+      isPrimary: true
+    }
+  ];
+
   const reinforcementsItems = [
     {
       icon: Users,
@@ -285,6 +296,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       id === 'scout'          ? isPathActive('/scout') :
       id === 'hunter'         ? isPathActive('/hunter') :
       id === 'sniper'         ? isPathActive('/sniper') :
+      id === 'basecamp'       ? isPathActive('/basecamp') :
       id === 'reinforcements' ? isPathActive('/reinforcements') :
       false;
 
@@ -338,6 +350,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         {renderPillar('scout',          'SCOUT',           Search,    'pillar-cyan',   scoutItems)}
         {renderPillar('hunter',         'HUNTER',          Crosshair, 'pillar-purple', hunterItems)}
         {renderPillar('sniper',         'SNIPER',          Target,    'pillar-cyan',   sniperItems)}
+        {renderPillar('basecamp',       'BASECAMP',        Home,      'pillar-cyan',   basecampItems)}
         {renderPillar('reinforcements', 'REINFORCEMENTS',  Users,     'pillar-purple', reinforcementsItems)}
       </nav>
 

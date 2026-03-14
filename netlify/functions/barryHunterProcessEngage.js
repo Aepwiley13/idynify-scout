@@ -20,6 +20,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
+import { checkRelationshipGuardrail } from './utils/barryGuardrail.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -246,6 +247,18 @@ export const handler = async (event) => {
     if (!contactDoc.exists) throw new Error('Contact not found');
     const contact = { id: contactId, ...contactDoc.data() };
 
+    // 1b. Pre-generation guardrail check (Sprint 2)
+    let barryWarning = null;
+    try {
+      const intent = contact.engagementIntent || contact.engagement_intent || 'prospect';
+      barryWarning = checkRelationshipGuardrail(contact, intent, contact.hunter_intake?.reason || '');
+      if (barryWarning) {
+        console.log(`[barryHunterProcessEngage] Guardrail triggered: ${barryWarning.type}`);
+      }
+    } catch (guardrailErr) {
+      console.warn('[barryHunterProcessEngage] Guardrail check failed (non-blocking):', guardrailErr.message);
+    }
+
     // 2. Load RECON data (non-fatal)
     let reconContext = '';
     try {
@@ -312,6 +325,7 @@ export const handler = async (event) => {
       status: 'active',
       isFirstContact,
       barry_reasoning: step1Draft.barry_reasoning,
+      barry_warning: barryWarning || null,
       steps,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -337,7 +351,7 @@ export const handler = async (event) => {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ success: true, missionId, outcome_goal: outcomeGoal, isFirstContact })
+      body: JSON.stringify({ success: true, missionId, outcome_goal: outcomeGoal, isFirstContact, barry_warning: barryWarning || null })
     };
 
   } catch (error) {

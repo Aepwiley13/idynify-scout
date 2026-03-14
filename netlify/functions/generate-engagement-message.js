@@ -4,6 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
+import { checkRelationshipGuardrail } from './utils/barryGuardrail.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -182,6 +183,17 @@ export const handler = async (event) => {
       }
     } catch (memoryError) {
       console.log('⚠️ Barry memory unavailable:', memoryError.message);
+    }
+
+    // === PRE-GENERATION GUARDRAIL CHECK (Sprint 2) ===
+    let barryWarning = null;
+    try {
+      barryWarning = checkRelationshipGuardrail(fullContact, engagementIntent, userIntent);
+      if (barryWarning) {
+        console.log(`⚠️ Barry guardrail triggered: ${barryWarning.type} (${barryWarning.severity})`);
+      }
+    } catch (guardrailError) {
+      console.log('⚠️ Guardrail check failed (non-blocking):', guardrailError.message);
     }
 
     // === BUILD CONTEXT FOR BARRY ===
@@ -404,6 +416,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
       body: JSON.stringify({
         success: true,
         messages: result.messages,
+        barry_warning: barryWarning || null,
         dataUsed: result.dataUsed || {
           contact: true,
           recon: reconLoaded,

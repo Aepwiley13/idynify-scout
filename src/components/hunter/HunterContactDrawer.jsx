@@ -22,6 +22,7 @@ import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../ut
 import { getSequencePlan } from '../../utils/sequenceEngine';
 import { generateContactRecommendations, dismissRecommendation } from '../../utils/recommendationEngine';
 import BarryRecommendationCard from './BarryRecommendationCard';
+import BarryWarningCard from './BarryWarningCard';
 import SequencePanel from './SequencePanel';
 import LearningToast from '../LearningToast';
 import { EmailDraftCard } from '../shared/EmailDraftCard';
@@ -91,6 +92,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   // Barry proactive recommendations (Step 7)
   const [drawerRecommendations, setDrawerRecommendations] = useState([]);
+
+  // Barry relationship guardrail (Sprint 2)
+  const [barryWarning, setBarryWarning] = useState(null);
 
   // Toast notification state (replaces native alert())
   const [toastMessage, setToastMessage] = useState(null);
@@ -314,6 +318,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   async function generateMessageOptions(intentText, relationshipIntent) {
     setLoading(true);
     setGenerationError(null);
+    setBarryWarning(null);
     setActiveView('options');
 
     try {
@@ -357,6 +362,11 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       // Expect 3 message options with strategy, label, subject, message, and reasoning
       if (data.success && data.messages && data.messages.length >= 3) {
         setMessageOptions(data.messages);
+
+        // Capture Barry guardrail warning if present (Sprint 2)
+        if (data.barry_warning) {
+          setBarryWarning(data.barry_warning);
+        }
 
         // Log timeline event: message_generated
         const user2 = auth.currentUser;
@@ -1053,6 +1063,38 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                     <span className="intent-label-small">Your goal:</span>
                     <span className="intent-text-small">{userIntent}</span>
                   </div>
+
+                  {/* Barry relationship guardrail (Sprint 2) */}
+                  {barryWarning && (
+                    <BarryWarningCard
+                      warning={barryWarning}
+                      contactId={contact?.id}
+                      onAction={(actionId) => {
+                        // Handle guardrail actions
+                        if (actionId === 'warm_up') {
+                          // Re-generate with warm intent
+                          setBarryWarning(null);
+                          generateMessageOptions(userIntent, 'warm');
+                        } else if (actionId === 'reference_history') {
+                          // Re-generate with follow-up context
+                          setBarryWarning(null);
+                          generateMessageOptions(`Follow up on our previous conversation: ${userIntent}`, engagementIntent);
+                        } else if (actionId === 'classify_known') {
+                          // Update intent to warm and regenerate
+                          setBarryWarning(null);
+                          setEngagementIntent('warm');
+                          generateMessageOptions(userIntent, 'warm');
+                        } else if (actionId === 'classify_prospect') {
+                          // Keep as-is, dismiss warning
+                          setBarryWarning(null);
+                        } else {
+                          // keep_professional, send_anyway, start_fresh, skip — dismiss and proceed
+                          setBarryWarning(null);
+                        }
+                      }}
+                      onDismiss={() => setBarryWarning(null)}
+                    />
+                  )}
 
                   <div className="message-options-list">
                     {messageOptions.map((option, index) => (

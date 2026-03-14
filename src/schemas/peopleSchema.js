@@ -66,6 +66,26 @@
  *                                           Used specifically in Barry message generation for tone calibration.
  *                                           Separate from relationship_type (different purpose, different question).
  *
+ * ── BARRY INFERENCE TRACKING (Sprint 1) ────────────────────────────
+ * Barry auto-infers relationship warmth from behavioral signals.
+ * User-set values always take priority. Inferred values tagged with source.
+ *
+ * @property {boolean} known_contact                 - true if Barry inferred this is a personally known contact
+ * @property {string}  known_contact_source          - 'barry_inferred' | 'user_set'
+ * @property {string}  relationship_state_source     - 'barry_inferred' | 'user_set' — who set the current value
+ * @property {string}  relationship_state_inferred_at - ISO timestamp of last Barry inference
+ * @property {string}  relationship_state_inference_reason - Why Barry inferred this state
+ * @property {string}  warmth_level_source           - 'barry_inferred' | 'user_set' — who set the current value
+ * @property {string}  warmth_level_inferred_at      - ISO timestamp of last Barry inference
+ * @property {string}  warmth_level_inference_reason  - Why Barry inferred this warmth level
+ * @property {string}  engagement_intent_source      - 'barry_inferred' | 'user_set'
+ * @property {Object}  barry_warmth_suggestion       - Pending suggestion for UI to render in engage panel
+ * @property {string}  barry_warmth_suggestion.field  - Which field Barry wants to update
+ * @property {string}  barry_warmth_suggestion.current - Current value
+ * @property {string}  barry_warmth_suggestion.suggested - Barry's suggested value
+ * @property {string}  barry_warmth_suggestion.reason - Why Barry is suggesting this
+ * @property {string}  barry_warmth_suggestion.message - Barry's conversational message for the UI
+ *
  * ── CONTACT STATUS (STATE MACHINE) ───────────────────────────────
  * @property {string}  contact_status      - 'New' | 'Engaged' | 'Awaiting Reply' | 'In Conversation' |
  *                                           'Active Customer' | 'Network' | 'Partner' | 'Dormant'
@@ -308,6 +328,18 @@ export function createPersonRecord(identity, personType = 'lead', addedFrom = 'm
     warmth_level: null,
     strategic_value: null,
     engagement_intent: null,
+
+    // Barry Inference Tracking (Sprint 1)
+    known_contact: false,
+    known_contact_source: null,
+    relationship_state_source: null,
+    relationship_state_inferred_at: null,
+    relationship_state_inference_reason: null,
+    warmth_level_source: null,
+    warmth_level_inferred_at: null,
+    warmth_level_inference_reason: null,
+    engagement_intent_source: null,
+    barry_warmth_suggestion: null,
 
     // Contact Status
     contact_status: 'New',

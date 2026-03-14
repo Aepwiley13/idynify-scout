@@ -56,7 +56,10 @@ const TIMELINE_EVENT_TYPES = [
   'next_step_completed',
   'next_step_dismissed',
   // Operation People First: Brigade System events
-  'brigade_changed'
+  'brigade_changed',
+  // Barry Intelligence Upgrade: Relationship guardrail events
+  'barry_guardrail_shown',
+  'barry_guardrail_response'
 ];
 
 // Actor types

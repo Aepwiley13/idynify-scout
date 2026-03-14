@@ -268,7 +268,7 @@ function App() {
         />
       )}
       {user && <CrispChat user={user} />}
-      {user && <WithTheForce />}
+      {user && <MissionControlForce />}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
@@ -737,6 +737,29 @@ function App() {
     </BrowserRouter>
     </ImpersonationProvider>
   );
+}
+
+// Only show the floating WithTheForce button on Mission Control
+function MissionControlForce() {
+  const { pathname } = window.location;
+  // Re-render on navigation by using useLocation inside BrowserRouter context
+  const [path, setPath] = React.useState(window.location.pathname);
+  React.useEffect(() => {
+    const onNav = () => setPath(window.location.pathname);
+    window.addEventListener('popstate', onNav);
+    // Also listen to React Router history changes via a patched pushState
+    const origPush = history.pushState.bind(history);
+    history.pushState = (...args) => { origPush(...args); onNav(); };
+    const origReplace = history.replaceState.bind(history);
+    history.replaceState = (...args) => { origReplace(...args); onNav(); };
+    return () => {
+      window.removeEventListener('popstate', onNav);
+      history.pushState = origPush;
+      history.replaceState = origReplace;
+    };
+  }, []);
+  if (path !== '/mission-control-v2') return null;
+  return <WithTheForce />;
 }
 
 export default App;

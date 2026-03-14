@@ -32,7 +32,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { themeId, setThemeId } = useThemeCtx();
   const isLightTheme = !THEMES[themeId]?.isDark;
-  const handleThemeToggle = () => setThemeId(isLightTheme ? 'mission' : 'workspace');
+  const [themePanelOpen, setThemePanelOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     people: true,
     recon: true,
@@ -327,20 +327,91 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         {!isCollapsed && <span className="settings-toggle-label">Settings</span>}
       </button>
 
-      {/* Theme Toggle */}
-      <button
-        className={`theme-toggle ${isCollapsed ? 'collapsed' : ''}`}
-        onClick={handleThemeToggle}
-        title={isLightTheme ? 'Switch to dark mode' : 'Switch to light mode'}
-        aria-label={isLightTheme ? 'Switch to dark mode' : 'Switch to light mode'}
-      >
-        <span className="theme-toggle-icon">{isLightTheme ? '🌙' : '☀️'}</span>
-        {!isCollapsed && (
-          <span className="theme-toggle-label">
-            {isLightTheme ? 'Dark mode' : 'Light mode'}
-          </span>
+      {/* Theme Picker */}
+      <div style={{ position: 'relative' }}>
+        {/* Panel — opens above the button */}
+        {themePanelOpen && (
+          <div style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 8px)',
+            left: 0,
+            width: 220,
+            background: isLightTheme ? '#ffffff' : '#0d1117',
+            border: `1px solid ${isLightTheme ? '#e5e7eb' : 'rgba(0,196,212,0.3)'}`,
+            borderRadius: 12,
+            padding: '12px 10px 10px',
+            boxShadow: isLightTheme
+              ? '0 12px 40px rgba(0,0,0,0.15)'
+              : '0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+            zIndex: 9999,
+          }}>
+            <div style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: 2.5,
+              color: '#00c4d4', marginBottom: 10,
+              fontFamily: 'Orbitron, sans-serif', textTransform: 'uppercase',
+            }}>
+              ⚡ Choose Theme
+            </div>
+            {/* Standard themes */}
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: isLightTheme ? '#9ca3af' : '#6b7280', marginBottom: 5, textTransform: 'uppercase' }}>
+              Standard
+            </div>
+            {Object.values(THEMES).filter(t => !t.starWars).map(theme => (
+              <div
+                key={theme.id}
+                onClick={() => { setThemeId(theme.id); setThemePanelOpen(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '5px 7px', borderRadius: 8, cursor: 'pointer', marginBottom: 2,
+                  background: themeId === theme.id ? 'rgba(250,170,32,0.12)' : 'transparent',
+                  border: `1px solid ${themeId === theme.id ? 'rgba(250,170,32,0.35)' : 'transparent'}`,
+                }}
+              >
+                <div style={{ width: 26, height: 17, borderRadius: 4, background: theme.swatchBg, border: '1px solid rgba(0,0,0,0.15)', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: themeId === theme.id ? '#faaa20' : (isLightTheme ? '#374151' : '#e5e7eb') }}>
+                  {theme.icon} {theme.label}
+                </span>
+                {themeId === theme.id && <span style={{ marginLeft: 'auto', color: '#faaa20', fontSize: 11 }}>✓</span>}
+              </div>
+            ))}
+            {/* Star Wars themes */}
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: '#00c4d4', marginTop: 8, marginBottom: 5, fontFamily: 'Orbitron, sans-serif' }}>
+              ⚡ Star Wars
+            </div>
+            {Object.values(THEMES).filter(t => t.starWars).map(theme => (
+              <div
+                key={theme.id}
+                onClick={() => { setThemeId(theme.id); setThemePanelOpen(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '5px 7px', borderRadius: 8, cursor: 'pointer', marginBottom: 2,
+                  background: themeId === theme.id ? 'rgba(0,196,212,0.12)' : 'transparent',
+                  border: `1px solid ${themeId === theme.id ? 'rgba(0,196,212,0.35)' : 'transparent'}`,
+                }}
+              >
+                <div style={{ width: 26, height: 17, borderRadius: 4, background: theme.swatchBg, border: '1px solid rgba(0,0,0,0.15)', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: themeId === theme.id ? '#00c4d4' : (isLightTheme ? '#374151' : '#e5e7eb') }}>
+                  {theme.icon} {theme.label}
+                </span>
+                {themeId === theme.id && <span style={{ marginLeft: 'auto', color: '#00c4d4', fontSize: 11 }}>✓</span>}
+              </div>
+            ))}
+          </div>
         )}
-      </button>
+
+        {/* Trigger button */}
+        <button
+          className={`theme-toggle ${isCollapsed ? 'collapsed' : ''}`}
+          onClick={() => setThemePanelOpen(o => !o)}
+          title="Change theme"
+          aria-label="Change theme"
+        >
+          <span className="theme-toggle-icon">⚡</span>
+          {!isCollapsed && (
+            <span className="theme-toggle-label">Change theme</span>
+          )}
+        </button>
+      </div>
 
       {/* Collapse Toggle */}
       <button

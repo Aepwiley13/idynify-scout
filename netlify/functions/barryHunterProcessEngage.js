@@ -20,7 +20,8 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
-import { checkRelationshipGuardrail } from './utils/barryGuardrail.js';
+import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
+import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -97,7 +98,7 @@ function buildMissionSteps(outcomeGoal) {
 }
 
 // ── Step 1 draft generation (4 angles) ──────────────────────────────────────
-async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '') {
+async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '') {
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Contact';
   const firstName = contact.first_name || name.split(' ')[0];
 
@@ -124,7 +125,7 @@ Context:
 - Contact: ${name}, ${contact.title || 'unknown title'} at ${contact.company_name || 'unknown company'}
 - Relationship state: ${contact.relationship_state || 'unaware'}
 - Outcome goal: ${outcomeGoal}
-- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${intakeContext}${limitedContextNote}
+- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${strategyGuidance}${guardrailModifier ? `\n${guardrailModifier}` : ''}${intakeContext}${limitedContextNote}
 
 Rules:
 1. Every message must contain at least one specific detail from the contact or context. No generic templates.
@@ -226,6 +227,7 @@ export const handler = async (event) => {
     contactId = body.contactId;
     userId = body.userId;
     const authToken = body.authToken;
+    const guardrailAction = body.guardrailAction || null; // User's response to a guardrail warning
 
     if (!contactId || !userId || !authToken) {
       throw new Error('Missing required parameters: contactId, userId, authToken');
@@ -272,14 +274,44 @@ export const handler = async (event) => {
 
     // 3. Load Barry's memory context (Sprint 0 — gives Barry history awareness)
     let barryMemoryContext = '';
+    let barryFullContext = null;
     try {
-      const { promptContext } = await assembleBarryContext(db, userId, contactId);
+      const { promptContext, context: fullCtx } = await assembleBarryContext(db, userId, contactId);
       barryMemoryContext = promptContext || '';
+      barryFullContext = fullCtx;
       if (barryMemoryContext) {
         console.log(`[barryHunterProcessEngage] Barry memory loaded for contact=${contactId}`);
       }
     } catch (memErr) {
       console.warn('[barryHunterProcessEngage] Barry memory unavailable:', memErr.message);
+    }
+
+    // 3b. Strategy recommendation (Sprint 4 — pre-generation intelligence)
+    let strategyGuidance = '';
+    let strategyRecommendation = null;
+    try {
+      const recResult = recommendStrategy({
+        contact,
+        engagementIntent: contact.engagementIntent || contact.engagement_intent || 'prospect',
+        strategyStats: barryFullContext?.strategy_stats || null,
+        barryMemory: contact.barry_memory || null
+      });
+      strategyRecommendation = recResult.recommendation;
+      strategyGuidance = recResult.promptGuidance || '';
+      if (strategyRecommendation?.strategy) {
+        console.log(`[barryHunterProcessEngage] Strategy recommendation: ${strategyRecommendation.strategy} (${strategyRecommendation.confidence})`);
+      }
+    } catch (recErr) {
+      console.warn('[barryHunterProcessEngage] Strategy recommendation failed (non-blocking):', recErr.message);
+    }
+
+    // 3c. Guardrail prompt modifier (Sprint 2 — wire user's guardrail response into generation)
+    let guardrailModifier = '';
+    if (guardrailAction && barryWarning) {
+      guardrailModifier = getGuardrailPromptModifier(guardrailAction, barryWarning.type, contact);
+      if (guardrailModifier) {
+        console.log(`[barryHunterProcessEngage] Guardrail modifier applied: ${guardrailAction}`);
+      }
     }
 
     // 4. Check mission history (determines isFirstContact)
@@ -310,7 +342,7 @@ export const handler = async (event) => {
     // 7. Generate step 1 draft (4 angles) — the main AI call
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const step1Draft = await generateStep1Draft(
-      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext
+      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext, strategyGuidance, guardrailModifier
     );
     steps[0].draft = step1Draft;
 
@@ -326,6 +358,8 @@ export const handler = async (event) => {
       isFirstContact,
       barry_reasoning: step1Draft.barry_reasoning,
       barry_warning: barryWarning || null,
+      barry_recommendation: strategyRecommendation || null,
+      guardrail_action: guardrailAction || null,
       steps,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -343,7 +377,7 @@ export const handler = async (event) => {
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryHunterProcessEngage', 'success', {
       responseTime,
-      metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, hasBarryMemory: !!barryMemoryContext, missionId }
+      metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, hasBarryMemory: !!barryMemoryContext, hasStrategyGuidance: !!strategyGuidance, guardrailAction, missionId }
     });
 
     console.log(`[barryHunterProcessEngage] ✓ Mission created: ${missionId} (${responseTime}ms)`);

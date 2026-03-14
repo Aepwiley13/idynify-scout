@@ -189,11 +189,6 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
         <div className="h-px w-24 bg-gradient-to-l from-transparent to-cyan-500/60" />
       </div>
 
-      {/* Fallback — full-width at top */}
-      <div className="mb-5">
-        <ActiveModuleCard mod={fallback} fullWidth />
-      </div>
-
       {/* 3-col grid: rows 1 & 2 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
         {modules.map((mod) => (
@@ -201,8 +196,13 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
         ))}
       </div>
 
-      {/* Reinforcements — full-width at bottom */}
-      <ActiveModuleCard mod={reinforcements} fullWidth />
+      {/* Reinforcements — full-width */}
+      <div className="mb-5">
+        <ActiveModuleCard mod={reinforcements} fullWidth />
+      </div>
+
+      {/* Fallback — full-width at bottom */}
+      <ActiveModuleCard mod={fallback} fullWidth />
     </section>
   );
 }
@@ -224,7 +224,7 @@ function ActiveModuleCard({ mod, fullWidth = false }) {
         transition-all duration-300
         hover:scale-[1.02] active:scale-[0.99]
         relative overflow-hidden
-        flex ${fullWidth ? 'flex-row items-center gap-6' : 'flex-col'}
+        flex ${fullWidth ? 'flex-col md:flex-row md:items-center md:gap-6' : 'flex-col'}
         select-none
         p-6
       `}
@@ -241,7 +241,7 @@ function ActiveModuleCard({ mod, fullWidth = false }) {
       )}
 
       {/* Icon */}
-      <div className={`${fullWidth ? 'shrink-0' : 'mb-4'} h-14 flex items-center`}>
+      <div className={`${fullWidth ? 'shrink-0 mb-4 md:mb-0' : 'mb-4'} h-14 flex items-center`}>
         {mod.icon}
       </div>
 
@@ -274,7 +274,7 @@ function ActiveModuleCard({ mod, fullWidth = false }) {
       {/* Full-width CTA */}
       <button
         className={`
-          ${fullWidth ? 'shrink-0 px-8' : 'w-full'} py-3 rounded-xl
+          ${fullWidth ? 'shrink-0 w-full md:w-auto md:px-8' : 'w-full'} py-3 rounded-xl
           bg-gradient-to-r ${mod.gradientClass}
           text-white font-mono text-sm font-bold
           transition-all shadow-lg ${mod.shadowClass}

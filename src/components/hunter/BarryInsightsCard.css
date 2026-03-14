@@ -1,0 +1,73 @@
+/* BARRY INSIGHTS CARD — Sprint 3: Outcome Attribution */
+
+.barry-insights-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.barry-insights-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.barry-insights-icon {
+  width: 14px;
+  height: 14px;
+  color: #22c55e;
+}
+
+.barry-insights-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #15803d;
+}
+
+.barry-insights-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #86efac;
+  font-weight: 500;
+}
+
+.barry-insights-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.barry-insight-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.barry-insight-row-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.barry-insight--positive .barry-insight-row-icon {
+  color: #22c55e;
+}
+
+.barry-insight--negative .barry-insight-row-icon {
+  color: #f59e0b;
+}
+
+.barry-insight--channel .barry-insight-row-icon {
+  color: #3b82f6;
+}
+
+.barry-insight-row strong {
+  font-weight: 600;
+}

@@ -68,6 +68,23 @@ export default function HunterOutcomeOverlay({
 
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), updates);
 
+      // Sprint 3: Trigger Barry outcome attribution (non-blocking)
+      try {
+        const authToken = await user.getIdToken();
+        fetch('/.netlify/functions/barryOutcomeAttribution', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.uid,
+            authToken,
+            contactId: contact.id,
+            outcome: outcomeId
+          })
+        }).catch(err => console.warn('[OutcomeAttribution] Non-blocking error:', err.message));
+      } catch (_) {
+        // Non-blocking — attribution failure should never block outcome recording
+      }
+
       onOutcomeRecorded(outcomeId, transition);
     } catch (err) {
       console.error('[HunterOutcomeOverlay] Save error:', err);

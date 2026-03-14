@@ -23,6 +23,7 @@ import { getSequencePlan } from '../../utils/sequenceEngine';
 import { generateContactRecommendations, dismissRecommendation } from '../../utils/recommendationEngine';
 import BarryRecommendationCard from './BarryRecommendationCard';
 import BarryWarningCard from './BarryWarningCard';
+import BarryInsightsCard from './BarryInsightsCard';
 import SequencePanel from './SequencePanel';
 import LearningToast from '../LearningToast';
 import { EmailDraftCard } from '../shared/EmailDraftCard';
@@ -796,6 +797,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   ))}
                 </div>
               )}
+
+              {/* Sprint 3: Barry's Outcome-Based Insights */}
+              <BarryInsightsCard contactId={contact?.id} />
 
               {/* Sprint 2.2: Reply Thread Viewer — shown when contact has replied */}
               {contact.hunter_status === 'in_conversation' && (

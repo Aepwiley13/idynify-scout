@@ -218,42 +218,74 @@ function PeopleShellInner({ user }) {
 
         {/* Mobile top bar */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
-          background: T.railBg, flexShrink: 0, zIndex: 2,
+          flexShrink: 0, zIndex: 2,
+          background: T.railBg, borderBottom: `1px solid ${T.border}`,
         }}>
-          <div
-            onClick={() => navigate('/mission-control-v2')}
-            title="Mission Control"
-            style={{
-              width: 28, height: 28, borderRadius: 7,
-              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
-              boxShadow: `0 2px 10px ${BRAND.pink}40`,
-            }}
-          >
-            <img src={ASSETS.logoMark} alt="Mission Control"
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
-            />
+          {/* Row 1: logo + title + theme + settings */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px' }}>
+            <div
+              onClick={() => navigate('/mission-control-v2')}
+              title="Mission Control"
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
+                boxShadow: `0 2px 10px ${BRAND.pink}40`,
+              }}
+            >
+              <img src={ASSETS.logoMark} alt="Mission Control"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
+              />
+            </div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: 0.3 }}>
+              Command Center
+            </div>
+            <ThemePicker />
+            <div
+              onClick={() => navigate('/settings')}
+              title="Settings"
+              style={{
+                width: 34, height: 34, borderRadius: 9,
+                background: T.accentBg, border: `1px solid ${T.accentBdr}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
+              }}
+            >
+              <SettingsIcon size={16} color={SETTINGS_ORANGE} />
+            </div>
           </div>
-          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            {activeSection === 'companies' ? 'All Companies' : 'All People'}
+
+          {/* Row 2: section tabs — People | Companies */}
+          <div style={{ display: 'flex', gap: 0, padding: '0 14px 8px' }}>
+            {[
+              { id: 'all',       label: 'All People' },
+              { id: 'companies', label: 'Companies'  },
+            ].map(tab => {
+              const active = activeSection === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveSection(tab.id);
+                    localStorage.setItem('people_active_section', tab.id);
+                  }}
+                  style={{
+                    flex: 1, padding: '7px 0', border: 'none', borderRadius: 8,
+                    background: active ? `${PEOPLE_CYAN}18` : 'transparent',
+                    color: active ? PEOPLE_CYAN : T.textFaint,
+                    fontSize: 12, fontWeight: active ? 700 : 500,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    borderBottom: active ? `2px solid ${PEOPLE_CYAN}` : '2px solid transparent',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
-          <div
-            onClick={() => navigate('/settings')}
-            title="Settings"
-            style={{
-              width: 34, height: 34, borderRadius: 9,
-              background: T.accentBg, border: `1px solid ${T.accentBdr}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-            }}
-          >
-            <SettingsIcon size={16} color={SETTINGS_ORANGE} />
-          </div>
-          <ThemePicker />
         </div>
 
         {/* Mobile main content — paddingBottom leaves room for BottomNav */}

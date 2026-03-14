@@ -5,8 +5,9 @@ import { db, auth } from '../../firebase/config';
 import {
   X, Target, Plus, Mail, MessageSquare, Phone, Check,
   ArrowLeft, ArrowRight, Sparkles, Linkedin, Send, Loader, RefreshCw,
-  ExternalLink, Calendar, AlertCircle
+  ExternalLink, Calendar, AlertCircle, Lock
 } from 'lucide-react';
+import { useSubscription } from '../../hooks/useSubscription';
 import {
   executeSendAction,
   resolveSendMethod,
@@ -55,6 +56,7 @@ const ENGAGEMENT_INTENTS = [
 
 export default function HunterContactDrawer({ contact, isOpen, onClose, onContactUpdate }) {
   const navigate = useNavigate();
+  const { isProTier } = useSubscription();
 
   // View states
   const [activeView, setActiveView] = useState('main');
@@ -1223,11 +1225,15 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 </button>
                 <button
                   className="weapon-btn"
-                  onClick={() => handleSelectWeapon('text')}
+                  onClick={() => isProTier ? handleSelectWeapon('text') : navigate('/checkout?tier=pro')}
+                  title={!isProTier ? 'Upgrade to Pro to send texts' : undefined}
                 >
                   <MessageSquare className="w-6 h-6" />
                   <span>Text</span>
-                  <span className="weapon-badge-alt">Opens App</span>
+                  {!isProTier
+                    ? <span className="weapon-badge" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 3 }}><Lock size={10} /> Pro</span>
+                    : <span className="weapon-badge-alt">Opens App</span>
+                  }
                 </button>
                 <button
                   className="weapon-btn"
@@ -1241,13 +1247,18 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 </button>
                 <button
                   className="weapon-btn"
-                  onClick={() => handleSelectWeapon('call')}
-                  disabled={!hasPhone}
+                  onClick={() => isProTier ? handleSelectWeapon('call') : navigate('/checkout?tier=pro')}
+                  disabled={isProTier && !hasPhone}
+                  title={!isProTier ? 'Upgrade to Pro to call contacts' : undefined}
                 >
                   <Phone className="w-6 h-6" />
                   <span>Call</span>
-                  {!hasPhone && <span className="weapon-disabled">No phone</span>}
-                  {hasPhone && <span className="weapon-badge-alt">Opens Dialer</span>}
+                  {!isProTier
+                    ? <span className="weapon-badge" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 3 }}><Lock size={10} /> Pro</span>
+                    : !hasPhone
+                      ? <span className="weapon-disabled">No phone</span>
+                      : <span className="weapon-badge-alt">Opens Dialer</span>
+                  }
                 </button>
               </div>
             </div>

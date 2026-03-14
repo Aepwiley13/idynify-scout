@@ -1,4 +1,6 @@
-import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase, Globe } from 'lucide-react';
+import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase, Globe, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useSubscription } from '../../hooks/useSubscription';
 import './ContactInfo.css';
 
 const LABEL_PILL_COLORS = {
@@ -22,7 +24,29 @@ function LabelPill({ label }) {
   );
 }
 
+function PhoneLockedBadge() {
+  const navigate = useNavigate();
+  return (
+    <span
+      onClick={() => navigate('/checkout?tier=pro')}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 10px', borderRadius: 20,
+        fontSize: 11, fontWeight: 600,
+        color: '#a78bfa', background: 'rgba(167,139,250,0.12)',
+        border: '1px solid rgba(167,139,250,0.3)',
+        cursor: 'pointer', flexShrink: 0,
+      }}
+      title="Upgrade to Pro to unlock phone numbers"
+    >
+      <Lock size={11} />
+      Pro plan
+    </span>
+  );
+}
+
 export default function ContactInfo({ contact, mode = 'compact' }) {
+  const { isProTier } = useSubscription();
   // Build email entries from multi-field array or primary field
   const emailEntries = (contact.emails && contact.emails.length > 0)
     ? contact.emails
@@ -79,7 +103,9 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
           <div className="info-item-compact">
             <Phone className="info-icon-compact" />
             <div className="info-content-compact" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
-              {phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
+              {!isProTier ? (
+                <PhoneLockedBadge />
+              ) : phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <LabelPill label={p.label} />
                   <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
@@ -210,7 +236,9 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
           </div>
           <div className="info-content-expanded">
             <span className="info-label">Phone</span>
-            {phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
+            {!isProTier ? (
+              <PhoneLockedBadge />
+            ) : phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <LabelPill label={p.label} />
                 <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>

@@ -2,14 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles, Smartphone, ArrowLeft, Send } from 'lucide-react';
+import { X, User, Mail, Phone, Building2, Briefcase, Linkedin, Save, Loader, AlertCircle, Edit3, CheckCircle, MapPin, Award, Target, Globe, Twitter, Sparkles, Smartphone, ArrowLeft, Send, Lock } from 'lucide-react';
+import { useNavigate as useNav } from 'react-router-dom';
 import { downloadVCard } from '../../utils/vcard';
 import FindContact from './FindContact';
 import './ContactDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { useSubscription } from '../../hooks/useSubscription';
 
 export default function ContactDetailModal({ contact, onClose, onUpdate }) {
   const navigate = useNavigate();
+  const navToCheckout = useNav();
+  const { isProTier } = useSubscription();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
@@ -211,7 +215,8 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
     const hasLinkedIn = !!contact.linkedin_url;
     const hasCompany = !!(contact.company_name || contact.company);
 
-    // Contact is NOT enriched if ANY of these fields are missing
+    // For Starter users, phone is gated behind Pro so exclude it from the check
+    if (!isProTier) return !hasWorkEmail || !hasLinkedIn || !hasCompany;
     return !hasWorkEmail || !hasPhone || !hasLinkedIn || !hasCompany;
   }
 
@@ -405,7 +410,22 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
                   <Phone className="w-4 h-4" />
                   <span>Phone</span>
                 </label>
-                {isEditing ? (
+                {!isProTier ? (
+                  <span
+                    onClick={() => navToCheckout('/checkout?tier=pro')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '4px 12px', borderRadius: 20,
+                      fontSize: 12, fontWeight: 600,
+                      color: '#a78bfa', background: 'rgba(167,139,250,0.10)',
+                      border: '1px solid rgba(167,139,250,0.3)',
+                      cursor: 'pointer',
+                    }}
+                    title="Upgrade to Pro to unlock phone numbers"
+                  >
+                    <Lock size={12} /> Pro plan — upgrade to view
+                  </span>
+                ) : isEditing ? (
                   <input
                     type="tel"
                     name="phone"

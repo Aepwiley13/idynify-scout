@@ -37,7 +37,10 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     people: true,
     recon: true,
     scout: true,
-    hunter: true
+    hunter: true,
+    sniper: true,
+    basecamp: true,
+    reinforcements: true,
   });
   const navigate = useNavigate();
   const location = useLocation();
@@ -228,6 +231,36 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     }
   ];
 
+  const sniperItems = [
+    {
+      icon: Crosshair,
+      label: 'Sniper',
+      sublabel: 'Conversion pipeline',
+      path: '/sniper',
+      isPrimary: true
+    }
+  ];
+
+  const basecampItems = [
+    {
+      icon: Home,
+      label: 'Basecamp',
+      sublabel: 'Mission command',
+      path: '/basecamp',
+      isPrimary: true
+    }
+  ];
+
+  const reinforcementsItems = [
+    {
+      icon: Users,
+      label: 'Reinforcements',
+      sublabel: 'Referral network',
+      path: '/reinforcements',
+      isPrimary: true
+    }
+  ];
+
   const renderNavItem = (item) => {
     const active = item.state
       ? isActive(item.path, item.state?.activeTab)
@@ -257,13 +290,15 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const renderPillar = (id, label, icon, color, items) => {
     const IconComponent = icon;
     const isExpanded = expandedSections[id];
-    const pillarActive = id === 'people'
-      ? isPathActive('/people')
-      : id === 'recon'
-      ? isPathActive('/recon')
-      : id === 'scout'
-      ? isPathActive('/scout')
-      : isPathActive('/hunter');
+    const pillarActive =
+      id === 'people'         ? isPathActive('/people') :
+      id === 'recon'          ? isPathActive('/recon') :
+      id === 'scout'          ? isPathActive('/scout') :
+      id === 'hunter'         ? isPathActive('/hunter') :
+      id === 'sniper'         ? isPathActive('/sniper') :
+      id === 'basecamp'       ? isPathActive('/basecamp') :
+      id === 'reinforcements' ? isPathActive('/reinforcements') :
+      false;
 
     return (
       <div className={`nav-pillar ${pillarActive ? 'pillar-active' : ''}`} data-pillar={id}>
@@ -310,10 +345,13 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
       {/* Navigation Pillars */}
       <nav className="sidebar-nav">
-        {renderPillar('people', 'COMMAND CENTER', Users, 'pillar-cyan', peopleItems)}
-        {renderPillar('scout', 'SCOUT', Search, 'pillar-cyan', scoutItems)}
-        {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-purple', hunterItems)}
-        {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
+        {renderPillar('people',         'COMMAND CENTER',  Users,     'pillar-cyan',   peopleItems)}
+        {renderPillar('recon',          'RECON',           Brain,     'pillar-purple', reconItems)}
+        {renderPillar('scout',          'SCOUT',           Search,    'pillar-cyan',   scoutItems)}
+        {renderPillar('hunter',         'HUNTER',          Crosshair, 'pillar-purple', hunterItems)}
+        {renderPillar('sniper',         'SNIPER',          Target,    'pillar-cyan',   sniperItems)}
+        {renderPillar('basecamp',       'BASECAMP',        Home,      'pillar-cyan',   basecampItems)}
+        {renderPillar('reinforcements', 'REINFORCEMENTS',  Users,     'pillar-purple', reinforcementsItems)}
       </nav>
 
       {/* Settings Link */}

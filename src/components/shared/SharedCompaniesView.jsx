@@ -180,8 +180,8 @@ async function loadCompanies(mode, uid) {
   if (mode === 'sniper' || mode === 'all') {
     fetches.push(getDocs(collection(db, 'users', uid, 'sniper_contacts')));
   }
-  // For 'all' mode also load archived companies
-  if (mode === 'all') {
+  // For 'all' and 'fallback' modes also load archived companies
+  if (mode === 'all' || mode === 'fallback') {
     fetches.push(getDocs(query(collection(db, 'users', uid, 'companies'), where('status', '==', 'archived'))));
   }
 
@@ -243,9 +243,9 @@ async function loadCompanies(mode, uid) {
     return { ...data, contact_count: contactCount, contactCount, source };
   });
 
-  // 'all' mode: also include archived companies
+  // 'all' / 'fallback' mode: also include archived companies
   let archivedList = [];
-  if (mode === 'all') {
+  if (mode === 'all' || mode === 'fallback') {
     const archivedSnap = rest[rest.length - 1];
     archivedList = archivedSnap?.docs.map(d => {
       const data = { id: d.id, ...d.data() };
@@ -263,6 +263,8 @@ async function loadCompanies(mode, uid) {
     filtered = acceptedList.filter(c =>
       sniperCompanyIds.has(c.id) || sniperCompanyIds.has('name:' + (c.name || '').toLowerCase())
     );
+  } else if (mode === 'fallback') {
+    filtered = []; // FallBack shows only archived companies (in archivedList)
   }
 
   // Sort: companies with contacts first, then by name
@@ -349,9 +351,12 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
   }
 
   // ── Filtering ──────────────────────────────────────────────────────────────
-  const sourceList = !isCommandCenter
-    ? (activeTab === 'active' ? companies : archivedCompanies)
-    : companies; // Command Center only shows active, use sourceFilter tabs instead
+  const isFallback = mode === 'fallback';
+  const sourceList = isCommandCenter
+    ? companies // Command Center only shows active, use sourceFilter tabs instead
+    : isFallback
+    ? archivedCompanies // FallBack always shows archived companies
+    : (activeTab === 'active' ? companies : archivedCompanies);
 
   const displayList = sourceList.filter(co => {
     if (isCommandCenter && sourceFilter !== 'all' && co.source !== sourceFilter) return false;
@@ -373,10 +378,11 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
   const sniperCount = companies.filter(c => c.source === 'sniper').length;
 
   const headings = {
-    scout:  'Saved Companies',
-    hunter: 'Companies',
-    sniper: 'Companies',
-    all:    'All Companies',
+    scout:    'Saved Companies',
+    hunter:   'Companies',
+    sniper:   'Companies',
+    all:      'All Companies',
+    fallback: 'Archived Companies',
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -391,22 +397,25 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
   }
 
   // ── Empty state ────────────────────────────────────────────────────────────
-  if (companies.length === 0 && archivedCompanies.length === 0) {
+  if (isFallback ? archivedCompanies.length === 0 : (companies.length === 0 && archivedCompanies.length === 0)) {
     const emptyMsg = {
-      scout:  { title: 'No Saved Companies Yet', body: 'Accept companies in Daily Leads to start building your hunt list.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
-      hunter: { title: 'No Hunter Companies Yet', body: 'Engage contacts in Scout to start tracking company-level activity here.', cta: () => navigate('/scout'), ctaLabel: 'Go to Scout' },
-      sniper: { title: 'No Sniper Companies Yet', body: 'Add warm contacts to your Sniper pipeline to see their companies here.', cta: () => navigate('/sniper'), ctaLabel: 'Go to Pipeline' },
-      all:    { title: 'No Companies Yet', body: 'Accept companies in Daily Leads to start building your pipeline.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
-    }[mode];
+      scout:    { title: 'No Saved Companies Yet', body: 'Accept companies in Daily Leads to start building your hunt list.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
+      hunter:   { title: 'No Hunter Companies Yet', body: 'Engage contacts in Scout to start tracking company-level activity here.', cta: () => navigate('/scout'), ctaLabel: 'Go to Scout' },
+      sniper:   { title: 'No Sniper Companies Yet', body: 'Add warm contacts to your Sniper pipeline to see their companies here.', cta: () => navigate('/sniper'), ctaLabel: 'Go to Pipeline' },
+      all:      { title: 'No Companies Yet', body: 'Accept companies in Daily Leads to start building your pipeline.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
+      fallback: { title: 'No Archived Companies', body: 'Companies you archive will appear here.', cta: null, ctaLabel: null },
+    }[mode] || { title: 'No Companies Yet', body: '', cta: null, ctaLabel: null };
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, color: T.textMuted }}>
         <Building2 size={48} color={T.textFaint} />
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>{emptyMsg.title}</h2>
         <p style={{ margin: 0, fontSize: 13, color: T.textFaint, textAlign: 'center' }}>{emptyMsg.body}</p>
-        <button
-          onClick={emptyMsg.cta}
-          style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
-        ><Users size={14} />{emptyMsg.ctaLabel}</button>
+        {emptyMsg.cta && (
+          <button
+            onClick={emptyMsg.cta}
+            style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+          ><Users size={14} />{emptyMsg.ctaLabel}</button>
+        )}
       </div>
     );
   }

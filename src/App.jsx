@@ -81,6 +81,9 @@ import HunterMain from './pages/Hunter/HunterMain';
 // Basecamp Pages
 import BasecampMain from './pages/Basecamp/BasecampMain';
 
+// Fallback Pages
+import FallbackMain from './pages/Fallback/FallbackMain';
+
 // Reinforcements Pages
 import ReinforcementsMain from './pages/Reinforcements/ReinforcementsMain';
 
@@ -468,6 +471,16 @@ function App() {
           element={
             <ProtectedRoute>
               <BasecampMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Fallback Module — archive hub for lost/archived people & companies (no MainLayout) */}
+        <Route
+          path="/fallback"
+          element={
+            <ProtectedRoute>
+              <FallbackMain />
             </ProtectedRoute>
           }
         />

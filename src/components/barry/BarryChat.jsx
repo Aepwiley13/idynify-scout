@@ -82,6 +82,14 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
     setTimeout(() => inputRef.current?.focus(), 150);
   }, []);
 
+  // Auto-resize textarea as user types
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px';
+    }
+  }, [input]);
+
   // Load prior session + show opening message
   useEffect(() => {
     let cancelled = false;
@@ -142,6 +150,8 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
           message: msg,
           conversationHistory: history,
           module,
+          barryMode: cfg.label,
+          contextStack: Object.keys(context).length > 0 ? context : null,
           moduleContext: context,
         }),
       });
@@ -321,19 +331,31 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
           padding: '12px 18px', borderTop: `1px solid ${T.border}`,
           display: 'flex', gap: 8, flexShrink: 0,
         }}>
-          <input
+          <textarea
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
             placeholder={loading ? 'Barry is thinking…' : 'Ask Barry anything…'}
             disabled={loading}
+            rows={1}
             style={{
               flex: 1, padding: '10px 14px', borderRadius: 10,
               border: `1px solid ${T.border2}`,
               background: T.surface, color: T.text,
               fontSize: 13, outline: 'none',
               opacity: loading ? 0.6 : 1,
+              resize: 'none',
+              minHeight: 40,
+              maxHeight: 120,
+              overflowY: 'auto',
+              lineHeight: 1.5,
+              fontFamily: 'inherit',
             }}
           />
           <button

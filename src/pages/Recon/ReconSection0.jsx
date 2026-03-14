@@ -31,6 +31,22 @@ const PROFILE_FIELDS = [
   { key: 'qualitativeGoal',      label: 'What winning looks like'},
 ];
 
+const IDENTITY_FIELDS = [
+  { key: 'emailSignature', label: 'Email signature'   },
+  { key: 'linkedinUrl',    label: 'LinkedIn URL'       },
+  { key: 'messageLength',  label: 'Message length'     },
+  { key: 'industries',     label: 'Target industries'  },
+  { key: 'currentTools',   label: 'Current tools'      },
+];
+
+const SUCCESS_TARGET_FIELDS = [
+  { key: 'pipelineValueTarget',  label: 'Pipeline value target'  },
+  { key: 'avgDealSize',          label: 'Avg deal size'          },
+  { key: 'closeRateTarget',      label: 'Close rate target'      },
+  { key: 'biggestBlocker',       label: 'Biggest blocker'        },
+  { key: 'whatFixedLooksLike',   label: 'What "fixed" looks like'},
+];
+
 export default function ReconSection0() {
   const T = useT();
   const navigate = useNavigate();
@@ -62,8 +78,9 @@ export default function ReconSection0() {
     return unsub;
   }, []);
 
-  const completedFields = PROFILE_FIELDS.filter(f => profile?.[f.key] !== undefined && profile[f.key] !== '');
-  const completionPct = Math.round((completedFields.length / PROFILE_FIELDS.length) * 100);
+  const ALL_TRACKED = [...PROFILE_FIELDS, ...IDENTITY_FIELDS, ...SUCCESS_TARGET_FIELDS];
+  const completedFields = ALL_TRACKED.filter(f => profile?.[f.key] !== undefined && profile[f.key] !== '');
+  const completionPct = Math.round((completedFields.length / ALL_TRACKED.length) * 100);
   const isComplete = completionPct === 100;
 
   return (
@@ -118,32 +135,94 @@ export default function ReconSection0() {
           background: T.surface, borderRadius: 14,
           border: `1px solid ${T.border2}`,
           padding: '18px 20px', marginBottom: 24,
+          display: 'flex', flexDirection: 'column', gap: 18,
         }}>
-          <div style={{ fontSize: 11, letterSpacing: 1.5, color: T.textFaint, fontWeight: 700, marginBottom: 14 }}>
-            WHAT BARRY KNOWS
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {PROFILE_FIELDS.map(({ key, label }) => {
-              const val = profile?.[key];
-              const filled = val !== undefined && val !== '';
-              return (
-                <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  {filled
-                    ? <CheckCircle size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
-                    : <div style={{ width: 14, height: 14, borderRadius: '50%', border: `1.5px solid ${T.border2}`, flexShrink: 0, marginTop: 2 }} />
-                  }
-                  <div>
-                    <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 1 }}>{label}</div>
-                    <div style={{ fontSize: 12, color: filled ? T.text : T.textGhost, fontStyle: filled ? 'normal' : 'italic' }}>
-                      {filled
-                        ? (typeof val === 'number' ? val.toLocaleString() : String(val))
-                        : 'Not set'
-                      }
+          {/* Core fields */}
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: 1.5, color: T.textFaint, fontWeight: 700, marginBottom: 12 }}>
+              WHAT BARRY KNOWS
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {PROFILE_FIELDS.map(({ key, label }) => {
+                const val = profile?.[key];
+                const filled = val !== undefined && val !== '';
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    {filled
+                      ? <CheckCircle size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                      : <div style={{ width: 14, height: 14, borderRadius: '50%', border: `1.5px solid ${T.border2}`, flexShrink: 0, marginTop: 2 }} />
+                    }
+                    <div>
+                      <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 1 }}>{label}</div>
+                      <div style={{ fontSize: 12, color: filled ? T.text : T.textGhost, fontStyle: filled ? 'normal' : 'italic' }}>
+                        {filled
+                          ? (typeof val === 'number' ? val.toLocaleString() : String(val))
+                          : 'Not set'
+                        }
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Identity extras */}
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 1.5, color: T.textFaint, fontWeight: 700, marginBottom: 10 }}>
+              IDENTITY
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {IDENTITY_FIELDS.map(({ key, label }) => {
+                const raw = profile?.[key];
+                const val = Array.isArray(raw) ? raw.join(', ') : raw;
+                const filled = val !== undefined && val !== '';
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    {filled
+                      ? <CheckCircle size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                      : <div style={{ width: 14, height: 14, borderRadius: '50%', border: `1.5px solid ${T.border2}`, flexShrink: 0, marginTop: 2 }} />
+                    }
+                    <div>
+                      <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 1 }}>{label}</div>
+                      <div style={{ fontSize: 12, color: filled ? T.text : T.textGhost, fontStyle: filled ? 'normal' : 'italic' }}>
+                        {filled ? (String(val).length > 40 ? String(val).slice(0, 40) + '…' : String(val)) : 'Not set'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Success targets */}
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 1.5, color: T.textFaint, fontWeight: 700, marginBottom: 10 }}>
+              SUCCESS TARGETS
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {SUCCESS_TARGET_FIELDS.map(({ key, label }) => {
+                const val = profile?.[key];
+                const filled = val !== undefined && val !== '';
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    {filled
+                      ? <CheckCircle size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                      : <div style={{ width: 14, height: 14, borderRadius: '50%', border: `1.5px solid ${T.border2}`, flexShrink: 0, marginTop: 2 }} />
+                    }
+                    <div>
+                      <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 1 }}>{label}</div>
+                      <div style={{ fontSize: 12, color: filled ? T.text : T.textGhost, fontStyle: filled ? 'normal' : 'italic' }}>
+                        {filled
+                          ? (typeof val === 'number' ? val.toLocaleString() : String(val).length > 40 ? String(val).slice(0, 40) + '…' : String(val))
+                          : 'Not set'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

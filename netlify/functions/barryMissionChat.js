@@ -447,6 +447,10 @@ export const handler = async (event) => {
     const contextStack = body.contextStack || null;
     const isIcpMode = body.icpMode === true;
     const icpProfile = body.icpProfile || null;
+    const module = body.module || 'default';
+    const moduleContext = body.moduleContext && Object.keys(body.moduleContext).length > 0
+      ? body.moduleContext
+      : null;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -481,7 +485,10 @@ export const handler = async (event) => {
 
       // Use the context stack if provided, otherwise use a minimal version
       const effectiveContext = contextStack || { contacts: [], missions: [], recon: {} };
-      const systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext);
+      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext);
+      if (moduleContext) {
+        systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}`;
+      }
 
       const topRecs = recommendations.slice(0, 3);
       const recContext = topRecs.length > 0
@@ -667,7 +674,10 @@ Return valid JSON only:
       console.log('[barryMissionChat] Conversation message, intent detection...');
 
       const effectiveMode = barryMode;
-      const systemPrompt = buildMissionControlSystemPrompt(effectiveMode, contextStack, reconContext);
+      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, contextStack, reconContext);
+      if (moduleContext) {
+        systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}\nUse this as live context for the user's current view — prioritise it over generic contact lists above.`;
+      }
 
       const messages = [
         ...conversationHistory,

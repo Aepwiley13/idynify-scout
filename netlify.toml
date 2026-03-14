@@ -35,6 +35,9 @@
 [functions."process-barry-queue"]
   timeout = 900
 
+[functions."process-scheduled-engagements"]
+  timeout = 900
+
 [functions."adminGetUsers"]
   timeout = 26
 

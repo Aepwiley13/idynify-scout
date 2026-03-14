@@ -564,9 +564,6 @@ function ScoutShellInner({ user }) {
             </span>
           </div>
           <ThemePicker />
-          <div title="Barry AI" style={{ cursor: 'pointer' }}>
-            <BarryAvatar size={34} style={{ boxShadow: `0 0 14px ${BRAND.cyan}50` }} />
-          </div>
         </div>
       </div>
 

@@ -54,6 +54,21 @@ const RECENT_SESSIONS_TO_LOAD = 5;
 // Minimum sessions before Barry stops asking certain context questions
 const SESSIONS_BEFORE_MEMORY_KICKS_IN = 1;
 
+// Max entries for memory arrays — keeps Firestore document size healthy.
+// When a limit is hit, oldest entries are dropped (FIFO).
+const MAX_WHAT_HAS_BEEN_TRIED = 20;
+const MAX_WHAT_HAS_WORKED = 15;
+const MAX_WHAT_HAS_NOT_WORKED = 15;
+const MAX_KNOWN_FACTS = 30;
+const MAX_CONTEXT_BY_SESSION = 20;
+const MAX_BRIGADE_HISTORY = 50;
+
+/** Trim an array to max length, keeping the most recent entries. */
+function boundArray(arr, max) {
+  if (!Array.isArray(arr) || arr.length <= max) return arr;
+  return arr.slice(arr.length - max);
+}
+
 // Fields Barry infers from history (no question needed after threshold)
 const INFERRED_AFTER_HISTORY = {
   channel_preference: 2,    // sessions before channel preference is inferred
@@ -189,6 +204,20 @@ export async function updateContactMemory(userId, contactId, sessionData) {
 
     memory.last_updated_at = now;
 
+    // Enforce bounds on all memory arrays
+    memory.what_has_been_tried = boundArray(memory.what_has_been_tried, MAX_WHAT_HAS_BEEN_TRIED);
+    memory.what_has_worked = boundArray(memory.what_has_worked, MAX_WHAT_HAS_WORKED);
+    memory.what_has_not_worked = boundArray(memory.what_has_not_worked, MAX_WHAT_HAS_NOT_WORKED);
+    memory.known_facts = boundArray(memory.known_facts, MAX_KNOWN_FACTS);
+
+    // Bound context_by_session: keep only the most recent N sessions
+    if (memory.context_by_session && typeof memory.context_by_session === 'object') {
+      const entries = Object.entries(memory.context_by_session);
+      if (entries.length > MAX_CONTEXT_BY_SESSION) {
+        memory.context_by_session = Object.fromEntries(entries.slice(entries.length - MAX_CONTEXT_BY_SESSION));
+      }
+    }
+
     await updateDoc(contactRef, {
       barry_memory: memory,
       updatedAt: now
@@ -219,7 +248,7 @@ export async function addKnownFact(userId, contactId, fact) {
     existingFacts.add(fact);
 
     await updateDoc(contactRef, {
-      'barry_memory.known_facts': Array.from(existingFacts),
+      'barry_memory.known_facts': boundArray(Array.from(existingFacts), MAX_KNOWN_FACTS),
       'barry_memory.last_updated_at': new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -761,7 +790,7 @@ export async function recordEngagementOutcome(userId, contactId, outcome) {
     if (gotReply && positiveReply && outcome.channel) {
       const worked = `${outcome.channel} — positive reply`;
       if (!memory.what_has_worked.includes(worked)) {
-        memory.what_has_worked = [...memory.what_has_worked, worked];
+        memory.what_has_worked = boundArray([...memory.what_has_worked, worked], MAX_WHAT_HAS_WORKED);
       }
       memory.channel_preference = outcome.channel;
     }
@@ -769,7 +798,7 @@ export async function recordEngagementOutcome(userId, contactId, outcome) {
     if (outcome.result === 'no_reply' && outcome.channel) {
       const noReply = `${outcome.channel} — no response`;
       if (!memory.what_has_not_worked.includes(noReply)) {
-        memory.what_has_not_worked = [...memory.what_has_not_worked, noReply];
+        memory.what_has_not_worked = boundArray([...memory.what_has_not_worked, noReply], MAX_WHAT_HAS_NOT_WORKED);
       }
     }
 
@@ -895,9 +924,12 @@ export async function applyBrigadeTransition(userId, contactId, newBrigadeId, re
     };
 
     // Update contact
-    const brigadeHistory = Array.isArray(contact.brigade_history)
-      ? [...contact.brigade_history, logEntry]
-      : [logEntry];
+    const brigadeHistory = boundArray(
+      Array.isArray(contact.brigade_history)
+        ? [...contact.brigade_history, logEntry]
+        : [logEntry],
+      MAX_BRIGADE_HISTORY
+    );
 
     await updateDoc(contactRef, {
       brigade: newBrigadeId,

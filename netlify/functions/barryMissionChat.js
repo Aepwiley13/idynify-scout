@@ -246,7 +246,7 @@ All fields are optional — only include what the user actually mentioned or con
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildMissionControlSystemPrompt(mode, contextStack, reconContext) {
+function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
   const recon = contextStack?.recon || {};
@@ -282,10 +282,16 @@ You are not a suggestion widget. You are the best analyst, strategist, and writi
 
 Your vibe: calm confidence, zero fluff, maximum usefulness. You talk like a smart colleague who has already done the research. You ask one question at a time when you need to. You confirm before you act. You offer options, not commands.
 
-━━━ CURRENT MODE: ${mode} ━━━
+━━━ CURRENT MODULE: ${module ? module.toUpperCase() : 'MISSION CONTROL'} | MODE: ${mode} ━━━
 PRIORITIZE: Time-sensitive items need action now. Name names, be specific, give the single most important next move.
 SUGGEST: Pipeline is healthy. Recommend next moves ranked by relational leverage.
 GROWTH: Pipeline is sparse. Focus on what's missing and how to build it.
+COACH (RECON): Build ICP through conversation. Ask questions one at a time, push back on vague answers, build intelligence reports.
+TARGETING (SCOUT): Evaluate ICP match scores. Suggest better targets. Draft first-touch messages when asked.
+PURSUE (HUNTER): Goal is a booked meeting. Write follow-ups. Surface who needs next action. Differentiate warm vs cold.
+CLOSE (SNIPER): Post-demo conversion. Write trust-first follow-ups. Know close rate target and nudge toward it.
+GUIDE (HOMEBASE): Help with settings, integrations, and platform configuration.
+CONNECT (REINFORCEMENTS): Surface warm intro paths, referral opportunities, and network connections.
 
 ━━━ CONTACTS (${contacts.length} total) ━━━
 ${contactSummary || 'No contacts loaded.'}
@@ -443,6 +449,7 @@ export const handler = async (event) => {
     const authToken = body.authToken;
     const message = body.message;
     const conversationHistory = body.conversationHistory || [];
+    const module = body.module || null;
     const barryMode = body.barryMode || body.mode || 'SUGGEST';
     const contextStack = body.contextStack || null;
     const isIcpMode = body.icpMode === true;
@@ -674,7 +681,28 @@ Return valid JSON only:
       console.log('[barryMissionChat] Conversation message, intent detection...');
 
       const effectiveMode = barryMode;
-      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, contextStack, reconContext);
+      // Load contacts server-side when contextStack is not provided (module drawer chats)
+      let effectiveContextStack = contextStack;
+      if (!effectiveContextStack) {
+        try {
+          const [contactsSnap, missionsSnap] = await Promise.all([
+            db.collection('users').doc(userId).collection('contacts').limit(30).get(),
+            db.collection('users').doc(userId).collection('missions')
+              .where('status', '==', 'active').limit(10).get(),
+          ]);
+          effectiveContextStack = {
+            contacts: contactsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+            missions: missionsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+            recon: {},
+            module,
+          };
+        } catch (ctxErr) {
+          console.warn('[barryMissionChat] Could not load context:', ctxErr.message);
+          effectiveContextStack = { contacts: [], missions: [], recon: {}, module };
+        }
+      }
+
+      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}\nUse this as live context for the user's current view — prioritise it over generic contact lists above.`;
       }

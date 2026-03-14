@@ -294,7 +294,8 @@ export const handler = async (event) => {
         contact,
         engagementIntent: contact.engagementIntent || contact.engagement_intent || 'prospect',
         strategyStats: barryFullContext?.strategy_stats || null,
-        barryMemory: contact.barry_memory || null
+        barryMemory: contact.barry_memory || null,
+        recentAttributions: barryFullContext?.recent_attributions || []
       });
       strategyRecommendation = recResult.recommendation;
       strategyGuidance = recResult.promptGuidance || '';

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMissionControlTheme } from '../theme/useMissionControlTheme';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -17,6 +18,7 @@ import BottomNav from '../components/layout/BottomNav';
 import MoreSheet from '../components/layout/MoreSheet';
 
 export default function MissionControlDashboardV2() {
+  useMissionControlTheme(); // Always render in Space theme
   const navigate = useNavigate();
   const activeUserId = useActiveUserId();
   const { isImpersonating, isReadOnly } = useImpersonation();

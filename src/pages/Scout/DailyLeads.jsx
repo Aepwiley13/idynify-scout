@@ -20,12 +20,14 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 20, style = {} }) {
-  const glow = `0 0 ${size * 0.5}px ${BRAND.cyan}50`;
+  const T = useT();
+  const chakra = T.cyan || BRAND.cyan;
+  const glow = `0 0 ${size * 0.5}px ${chakra}50`;
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-      border: `2px solid ${BRAND.cyan}50`,
+      background: `linear-gradient(135deg,${BRAND.pink},${chakra})`,
+      border: `2px solid ${chakra}50`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.46, flexShrink: 0, boxShadow: glow, overflow: 'hidden', ...style,
     }}>

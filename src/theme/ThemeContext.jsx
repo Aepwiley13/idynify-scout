@@ -5,7 +5,7 @@
  * Theme preference persists to localStorage as 'idynify_theme' (full theme ID).
  * Firestore is used as secondary persistence (keeps existing user prefs in sync).
  *
- * Default: 'workspace' (light) on first visit.
+ * Default: 'mission' (Space theme) on first visit.
  *
  * Usage:
  *   const T = useT();                              // get current theme token set
@@ -21,17 +21,17 @@ const LS_KEY = "idynify_theme";
 
 /** Resolve a stored value (full themeId or legacy 'light'/'dark') → valid themeId */
 function resolveThemeId(stored) {
-  if (!stored) return "workspace";
+  if (!stored) return "mission";
   if (THEMES[stored]) return stored;
   // Legacy: 'dark' → mission, 'light' → workspace
   if (stored === "dark") return "mission";
-  return "workspace";
+  return "mission";
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 export const ThemeCtx = createContext({
-  T: THEMES.workspace,
-  themeId: "workspace",
+  T: THEMES.mission,
+  themeId: "mission",
   setThemeId: () => {},
 });
 
@@ -40,23 +40,25 @@ export const useThemeCtx = () => useContext(ThemeCtx);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function ThemeProvider({ children }) {
-  // Initialize from localStorage; fall back to 'workspace' if unset
+  // Initialize from localStorage; fall back to 'mission' (Space) if unset
   const [themeId, setThemeIdState] = useState(() => {
     try {
       const stored = localStorage.getItem(LS_KEY);
       return resolveThemeId(stored);
     } catch {
-      return "workspace";
+      return "mission";
     }
   });
 
-  // Apply body class and data-theme attribute whenever theme changes
+  // Apply body class, data-theme attribute, and CSS custom properties whenever theme changes
   useEffect(() => {
     const theme = THEMES[themeId];
     const isDark = theme?.isDark ?? false;
     document.body.classList.toggle("theme-dark", isDark);
     document.body.classList.toggle("theme-light", !isDark);
     document.documentElement.setAttribute("data-theme", themeId);
+    // Module-driven CSS variable for Barry's chakra glow color
+    document.documentElement.style.setProperty("--barry-chakra-color", theme?.cyan || "#00c4cc");
   }, [themeId]);
 
   // Load from Firestore only when localStorage has no value yet (first-ever visit)
@@ -106,7 +108,7 @@ export function ThemeProvider({ children }) {
     }
   }, []);
 
-  const T = THEMES[themeId] ?? THEMES.workspace;
+  const T = THEMES[themeId] ?? THEMES.mission;
 
   return (
     <ThemeCtx.Provider value={{ T, themeId, setThemeId }}>

@@ -358,7 +358,7 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engag
 
 // ─── AllLeadsCard ─────────────────────────────────────────────────────────────
 function AllLeadsCard({
-  contact, company, onClick, onCompanyClick,
+  contact, company, onClick, onCompanyClick, onEngage,
   engageState = 'not_started', mode = 'people', onReturnToScout,
   isSelected = false, bulkMode = false, onSelect,
   onBrigadeUpdate,
@@ -692,7 +692,10 @@ function AllLeadsCard({
             onClick={e => {
               e.stopPropagation();
               if (mode === 'sniper') { if (!inSniper) onAddToSniper && onAddToSniper(); }
-              else if (!bulkMode) onClick && onClick(e);
+              else if (!bulkMode) {
+                if (onEngage) onEngage(e);
+                else onClick && onClick(e);
+              }
             }}
             style={{
               flex: 1, padding: '7px 0', borderRadius: 7, fontSize: 11, fontWeight: 600,
@@ -700,7 +703,11 @@ function AllLeadsCard({
               border: mode === 'sniper' && inSniper ? '1px solid #14b8a640' : 'none',
               background: mode === 'sniper' ? (inSniper ? '#14b8a615' : '#14b8a6') : btnCfg.bg,
               color: mode === 'sniper' && inSniper ? '#14b8a6' : '#fff',
+              transition: 'opacity 0.08s, transform 0.08s',
             }}
+            onMouseDown={e => { e.currentTarget.style.opacity = '0.82'; e.currentTarget.style.transform = 'scale(0.97)'; }}
+            onMouseUp={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)'; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)'; }}
           >
             {mode === 'sniper' ? (inSniper ? '✓ In SNIPER' : 'Add to SNIPER') : btnCfg.label}
           </button>
@@ -1813,6 +1820,11 @@ export default function AllLeads({ mode = 'people' }) {
                   mode={mode}
                   onReturnToScout={() => resetContactToScout(c.id)}
                   onClick={() => isMobile ? openMobileProfile(c.id) : setModal(c)}
+                  onEngage={() => {
+                    savedListScroll.current = listRef.current?.scrollTop ?? 0;
+                    if (isMobile) { openMobileProfile(c.id); }
+                    else { setPanelAutoEngage(true); setPanelContactId(c.id); }
+                  }}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
                       ? () => navigate(`/scout/company/${c.company_id}`)

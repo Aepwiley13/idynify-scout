@@ -21,6 +21,45 @@ const RECENT_SESSIONS_TO_LOAD = 5;
 // Approximate token budget for history context in prompts
 const HISTORY_TOKEN_BUDGET_CHARS = 1200; // ~300 tokens ≈ 1200 chars
 
+// ── In-memory TTL cache ─────────────────────────────────────────────────────
+// Avoids redundant Firestore reads when the same contact triggers multiple
+// generation calls in quick succession (e.g. guardrail re-gen).
+const CACHE_TTL_MS = 30_000; // 30 seconds
+const _contextCache = new Map();
+
+function getCachedContext(userId, contactId) {
+  const key = `${userId}:${contactId}`;
+  const entry = _contextCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    _contextCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+/** Clear the context cache. Exported for testing. */
+export function clearContextCache() {
+  _contextCache.clear();
+}
+
+function setCachedContext(userId, contactId, value) {
+  const key = `${userId}:${contactId}`;
+  // Evict stale entries to prevent unbounded growth (max 100 entries)
+  if (_contextCache.size >= 100) {
+    const now = Date.now();
+    for (const [k, v] of _contextCache) {
+      if (now - v.timestamp > CACHE_TTL_MS) _contextCache.delete(k);
+    }
+    // If still full, drop oldest
+    if (_contextCache.size >= 100) {
+      const oldest = _contextCache.keys().next().value;
+      _contextCache.delete(oldest);
+    }
+  }
+  _contextCache.set(key, { value, timestamp: Date.now() });
+}
+
 /**
  * Assemble full Barry context for a contact using Firebase Admin SDK.
  *
@@ -32,6 +71,10 @@ const HISTORY_TOKEN_BUDGET_CHARS = 1200; // ~300 tokens ≈ 1200 chars
  *   - promptContext: string ready for injection into Claude prompts (~300 tokens)
  */
 export async function assembleBarryContext(db, userId, contactId) {
+  // Check cache first
+  const cached = getCachedContext(userId, contactId);
+  if (cached) return cached;
+
   try {
     // Load contact, user memory, recent sessions, strategy stats, and attributions in parallel
     const [contactSnap, userMemorySnap, recentSessions, strategyStats, recentAttributions] = await Promise.all([
@@ -119,7 +162,9 @@ export async function assembleBarryContext(db, userId, contactId) {
     // Build prompt-ready string (capped at ~300 tokens)
     const promptContext = buildPromptContext(context);
 
-    return { context, promptContext };
+    const result = { context, promptContext };
+    setCachedContext(userId, contactId, result);
+    return result;
   } catch (error) {
     console.error('[BarryContextAssembler] Failed to assemble context:', error);
     return { context: null, promptContext: '' };

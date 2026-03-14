@@ -12,6 +12,7 @@
  *   1. Warm/trusted contact + cold/prospecting intent → Barry flags
  *   2. Prior engagement history + no shared context referenced → Barry flags
  *   3. Manually added contact with no relationship classification → Barry asks
+ *   4. Cold/unknown contact + overly warm/familiar intent → Barry flags (reverse)
  *
  * Returns null if no mismatch detected.
  */
@@ -114,6 +115,32 @@ export function checkRelationshipGuardrail(contact, engagementIntent, userIntent
     });
   }
 
+  // ── Rule 4: Cold/unknown contact + warm/familiar intent (reverse mismatch) ──
+  const isColdRelationship = (
+    !isKnown &&
+    !hasReplied &&
+    !hasPositiveReply &&
+    warmth !== 'warm' && warmth !== 'hot' &&
+    relState !== 'warm' && relState !== 'trusted' && relState !== 'engaged' &&
+    relState !== 'advocate' && relState !== 'strategic_partner' &&
+    messagesSent === 0
+  );
+
+  const isWarmIntent = engagementIntent === 'warm' || engagementIntent === 'customer' || engagementIntent === 'partner';
+
+  if (isColdRelationship && isWarmIntent) {
+    warnings.push({
+      type: 'reverse_tone_mismatch',
+      severity: 'medium',
+      message: `${firstName} looks like a cold contact — no prior messages or replies. Using a warm/familiar tone might feel presumptuous. Want me to dial it back, or do you actually know them?`,
+      actions: [
+        { id: 'cool_down', label: 'Dial it back', description: 'Barry uses a more measured tone appropriate for a new contact' },
+        { id: 'actually_know', label: 'I know them', description: 'Barry keeps the warm tone — you have context Barry doesn\'t' },
+        { id: 'send_anyway', label: 'Send anyway', description: 'Skip this check and generate as-is' }
+      ]
+    });
+  }
+
   // Return the highest-severity warning (only one at a time to avoid noise)
   if (warnings.length === 0) return null;
 
@@ -150,7 +177,11 @@ export function getGuardrailPromptModifier(actionId, guardrailType, contact) {
     // Rule 3 responses: unknown_relationship
     classify_known: `GUARDRAIL INSTRUCTION: The user confirmed ${firstName} is someone they know. Treat this as a warm relationship — use a friendly, familiar tone. Avoid cold outreach patterns.`,
     classify_prospect: '', // No modification — default cold approach is correct
-    skip: '' // No modification
+    skip: '', // No modification
+
+    // Rule 4 responses: reverse_tone_mismatch (too warm for cold contact)
+    cool_down: `GUARDRAIL INSTRUCTION: This is a cold contact with no prior relationship. Dial back the warmth — avoid phrases that imply familiarity like "great to connect" or "loved your recent post" unless backed by real context. Use a respectful, professional, slightly formal tone. Earn trust before assuming it.`,
+    actually_know: `GUARDRAIL INSTRUCTION: The user confirmed they know ${firstName} despite no digital trail. Treat this as a warm relationship — the user has real-world context that Barry doesn't see in the data.`
   };
 
   return modifiers[actionId] || '';

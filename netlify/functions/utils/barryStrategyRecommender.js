@@ -33,7 +33,8 @@ export function recommendStrategy({ contact, engagementIntent, strategyStats, ba
   const scores = {
     direct: { score: 50, reasons: [], avoid: false },
     warm:   { score: 50, reasons: [], avoid: false },
-    value:  { score: 50, reasons: [], avoid: false }
+    value:  { score: 50, reasons: [], avoid: false },
+    humor:  { score: 35, reasons: [], avoid: false }   // Lower baseline — humor is situational
   };
 
   let bestChannel = null;
@@ -60,6 +61,10 @@ export function recommendStrategy({ contact, engagementIntent, strategyStats, ba
         scores.value.score += 25;
         scores.value.reasons.push('Worked with this contact before');
       }
+      if (lower.includes('humor') || lower.includes('funny') || lower.includes('playful')) {
+        scores.humor.score += 25;
+        scores.humor.reasons.push('Worked with this contact before');
+      }
     }
 
     // Penalize strategies that have failed with this contact
@@ -76,6 +81,10 @@ export function recommendStrategy({ contact, engagementIntent, strategyStats, ba
       if (lower.includes('value')) {
         scores.value.score -= 20;
         scores.value.reasons.push('Failed with this contact');
+      }
+      if (lower.includes('humor') || lower.includes('funny') || lower.includes('playful')) {
+        scores.humor.score -= 20;
+        scores.humor.reasons.push('Failed with this contact');
       }
     }
   }
@@ -153,12 +162,25 @@ export function recommendStrategy({ contact, engagementIntent, strategyStats, ba
     // Boost the strategies that haven't been tried
     scores.value.score += 10;
     scores.value.reasons.push(`${consecutiveNoReplies} no-replies — try a different angle`);
+    // Humor can break through when conventional approaches stall
+    scores.humor.score += 15;
+    scores.humor.reasons.push(`${consecutiveNoReplies} no-replies — humor can break the pattern`);
   }
 
-  // Engaged or trusted → warm works best
+  // Engaged or trusted → warm works best, humor is also safe
   if (relState === 'engaged' || relState === 'warm' || relState === 'trusted') {
     scores.warm.score += 10;
     scores.warm.reasons.push('Active relationship — personal touch resonates');
+    scores.humor.score += 10;
+    scores.humor.reasons.push('Established rapport makes humor safe');
+  }
+
+  // Suppress humor for high-value cold prospects (too risky)
+  if (engagementIntent === 'prospect' && !isKnown && !hasReplied) {
+    if (contact?.strategic_value === 'high' || contact?.strategic_value === 'critical') {
+      scores.humor.score -= 15;
+      scores.humor.reasons.push('High-value cold prospect — humor is risky');
+    }
   }
 
   // ── 3. User-level aggregate stats ─────────────────────────────────────
@@ -243,6 +265,7 @@ function mapStrategyKey(name) {
   if (lower.includes('direct') || lower === 'direct & short' || lower.includes('direct_ask')) return 'direct';
   if (lower.includes('warm') || lower.includes('personal') || lower.includes('soft_reconnect')) return 'warm';
   if (lower.includes('value') || lower.includes('insight') || lower.includes('value_add') || lower.includes('pattern_interrupt')) return 'value';
+  if (lower.includes('humor') || lower.includes('playful') || lower.includes('funny') || lower.includes('humor_driven')) return 'humor';
   return null;
 }
 
@@ -259,7 +282,9 @@ function mapGuardrailToStrategy(action) {
     send_anyway: 'direct',
     start_fresh: 'value',
     skip: null,
-    classify_prospect: 'direct'
+    classify_prospect: 'direct',
+    cool_down: 'direct',
+    actually_know: 'warm'
   };
   return map[action] || null;
 }
@@ -275,7 +300,8 @@ function buildPromptGuidance(recommendation, scores) {
     const strategyLabels = {
       direct: 'Direct & Short',
       warm: 'Warm & Personal',
-      value: 'Value-Led'
+      value: 'Value-Led',
+      humor: 'Humor-Driven'
     };
     parts.push(
       `BARRY'S RECOMMENDATION: The "${strategyLabels[recommendation.strategy]}" approach is most likely to succeed` +
@@ -286,7 +312,7 @@ function buildPromptGuidance(recommendation, scores) {
 
   if (recommendation.avoidStrategies.length > 0) {
     const labels = recommendation.avoidStrategies.map(s => {
-      const map = { direct: 'Direct & Short', warm: 'Warm & Personal', value: 'Value-Led' };
+      const map = { direct: 'Direct & Short', warm: 'Warm & Personal', value: 'Value-Led', humor: 'Humor-Driven' };
       return map[s] || s;
     });
     parts.push(

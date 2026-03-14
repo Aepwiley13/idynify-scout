@@ -17,10 +17,11 @@ import { recommendStrategy } from './utils/barryStrategyRecommender.js';
  * - RECON data (Sections 5 & 9 - pain points, messaging preferences)
  * - Existing barryContext
  *
- * And generates 3 distinct, personalized message strategies:
+ * And generates 4 distinct, personalized message strategies:
  * - Direct & Short
  * - Warm & Personal
  * - Value-Led
+ * - Humor-Driven
  *
  * Each with subject line, body, and reasoning.
  */
@@ -201,12 +202,17 @@ export const handler = async (event) => {
     }
 
     // === GUARDRAIL PROMPT MODIFIER (Sprint 2 wiring) ===
+    // Apply modifier whenever the frontend passes a guardrailAction — even if the
+    // guardrail didn't re-trigger on this call (the user already responded to it).
     let guardrailPromptModifier = '';
-    if (guardrailAction && barryWarning) {
-      guardrailPromptModifier = getGuardrailPromptModifier(guardrailAction, barryWarning.type, fullContact);
+    if (guardrailAction) {
+      const guardrailType = barryWarning?.type || 'tone_mismatch';
+      guardrailPromptModifier = getGuardrailPromptModifier(guardrailAction, guardrailType, fullContact);
       if (guardrailPromptModifier) {
         console.log(`✅ Guardrail modifier applied: ${guardrailAction}`);
       }
+      // Suppress the warning from the response — user already acted on it
+      barryWarning = null;
     }
 
     // === STRATEGY RECOMMENDATION (Sprint 4) ===
@@ -345,7 +351,7 @@ USER'S COMPANY (if available):
 ${userProfile?.companyName || userProfile?.company || 'Not specified'}
 
 YOUR TASK:
-Generate 3 DISTINCT message approaches that fulfill the user's goal. Each must be clearly different in strategy and tone.
+Generate 4 DISTINCT message approaches that fulfill the user's goal. Each must be clearly different in strategy and tone.
 
 CRITICAL REQUIREMENTS:
 1. Messages must be SPECIFIC to this contact - reference their name, title, company, or industry
@@ -378,6 +384,13 @@ OUTPUT FORMAT (respond ONLY with this JSON structure):
       "subject": "Subject line here",
       "message": "The full message body here. Lead with value/insight.",
       "reasoning": "Why this approach works for ${firstName}: Brief explanation."
+    },
+    {
+      "strategy": "humor",
+      "label": "Humor-Driven",
+      "subject": "Subject line here",
+      "message": "The full message body here. Use a witty, self-aware, or playful tone to stand out.",
+      "reasoning": "Why this approach works for ${firstName}: Brief explanation."
     }
   ],
   "dataUsed": {
@@ -393,6 +406,7 @@ STYLE GUIDELINES:
 - Be conversational and genuine
 - Match the relationship context (${engagementIntent || 'prospect'})
 - Keep messages between 3-6 sentences unless user specified otherwise
+- For the Humor-Driven option: be witty, self-aware, or playfully irreverent — NOT cheesy or forced. Think "clever subject line that earns the open" not "dad joke". The humor should serve the goal, not distract from it.
 
 Generate the messages now. Respond ONLY with valid JSON.`;
 
@@ -418,7 +432,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
       }
 
       // Validate structure
-      if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) {
+      if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) { // Accept 3+ (humor may be omitted by Claude)
         throw new Error('Invalid response structure');
       }
     } catch (parseError) {
@@ -439,7 +453,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
       }
     });
 
-    console.log(`✅ Generated 3 messages in ${responseTime}ms`);
+    console.log(`✅ Generated ${result.messages.length} messages in ${responseTime}ms`);
 
     return {
       statusCode: 200,

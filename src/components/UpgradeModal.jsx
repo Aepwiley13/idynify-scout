@@ -80,7 +80,7 @@ export default function UpgradeModal({ isOpen, onClose, currentCredits = 0 }) {
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-green-400 text-xl">✓</span>
-                <span className="text-gray-300">120 contact details/month</span>
+                <span className="text-gray-300">120 contact details/month (email only)</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-green-400 text-xl">✓</span>
@@ -89,6 +89,10 @@ export default function UpgradeModal({ isOpen, onClose, currentCredits = 0 }) {
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-green-400 text-xl">✓</span>
                 <span className="text-gray-300">CSV exports (basic)</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-gray-500 text-xl">✕</span>
+                <span className="text-gray-500">Mobile phone numbers</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-green-400 text-xl">✓</span>
@@ -140,7 +144,11 @@ export default function UpgradeModal({ isOpen, onClose, currentCredits = 0 }) {
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-cyan-400 text-xl">✓</span>
-                <span className="text-gray-300">375 contact details/month</span>
+                <span className="text-gray-300">375 contact details/month (email + phone)</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-cyan-400 text-xl">✓</span>
+                <span className="text-white font-semibold">Mobile phone numbers</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-cyan-400 text-xl">✓</span>

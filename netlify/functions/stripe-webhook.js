@@ -112,6 +112,11 @@ export const handler = async (event) => {
             support: tierConfig.support
           },
 
+          // Feature flags per tier
+          features: {
+            mobilePhone: tier === 'pro'
+          },
+
           // Billing cycle day of month for credit reset
           billingCycleDate: billingDate.getDate()
         });

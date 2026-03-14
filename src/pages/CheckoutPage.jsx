@@ -23,7 +23,7 @@ export default function CheckoutPage() {
       features: [
         'Browse unlimited companies',
         '40 enriched companies/month',
-        '120 contact details (email + phone)',
+        '120 contact details (email only)',
         'Full RECON access',
         'CSV exports',
         'Email support (48-hour response)'
@@ -39,6 +39,7 @@ export default function CheckoutPage() {
         'Browse unlimited companies',
         '125 enriched companies/month',
         '375 contact details (email + phone)',
+        'Mobile phone numbers unlocked',
         'Full RECON access',
         'Unlimited CSV exports',
         'Enhanced RECON reports with PDF',

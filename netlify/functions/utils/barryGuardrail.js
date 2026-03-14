@@ -123,3 +123,35 @@ export function checkRelationshipGuardrail(contact, engagementIntent, userIntent
 
   return warnings[0];
 }
+
+/**
+ * Map a guardrail action ID to a concrete prompt modifier.
+ * This is the missing link: user clicks an action in the UI,
+ * and this function returns the instruction that modifies generation.
+ *
+ * @param {string} actionId - The guardrail action the user selected
+ * @param {string} guardrailType - The type of guardrail that fired
+ * @param {Object} [contact] - Contact data for contextual modifiers
+ * @returns {string} Prompt modifier string, or '' if no modification needed
+ */
+export function getGuardrailPromptModifier(actionId, guardrailType, contact) {
+  const firstName = contact?.first_name || contact?.firstName || contact?.name?.split(' ')[0] || 'this contact';
+
+  const modifiers = {
+    // Rule 1 responses: tone_mismatch
+    warm_up: `GUARDRAIL INSTRUCTION: The user confirmed they know ${firstName} personally. Adjust tone to be warm and familiar — reference the existing relationship, use a conversational opener, and avoid any cold-prospecting language. Write as if reaching out to someone you already have rapport with.`,
+    keep_professional: `GUARDRAIL INSTRUCTION: The user wants to keep a professional tone despite the existing relationship with ${firstName}. Maintain a polished, business-appropriate tone but you may subtly acknowledge familiarity. Do not be overly cold.`,
+    send_anyway: '', // No modification — generate as originally intended
+
+    // Rule 2 responses: missing_context
+    reference_history: `GUARDRAIL INSTRUCTION: The user wants to reference shared history with ${firstName}. This contact has replied to previous messages. Weave in an acknowledgment of prior conversations — something like "following up on..." or "since we last spoke..." — to show continuity. Do NOT start from scratch.`,
+    start_fresh: '', // No modification — treat as new thread
+
+    // Rule 3 responses: unknown_relationship
+    classify_known: `GUARDRAIL INSTRUCTION: The user confirmed ${firstName} is someone they know. Treat this as a warm relationship — use a friendly, familiar tone. Avoid cold outreach patterns.`,
+    classify_prospect: '', // No modification — default cold approach is correct
+    skip: '' // No modification
+  };
+
+  return modifiers[actionId] || '';
+}

@@ -321,7 +321,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
 
   // === MESSAGE GENERATION ===
 
-  async function generateMessageOptions(intentText, relationshipIntent) {
+  async function generateMessageOptions(intentText, relationshipIntent, guardrailAction = null) {
     setLoading(true);
     setGenerationError(null);
     setBarryWarning(null);
@@ -344,6 +344,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           userIntent: intentText,           // FREE-FORM: What the user wants to do (PRIMARY DRIVER)
           engagementIntent: relationshipIntent, // Relationship context: prospect, warm, customer, partner
           barryContext: contact.barryContext,
+          guardrailAction: guardrailAction,
           contact: {
             firstName: contact.firstName,
             lastName: contact.lastName,
@@ -1085,26 +1086,15 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                       warning={barryWarning}
                       contactId={contact?.id}
                       onAction={(actionId) => {
-                        // Handle guardrail actions
-                        if (actionId === 'warm_up') {
-                          // Re-generate with warm intent
-                          setBarryWarning(null);
-                          generateMessageOptions(userIntent, 'warm');
-                        } else if (actionId === 'reference_history') {
-                          // Re-generate with follow-up context
-                          setBarryWarning(null);
-                          generateMessageOptions(`Follow up on our previous conversation: ${userIntent}`, engagementIntent);
-                        } else if (actionId === 'classify_known') {
-                          // Update intent to warm and regenerate
-                          setBarryWarning(null);
-                          setEngagementIntent('warm');
-                          generateMessageOptions(userIntent, 'warm');
+                        // Handle guardrail actions — pass through to backend as prompt modifiers
+                        setBarryWarning(null);
+                        if (actionId === 'warm_up' || actionId === 'reference_history' || actionId === 'classify_known' || actionId === 'keep_professional') {
+                          // Re-generate with guardrail action injected as prompt modifier
+                          generateMessageOptions(userIntent, engagementIntent, actionId);
                         } else if (actionId === 'classify_prospect') {
-                          // Keep as-is, dismiss warning
-                          setBarryWarning(null);
+                          // Keep as-is, no regeneration needed
                         } else {
-                          // keep_professional, send_anyway, start_fresh, skip — dismiss and proceed
-                          setBarryWarning(null);
+                          // send_anyway, start_fresh, skip — dismiss and use current messages
                         }
                       }}
                       onDismiss={() => setBarryWarning(null)}

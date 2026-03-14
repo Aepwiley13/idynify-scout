@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
-import { checkRelationshipGuardrail } from './utils/barryGuardrail.js';
+import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 
 /**
@@ -74,7 +74,8 @@ export const handler = async (event) => {
       userIntent,        // FREE-FORM: What the user wants to do (REQUIRED)
       engagementIntent,  // Prospect / Warm / Customer / Partner
       contact,           // Basic contact info passed from frontend
-      barryContext       // Existing Barry context (if available)
+      barryContext,      // Existing Barry context (if available)
+      guardrailAction    // User's response to a guardrail warning (Sprint 2 wiring)
     } = JSON.parse(event.body);
 
     // Validate required fields
@@ -197,6 +198,15 @@ export const handler = async (event) => {
       }
     } catch (guardrailError) {
       console.log('⚠️ Guardrail check failed (non-blocking):', guardrailError.message);
+    }
+
+    // === GUARDRAIL PROMPT MODIFIER (Sprint 2 wiring) ===
+    let guardrailPromptModifier = '';
+    if (guardrailAction && barryWarning) {
+      guardrailPromptModifier = getGuardrailPromptModifier(guardrailAction, barryWarning.type, fullContact);
+      if (guardrailPromptModifier) {
+        console.log(`✅ Guardrail modifier applied: ${guardrailAction}`);
+      }
     }
 
     // === STRATEGY RECOMMENDATION (Sprint 4) ===
@@ -329,7 +339,7 @@ Calibrate messaging accordingly:
 ${barryContextString}
 ${reconContext}
 ${barryMemoryContext}
-${strategyPromptGuidance}
+${strategyPromptGuidance}${guardrailPromptModifier ? `\n${guardrailPromptModifier}\n` : ''}
 USER'S COMPANY (if available):
 ${userProfile?.companyName || userProfile?.company || 'Not specified'}
 

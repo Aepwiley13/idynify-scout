@@ -13,6 +13,7 @@ import { useLocation } from 'react-router-dom';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import BarryChat, { MODULE_CONFIG } from './BarryChat';
+import { useBarryContext } from '../../context/barryContextStore';
 
 // Route → module mapping
 const ROUTE_MODULE_MAP = [
@@ -40,6 +41,7 @@ export default function BarryTrigger() {
   const location = useLocation();
   const T = useT();
   const [open, setOpen] = useState(false);
+  const barryCtx = useBarryContext();
 
   // Hide on Mission Control + auth/payment routes
   const hidden = HIDDEN_ROUTES.some(r => location.pathname.startsWith(r));
@@ -72,7 +74,7 @@ export default function BarryTrigger() {
           justifyContent: 'center',
           overflow: 'hidden',
           boxShadow: `0 4px 20px ${chakra}50, 0 0 0 ${open ? '4px' : '0px'} ${chakra}30`,
-          transition: 'box-shadow 0.2s, transform 0.15s',
+          transition: 'border-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s',
           transform: open ? 'scale(0.94)' : 'scale(1)',
           padding: 0,
         }}
@@ -100,7 +102,7 @@ export default function BarryTrigger() {
       {open && (
         <BarryChat
           module={module}
-          context={{}}
+          context={barryCtx}
           onClose={() => setOpen(false)}
         />
       )}

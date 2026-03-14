@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { ArrowRight, X, Loader, CheckCircle } from 'lucide-react';
+import { ArrowRight, X, Loader, CheckCircle, RotateCcw } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
 import { useT } from '../../theme/ThemeContext';
@@ -268,28 +268,107 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
             </div>
           )}
 
-          {/* Section complete CTA */}
+          {/* Section complete — inline snapshot card */}
           {sectionComplete && !loading && (
             <div style={{
-              padding: '14px 16px', borderRadius: 14,
-              background: `${RECON_INDIGO}12`, border: `1px solid ${RECON_INDIGO}35`,
-              display: 'flex', alignItems: 'center', gap: 12, marginTop: 8,
+              borderRadius: 14, overflow: 'hidden',
+              border: `1px solid ${RECON_INDIGO}35`,
+              marginTop: 8,
             }}>
-              <CheckCircle size={20} color={RECON_INDIGO} style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Profile saved</div>
-                <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>Barry has your profile locked in.</div>
+              {/* Snapshot header */}
+              <div style={{
+                padding: '12px 16px',
+                background: `${RECON_INDIGO}15`,
+                borderBottom: `1px solid ${RECON_INDIGO}20`,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <CheckCircle size={15} color={RECON_INDIGO} style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: RECON_INDIGO }}>
+                  {isSection0 ? 'Profile saved' : 'Section complete'}
+                </div>
               </div>
+
+              {/* Snapshot body — what Barry captured */}
+              <div style={{ padding: '12px 16px', background: T.surface }}>
+                {isSection0 ? (
+                  <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.55 }}>
+                    Barry has your profile locked in. He'll use this in every outreach, briefing, and coaching session.
+                  </div>
+                ) : (
+                  <div>
+                    {Object.keys(existingAnswers).filter(k => existingAnswers[k]).length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {Object.entries(existingAnswers)
+                          .filter(([, v]) => v && String(v).trim())
+                          .slice(0, 5)
+                          .map(([k, v]) => (
+                            <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                              <CheckCircle size={12} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                              <div style={{ fontSize: 11, color: T.textMuted, lineHeight: 1.4 }}>
+                                <span style={{ fontWeight: 600, color: T.text, textTransform: 'capitalize' }}>
+                                  {k.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>{' '}
+                                {String(v).length > 60 ? String(v).slice(0, 60) + '…' : String(v)}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: T.textMuted }}>
+                        Barry has reviewed this section and it's locked in.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm / re-open actions */}
+              <div style={{
+                padding: '10px 16px',
+                background: T.surface,
+                borderTop: `1px solid ${T.border}`,
+                display: 'flex', gap: 8,
+              }}>
+                <button
+                  onClick={onComplete}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 9,
+                    background: RECON_INDIGO, border: 'none',
+                    color: '#fff', fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: 5,
+                  }}
+                >
+                  Looks right →
+                </button>
+                <button
+                  onClick={() => setSectionComplete(false)}
+                  style={{
+                    padding: '8px 12px', borderRadius: 9,
+                    background: 'none', border: `1px solid ${T.border2}`,
+                    color: T.textMuted, fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <RotateCcw size={11} />
+                  Let me fix something
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Manual complete trigger for sections 1-10 */}
+          {!isSection0 && !sectionComplete && messages.length > 2 && !loading && (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 4 }}>
               <button
-                onClick={onComplete}
+                onClick={() => setSectionComplete(true)}
                 style={{
-                  padding: '7px 14px', borderRadius: 10,
-                  background: RECON_INDIGO, border: 'none',
-                  color: '#fff', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer',
+                  padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${RECON_INDIGO}35`, background: `${RECON_INDIGO}10`,
+                  color: RECON_INDIGO, cursor: 'pointer',
                 }}
               >
-                Done
+                I'm done with this section →
               </button>
             </div>
           )}

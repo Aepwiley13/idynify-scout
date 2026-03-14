@@ -18,6 +18,7 @@ import { auth } from '../../firebase/config';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import ReconFeedbackToast from '../../components/recon/ReconFeedbackToast';
 import BarryReconGuide from '../../components/recon/BarryReconGuide';
+import BarryReconCoach from '../../components/recon/BarryReconCoach';
 import { getSectionData, startSection, completeSection, saveSectionData } from '../../utils/dashboardUtils';
 import Section1Foundation from '../../components/recon/Section1Foundation';
 import Section2ProductDeepDive from '../../components/recon/Section2ProductDeepDive';
@@ -80,6 +81,8 @@ export default function ReconSectionEditor() {
   const [toastVariant, setToastVariant] = useState('save');
   const [coaching, setCoaching] = useState(null);
   const [coachingLoading, setCoachingLoading] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachUserId, setCoachUserId] = useState(null);
 
   // Responsive
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
@@ -121,6 +124,7 @@ export default function ReconSectionEditor() {
 
       setSection(sectionData);
       setFormData(sectionData.data || {});
+      setCoachUserId(user.uid);
 
       if (sectionData.status === 'not_started') {
         await startSection(user.uid, 'recon', sectionNum);
@@ -371,19 +375,42 @@ export default function ReconSectionEditor() {
           display: 'flex', flexDirection: 'column',
           minHeight: isMobile ? 400 : 'auto',
         }}>
-          {/* Barry panel label */}
+          {/* Barry panel label + Coach CTA */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: 12,
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: T.textFaint,
           }}>
             <div style={{
-              width: 16, height: 16, borderRadius: '50%',
-              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-              flexShrink: 0,
-            }} />
-            Barry's Guide
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: T.textFaint,
+            }}>
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%',
+                background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+                flexShrink: 0,
+              }} />
+              Barry's Guide
+            </div>
+            <button
+              onClick={() => setCoachOpen(true)}
+              style={{
+                padding: '5px 11px', borderRadius: 8,
+                background: `${RECON_INDIGO}15`,
+                border: `1px solid ${RECON_INDIGO}35`,
+                color: RECON_INDIGO, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${RECON_INDIGO}25`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = `${RECON_INDIGO}15`; }}
+            >
+              <div style={{
+                width: 12, height: 12, borderRadius: '50%',
+                background: `linear-gradient(135deg,${BRAND.pink},${RECON_INDIGO})`,
+              }} />
+              Coach me through this
+            </button>
           </div>
 
           <div style={{ flex: 1 }}>
@@ -405,6 +432,18 @@ export default function ReconSectionEditor() {
         onClose={() => setShowToast(false)}
         variant={toastVariant}
       />
+
+      {/* Barry Conversational Coach */}
+      {coachOpen && coachUserId && (
+        <BarryReconCoach
+          sectionId={sectionNum}
+          sectionLabel={section.title}
+          existingAnswers={formData}
+          userId={coachUserId}
+          onClose={() => setCoachOpen(false)}
+          onComplete={() => setCoachOpen(false)}
+        />
+      )}
     </div>
   );
 }

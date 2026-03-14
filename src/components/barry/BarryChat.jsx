@@ -67,6 +67,7 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initLoading, setInitLoading] = useState(true);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [chips, setChips] = useState([]);
   const messagesEndRef = useRef(null);
@@ -129,7 +130,7 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
         setChips(getChips(module, context));
       }
     }
-    init();
+    init().finally(() => { setInitLoading(false); });
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -269,7 +270,30 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
 
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {messages.map((msg, i) => (
+          {/* Initial load skeleton */}
+        {initLoading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <BarryAvatar size={24} chakraColor={chakra} />
+            <div style={{ padding: '9px 13px', borderRadius: '16px 16px 16px 4px', background: T.surface, border: `1px solid ${T.border2}` }}>
+              <style>{`
+                @keyframes barryDotPulse {
+                  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+                  40% { opacity: 1; transform: scale(1); }
+                }
+              `}</style>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {[0, 0.2, 0.4].map((delay, i) => (
+                  <div key={i} style={{
+                    width: 6, height: 6, borderRadius: '50%', background: chakra,
+                    animation: `barryDotPulse 1.2s ease-in-out ${delay}s infinite`,
+                  }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!initLoading && messages.map((msg, i) => (
             msg.role === 'system' ? (
               <div key={i} style={{ textAlign: 'center', fontSize: 11, color: T.textFaint, padding: '2px 0' }}>
                 {msg.content}

@@ -281,13 +281,13 @@ export default function MissionControlDashboardV2() {
             {/* Module Quick-Nav Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               {[
-                { label: 'BASECAMP',       path: '/basecamp',              color: 'green'  },
-                { label: 'SCOUT',          path: '/scout?tab=all-leads', color: 'cyan'   },
-                { label: 'HUNTER',         path: '/hunter',                color: 'pink'   },
-                { label: 'RECON',          path: '/recon',                 color: 'purple' },
-                { label: 'SNIPER',         path: '/sniper',                color: 'green'  },
-                { label: 'COMMAND CENTER', path: '/people',                color: 'cyan'   },
-                { label: 'ALL PEOPLE',     path: '/people',                color: 'pink'   },
+                { label: 'COMMAND CENTER',  path: '/people',              color: 'cyan'   },
+                { label: 'RECON',           path: '/recon',               color: 'purple' },
+                { label: 'SCOUT',           path: '/scout?tab=all-leads', color: 'cyan'   },
+                { label: 'HUNTER',          path: '/hunter',              color: 'pink'   },
+                { label: 'SNIPER',          path: '/sniper',              color: 'green'  },
+                { label: 'BASECAMP',        path: '/basecamp',            color: 'green'  },
+                { label: 'REINFORCEMENTS',  path: '/reinforcements',      color: 'pink'   },
               ].map(({ label, path, color }) => (
                 <button
                   key={label}
@@ -325,6 +325,13 @@ export default function MissionControlDashboardV2() {
         {/* BARRY CHAT PANEL — Mission Co-pilot */}
         {userId && <BarryChatPanel userId={userId} />}
 
+        {/* MODULE NAVIGATION GRID — 4-card prominent launcher above Attention Required */}
+        <ModuleNavigationGrid
+          stats={stats}
+          onScoutClick={handleScoutClick}
+          onNavigate={(route) => navigate(route)}
+        />
+
         {/* QUICK LAUNCH STRIP — Horizontal carousel, opens inline deck (Scout, Hunter, RECON) */}
         <QuickLaunchStrip
           stats={stats}
@@ -343,19 +350,12 @@ export default function MissionControlDashboardV2() {
           />
         )}
 
-        {/* MODULE NAVIGATION GRID — 4-card prominent launcher above Attention Required */}
-        <ModuleNavigationGrid
-          stats={stats}
-          onScoutClick={handleScoutClick}
-          onNavigate={(route) => navigate(route)}
-        />
-
-        {/* ATTENTION REQUIRED — Barry's pipeline signals */}
-        <AttentionCarousel
+        {/* ATTENTION REQUIRED — temporarily hidden */}
+        {/* <AttentionCarousel
           recommendations={recommendations}
           userId={userId}
           loading={recommendationsLoading}
-        />
+        /> */}
       </main>
 
       {/* Welcome Modal for First-Time Users */}

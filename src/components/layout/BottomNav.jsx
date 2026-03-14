@@ -10,10 +10,16 @@
  * Primary actions sit in the bottom third of the screen where thumbs rest.
  */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Brain, Star, Target, Zap, MoreHorizontal } from 'lucide-react';
+import { Users, Brain, Star, Target, MoreHorizontal } from 'lucide-react';
 import './BottomNav.css';
 
 const NAV_ITEMS = [
+  {
+    id: 'people',
+    label: 'Hub',
+    icon: Users,
+    path: '/people',
+  },
   {
     id: 'recon',
     label: 'RECON',
@@ -22,7 +28,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'scout',
-    label: 'Discover',
+    label: 'Scout',
     icon: Star,
     path: '/scout',
     search: '?tab=all-leads',
@@ -33,12 +39,6 @@ const NAV_ITEMS = [
     icon: Target,
     path: '/hunter',
     search: '?tab=dashboard',
-  },
-  {
-    id: 'game',
-    label: 'Game',
-    icon: Zap,
-    path: '/scout/game',
   },
   {
     id: 'more',
@@ -54,7 +54,7 @@ export default function BottomNav({ onOpenMore }) {
 
   const isActive = (item) => {
     if (!item.path) return false;
-    if (item.id === 'game') return location.pathname === '/scout/game';
+    if (item.id === 'people') return location.pathname === '/people' || location.pathname.startsWith('/people/');
     if (item.id === 'scout') {
       // Active on /scout and /scout/* but NOT on /scout/game (that's the Game tab)
       return (location.pathname === '/scout' || location.pathname.startsWith('/scout/')) &&

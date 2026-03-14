@@ -156,11 +156,11 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'people', label: 'COMMAND CENTER', Icon: Users, route: '/people'  },
-  { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'   },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter'  },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: null       }, // active module
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper'  },
+  { id: 'people', label: 'COMMAND CENTER', Icon: Users,     route: '/people' },
+  { id: 'recon',  label: 'RECON',          Icon: Eye,       route: null      }, // active module
+  { id: 'scout',  label: 'SCOUT',          Icon: Radar,     route: '/scout'  },
+  { id: 'hunter', label: 'HUNTER',         Icon: Crosshair, route: '/hunter' },
+  { id: 'sniper', label: 'SNIPER',         Icon: Target,    route: '/sniper' },
 ];
 
 // ─── Recon sub-nav items ──────────────────────────────────────────────────────

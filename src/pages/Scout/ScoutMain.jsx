@@ -157,7 +157,8 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
-  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users, route: '/people', items: [] },
+  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users,     route: '/people',  items: [] },
+  { id: 'recon',     label: 'RECON',          Icon: Eye,       route: '/recon',   items: [] },
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
@@ -169,7 +170,6 @@ const NAV_SECTIONS = [
     ],
   },
   { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
-  { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
   { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: '/sniper', items: [] },
 ];
 

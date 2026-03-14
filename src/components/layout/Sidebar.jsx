@@ -311,9 +311,9 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       {/* Navigation Pillars */}
       <nav className="sidebar-nav">
         {renderPillar('people', 'COMMAND CENTER', Users, 'pillar-cyan', peopleItems)}
+        {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
         {renderPillar('scout', 'SCOUT', Search, 'pillar-cyan', scoutItems)}
         {renderPillar('hunter', 'HUNTER', Crosshair, 'pillar-purple', hunterItems)}
-        {renderPillar('recon', 'RECON', Brain, 'pillar-purple', reconItems)}
       </nav>
 
       {/* Settings Link */}

@@ -20,7 +20,7 @@ import {
   Loader, LogOut, Lock, Smartphone, BarChart3, Calendar,
   Key, Zap, ExternalLink, Layers,
   RefreshCw, Star, Database, MessageSquare, Share2,
-  Radar, Crosshair, Eye, Target,
+  Radar, Crosshair, Eye, Target, Users,
   Palette, Check, ChevronLeft, ChevronRight, Home, Settings as SettingsIcon, Clock,
 } from 'lucide-react';
 import { db, auth } from '../firebase/config';
@@ -373,10 +373,11 @@ function Av({ initials, size = 24 }) {
 
 /* ─── Module rail ────────────────────────────────────────────────────────── */
 const MODULE_RAIL = [
-  { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon'  },
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'people', label: 'COMMAND CENTER', Icon: Users,     route: '/people' },
+  { id: 'recon',  label: 'RECON',          Icon: Eye,       route: '/recon'  },
+  { id: 'scout',  label: 'SCOUT',          Icon: Radar,     route: '/scout'  },
+  { id: 'hunter', label: 'HUNTER',         Icon: Crosshair, route: '/hunter' },
+  { id: 'sniper', label: 'SNIPER',         Icon: Target,    route: '/sniper' },
 ];
 
 /* ─── Main component ─────────────────────────────────────────────────────── */

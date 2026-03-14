@@ -161,11 +161,11 @@ function AllCompaniesSection() {
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'people', label: 'COMMAND CENTER', Icon: Users, route: null      }, // active module
-  { id: 'scout',  label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
-  { id: 'hunter', label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
-  { id: 'recon',  label: 'RECON',  Icon: Eye,       route: '/recon'  },
-  { id: 'sniper', label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'people', label: 'COMMAND CENTER', Icon: Users,     route: null      }, // active module
+  { id: 'recon',  label: 'RECON',          Icon: Eye,       route: '/recon'  },
+  { id: 'scout',  label: 'SCOUT',          Icon: Radar,     route: '/scout'  },
+  { id: 'hunter', label: 'HUNTER',         Icon: Crosshair, route: '/hunter' },
+  { id: 'sniper', label: 'SNIPER',         Icon: Target,    route: '/sniper' },
 ];
 
 // ─── People sub-nav items ─────────────────────────────────────────────────────

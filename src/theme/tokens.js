@@ -46,7 +46,7 @@ export const ASSETS = {
 export const THEMES = {
 
   mission: {
-    id: "mission", label: "Mission Control", icon: "🌌",
+    id: "mission", label: "Space", icon: "🌌",
     // Surfaces
     appBg:      "#000000",
     railBg:     "#06040f",

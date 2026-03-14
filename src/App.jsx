@@ -25,6 +25,7 @@ import ReconMain from './pages/Recon/ReconMain';
 import ReconOverview from './pages/Recon/ReconOverview';
 import ReconModulePage from './pages/Recon/ReconModulePage';
 import ReconSectionEditor from './pages/Recon/ReconSectionEditor';
+import ReconSection0 from './pages/Recon/ReconSection0';
 import BarryTraining from './pages/Recon/BarryTraining';
 import ReconErrorBoundary from './components/recon/ReconErrorBoundary';
 import Prospects from './pages/Prospects';
@@ -99,6 +100,9 @@ import UserSettings from './pages/UserSettings';
 
 // Theme
 import WithTheForce from './components/WithTheForce';
+
+// Barry unified trigger
+import BarryTrigger from './components/barry/BarryTrigger';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -269,6 +273,7 @@ function App() {
       )}
       {user && <CrispChat user={user} />}
       {user && <MissionControlForce />}
+      {user && <BarryTrigger />}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
@@ -375,6 +380,7 @@ function App() {
           }
         >
           <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
+          <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
           <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
           <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
           <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />

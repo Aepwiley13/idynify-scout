@@ -350,12 +350,12 @@ export default function MissionControlDashboardV2() {
           />
         )}
 
-        {/* ATTENTION REQUIRED — Barry's pipeline signals */}
-        <AttentionCarousel
+        {/* ATTENTION REQUIRED — temporarily hidden */}
+        {/* <AttentionCarousel
           recommendations={recommendations}
           userId={userId}
           loading={recommendationsLoading}
-        />
+        /> */}
       </main>
 
       {/* Welcome Modal for First-Time Users */}

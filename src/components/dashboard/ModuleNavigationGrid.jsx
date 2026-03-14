@@ -142,6 +142,24 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
     },
   ];
 
+  // Fallback is full-width at the top
+  const fallback = {
+    id: 'fallback',
+    label: 'FALLBACK',
+    description: 'Closed lost companies & contacts — re-engage dormant pipeline and recover lost deals',
+    stat: 'Review closed lost accounts and contacts ready for a second chance',
+    badge: null,
+    accent: '#ef4444',
+    borderClass: 'border-red-500/50 hover:border-red-400',
+    glowStyle: { boxShadow: '0 0 32px rgba(239, 68, 68, 0.2), inset 0 0 24px rgba(239, 68, 68, 0.04)' },
+    gradientClass: 'from-red-500 to-rose-700 hover:from-red-400 hover:to-rose-600',
+    shadowClass: 'shadow-red-500/40',
+    bgGradient: 'from-red-500/10 to-rose-700/5',
+    icon: <FallbackIcon />,
+    btnLabel: 'Enter Fallback →',
+    onClick: () => onNavigate('/fallback'),
+  };
+
   // Reinforcements is full-width at the bottom
   const reinforcements = {
     id: 'reinforcements',
@@ -171,6 +189,11 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
         <div className="h-px w-24 bg-gradient-to-l from-transparent to-cyan-500/60" />
       </div>
 
+      {/* Fallback — full-width at top */}
+      <div className="mb-5">
+        <ActiveModuleCard mod={fallback} fullWidth />
+      </div>
+
       {/* 3-col grid: rows 1 & 2 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
         {modules.map((mod) => (
@@ -178,7 +201,7 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
         ))}
       </div>
 
-      {/* Row 3: Reinforcements full-width */}
+      {/* Reinforcements — full-width at bottom */}
       <ActiveModuleCard mod={reinforcements} fullWidth />
     </section>
   );
@@ -358,6 +381,17 @@ function HomebaseIcon() {
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    </div>
+  );
+}
+
+function FallbackIcon() {
+  return (
+    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-red-500/30 to-rose-700/30 border-2 border-red-400/50 flex items-center justify-center shadow-lg shadow-red-500/40">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="1 4 1 10 7 10" />
+        <path d="M3.51 15a9 9 0 1 0 .49-4.5" />
       </svg>
     </div>
   );

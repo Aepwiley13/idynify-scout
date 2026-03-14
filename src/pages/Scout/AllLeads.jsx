@@ -1122,12 +1122,14 @@ export default function AllLeads({ mode = 'people' }) {
         .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {
           const s = c.status || '';
-          if (['people_mode_archived', 'people_mode_skipped'].includes(s)) return false;
+          const isArchived = ['people_mode_archived', 'people_mode_skipped'].includes(s);
+          if (mode === 'fallback') return isArchived; // FallBack: only archived/lost people
+          if (isArchived) return false;
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
           if (mode === 'sniper') return sniperIdsLocal.has(c.id); // Only contacts explicitly added to Sniper
-          return true; // 'people' — show all
+          return true; // 'people' / 'basecamp' — show all
         });
       setContacts(contactsList);
       setLoading(false);
@@ -1441,6 +1443,8 @@ export default function AllLeads({ mode = 'people' }) {
       ? { title: 'No Pipeline Contacts', body: 'Add warm contacts to your pipeline from Scout or Hunter using "Add to SNIPER".', cta: null }
       : mode === 'scout'
       ? { title: 'No Unengaged Contacts', body: 'All contacts are in active missions, or add new ones via Daily Leads.', cta: null }
+      : mode === 'fallback'
+      ? { title: 'No Archived People', body: 'People you archive or mark as lost will appear here.', cta: null }
       : { title: 'No Contacts Yet', body: 'Accept companies in Daily Leads to start building your contact pipeline.', cta: 'View Saved Companies' };
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, color: T.textMuted }}>
@@ -1465,7 +1469,7 @@ export default function AllLeads({ mode = 'people' }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>
-              {mode === 'hunter' ? 'Active Contacts' : mode === 'sniper' ? 'My Pipeline' : mode === 'scout' ? 'People' : 'All People'}
+              {mode === 'hunter' ? 'Active Contacts' : mode === 'sniper' ? 'My Pipeline' : mode === 'scout' ? 'People' : mode === 'fallback' ? 'Archived People' : 'All People'}
             </h2>
             <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
               {mode === 'hunter'
@@ -1474,6 +1478,8 @@ export default function AllLeads({ mode = 'people' }) {
                 ? 'Warm contacts you\'ve moved into your conversion pipeline.'
                 : mode === 'scout'
                 ? 'Ready for first contact.'
+                : mode === 'fallback'
+                ? 'People you\'ve archived or marked as lost.'
                 : 'Your daily engagement hub — focus on what matters today.'}
             </div>
           </div>

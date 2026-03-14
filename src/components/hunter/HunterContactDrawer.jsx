@@ -1086,7 +1086,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                       onAction={(actionId) => {
                         // Handle guardrail actions — pass through to backend as prompt modifiers
                         setBarryWarning(null);
-                        if (actionId === 'warm_up' || actionId === 'reference_history' || actionId === 'classify_known' || actionId === 'keep_professional') {
+                        if (actionId === 'warm_up' || actionId === 'reference_history' || actionId === 'classify_known' || actionId === 'keep_professional' || actionId === 'cool_down' || actionId === 'actually_know') {
                           // Re-generate with guardrail action injected as prompt modifier
                           generateMessageOptions(userIntent, engagementIntent, actionId);
                         } else if (actionId === 'classify_prospect') {

@@ -12,6 +12,7 @@ import QuickLaunchStrip from '../components/dashboard/QuickLaunchStrip';
 import MissionCardDeck from '../components/dashboard/MissionCardDeck';
 import AttentionCarousel from '../components/dashboard/AttentionCarousel';
 import ModuleNavigationGrid from '../components/dashboard/ModuleNavigationGrid';
+import { CommandCenterIcon, ReconIcon, ScoutIcon, HunterIcon, SniperIcon, HomebaseIcon, ReinforcementsIcon } from '../components/dashboard/ModuleIcons';
 import BottomNav from '../components/layout/BottomNav';
 import MoreSheet from '../components/layout/MoreSheet';
 
@@ -281,18 +282,18 @@ export default function MissionControlDashboardV2() {
             {/* Module Quick-Nav Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               {[
-                { label: 'COMMAND CENTER',  path: '/people',              color: 'cyan'   },
-                { label: 'RECON',           path: '/recon',               color: 'purple' },
-                { label: 'SCOUT',           path: '/scout?tab=all-leads', color: 'cyan'   },
-                { label: 'HUNTER',          path: '/hunter',              color: 'pink'   },
-                { label: 'SNIPER',          path: '/sniper',              color: 'green'  },
-                { label: 'BASECAMP',        path: '/basecamp',            color: 'green'  },
-                { label: 'REINFORCEMENTS',  path: '/reinforcements',      color: 'pink'   },
-              ].map(({ label, path, color }) => (
+                { label: 'COMMAND CENTER',  icon: <CommandCenterIcon size="sm" />,   path: '/people',              color: 'cyan'   },
+                { label: 'RECON',           icon: <ReconIcon size="sm" />,           path: '/recon',               color: 'purple' },
+                { label: 'SCOUT',           icon: <ScoutIcon size="sm" />,           path: '/scout?tab=all-leads', color: 'cyan'   },
+                { label: 'HUNTER',          icon: <HunterIcon size="sm" />,          path: '/hunter',              color: 'pink'   },
+                { label: 'SNIPER',          icon: <SniperIcon size="sm" />,          path: '/sniper',              color: 'green'  },
+                { label: 'BASECAMP',        icon: <HomebaseIcon size="sm" />,        path: '/basecamp',            color: 'green'  },
+                { label: 'REINFORCEMENTS',  icon: <ReinforcementsIcon size="sm" />,  path: '/reinforcements',      color: 'pink'   },
+              ].map(({ label, icon, path, color }) => (
                 <button
                   key={label}
                   onClick={() => navigate(path)}
-                  className={`px-4 py-1.5 rounded-lg font-mono text-xs font-semibold tracking-widest border transition-all hover:scale-105 active:scale-95`}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-mono text-xs font-semibold tracking-widest border transition-all hover:scale-105 active:scale-95`}
                   style={{
                     background: color === 'cyan'   ? 'rgba(6,182,212,0.12)'   :
                                 color === 'pink'   ? 'rgba(236,72,153,0.12)'  :
@@ -312,7 +313,8 @@ export default function MissionControlDashboardV2() {
                                                     '0 0 8px rgba(34,197,94,0.2)',
                   }}
                 >
-                  {label}
+                  {icon}
+                  <span>{label}</span>
                 </button>
               ))}
             </div>

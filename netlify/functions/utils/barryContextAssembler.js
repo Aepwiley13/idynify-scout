@@ -33,12 +33,13 @@ const HISTORY_TOKEN_BUDGET_CHARS = 1200; // ~300 tokens ≈ 1200 chars
  */
 export async function assembleBarryContext(db, userId, contactId) {
   try {
-    // Load contact, user memory, recent sessions, and strategy stats in parallel
-    const [contactSnap, userMemorySnap, recentSessions, strategyStats] = await Promise.all([
+    // Load contact, user memory, recent sessions, strategy stats, and attributions in parallel
+    const [contactSnap, userMemorySnap, recentSessions, strategyStats, recentAttributions] = await Promise.all([
       db.collection('users').doc(userId).collection('contacts').doc(contactId).get(),
       db.collection('users').doc(userId).collection('barry_memory').doc('current').get(),
       loadRecentSessions(db, userId, contactId),
-      loadStrategyStats(db, userId)
+      loadStrategyStats(db, userId),
+      loadRecentAttributions(db, userId, contactId)
     ]);
 
     if (!contactSnap.exists) {
@@ -110,6 +111,9 @@ export async function assembleBarryContext(db, userId, contactId) {
 
       // Sprint 3: Strategy effectiveness from outcome attribution
       strategy_stats: strategyStats,
+
+      // Recent attribution outcomes for this contact
+      recent_attributions: recentAttributions,
     };
 
     // Build prompt-ready string (capped at ~300 tokens)
@@ -170,6 +174,41 @@ async function loadRecentSessions(db, userId, contactId, n = RECENT_SESSIONS_TO_
 }
 
 /**
+ * Load recent attribution outcomes for a contact.
+ * Surfaces what worked/didn't in the last few engagements.
+ */
+async function loadRecentAttributions(db, userId, contactId, limit = 5) {
+  try {
+    const snap = await db
+      .collection('users').doc(userId)
+      .collection('contacts').doc(contactId)
+      .collection('barry_attributions')
+      .orderBy('created_at', 'desc')
+      .limit(limit)
+      .get();
+
+    if (snap.empty) return [];
+
+    return snap.docs.map(d => {
+      const data = d.data();
+      return {
+        outcome: data.outcome,
+        outcome_class: data.outcome_class,
+        strategy_used: data.strategy_used,
+        channel_used: data.channel_used,
+        followed_advice: data.followed_advice,
+        guardrail_type: data.guardrail_type,
+        guardrail_action: data.guardrail_action,
+        attributed_at: data.attributed_at,
+      };
+    });
+  } catch (error) {
+    console.error('[BarryContextAssembler] Failed to load attributions:', error.message);
+    return [];
+  }
+}
+
+/**
  * Build a prompt-ready context string from structured Barry context.
  * Capped at ~300 tokens (HISTORY_TOKEN_BUDGET_CHARS characters).
  *
@@ -215,6 +254,19 @@ function buildPromptContext(context) {
     if (insights) {
       sections.push({ priority: 1, text: insights });
     }
+  }
+
+  // P1 — Recent attribution outcomes (last engagement results)
+  if (context.recent_attributions && context.recent_attributions.length > 0) {
+    const attrLines = context.recent_attributions.slice(0, 3).map(a => {
+      let line = `${a.strategy_used || 'unknown strategy'}`;
+      if (a.channel_used) line += ` via ${a.channel_used}`;
+      line += ` → ${a.outcome_class}`;
+      if (a.followed_advice === true) line += ' (followed Barry\'s advice)';
+      if (a.followed_advice === false) line += ' (ignored Barry\'s advice)';
+      return line;
+    });
+    sections.push({ priority: 1, text: `Recent outcomes for this contact: ${attrLines.join('; ')}` });
   }
 
   // P2 — Preferences and stats

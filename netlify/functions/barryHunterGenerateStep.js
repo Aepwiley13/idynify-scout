@@ -24,6 +24,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { assembleBarryContext } from './utils/barryContextAssembler.js';
+import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 
 // Barry's step adaptation map (spec-exact)
 const STEP_ADAPTATION = {
@@ -125,11 +127,27 @@ export const handler = async (event) => {
       .filter((s, idx) => idx < stepIndex && s.outcome)
       .map(s => `Step ${s.stepNumber}: ${s.action} → ${s.outcome || 'pending'}`);
 
-    // Load RECON (non-fatal)
+    // Load RECON + Barry intelligence layers in parallel (non-fatal)
     let reconContext = '';
+    let barryMemoryContext = '';
+    let strategyGuidance = '';
     try {
-      const dashboardDoc = await db.collection('dashboards').doc(userId).get();
+      const [dashboardDoc, barryCtx] = await Promise.all([
+        db.collection('dashboards').doc(userId).get(),
+        assembleBarryContext(db, userId, contactId)
+      ]);
       if (dashboardDoc.exists) reconContext = compileReconForPrompt(dashboardDoc.data()) || '';
+      barryMemoryContext = barryCtx.promptContext || '';
+
+      // Get strategy recommendation using full contact + attribution data
+      const { promptGuidance } = recommendStrategy({
+        contact,
+        engagementIntent: contact.engagement_intent || contact.engagementIntent || 'prospect',
+        strategyStats: barryCtx.context?.strategy_stats || null,
+        barryMemory: contact.barry_memory || null,
+        recentAttributions: barryCtx.context?.recent_attributions || []
+      });
+      strategyGuidance = promptGuidance || '';
     } catch (_) {}
 
     const adaptation = STEP_ADAPTATION[previousOutcome] || {
@@ -151,7 +169,7 @@ Context:
 - Relationship state: ${contact.relationship_state || 'unaware'}
 - Outcome goal: ${mission.outcome_goal}
 - This step: ${stepPlan?.action || 'Follow up'}
-- Previous step outcome: ${previousOutcome}${reconContext ? `\n${reconContext}` : ''}
+- Previous step outcome: ${previousOutcome}${reconContext ? `\n${reconContext}` : ''}${barryMemoryContext}${strategyGuidance}
 
 Engagement history:
 ${completedSteps.length > 0 ? completedSteps.join('\n') : 'No prior steps completed.'}

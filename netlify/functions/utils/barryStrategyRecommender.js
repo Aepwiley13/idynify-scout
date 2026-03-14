@@ -29,7 +29,7 @@
  * @param {Object|null} params.barryMemory - Per-contact barry_memory
  * @returns {Object} { recommendation, promptGuidance, strategyScores }
  */
-export function recommendStrategy({ contact, engagementIntent, strategyStats, barryMemory }) {
+export function recommendStrategy({ contact, engagementIntent, strategyStats, barryMemory, recentAttributions }) {
   const scores = {
     direct: { score: 50, reasons: [], avoid: false },
     warm:   { score: 50, reasons: [], avoid: false },
@@ -76,6 +76,49 @@ export function recommendStrategy({ contact, engagementIntent, strategyStats, ba
       if (lower.includes('value')) {
         scores.value.score -= 20;
         scores.value.reasons.push('Failed with this contact');
+      }
+    }
+  }
+
+  // ── 1b. Contact-level attribution outcomes (recency-weighted) ────────
+  //    Recent outcomes carry more weight than older ones.
+
+  if (recentAttributions && recentAttributions.length > 0) {
+    for (let i = 0; i < recentAttributions.length; i++) {
+      const attr = recentAttributions[i];
+      const strategy = attr.strategy_used;
+      if (!strategy) continue;
+
+      const key = mapStrategyKey(strategy);
+      if (!key || !scores[key]) continue;
+
+      // Recency weight: most recent = 1.0, each older = 0.7x previous
+      const recencyWeight = Math.pow(0.7, i);
+      const delta = Math.round(15 * recencyWeight);
+
+      if (attr.outcome_class === 'positive') {
+        scores[key].score += delta;
+        if (i === 0) scores[key].reasons.push(`Last engagement with this contact was positive (${strategy})`);
+      } else if (attr.outcome_class === 'negative') {
+        scores[key].score -= delta;
+        if (i === 0) scores[key].reasons.push(`Last engagement with this contact was negative (${strategy})`);
+      }
+
+      // Guardrail compliance signal: following advice led to positive outcome
+      if (attr.followed_advice === true && attr.outcome_class === 'positive' && attr.guardrail_action) {
+        const guardrailKey = mapGuardrailToStrategy(attr.guardrail_action);
+        if (guardrailKey && scores[guardrailKey]) {
+          scores[guardrailKey].score += Math.round(10 * recencyWeight);
+          if (i === 0) scores[guardrailKey].reasons.push('Following Barry\'s guardrail advice led to positive outcome');
+        }
+      }
+
+      // Ignoring advice led to negative outcome — penalize that strategy
+      if (attr.followed_advice === false && attr.outcome_class === 'negative' && attr.guardrail_action) {
+        const ignoredKey = mapStrategyKey(strategy);
+        if (ignoredKey && scores[ignoredKey]) {
+          scores[ignoredKey].score -= Math.round(8 * recencyWeight);
+        }
       }
     }
   }
@@ -197,10 +240,28 @@ export function recommendStrategy({ contact, engagementIntent, strategyStats, ba
  */
 function mapStrategyKey(name) {
   const lower = (name || '').toLowerCase();
-  if (lower.includes('direct') || lower === 'direct & short') return 'direct';
-  if (lower.includes('warm') || lower.includes('personal')) return 'warm';
-  if (lower.includes('value') || lower.includes('insight')) return 'value';
+  if (lower.includes('direct') || lower === 'direct & short' || lower.includes('direct_ask')) return 'direct';
+  if (lower.includes('warm') || lower.includes('personal') || lower.includes('soft_reconnect')) return 'warm';
+  if (lower.includes('value') || lower.includes('insight') || lower.includes('value_add') || lower.includes('pattern_interrupt')) return 'value';
   return null;
+}
+
+/**
+ * Map guardrail actions to strategy keys.
+ * When a guardrail action leads to a positive outcome, boost that strategy.
+ */
+function mapGuardrailToStrategy(action) {
+  const map = {
+    warm_up: 'warm',
+    reference_history: 'warm',
+    classify_known: 'warm',
+    keep_professional: 'direct',
+    send_anyway: 'direct',
+    start_fresh: 'value',
+    skip: null,
+    classify_prospect: 'direct'
+  };
+  return map[action] || null;
 }
 
 /**

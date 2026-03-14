@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { assembleBarryContext } from './utils/barryContextAssembler.js';
+import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 
 /**
  * BARRY SEQUENCE STEP CONTENT GENERATOR (Step 5)
@@ -86,6 +88,34 @@ export const handler = async (event) => {
 
     if (tokenUserId !== userId) {
       throw new Error('Token does not match user ID');
+    }
+
+    // ─── Load Barry intelligence layers ───
+    let barryMemoryContext = '';
+    let strategyGuidance = '';
+    try {
+      const contactId = contact.id || contact.contactId;
+      if (contactId) {
+        const [barryCtx, contactDoc] = await Promise.all([
+          assembleBarryContext(db, userId, contactId),
+          db.collection('users').doc(userId).collection('contacts').doc(contactId).get()
+        ]);
+        barryMemoryContext = barryCtx.promptContext || '';
+
+        if (contactDoc.exists) {
+          const fullContact = { id: contactId, ...contactDoc.data() };
+          const { promptGuidance } = recommendStrategy({
+            contact: fullContact,
+            engagementIntent: fullContact.engagement_intent || fullContact.engagementIntent || 'prospect',
+            strategyStats: barryCtx.context?.strategy_stats || null,
+            barryMemory: fullContact.barry_memory || null,
+            recentAttributions: barryCtx.context?.recent_attributions || []
+          });
+          strategyGuidance = promptGuidance || '';
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ Non-fatal: Could not load Barry intelligence layers:', err.message);
     }
 
     // ─── Fetch RECON training data ───
@@ -185,7 +215,7 @@ ${adaptiveMap[previousOutcome] || 'No specific adaptation needed.'}
     const prompt = `You are Barry, a strategic engagement advisor. You are generating the actual content for Step ${stepIndex + 1} of a multi-step engagement sequence.
 
 CRITICAL: You are generating a REAL message that the user will review, potentially edit, and then send. Make it natural, personal, and purposeful.
-${reconContext}
+${reconContext}${barryMemoryContext}${strategyGuidance}
 CONTACT:
 - Name: ${contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()}
 - Title: ${contact.title || 'Unknown'}

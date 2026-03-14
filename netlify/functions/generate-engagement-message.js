@@ -217,7 +217,8 @@ export const handler = async (event) => {
         contact: fullContact,
         engagementIntent: engagementIntent || 'prospect',
         strategyStats: barryFullContext?.strategy_stats || null,
-        barryMemory: fullContact.barry_memory || null
+        barryMemory: fullContact.barry_memory || null,
+        recentAttributions: barryFullContext?.recent_attributions || []
       });
       strategyRecommendation = recResult.recommendation;
       strategyPromptGuidance = recResult.promptGuidance || '';

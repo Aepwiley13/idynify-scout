@@ -33,11 +33,12 @@ const HISTORY_TOKEN_BUDGET_CHARS = 1200; // ~300 tokens ≈ 1200 chars
  */
 export async function assembleBarryContext(db, userId, contactId) {
   try {
-    // Load contact, user memory, and recent sessions in parallel
-    const [contactSnap, userMemorySnap, recentSessions] = await Promise.all([
+    // Load contact, user memory, recent sessions, and strategy stats in parallel
+    const [contactSnap, userMemorySnap, recentSessions, strategyStats] = await Promise.all([
       db.collection('users').doc(userId).collection('contacts').doc(contactId).get(),
       db.collection('users').doc(userId).collection('barry_memory').doc('current').get(),
-      loadRecentSessions(db, userId, contactId)
+      loadRecentSessions(db, userId, contactId),
+      loadStrategyStats(db, userId)
     ]);
 
     if (!contactSnap.exists) {
@@ -106,6 +107,9 @@ export async function assembleBarryContext(db, userId, contactId) {
         preferred_tone: userMemory.preferred_tone || null,
         preferred_channel: userMemory.preferred_channel || null,
       },
+
+      // Sprint 3: Strategy effectiveness from outcome attribution
+      strategy_stats: strategyStats,
     };
 
     // Build prompt-ready string (capped at ~300 tokens)
@@ -115,6 +119,33 @@ export async function assembleBarryContext(db, userId, contactId) {
   } catch (error) {
     console.error('[BarryContextAssembler] Failed to assemble context:', error);
     return { context: null, promptContext: '' };
+  }
+}
+
+/**
+ * Load per-user strategy effectiveness stats (Sprint 3: Outcome Attribution).
+ */
+async function loadStrategyStats(db, userId) {
+  try {
+    const statsSnap = await db
+      .collection('users').doc(userId)
+      .collection('barry_memory').doc('strategy_stats')
+      .get();
+
+    if (!statsSnap.exists) return null;
+
+    const stats = statsSnap.data();
+    if (!stats.total_attributions || stats.total_attributions < 3) return null; // Not enough data yet
+
+    return {
+      angle_outcomes: stats.angle_outcomes || {},
+      channel_outcomes: stats.channel_outcomes || {},
+      guardrail_outcomes: stats.guardrail_outcomes || {},
+      total_attributions: stats.total_attributions
+    };
+  } catch (error) {
+    console.error('[BarryContextAssembler] Failed to load strategy stats:', error);
+    return null;
   }
 }
 
@@ -226,6 +257,14 @@ function buildPromptContext(context) {
     parts.push(`Barry's last recommended next step: ${context.engage.last_session_next_step}`);
   }
 
+  // Sprint 3: Strategy effectiveness insights (only if meaningful data exists)
+  if (context.strategy_stats && context.strategy_stats.total_attributions >= 5) {
+    const insights = buildStrategyInsights(context.strategy_stats);
+    if (insights) {
+      parts.push(insights);
+    }
+  }
+
   // Relationship summary (truncated)
   if (context.memory.relationship_summary) {
     const summary = context.memory.relationship_summary;
@@ -242,6 +281,59 @@ function buildPromptContext(context) {
   if (!result.trim()) return '';
 
   return `\nBARRY'S MEMORY — WHAT BARRY KNOWS ABOUT THIS CONTACT:\n${result}\n\nINSTRUCTION: Use this memory to avoid repeating failed approaches, build on what has worked, and maintain continuity with prior sessions. Do NOT repeat the same angle or channel that has already failed. Reference known facts naturally when relevant.\n`;
+}
+
+/**
+ * Build a concise strategy effectiveness summary from attribution stats.
+ * Only surfaces clear winners/losers — no noise.
+ */
+function buildStrategyInsights(stats) {
+  const insights = [];
+
+  // Find best-performing angle (min 3 uses, >50% positive rate)
+  const bestAngle = findBestPerformer(stats.angle_outcomes, 3);
+  if (bestAngle) {
+    insights.push(`Best-performing strategy: "${bestAngle.key}" (${bestAngle.rate}% positive, ${bestAngle.total} uses)`);
+  }
+
+  // Find worst-performing angle (min 3 uses, <20% positive rate)
+  const worstAngle = findWorstPerformer(stats.angle_outcomes, 3);
+  if (worstAngle) {
+    insights.push(`Avoid: "${worstAngle.key}" strategy (${worstAngle.rate}% positive, ${worstAngle.total} uses)`);
+  }
+
+  // Find best channel
+  const bestChannel = findBestPerformer(stats.channel_outcomes, 3);
+  if (bestChannel) {
+    insights.push(`Best channel: ${bestChannel.key} (${bestChannel.rate}% positive)`);
+  }
+
+  if (insights.length === 0) return null;
+  return `Strategy insights (from ${stats.total_attributions} tracked outcomes): ${insights.join('. ')}`;
+}
+
+function findBestPerformer(outcomes, minUses) {
+  let best = null;
+  for (const [key, data] of Object.entries(outcomes || {})) {
+    if (data.total < minUses) continue;
+    const rate = Math.round((data.positive / data.total) * 100);
+    if (rate >= 50 && (!best || rate > best.rate)) {
+      best = { key, rate, total: data.total };
+    }
+  }
+  return best;
+}
+
+function findWorstPerformer(outcomes, minUses) {
+  let worst = null;
+  for (const [key, data] of Object.entries(outcomes || {})) {
+    if (data.total < minUses) continue;
+    const rate = Math.round((data.positive / data.total) * 100);
+    if (rate < 20 && (!worst || rate < worst.rate)) {
+      worst = { key, rate, total: data.total };
+    }
+  }
+  return worst;
 }
 
 function createEmptyMemory() {

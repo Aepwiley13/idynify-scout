@@ -86,6 +86,23 @@
  * @property {string}  barry_warmth_suggestion.reason - Why Barry is suggesting this
  * @property {string}  barry_warmth_suggestion.message - Barry's conversational message for the UI
  *
+ * ── BARRY OUTCOME ATTRIBUTION (Sprint 3) ─────────────────────────
+ * Subcollection: contacts/{contactId}/barry_attributions/{attributionId}
+ * Each attribution links an engagement outcome to the Barry advice that preceded it.
+ *
+ * @property {string}  outcome                 - The engagement outcome recorded
+ * @property {string}  outcome_class           - 'positive' | 'negative' | 'neutral'
+ * @property {string}  guardrail_type          - Type of guardrail that was shown (if any)
+ * @property {string}  guardrail_action        - User's response to the guardrail
+ * @property {boolean} followed_advice         - Whether user followed Barry's suggestion
+ * @property {string}  strategy_used           - The message strategy/angle that was selected
+ * @property {string}  channel_used            - Channel used for the engagement
+ * @property {string}  warmth_at_send          - Contact warmth level when message was sent
+ * @property {string}  relationship_state_at_send - Relationship state when message was sent
+ *
+ * User-level strategy stats stored at: users/{userId}/barry_memory/strategy_stats
+ * Aggregates: angle_outcomes, channel_outcomes, guardrail_outcomes, total_attributions
+ *
  * ── CONTACT STATUS (STATE MACHINE) ───────────────────────────────
  * @property {string}  contact_status      - 'New' | 'Engaged' | 'Awaiting Reply' | 'In Conversation' |
  *                                           'Active Customer' | 'Network' | 'Partner' | 'Dormant'

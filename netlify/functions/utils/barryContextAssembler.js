@@ -62,10 +62,13 @@ export async function assembleBarryContext(db, userId, contactId) {
         brigade: contact.brigade || null,
         relationship_type: contact.relationship_type || null,
         warmth_level: contact.warmth_level || null,
+        warmth_level_source: contact.warmth_level_source || null,
         strategic_value: contact.strategic_value || null,
         engagement_intent: contact.engagement_intent || contact.engagementIntent || null,
         contact_status: contact.contact_status || 'New',
         relationship_state: contact.relationship_state || null,
+        relationship_state_source: contact.relationship_state_source || null,
+        known_contact: contact.known_contact || false,
       },
 
       memory: {
@@ -147,6 +150,11 @@ async function loadRecentSessions(db, userId, contactId, n = RECENT_SESSIONS_TO_
  */
 function buildPromptContext(context) {
   const parts = [];
+
+  // Flag known contacts — critical for tone calibration
+  if (context.relationship.known_contact) {
+    parts.push('IMPORTANT: This is a KNOWN contact (added manually by the user). Treat as a warm relationship — do NOT use cold prospecting tone.');
+  }
 
   // Always include relationship memory if available
   if (context.memory.who_they_are) {

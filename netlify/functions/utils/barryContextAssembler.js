@@ -173,109 +173,111 @@ async function loadRecentSessions(db, userId, contactId, n = RECENT_SESSIONS_TO_
  * Build a prompt-ready context string from structured Barry context.
  * Capped at ~300 tokens (HISTORY_TOKEN_BUDGET_CHARS characters).
  *
- * Prioritizes the most useful information:
- *   1. Who they are + current goal (highest value)
- *   2. What has worked / not worked (direct generation guidance)
- *   3. Recent session summaries (continuity)
- *   4. Known facts (color)
+ * Uses priority-based truncation: when over budget, drops lowest-priority
+ * sections first so strategy insights and core memory are never silently cut.
+ *
+ * Priority tiers (highest first):
+ *   P0: Known contact flag, who they are, current goal
+ *   P1: What has worked/not worked, strategy insights, no-reply warnings
+ *   P2: Tone/channel preferences, engagement stats, last next step
+ *   P3: Session summaries, known facts, relationship summary
  */
 function buildPromptContext(context) {
-  const parts = [];
+  // Build sections with explicit priority (lower number = higher priority)
+  const sections = [];
 
-  // Flag known contacts — critical for tone calibration
+  // P0 — Critical identity and relationship signals
   if (context.relationship.known_contact) {
-    parts.push('IMPORTANT: This is a KNOWN contact (added manually by the user). Treat as a warm relationship — do NOT use cold prospecting tone.');
+    sections.push({ priority: 0, text: 'IMPORTANT: This is a KNOWN contact (added manually by the user). Treat as a warm relationship — do NOT use cold prospecting tone.' });
   }
-
-  // Always include relationship memory if available
   if (context.memory.who_they_are) {
-    parts.push(`Who this person is to the user: ${context.memory.who_they_are}`);
+    sections.push({ priority: 0, text: `Who this person is to the user: ${context.memory.who_they_are}` });
   }
-
   if (context.memory.current_goal) {
-    parts.push(`Current goal with this person: ${context.memory.current_goal}`);
+    sections.push({ priority: 0, text: `Current goal with this person: ${context.memory.current_goal}` });
   }
 
-  // What has worked — directly useful for generation
+  // P1 — Direct generation guidance (what to do / avoid)
   if (context.memory.what_has_worked.length > 0) {
-    parts.push(`What has worked before: ${context.memory.what_has_worked.join('; ')}`);
+    sections.push({ priority: 1, text: `What has worked before: ${context.memory.what_has_worked.join('; ')}` });
   }
-
-  // What has NOT worked — avoid repeating failures
   if (context.memory.what_has_not_worked.length > 0) {
-    parts.push(`What has NOT worked: ${context.memory.what_has_not_worked.join('; ')}`);
+    sections.push({ priority: 1, text: `What has NOT worked: ${context.memory.what_has_not_worked.join('; ')}` });
   }
-
-  // What has been tried — avoid repetition
   if (context.memory.what_has_been_tried.length > 0) {
-    parts.push(`Approaches already tried: ${context.memory.what_has_been_tried.join('; ')}`);
+    sections.push({ priority: 1, text: `Approaches already tried: ${context.memory.what_has_been_tried.join('; ')}` });
+  }
+  if (context.stats.consecutive_no_replies >= 2) {
+    sections.push({ priority: 1, text: `WARNING: ${context.stats.consecutive_no_replies} consecutive messages with no reply — consider changing approach` });
+  }
+  if (context.strategy_stats && context.strategy_stats.total_attributions >= 5) {
+    const insights = buildStrategyInsights(context.strategy_stats);
+    if (insights) {
+      sections.push({ priority: 1, text: insights });
+    }
   }
 
-  // Tone and channel preferences
+  // P2 — Preferences and stats
   if (context.memory.tone_preference) {
-    parts.push(`This person responds best to: ${context.memory.tone_preference} tone`);
+    sections.push({ priority: 2, text: `This person responds best to: ${context.memory.tone_preference} tone` });
   }
   if (context.memory.channel_preference) {
-    parts.push(`Preferred channel: ${context.memory.channel_preference}`);
+    sections.push({ priority: 2, text: `Preferred channel: ${context.memory.channel_preference}` });
   }
-
-  // User's global preferences
   if (context.user_preferences.preferred_tone) {
-    parts.push(`User's overall preferred tone: ${context.user_preferences.preferred_tone}`);
+    sections.push({ priority: 2, text: `User's overall preferred tone: ${context.user_preferences.preferred_tone}` });
   }
-
-  // Engagement stats summary (one line)
   if (context.stats.total_sent > 0) {
     const replyRate = context.stats.replies_received > 0
       ? ` (${context.stats.replies_received} replies, ${context.stats.positive_replies} positive)`
       : ' (no replies yet)';
-    parts.push(`Engagement history: ${context.stats.total_sent} messages sent${replyRate}`);
+    sections.push({ priority: 2, text: `Engagement history: ${context.stats.total_sent} messages sent${replyRate}` });
+  }
+  if (context.engage.last_session_next_step) {
+    sections.push({ priority: 2, text: `Barry's last recommended next step: ${context.engage.last_session_next_step}` });
   }
 
-  if (context.stats.consecutive_no_replies >= 2) {
-    parts.push(`WARNING: ${context.stats.consecutive_no_replies} consecutive messages with no reply — consider changing approach`);
-  }
-
-  // Recent session summaries (most recent first)
+  // P3 — Color and continuity (first to drop)
   const sessionSummaries = context.recent_sessions
     .filter(s => s.session_summary)
     .slice(0, 3)
     .map(s => `[${(s.started_at || '').slice(0, 10)}] ${s.session_summary}`);
-
   if (sessionSummaries.length > 0) {
-    parts.push(`Recent session history:\n${sessionSummaries.join('\n')}`);
+    sections.push({ priority: 3, text: `Recent session history:\n${sessionSummaries.join('\n')}` });
   }
-
-  // Known facts
   if (context.memory.known_facts.length > 0) {
     const factsStr = context.memory.known_facts.slice(0, 5).join('; ');
-    parts.push(`Known facts: ${factsStr}`);
+    sections.push({ priority: 3, text: `Known facts: ${factsStr}` });
   }
-
-  // Last session next step
-  if (context.engage.last_session_next_step) {
-    parts.push(`Barry's last recommended next step: ${context.engage.last_session_next_step}`);
-  }
-
-  // Sprint 3: Strategy effectiveness insights (only if meaningful data exists)
-  if (context.strategy_stats && context.strategy_stats.total_attributions >= 5) {
-    const insights = buildStrategyInsights(context.strategy_stats);
-    if (insights) {
-      parts.push(insights);
-    }
-  }
-
-  // Relationship summary (truncated)
   if (context.memory.relationship_summary) {
     const summary = context.memory.relationship_summary;
     const truncated = summary.length > 200 ? summary.slice(-200) : summary;
-    parts.push(`Relationship summary: ${truncated}`);
+    sections.push({ priority: 3, text: `Relationship summary: ${truncated}` });
   }
 
-  // Join and cap at budget
-  let result = parts.join('\n');
+  // Assemble with priority-based truncation
+  // Sort by priority (stable — preserves insertion order within same priority)
+  sections.sort((a, b) => a.priority - b.priority);
+
+  let result = sections.map(s => s.text).join('\n');
+
   if (result.length > HISTORY_TOKEN_BUDGET_CHARS) {
-    result = result.slice(0, HISTORY_TOKEN_BUDGET_CHARS) + '...';
+    // Drop sections from lowest priority until we fit
+    let kept = [...sections];
+    const maxPriority = Math.max(...kept.map(s => s.priority));
+
+    for (let dropPriority = maxPriority; dropPriority >= 0; dropPriority--) {
+      if (kept.map(s => s.text).join('\n').length <= HISTORY_TOKEN_BUDGET_CHARS) break;
+      kept = kept.filter(s => s.priority !== dropPriority);
+    }
+
+    result = kept.map(s => s.text).join('\n');
+
+    // If still over budget after dropping all but P0, truncate at word boundary
+    if (result.length > HISTORY_TOKEN_BUDGET_CHARS) {
+      const truncPoint = result.lastIndexOf(' ', HISTORY_TOKEN_BUDGET_CHARS);
+      result = result.slice(0, truncPoint > 0 ? truncPoint : HISTORY_TOKEN_BUDGET_CHARS) + '...';
+    }
   }
 
   if (!result.trim()) return '';

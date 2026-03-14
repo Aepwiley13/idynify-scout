@@ -306,9 +306,22 @@ async function runAttribution(userId, contactId, outcome, outcomeTimestamp) {
   // Build attribution record
   const attribution = buildAttribution(outcome, outcomeClass, guardrail, session, contact);
 
+  // Deduplication check: prevent duplicate attributions for the same outcome + session
+  const dedupKey = `${outcome}_${session?.id || 'no_session'}_${guardrail?.id || 'no_guardrail'}`;
+  const existingSnap = await contactRef.collection('barry_attributions')
+    .where('dedup_key', '==', dedupKey)
+    .limit(1)
+    .get();
+
+  if (!existingSnap.empty) {
+    console.log(`[OutcomeAttribution] Duplicate attribution skipped: ${dedupKey}`);
+    return { attributed: false, attribution: null, reason: 'duplicate' };
+  }
+
   // Store attribution record
   await contactRef.collection('barry_attributions').add({
     ...attribution,
+    dedup_key: dedupKey,
     created_at: new Date().toISOString()
   });
 

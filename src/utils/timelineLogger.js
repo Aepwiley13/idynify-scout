@@ -59,7 +59,10 @@ const TIMELINE_EVENT_TYPES = [
   'brigade_changed',
   // Barry Intelligence Upgrade: Relationship guardrail events
   'barry_guardrail_shown',
-  'barry_guardrail_response'
+  'barry_guardrail_response',
+  // Scheduled engagement events
+  'message_scheduled',
+  'message_schedule_cancelled'
 ];
 
 // Actor types

@@ -5,7 +5,7 @@ import { db, auth } from '../../firebase/config';
 import {
   X, Target, Plus, Mail, MessageSquare, Phone, Check,
   ArrowLeft, ArrowRight, Sparkles, Linkedin, Send, Loader, RefreshCw,
-  ExternalLink, Calendar, AlertCircle, Lock
+  ExternalLink, Calendar, AlertCircle, Lock, Clock
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
@@ -93,6 +93,11 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // Send result tracking (for honest UX)
   const [sendResult, setSendResult] = useState(null); // { result, message, method }
 
+  // Scheduling state
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState('');
+  const [scheduleResult, setScheduleResult] = useState(null); // { success, scheduledFor }
+
   // Barry proactive recommendations (Step 7)
   const [drawerRecommendations, setDrawerRecommendations] = useState([]);
 
@@ -153,6 +158,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     setMessageOptions([]);
     setGenerationError(null);
     setSendResult(null);
+    setIsScheduling(false);
+    setScheduledFor('');
+    setScheduleResult(null);
   }
 
   // Check Gmail connection status
@@ -479,6 +487,89 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     } finally {
       setLoading(false);
     }
+  }
+
+  // === SCHEDULE MESSAGE ===
+
+  async function handleScheduleMessage() {
+    if (!scheduledFor) return;
+
+    const scheduledDate = new Date(scheduledFor);
+    if (scheduledDate <= new Date()) {
+      alert('Please choose a future date and time.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const channelMap = {
+        email: 'email',
+        text: 'text',
+        call: 'call',
+        linkedin: 'linkedin',
+        calendar: 'calendar'
+      };
+      const channel = channelMap[selectedWeapon] || selectedWeapon;
+
+      // Save scheduled engagement to Firestore
+      const scheduledEngagementsRef = collection(db, 'users', user.uid, 'scheduledEngagements');
+      await addDoc(scheduledEngagementsRef, {
+        contactId: contact.id,
+        contact: {
+          firstName: contact.firstName || null,
+          lastName: contact.lastName || null,
+          email: contact.email || null,
+          phone: contact.phone || contact.phone_mobile || null,
+          linkedin_url: contact.linkedin_url || null,
+          gmail_thread_id: contact.gmail_thread_id || null
+        },
+        channel,
+        subject: subject || null,
+        body: message,
+        userIntent,
+        engagementIntent,
+        strategy: selectedStrategy || null,
+        scheduledFor: scheduledDate.toISOString(),
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+
+      // Log timeline event
+      await logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.id,
+        type: 'message_scheduled',
+        actor: ACTORS.USER,
+        preview: subject || (message ? message.substring(0, 120) : null),
+        metadata: {
+          channel,
+          scheduledFor: scheduledDate.toISOString(),
+          subject: subject || null,
+          engagementIntent: engagementIntent || null,
+          strategy: selectedStrategy || null
+        }
+      });
+
+      setScheduleResult({ success: true, scheduledFor: scheduledDate });
+      setActiveView('scheduled');
+
+    } catch (error) {
+      console.error('Error scheduling engagement:', error);
+      setScheduleResult({ success: false, error: error.message });
+      setActiveView('scheduled');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Build the min value for the datetime-local input (now + 5 min)
+  function getMinScheduleDateTime() {
+    const d = new Date(Date.now() + 5 * 60 * 1000);
+    // datetime-local format: YYYY-MM-DDTHH:MM
+    return d.toISOString().slice(0, 16);
   }
 
   // Get button label based on weapon and integration status
@@ -1349,6 +1440,95 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   />
                 </div>
               )}
+
+              {/* Schedule for later */}
+              <div className="schedule-section">
+                <button
+                  className="btn-schedule-toggle"
+                  onClick={() => {
+                    setIsScheduling(v => !v);
+                    if (!scheduledFor) setScheduledFor(getMinScheduleDateTime());
+                  }}
+                  disabled={loading}
+                >
+                  <Clock className="w-4 h-4" />
+                  {isScheduling ? 'Cancel scheduling' : 'Schedule for later'}
+                </button>
+
+                {isScheduling && (
+                  <div className="schedule-picker">
+                    <label className="schedule-label">Send at:</label>
+                    <input
+                      type="datetime-local"
+                      className="schedule-datetime-input"
+                      value={scheduledFor}
+                      min={getMinScheduleDateTime()}
+                      onChange={(e) => setScheduledFor(e.target.value)}
+                    />
+                    <button
+                      className="btn-schedule-confirm"
+                      onClick={handleScheduleMessage}
+                      disabled={!scheduledFor || !message || loading}
+                    >
+                      {loading ? (
+                        <><Loader className="w-4 h-4 animate-spin" /> Scheduling...</>
+                      ) : (
+                        <><Clock className="w-4 h-4" /> Schedule</>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* === SCHEDULED VIEW === */}
+          {activeView === 'scheduled' && (
+            <div className="drawer-view success-view">
+              {scheduleResult?.success ? (
+                <>
+                  <div className="success-icon success-icon-sent">
+                    <Clock className="w-16 h-16" />
+                  </div>
+                  <h3 className="success-title">Scheduled!</h3>
+                  <p className="success-description">
+                    Your {selectedWeapon} to {contact.firstName} is scheduled for{' '}
+                    <strong>
+                      {scheduleResult.scheduledFor.toLocaleString(undefined, {
+                        weekday: 'short', month: 'short', day: 'numeric',
+                        hour: 'numeric', minute: '2-digit'
+                      })}
+                    </strong>.
+                  </p>
+                  <p className="success-detail">
+                    Barry will send it automatically at the scheduled time.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="success-icon success-icon-failed">
+                    <AlertCircle className="w-16 h-16" />
+                  </div>
+                  <h3 className="success-title error-title">Scheduling Failed</h3>
+                  <p className="success-description error-description">
+                    {scheduleResult?.error || 'Something went wrong. Please try again.'}
+                  </p>
+                </>
+              )}
+              <div className="success-actions">
+                <button
+                  className="btn-primary-hunter"
+                  onClick={() => {
+                    resetEngagementState();
+                    setActiveView('main');
+                  }}
+                >
+                  {scheduleResult?.success ? 'Done' : 'Try Again'}
+                </button>
+                <button className="btn-secondary" onClick={onClose}>
+                  Close
+                </button>
+              </div>
             </div>
           )}
 

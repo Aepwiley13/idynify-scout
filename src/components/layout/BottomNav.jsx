@@ -1,28 +1,19 @@
 /**
  * BottomNav.jsx — Mobile bottom navigation bar.
  *
- * Renders on screens ≤768px only. Provides one-tap access to the five primary
- * destinations: RECON, Discoveries (Scout), Hunter, Game Mode, and a More
- * sheet for sub-items. Replaces the 4-tap hamburger → sidebar → item → close
- * flow on mobile.
+ * Primary tabs: Scout, Hunter, Sniper, Basecamp + More sheet for everything else
+ * (Recon, Game, Reinforcements, etc.).
  *
  * Thumb-zone optimised: 56px bar height + iOS safe-area-inset-bottom padding.
- * Primary actions sit in the bottom third of the screen where thumbs rest.
  */
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Brain, Star, Target, Zap, MoreHorizontal } from 'lucide-react';
+import { Star, Target, Crosshair, Tent, MoreHorizontal } from 'lucide-react';
 import './BottomNav.css';
 
 const NAV_ITEMS = [
   {
-    id: 'recon',
-    label: 'RECON',
-    icon: Brain,
-    path: '/recon',
-  },
-  {
     id: 'scout',
-    label: 'Discover',
+    label: 'Scout',
     icon: Star,
     path: '/scout',
     search: '?tab=all-leads',
@@ -35,10 +26,16 @@ const NAV_ITEMS = [
     search: '?tab=dashboard',
   },
   {
-    id: 'game',
-    label: 'Game',
-    icon: Zap,
-    path: '/scout/game',
+    id: 'sniper',
+    label: 'Sniper',
+    icon: Crosshair,
+    path: '/sniper',
+  },
+  {
+    id: 'basecamp',
+    label: 'Basecamp',
+    icon: Tent,
+    path: '/basecamp',
   },
   {
     id: 'more',
@@ -54,14 +51,13 @@ export default function BottomNav({ onOpenMore }) {
 
   const isActive = (item) => {
     if (!item.path) return false;
-    if (item.id === 'game') return location.pathname === '/scout/game';
     if (item.id === 'scout') {
-      // Active on /scout and /scout/* but NOT on /scout/game (that's the Game tab)
       return (location.pathname === '/scout' || location.pathname.startsWith('/scout/')) &&
         !location.pathname.startsWith('/scout/game');
     }
-    if (item.id === 'recon') return location.pathname === '/recon' || location.pathname.startsWith('/recon/');
-    if (item.id === 'hunter') return location.pathname === '/hunter' || location.pathname.startsWith('/hunter/');
+    if (item.id === 'hunter')   return location.pathname === '/hunter'   || location.pathname.startsWith('/hunter/');
+    if (item.id === 'sniper')   return location.pathname === '/sniper'   || location.pathname.startsWith('/sniper/');
+    if (item.id === 'basecamp') return location.pathname === '/basecamp' || location.pathname.startsWith('/basecamp/');
     return location.pathname === item.path;
   };
 

@@ -550,6 +550,56 @@
   color: #a855f7;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Sprint 4: Strategy recommendation badges */
+.barry-rec-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.barry-avoid-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.message-option-card--recommended {
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.1);
+}
+
+.barry-channel-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.barry-channel-hint strong {
+  text-transform: capitalize;
 }
 
 .option-header svg {

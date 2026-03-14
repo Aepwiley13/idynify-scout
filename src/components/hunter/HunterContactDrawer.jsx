@@ -97,6 +97,9 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   // Barry relationship guardrail (Sprint 2)
   const [barryWarning, setBarryWarning] = useState(null);
 
+  // Barry strategy recommendation (Sprint 4)
+  const [barryRecommendation, setBarryRecommendation] = useState(null);
+
   // Toast notification state (replaces native alert())
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -320,6 +323,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
     setLoading(true);
     setGenerationError(null);
     setBarryWarning(null);
+    setBarryRecommendation(null);
     setActiveView('options');
 
     try {
@@ -367,6 +371,11 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
         // Capture Barry guardrail warning if present (Sprint 2)
         if (data.barry_warning) {
           setBarryWarning(data.barry_warning);
+        }
+
+        // Capture Barry strategy recommendation if present (Sprint 4)
+        if (data.barry_recommendation) {
+          setBarryRecommendation(data.barry_recommendation);
         }
 
         // Log timeline event: message_generated
@@ -1101,14 +1110,30 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                   )}
 
                   <div className="message-options-list">
-                    {messageOptions.map((option, index) => (
+                    {messageOptions.map((option, index) => {
+                      const isRecommended = barryRecommendation?.strategy &&
+                        option.strategy === barryRecommendation.strategy;
+                      const isAvoided = barryRecommendation?.avoidStrategies?.includes(option.strategy);
+                      return (
                       <button
                         key={index}
-                        className="message-option-card"
+                        className={`message-option-card${isRecommended ? ' message-option-card--recommended' : ''}`}
                         onClick={() => handleSelectStrategy(option)}
                       >
                         <div className="option-header">
-                          <span className="option-strategy-label">{option.label || option.strategy}</span>
+                          <span className="option-strategy-label">
+                            {option.label || option.strategy}
+                            {isRecommended && (
+                              <span className="barry-rec-badge" title={barryRecommendation.reasons?.[0] || 'Based on past results'}>
+                                Barry's pick
+                              </span>
+                            )}
+                            {isAvoided && (
+                              <span className="barry-avoid-badge" title="This approach has underperformed">
+                                Low success
+                              </span>
+                            )}
+                          </span>
                           <ArrowRight className="w-4 h-4" />
                         </div>
                         {option.subject && (
@@ -1119,7 +1144,8 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                           <p className="option-reasoning">{option.reasoning}</p>
                         )}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="options-mission-cta">
@@ -1145,6 +1171,14 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               </button>
 
               <h3 className="view-title">How do you want to send this?</h3>
+
+              {/* Sprint 4: Best channel hint from outcome attribution */}
+              {barryRecommendation?.bestChannel && (
+                <div className="barry-channel-hint">
+                  <Sparkles className="w-3 h-3" />
+                  <span>Barry's data: <strong>{barryRecommendation.bestChannel.name}</strong> has your best response rate ({barryRecommendation.bestChannel.rate}%)</span>
+                </div>
+              )}
 
               {/* Show reasoning for selected strategy */}
               {selectedMessage?.reasoning && (

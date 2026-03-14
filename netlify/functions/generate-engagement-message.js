@@ -5,6 +5,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail } from './utils/barryGuardrail.js';
+import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -173,10 +174,12 @@ export const handler = async (event) => {
 
     // 4. Load Barry's memory context (Sprint 0 — gives Barry history awareness)
     let barryMemoryContext = '';
+    let barryFullContext = null;
     try {
       if (contactId) {
-        const { promptContext } = await assembleBarryContext(db, userId, contactId);
+        const { promptContext, context: fullCtx } = await assembleBarryContext(db, userId, contactId);
         barryMemoryContext = promptContext || '';
+        barryFullContext = fullCtx;
         if (barryMemoryContext) {
           console.log('✅ Barry memory context loaded');
         }
@@ -194,6 +197,25 @@ export const handler = async (event) => {
       }
     } catch (guardrailError) {
       console.log('⚠️ Guardrail check failed (non-blocking):', guardrailError.message);
+    }
+
+    // === STRATEGY RECOMMENDATION (Sprint 4) ===
+    let strategyRecommendation = null;
+    let strategyPromptGuidance = '';
+    try {
+      const recResult = recommendStrategy({
+        contact: fullContact,
+        engagementIntent: engagementIntent || 'prospect',
+        strategyStats: barryFullContext?.strategy_stats || null,
+        barryMemory: fullContact.barry_memory || null
+      });
+      strategyRecommendation = recResult.recommendation;
+      strategyPromptGuidance = recResult.promptGuidance || '';
+      if (strategyRecommendation?.strategy) {
+        console.log(`✅ Barry recommends: ${strategyRecommendation.strategy} (${strategyRecommendation.confidence})`);
+      }
+    } catch (recError) {
+      console.log('⚠️ Strategy recommendation failed (non-blocking):', recError.message);
     }
 
     // === BUILD CONTEXT FOR BARRY ===
@@ -307,6 +329,7 @@ Calibrate messaging accordingly:
 ${barryContextString}
 ${reconContext}
 ${barryMemoryContext}
+${strategyPromptGuidance}
 USER'S COMPANY (if available):
 ${userProfile?.companyName || userProfile?.company || 'Not specified'}
 
@@ -417,6 +440,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
         success: true,
         messages: result.messages,
         barry_warning: barryWarning || null,
+        barry_recommendation: strategyRecommendation || null,
         dataUsed: result.dataUsed || {
           contact: true,
           recon: reconLoaded,

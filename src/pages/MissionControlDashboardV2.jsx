@@ -325,6 +325,13 @@ export default function MissionControlDashboardV2() {
         {/* BARRY CHAT PANEL — Mission Co-pilot */}
         {userId && <BarryChatPanel userId={userId} />}
 
+        {/* MODULE NAVIGATION GRID — 4-card prominent launcher above Attention Required */}
+        <ModuleNavigationGrid
+          stats={stats}
+          onScoutClick={handleScoutClick}
+          onNavigate={(route) => navigate(route)}
+        />
+
         {/* QUICK LAUNCH STRIP — Horizontal carousel, opens inline deck (Scout, Hunter, RECON) */}
         <QuickLaunchStrip
           stats={stats}
@@ -342,13 +349,6 @@ export default function MissionControlDashboardV2() {
             onClose={() => setActiveModule(null)}
           />
         )}
-
-        {/* MODULE NAVIGATION GRID — 4-card prominent launcher above Attention Required */}
-        <ModuleNavigationGrid
-          stats={stats}
-          onScoutClick={handleScoutClick}
-          onNavigate={(route) => navigate(route)}
-        />
 
         {/* ATTENTION REQUIRED — Barry's pipeline signals */}
         <AttentionCarousel

@@ -96,6 +96,19 @@ function buildIcpSummary(icpProfile) {
   return parts.length ? parts.join(' — ') : 'your current profile';
 }
 
+// ── Action intent detection (routes to barryActions instead of barryMissionChat) ──
+
+const ACTION_PATTERNS = [
+  /\b(send it|send this|go ahead(?: and send)?|yes[,.]?\s*send|send that|send (?:the )?(?:email|message))\b/i,
+  /\b(check (?:my )?inbox|any (?:new )?(?:emails?|messages?|replies?)|what(?:'s| is) in my inbox|did .+ reply)\b/i,
+  /\b(check (?:my )?calendar|what(?:'s| is) on my calendar|am i free|what do i have (?:today|this week|tomorrow))\b/i,
+  /\b(book (?:a )?(?:call|meeting)|schedule (?:a )?(?:call|meeting|time)|set up (?:a )?(?:call|meeting))\b/i,
+];
+
+function isActionIntent(message) {
+  return ACTION_PATTERNS.some(p => p.test(message));
+}
+
 // ── Mode configuration ─────────────────────────────────────────────────────────
 
 const MODE_CONFIG = {
@@ -132,6 +145,7 @@ export default function BarryChatPanel({ userId }) {
   const [sending, setSending] = useState(false);
   const [contextStack, setContextStack] = useState(null);
   const [pendingIcpChange, setPendingIcpChange] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
@@ -298,6 +312,123 @@ export default function BarryChatPanel({ userId }) {
     }
   }
 
+  // ── Action execution via barryActions ─────────────────────────────────────
+
+  async function handleActionMessage(userMessage) {
+    setSending(true);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+    try {
+      const user = getEffectiveUser();
+      if (!user) { setSending(false); return; }
+      const authToken = await user.getIdToken();
+
+      // Pull context from the last angle block Barry generated
+      const lastAngleMsg = [...messages].reverse().find(m => m.has_message_angles && m.angles?.length > 0);
+      const recommendedAngle = lastAngleMsg?.angles?.find(a => a.recommended) || lastAngleMsg?.angles?.[0];
+      const lastContactId = lastAngleMsg?.contact_id || null;
+      const lastContact = contextStack?.contacts?.find(c => c.id === lastContactId);
+
+      // Fetch contact email from Firestore if we have a contactId
+      let contactEmail = null;
+      if (lastContactId) {
+        try {
+          const contactSnap = await getDoc(doc(db, 'users', userId, 'contacts', lastContactId));
+          if (contactSnap.exists()) contactEmail = contactSnap.data()?.email || null;
+        } catch (_) {}
+      }
+
+      const context = {
+        ...(recommendedAngle && { subject: recommendedAngle.subject, body: recommendedAngle.message }),
+        ...(lastContact && { to_name: lastContact.name }),
+        ...(contactEmail && { to_email: contactEmail }),
+      };
+
+      const res = await fetch('/.netlify/functions/barryActions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, authToken, message: userMessage, context })
+      });
+      const data = await res.json();
+
+      // Integration not connected
+      if (!data.success && data.error === 'not_connected') {
+        setMessages(prev => [...prev, { role: 'action_not_connected', service: data.service, text: data.message }]);
+        return;
+      }
+
+      // Destructive action — show confirmation bubble
+      if (data.requires_confirmation && data.action?.confidence >= 0.7) {
+        setPendingAction(data.action);
+        setMessages(prev => [...prev, { role: 'action_confirm', action: data.action, summary: data.action.summary }]);
+        return;
+      }
+
+      // Non-destructive action executed immediately
+      if (data.executed) {
+        const { action, result } = data;
+        if (action.action_type === 'gmail_read') {
+          setMessages(prev => [...prev, { role: 'action_inbox', threads: result?.threads || [] }]);
+        } else if (action.action_type === 'calendar_check') {
+          setMessages(prev => [...prev, { role: 'action_calendar', events: result?.events || [] }]);
+        } else if (action.action_type === 'gmail_draft') {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Draft ready:\n\n**Subject:** ${result.draft?.subject || ''}\n\n${result.draft?.body || ''}`,
+            has_message_angles: false, angles: []
+          }]);
+        }
+        return;
+      }
+
+      // Barry couldn't parse a clear action — fall back to normal chat
+      // Re-use the existing fetch path by falling through isn't possible here,
+      // so just let Barry explain what he needs.
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.action?.summary || "I wasn't sure what to do with that — can you be more specific?",
+        has_message_angles: false, angles: []
+      }]);
+
+    } catch (err) {
+      console.error('[BarryChatPanel] handleActionMessage failed:', err);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Action failed — try again in a moment.',
+        has_message_angles: false, angles: []
+      }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function executeConfirmedAction(action) {
+    setSending(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const authToken = await user.getIdToken();
+
+      const res = await fetch('/.netlify/functions/barryActions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, authToken, confirm: true, pendingAction: action })
+      });
+      const data = await res.json();
+
+      setMessages(prev => [...prev, {
+        role: 'action_result',
+        success: !!(data.success && data.executed),
+        text: data.message || data.error || 'Done.'
+      }]);
+    } catch (err) {
+      console.error('[BarryChatPanel] executeConfirmedAction failed:', err);
+      setMessages(prev => [...prev, { role: 'action_result', success: false, text: 'Failed — try again.' }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
   // ── Send message ──────────────────────────────────────────────────────────
 
   const sendMessage = async (text) => {
@@ -305,6 +436,31 @@ export default function BarryChatPanel({ userId }) {
 
     const userMessage = text.trim();
     setInputValue('');
+
+    // ── Action confirmation flow (user responding to a pending action) ──
+    if (pendingAction) {
+      const lower = userMessage.toLowerCase().trim();
+      const isConfirm = /^(yes|yeah|yep|send|confirm|do it|go|ok|sure|absolutely)[!.]?$/i.test(lower);
+      const isCancel = /^(no|nope|cancel|stop|don't|wait|nevermind|never mind)[!.]?$/i.test(lower);
+
+      if (isConfirm) {
+        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        const saved = pendingAction;
+        setPendingAction(null);
+        await executeConfirmedAction(saved);
+        return;
+      }
+      if (isCancel) {
+        setMessages(prev => [...prev,
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: 'Got it — cancelled.', has_message_angles: false, angles: [] }
+        ]);
+        setPendingAction(null);
+        return;
+      }
+      // Ambiguous — clear pending and fall through
+      setPendingAction(null);
+    }
 
     // ── ICP confirmation flow (user responding to add vs. replace question) ──
     if (pendingIcpChange) {
@@ -340,6 +496,12 @@ export default function BarryChatPanel({ userId }) {
         }
       ]);
       setPendingIcpChange({ originalMessage: userMessage, newTarget: icpIntent.newTarget });
+      return;
+    }
+
+    // ── Action intent (send email, check inbox, check calendar) ──
+    if (isActionIntent(userMessage)) {
+      await handleActionMessage(userMessage);
       return;
     }
 
@@ -592,6 +754,109 @@ export default function BarryChatPanel({ userId }) {
                             className="underline underline-offset-2 text-emerald-300 hover:text-emerald-100 transition-colors"
                           >
                             View in Hunter →
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Action confirmation bubble ──
+                  if (msg.role === 'action_confirm') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="text-sm px-3 py-3 leading-relaxed bg-cyan-500/10 text-cyan-200 border border-cyan-500/30 rounded-2xl rounded-tl-sm max-w-[88%]">
+                          <div className="mb-3">📧 {msg.summary}</div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => { const saved = pendingAction; setPendingAction(null); await executeConfirmedAction(saved); }}
+                              className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-mono transition-all"
+                            >
+                              Yes, send →
+                            </button>
+                            <button
+                              onClick={() => { setPendingAction(null); setMessages(prev => [...prev, { role: 'assistant', content: 'Got it — cancelled.', has_message_angles: false, angles: [] }]); }}
+                              className="px-3 py-1.5 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/40 text-gray-400 rounded-lg text-xs font-mono transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Action result bubble ──
+                  if (msg.role === 'action_result') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className={`text-sm px-3 py-2 leading-relaxed border rounded-2xl rounded-tl-sm ${
+                          msg.success
+                            ? 'bg-emerald-500/10 text-emerald-200 border-emerald-500/25'
+                            : 'bg-red-500/10 text-red-300 border-red-500/25'
+                        }`}>
+                          {msg.success ? '✓ ' : '✗ '}{msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Gmail inbox bubble ──
+                  if (msg.role === 'action_inbox') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="flex flex-col gap-1.5 max-w-[88%]">
+                          <div className="text-xs text-gray-500 font-mono px-1">Recent inbox</div>
+                          {msg.threads.length === 0 ? (
+                            <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-400 border border-gray-700/50 rounded-2xl rounded-tl-sm">Inbox is empty.</div>
+                          ) : msg.threads.map((thread, ti) => (
+                            <div key={ti} className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-xl">
+                              <div className="font-medium text-gray-100 truncate">{thread.subject || '(no subject)'}</div>
+                              <div className="text-xs text-gray-400 mt-0.5 truncate">{thread.from}</div>
+                              {thread.snippet && <div className="text-xs text-gray-500 mt-1 line-clamp-1">{thread.snippet}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Calendar events bubble ──
+                  if (msg.role === 'action_calendar') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="flex flex-col gap-1.5 max-w-[88%]">
+                          <div className="text-xs text-gray-500 font-mono px-1">Upcoming calendar</div>
+                          {msg.events.length === 0 ? (
+                            <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-400 border border-gray-700/50 rounded-2xl rounded-tl-sm">Nothing scheduled.</div>
+                          ) : msg.events.slice(0, 5).map((event, ei) => (
+                            <div key={ei} className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-xl">
+                              <div className="font-medium text-gray-100">{event.title}</div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {event.start ? new Date(event.start).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Time TBD'}
+                              </div>
+                              {event.attendees?.length > 0 && (
+                                <div className="text-xs text-gray-500 mt-0.5">With: {event.attendees.join(', ')}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Integration not connected bubble ──
+                  if (msg.role === 'action_not_connected') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="text-sm px-3 py-2 leading-relaxed bg-amber-500/10 text-amber-200 border border-amber-500/25 rounded-2xl rounded-tl-sm">
+                          {msg.text}{' '}
+                          <a href="/basecamp?tab=integrations" className="underline text-amber-300 hover:text-amber-100 transition-colors">
+                            Connect {msg.service} →
                           </a>
                         </div>
                       </div>

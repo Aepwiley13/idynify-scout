@@ -454,7 +454,6 @@ export const handler = async (event) => {
     const contextStack = body.contextStack || null;
     const isIcpMode = body.icpMode === true;
     const icpProfile = body.icpProfile || null;
-    const module = body.module || 'default';
     const moduleContext = body.moduleContext && Object.keys(body.moduleContext).length > 0
       ? body.moduleContext
       : null;

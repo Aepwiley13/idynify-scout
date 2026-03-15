@@ -21,11 +21,40 @@
 
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { auth } from '../../firebase/config';
+import { auth, db } from '../../firebase/config';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { buildContextStack } from '../../utils/barryContextStack';
 import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+
+// ── Conversation persistence helpers ───────────────────────────────────────────
+
+async function saveConversation(userId, messages, conversationHistory, mode) {
+  try {
+    await setDoc(
+      doc(db, 'users', userId, 'barryConversations', 'missionControl'),
+      {
+        messages: messages.slice(-30),
+        conversationHistory: conversationHistory.slice(-20),
+        mode,
+        updatedAt: serverTimestamp()
+      }
+    );
+  } catch (err) {
+    console.warn('[BarryChatPanel] Could not save conversation:', err.message);
+  }
+}
+
+async function loadConversation(userId) {
+  try {
+    const snap = await getDoc(doc(db, 'users', userId, 'barryConversations', 'missionControl'));
+    if (snap.exists()) return snap.data();
+  } catch (err) {
+    console.warn('[BarryChatPanel] Could not load conversation:', err.message);
+  }
+  return null;
+}
 
 // ── ICP intent helpers (pure, outside component) ───────────────────────────────
 
@@ -106,6 +135,11 @@ export default function BarryChatPanel({ userId }) {
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
+  const conversationHistoryRef = useRef(conversationHistory);
+  const modeRef = useRef(mode);
+
+  useEffect(() => { conversationHistoryRef.current = conversationHistory; }, [conversationHistory]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   // ── On mount: build context stack + load opening brief ────────────────────
 
@@ -120,6 +154,16 @@ export default function BarryChatPanel({ userId }) {
     initPanel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Auto-save conversation to Firestore whenever messages change ───────────
+
+  useEffect(() => {
+    if (messages.length === 0 || !userId) return;
+    const timer = setTimeout(() => {
+      saveConversation(userId, messages, conversationHistoryRef.current, modeRef.current);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [messages, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Auto-scroll conversation thread ───────────────────────────────────────
 
   useEffect(() => {
@@ -133,6 +177,14 @@ export default function BarryChatPanel({ userId }) {
   async function initPanel() {
     const user = getEffectiveUser();
     if (!user) { setLoading(false); return; }
+
+    // Restore saved conversation before loading the fresh brief
+    const saved = await loadConversation(user.uid);
+    if (saved?.messages?.length > 0) {
+      setMessages(saved.messages);
+      setConversationHistory(saved.conversationHistory || []);
+      if (saved.mode) setMode(saved.mode);
+    }
 
     // Build context stack first (non-blocking for brief load)
     let stack = null;

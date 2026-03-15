@@ -901,12 +901,12 @@ export default function BarryChatPanel({ userId }) {
                             contactId={msg.contact_id}
                             userId={userId}
                             onLoaded={(result) => {
-                              if (result.created) {
+                              if (result.success) {
                                 setMessages(prev => [...prev, {
-                                  role: 'event',
-                                  event: 'mission_created',
-                                  contactName: result.contactName,
-                                  missionId: result.missionId
+                                  role: 'assistant',
+                                  content: `Outreach saved to ${result.contactName}'s profile. Who's next?`,
+                                  has_message_angles: false,
+                                  angles: []
                                 }]);
                               }
                             }}

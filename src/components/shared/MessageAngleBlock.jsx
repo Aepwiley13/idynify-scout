@@ -77,20 +77,13 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded 
     if (hunterResult.success) {
       return (
         <div className="mab-feedback mab-feedback--success">
-          ✓ Loaded into {hunterResult.contactName}&apos;s mission — open Hunter to edit &amp; send.
-        </div>
-      );
-    }
-    if (hunterResult.error === 'no_active_mission') {
-      return (
-        <div className="mab-feedback mab-feedback--warn">
-          Engage {hunterResult.contactName || 'this contact'} from the Hunter deck first.
+          ✓ Saved to {hunterResult.contactName}&apos;s profile.
         </div>
       );
     }
     return (
       <div className="mab-feedback mab-feedback--error">
-        Could not load into Hunter — try again.
+        Could not save — {hunterResult.error || 'try again'}.
       </div>
     );
   };
@@ -153,9 +146,9 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded 
           <button
             className="mab-hunter-btn"
             onClick={handleLoadIntoHunter}
-            disabled={loadingHunter}
+            disabled={loadingHunter || hunterResult?.success}
           >
-            {loadingHunter ? 'Loading...' : '→ Load into Hunter'}
+            {loadingHunter ? 'Saving...' : hunterResult?.success ? '✓ Saved' : '→ Save to Profile'}
           </button>
         )}
       </div>

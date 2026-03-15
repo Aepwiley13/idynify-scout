@@ -96,6 +96,33 @@ function buildIcpSummary(icpProfile) {
   return parts.length ? parts.join(' — ') : 'your current profile';
 }
 
+// ── Channel selection row (rendered below angle block) ────────────────────────
+
+function ChannelRow({ contactProfile, onSelect }) {
+  const channels = [];
+  if (contactProfile?.email)        channels.push({ id: 'email',    label: '📧 Email',    value: contactProfile.email });
+  if (contactProfile?.linkedin_url) channels.push({ id: 'linkedin', label: '💼 LinkedIn', value: contactProfile.linkedin_url });
+  if (contactProfile?.phone)        channels.push({ id: 'call',     label: '📞 Call',     value: contactProfile.phone });
+  if (contactProfile?.phone)        channels.push({ id: 'text',     label: '💬 Text',     value: contactProfile.phone });
+  if (channels.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5 mt-1">
+      <div className="text-xs text-gray-500 font-mono">Send via:</div>
+      <div className="flex flex-wrap gap-2">
+        {channels.map(ch => (
+          <button
+            key={ch.id}
+            onClick={() => onSelect(ch)}
+            className="px-3 py-1.5 text-xs font-mono bg-black/40 hover:bg-cyan-500/10 border border-gray-700/60 hover:border-cyan-500/30 text-gray-300 hover:text-cyan-300 rounded-lg transition-all"
+          >
+            {ch.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Action intent detection (routes to barryActions instead of barryMissionChat) ──
 
 const ACTION_PATTERNS = [
@@ -436,6 +463,57 @@ export default function BarryChatPanel({ userId }) {
     }
   }
 
+  // ── Channel send (from ChannelRow button click) ────────────────────────────
+
+  async function handleChannelSend(channel, msg) {
+    const recommended = msg.angles?.find(a => a.recommended) || msg.angles?.[0];
+    if (!recommended) return;
+
+    if (channel.id === 'email') {
+      // Wire into the existing barryActions confirmation flow
+      const action = {
+        action_type: 'gmail_send',
+        parameters: {
+          to_email: channel.value,
+          to_name: msg.contact_profile?.name,
+          subject: recommended.subject,
+          body: recommended.message
+        },
+        confirmation_required: true,
+        summary: `Send "${recommended.subject}" to ${msg.contact_profile?.name} via email`
+      };
+      setPendingAction(action);
+      setMessages(prev => [...prev, { role: 'action_confirm', action, summary: action.summary }]);
+
+    } else if (channel.id === 'linkedin') {
+      setMessages(prev => [...prev, {
+        role: 'action_linkedin',
+        contactName: msg.contact_profile?.name,
+        linkedinUrl: channel.value,
+        message: recommended.message
+      }]);
+
+    } else if (channel.id === 'call') {
+      setMessages(prev => [...prev, {
+        role: 'action_call',
+        contactName: msg.contact_profile?.name,
+        phone: channel.value,
+        talkingPoints: recommended.message
+      }]);
+
+    } else if (channel.id === 'text') {
+      const sms = recommended.message.length > 160
+        ? recommended.message.slice(0, 157) + '...'
+        : recommended.message;
+      setMessages(prev => [...prev, {
+        role: 'action_text',
+        contactName: msg.contact_profile?.name,
+        phone: channel.value,
+        message: sms
+      }]);
+    }
+  }
+
   // ── Send message ──────────────────────────────────────────────────────────
 
   const sendMessage = async (text) => {
@@ -574,6 +652,7 @@ export default function BarryChatPanel({ userId }) {
           has_message_angles: !!data.has_message_angles,
           angles: data.angles || [],
           contact_id: data.contact_id || null,
+          contact_profile: data.contact_profile || null,
           intent: data.intent || null,
           step: data.step || null
         };
@@ -870,6 +949,87 @@ export default function BarryChatPanel({ userId }) {
                     );
                   }
 
+                  // ── LinkedIn send bubble ──
+                  if (msg.role === 'action_linkedin') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="flex flex-col gap-2 max-w-[88%]">
+                          <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                            <div className="text-xs text-gray-500 font-mono mb-2">💼 Send to {msg.contactName} on LinkedIn</div>
+                            <p className="text-gray-300 whitespace-pre-wrap text-xs leading-relaxed">{msg.message}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { navigator.clipboard.writeText(msg.message).catch(() => {}); }}
+                              className="px-3 py-1.5 text-xs font-mono bg-black/40 hover:bg-gray-700/40 border border-gray-700/50 text-gray-400 rounded-lg transition-all"
+                            >
+                              Copy message
+                            </button>
+                            <a
+                              href={msg.linkedinUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 text-xs font-mono bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg transition-all"
+                            >
+                              Open LinkedIn →
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Call bubble ──
+                  if (msg.role === 'action_call') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm max-w-[88%]">
+                          <div className="text-xs text-gray-500 font-mono mb-2">📞 Call {msg.contactName} — {msg.phone}</div>
+                          <div className="text-xs text-gray-400 mb-1 font-mono">Talking points:</div>
+                          <p className="text-gray-300 whitespace-pre-wrap text-xs leading-relaxed">{msg.talkingPoints}</p>
+                          <a
+                            href={`tel:${msg.phone}`}
+                            className="inline-block mt-3 px-3 py-1.5 text-xs font-mono bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg transition-all"
+                          >
+                            Dial {msg.phone} →
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Text bubble ──
+                  if (msg.role === 'action_text') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="flex flex-col gap-2 max-w-[88%]">
+                          <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                            <div className="text-xs text-gray-500 font-mono mb-2">💬 Text to {msg.contactName} — {msg.phone}</div>
+                            <p className="text-gray-300 whitespace-pre-wrap text-xs leading-relaxed">{msg.message}</p>
+                            <div className="text-xs text-gray-600 mt-1">{msg.message.length}/160 chars</div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { navigator.clipboard.writeText(msg.message).catch(() => {}); }}
+                              className="px-3 py-1.5 text-xs font-mono bg-black/40 hover:bg-gray-700/40 border border-gray-700/50 text-gray-400 rounded-lg transition-all"
+                            >
+                              Copy
+                            </button>
+                            <a
+                              href={`sms:${msg.phone}&body=${encodeURIComponent(msg.message)}`}
+                              className="px-3 py-1.5 text-xs font-mono bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 rounded-lg transition-all"
+                            >
+                              Open Messages →
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   if (msg.role === 'user') {
                     return (
                       <div key={i} className="flex gap-2 flex-row-reverse">
@@ -896,21 +1056,28 @@ export default function BarryChatPanel({ userId }) {
 
                         {/* Message angle block — shown when Barry generated 4 angles */}
                         {msg.has_message_angles && msg.angles && msg.angles.length > 0 && (
-                          <MessageAngleBlock
-                            angles={msg.angles}
-                            contactId={msg.contact_id}
-                            userId={userId}
-                            onLoaded={(result) => {
-                              if (result.success) {
-                                setMessages(prev => [...prev, {
-                                  role: 'assistant',
-                                  content: `Outreach saved to ${result.contactName}'s profile. Who's next?`,
-                                  has_message_angles: false,
-                                  angles: []
-                                }]);
-                              }
-                            }}
-                          />
+                          <>
+                            <MessageAngleBlock
+                              angles={msg.angles}
+                              contactId={msg.contact_id}
+                              userId={userId}
+                              onLoaded={(result) => {
+                                if (result.success) {
+                                  setMessages(prev => [...prev, {
+                                    role: 'assistant',
+                                    content: `Saved to ${result.contactName}'s profile. How do you want to send it?`,
+                                    has_message_angles: false,
+                                    angles: []
+                                  }]);
+                                }
+                              }}
+                            />
+                            {/* Channel selection — only shown when contact has reachable channels */}
+                            <ChannelRow
+                              contactProfile={msg.contact_profile}
+                              onSelect={(channel) => handleChannelSend(channel, msg)}
+                            />
+                          </>
                         )}
                       </div>
                     </div>

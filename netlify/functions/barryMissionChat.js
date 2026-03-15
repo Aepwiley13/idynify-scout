@@ -346,16 +346,24 @@ Classify the user's message into one of:
 2. CONFIRM — briefly restate what you understand + key context (step="confirm")
 3. EXECUTE — deliver output with clear options (step="execute")
 
+━━━ ENGAGEMENT FLOW (FOLLOW_UP / NEW_OUTREACH) ━━━
+When the user wants to reach out to a contact, you are their engagement partner — not a template machine.
+
+STEP 1 — INTAKE: If the contact isn't clear, ask. One question only.
+STEP 2 — CONFIRM: Before drafting, briefly state what you know about this contact (relationship state, last touch, anything relevant from RECON). One sentence. Then draft.
+STEP 3 — EXECUTE: Generate 4 angles. End response_text with a natural question about how they want to send it. Example: "I have her email and LinkedIn — which do you want to use?" (only mention channels that actually exist on the contact's profile — see contact_channels in the response).
+
 ━━━ MESSAGE GENERATION RULES ━━━
 When generating outreach (FOLLOW_UP or NEW_OUTREACH intents in execute step):
-- At least one specific detail from contact data or RECON per message
+- Pull at least one specific detail from contact data AND one from RECON data per message
+- Use the user's company name (${userCompanyName || 'their company'}) naturally — never invent a company name
 - Four angles: value_add / direct_ask / soft_reconnect / pattern_interrupt
 - Each angle genuinely different — not same message, different opener
 - One clear CTA per message — never two asks
 - Subject lines under 8 words, no clickbait
 - Under 120 words per message
 - Write in the user's voice, not Barry's
-- Include the contact's id in the response so the UI can wire Load into Hunter
+- Include the contact's id in the response
 
 ━━━ OUTPUT FORMAT ━━━
 Return ONLY valid JSON. No other text before or after.
@@ -766,6 +774,27 @@ Return valid JSON only:
       const updatedMode = detectModeShift(contextStack, parsed.intent, effectiveMode);
       parsed.barry_mode = updatedMode;
 
+      // Load full contact profile for channel selection when angles are generated
+      let contactProfile = null;
+      if (parsed.contact_id && parsed.has_message_angles) {
+        try {
+          const contactSnap = await db.collection('users').doc(userId)
+            .collection('contacts').doc(parsed.contact_id).get();
+          if (contactSnap.exists) {
+            const c = contactSnap.data();
+            contactProfile = {
+              name: c.name || c.first_name || null,
+              email: c.email || null,
+              phone: c.phone || c.mobile || null,
+              linkedin_url: c.linkedin_url || c.linkedin || null,
+              company: c.company || null
+            };
+          }
+        } catch (err) {
+          console.warn('[barryMissionChat] Contact profile load skipped:', err.message);
+        }
+      }
+
       // Append to history for next call
       const updatedHistory = [
         ...messages,
@@ -790,6 +819,7 @@ Return valid JSON only:
           // Legacy field
           response: parsed.response_text,
           updatedHistory,
+          contact_profile: contactProfile,
           // Structured fields
           ...parsed
         })

@@ -155,6 +155,13 @@ export default function BarryChatPanel({ userId }) {
   useEffect(() => { conversationHistoryRef.current = conversationHistory; }, [conversationHistory]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
+  // Reset textarea height after message is sent
+  useEffect(() => {
+    if (!inputValue && inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, [inputValue]);
+
   // ── On mount: build context stack + load opening brief ────────────────────
 
   useEffect(() => {
@@ -930,16 +937,21 @@ export default function BarryChatPanel({ userId }) {
           {/* Input Area */}
           <div className="px-5 py-4 border-t border-cyan-500/10">
             <div className="flex gap-2">
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                rows={1}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Tell me what you want to work on..."
                 disabled={sending || loading}
                 aria-label="Message Barry"
-                className="flex-1 min-w-0 bg-black/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50 font-mono"
+                style={{ resize: 'none', overflowY: 'auto' }}
+                className="flex-1 min-w-0 bg-black/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50 font-mono leading-relaxed"
               />
               <button
                 onClick={() => sendMessage(inputValue)}

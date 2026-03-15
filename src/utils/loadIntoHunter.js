@@ -67,7 +67,12 @@ async function createMissionFromChat({ contactId, contactData, subject, message,
     hunter_status: 'active_mission',
     active_mission_id: missionRef.id,
     engaged_at: now,
-    updated_at: now
+    updated_at: now,
+    last_outreach_subject: subject || '',
+    last_outreach_draft: message || '',
+    last_outreach_angle: angleId || null,
+    last_outreach_source: 'mission_control',
+    last_outreach_loaded_at: now
   });
 
   return { success: true, created: true, missionId: missionRef.id, contactName };
@@ -103,7 +108,15 @@ export async function loadIntoHunter({ contactId, subject, message, angleId, use
 
     // Path A — write draft_override to the current mission step
     const missionDoc = await getDoc(doc(db, 'users', userId, 'missions', missionId));
-    if (!missionDoc.exists()) return { success: false, error: 'Mission not found', contactName };
+    if (!missionDoc.exists()) {
+      // Stale active_mission_id — clear it and create a fresh mission instead
+      await updateDoc(doc(db, 'users', userId, 'contacts', contactId), {
+        active_mission_id: null,
+        hunter_status: 'none',
+        updated_at: new Date().toISOString()
+      });
+      return createMissionFromChat({ contactId, contactData: contact, subject, message, angleId, userId });
+    }
 
     const mission = missionDoc.data();
     const stepIdx = (mission.steps || []).findIndex(s => s.status === 'current');
@@ -120,6 +133,16 @@ export async function loadIntoHunter({ contactId, subject, message, angleId, use
     updatePath['updated_at'] = new Date().toISOString();
 
     await updateDoc(doc(db, 'users', userId, 'missions', missionId), updatePath);
+
+    // Keep contact profile in sync with the latest draft
+    await updateDoc(doc(db, 'users', userId, 'contacts', contactId), {
+      last_outreach_subject: subject || '',
+      last_outreach_draft: message || '',
+      last_outreach_angle: angleId || null,
+      last_outreach_source: 'mission_control',
+      last_outreach_loaded_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
 
     return { success: true, missionId, stepIdx: activeStepIdx, contactName };
 

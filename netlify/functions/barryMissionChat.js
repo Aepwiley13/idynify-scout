@@ -276,9 +276,18 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
     return `  Mission for ${contact?.name || m.contactId}: goal=${m.outcome_goal}, step ${m.current_step}/${m.steps_total}, last_outcome=${m.last_outcome || 'none'}`;
   }).join('\n');
 
+  // Extract user's company name from compiled RECON context so Barry never guesses
+  let userCompanyName = null;
+  if (reconContext) {
+    const match = reconContext.match(/- Company:\s*(.+)/);
+    if (match) userCompanyName = match[1].trim();
+  }
+
   return `You are Barry, Idynify's AI sales intelligence assistant operating in Mission Control.
 
 You are not a suggestion widget. You are the best analyst, strategist, and writing partner the user has ever had — and you know everything about their contacts, their ICP, their past messages, and their pipeline.
+
+IMPORTANT — USER'S COMPANY: ${userCompanyName ? `The user's company is "${userCompanyName}". Always use this exact name when drafting messages or referring to their business. Never invent or substitute another company name.` : 'Company name not yet configured — user should complete RECON training (Section 1). Do NOT invent a company name.'}
 
 Your vibe: calm confidence, zero fluff, maximum usefulness. You talk like a smart colleague who has already done the research. You ask one question at a time when you need to. You confirm before you act. You offer options, not commands.
 
@@ -303,7 +312,7 @@ ${missionSummary || 'No active missions.'}
 ${recon.pain_points ? `Pain points: ${recon.pain_points}` : 'Pain points: not set'}
 ${recon.icp ? `ICP snapshot: ${recon.icp}` : 'ICP snapshot: not set'}
 ${recon.value_proposition ? `Value prop: ${recon.value_proposition}` : 'Value prop: not set'}
-${reconContext ? reconContext.slice(0, 800) : ''}
+${reconContext ? reconContext.slice(0, 2000) : ''}
 
 ━━━ ICP PROFILE (configured settings) ━━━
 ${icpBlock}

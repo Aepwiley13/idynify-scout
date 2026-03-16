@@ -1,5 +1,5 @@
 /**
- * PeopleMain.jsx — Two-column nav shell for the Command Center / People module.
+ * PeopleMain.jsx — Two-column nav shell for the Command Center module.
  *
  * Architecture:
  *  ┌─────────────────────────────────────────────────────────┐
@@ -8,15 +8,20 @@
  *
  * This component is self-contained — it does NOT use MainLayout.
  * The App.jsx /people route must NOT use withLayout={true}.
+ *
+ * Command Center = strategy and setup hub.
+ * Sections: Missions, People, Companies, Weapons, Arsenal, Outcomes
  */
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { auth } from '../../firebase/config';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db, auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield, Users, Building2,
+  Zap, Archive, BarChart3,
   Palette, Check, ChevronLeft, ChevronRight, Home,
-  Settings as SettingsIcon,
+  Settings as SettingsIcon, Plus,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -24,9 +29,13 @@ import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
 import AllLeads from './AllLeads';
 import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
+import MissionsSection from '../Hunter/sections/MissionsSection';
+import WeaponsSection from '../Hunter/sections/WeaponsSection';
+import ArsenalSection from '../Hunter/sections/ArsenalSection';
+import OutcomesSection from '../Hunter/sections/OutcomesSection';
 
-// People/Command Center accent color
-const PEOPLE_CYAN = BRAND.cyan;
+// Command Center accent color
+const CC_CYAN = BRAND.cyan;
 
 // Orange token for settings accent
 const SETTINGS_ORANGE = '#faaa20';
@@ -91,7 +100,7 @@ function ThemePicker() {
           justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s',
         }}
       >
-        <Palette size={16} color={PEOPLE_CYAN} />
+        <Palette size={16} color={CC_CYAN} />
       </div>
       {open && (
         <div
@@ -126,12 +135,12 @@ function ThemePicker() {
                 background: theme.swatchBg, border: `1px solid ${T.border2}`, flexShrink: 0,
               }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: themeId === theme.id ? PEOPLE_CYAN : T.text }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: themeId === theme.id ? CC_CYAN : T.text }}>
                   {theme.label}
                 </div>
                 <div style={{ fontSize: 10, color: T.textFaint }}>{theme.icon}</div>
               </div>
-              {themeId === theme.id && <Check size={14} color={PEOPLE_CYAN} />}
+              {themeId === theme.id && <Check size={14} color={CC_CYAN} />}
             </div>
           ))}
         </div>
@@ -141,7 +150,7 @@ function ThemePicker() {
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
-function Av({ initials, color = PEOPLE_CYAN, size = 24 }) {
+function Av({ initials, color = CC_CYAN, size = 24 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -154,27 +163,81 @@ function Av({ initials, color = PEOPLE_CYAN, size = 24 }) {
   );
 }
 
-// ─── AllCompaniesSection — delegates to the shared consistent view ────────────
-function AllCompaniesSection() {
-  return <SharedCompaniesView mode="all" />;
-}
-
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
-  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: null      }, // active module
-  { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
-  { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
-  { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
-  { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'basecamp', label: 'BASECAMP',       Icon: Tent,      route: '/basecamp' },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users,     route: null       }, // active module
+  { id: 'scout',    label: 'SCOUT',          Icon: Radar,     route: '/scout'   },
+  { id: 'hunter',   label: 'HUNTER',         Icon: Crosshair, route: '/hunter'  },
+  { id: 'recon',    label: 'RECON',          Icon: Eye,       route: '/recon'   },
+  { id: 'sniper',   label: 'SNIPER',         Icon: Target,    route: '/sniper'  },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: '/reinforcements' },
 ];
 
-// ─── People sub-nav items ─────────────────────────────────────────────────────
-const PEOPLE_ITEMS = [
-  { id: 'all',       label: 'All People',     Icon: Users,     desc: 'Every relationship — one place.' },
-  { id: 'companies', label: 'All Companies',  Icon: Building2, desc: 'Scout, Hunter & Sniper companies.' },
+// ─── Command Center sub-nav items ─────────────────────────────────────────────
+const CC_ITEMS = [
+  { id: 'missions',  label: 'Missions',       Icon: Zap,       desc: 'Create and manage campaigns'      },
+  { id: 'people',    label: 'People',         Icon: Users,     desc: 'Full contacts roster — all view'  },
+  { id: 'companies', label: 'Companies',      Icon: Building2, desc: 'Full accounts roster — all view'  },
+  { id: 'weapons',   label: 'Weapons',        Icon: Crosshair, desc: 'Channel selector, message builder' },
+  { id: 'arsenal',   label: 'Arsenal',        Icon: Archive,   desc: 'Saved message templates library'  },
+  { id: 'outcomes',  label: 'Outcomes',       Icon: BarChart3, desc: 'Mission performance analytics'    },
 ];
+
+// ─── Tab → URL param mapping ──────────────────────────────────────────────────
+const TAB_MAP = {
+  missions:  'missions',
+  people:    'people',
+  companies: 'companies',
+  weapons:   'weapons',
+  arsenal:   'arsenal',
+  outcomes:  'outcomes',
+};
+
+// ─── Empty Missions CTA ───────────────────────────────────────────────────────
+function EmptyMissionsCTA({ navigate, T }) {
+  return (
+    <div style={{
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 40, zIndex: 1, position: 'relative',
+    }}>
+      <div style={{
+        maxWidth: 400, textAlign: 'center',
+        background: T.cardBg, border: `1px solid ${T.border2}`,
+        borderRadius: 18, padding: '36px 32px',
+        boxShadow: `0 8px 32px ${T.isDark ? '#00000040' : '#00000010'}`,
+      }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: 16,
+          background: `${CC_CYAN}18`, border: `1px solid ${CC_CYAN}40`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px',
+        }}>
+          <Zap size={26} color={CC_CYAN} />
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+          Start your first mission
+        </div>
+        <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.6, marginBottom: 24 }}>
+          Build your mission, assign people and companies, choose your weapons, and set sequences — all from Command Center.
+        </div>
+        <button
+          onClick={() => navigate('/hunter/create-mission')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '11px 22px', borderRadius: 10, border: 'none',
+            background: CC_CYAN, color: '#000',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            boxShadow: `0 4px 16px ${CC_CYAN}40`,
+          }}
+        >
+          <Plus size={16} />
+          Create Mission
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── PeopleShellInner ─────────────────────────────────────────────────────────
 function PeopleShellInner({ user }) {
@@ -182,6 +245,7 @@ function PeopleShellInner({ user }) {
   const { themeId } = useThemeCtx();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const mql = window.matchMedia('(max-width: 768px)');
   const [isMobile, setIsMobile] = useState(() => mql.matches);
@@ -193,9 +257,105 @@ function PeopleShellInner({ user }) {
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('people_subnav_collapsed') !== 'true');
-  const [activeSection, setActiveSection] = useState(() => localStorage.getItem('people_active_section') || 'all');
+
+  // Resolve active section from URL param or legacy localStorage
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || null;
+  const initialSection = (tabParam && TAB_MAP[tabParam]) || 'missions';
+  const [activeSection, setActiveSection] = useState(initialSection);
+
+  // Sync section when URL params change
+  useEffect(() => {
+    const tab = searchParams.get('tab') || location.state?.activeTab;
+    if (tab && TAB_MAP[tab]) setActiveSection(TAB_MAP[tab]);
+    else if (!tab) setActiveSection('missions');
+  }, [searchParams, location.state?.activeTab]);
+
+  const switchSection = (sectionId) => {
+    setActiveSection(sectionId);
+    setSearchParams({ tab: sectionId }, { replace: true });
+  };
+
+  // Missions and campaigns data (needed for MissionsSection, OutcomesSection, and empty state)
+  const [missions, setMissions] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+  const [missionsLoading, setMissionsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        if (!user?.uid) return;
+        const uid = user.uid;
+
+        const missionsSnap = await getDocs(query(
+          collection(db, 'users', uid, 'missions'),
+          orderBy('createdAt', 'desc')
+        ));
+        setMissions(missionsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        const campaignsSnap = await getDocs(query(
+          collection(db, 'users', uid, 'campaigns'),
+          orderBy('createdAt', 'desc')
+        ));
+        setCampaigns(campaignsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error('Error loading Command Center data:', err);
+      } finally {
+        setMissionsLoading(false);
+      }
+    }
+    loadData();
+  }, [user?.uid]);
+
+  const activeMissionsCount = missions.filter(m => m.status === 'autopilot' || m.status === 'draft').length;
+  const hasActiveMissions = activeMissionsCount > 0;
 
   const userInitials = (user?.email || 'CC').slice(0, 2).toUpperCase();
+
+  const renderMain = () => {
+    switch (activeSection) {
+      case 'missions':
+        if (!missionsLoading && !hasActiveMissions) {
+          return <EmptyMissionsCTA navigate={navigate} T={T} />;
+        }
+        return (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <MissionsSection missions={missions} loading={missionsLoading} />
+          </div>
+        );
+      case 'people':
+        return (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <AllLeads mode="people" />
+          </div>
+        );
+      case 'companies':
+        return (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <SharedCompaniesView mode="all" />
+          </div>
+        );
+      case 'weapons':
+        return (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <WeaponsSection />
+          </div>
+        );
+      case 'arsenal':
+        return (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <ArsenalSection />
+          </div>
+        );
+      case 'outcomes':
+        return (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <OutcomesSection campaigns={campaigns} missions={missions} />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
   if (isMobile) {
@@ -257,31 +417,37 @@ function PeopleShellInner({ user }) {
             </div>
           </div>
 
-          {/* Row 2: section tabs — People | Companies */}
-          <div style={{ display: 'flex', gap: 0, padding: '0 14px 8px' }}>
-            {[
-              { id: 'all',       label: 'All People' },
-              { id: 'companies', label: 'Companies'  },
-            ].map(tab => {
-              const active = activeSection === tab.id;
+          {/* Row 2: section tabs */}
+          <div style={{ display: 'flex', overflowX: 'auto', gap: 0, padding: '0 14px 8px' }}>
+            {CC_ITEMS.map(item => {
+              const active = activeSection === item.id;
               return (
                 <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveSection(tab.id);
-                    localStorage.setItem('people_active_section', tab.id);
-                  }}
+                  key={item.id}
+                  onClick={() => switchSection(item.id)}
                   style={{
-                    flex: 1, padding: '7px 0', border: 'none', borderRadius: 8,
-                    background: active ? `${PEOPLE_CYAN}18` : 'transparent',
-                    color: active ? PEOPLE_CYAN : T.textFaint,
+                    flexShrink: 0, padding: '7px 12px', border: 'none', borderRadius: 8,
+                    background: active ? `${CC_CYAN}18` : 'transparent',
+                    color: active ? CC_CYAN : T.textFaint,
                     fontSize: 12, fontWeight: active ? 700 : 500,
                     cursor: 'pointer', transition: 'all 0.15s',
-                    borderBottom: active ? `2px solid ${PEOPLE_CYAN}` : '2px solid transparent',
+                    borderBottom: active ? `2px solid ${CC_CYAN}` : '2px solid transparent',
                     fontFamily: 'Inter, system-ui, sans-serif',
+                    display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
                   }}
                 >
-                  {tab.label}
+                  <item.Icon size={12} />
+                  {item.label}
+                  {item.id === 'missions' && activeMissionsCount > 0 && (
+                    <span style={{
+                      minWidth: 14, height: 14, borderRadius: 7,
+                      background: CC_CYAN, color: '#000',
+                      fontSize: 8, fontWeight: 700, padding: '0 3px',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {activeMissionsCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -290,7 +456,7 @@ function PeopleShellInner({ user }) {
 
         {/* Mobile main content — paddingBottom leaves room for BottomNav */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
-          {activeSection === 'companies' ? <AllCompaniesSection /> : <AllLeads mode="people" />}
+          {renderMain()}
         </div>
 
         {/* Cross-module bottom nav */}
@@ -372,8 +538,8 @@ function PeopleShellInner({ user }) {
               onMouseEnter={e => { if (!active && mod.route) e.currentTarget.style.background = T.surface; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
-              <mod.Icon size={14} color={active ? PEOPLE_CYAN : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? PEOPLE_CYAN : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
+              <mod.Icon size={14} color={active ? CC_CYAN : T.textFaint} />
+              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? CC_CYAN : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
                 {mod.label}
               </span>
             </div>
@@ -392,7 +558,7 @@ function PeopleShellInner({ user }) {
               cursor: 'pointer', gap: 1, transition: 'all 0.15s',
               background: 'transparent', border: '1px solid transparent',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${PEOPLE_CYAN}40`; }}
+            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${CC_CYAN}40`; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
           >
             <Home size={14} color={T.textFaint} />
@@ -443,10 +609,10 @@ function PeopleShellInner({ user }) {
             flexShrink: 0,
           }}>
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: PEOPLE_CYAN, fontWeight: 700, marginBottom: 1 }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: CC_CYAN, fontWeight: 700, marginBottom: 1 }}>
                 COMMAND CENTER
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{PEOPLE_ITEMS.length} views</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('people_subnav_collapsed', 'true'); }}
@@ -464,33 +630,45 @@ function PeopleShellInner({ user }) {
 
           {/* Sub-nav items */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
-            {PEOPLE_ITEMS.map(it => {
+            {CC_ITEMS.map(it => {
               const active = activeSection === it.id;
               return (
                 <div
                   key={it.id}
-                  onClick={() => { setActiveSection(it.id); localStorage.setItem('people_active_section', it.id); }}
+                  onClick={() => switchSection(it.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 8, marginBottom: 1, cursor: 'pointer',
                     background: active ? T.accentBg : 'transparent',
-                    borderLeft: `2px solid ${active ? PEOPLE_CYAN : 'transparent'}`,
-                    transition: 'all 0.12s',
+                    borderLeft: `2px solid ${active ? CC_CYAN : 'transparent'}`,
+                    transition: 'all 0.12s', position: 'relative',
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <it.Icon size={13} color={active ? PEOPLE_CYAN : T.textFaint} style={{ flexShrink: 0 }} />
+                  <it.Icon size={13} color={active ? CC_CYAN : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? PEOPLE_CYAN : T.textMuted,
+                      color: active ? CC_CYAN : T.textMuted,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.label}
                     </div>
                     <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{it.desc}</div>
                   </div>
+                  {/* Badge for missions count */}
+                  {it.id === 'missions' && activeMissionsCount > 0 && (
+                    <span style={{
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      background: CC_CYAN, color: '#000',
+                      fontSize: 9, fontWeight: 700, padding: '0 4px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      {activeMissionsCount}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -501,7 +679,7 @@ function PeopleShellInner({ user }) {
             padding: '9px 11px', borderTop: `1px solid ${T.border}`,
             display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
           }}>
-            <Av initials={userInitials} color={PEOPLE_CYAN} size={24} />
+            <Av initials={userInitials} color={CC_CYAN} size={24} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.email || 'user@idynify.com'}
@@ -537,7 +715,7 @@ function PeopleShellInner({ user }) {
         overflow: 'hidden', position: 'relative', zIndex: 1,
         transition: 'background 0.25s',
       }}>
-        {activeSection === 'companies' ? <AllCompaniesSection /> : <AllLeads mode="people" />}
+        {renderMain()}
       </div>
     </div>
   );

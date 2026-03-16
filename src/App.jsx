@@ -389,14 +389,29 @@ function App() {
           <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
         </Route>
 
-        {/* People — top-level canonical hub, self-contained shell (no MainLayout) */}
+        {/* Command Center — strategy & setup hub, self-contained shell (no MainLayout) */}
+        {/* Primary URL: /command-center — /people remains for backward compatibility */}
         <Route
-          path="/people"
+          path="/command-center"
           element={
             <ProtectedRoute>
               <PeopleMain />
             </ProtectedRoute>
           }
+        />
+
+        {/* Redirect old /hunter/* setup routes → /command-center with matching tab */}
+        <Route path="/hunter/missions"  element={<Navigate to="/command-center?tab=missions"  replace />} />
+        <Route path="/hunter/weapons"   element={<Navigate to="/command-center?tab=weapons"   replace />} />
+        <Route path="/hunter/arsenal"   element={<Navigate to="/command-center?tab=arsenal"   replace />} />
+        <Route path="/hunter/outcomes"  element={<Navigate to="/command-center?tab=outcomes"  replace />} />
+        <Route path="/hunter/companies" element={<Navigate to="/command-center?tab=companies" replace />} />
+        <Route path="/hunter/people"    element={<Navigate to="/command-center?tab=people"    replace />} />
+
+        {/* Backward compat: /people → /command-center */}
+        <Route
+          path="/people"
+          element={<Navigate to="/command-center" replace />}
         />
 
         {/* Scout Module — self-contained two-column shell (no MainLayout) */}

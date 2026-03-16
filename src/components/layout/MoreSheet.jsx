@@ -54,7 +54,7 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
             <Shield size={22} />
             <span>Reinforcements</span>
           </button>
-          <button className="more-sheet-item" onClick={() => go('/people')}>
+          <button className="more-sheet-item" onClick={() => go('/command-center')}>
             <Users size={22} />
             <span>Command Center</span>
           </button>

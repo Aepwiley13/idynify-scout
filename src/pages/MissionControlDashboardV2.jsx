@@ -284,7 +284,7 @@ export default function MissionControlDashboardV2() {
             {/* Module Quick-Nav Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               {[
-                { label: 'COMMAND CENTER',  icon: <CommandCenterIcon size="sm" />,   path: '/people',              color: 'cyan'   },
+                { label: 'COMMAND CENTER',  icon: <CommandCenterIcon size="sm" />,   path: '/command-center',              color: 'cyan'   },
                 { label: 'RECON',           icon: <ReconIcon size="sm" />,           path: '/recon',               color: 'purple' },
                 { label: 'SCOUT',           icon: <ScoutIcon size="sm" />,           path: '/scout?tab=all-leads', color: 'cyan'   },
                 { label: 'HUNTER',          icon: <HunterIcon size="sm" />,          path: '/hunter',              color: 'pink'   },

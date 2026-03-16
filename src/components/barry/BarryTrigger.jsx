@@ -17,14 +17,15 @@ import { useBarryContext } from '../../context/barryContextStore';
 
 // Route → module mapping
 const ROUTE_MODULE_MAP = [
-  { prefix: '/recon',           module: 'recon'           },
-  { prefix: '/scout',           module: 'scout'           },
-  { prefix: '/hunter',          module: 'hunter'          },
-  { prefix: '/sniper',          module: 'sniper'          },
-  { prefix: '/people',          module: 'command-center'  },
-  { prefix: '/basecamp',        module: 'homebase'        },
-  { prefix: '/reinforcements',  module: 'reinforcements'  },
-  { prefix: '/fallback',        module: 'fallback'        },
+  { prefix: '/recon',            module: 'recon'           },
+  { prefix: '/scout',            module: 'scout'           },
+  { prefix: '/hunter',           module: 'hunter'          },
+  { prefix: '/sniper',           module: 'sniper'          },
+  { prefix: '/command-center',   module: 'command-center'  },
+  { prefix: '/people',           module: 'command-center'  },
+  { prefix: '/basecamp',         module: 'homebase'        },
+  { prefix: '/reinforcements',   module: 'reinforcements'  },
+  { prefix: '/fallback',         module: 'fallback'        },
 ];
 
 // Routes where BarryTrigger is hidden

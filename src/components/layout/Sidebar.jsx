@@ -82,9 +82,9 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const peopleItems = [
     {
       icon: Users,
-      label: 'All People',
+      label: 'Command Center',
       sublabel: 'Overview',
-      path: '/people',
+      path: '/command-center',
       isPrimary: true
     }
   ];
@@ -291,7 +291,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     const IconComponent = icon;
     const isExpanded = expandedSections[id];
     const pillarActive =
-      id === 'people'         ? isPathActive('/people') :
+      id === 'people'         ? isPathActive('/command-center') || isPathActive('/people') :
       id === 'recon'          ? isPathActive('/recon') :
       id === 'scout'          ? isPathActive('/scout') :
       id === 'hunter'         ? isPathActive('/hunter') :

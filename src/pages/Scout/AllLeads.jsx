@@ -948,7 +948,7 @@ function ContactProfileView({ contactId, onBack }) {
 // mode: 'people' (all contacts, context-aware CTA)
 //       'scout'  (unengaged only, always pink Engage)
 //       'hunter' (active_mission only, purple Follow Up + Return to Scout)
-export default function AllLeads({ mode = 'people' }) {
+export default function AllLeads({ mode = 'people', activeFilter = null }) {
   const T = useT();
   const navigate = useNavigate();
   const impersonatedUserId = useActiveUserId();
@@ -974,7 +974,14 @@ export default function AllLeads({ mode = 'people' }) {
 
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
-  const [actionFilter, setActionFilter] = useState(mode === 'scout' ? 'new' : 'today'); // action-oriented lens
+  const [actionFilter, setActionFilter] = useState(
+    activeFilter || (mode === 'scout' ? 'new' : 'today')
+  ); // action-oriented lens
+
+  // Sync actionFilter when activeFilter prop changes (controlled from parent)
+  useEffect(() => {
+    if (activeFilter) setActionFilter(activeFilter);
+  }, [activeFilter]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
   const [tagFilter, setTagFilter] = useState(null); // selected tag string or null

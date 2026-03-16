@@ -166,7 +166,7 @@ function Av({ initials, color = REINFORCEMENTS_AMBER, size = 24 }) {
 const MODULE_RAIL = [
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: null }, // active module
   { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
-  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/people'   },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/command-center'   },
   { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
   { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
   { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },

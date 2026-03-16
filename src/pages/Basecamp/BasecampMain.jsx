@@ -158,7 +158,7 @@ function Av({ initials, color = BASECAMP_GREEN, size = 24 }) {
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
   { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: null      }, // active module
-  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/people' },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/command-center' },
   { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
   { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
   { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },

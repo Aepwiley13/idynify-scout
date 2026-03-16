@@ -157,7 +157,7 @@ const SETTINGS_ORANGE = '#faaa20';
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
   { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
-  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/people'  },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/command-center'  },
   { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'   },
   { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter'  },
   { id: 'recon',    label: 'RECON',  Icon: Eye,       route: null       }, // active module

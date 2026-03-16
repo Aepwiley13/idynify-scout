@@ -23,7 +23,7 @@ const NAV_ITEMS = [
     label: 'Hunter',
     icon: Target,
     path: '/hunter',
-    search: '?tab=dashboard',
+    search: '?tab=today',
   },
   {
     id: 'sniper',

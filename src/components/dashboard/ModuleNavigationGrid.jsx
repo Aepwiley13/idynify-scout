@@ -38,7 +38,7 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
       bgGradient: 'from-cyan-500/10 to-blue-600/5',
       icon: <CommandCenterIcon />,
       btnLabel: 'Enter Command Center →',
-      onClick: () => onNavigate('/people'),
+      onClick: () => onNavigate('/command-center'),
     },
     {
       id: 'recon',

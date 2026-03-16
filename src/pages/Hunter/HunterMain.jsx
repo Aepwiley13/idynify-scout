@@ -1,5 +1,5 @@
 /**
- * HunterMain.jsx — Two-column nav shell for the Hunter module.
+ * HunterMain.jsx — Two-column nav shell for the Hunter module (execution only).
  *
  * Architecture:
  *  ┌─────────────────────────────────────────────────────────┐
@@ -9,29 +9,24 @@
  * This component is self-contained — it does NOT use MainLayout.
  * The App.jsx /hunter route must NOT use withLayout={true}.
  *
+ * Hunter = pure execution. Strategy/setup lives in Command Center (/people).
+ *
  * Top-left logo mark = Mission Control button.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../../firebase/config';
+import { auth } from '../../firebase/config';
 import { useActiveUser, useImpersonation } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield,
-  LayoutDashboard, Zap, Archive, BarChart3, Users, Building2,
+  Users, CalendarCheck, AlertTriangle, Inbox, Zap, Sparkles,
   Palette, Check, ChevronLeft, ChevronRight,
-  Mail, CheckCircle, Settings as SettingsIcon, Home,
+  Settings as SettingsIcon, Home,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
-import DashboardSection from './sections/DashboardSection';
-import WeaponsSection from './sections/WeaponsSection';
-import MissionsSection from './sections/MissionsSection';
-import ArsenalSection from './sections/ArsenalSection';
-import OutcomesSection from './sections/OutcomesSection';
-import CompaniesSection from './sections/CompaniesSection';
 import AllLeads from '../Scout/AllLeads';
 
 // ─── Particles ───────────────────────────────────────────────────────────────
@@ -158,24 +153,24 @@ function Av({ initials, color = BRAND.purple, size = 24 }) {
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
-  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/people' },
-  { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
-  { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: null      }, // active module
-  { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
-  { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'basecamp', label: 'BASECAMP',       Icon: Tent,      route: '/basecamp' },
+  { id: 'people',   label: 'COMMAND CENTER', Icon: Users,     route: '/command-center'  },
+  { id: 'scout',    label: 'SCOUT',          Icon: Radar,     route: '/scout'   },
+  { id: 'hunter',   label: 'HUNTER',         Icon: Crosshair, route: null       }, // active module
+  { id: 'recon',    label: 'RECON',          Icon: Eye,       route: '/recon'   },
+  { id: 'sniper',   label: 'SNIPER',         Icon: Target,    route: '/sniper'  },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: '/reinforcements' },
 ];
 
-// ─── Hunter sub-nav items ─────────────────────────────────────────────────────
+// ─── Hunter execution sub-nav items ──────────────────────────────────────────
+// These mirror the ACTION_LENSES in AllLeads for execution-focused workflow.
 const HUNTER_ITEMS = [
-  { id: 'companies', label: 'Companies', Icon: Building2,       desc: 'Engaged companies'  },
-  { id: 'people',    label: 'People',    Icon: Users,           desc: 'Your contacts'      },
-  { id: 'weapons',   label: 'Weapons',   Icon: Crosshair,       desc: 'Build messages'     },
-  { id: 'missions',  label: 'Missions',  Icon: Zap,             desc: 'Active campaigns'   },
-  { id: 'arsenal',   label: 'Arsenal',   Icon: Archive,         desc: 'Templates library'  },
-  { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, desc: 'Operational clarity' },
-  { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,       desc: 'Analytics'          },
+  { id: 'today',    label: "Today's Actions", Icon: CalendarCheck,  desc: 'Due follow-ups & priority contacts', filter: 'today'        },
+  { id: 'followup', label: 'Follow Up Now',   Icon: AlertTriangle,  desc: 'Overdue engagement queue',          filter: 'follow_up_due' },
+  { id: 'replied',  label: 'Replied',         Icon: Inbox,          desc: 'Contacts who have responded',       filter: 'replied'       },
+  { id: 'active',   label: 'Active',          Icon: Zap,            desc: 'Currently in a sequence',           filter: 'in_mission'    },
+  { id: 'new',      label: 'New (Unengaged)', Icon: Sparkles,       desc: 'Fresh contacts, not yet touched',   filter: 'new'           },
+  { id: 'all',      label: 'All People',      Icon: Users,          desc: 'Engagement card feed — work your board', filter: 'all'   },
 ];
 
 // Orange token for settings accent
@@ -183,13 +178,12 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
 const TAB_MAP = {
-  'companies': 'companies',
-  'dashboard': 'dashboard',
-  'weapons':   'weapons',
-  'missions':  'missions',
-  'arsenal':   'arsenal',
-  'outcomes':  'outcomes',
-  'people':    'people',
+  today:    'today',
+  followup: 'followup',
+  replied:  'replied',
+  active:   'active',
+  new:      'new',
+  all:      'all',
 };
 
 // ─── HunterShellInner ─────────────────────────────────────────────────────────
@@ -211,24 +205,17 @@ function HunterShellInner({ user }) {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   // Resolve active tab from URL
-  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'dashboard';
-  const initialTab = TAB_MAP[tabParam] || 'dashboard';
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'today';
+  const initialTab = TAB_MAP[tabParam] || 'today';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('hunter_subnav_collapsed') !== 'true');
-
-  // Data state
-  const [missions, setMissions] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [gmailEmail, setGmailEmail] = useState('');
 
   // Sync tab when URL params change
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
     if (tab && TAB_MAP[tab]) setActiveTab(TAB_MAP[tab]);
-    else if (!tab) setActiveTab('dashboard');
+    else if (!tab) setActiveTab('today');
   }, [searchParams, location.state?.activeTab]);
 
   const switchTab = (tabId) => {
@@ -236,123 +223,18 @@ function HunterShellInner({ user }) {
     setSearchParams({ tab: tabId }, { replace: true });
   };
 
-  // Load Hunter data — uses user.uid which respects impersonation
-  useEffect(() => {
-    async function loadData() {
-      try {
-        if (!user?.uid) { navigate('/login'); return; }
-        const uid = user.uid;
-
-        const gmailDoc = await getDoc(doc(db, 'users', uid, 'integrations', 'gmail'));
-        if (gmailDoc.exists()) {
-          const d = gmailDoc.data();
-          setGmailConnected(d.status === 'connected');
-          setGmailEmail(d.email || '');
-        }
-
-        const missionsSnap = await getDocs(query(
-          collection(db, 'users', uid, 'missions'),
-          orderBy('createdAt', 'desc')
-        ));
-        setMissions(missionsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        const campaignsSnap = await getDocs(query(
-          collection(db, 'users', uid, 'campaigns'),
-          orderBy('createdAt', 'desc')
-        ));
-        setCampaigns(campaignsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (err) {
-        console.error('Error loading Hunter data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, [user?.uid, navigate]);
-
-  async function handleConnectGmail() {
-    const currentUser = auth.currentUser;
-    const authToken = await currentUser.getIdToken();
-    const response = await fetch('/.netlify/functions/gmail-oauth-init', {
-      method: 'POST',
-      body: JSON.stringify({ userId: currentUser.uid, authToken }),
-    });
-    const data = await response.json();
-    window.location.href = data.authUrl;
-  }
-
-  const activeMissionsCount = missions.filter(m => m.status === 'autopilot' || m.status === 'draft').length;
   const userInitials = (user?.email || 'HU').slice(0, 2).toUpperCase();
 
-  const renderMain = () => {
-    if (loading) {
-      return (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-          <div style={{ textAlign: 'center', color: T.textFaint }}>
-            <Crosshair size={32} color={BRAND.purple} style={{ marginBottom: 10, opacity: 0.6 }} />
-            <div style={{ fontSize: 12, color: T.textMuted }}>Loading Hunter...</div>
-          </div>
-        </div>
-      );
-    }
+  const activeItem = HUNTER_ITEMS.find(i => i.id === activeTab) || HUNTER_ITEMS[0];
+  const activeFilter = activeItem.filter;
 
-    return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
-        {/* Gmail notice — shown only in Weapons tab */}
-        {activeTab === 'weapons' && !gmailConnected && (
-          <div style={{
-            margin: '16px 20px 0',
-            padding: '12px 16px',
-            background: T.accentBg,
-            border: `1px solid ${T.accentBdr}`,
-            borderRadius: 10,
-            display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-          }}>
-            <Mail size={18} color={BRAND.purple} style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Connect Gmail to Send Emails</div>
-              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>
-                Hunter sends emails directly from your Gmail account.
-              </div>
-            </div>
-            <button
-              onClick={handleConnectGmail}
-              style={{
-                padding: '6px 14px', borderRadius: 7, border: 'none',
-                background: BRAND.purple, color: '#fff', fontSize: 12, fontWeight: 600,
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              Connect Gmail
-            </button>
-          </div>
-        )}
-        {activeTab === 'weapons' && gmailConnected && (
-          <div style={{
-            margin: '16px 20px 0',
-            padding: '8px 14px',
-            background: `${BRAND.cyan}12`,
-            border: `1px solid ${BRAND.cyan}30`,
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-          }}>
-            <CheckCircle size={14} color={BRAND.cyan} />
-            <span style={{ fontSize: 11, color: T.textMuted }}>{gmailEmail} connected</span>
-          </div>
-        )}
-
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          {activeTab === 'companies' && <CompaniesSection />}
-          {activeTab === 'dashboard' && <DashboardSection missions={missions} campaigns={campaigns} />}
-          {activeTab === 'weapons'   && <WeaponsSection />}
-          {activeTab === 'missions'  && <MissionsSection missions={missions} loading={false} />}
-          {activeTab === 'arsenal'   && <ArsenalSection />}
-          {activeTab === 'outcomes'  && <OutcomesSection campaigns={campaigns} missions={missions} />}
-          {activeTab === 'people'    && <AllLeads mode="hunter" />}
-        </div>
+  const renderMain = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <AllLeads mode="hunter" activeFilter={activeFilter} />
       </div>
-    );
-  };
+    </div>
+  );
 
   // ── Mobile layout ─────────────────────────────────────────────────────────────
   if (isMobile) {
@@ -396,9 +278,8 @@ function HunterShellInner({ user }) {
             />
           </div>
           <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            {HUNTER_ITEMS.find(i => i.id === activeTab)?.label || 'Hunter'}
+            {activeItem.label}
           </div>
-          {/* Settings shortcut — top-right, always reachable */}
           <div
             onClick={() => navigate('/settings')}
             title="Settings"
@@ -435,22 +316,11 @@ function HunterShellInner({ user }) {
                   color: active ? BRAND.purple : T.textMuted,
                   fontSize: 12, fontWeight: active ? 600 : 400,
                   cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'all 0.12s', position: 'relative',
+                  transition: 'all 0.12s',
                 }}
               >
                 <it.Icon size={12} />
                 {it.label}
-                {it.id === 'missions' && activeMissionsCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: 6, right: 4,
-                    width: 14, height: 14, borderRadius: '50%',
-                    background: BRAND.purple, color: '#fff',
-                    fontSize: 8, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {activeMissionsCount}
-                  </span>
-                )}
               </div>
             );
           })}
@@ -621,7 +491,7 @@ function HunterShellInner({ user }) {
               <div style={{ fontSize: 9, letterSpacing: 2, color: BRAND.purple, fontWeight: 700, marginBottom: 1 }}>
                 HUNTER
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{HUNTER_ITEMS.length} modules</div>
+              <div style={{ fontSize: 9, color: T.textFaint }}>Execution</div>
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('hunter_subnav_collapsed', 'true'); }}
@@ -650,7 +520,7 @@ function HunterShellInner({ user }) {
                     borderRadius: 8, cursor: 'pointer', marginBottom: 1,
                     background: active ? T.accentBg : 'transparent',
                     borderLeft: `2px solid ${active ? BRAND.purple : 'transparent'}`,
-                    transition: 'all 0.12s', position: 'relative',
+                    transition: 'all 0.12s',
                   }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
@@ -666,18 +536,6 @@ function HunterShellInner({ user }) {
                     </div>
                     <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{it.desc}</div>
                   </div>
-                  {/* Badge for missions count */}
-                  {it.id === 'missions' && activeMissionsCount > 0 && (
-                    <span style={{
-                      minWidth: 16, height: 16, borderRadius: 8,
-                      background: BRAND.purple, color: '#fff',
-                      fontSize: 9, fontWeight: 700, padding: '0 4px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
-                      {activeMissionsCount}
-                    </span>
-                  )}
                 </div>
               );
             })}

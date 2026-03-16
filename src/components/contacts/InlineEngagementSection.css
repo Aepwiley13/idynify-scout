@@ -318,19 +318,20 @@
 
 .ies-collapse-btn {
   background: transparent;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(220, 38, 38, 0.35);
   border-radius: 6px;
-  padding: 0.3rem 0.75rem;
+  padding: 0.3rem 0.875rem;
   font-size: 0.8125rem;
-  color: var(--text-secondary);
+  color: #dc2626;
   cursor: pointer;
   transition: all 0.15s;
+  font-weight: 500;
 }
 
 .ies-collapse-btn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-color: var(--border);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.55);
 }
 
 /* ── Step Divider ── */
@@ -997,10 +998,13 @@
   color: var(--text-primary);
   background: var(--bg-card);
   resize: none;
-  overflow: hidden;
+  /* overflow-y: auto ensures content is always readable even if JS auto-resize
+     hasn't fired yet (e.g. wider viewport / initial render at 1440p+) */
+  overflow-y: auto;
   font-family: inherit;
   line-height: 1.5;
-  min-height: 80px;
+  min-height: 140px;
+  max-height: 480px;
   transition: border-color 0.15s;
   box-sizing: border-box;
 }
@@ -1687,14 +1691,14 @@ body.theme-dark .ies-flow-contact-name {
 }
 
 body.theme-dark .ies-collapse-btn {
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #9080b0;
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #f87171;
 }
 
 body.theme-dark .ies-collapse-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #d4cae8;
-  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(220, 38, 38, 0.12);
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.6);
 }
 
 body.theme-dark .ies-barry-question {

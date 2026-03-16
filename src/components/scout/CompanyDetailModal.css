@@ -143,10 +143,22 @@
   color: var(--text-secondary);
 }
 
+/* Close button gets a more visible treatment so it's always easy to find */
+.close-button {
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #dc2626;
+}
+
 .refresh-button:hover:not(:disabled),
 .close-button:hover {
   background: var(--border);
   color: var(--text-primary);
+}
+
+.close-button:hover {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.55);
+  color: #b91c1c;
 }
 
 .refresh-button:disabled {

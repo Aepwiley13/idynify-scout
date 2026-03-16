@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   collection, query, orderBy, limit, onSnapshot,
-  getDocs, updateDoc, doc, addDoc
+  getDocs, updateDoc, doc, addDoc, getDoc
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
@@ -256,6 +256,39 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [promptSaved, setPromptSaved] = useState(false);
 
+  // Auto-draft: persist the current intent per contact so it survives accidental closes
+  const draftKey = contact?.id ? `ies_draft_${contact.id}` : null;
+
+  // RECON health: track whether the user has completed enough RECON to get good messages
+  const [reconIncomplete, setReconIncomplete] = useState(false);
+
+  useEffect(() => {
+    async function checkReconHealth() {
+      const user = getEffectiveUser();
+      if (!user) return;
+      try {
+        const dashSnap = await getDoc(doc(db, 'dashboards', user.uid));
+        if (!dashSnap.exists()) { setReconIncomplete(true); return; }
+        const sections = dashSnap.data()?.modules?.find(m => m.id === 'recon')?.sections || [];
+        // Critical sections: 1 (Business Foundation), 7 (Communication Style), 9 (Messaging & Value Prop)
+        const CRITICAL = [1, 7, 9];
+        const completedIds = sections.filter(s => s.status === 'completed').map(s => s.sectionId);
+        const missing = CRITICAL.filter(id => !completedIds.includes(id));
+        setReconIncomplete(missing.length > 0);
+      } catch {
+        // Non-blocking — don't surface errors
+      }
+    }
+    checkReconHealth();
+  }, []);
+
+  // Save intent to localStorage whenever it changes while the flow is active
+  useEffect(() => {
+    if (flowActive && draftKey && userIntent.trim()) {
+      localStorage.setItem(draftKey, userIntent);
+    }
+  }, [userIntent, flowActive, draftKey]);
+
   // Barry message → template saving
   const [savedMsgIndices, setSavedMsgIndices] = useState(new Set());
   const [savingMsgIdx, setSavingMsgIdx] = useState(null);
@@ -337,6 +370,12 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
     resetFlow();
     setFlowActive(true);
     loadSavedPrompts();
+
+    // Restore any unsaved draft for this contact
+    if (draftKey) {
+      const draft = localStorage.getItem(draftKey);
+      if (draft) setUserIntent(draft);
+    }
 
     const user = getEffectiveUser();
     if (user && contact?.id) {
@@ -753,6 +792,9 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
       // Trigger Barry context auto-refresh in background so next engagement is smarter
       triggerBarryContextRefresh();
 
+      // Clear the auto-draft since this intent was successfully acted on
+      if (draftKey) localStorage.removeItem(draftKey);
+
       setReviewStep(false);
       setResultStep(true);
 
@@ -930,6 +972,26 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                   What do you want to do with {firstName}?
                 </p>
               </div>
+              {/* RECON incomplete nudge — Barry needs your profile to write great messages */}
+              {reconIncomplete && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+                  padding: '0.625rem 0.75rem', marginBottom: '0.625rem',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: '8px',
+                }}>
+                  <AlertCircle style={{ width: 15, height: 15, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+                  <span style={{ fontSize: '0.8rem', color: '#92400e', lineHeight: 1.4 }}>
+                    <strong>Barry is missing context about you.</strong>{' '}
+                    Messages may feel generic until you complete{' '}
+                    <a href="/recon" style={{ color: '#b45309', fontWeight: 600, textDecoration: 'underline' }}>
+                      RECON training
+                    </a>
+                    {' '}(Business Foundation, Communication Style, Messaging).
+                  </span>
+                </div>
+              )}
               <textarea
                 ref={intentTextareaRef}
                 className="ies-intent-input"
@@ -939,6 +1001,22 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 placeholder={`E.g., "Follow up on our conversation at the conference" or "Introduce myself and see if they need help with marketing automation"`}
                 autoFocus
               />
+              {/* Unsaved draft restore — only when textarea is empty and a draft exists */}
+              {!userIntent.trim() && draftKey && localStorage.getItem(draftKey) && (
+                <div className="ies-saved-prompts" style={{ marginTop: '0.5rem' }}>
+                  <span className="ies-saved-prompts-label">Unsaved draft:</span>
+                  <div className="ies-prompt-chips">
+                    <button
+                      className="ies-prompt-chip"
+                      style={{ borderColor: 'rgba(124,58,237,0.4)', color: '#7c3aed' }}
+                      onClick={() => setUserIntent(localStorage.getItem(draftKey))}
+                      title="Restore your last unsaved message goal"
+                    >
+                      ↩ {(() => { const d = localStorage.getItem(draftKey); return d.length > 45 ? d.slice(0, 42) + '…' : d; })()}
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Saved prompts chips */}
               {savedPrompts.length > 0 && (
                 <div className="ies-saved-prompts">

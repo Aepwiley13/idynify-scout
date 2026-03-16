@@ -256,7 +256,7 @@ function PeopleShellInner({ user }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
-  const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('people_subnav_collapsed') !== 'true');
+  const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('cc_subnav_collapsed') !== 'true');
 
   // Resolve active section from URL param or legacy localStorage
   const tabParam = searchParams.get('tab') || location.state?.activeTab || null;
@@ -615,7 +615,7 @@ function PeopleShellInner({ user }) {
               <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
             </div>
             <div
-              onClick={() => { setSubNavOpen(false); localStorage.setItem('people_subnav_collapsed', 'true'); }}
+              onClick={() => { setSubNavOpen(false); localStorage.setItem('cc_subnav_collapsed', 'true'); }}
               title="Collapse sidebar"
               style={{
                 width: 22, height: 22, borderRadius: 6,
@@ -695,7 +695,7 @@ function PeopleShellInner({ user }) {
       {/* Sub-nav expand button (shown when collapsed) */}
       {!subNavOpen && (
         <div
-          onClick={() => { setSubNavOpen(true); localStorage.setItem('people_subnav_collapsed', 'false'); }}
+          onClick={() => { setSubNavOpen(true); localStorage.setItem('cc_subnav_collapsed', 'false'); }}
           title="Expand sidebar"
           style={{
             position: 'absolute', left: 60, top: 13, zIndex: 3,

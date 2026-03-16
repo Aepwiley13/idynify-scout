@@ -1298,7 +1298,8 @@ export default function AllLeads({ mode = 'people' }) {
     return addedDate >= weekAgo;
   };
 
-  let filtered = contacts;
+  // Exclude contacts whose parent company has been archived
+  let filtered = contacts.filter(c => !c.company_archived);
 
   // Action-oriented lens filter
   if (actionFilter === 'today') {

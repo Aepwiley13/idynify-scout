@@ -14,12 +14,14 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target,
+  Radar, Crosshair, Eye, Target, Tent, Shield,
   Zap, Building2, Users, Plus,
   Palette, Check, Settings, ChevronLeft, ChevronRight, Home,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
+import BarryChat, { MODULE_CONFIG } from '../../components/barry/BarryChat';
+import { useBarryContext } from '../../context/barryContextStore';
 import DailyLeads from './DailyLeads';
 import SavedCompanies from './SavedCompanies';
 import AllLeads from './AllLeads';
@@ -155,22 +157,27 @@ function Av({ initials, color = BRAND.pink, size = 24 }) {
 // Orange token for settings accent
 const SETTINGS_ORANGE = '#faaa20';
 
+const BARRY_MODULE = 'scout';
+const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
+
 // ─── Nav config ──────────────────────────────────────────────────────────────
 const NAV_SECTIONS = [
-  { id: 'allpeople', label: 'COMMAND CENTER', Icon: Users, route: '/command-center', items: [] },
+  { id: 'allpeople',       label: 'COMMAND CENTER', Icon: Users,     route: '/command-center', items: [] },
   {
     id: 'scout', label: 'SCOUT', Icon: Radar, route: null,
     items: [
-      { id: 'all',       label: 'People',             Icon: Users,     desc: 'My Leads'      },
-      { id: 'saved',     label: 'Saved Companies',   Icon: Building2, desc: 'Hunt list'          },
-      { id: 'daily',     label: 'Daily Discoveries', Icon: Zap,       desc: 'Review Queue'       },
-      { id: 'scoutplus',   label: 'Scout+',           Icon: Plus,     desc: 'Add contacts'       },
-      { id: 'icpsettings', label: 'ICP Settings',     Icon: Settings, desc: 'Targeting criteria' },
+      { id: 'all',         label: 'People',           Icon: Users,     desc: 'My Leads'           },
+      { id: 'saved',       label: 'Saved Companies',  Icon: Building2, desc: 'Hunt list'           },
+      { id: 'daily',       label: 'Daily Discoveries', Icon: Zap,      desc: 'Review Queue'        },
+      { id: 'scoutplus',   label: 'Scout+',            Icon: Plus,     desc: 'Add contacts'        },
+      { id: 'icpsettings', label: 'ICP Settings',      Icon: Settings, desc: 'Targeting criteria'  },
     ],
   },
-  { id: 'hunter',    label: 'HUNTER',  Icon: Crosshair, route: '/hunter', items: [] },
-  { id: 'recon',     label: 'RECON',   Icon: Eye,       route: '/recon',  items: [] },
-  { id: 'sniper',    label: 'SNIPER',  Icon: Target,    route: '/sniper', items: [] },
+  { id: 'hunter',         label: 'HUNTER',          Icon: Crosshair, route: '/hunter',          items: [] },
+  { id: 'sniper',         label: 'SNIPER',          Icon: Target,    route: '/sniper',          items: [] },
+  { id: 'basecamp',       label: 'BASECAMP',        Icon: Tent,      route: '/basecamp',        items: [] },
+  { id: 'reinforcements', label: 'REINFORCEMENTS',  Icon: Shield,    route: '/reinforcements',  items: [] },
+  { id: 'recon',          label: 'RECON',           Icon: Eye,       route: '/recon',           items: [] },
 ];
 
 // ─── ScoutShellInner ─────────────────────────────────────────────────────────
@@ -218,6 +225,8 @@ function ScoutShellInner({ user }) {
   const [activeItem, setActiveItem] = useState(initialItem);
   const [drillCompanyId, setDrillCompanyId] = useState(null);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('scout_subnav_collapsed') !== 'true');
+  const [barryOpen, setBarryOpen] = useState(false);
+  const barryCtx = useBarryContext();
 
   // Sync tab when URL search params change (e.g. navigating from Sidebar).
   // setState inside the effect is intentional — URL params are external state
@@ -564,6 +573,28 @@ function ScoutShellInner({ user }) {
             </span>
           </div>
           <ThemePicker />
+          <div
+            onClick={() => setBarryOpen(o => !o)}
+            title="Barry AI"
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
+              background: barryOpen ? `${BARRY_CHAKRA}20` : 'transparent',
+              border: `1px solid ${barryOpen ? BARRY_CHAKRA : 'transparent'}`,
+              boxShadow: barryOpen ? `0 0 12px ${BARRY_CHAKRA}40` : 'none',
+            }}
+            onMouseEnter={e => { if (!barryOpen) e.currentTarget.style.background = T.surface; }}
+            onMouseLeave={e => { if (!barryOpen) e.currentTarget.style.background = 'transparent'; }}
+          >
+            <BarryAvatar size={22} />
+            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: barryOpen ? BARRY_CHAKRA : T.textFaint }}>
+              BARRY
+            </span>
+          </div>
+          {barryOpen && (
+            <BarryChat module={BARRY_MODULE} context={barryCtx} onClose={() => setBarryOpen(false)} />
+          )}
         </div>
       </div>
 

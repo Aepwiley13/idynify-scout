@@ -25,14 +25,36 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 import { useThemeCtx } from '../../theme/ThemeContext';
-import { THEMES } from '../../theme/tokens';
+import { THEMES, ASSETS, BRAND } from '../../theme/tokens';
+import BarryChat, { MODULE_CONFIG } from '../barry/BarryChat';
+import { useBarryContext } from '../../context/barryContextStore';
 import './Sidebar.css';
+
+// Route → module mapping for Barry context
+const SIDEBAR_ROUTE_MODULE_MAP = [
+  { prefix: '/recon',          module: 'recon'          },
+  { prefix: '/scout',          module: 'scout'          },
+  { prefix: '/hunter',         module: 'hunter'         },
+  { prefix: '/sniper',         module: 'sniper'         },
+  { prefix: '/command-center', module: 'command-center' },
+  { prefix: '/people',         module: 'command-center' },
+  { prefix: '/basecamp',       module: 'homebase'       },
+  { prefix: '/reinforcements', module: 'reinforcements' },
+];
+
+function getSidebarModule(pathname) {
+  for (const { prefix, module } of SIDEBAR_ROUTE_MODULE_MAP) {
+    if (pathname.startsWith(prefix)) return module;
+  }
+  return 'default';
+}
 
 const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { themeId, setThemeId } = useThemeCtx();
   const isLightTheme = !THEMES[themeId]?.isDark;
   const [themePanelOpen, setThemePanelOpen] = useState(false);
+  const [barryOpen, setBarryOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     people: true,
     recon: true,
@@ -44,6 +66,9 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   });
   const navigate = useNavigate();
   const location = useLocation();
+  const barryCtx = useBarryContext();
+  const barryModule = getSidebarModule(location.pathname);
+  const barryCfg = MODULE_CONFIG[barryModule] || MODULE_CONFIG.default;
 
   const handleNavigation = (path, state = {}) => {
     // If state contains an activeTab, encode it as a URL search param instead
@@ -346,12 +371,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       {/* Navigation Pillars */}
       <nav className="sidebar-nav">
         {renderPillar('people',         'COMMAND CENTER',  Users,     'pillar-cyan',   peopleItems)}
-        {renderPillar('recon',          'RECON',           Brain,     'pillar-purple', reconItems)}
         {renderPillar('scout',          'SCOUT',           Search,    'pillar-cyan',   scoutItems)}
         {renderPillar('hunter',         'HUNTER',          Crosshair, 'pillar-purple', hunterItems)}
         {renderPillar('sniper',         'SNIPER',          Target,    'pillar-cyan',   sniperItems)}
         {renderPillar('basecamp',       'BASECAMP',        Home,      'pillar-cyan',   basecampItems)}
         {renderPillar('reinforcements', 'REINFORCEMENTS',  Users,     'pillar-purple', reinforcementsItems)}
+        {renderPillar('recon',          'RECON',           Brain,     'pillar-purple', reconItems)}
       </nav>
 
       {/* Settings Link */}
@@ -364,6 +389,39 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         <Settings size={16} />
         {!isCollapsed && <span className="settings-toggle-label">Settings</span>}
       </button>
+
+      {/* Barry Nav Button */}
+      <button
+        className={`settings-toggle ${isCollapsed ? 'collapsed' : ''} ${barryOpen ? 'active' : ''}`}
+        onClick={() => setBarryOpen(o => !o)}
+        title={isCollapsed ? 'Barry AI' : ''}
+        aria-label="Open Barry chat"
+        style={{ borderColor: barryOpen ? barryCfg.color : undefined, position: 'relative' }}
+      >
+        <div style={{ position: 'relative', flexShrink: 0, width: 16, height: 16 }}>
+          <img
+            src={ASSETS.barryAvatar}
+            alt="Barry"
+            style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+            onError={e => { e.target.style.display = 'none'; }}
+          />
+          <div style={{
+            position: 'absolute', bottom: -1, right: -1,
+            width: 7, height: 7, borderRadius: '50%',
+            background: barryCfg.color,
+            border: `1.5px solid ${isLightTheme ? '#fff' : '#0d1117'}`,
+          }} />
+        </div>
+        {!isCollapsed && <span className="settings-toggle-label">Barry</span>}
+      </button>
+
+      {barryOpen && (
+        <BarryChat
+          module={barryModule}
+          context={barryCtx}
+          onClose={() => setBarryOpen(false)}
+        />
+      )}
 
       {/* Theme Picker */}
       <div style={{ position: 'relative' }}>

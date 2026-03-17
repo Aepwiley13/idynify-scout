@@ -286,7 +286,7 @@ export default function Section7DecisionProcess({ initialData = {}, onSave, onCo
 
   const handleGenerate = async () => {
     // Save before generating
-    await handleManualSave();
+    await saveAnswers();
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;

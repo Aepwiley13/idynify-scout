@@ -152,21 +152,25 @@ const SECTION_2_QUESTIONS = [
   }
 ];
 
+const DEFAULT_ANSWERS = {
+  productName: '',
+  category: '',
+  coreFeatures: ['', '', '', '', ''],
+  differentiation: '',
+  useCases: [],
+  implementationTime: '',
+  supportLevel: '',
+  pricingModel: '',
+  startingPrice: '',
+  techStack: '',
+  integrations: ['', '', '', '', '']
+};
+
 export default function Section2ProductDeepDive({ initialData = {}, onSave, onComplete }) {
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState(initialData || {
-    productName: '',
-    category: '',
-    coreFeatures: ['', '', '', '', ''],
-    differentiation: '',
-    useCases: [],
-    implementationTime: '',
-    supportLevel: '',
-    pricingModel: '',
-    startingPrice: '',
-    techStack: '',
-    integrations: ['', '', '', '', '']
-  });
+  const [answers, setAnswers] = useState(
+    (initialData && Object.keys(initialData).length > 0) ? initialData : DEFAULT_ANSWERS
+  );
   const [output, setOutput] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -253,7 +257,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
         const value = answers[q.id];
         
         if (q.type === 'multi-text') {
-          const filledCount = value.filter(v => v && v.trim().length > 0).length;
+          const filledCount = (value || []).filter(v => v && v.trim().length > 0).length;
           if (filledCount === 0) {
             errors[q.id] = `Please provide at least one ${q.question.toLowerCase()}`;
           } else {
@@ -511,7 +515,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
             )}
             <div className="space-y-3">
               {[...Array(q.count)].map((_, idx) => {
-                const itemValue = value[idx] || '';
+                const itemValue = (value || [])[idx] || '';
                 const itemError = validationErrors[`${q.id}_${idx}`];
                 return (
                   <div key={idx}>

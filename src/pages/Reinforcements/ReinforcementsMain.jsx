@@ -28,6 +28,8 @@ import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import { auth } from '../../firebase/config';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
+import BarryChat, { MODULE_CONFIG } from '../../components/barry/BarryChat';
+import { useBarryContext } from '../../context/barryContextStore';
 import { useActiveUser } from '../../context/ImpersonationContext';
 
 // Reinforcements sections
@@ -164,13 +166,13 @@ function Av({ initials, color = REINFORCEMENTS_AMBER, size = 24 }) {
 
 // ─── Module rail config ───────────────────────────────────────────────────────
 const MODULE_RAIL = [
-  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield, route: null }, // active module
-  { id: 'basecamp', label: 'BASECAMP', Icon: Tent,      route: '/basecamp' },
-  { id: 'people',   label: 'COMMAND CENTER', Icon: Users, route: '/command-center'   },
-  { id: 'scout',    label: 'SCOUT',  Icon: Radar,     route: '/scout'  },
-  { id: 'hunter',   label: 'HUNTER', Icon: Crosshair, route: '/hunter' },
-  { id: 'recon',    label: 'RECON',  Icon: Eye,       route: '/recon'  },
-  { id: 'sniper',   label: 'SNIPER', Icon: Target,    route: '/sniper' },
+  { id: 'people',         label: 'COMMAND CENTER', Icon: Users,     route: '/command-center' },
+  { id: 'scout',          label: 'SCOUT',          Icon: Radar,     route: '/scout'          },
+  { id: 'hunter',         label: 'HUNTER',         Icon: Crosshair, route: '/hunter'         },
+  { id: 'sniper',         label: 'SNIPER',         Icon: Target,    route: '/sniper'         },
+  { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'       },
+  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: null              }, // active module
+  { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'          },
 ];
 
 // ─── REINFORCEMENTS sub-nav items ───────────────────────────────────────────
@@ -183,6 +185,9 @@ const REINFORCEMENTS_ITEMS = [
 ];
 
 const SETTINGS_ORANGE = '#faaa20';
+
+const BARRY_MODULE = 'reinforcements';
+const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 const TAB_MAP = {
   dashboard:     'dashboard',
@@ -215,6 +220,8 @@ function ReinforcementsShellInner({ user }) {
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('reinforcements_subnav_collapsed') !== 'true');
+  const [barryOpen, setBarryOpen] = useState(false);
+  const barryCtx = useBarryContext();
 
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
@@ -458,9 +465,28 @@ function ReinforcementsShellInner({ user }) {
             </span>
           </div>
           <ThemePicker />
-          <div title="Barry AI" style={{ cursor: 'pointer' }}>
-            <BarryAvatar size={34} style={{ boxShadow: `0 0 14px ${BRAND.cyan}50` }} />
+          <div
+            onClick={() => setBarryOpen(o => !o)}
+            title="Barry AI"
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
+              background: barryOpen ? `${BARRY_CHAKRA}20` : 'transparent',
+              border: `1px solid ${barryOpen ? BARRY_CHAKRA : 'transparent'}`,
+              boxShadow: barryOpen ? `0 0 12px ${BARRY_CHAKRA}40` : 'none',
+            }}
+            onMouseEnter={e => { if (!barryOpen) e.currentTarget.style.background = T.surface; }}
+            onMouseLeave={e => { if (!barryOpen) e.currentTarget.style.background = 'transparent'; }}
+          >
+            <BarryAvatar size={22} />
+            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: barryOpen ? BARRY_CHAKRA : T.textFaint }}>
+              BARRY
+            </span>
           </div>
+          {barryOpen && (
+            <BarryChat module={BARRY_MODULE} context={barryCtx} onClose={() => setBarryOpen(false)} />
+          )}
         </div>
       </div>
 

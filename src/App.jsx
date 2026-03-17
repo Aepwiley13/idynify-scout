@@ -104,8 +104,6 @@ import UserSettings from './pages/UserSettings';
 // Theme
 import WithTheForce from './components/WithTheForce';
 
-// Barry unified trigger
-import BarryTrigger from './components/barry/BarryTrigger';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -276,7 +274,7 @@ function App() {
       )}
       {user && <CrispChat user={user} />}
       {user && <MissionControlForce />}
-      {user && <BarryTrigger />}
+      {/* BarryTrigger removed — Barry is now a permanent nav item in each module's icon rail */}
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />

@@ -248,9 +248,28 @@ export default function ReconOverview() {
   const [scoreDelta, setScoreDelta] = useState(null);
   const [showDelta, setShowDelta] = useState(false);
 
+  const SCORE_KEY = 'recon_last_score';
+
   useEffect(() => {
     loadReconData();
   }, []);
+
+  // Track score delta in an effect to avoid state updates during render
+  useEffect(() => {
+    if (dashboardData === null) return;
+    const health = computeReconHealth(dashboardData, currentIcp);
+    const score = health.weightedScore;
+    const lastScore = parseInt(localStorage.getItem(SCORE_KEY) || '0', 10);
+    if (lastScore !== score) {
+      localStorage.setItem(SCORE_KEY, String(score));
+      if (lastScore > 0 && Math.abs(score - lastScore) > 0) {
+        setScoreDelta(score - lastScore);
+        setShowDelta(true);
+        const timer = setTimeout(() => setShowDelta(false), 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [dashboardData, currentIcp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadReconData = async () => {
     try {
@@ -288,19 +307,6 @@ export default function ReconOverview() {
   // ── Derived state ───────────────────────────────────────────────────────────
   const health = computeReconHealth(dashboardData, currentIcp);
   const { weightedScore, completedSectionIds, stalenessFlags, dimensionStates } = health;
-
-  // Score delta vs last visit
-  const SCORE_KEY = 'recon_last_score';
-  const lastScore = parseInt(localStorage.getItem(SCORE_KEY) || '0', 10);
-  if (lastScore !== weightedScore) {
-    const delta = weightedScore - lastScore;
-    localStorage.setItem(SCORE_KEY, String(weightedScore));
-    if (lastScore > 0 && Math.abs(delta) > 0 && scoreDelta === null) {
-      setScoreDelta(delta);
-      setShowDelta(true);
-      setTimeout(() => setShowDelta(false), 5000);
-    }
-  }
 
   const trainNext = getTrainNextRecommendation(health, TRAINING_DIMENSIONS);
 

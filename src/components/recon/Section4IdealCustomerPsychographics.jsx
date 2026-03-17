@@ -272,7 +272,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
 
   const handleGenerate = async () => {
     // Save before generating
-    await handleManualSave();
+    await saveAnswers();
     if (!validateAnswers()) {
       setError('Please complete all required fields correctly');
       return;

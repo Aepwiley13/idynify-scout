@@ -660,58 +660,99 @@
   justify-content: center;
 }
 
-/* ── Light theme overrides ── */
-@media (prefers-color-scheme: light) {
-  :root {
-    --settings-card-bg: rgba(0, 0, 0, 0.04);
-    --settings-card-border: rgba(0, 0, 0, 0.1);
-    --settings-card-bg-hover: rgba(0, 0, 0, 0.07);
-  }
-
-  .us-tab {
-    color: var(--text-secondary);
-  }
-  .us-tab:hover {
-    color: var(--text-primary);
-    background: rgba(0, 0, 0, 0.05);
-  }
-  .us-tabs {
-    background: rgba(0, 0, 0, 0.04);
-    border-color: rgba(0, 0, 0, 0.1);
-  }
-  .us-section-title {
-    color: #d97706;
-    text-shadow: none;
-  }
-  .us-card-label { color: var(--text-primary); }
-  .us-card-value { color: var(--text-primary); }
-  .us-card-value--muted { color: var(--text-secondary); }
-  .us-section-note { color: var(--text-secondary); }
-  .us-credit-remaining { color: var(--text-primary); }
-  .us-credit-meta-value { color: var(--text-primary); }
-  .us-integration-name { color: var(--text-primary); }
-  .us-integration-desc { color: var(--text-secondary); }
-  .us-mfa-step { color: var(--text-primary); }
-  .us-billing-plan-price { color: var(--text-primary); }
-  .us-title { color: var(--text-primary); }
-  .us-action-btn {
-    background: rgba(0, 0, 0, 0.06);
-    border-color: rgba(0, 0, 0, 0.12);
-    color: var(--text-primary);
-  }
-  .us-action-btn:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.1);
-    color: var(--text-primary);
-  }
-  .us-back-btn {
-    background: rgba(0, 0, 0, 0.04);
-    border-color: rgba(0, 0, 0, 0.12);
-    color: var(--text-secondary);
-  }
-  .us-mfa-input {
-    background: rgba(0, 0, 0, 0.04);
-    border-color: rgba(0, 0, 0, 0.12);
-    color: var(--text-primary);
-  }
-  .us-mfa-input::placeholder { color: var(--text-faint); }
+/* ── Light theme overrides (workspace / sand / lightSide) ── */
+/* Keyed on data-theme so they apply regardless of OS color-scheme preference */
+html[data-theme="workspace"],
+html[data-theme="sand"],
+html[data-theme="lightSide"] {
+  --settings-card-bg: rgba(0, 0, 0, 0.04);
+  --settings-card-border: rgba(0, 0, 0, 0.1);
+  --settings-card-bg-hover: rgba(0, 0, 0, 0.07);
 }
+
+html[data-theme="workspace"] .us-tab,
+html[data-theme="sand"] .us-tab,
+html[data-theme="lightSide"] .us-tab {
+  color: var(--text-secondary);
+}
+html[data-theme="workspace"] .us-tab:hover,
+html[data-theme="sand"] .us-tab:hover,
+html[data-theme="lightSide"] .us-tab:hover {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.05);
+}
+html[data-theme="workspace"] .us-tabs,
+html[data-theme="sand"] .us-tabs,
+html[data-theme="lightSide"] .us-tabs {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+html[data-theme="workspace"] .us-section-title,
+html[data-theme="sand"] .us-section-title,
+html[data-theme="lightSide"] .us-section-title {
+  color: #d97706;
+  text-shadow: none;
+}
+html[data-theme="workspace"] .us-card-label,
+html[data-theme="sand"] .us-card-label,
+html[data-theme="lightSide"] .us-card-label { color: var(--text-primary); }
+html[data-theme="workspace"] .us-card-value,
+html[data-theme="sand"] .us-card-value,
+html[data-theme="lightSide"] .us-card-value { color: var(--text-primary); }
+html[data-theme="workspace"] .us-card-value--muted,
+html[data-theme="sand"] .us-card-value--muted,
+html[data-theme="lightSide"] .us-card-value--muted { color: var(--text-secondary); }
+html[data-theme="workspace"] .us-section-note,
+html[data-theme="sand"] .us-section-note,
+html[data-theme="lightSide"] .us-section-note { color: var(--text-secondary); }
+html[data-theme="workspace"] .us-credit-remaining,
+html[data-theme="sand"] .us-credit-remaining,
+html[data-theme="lightSide"] .us-credit-remaining { color: var(--text-primary); }
+html[data-theme="workspace"] .us-credit-meta-value,
+html[data-theme="sand"] .us-credit-meta-value,
+html[data-theme="lightSide"] .us-credit-meta-value { color: var(--text-primary); }
+html[data-theme="workspace"] .us-integration-name,
+html[data-theme="sand"] .us-integration-name,
+html[data-theme="lightSide"] .us-integration-name { color: var(--text-primary); }
+html[data-theme="workspace"] .us-integration-desc,
+html[data-theme="sand"] .us-integration-desc,
+html[data-theme="lightSide"] .us-integration-desc { color: var(--text-secondary); }
+html[data-theme="workspace"] .us-mfa-step,
+html[data-theme="sand"] .us-mfa-step,
+html[data-theme="lightSide"] .us-mfa-step { color: var(--text-primary); }
+html[data-theme="workspace"] .us-billing-plan-price,
+html[data-theme="sand"] .us-billing-plan-price,
+html[data-theme="lightSide"] .us-billing-plan-price { color: var(--text-primary); }
+html[data-theme="workspace"] .us-title,
+html[data-theme="sand"] .us-title,
+html[data-theme="lightSide"] .us-title { color: var(--text-primary); }
+html[data-theme="workspace"] .us-action-btn,
+html[data-theme="sand"] .us-action-btn,
+html[data-theme="lightSide"] .us-action-btn {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: var(--text-primary);
+}
+html[data-theme="workspace"] .us-action-btn:hover:not(:disabled),
+html[data-theme="sand"] .us-action-btn:hover:not(:disabled),
+html[data-theme="lightSide"] .us-action-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+html[data-theme="workspace"] .us-back-btn,
+html[data-theme="sand"] .us-back-btn,
+html[data-theme="lightSide"] .us-back-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: var(--text-secondary);
+}
+html[data-theme="workspace"] .us-mfa-input,
+html[data-theme="sand"] .us-mfa-input,
+html[data-theme="lightSide"] .us-mfa-input {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: var(--text-primary);
+}
+html[data-theme="workspace"] .us-mfa-input::placeholder,
+html[data-theme="sand"] .us-mfa-input::placeholder,
+html[data-theme="lightSide"] .us-mfa-input::placeholder { color: var(--text-faint); }

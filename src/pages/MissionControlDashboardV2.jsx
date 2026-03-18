@@ -336,23 +336,23 @@ export default function MissionControlDashboardV2() {
           onNavigate={(route) => navigate(route)}
         />
 
-        {/* QUICK LAUNCH STRIP — Horizontal carousel, opens inline deck (Scout, Hunter, RECON) */}
-        <QuickLaunchStrip
+        {/* QUICK LAUNCH STRIP — temporarily hidden */}
+        {/* <QuickLaunchStrip
           stats={stats}
           activeModule={activeModule}
           onModuleSelect={(id) => {
             setActiveModule(prev => prev === id ? null : id);
           }}
-        />
+        /> */}
 
-        {/* MISSION CARD DECK — Inline, below carousel */}
-        {activeModule && userId && (
+        {/* MISSION CARD DECK — temporarily hidden */}
+        {/* activeModule && userId && (
           <MissionCardDeck
             module={activeModule}
             userId={userId}
             onClose={() => setActiveModule(null)}
           />
-        )}
+        ) */}
 
         {/* ATTENTION REQUIRED — temporarily hidden */}
         {/* <AttentionCarousel

@@ -175,10 +175,10 @@ const MODULE_RAIL = [
 
 // ─── SNIPER sub-nav items ─────────────────────────────────────────────────────
 const SNIPER_ITEMS = [
+  { id: 'people',    label: 'People',    Icon: Users,          desc: 'Add to pipeline'      },
+  { id: 'companies', label: 'Companies', Icon: Building2,      desc: 'Saved companies'      },
   { id: 'pipeline',  label: 'Pipeline',  Icon: Target,         desc: 'Conversion board'     },
   { id: 'targets',   label: 'Targets',   Icon: Users,          desc: 'All contacts'         },
-  { id: 'companies', label: 'Companies', Icon: Building2,      desc: 'Saved companies'      },
-  { id: 'people',    label: 'People',    Icon: Users,          desc: 'Add to pipeline'      },
   { id: 'touches',   label: 'Touches',   Icon: Activity,       desc: 'Follow-up log'        },
   { id: 'playbooks', label: 'Playbooks', Icon: BookOpen,       desc: 'Conversion sequences' },
   { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,      desc: 'Win/loss analytics'   },
@@ -217,8 +217,8 @@ function SniperShellInner({ user }) {
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
-  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'pipeline';
-  const initialTab = TAB_MAP[tabParam] || 'pipeline';
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'people';
+  const initialTab = TAB_MAP[tabParam] || 'people';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('sniper_subnav_collapsed') !== 'true');
@@ -228,7 +228,7 @@ function SniperShellInner({ user }) {
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
     if (tab && TAB_MAP[tab]) setActiveTab(TAB_MAP[tab]);
-    else if (!tab) setActiveTab('pipeline');
+    else if (!tab) setActiveTab('people');
   }, [searchParams, location.state?.activeTab]);
 
   const switchTab = (tabId) => {

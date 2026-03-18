@@ -286,7 +286,7 @@ export default function MissionControlDashboardV2() {
               {[
                 { label: 'SCOUT',           icon: <ScoutIcon size="sm" />,           path: '/scout?tab=all-leads', color: 'cyan'   },
                 { label: 'HUNTER',          icon: <HunterIcon size="sm" />,          path: '/hunter?tab=all',      color: 'pink'   },
-                { label: 'SNIPER',          icon: <SniperIcon size="sm" />,          path: '/sniper',              color: 'green'  },
+                { label: 'SNIPER',          icon: <SniperIcon size="sm" />,          path: '/sniper?tab=people',   color: 'green'  },
                 { label: 'HOMEBASE',        icon: <HomebaseIcon size="sm" />,        path: '/basecamp',            color: 'green'  },
                 { label: 'COMMAND CENTER',  icon: <CommandCenterIcon size="sm" />,   path: '/command-center',      color: 'cyan'   },
                 { label: 'RECON',           icon: <ReconIcon size="sm" />,           path: '/recon',               color: 'purple' },

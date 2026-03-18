@@ -25,6 +25,7 @@ import {
   CalendarCheck,
   Inbox,
   Sparkles,
+  BookOpen,
   Zap,
   LayoutDashboard
 } from 'lucide-react';
@@ -104,6 +105,10 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     if (path === '/command-center' && tabName) {
       const urlTab = new URLSearchParams(location.search).get('tab') || 'people';
       return location.pathname === '/command-center' && urlTab === tabName;
+    }
+    if (path === '/sniper' && tabName) {
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'people';
+      return location.pathname === '/sniper' && urlTab === tabName;
     }
     return location.pathname === path;
   };
@@ -313,11 +318,54 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const sniperItems = [
     {
-      icon: Crosshair,
-      label: 'Sniper',
-      sublabel: 'Conversion pipeline',
+      icon: Users,
+      label: 'People',
+      sublabel: 'Add to pipeline',
       path: '/sniper',
+      state: { activeTab: 'people' },
       isPrimary: true
+    },
+    {
+      icon: Building2,
+      label: 'Companies',
+      sublabel: 'Saved companies',
+      path: '/sniper',
+      state: { activeTab: 'companies' }
+    },
+    {
+      icon: Target,
+      label: 'Pipeline',
+      sublabel: 'Conversion board',
+      path: '/sniper',
+      state: { activeTab: 'pipeline' }
+    },
+    {
+      icon: Crosshair,
+      label: 'Targets',
+      sublabel: 'All contacts',
+      path: '/sniper',
+      state: { activeTab: 'targets' }
+    },
+    {
+      icon: Activity,
+      label: 'Touches',
+      sublabel: 'Follow-up log',
+      path: '/sniper',
+      state: { activeTab: 'touches' }
+    },
+    {
+      icon: BookOpen,
+      label: 'Playbooks',
+      sublabel: 'Conversion sequences',
+      path: '/sniper',
+      state: { activeTab: 'playbooks' }
+    },
+    {
+      icon: BarChart3,
+      label: 'Outcomes',
+      sublabel: 'Win/loss analytics',
+      path: '/sniper',
+      state: { activeTab: 'outcomes' }
     }
   ];
 

@@ -11,6 +11,7 @@ import { getEffectiveUser } from '../context/ImpersonationContext';
 export default function ICPBriefView() {
   const navigate = useNavigate();
   const [brief, setBrief] = useState(null);
+  const [foundedAgeRange, setFoundedAgeRange] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -36,6 +37,16 @@ export default function ICPBriefView() {
         setBrief(briefDoc.data());
       } else {
         setError('No ICP brief found. Please complete the ICP Builder first.');
+      }
+
+      // Load structured ICP profile for additional filters (e.g. foundedAgeRange)
+      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+      const profileDoc = await getDoc(profileRef);
+      if (profileDoc.exists()) {
+        const profileData = profileDoc.data();
+        if (profileData.foundedAgeRange) {
+          setFoundedAgeRange(profileData.foundedAgeRange);
+        }
       }
     } catch (err) {
       console.error('Error loading brief:', err);
@@ -151,6 +162,19 @@ export default function ICPBriefView() {
           <div className="whitespace-pre-wrap text-gray-200 leading-relaxed">
             {brief.text}
           </div>
+          {foundedAgeRange && (
+            <div className="mt-6 pt-6 border-t border-gray-700">
+              <span className="text-sm text-gray-400">Company age filter: </span>
+              <span className="text-sm text-cyan-400">
+                {foundedAgeRange.minAge !== null && foundedAgeRange.minAge !== undefined
+                  ? `${foundedAgeRange.minAge}+`
+                  : '0'} – {foundedAgeRange.maxAge !== null && foundedAgeRange.maxAge !== undefined
+                  ? `${foundedAgeRange.maxAge}`
+                  : 'any'} years old
+              </span>
+              <span className="ml-2 text-xs text-gray-500">(companies with unknown founding year will pass through and show a [Year unknown] badge)</span>
+            </div>
+          )}
         </div>
 
         {/* Actions */}

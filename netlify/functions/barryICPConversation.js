@@ -529,6 +529,16 @@ REQUIRED FIELDS — never confirm ICP until all 6 are populated:
                         NEVER set needsClarification:false if targetTitles
                         is empty or null. No exceptions.
 
+OPTIONAL FIELD (7th — never block ICP completion on this):
+7. foundedAgeRange    — { minAge: number|null, maxAge: number|null }
+                        ONLY set when user explicitly references company age or founding time.
+                        "founded after 2015" → { minAge: ${new Date().getFullYear() - 2015}, maxAge: null }
+                        "companies under 5 years old" → { minAge: null, maxAge: 5 }
+                        "companies 5 to 10 years old" → { minAge: 5, maxAge: 10 }
+                        "at least 15 years old" → { minAge: 15, maxAge: null }
+                        DO NOT infer from stage language ("startup", "Series A") — those go to companyKeywords.
+                        If the intent is ambiguous, ask once: "Do you want to filter by founding year?"
+
 HARD RULES:
 - If the user has not mentioned who they want to reach, ask: "Who should I be finding at these companies? What titles or roles are you going after?" — ask this once, clearly.
 - If the user gives a vague industry (e.g. "software", "tech"), ask for 1-2 real example companies before proceeding.
@@ -586,6 +596,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     "locations": ["state names"] or "nationwide" or null,
     "targetTitles": ["job titles"] or null,
     "companyKeywords": ["agency", "saas", etc.] - extracted company type keywords,
+    "foundedAgeRange": { "minAge": number or null, "maxAge": number or null } or null,
     "rawInput": "what the user said"
   },
   "mappingExplanation": "Your explanation of what you understood",
@@ -593,7 +604,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   "lookalikeSuggestions": ["Company 1", "Company 2", "Company 3"] or null - suggestions if asking for lookalike,
   "needsClarification": true/false,
   "followUpQuestion": "your question" or null,
-  "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | null,
+  "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | "foundedAge" | null,
   "searchStrategy": "lookalike" | "industry_only" | "hybrid",
   "confidenceScore": 0.0 to 1.0,
   "isAmbiguous": true/false,
@@ -646,6 +657,19 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate foundedAgeRange — sanitize values, never block ICP completion
+  if (barryResponse.understood?.foundedAgeRange) {
+    const far = barryResponse.understood.foundedAgeRange;
+    const minAge = typeof far.minAge === 'number' && far.minAge >= 0 ? Math.round(far.minAge) : null;
+    const maxAge = typeof far.maxAge === 'number' && far.maxAge >= 0 ? Math.round(far.maxAge) : null;
+    // If both are null, drop the field entirely
+    if (minAge === null && maxAge === null) {
+      barryResponse.understood.foundedAgeRange = null;
+    } else {
+      barryResponse.understood.foundedAgeRange = { minAge, maxAge };
+    }
+  }
+
   // Backend enforcement: targetTitles is required — never allow confirming without them
   const hasExtractedTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
   if (!hasExtractedTitles && !barryResponse.needsClarification) {
@@ -696,6 +720,12 @@ REQUIRED FIELDS — never set readyToConfirm:true until all 6 are populated:
 5. lookalikeSeed      — at least 1 real company as a search anchor
 6. targetTitles       — REQUIRED. NEVER set readyToConfirm:true if targetTitles is empty or null. No exceptions.
 
+OPTIONAL FIELD (7th — never block ICP completion on this):
+7. foundedAgeRange    — { minAge: number|null, maxAge: number|null }
+                        ONLY set when user explicitly references company age or founding time.
+                        DO NOT infer from stage language ("startup", "Series A") — those go to companyKeywords.
+                        If ambiguous, ask once: "Do you want to filter by founding year?"
+
 HARD RULES:
 - If the user has not mentioned who they want to reach, ask: "Who should I be finding at these companies? What titles or roles are you going after?" — ask this once, clearly.
 - If the user gives a vague industry (e.g. "software", "tech"), ask for 1-2 real example companies before proceeding.
@@ -745,14 +775,15 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     "locations": ["states"] or "nationwide" or null,
     "targetTitles": ["titles"] or null,
     "companyKeywords": ["agency", etc.] or null,
-    "lookalikeSeed": { "name": "Company Name" } or null
+    "lookalikeSeed": { "name": "Company Name" } or null,
+    "foundedAgeRange": { "minAge": number or null, "maxAge": number or null } or null
   },
   "mappingExplanation": "explanation",
   "needsLookalike": true/false,
   "lookalikeSuggestions": ["Company 1", "Company 2"] or null,
   "needsMoreInfo": true/false,
   "followUpQuestion": "question" or null,
-  "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | null,
+  "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | "foundedAge" | null,
   "searchStrategy": "lookalike" | "industry_only" | "hybrid",
   "confidenceScore": 0.0 to 1.0,
   "readyToConfirm": true/false
@@ -795,6 +826,16 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
       US_STATES.includes(loc) || loc.toLowerCase() === 'nationwide'
     );
+  }
+
+  // Validate foundedAgeRange — sanitize values, never block ICP completion
+  if (barryResponse.understood?.foundedAgeRange) {
+    const far = barryResponse.understood.foundedAgeRange;
+    const minAge = typeof far.minAge === 'number' && far.minAge >= 0 ? Math.round(far.minAge) : null;
+    const maxAge = typeof far.maxAge === 'number' && far.maxAge >= 0 ? Math.round(far.maxAge) : null;
+    barryResponse.understood.foundedAgeRange = (minAge === null && maxAge === null)
+      ? null
+      : { minAge, maxAge };
   }
 
   // Backend enforcement: targetTitles is required — never allow confirming without them
@@ -869,12 +910,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     "lookalikeSeed": {
       "name": "Company Name the user provided",
       "domain": "companyname.com" (if you can infer it, otherwise null)
-    }
+    },
+    "foundedAgeRange": { "minAge": number or null, "maxAge": number or null } or null
   },
   "mappingExplanation": "Your strategic explanation of how you'll use this",
   "needsMoreInfo": true/false,
   "followUpQuestion": "question about size/location/titles" or null,
-  "followUpType": "size" | "location" | "titles" | null,
+  "followUpType": "size" | "location" | "titles" | "foundedAge" | null,
   "searchStrategy": "lookalike",
   "confidenceScore": 0.0 to 1.0,
   "readyToConfirm": true/false
@@ -917,6 +959,16 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
       US_STATES.includes(loc) || loc.toLowerCase() === 'nationwide'
     );
+  }
+
+  // Validate foundedAgeRange — sanitize values, never block ICP completion
+  if (barryResponse.understood?.foundedAgeRange) {
+    const far = barryResponse.understood.foundedAgeRange;
+    const minAge = typeof far.minAge === 'number' && far.minAge >= 0 ? Math.round(far.minAge) : null;
+    const maxAge = typeof far.maxAge === 'number' && far.maxAge >= 0 ? Math.round(far.maxAge) : null;
+    barryResponse.understood.foundedAgeRange = (minAge === null && maxAge === null)
+      ? null
+      : { minAge, maxAge };
   }
 
   // Backend enforcement: targetTitles is required — never allow confirming without them

@@ -97,6 +97,10 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       const urlTab = new URLSearchParams(location.search).get('tab') || 'dashboard';
       return location.pathname === '/hunter' && urlTab === tabName;
     }
+    if (path === '/command-center' && tabName) {
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'people';
+      return location.pathname === '/command-center' && urlTab === tabName;
+    }
     return location.pathname === path;
   };
 
@@ -107,10 +111,46 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const peopleItems = [
     {
       icon: Users,
-      label: 'Command Center',
-      sublabel: 'Overview',
+      label: 'People',
+      sublabel: 'Full contacts roster — all view',
       path: '/command-center',
+      state: { activeTab: 'people' },
       isPrimary: true
+    },
+    {
+      icon: Building2,
+      label: 'Companies',
+      sublabel: 'Full accounts roster — all view',
+      path: '/command-center',
+      state: { activeTab: 'companies' }
+    },
+    {
+      icon: Zap,
+      label: 'Missions',
+      sublabel: 'Create and manage campaigns',
+      path: '/command-center',
+      state: { activeTab: 'missions' }
+    },
+    {
+      icon: Crosshair,
+      label: 'Weapons',
+      sublabel: 'Channel selector, message builder',
+      path: '/command-center',
+      state: { activeTab: 'weapons' }
+    },
+    {
+      icon: Package,
+      label: 'Arsenal',
+      sublabel: 'Saved message templates library',
+      path: '/command-center',
+      state: { activeTab: 'arsenal' }
+    },
+    {
+      icon: BarChart3,
+      label: 'Outcomes',
+      sublabel: 'Mission performance analytics',
+      path: '/command-center',
+      state: { activeTab: 'outcomes' }
     }
   ];
 

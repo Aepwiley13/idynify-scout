@@ -3,8 +3,8 @@ import { CommandCenterIcon, ReconIcon, ScoutIcon, HunterIcon, SniperIcon, Homeba
 /**
  * ModuleNavigationGrid — 7-card module launcher in two rows + footer card.
  *
- * Row 1: Command Center, Recon, Scout
- * Row 2: Hunter, Sniper, Homebase
+ * Row 1: Scout, Hunter, Sniper
+ * Row 2: Homebase, Command Center, Recon
  * Row 3: Reinforcements (full width)
  *
  * Props:
@@ -23,7 +23,85 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
   // ── Module definitions ──────────────────────────────────────────────
 
   const modules = [
-    // ── Row 1 ──
+    // ── Row 1: Scout, Hunter, Sniper ──
+    {
+      id: 'scout',
+      label: 'SCOUT',
+      description: 'Discover & track ideal customers',
+      stat: scoutContacts > 0
+        ? `${scoutContacts} contact${scoutContacts !== 1 ? 's' : ''} tracked`
+        : scoutCompanies > 0
+          ? `${scoutCompanies} compan${scoutCompanies !== 1 ? 'ies' : 'y'} saved`
+          : 'No contacts yet — start scouting',
+      badge: scoutContacts > 0
+        ? { label: 'ACTIVE', color: 'green' }
+        : scoutCompanies > 0
+          ? { label: 'IN PROGRESS', color: 'amber' }
+          : null,
+      accent: '#06b6d4',
+      borderClass: 'border-cyan-500/50 hover:border-cyan-400',
+      glowStyle: { boxShadow: '0 0 32px rgba(6, 182, 212, 0.25), inset 0 0 24px rgba(6, 182, 212, 0.04)' },
+      gradientClass: 'from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500',
+      shadowClass: 'shadow-cyan-500/40',
+      bgGradient: 'from-cyan-500/10 to-blue-600/5',
+      icon: <ScoutIcon />,
+      btnLabel: 'Enter Scout →',
+      onClick: onScoutClick,
+    },
+    {
+      id: 'hunter',
+      label: 'HUNTER',
+      description: 'Automated outreach campaigns',
+      stat: hunterMissions > 0
+        ? `${hunterMissions} active mission${hunterMissions !== 1 ? 's' : ''}`
+        : 'No missions running',
+      badge: hunterMissions > 0
+        ? { label: 'RUNNING', color: 'green' }
+        : { label: 'IDLE', color: 'amber' },
+      accent: '#ec4899',
+      borderClass: 'border-pink-500/50 hover:border-pink-400',
+      glowStyle: { boxShadow: '0 0 32px rgba(236, 72, 153, 0.25), inset 0 0 24px rgba(236, 72, 153, 0.04)' },
+      gradientClass: 'from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500',
+      shadowClass: 'shadow-pink-500/40',
+      bgGradient: 'from-pink-500/10 to-purple-600/5',
+      icon: <HunterIcon />,
+      btnLabel: 'Launch Hunter →',
+      onClick: () => onNavigate('/hunter'),
+    },
+    {
+      id: 'sniper',
+      label: 'SNIPER',
+      description: 'Post-demo conversion pipeline',
+      stat: 'Convert warm prospects to customers',
+      badge: null,
+      accent: '#14b8a6',
+      borderClass: 'border-teal-500/40 hover:border-teal-400',
+      glowStyle: { boxShadow: '0 0 18px rgba(20, 184, 166, 0.2)' },
+      gradientClass: 'from-teal-500 to-teal-700 hover:from-teal-400 hover:to-teal-600',
+      shadowClass: 'shadow-teal-500/40',
+      bgGradient: 'from-teal-900/10 to-transparent',
+      icon: <SniperIcon />,
+      btnLabel: 'Open Sniper →',
+      onClick: () => onNavigate('/sniper'),
+    },
+
+    // ── Row 2: Homebase, Command Center, Recon ──
+    {
+      id: 'homebase',
+      label: 'HOMEBASE',
+      description: 'Your mission command & settings',
+      stat: 'Configure your base of operations',
+      badge: null,
+      accent: '#22c55e',
+      borderClass: 'border-green-500/50 hover:border-green-400',
+      glowStyle: { boxShadow: '0 0 32px rgba(34, 197, 94, 0.2), inset 0 0 24px rgba(34, 197, 94, 0.04)' },
+      gradientClass: 'from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500',
+      shadowClass: 'shadow-green-500/40',
+      bgGradient: 'from-green-500/10 to-emerald-600/5',
+      icon: <HomebaseIcon />,
+      btnLabel: 'Enter Homebase →',
+      onClick: () => onNavigate('/basecamp'),
+    },
     {
       id: 'command-center',
       label: 'COMMAND CENTER',
@@ -63,84 +141,6 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
       icon: <ReconIcon />,
       btnLabel: 'Train AI →',
       onClick: () => onNavigate('/mission-control-v2/recon'),
-    },
-    {
-      id: 'scout',
-      label: 'SCOUT',
-      description: 'Discover & track ideal customers',
-      stat: scoutContacts > 0
-        ? `${scoutContacts} contact${scoutContacts !== 1 ? 's' : ''} tracked`
-        : scoutCompanies > 0
-          ? `${scoutCompanies} compan${scoutCompanies !== 1 ? 'ies' : 'y'} saved`
-          : 'No contacts yet — start scouting',
-      badge: scoutContacts > 0
-        ? { label: 'ACTIVE', color: 'green' }
-        : scoutCompanies > 0
-          ? { label: 'IN PROGRESS', color: 'amber' }
-          : null,
-      accent: '#06b6d4',
-      borderClass: 'border-cyan-500/50 hover:border-cyan-400',
-      glowStyle: { boxShadow: '0 0 32px rgba(6, 182, 212, 0.25), inset 0 0 24px rgba(6, 182, 212, 0.04)' },
-      gradientClass: 'from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500',
-      shadowClass: 'shadow-cyan-500/40',
-      bgGradient: 'from-cyan-500/10 to-blue-600/5',
-      icon: <ScoutIcon />,
-      btnLabel: 'Enter Scout →',
-      onClick: onScoutClick,
-    },
-
-    // ── Row 2 ──
-    {
-      id: 'hunter',
-      label: 'HUNTER',
-      description: 'Automated outreach campaigns',
-      stat: hunterMissions > 0
-        ? `${hunterMissions} active mission${hunterMissions !== 1 ? 's' : ''}`
-        : 'No missions running',
-      badge: hunterMissions > 0
-        ? { label: 'RUNNING', color: 'green' }
-        : { label: 'IDLE', color: 'amber' },
-      accent: '#ec4899',
-      borderClass: 'border-pink-500/50 hover:border-pink-400',
-      glowStyle: { boxShadow: '0 0 32px rgba(236, 72, 153, 0.25), inset 0 0 24px rgba(236, 72, 153, 0.04)' },
-      gradientClass: 'from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500',
-      shadowClass: 'shadow-pink-500/40',
-      bgGradient: 'from-pink-500/10 to-purple-600/5',
-      icon: <HunterIcon />,
-      btnLabel: 'Launch Hunter →',
-      onClick: () => onNavigate('/hunter'),
-    },
-    {
-      id: 'sniper',
-      label: 'SNIPER',
-      description: 'Post-demo conversion pipeline',
-      stat: 'Convert warm prospects to customers',
-      badge: null,
-      accent: '#14b8a6',
-      borderClass: 'border-teal-500/40 hover:border-teal-400',
-      glowStyle: { boxShadow: '0 0 18px rgba(20, 184, 166, 0.2)' },
-      gradientClass: 'from-teal-500 to-teal-700 hover:from-teal-400 hover:to-teal-600',
-      shadowClass: 'shadow-teal-500/40',
-      bgGradient: 'from-teal-900/10 to-transparent',
-      icon: <SniperIcon />,
-      btnLabel: 'Open Sniper →',
-      onClick: () => onNavigate('/sniper'),
-    },
-    {
-      id: 'homebase',
-      label: 'HOMEBASE',
-      description: 'Your mission command & settings',
-      stat: 'Configure your base of operations',
-      badge: null,
-      accent: '#22c55e',
-      borderClass: 'border-green-500/50 hover:border-green-400',
-      glowStyle: { boxShadow: '0 0 32px rgba(34, 197, 94, 0.2), inset 0 0 24px rgba(34, 197, 94, 0.04)' },
-      gradientClass: 'from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500',
-      shadowClass: 'shadow-green-500/40',
-      bgGradient: 'from-green-500/10 to-emerald-600/5',
-      icon: <HomebaseIcon />,
-      btnLabel: 'Enter Homebase →',
-      onClick: () => onNavigate('/basecamp'),
     },
   ];
 

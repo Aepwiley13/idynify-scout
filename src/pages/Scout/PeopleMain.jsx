@@ -181,9 +181,9 @@ const MODULE_RAIL = [
 
 // ─── Command Center sub-nav items ─────────────────────────────────────────────
 const CC_ITEMS = [
-  { id: 'missions',  label: 'Missions',       Icon: Zap,       desc: 'Create and manage campaigns'      },
   { id: 'people',    label: 'People',         Icon: Users,     desc: 'Full contacts roster — all view'  },
   { id: 'companies', label: 'Companies',      Icon: Building2, desc: 'Full accounts roster — all view'  },
+  { id: 'missions',  label: 'Missions',       Icon: Zap,       desc: 'Create and manage campaigns'      },
   { id: 'weapons',   label: 'Weapons',        Icon: Crosshair, desc: 'Channel selector, message builder' },
   { id: 'arsenal',   label: 'Arsenal',        Icon: Archive,   desc: 'Saved message templates library'  },
   { id: 'outcomes',  label: 'Outcomes',       Icon: BarChart3, desc: 'Mission performance analytics'    },
@@ -267,14 +267,14 @@ function PeopleShellInner({ user }) {
 
   // Resolve active section from URL param or legacy localStorage
   const tabParam = searchParams.get('tab') || location.state?.activeTab || null;
-  const initialSection = (tabParam && TAB_MAP[tabParam]) || 'missions';
+  const initialSection = (tabParam && TAB_MAP[tabParam]) || 'people';
   const [activeSection, setActiveSection] = useState(initialSection);
 
   // Sync section when URL params change
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
     if (tab && TAB_MAP[tab]) setActiveSection(TAB_MAP[tab]);
-    else if (!tab) setActiveSection('missions');
+    else if (!tab) setActiveSection('people');
   }, [searchParams, location.state?.activeTab]);
 
   const switchSection = (sectionId) => {

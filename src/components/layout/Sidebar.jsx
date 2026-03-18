@@ -21,6 +21,11 @@ import {
   Mail,
   Package,
   BarChart3,
+  AlertTriangle,
+  CalendarCheck,
+  Inbox,
+  Sparkles,
+  BookOpen,
   Zap,
   LayoutDashboard
 } from 'lucide-react';
@@ -94,8 +99,16 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       return location.pathname === '/scout' && urlTab === tabName;
     }
     if (path === '/hunter' && tabName) {
-      const urlTab = new URLSearchParams(location.search).get('tab') || 'dashboard';
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'all';
       return location.pathname === '/hunter' && urlTab === tabName;
+    }
+    if (path === '/command-center' && tabName) {
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'people';
+      return location.pathname === '/command-center' && urlTab === tabName;
+    }
+    if (path === '/sniper' && tabName) {
+      const urlTab = new URLSearchParams(location.search).get('tab') || 'people';
+      return location.pathname === '/sniper' && urlTab === tabName;
     }
     return location.pathname === path;
   };
@@ -107,10 +120,46 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const peopleItems = [
     {
       icon: Users,
-      label: 'Command Center',
-      sublabel: 'Overview',
+      label: 'People',
+      sublabel: 'Full contacts roster — all view',
       path: '/command-center',
+      state: { activeTab: 'people' },
       isPrimary: true
+    },
+    {
+      icon: Building2,
+      label: 'Companies',
+      sublabel: 'Full accounts roster — all view',
+      path: '/command-center',
+      state: { activeTab: 'companies' }
+    },
+    {
+      icon: Zap,
+      label: 'Missions',
+      sublabel: 'Create and manage campaigns',
+      path: '/command-center',
+      state: { activeTab: 'missions' }
+    },
+    {
+      icon: Crosshair,
+      label: 'Weapons',
+      sublabel: 'Channel selector, message builder',
+      path: '/command-center',
+      state: { activeTab: 'weapons' }
+    },
+    {
+      icon: Package,
+      label: 'Arsenal',
+      sublabel: 'Saved message templates library',
+      path: '/command-center',
+      state: { activeTab: 'arsenal' }
+    },
+    {
+      icon: BarChart3,
+      label: 'Outcomes',
+      sublabel: 'Mission performance analytics',
+      path: '/command-center',
+      state: { activeTab: 'outcomes' }
     }
   ];
 
@@ -156,12 +205,19 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const scoutItems = [
     {
+      icon: Users,
+      label: 'People',
+      sublabel: 'My Leads',
+      path: '/scout',
+      state: { activeTab: 'all-leads' },
+      isPrimary: true
+    },
+    {
       icon: Star,
       label: 'Daily Discoveries',
       sublabel: 'Review Queue',
       path: '/scout',
-      state: { activeTab: 'daily-leads' },
-      isPrimary: true
+      state: { activeTab: 'daily-leads' }
     },
     {
       icon: Building2,
@@ -211,42 +267,46 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
   const hunterItems = [
     {
       icon: Users,
-      label: 'People',
-      sublabel: 'Active missions',
+      label: 'All People',
+      sublabel: 'Engagement card feed — work your board',
       path: '/hunter',
-      state: { activeTab: 'people' },
+      state: { activeTab: 'all' },
       isPrimary: true
     },
     {
-      icon: Mail,
-      label: 'Weapons',
+      icon: AlertTriangle,
+      label: 'Follow Up Now',
+      sublabel: 'Overdue engagement queue',
       path: '/hunter',
-      state: { activeTab: 'weapons' }
+      state: { activeTab: 'followup' }
     },
     {
-      icon: Crosshair,
-      label: 'Missions',
+      icon: CalendarCheck,
+      label: "Today's Actions",
+      sublabel: 'Due follow-ups & priority contacts',
       path: '/hunter',
-      state: { activeTab: 'missions' }
+      state: { activeTab: 'today' }
     },
     {
-      icon: Package,
-      label: 'Arsenal',
+      icon: Inbox,
+      label: 'Replied',
+      sublabel: 'Contacts who have responded',
       path: '/hunter',
-      state: { activeTab: 'arsenal' }
+      state: { activeTab: 'replied' }
     },
     {
-      icon: LayoutDashboard,
-      label: 'Dashboard',
-      sublabel: 'Operational View',
+      icon: Zap,
+      label: 'Active',
+      sublabel: 'Currently in a sequence',
       path: '/hunter',
-      state: { activeTab: 'dashboard' }
+      state: { activeTab: 'active' }
     },
     {
-      icon: BarChart3,
-      label: 'Outcomes',
+      icon: Sparkles,
+      label: 'New (Unengaged)',
+      sublabel: 'Fresh contacts, not yet touched',
       path: '/hunter',
-      state: { activeTab: 'outcomes' }
+      state: { activeTab: 'new' }
     },
     {
       icon: Settings,
@@ -258,11 +318,54 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const sniperItems = [
     {
-      icon: Crosshair,
-      label: 'Sniper',
-      sublabel: 'Conversion pipeline',
+      icon: Users,
+      label: 'People',
+      sublabel: 'Add to pipeline',
       path: '/sniper',
+      state: { activeTab: 'people' },
       isPrimary: true
+    },
+    {
+      icon: Building2,
+      label: 'Companies',
+      sublabel: 'Saved companies',
+      path: '/sniper',
+      state: { activeTab: 'companies' }
+    },
+    {
+      icon: Target,
+      label: 'Pipeline',
+      sublabel: 'Conversion board',
+      path: '/sniper',
+      state: { activeTab: 'pipeline' }
+    },
+    {
+      icon: Crosshair,
+      label: 'Targets',
+      sublabel: 'All contacts',
+      path: '/sniper',
+      state: { activeTab: 'targets' }
+    },
+    {
+      icon: Activity,
+      label: 'Touches',
+      sublabel: 'Follow-up log',
+      path: '/sniper',
+      state: { activeTab: 'touches' }
+    },
+    {
+      icon: BookOpen,
+      label: 'Playbooks',
+      sublabel: 'Conversion sequences',
+      path: '/sniper',
+      state: { activeTab: 'playbooks' }
+    },
+    {
+      icon: BarChart3,
+      label: 'Outcomes',
+      sublabel: 'Win/loss analytics',
+      path: '/sniper',
+      state: { activeTab: 'outcomes' }
     }
   ];
 

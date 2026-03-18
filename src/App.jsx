@@ -273,7 +273,7 @@ function App() {
         />
       )}
       {user && <CrispChat user={user} />}
-      {user && <MissionControlForce />}
+      {/* WithTheForce button hidden: {user && <MissionControlForce />} */}
       {/* BarryTrigger removed — Barry is now a permanent nav item in each module's icon rail */}
       <Routes>
         {/* Public Routes */}

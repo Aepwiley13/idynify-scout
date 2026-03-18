@@ -187,6 +187,49 @@ export function calculateICPScore(company, icpProfile, weights = DEFAULT_WEIGHTS
 }
 
 /**
+ * Generic numeric range match — used for any post-fetch numeric ICP filter.
+ * Returns 100 (pass) or 0 (fail). Unknown values (null/undefined) always pass through.
+ * @param {number|null} value - The company's value for this field
+ * @param {{ min: number|null, max: number|null }|null} range - The configured range
+ * @returns {number} 100 = pass, 0 = fail
+ */
+export function calculateNumericRangeMatch(value, range) {
+  if (!range || (range.min === null && range.max === null)) return 100; // not configured
+  if (value === null || value === undefined) return 100; // unknown = pass through
+  if (range.min !== null && value < range.min) return 0;
+  if (range.max !== null && value > range.max) return 0;
+  return 100;
+}
+
+/**
+ * Gate function: returns true only if the company passes all active post-fetch range filters.
+ * This runs BEFORE scoring. Companies that fail never enter the queue.
+ * 90% of users have no foundedAgeRange set — this returns true immediately for them.
+ * @param {Object} company - Company data (must have founded_year)
+ * @param {Object} icpProfile - ICP profile
+ * @returns {boolean}
+ */
+export function passesAllFilters(company, icpProfile) {
+  if (!icpProfile) return true;
+
+  // Founded age filter
+  if (icpProfile.foundedAgeRange) {
+    const currentYear = new Date().getFullYear();
+    const { minAge, maxAge } = icpProfile.foundedAgeRange;
+    // Convert age to year range: older company = smaller year
+    const minYear = maxAge !== null && maxAge !== undefined ? currentYear - maxAge : null;
+    const maxYear = minAge !== null && minAge !== undefined ? currentYear - minAge : null;
+    if (calculateNumericRangeMatch(company.founded_year, { min: minYear, max: maxYear }) === 0) {
+      return false;
+    }
+  }
+
+  // Future numeric range filters added here — one block each
+
+  return true;
+}
+
+/**
  * Validate that weights total 100%
  * @param {Object} weights - Weights object
  * @returns {boolean} True if valid

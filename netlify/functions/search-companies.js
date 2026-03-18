@@ -2,6 +2,49 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 
+// ---------------------------------------------------------------------------
+// Post-fetch age filter helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if company.founded_year falls within the configured age range.
+ * Unknown founded_year (null) always passes — never silently exclude.
+ * Only runs when icpProfile.foundedAgeRange is set; otherwise immediate true.
+ */
+function passesAgeFilter(company, foundedAgeRange) {
+  if (!foundedAgeRange) return true;
+  const { minAge, maxAge } = foundedAgeRange;
+  const founded = company.founded_year || null;
+  if (founded === null) return true; // unknown = pass through
+  const currentYear = new Date().getFullYear();
+  const minYear = maxAge !== null && maxAge !== undefined ? currentYear - maxAge : null;
+  const maxYear = minAge !== null && minAge !== undefined ? currentYear - minAge : null;
+  if (minYear !== null && founded < minYear) return false;
+  if (maxYear !== null && founded > maxYear) return false;
+  return true;
+}
+
+/**
+ * Fetch one Apollo page and return { organizations, totalPages }.
+ * Separated so the waterfall loop can call it multiple times.
+ */
+async function fetchApolloPage(apolloQuery, page) {
+  const response = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
+    method: 'POST',
+    headers: getApolloHeaders(),
+    body: JSON.stringify({ ...apolloQuery, page })
+  });
+  if (!response.ok) {
+    await logApolloError(response, { ...apolloQuery, page }, 'search-companies-waterfall');
+    throw new Error(`Apollo returned ${response.status} on page ${page}`);
+  }
+  const data = await response.json();
+  return {
+    organizations: data.organizations || [],
+    totalPages: data.pagination?.total_pages || data.total_pages || 1
+  };
+}
+
 // Apollo industry mapping helpers (copied to avoid import issues)
 // Full list of 150+ Apollo industry tag IDs
 const APOLLO_INDUSTRIES = {
@@ -265,41 +308,76 @@ export const handler = async (event) => {
       throw new Error('Invalid search parameters - please contact support');
     }
 
-    // Call external company search API
-    const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
-      method: 'POST',
-      headers: getApolloHeaders(),
-      body: JSON.stringify(apolloQuery)
-    });
+    // ---------------------------------------------------------------------------
+    // Apollo fetch — single page (no age filter) or waterfall (age filter active)
+    // ---------------------------------------------------------------------------
+    const foundedAgeRange = companyProfile.foundedAgeRange || null;
+    let companies = [];
+    let sparseResults = false;
+    let filterEfficiency = null;
+    let totalFetched = 0;
 
-    if (!apolloResponse.ok) {
-      // Log detailed error for server-side debugging
-      const errorText = await logApolloError(apolloResponse, apolloQuery, 'search-companies');
-      console.error('External API request failed:', apolloResponse.status);
-      console.error('Error details logged above');
+    if (!foundedAgeRange) {
+      // Standard single-page fetch — behavior identical to before this feature
+      const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
+        method: 'POST',
+        headers: getApolloHeaders(),
+        body: JSON.stringify(apolloQuery)
+      });
 
-      // Return user-friendly error messages based on status
-      let userMessage = 'Company search service is temporarily unavailable. Please try again later.';
-
-      if (apolloResponse.status === 422) {
-        console.error('❌ VALIDATION ERROR: Invalid search parameters detected');
-        console.error('   This usually means empty or malformed query data');
-        userMessage = 'Invalid search criteria. Please check your company profile settings and try again, or contact support if this persists.';
-      } else if (apolloResponse.status === 429) {
-        userMessage = 'Search service rate limit exceeded. Please try again in a few minutes.';
-      } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
-        userMessage = 'Search service authentication error. Please contact support.';
-      } else if (apolloResponse.status >= 500) {
-        userMessage = 'Search service is experiencing issues. Please try again later.';
+      if (!apolloResponse.ok) {
+        await logApolloError(apolloResponse, apolloQuery, 'search-companies');
+        console.error('External API request failed:', apolloResponse.status);
+        let userMessage = 'Company search service is temporarily unavailable. Please try again later.';
+        if (apolloResponse.status === 422) {
+          userMessage = 'Invalid search criteria. Please check your company profile settings and try again, or contact support if this persists.';
+        } else if (apolloResponse.status === 429) {
+          userMessage = 'Search service rate limit exceeded. Please try again in a few minutes.';
+        } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
+          userMessage = 'Search service authentication error. Please contact support.';
+        } else if (apolloResponse.status >= 500) {
+          userMessage = 'Search service is experiencing issues. Please try again later.';
+        }
+        throw new Error(userMessage);
       }
 
-      throw new Error(userMessage);
+      const apolloData = await apolloResponse.json();
+      companies = apolloData.organizations || [];
+      console.log(`✅ Found ${companies.length} companies from external API`);
+
+    } else {
+      // Waterfall loop — fetch up to MAX_PAGES until we have enough filtered results
+      const MAX_PAGES = 5;
+      const SPARSE_THRESHOLD = 10;
+      let page = 1;
+      let totalPages = 1;
+      let filtered = [];
+
+      console.log(`🔍 foundedAgeRange active (minAge:${foundedAgeRange.minAge}, maxAge:${foundedAgeRange.maxAge}) — running waterfall fetch`);
+
+      const QUEUE_TARGET = 50; // matches TARGET_QUEUE_SIZE below
+      while (filtered.length < QUEUE_TARGET && page <= MAX_PAGES && page <= totalPages) {
+        const { organizations, totalPages: tp } = await fetchApolloPage(apolloQuery, page);
+        totalPages = tp;
+        totalFetched += organizations.length;
+
+        const passing = organizations.filter(c => passesAgeFilter(c, foundedAgeRange));
+        filtered.push(...passing);
+
+        console.log(`  Page ${page}/${Math.min(totalPages, MAX_PAGES)}: ${organizations.length} from Apollo, ${passing.length} passed age filter (total filtered: ${filtered.length})`);
+        page++;
+      }
+
+      companies = filtered;
+      filterEfficiency = totalFetched > 0 ? Math.round((filtered.length / totalFetched) * 100) / 100 : null;
+      sparseResults = filtered.length < SPARSE_THRESHOLD;
+
+      if (sparseResults) {
+        console.warn(`⚠️ Sparse results: only ${filtered.length} companies passed age filter after fetching ${totalFetched} from Apollo`);
+      }
+
+      console.log(`✅ Waterfall complete: ${filtered.length} companies passed age filter (fetched ${totalFetched} total, efficiency: ${filterEfficiency})`);
     }
-
-    const apolloData = await apolloResponse.json();
-    let companies = apolloData.organizations || [];
-
-    console.log(`✅ Found ${companies.length} companies from external API`);
 
     // Log first 3 companies details for debugging
     if (companies.length > 0) {
@@ -418,7 +496,10 @@ export const handler = async (event) => {
       responseTime,
       metadata: {
         companiesFound: companies.length,
-        companiesAdded: toAdd.length
+        companiesAdded: toAdd.length,
+        foundedAgeFilterActive: !!foundedAgeRange,
+        filterEfficiency,
+        sparseResults: sparseResults || false
       }
     });
 
@@ -435,6 +516,8 @@ export const handler = async (event) => {
         companiesAdded: toAdd.length,
         currentQueueSize: pendingCount + toAdd.length,
         generationTime,
+        sparseResults: sparseResults || false,
+        filterEfficiency,
         message: `Added ${toAdd.length} companies to queue (now ${pendingCount + toAdd.length}/${TARGET_QUEUE_SIZE})`,
         debug: companies.length === 0 ? {
           apolloQuery: apolloQuery,

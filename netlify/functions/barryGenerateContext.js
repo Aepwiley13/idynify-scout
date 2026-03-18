@@ -109,7 +109,9 @@ export const handler = async (event) => {
       industry: companyData.industry || contact.company_industry,
       size: companyData.size || 'Unknown',
       description: companyData.description || 'Not available',
-      website: companyData.website || 'Not available'
+      website: companyData.website || 'Not available',
+      // founded_year explicitly included so Barry never guesses company age
+      founded_year: companyData.founded_year || null
     } : null;
 
     // Build the prompt for Barry — now with RECON context
@@ -144,6 +146,7 @@ ${companyContext ? `COMPANY CONTEXT:
 Company: ${companyContext.name}
 Industry: ${companyContext.industry}
 Size: ${companyContext.size}
+Founded: ${companyContext.founded_year ? companyContext.founded_year : 'Unknown — do not reference company age or founding year'}
 Description: ${companyContext.description}
 Website: ${companyContext.website}
 ` : ''}

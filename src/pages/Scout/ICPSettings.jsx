@@ -5,7 +5,8 @@ import { calculateICPScore } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare } from 'lucide-react';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar } from 'lucide-react';
+import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -71,7 +72,8 @@ export default function ICPSettings() {
           locations: [],
           isNationwide: false,
           targetTitles: [],
-          scoringWeights: DEFAULT_WEIGHTS
+          scoringWeights: DEFAULT_WEIGHTS,
+          foundedAgeRange: null
         });
       }
       setLoading(false);
@@ -210,6 +212,19 @@ export default function ICPSettings() {
         : [...prev.locations, location],
       isNationwide: false
     }));
+  };
+
+  const handleFoundedAgeChange = (minAge, maxAge) => {
+    const bothNull = (minAge === null || minAge === undefined) &&
+                     (maxAge === null || maxAge === undefined);
+    setProfile(prev => ({
+      ...prev,
+      foundedAgeRange: bothNull ? null : { minAge: minAge ?? null, maxAge: maxAge ?? null, includeUnknown: true }
+    }));
+  };
+
+  const handleClearFoundedAge = () => {
+    setProfile(prev => ({ ...prev, foundedAgeRange: null }));
   };
 
   const handleNationwideToggle = () => {
@@ -414,6 +429,24 @@ export default function ICPSettings() {
             </p>
           </div>
         </div>
+
+        {profile.foundedAgeRange && (
+          <div className="summary-card">
+            <div className="summary-icon">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div className="summary-content">
+              <p className="summary-label">Company Age</p>
+              <p className="summary-value">
+                {profile.foundedAgeRange.minAge != null && profile.foundedAgeRange.maxAge != null
+                  ? `${profile.foundedAgeRange.minAge}–${profile.foundedAgeRange.maxAge} yrs`
+                  : profile.foundedAgeRange.minAge != null
+                    ? `${profile.foundedAgeRange.minAge}+ yrs`
+                    : `Up to ${profile.foundedAgeRange.maxAge} yrs`}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="settings-content">
@@ -504,6 +537,30 @@ export default function ICPSettings() {
             ))}
           </div>
         </div>
+
+        {/* Company Age Section */}
+        <NumericRangeFilter
+          label="Company Age"
+          unit="years"
+          minValue={profile.foundedAgeRange?.minAge ?? null}
+          maxValue={profile.foundedAgeRange?.maxAge ?? null}
+          presets={[
+            { label: 'Startup (0–5 yrs)', minValue: null, maxValue: 5 },
+            { label: 'Growth (5–10 yrs)', minValue: 5, maxValue: 10 },
+            { label: 'Established (10+ yrs)', minValue: 10, maxValue: null }
+          ]}
+          helperText={(minAge, maxAge) => {
+            const currentYear = new Date().getFullYear();
+            const fromYear = maxAge != null ? currentYear - maxAge : null;
+            const toYear = minAge != null ? currentYear - minAge : null;
+            if (fromYear && toYear) return `Companies founded between ${fromYear} and ${toYear}`;
+            if (fromYear) return `Companies founded ${fromYear} or later`;
+            if (toYear) return `Companies founded ${toYear} or earlier`;
+            return '';
+          }}
+          onChange={handleFoundedAgeChange}
+          onClear={handleClearFoundedAge}
+        />
 
         {/* Locations Section */}
         <div className="setting-section">
@@ -784,7 +841,10 @@ export default function ICPSettings() {
           {saveSuccess && (
             <div className="success-message">
               <CheckCircle className="w-5 h-5" />
-              <span>Settings saved successfully! Click "Refresh Results" to fetch new companies.</span>
+              <span>
+                Settings saved successfully! Click "Refresh Results" to fetch new companies.
+                {profile.foundedAgeRange && ' Note: companies without founding year data will still appear — look for the Year unknown badge.'}
+              </span>
             </div>
           )}
 

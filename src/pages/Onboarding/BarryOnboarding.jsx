@@ -319,6 +319,7 @@ export default function BarryOnboarding() {
         searchStrategy: extractedICP.searchStrategy || 'industry_only',
         lookalikeSeed: extractedICP.lookalikeSeed || null,
         companyKeywords: extractedICP.companyKeywords || [],
+        foundedAgeRange: extractedICP.foundedAgeRange || null,
         // Standard fields
         scoringWeights: DEFAULT_WEIGHTS,
         updatedAt: new Date().toISOString(),

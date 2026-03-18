@@ -32,6 +32,41 @@
   pointer-events: none;
 }
 
+/* ── Stage badge (top-right of banner) ──────────────────────────── */
+.idc-stage-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 3;
+  user-select: none;
+  pointer-events: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  transition: opacity 0.2s ease;
+}
+
+.idc-stage-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.idc-stage-badge-manual {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
 /* ── Avatar row (straddles banner / body boundary) ──────────────── */
 .idc-avatar-row {
   display: flex;

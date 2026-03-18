@@ -32,6 +32,16 @@ export const BRIGADE = {
   pink:    "#ec4899",   // Referral
 };
 
+// ─── MODULE COLORS (pipeline stage brand colors) ─────────────────────────────
+// One color per module — used by the stage badge and stage chip on contact cards.
+export const MODULE_COLORS = {
+  scout:    "#e8197d",   // Scout module — BRAND.pink
+  hunter:   "#7c3aed",   // Hunter module — BRAND.purple
+  sniper:   "#14b8a6",   // Sniper module — teal
+  basecamp: "#22c55e",   // Basecamp module — green
+  fallback: "#f59e0b",   // Fallback module — amber
+};
+
 // ─── ASSET PATHS ─────────────────────────────────────────────────────────────
 export const ASSETS = {
   barryAvatar:  "/assets/barry_AI.jpg",          // Astronaut bear — circular crop

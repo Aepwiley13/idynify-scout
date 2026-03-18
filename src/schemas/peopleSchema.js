@@ -53,6 +53,13 @@
  *                                           The behavioral contract that drives Barry's strategy for this person.
  *                                           Barry suggests, user confirms. Never auto-assigned.
  *
+ * @property {string}  stage               - Pipeline stage: 'scout' | 'hunter' | 'sniper' | 'basecamp' | 'fallback'
+ *                                           Auto-derived from person_type unless manually overridden.
+ *                                           Drives the stage badge on the contact profile card.
+ *
+ * @property {string}  stage_source        - 'auto' | 'manual_override'
+ *                                           'auto' = derived from person_type; 'manual_override' = user chose explicitly.
+ *
  * @property {string}  relationship_type   - 'prospect' | 'known' | 'partner' | 'delegate'
  *                                           How the user characterizes the existing relationship.
  *
@@ -229,6 +236,8 @@
 // VALIDATION HELPERS
 // ─────────────────────────────────────────────────────────────────
 
+import { deriveStageFromPersonType } from '../constants/stageSystem';
+
 export const PERSON_TYPE_IDS = ['lead', 'customer', 'partner', 'network', 'past_customer'];
 export const LEAD_STATUS_IDS  = ['new_lead', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'on_hold'];
 export const ENGAGE_STATUS_IDS = ['never_engaged', 'in_progress', 'awaiting_reply', 'paused'];
@@ -341,6 +350,8 @@ export function createPersonRecord(identity, personType = 'lead', addedFrom = 'm
     brigade: null,              // Barry recommends on first load — user confirms
     brigade_updated_at: null,
     brigade_history: [],        // Immutable log of all brigade transitions
+    stage: deriveStageFromPersonType(PERSON_TYPE_IDS.includes(personType) ? personType : 'lead'),
+    stage_source: 'auto',       // 'auto' = derived from person_type; 'manual_override' = user chose
     relationship_type: null,
     warmth_level: null,
     strategic_value: null,

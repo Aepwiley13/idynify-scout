@@ -32,6 +32,7 @@ import {
   RELATIONSHIP_TYPES,
   STRATEGIC_VALUES,
 } from '../../constants/structuredFields';
+import { STAGES, STAGE_MAP, STAGE_COLORS, resolveContactStage } from '../../constants/stageSystem';
 import CompanyDetailModal from '../scout/CompanyDetailModal';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
@@ -358,6 +359,9 @@ export default function IdentityCard({
   // Structured field saving indicator
   const [fieldSaving, setFieldSaving] = useState(false);
 
+  // Stage saving indicator
+  const [stageSaving, setStageSaving] = useState(false);
+
   // Tags
   const [tagInput, setTagInput] = useState('');
   const [tagInputOpen, setTagInputOpen] = useState(false);
@@ -370,6 +374,8 @@ export default function IdentityCard({
   const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
   const canSearch = !!contact.linkedin_url || (!!contact.name && !!contact.company_name);
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
+  const effectiveStageId = resolveContactStage(contact);
+  const currentStage = effectiveStageId ? STAGE_MAP[effectiveStageId] : null;
   const email = emailsList[0]?.value || contact.email || contact.work_email;
   const phone = phonesList[0]?.value || contact.phone_mobile || contact.phone_direct || contact.phone;
   const emailVerified = contact.email_status === 'verified';
@@ -590,6 +596,30 @@ export default function IdentityCard({
     }
   }
 
+  // ── Stage ────────────────────────────────────────────────────────────────────
+  async function handleStageSave(stageId) {
+    const user = getEffectiveUser();
+    if (!user || !contact?.id) return;
+    // Toggle off → revert to auto
+    const isToggleOff = contact.stage === stageId && contact.stage_source === 'manual_override';
+    const newStage = isToggleOff ? null : stageId;
+    const newSource = isToggleOff ? 'auto' : 'manual_override';
+    onUpdate({ ...contact, stage: newStage, stage_source: newSource });
+    try {
+      setStageSaving(true);
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+        stage: newStage,
+        stage_source: newSource,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[IdentityCard] Stage save failed:', err);
+      onUpdate(contact);
+    } finally {
+      setStageSaving(false);
+    }
+  }
+
   // ── Tags ─────────────────────────────────────────────────────────────────────
 
   // Close tag input on outside click
@@ -695,6 +725,26 @@ export default function IdentityCard({
       <div className="idc-banner" style={{ background: bannerGradient }}>
         {hasRealPhoto && (
           <img src={contact.photo_url} alt="" className="idc-banner-blur" />
+        )}
+        {/* Stage badge — top-right of banner */}
+        {currentStage && (
+          <div
+            className="idc-stage-badge"
+            style={{
+              background: currentStage.bgColor,
+              border: `1.5px solid ${currentStage.borderColor}`,
+              color: currentStage.color,
+            }}
+          >
+            <span
+              className="idc-stage-badge-dot"
+              style={{ background: currentStage.color }}
+            />
+            {currentStage.label.toUpperCase()}
+            {contact.stage_source === 'manual_override' && (
+              <span className="idc-stage-badge-manual" title="Manually overridden">★</span>
+            )}
+          </div>
         )}
       </div>
 
@@ -910,6 +960,17 @@ export default function IdentityCard({
 
         {/* ── Classification chips row ── */}
         <div className="idc-chips-row">
+
+          {/* Stage */}
+          <FieldChip
+            label="Stage"
+            value={effectiveStageId}
+            options={STAGES}
+            colorMap={STAGE_COLORS}
+            onSelect={handleStageSave}
+            saving={stageSaving}
+            T={T}
+          />
 
           {/* Brigade */}
           <div className="idc-chip-wrap" ref={brigadeRef}>

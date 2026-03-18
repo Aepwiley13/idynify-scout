@@ -24,7 +24,8 @@ function resolveThemeId(stored) {
   if (!stored) return "mission";
   if (THEMES[stored]) return stored;
   // Legacy: 'dark' → mission, 'light' → workspace
-  if (stored === "dark") return "mission";
+  if (stored === "dark")  return "mission";
+  if (stored === "light") return "workspace";
   return "mission";
 }
 

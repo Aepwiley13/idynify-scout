@@ -196,12 +196,19 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
   const scoutItems = [
     {
+      icon: Users,
+      label: 'People',
+      sublabel: 'My Leads',
+      path: '/scout',
+      state: { activeTab: 'all-leads' },
+      isPrimary: true
+    },
+    {
       icon: Star,
       label: 'Daily Discoveries',
       sublabel: 'Review Queue',
       path: '/scout',
-      state: { activeTab: 'daily-leads' },
-      isPrimary: true
+      state: { activeTab: 'daily-leads' }
     },
     {
       icon: Building2,

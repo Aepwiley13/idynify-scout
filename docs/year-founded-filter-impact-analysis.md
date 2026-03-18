@@ -732,3 +732,122 @@ netlify/functions/barryGenerateContext.js        — age range in context string
 ```
 
 One new file (`NumericRangeFilter.jsx`). No migrations. No existing data at risk.
+
+---
+
+## Q7: Multiple Numeric Filters Together
+
+> *"What happens when multiple numeric filters exist together?"*
+
+---
+
+### The two filter systems don't interact — they run sequentially
+
+Before answering compound behavior, the architecture has a clean two-stage structure:
+
+```
+Stage 1: Apollo pre-filters (server-side)
+  industry, companySizes, locations → sent as Apollo query params
+  Apollo returns up to 50 results already narrowed by these dimensions
+
+Stage 2: Post-fetch range gates (Netlify function, in-memory)
+  foundedAgeRange → applied to Apollo results
+  [future] employeeCountRange, revenueAmountRange → same stage
+```
+
+The two stages are sequential, not overlapping. Stage 2 range filters only see results that already passed Stage 1. This is important because it means compound degradation is applied to an already-qualified pool, not the entire Apollo index.
+
+---
+
+### Compound logic: all range gates are AND-combined
+
+A company must pass **every** active range filter to be included. There is no OR behavior, no partial credit, no scoring interaction.
+
+```javascript
+function passesAllRangeFilters(company, icpProfile) {
+  const currentYear = new Date().getFullYear();
+
+  if (icpProfile.foundedAgeRange) {
+    const minYear = icpProfile.foundedAgeRange.maxAge
+      ? currentYear - icpProfile.foundedAgeRange.maxAge : null;
+    const maxYear = icpProfile.foundedAgeRange.minAge
+      ? currentYear - icpProfile.foundedAgeRange.minAge : null;
+    if (calculateNumericRangeMatch(company.founded_year, { min: minYear, max: maxYear }) === 0)
+      return false;
+  }
+
+  // Future range filters added here — one line each
+  // if (icpProfile.employeeCountRange) { ... }
+
+  return true;
+}
+```
+
+Adding a new range filter means one additional block in this function. Nothing else changes — the waterfall loop, the efficiency tracking, and the sparse results logic all operate on the output of this single gate function.
+
+---
+
+### Efficiency degrades multiplicatively — and must be surfaced per-filter
+
+With multiple active range filters, efficiency compounds:
+
+| Scenario | Age filter match rate | Size filter match rate | Combined |
+|----------|----------------------|----------------------|---------|
+| Loose both | 75% | 80% | 60% |
+| One tight | 20% | 80% | 16% |
+| Both tight | 20% | 25% | 5% |
+
+At 5% combined efficiency, a 50-result Apollo page yields 2–3 qualifying companies. The 5-page waterfall ceiling (250 total) yields ~12, which is above the sparse-results threshold of 10. Genuinely extreme cases (both filters very narrow) will hit the floor — which is the correct signal to surface to the user.
+
+**The sparse results warning must identify which filter(s) caused the sparsity.** A generic "no results" message is not useful when the user has multiple filters active. The API response should return per-filter efficiency alongside the combined result:
+
+```json
+{
+  "sparseResults": true,
+  "totalFetched": 250,
+  "combinedMatches": 8,
+  "filterBreakdown": {
+    "foundedAgeRange": { "matched": 52, "rate": 0.21 },
+    "employeeCountRange": { "matched": 38, "rate": 0.15 }
+  },
+  "suggestion": "Your employee count range (15% match rate) is the primary limiting factor. Consider widening it."
+}
+```
+
+The UI translates this into a user-readable notice that names the most restrictive filter.
+
+---
+
+### Range gates vs. the fit score: two separate systems
+
+Range gates (Stage 2) control **inclusion**: does this company enter the queue at all.
+
+`calculateICPScore()` controls **ranking**: once a company is in the queue, how good a fit is it.
+
+These two systems are intentionally separate. A company that passes all range gates still receives a fit score based on industry, location, employee size, and revenue matches. The range gate result is not fed into the fit score — it's binary inclusion logic. This keeps the scoring model clean: scores remain comparable between companies regardless of which range filters are active.
+
+The one interaction: when `foundedAgeRange` is active, the `fit_reasons` array on each company should include a founded-year match line (e.g., `✓ Founded 4 years ago — within target range`). This is for display transparency, not score calculation.
+
+---
+
+### Waterfall ceiling behavior with multiple filters
+
+The 5-page ceiling applies to the **combined** filter, not per filter. We don't run separate waterfalls for each range filter — the single waterfall applies all range gates together. The waterfall terminates when either:
+- `filtered.length >= needed` (queue filled), or
+- `page >= total_pages` (Apollo exhausted), or
+- `page > MAX_PAGES (5)` (safety ceiling)
+
+The ceiling doesn't change based on how many filters are active. If a user stacks multiple narrow filters and the ceiling is hit without filling the queue, that is the correct behavior — surface the sparse warning with per-filter breakdown and let the user decide which filter to relax.
+
+---
+
+### Design rule for future numeric filters
+
+Any future numeric attribute added to the ICP must follow this contract:
+1. Stored as `{ min: number | null, max: number | null }` (or age-based equivalent)
+2. Implemented as one block in `passesAllRangeFilters()`
+3. Uses the shared `calculateNumericRangeMatch()` utility
+4. Contributes to per-filter efficiency tracking in the API response
+5. Does NOT affect `calculateICPScore()` weights — scoring and gating are separate systems
+
+This keeps compound filter behavior predictable and observable regardless of how many filters are added in the future.

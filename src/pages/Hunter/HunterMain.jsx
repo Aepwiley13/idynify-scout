@@ -167,12 +167,12 @@ const MODULE_RAIL = [
 // ─── Hunter execution sub-nav items ──────────────────────────────────────────
 // These mirror the ACTION_LENSES in AllLeads for execution-focused workflow.
 const HUNTER_ITEMS = [
-  { id: 'today',    label: "Today's Actions", Icon: CalendarCheck,  desc: 'Due follow-ups & priority contacts', filter: 'today'        },
+  { id: 'all',      label: 'All People',      Icon: Users,          desc: 'Engagement card feed — work your board', filter: 'all'   },
   { id: 'followup', label: 'Follow Up Now',   Icon: AlertTriangle,  desc: 'Overdue engagement queue',          filter: 'follow_up_due' },
+  { id: 'today',    label: "Today's Actions", Icon: CalendarCheck,  desc: 'Due follow-ups & priority contacts', filter: 'today'        },
   { id: 'replied',  label: 'Replied',         Icon: Inbox,          desc: 'Contacts who have responded',       filter: 'replied'       },
   { id: 'active',   label: 'Active',          Icon: Zap,            desc: 'Currently in a sequence',           filter: 'in_mission'    },
   { id: 'new',      label: 'New (Unengaged)', Icon: Sparkles,       desc: 'Fresh contacts, not yet touched',   filter: 'new'           },
-  { id: 'all',      label: 'All People',      Icon: Users,          desc: 'Engagement card feed — work your board', filter: 'all'   },
 ];
 
 // Orange token for settings accent
@@ -210,8 +210,8 @@ function HunterShellInner({ user }) {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   // Resolve active tab from URL
-  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'today';
-  const initialTab = TAB_MAP[tabParam] || 'today';
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'all';
+  const initialTab = TAB_MAP[tabParam] || 'all';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('hunter_subnav_collapsed') !== 'true');
@@ -222,7 +222,7 @@ function HunterShellInner({ user }) {
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
     if (tab && TAB_MAP[tab]) setActiveTab(TAB_MAP[tab]);
-    else if (!tab) setActiveTab('today');
+    else if (!tab) setActiveTab('all');
   }, [searchParams, location.state?.activeTab]);
 
   const switchTab = (tabId) => {

@@ -285,7 +285,7 @@ export default function MissionControlDashboardV2() {
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               {[
                 { label: 'SCOUT',           icon: <ScoutIcon size="sm" />,           path: '/scout?tab=all-leads', color: 'cyan'   },
-                { label: 'HUNTER',          icon: <HunterIcon size="sm" />,          path: '/hunter',              color: 'pink'   },
+                { label: 'HUNTER',          icon: <HunterIcon size="sm" />,          path: '/hunter?tab=all',      color: 'pink'   },
                 { label: 'SNIPER',          icon: <SniperIcon size="sm" />,          path: '/sniper',              color: 'green'  },
                 { label: 'HOMEBASE',        icon: <HomebaseIcon size="sm" />,        path: '/basecamp',            color: 'green'  },
                 { label: 'COMMAND CENTER',  icon: <CommandCenterIcon size="sm" />,   path: '/command-center',      color: 'cyan'   },

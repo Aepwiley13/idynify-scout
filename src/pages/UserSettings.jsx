@@ -19,7 +19,7 @@ import {
   Volume2, VolumeX, Mail, CheckCircle, AlertTriangle,
   Loader, LogOut, Lock, Smartphone, BarChart3, Calendar,
   Key, Zap, ExternalLink, Layers,
-  RefreshCw, Star, Database, MessageSquare, Share2,
+  RefreshCw, Star, MessageSquare, Share2,
   Radar, Crosshair, Eye, Target, Tent,
   Palette, Check, ChevronLeft, ChevronRight, Home, Settings as SettingsIcon, Clock,
 } from 'lucide-react';
@@ -62,7 +62,6 @@ const PLAN_PRICES  = { starter: '$20 / mo', pro: '$50 / mo' };
 const PLAN_CREDITS = { starter: 400, pro: 1250 };
 
 const INTEGRATION_STUBS = [
-  { id: 'apollo',     name: 'Apollo.io',   desc: 'Sync prospect data and enrichment',     color: '#6366f1', icon: Database    },
   { id: 'hubspot',    name: 'HubSpot',     desc: 'Two-way CRM sync for contacts & deals', color: '#f97316', icon: Layers      },
   { id: 'salesforce', name: 'Salesforce',  desc: 'Enterprise CRM pipeline integration',   color: '#38bdf8', icon: Star        },
   { id: 'slack',      name: 'Slack',       desc: 'Mission alerts and team notifications',  color: '#a78bfa', icon: MessageSquare },

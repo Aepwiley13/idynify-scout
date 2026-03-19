@@ -22,6 +22,7 @@ import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
+import { resolveContactStage } from '../../constants/stageSystem';
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 
@@ -1136,7 +1137,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
           if (mode === 'sniper') return sniperIdsLocal.has(c.id); // Only contacts explicitly added to Sniper
-          if (mode === 'basecamp') return c.person_type === 'customer'; // Basecamp: customers only
+          if (mode === 'basecamp') return resolveContactStage(c) === 'basecamp'; // Basecamp: stage-based
           return true; // 'people' — show all
         });
       setContacts(contactsList);

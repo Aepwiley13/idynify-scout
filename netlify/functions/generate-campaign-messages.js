@@ -40,7 +40,7 @@ export const handler = async (event) => {
     console.log(`🎯 Generating messages for ${contactIds.length} contacts in campaign:`, campaignName);
 
     // Verify Firebase Auth token
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       throw new Error('Firebase API key not configured');
     }

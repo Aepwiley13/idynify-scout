@@ -242,13 +242,13 @@ export const handler = async (event) => {
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
 
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       console.error('❌ FIREBASE_API_KEY not configured in environment');
       throw new Error('Firebase API key not configured. Please contact support.');
     }
 
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
     if (!projectId) {
       console.error('❌ FIREBASE_PROJECT_ID not configured in environment');
       throw new Error('Firebase Project ID not configured. Please contact support.');
@@ -686,7 +686,7 @@ function convertRevenueToNumeric(revenueRange) {
  */
 async function countPendingCompanies(userId, authToken) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
 
     if (!projectId) {
       console.error('❌ Firebase Project ID not configured');
@@ -741,7 +741,7 @@ async function countPendingCompanies(userId, authToken) {
  */
 async function getExistingCompanyIds(userId, authToken) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
 
     if (!projectId) {
       return new Set();
@@ -791,7 +791,7 @@ async function getExistingCompanyIds(userId, authToken) {
 
 async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
 
     if (!projectId) {
       console.error('❌ Firebase Project ID not configured');

@@ -25,7 +25,7 @@ export const handler = async (event) => {
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
 
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       console.error('❌ FIREBASE_API_KEY not configured');
       throw new Error('Firebase API key not configured');

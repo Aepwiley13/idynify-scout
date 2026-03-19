@@ -19,7 +19,7 @@ export const handler = async (event) => {
     console.log('🔐 Initializing Gmail OAuth for user:', userId);
 
     // Verify Firebase Auth token
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       console.error('❌ FIREBASE_API_KEY not configured');
       throw new Error('Firebase API key not configured');

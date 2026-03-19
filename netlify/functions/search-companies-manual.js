@@ -49,7 +49,7 @@ export async function handler(event, context) {
     console.log('🔍 Searching for:', companyName);
 
     // Verify Firebase Auth
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       return {
         statusCode: 500,

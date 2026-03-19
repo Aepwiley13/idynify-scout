@@ -392,7 +392,7 @@ export const handler = async (event) => {
       throw new Error('Claude API key not configured');
     }
 
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       throw new Error('Firebase API key not configured');
     }

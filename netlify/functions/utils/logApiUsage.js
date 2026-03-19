@@ -11,7 +11,7 @@
  */
 export async function logApiUsage(userId, operation, status, options = {}) {
   try {
-    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'idynify-scout-dev';
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev';
 
     // Determine environment from project ID
     const environment = projectId.includes('dev') ? 'dev' : 'prod';

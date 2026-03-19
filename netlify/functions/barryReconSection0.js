@@ -85,7 +85,7 @@ Only include fields you have confirmed. Do not include fields you're still gathe
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
 async function verifyAuth(userId, authToken) {
-  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  const firebaseApiKey = process.env.FIREBASE_API_KEY;
   if (!firebaseApiKey) throw new Error('Firebase API key not configured');
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,

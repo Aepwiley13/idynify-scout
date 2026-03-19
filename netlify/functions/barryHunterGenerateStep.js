@@ -55,7 +55,7 @@ const STEP_ADAPTATION = {
 const TERMINAL_OUTCOMES = ['scheduled', 'not_interested'];
 
 async function verifyAuthToken(authToken, userId) {
-  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  const firebaseApiKey = process.env.FIREBASE_API_KEY;
   if (!firebaseApiKey) throw new Error('Firebase API key not configured');
 
   const res = await fetch(

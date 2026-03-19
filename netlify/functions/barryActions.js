@@ -40,7 +40,7 @@ const db = getFirestore();
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
 async function verifyAuth(userId, authToken) {
-  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  const firebaseApiKey = process.env.FIREBASE_API_KEY;
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: authToken }) }

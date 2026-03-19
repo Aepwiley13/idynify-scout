@@ -17,7 +17,7 @@ export const handler = async (event) => {
 
     // Verify Firebase Auth token
     const firebaseApiKey =
-      process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+      process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) {
       return {
         statusCode: 500,

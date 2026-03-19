@@ -34,7 +34,7 @@
  * @returns {Promise<object>} - { data, fieldsFound, source }
  */
 export async function googleBusinessLookup({ companyName, domain, city, state }) {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.VITE_GOOGLE_PLACES_API_KEY;
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
 
   if (!apiKey) {
     console.warn('⚠️  GOOGLE_PLACES_API_KEY not configured, skipping Google Business lookup');

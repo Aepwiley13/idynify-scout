@@ -159,7 +159,7 @@ export const handler = async (event) => {
     }
 
     // ─── Verify Firebase Auth ───
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
     if (!firebaseApiKey) throw new Error('Firebase API key not configured');
 
     const verifyResponse = await fetch(
@@ -183,7 +183,7 @@ export const handler = async (event) => {
     console.log(`📷 Photo retry for contact ${contactId} | LinkedIn: ${linkedinUrl || 'NONE'} | Name: ${contactName}`);
 
     // ─── Rate Limiting ───
-    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'idynify-scout-dev';
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev';
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const retryDocUrl = `${firestoreUrl}/users/${userId}/contacts/${contactId}`;
     const contactResponse = await fetch(retryDocUrl);

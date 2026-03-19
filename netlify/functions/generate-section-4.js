@@ -29,13 +29,13 @@ export const handler = async (event) => {
     console.log('🎯 Generating Section 4 Ideal Customer Psychographics for user:', userId);
 
     // Verify Firebase Auth token using REST API
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
     if (!projectId) {
       throw new Error('Firebase project ID not configured');
     }
 
     console.log('🔐 Verifying auth token...');
-    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    const apiKey = process.env.FIREBASE_API_KEY;
     if (!apiKey) {
       throw new Error('Firebase API key not configured');
     }

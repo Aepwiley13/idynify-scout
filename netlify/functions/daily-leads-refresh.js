@@ -26,8 +26,8 @@ const handler = async (event) => {
     }
 
     // Get Firebase credentials
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const firebaseApiKey = process.env.FIREBASE_API_KEY;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
 
     if (!firebaseApiKey || !projectId) {
       throw new Error('Firebase credentials not configured');
@@ -196,7 +196,7 @@ async function getServiceAccountToken() {
   // For now, return a placeholder
   // In production, this would use Firebase Admin SDK or service account credentials
   // Since we're calling public Firestore REST API, we can use the API key
-  return process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  return process.env.FIREBASE_API_KEY;
 }
 
 /**
@@ -244,7 +244,7 @@ async function refreshUserQueue(userId, authToken, companyProfile) {
  */
 async function logRefresh(userId, authToken, refreshResult) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
     const logData = {

@@ -1136,7 +1136,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
           if (mode === 'sniper') return sniperIdsLocal.has(c.id); // Only contacts explicitly added to Sniper
-          return true; // 'people' / 'basecamp' — show all
+          if (mode === 'basecamp') return c.person_type === 'customer'; // Basecamp: customers only
+          return true; // 'people' — show all
         });
       setContacts(contactsList);
       setLoading(false);

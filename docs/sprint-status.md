@@ -1,16 +1,88 @@
 # Sprint Status — idynify Scout
-_Last updated: 2026-03-14_
+_Last updated: 2026-03-19_
 
 ---
 
-## Current State: 7 of 10 Done
+## Active Sprint: Go To War (Command Center)
 
-Sprint 1 and Sprint 3 are fully closed in a single commit (`56456d4`).
-Branch: `claude/review-codebase-brief-WqQqZ` (merged to `main`).
+**Branch:** `claude/create-alignment-brief-page-vuwR9`
+**Status:** Day 1 in progress
+
+### Aaron's Pre-Sprint Locked Calls (all 5 resolved)
+
+| # | Item | Decision |
+|---|------|----------|
+| 1 | **Data model** | `waitingForReply: bool` removed from Mission root. Replaced on `mission.roster[n]` with `replyStatus: 'no-reply' \| 'replied' \| 'bounced'` and `lastContactedAt: Timestamp \| null`. This is what Lane 6 queries. |
+| 2 | **Lane 3 scope** | Send engine uses a **global per-sender queue** — not per-mission. 90-second minimum interval across ALL active missions for that user. Prevents simultaneous sends across missions. |
+| 3 | **Barry HUD content** | 8 phase-aware coaching lines written and embedded in `BarryHUD.jsx`. Shell goes up Day 1 with real lines. See `src/components/BarryHUD.jsx`. |
+| 4 | **Blocker gating** | Lanes 1 and 3 start Day 1 regardless of other blockers. They don't wait on each other. |
+| 5 | **Voice/audio** | Deferred to Sprint 2, pending legal review. Not cut — parked. |
+
+### Day 1 Lane Status
+
+**Lane 1 (Frontend / Command Center):**
+- [x] Go To War route created — `/people?tab=go_to_war`, dedicated view in Command Center
+- [x] Scout company card audit — CompanyCard is a swipe-only component, not extensible for list+checkbox. Verdict: build new `ContactRosterRow` list component for roster phase. See GoToWar.jsx Phase 2.
+- [x] Barry HUD shell built — persistent top strip, 8-phase-aware, real coaching lines in place
+
+**Lane 3 (Backend / Infra):**
+- [ ] Check if Hunter email send logs a `sent` event to Firebase — **Answer: No.** `gmail-send.js` updates campaign doc status to "sent" but does NOT emit to a Firebase events collection. `emailLog.js` utility exists but is not wired in. This sets scope: Cloud Tasks architecture must include a send-event write to Firestore for Lane 6 reply tracking.
+- [ ] Cloud Tasks architecture — global per-sender queue, 90s minimum interval (IN PROGRESS)
+
+**Lanes 2, 4, 5, 6:** Blocked pending Lane 1 + 3 foundations.
 
 ---
 
-## ✅ Closed
+## Go To War — Feature Spec
+
+**Location:** Command Center → Go To War tab
+**Route:** `/people?tab=go_to_war`
+**UX:** One room, persistent Barry HUD at top, 8-phase inline flow, URL params for deep-linking
+
+### 8 Phases
+
+| # | Phase | Description |
+|---|-------|-------------|
+| 1 | Brief | Define objective (goal type: book meetings / warm conversations / reengage stalled) |
+| 2 | Roster | Select contacts from list with checkboxes |
+| 3 | Approach | Engagement style + channel selection |
+| 4 | Sequence | Barry-generated message sequence (approval-gated) |
+| 5 | Approve | Per-message review and edit before send |
+| 6 | Launch | Fire. Missions go live. |
+| 7 | Monitor | Track replies and engagement in real time |
+| 8 | Debrief | Record outcomes, train Barry for next wave |
+
+### Data Model (Mission Roster Contact)
+
+```js
+// users/{userId}/missions/{missionId}
+mission.roster[n] = {
+  contactId: string,
+  name: string,
+  email: string | null,
+  phone: string | null,
+
+  // Lane 6 fields — replaces old `waitingForReply: bool`
+  replyStatus: 'no-reply' | 'replied' | 'bounced',   // default: 'no-reply'
+  lastContactedAt: Timestamp | null,                  // set when a message is sent
+
+  currentStepIndex: number,
+  status: 'pending' | 'active' | 'awaiting_outcome' | 'completed',
+  stepHistory: [ /* see mission data model */ ],
+}
+```
+
+### Architecture Notes
+
+- **Send queue:** Global per-sender (not per-mission). Key: `queue:{userId}`. Min interval: 90s between sends across all active missions.
+- **Reply tracking:** After `lastContactedAt` is set, Lane 6 polls for inbound email and updates `replyStatus`.
+- **HUD:** `BarryHUD.jsx` — phase prop drives which coaching line shows. Import into any phase view.
+- **Resume banner:** Shown in Go To War view if any mission has `status = 'active'` with `warPhase` set.
+- **Voice/audio:** Parked. Sprint 2, after legal review.
+
+---
+
+## Previous Sprint: Closed
 
 | # | Item | Notes |
 |---|------|-------|
@@ -21,87 +93,25 @@ Branch: `claude/review-codebase-brief-WqQqZ` (merged to `main`).
 | 6 | Contact snapshot UI | `ContactSnapshot.jsx` + `BarryContext.jsx` wired |
 | 7 | 18-field profile schema | Contract in `scoutContactContract.js` |
 | 8 | Coach wiring | `barry-coach-section.js` live; coach responses in `barryMissionChat` |
+| — | Alignment Brief page | `/recon/alignment-brief` — Barry training score + dimension status |
 
 ---
 
-## 🔜 Remaining — In Priority Order
-
----
+## Backlog (Post Go To War)
 
 ### #9 — BarryICPPanel extraction from `DailyLeads.jsx`
-**Status:** Ready to cut. The blocker (context store) is in production.
-
-**What to do:**
-- `BarryICPPanel` (lines 872–1161, ~290 lines) and `IcpReclarificationModal` (lines 1165–~1260) are inline components inside a 2,561-line file
-- `icpProfile` state and `onSearchComplete` callback live only in `DailyLeads.jsx` local state
-- **Move ICP trigger** → open the unified Barry drawer with `module="scout"` so Barry reads ICP context from the context store like every other module does
-- **Delete** lines 872–1161 (BarryICPPanel) and the `IcpReclarificationModal` component below it
-- **Update** the two call sites at lines 2526 and 2538 to use the unified drawer trigger
-
-**Why first:** Every new feature gets built on top of `DailyLeads`. 2,561 lines with two dead inline components is debt that compounds.
-
----
+**Status:** Ready to cut. Blocker (context store) is in production.
+- `BarryICPPanel` (~290 lines) is inline in a 2,561-line file
+- Move ICP trigger → open unified Barry drawer with `module="scout"`
+- Delete lines 872–1161 + `IcpReclarificationModal`
+- Estimated diff: ~−400 lines in DailyLeads, ~+20 lines wiring
 
 ### #5 — Daily intelligence drops
-**Status:** Nothing exists yet. Three-part build.
-
-**Part 1 — Scheduler**
-- Netlify scheduled function (cron: `0 7 * * *` — 7am per user timezone)
-- Query `users` collection for active users with `lastActive > 30 days ago`
-- Fan out to `barryDailyIntelligence.js` per user
-
-**Part 2 — `barryDailyIntelligence.js`**
-- Load user's RECON profile (from `users/{userId}/recon`) + top contacts (by warmth, last touched)
-- Call Claude to generate: 1 coaching nudge + 2–3 contact follow-up prompts + 1 market signal (if enriched data available)
-- Write result to `users/{userId}/dailyIntel/{date}` in Firestore
-
-**Part 3 — RECON panel UI**
-- New section in `RECONSectionPage.jsx` (or a dedicated panel component)
-- Reads from `users/{userId}/dailyIntel` collection, sorted by date descending
-- Shows today's drop at the top; previous drops collapsed below
-- Empty state: "Your first intel drop arrives tomorrow morning."
-
-**Why this matters:** RECON currently feels like a one-time setup. Daily drops make it a living coaching relationship — highest retention impact of anything left on the list.
-
----
+**Status:** Nothing built yet.
+- Part 1: Netlify cron `0 7 * * *` — fan out to `barryDailyIntelligence.js` per user
+- Part 2: `barryDailyIntelligence.js` — 1 coaching nudge + 2–3 contact prompts + 1 market signal
+- Part 3: RECON panel UI reading `users/{userId}/dailyIntel`
 
 ### #10 — Slack + LinkedIn integrations
-**Status:** LinkedIn enrichment utilities exist (`linkedinSearch.js`, `enrichContact.js`, `retryLinkedInPhoto.js`) — OAuth does not. No Slack code exists anywhere.
-
-**Do Slack first:**
-- Add `slackWebhook` field to Homebase/user settings UI + Firestore `users/{userId}` doc
-- Create `netlify/functions/notify-slack.js` — simple incoming webhook POST
-- Hook into `barryDailyIntelligence.js`: if `slackWebhook` is set, POST the day's intel drop to the user's channel
-- Half-day build. Immediately puts Barry's output into users' actual workflow.
-
-**Then LinkedIn OAuth:**
-- Standard OAuth 2.0 flow via a Netlify function pair (`linkedin-auth-start.js`, `linkedin-auth-callback.js`)
-- Store access token in `users/{userId}/integrations/linkedin`
-- Use token in `linkedinSearch.js` to replace the current scrape-dependent path
-- Longer lift; unblocked by Slack.
-
----
-
-## Architecture Reference
-
-```
-barryContextStore.js        ← pub/sub singleton (done)
-  └── setBarryContext()     ← called by each module page on mount
-  └── useBarryContext()     ← read by BarryTrigger → BarryChat
-
-barryMissionChat.js         ← main conversation function (done)
-  └── effectiveContextStack ← server-side contact load when stack not passed
-  └── moduleContext         ← appended to system prompt from context store
-
-barryDailyIntelligence.js   ← NOT YET BUILT (#5)
-  └── writes → users/{uid}/dailyIntel/{date}
-
-RECONSectionPage.jsx        ← sections 1–10 exist; intel panel NOT YET BUILT (#5)
-```
-
----
-
-## Next PR Target
-
-`#9` (BarryICPPanel removal) is a clean, reviewable PR with no new dependencies.
-Estimated diff: ~−400 lines in `DailyLeads.jsx`, ~+20 lines wiring the context store trigger.
+- Slack first: `slackWebhook` field + `notify-slack.js` + hook into daily intel
+- Then LinkedIn OAuth 2.0 flow

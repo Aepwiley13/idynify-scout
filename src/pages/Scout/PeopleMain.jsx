@@ -19,7 +19,7 @@ import { db, auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield, Users, Building2,
-  Zap, Archive, BarChart3,
+  Zap, Archive, BarChart3, Swords,
   Palette, Check, ChevronLeft, ChevronRight, Home,
   Settings as SettingsIcon, Plus,
 } from 'lucide-react';
@@ -35,6 +35,7 @@ import MissionsSection from '../Hunter/sections/MissionsSection';
 import WeaponsSection from '../Hunter/sections/WeaponsSection';
 import ArsenalSection from '../Hunter/sections/ArsenalSection';
 import OutcomesSection from '../Hunter/sections/OutcomesSection';
+import GoToWar from './GoToWar';
 
 // Command Center accent color
 const CC_CYAN = BRAND.cyan;
@@ -181,22 +182,24 @@ const MODULE_RAIL = [
 
 // ─── Command Center sub-nav items ─────────────────────────────────────────────
 const CC_ITEMS = [
-  { id: 'people',    label: 'People',         Icon: Users,     desc: 'Full contacts roster — all view'  },
-  { id: 'companies', label: 'Companies',      Icon: Building2, desc: 'Full accounts roster — all view'  },
-  { id: 'missions',  label: 'Missions',       Icon: Zap,       desc: 'Create and manage campaigns'      },
-  { id: 'weapons',   label: 'Weapons',        Icon: Crosshair, desc: 'Channel selector, message builder' },
-  { id: 'arsenal',   label: 'Arsenal',        Icon: Archive,   desc: 'Saved message templates library'  },
-  { id: 'outcomes',  label: 'Outcomes',       Icon: BarChart3, desc: 'Mission performance analytics'    },
+  { id: 'people',     label: 'People',       Icon: Users,     desc: 'Full contacts roster — all view'  },
+  { id: 'companies',  label: 'Companies',    Icon: Building2, desc: 'Full accounts roster — all view'  },
+  { id: 'missions',   label: 'Missions',     Icon: Zap,       desc: 'Create and manage campaigns'      },
+  { id: 'go_to_war',  label: 'Go To War',    Icon: Swords,    desc: '8-phase bulk mission launcher'    },
+  { id: 'weapons',    label: 'Weapons',      Icon: Crosshair, desc: 'Channel selector, message builder' },
+  { id: 'arsenal',    label: 'Arsenal',      Icon: Archive,   desc: 'Saved message templates library'  },
+  { id: 'outcomes',   label: 'Outcomes',     Icon: BarChart3, desc: 'Mission performance analytics'    },
 ];
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
 const TAB_MAP = {
-  missions:  'missions',
-  people:    'people',
-  companies: 'companies',
-  weapons:   'weapons',
-  arsenal:   'arsenal',
-  outcomes:  'outcomes',
+  missions:   'missions',
+  people:     'people',
+  companies:  'companies',
+  go_to_war:  'go_to_war',
+  weapons:    'weapons',
+  arsenal:    'arsenal',
+  outcomes:   'outcomes',
 };
 
 // ─── Empty Missions CTA ───────────────────────────────────────────────────────
@@ -339,6 +342,12 @@ function PeopleShellInner({ user }) {
         return (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <SharedCompaniesView mode="all" />
+          </div>
+        );
+      case 'go_to_war':
+        return (
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <GoToWar />
           </div>
         );
       case 'weapons':
@@ -639,6 +648,7 @@ function PeopleShellInner({ user }) {
                 COMMAND CENTER
               </div>
               <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
+
             </div>
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('cc_subnav_collapsed', 'true'); }}

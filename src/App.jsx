@@ -27,6 +27,7 @@ import ReconModulePage from './pages/Recon/ReconModulePage';
 import ReconSectionEditor from './pages/Recon/ReconSectionEditor';
 import ReconSection0 from './pages/Recon/ReconSection0';
 import BarryTraining from './pages/Recon/BarryTraining';
+import AlignmentBrief from './pages/Recon/AlignmentBrief';
 import ReconErrorBoundary from './components/recon/ReconErrorBoundary';
 import Prospects from './pages/Prospects';
 import Questionnaire from './pages/Questionnaire';
@@ -383,6 +384,7 @@ function App() {
           <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
           <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
           <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
+          <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
           <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
           <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
         </Route>

@@ -15,12 +15,13 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { ArrowRight, X, Loader, RotateCcw } from 'lucide-react';
+import { ArrowRight, X, Loader, RotateCcw, Crosshair, Check } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { moveContactToSniper } from '../../utils/moveToSniper';
 
 // ─── Module → chakra config ───────────────────────────────────────────────────
 export const MODULE_CONFIG = {
@@ -70,6 +71,9 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
   const [initLoading, setInitLoading] = useState(true);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [chips, setChips] = useState([]);
+  const [pendingAction, setPendingAction] = useState(null); // { type, contactId, contactName, sniper_reason }
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionDone, setActionDone] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -160,6 +164,17 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
       if (data.success) {
         const barryMsg = { role: 'barry', content: data.response_text };
         setMessages(prev => [...prev, barryMsg]);
+
+        // Handle MOVE_TO_SNIPER intent — surface a confirm card
+        if (data.intent === 'MOVE_TO_SNIPER' && data.contact_id) {
+          setPendingAction({
+            type: 'move_to_sniper',
+            contactId: data.contact_id,
+            contactName: data.contact_name || 'this contact',
+            sniper_reason: data.sniper_reason || 'barry_suggested',
+          });
+          setActionDone(false);
+        }
         const newHistory = data.updatedHistory || [
           ...history,
           { role: 'user', content: msg },
@@ -192,6 +207,31 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
     sendToBarry(msg, conversationHistory);
+  };
+
+  const handleConfirmMoveToSniper = async () => {
+    if (!pendingAction || actionLoading) return;
+    try {
+      setActionLoading(true);
+      const user = getEffectiveUser();
+      if (!user) throw new Error('Not authenticated');
+      await moveContactToSniper({
+        userId: user.uid,
+        contactId: pendingAction.contactId,
+        reason: pendingAction.sniper_reason,
+        actor: 'barry',
+      });
+      setActionDone(true);
+      setMessages(prev => [...prev, {
+        role: 'barry',
+        content: `Done — ${pendingAction.contactName} has been moved to Sniper. You'll find them in the close zone.`,
+      }]);
+    } catch (err) {
+      console.error('[BarryChat] Move to Sniper failed:', err);
+      setMessages(prev => [...prev, { role: 'barry', content: 'Move failed — try again from the contact profile.' }]);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleReset = async () => {
@@ -316,6 +356,54 @@ export default function BarryChat({ module = 'default', context = {}, onClose })
               </div>
             )
           ))}
+
+          {/* MOVE_TO_SNIPER confirm card */}
+          {pendingAction?.type === 'move_to_sniper' && !actionDone && !loading && (
+            <div style={{
+              borderRadius: 12,
+              border: '1px solid rgba(20,184,166,0.35)',
+              background: 'rgba(20,184,166,0.07)',
+              padding: '13px 15px',
+              display: 'flex', flexDirection: 'column', gap: 9,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Crosshair size={14} color="#14b8a6" />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#14b8a6', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Move to Sniper</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: T.text, lineHeight: 1.5 }}>
+                Move <strong>{pendingAction.contactName}</strong> to the Sniper close zone?
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleConfirmMoveToSniper}
+                  disabled={actionLoading}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 8,
+                    background: actionLoading ? 'rgba(20,184,166,0.4)' : 'linear-gradient(135deg,#14b8a6,#0d9488)',
+                    border: 'none', color: '#fff', fontSize: 12, fontWeight: 700,
+                    cursor: actionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {actionLoading
+                    ? <Loader size={12} style={{ animation: 'barrySpin 1s linear infinite' }} />
+                    : <><Crosshair size={12} />Confirm</>
+                  }
+                </button>
+                <button
+                  onClick={() => setPendingAction(null)}
+                  disabled={actionLoading}
+                  style={{
+                    padding: '8px 12px', borderRadius: 8,
+                    background: T.surface, border: `1px solid ${T.border2}`,
+                    color: T.textMuted, fontSize: 12, cursor: 'pointer',
+                  }}
+                >
+                  Not yet
+                </button>
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

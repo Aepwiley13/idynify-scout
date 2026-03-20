@@ -14,7 +14,8 @@ import {
   CheckCircle,
   PlayCircle,
   SkipForward,
-  Flag
+  Flag,
+  Crosshair
 } from 'lucide-react';
 import './EngagementTimeline.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -107,6 +108,13 @@ const EVENT_CONFIG = {
     color: '#10b981',
     bgColor: 'rgba(16, 185, 129, 0.1)',
     actorLabel: 'System'
+  },
+  stage_moved: {
+    icon: Crosshair,
+    label: 'Moved to Sniper',
+    color: '#14b8a6',
+    bgColor: 'rgba(20, 184, 166, 0.1)',
+    actorLabel: null
   }
 };
 
@@ -188,6 +196,10 @@ function getPreviewText(event) {
         : null;
     case 'sequence_completed':
       return 'All steps finished';
+    case 'stage_moved':
+      return meta.reasonLabel
+        ? `${meta.stageFrom || 'Hunter'} → ${meta.stageTo || 'Sniper'} — ${meta.reasonLabel}`
+        : `${meta.stageFrom || 'Hunter'} → ${meta.stageTo || 'Sniper'}`;
     default:
       return null;
   }

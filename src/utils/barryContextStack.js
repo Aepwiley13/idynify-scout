@@ -16,7 +16,7 @@ import {
   collection, query, where, limit,
   getDocs, doc, getDoc
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { calculateReconConfidence } from './reconConfidence';
 
 async function getActiveContacts(userId) {
@@ -94,6 +94,78 @@ async function getActiveMissions(userId) {
   }
 }
 
+/**
+ * Check if a Google Calendar integration is connected for this user.
+ * Returns a lightweight calendar summary: upcoming meetings with Hunter contacts.
+ * Non-blocking — returns empty array on any failure.
+ */
+async function getCalendarContext(userId, contacts) {
+  try {
+    // Check if calendar is connected
+    const calSnap = await getDoc(doc(db, 'users', userId, 'integrations', 'googleCalendar'));
+    if (!calSnap.exists() || calSnap.data().status !== 'connected') return [];
+
+    const user = auth.currentUser;
+    if (!user) return [];
+    const authToken = await user.getIdToken();
+
+    // Fetch upcoming 30-day calendar events
+    const res = await fetch('/.netlify/functions/calendar-list-events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, authToken, maxResults: 30 }),
+    });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const events = data.events || [];
+    if (events.length === 0) return [];
+
+    // Match calendar events to Hunter contacts by email
+    const hunterContactEmails = new Set(
+      contacts
+        .filter(c => c.hunter_status && c.last_interaction !== undefined)
+        .map(c => c.email?.toLowerCase())
+        .filter(Boolean)
+    );
+
+    // Also build a name-based lookup for fuzzy matching
+    const hunterContactNames = contacts
+      .filter(c => c.hunter_status)
+      .map(c => ({ id: c.id, name: c.name?.toLowerCase(), email: c.email?.toLowerCase() }))
+      .filter(c => c.name);
+
+    return events
+      .filter(ev => {
+        const attendeeEmails = (ev.attendees || []).map(a => a.email?.toLowerCase());
+        // Direct email match
+        if (attendeeEmails.some(e => hunterContactEmails.has(e))) return true;
+        // Name in title
+        if (ev.title && hunterContactNames.some(c => ev.title.toLowerCase().includes(c.name))) return true;
+        return false;
+      })
+      .slice(0, 10)
+      .map(ev => {
+        // Find the matched contact
+        const attendeeEmails = (ev.attendees || []).map(a => a.email?.toLowerCase());
+        const matched = contacts.find(c =>
+          attendeeEmails.includes(c.email?.toLowerCase()) ||
+          (ev.title && c.name && ev.title.toLowerCase().includes(c.name.toLowerCase()))
+        );
+        return {
+          eventId: ev.id,
+          title: ev.title,
+          startDateTime: ev.startDateTime,
+          contactId: matched?.id || null,
+          contactName: matched?.name || null,
+        };
+      });
+  } catch (err) {
+    console.warn('[barryContextStack] Calendar context load failed (non-fatal):', err.message);
+    return [];
+  }
+}
+
 function extractSection(dashboardData, sectionId) {
   if (!dashboardData?.modules) return null;
   const reconModule = dashboardData.modules.find(m => m.id === 'recon');
@@ -122,6 +194,9 @@ export async function buildContextStack(userId) {
       getIcpProfile(userId)
     ]);
 
+    // Load calendar context after contacts are resolved (needs contact list for matching)
+    const calendarEvents = await getCalendarContext(userId, contacts);
+
     const dashboardData = dashboardDoc.exists() ? dashboardDoc.data() : null;
     const reconConfidence = calculateReconConfidence(dashboardData);
 
@@ -139,6 +214,7 @@ export async function buildContextStack(userId) {
       missions,
       recon,
       icpProfile: icpProfile || null,
+      calendarEvents,
       user_style: dashboardData?.communicationStyle || null,
       timestamp: new Date().toISOString()
     };
@@ -154,6 +230,7 @@ function emptyStack() {
     missions: [],
     recon: { confidence: 0, enhanced: false },
     icpProfile: null,
+    calendarEvents: [],
     timestamp: new Date().toISOString()
   };
 }

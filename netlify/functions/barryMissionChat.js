@@ -252,6 +252,7 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
   const recon = contextStack?.recon || {};
   const userStyle = contextStack?.user_style || null;
   const icpProfile = contextStack?.icpProfile || null;
+  const calendarEvents = contextStack?.calendarEvents || [];
 
   // Build ICP summary block from structured profile (same field set as buildIcpReclarificationPrompt)
   const icpLines = [];
@@ -302,6 +303,15 @@ CLOSE (SNIPER): Post-demo conversion. Write trust-first follow-ups. Know close r
 GUIDE (HOMEBASE): Help with settings, integrations, and platform configuration.
 CONNECT (REINFORCEMENTS): Surface warm intro paths, referral opportunities, and network connections.
 
+━━━ CALENDAR EVENTS (${calendarEvents.length} upcoming — matched to Hunter contacts) ━━━
+${calendarEvents.length > 0
+  ? calendarEvents.map(ev =>
+      `  "${ev.title}" on ${ev.startDateTime ? new Date(ev.startDateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'TBD'}${ev.contactName ? ` — with ${ev.contactName} (id: ${ev.contactId})` : ''}`
+    ).join('\n')
+  : 'No upcoming calendar meetings with Hunter contacts.'}
+
+IMPORTANT: If you see a calendar event with a Hunter contact, that contact likely had a meeting booked and should be moved to Sniper. Proactively suggest this with a MOVE_TO_SNIPER action.
+
 ━━━ CONTACTS (${contacts.length} total) ━━━
 ${contactSummary || 'No contacts loaded.'}
 
@@ -338,6 +348,7 @@ Classify the user's message into one of:
 - SCHEDULE: set up a call, book time, send calendar invite
 - RESEARCH: find out about, who is the decision maker, what do we know
 - PIPELINE_CHECK: status of pipeline, how many contacts, what's active
+- MOVE_TO_SNIPER: user wants to move a contact from Hunter to Sniper — signals: "move X to sniper", "X had a meeting", "X is ready to close", "X booked a demo", "move X forward", "X is in the close zone" — OR you detect a calendar event with a Hunter contact
 - ICP_CHANGE: user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
 - CUSTOM: anything else
 
@@ -415,6 +426,21 @@ For ICP_CHANGE intent (user signals a new targeting focus — client handles the
   "has_message_angles": false,
   "angles": [],
   "actions": [],
+  "clarifying_question": null
+}
+
+For MOVE_TO_SNIPER intent (user asks to move a contact to Sniper, or you detected a calendar meeting with a Hunter contact — client will show a confirm button):
+{
+  "intent": "MOVE_TO_SNIPER",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "Barry's explanation of why this contact should move to Sniper — 1-2 sentences, specific.",
+  "contact_id": "the contact's id from the context above",
+  "contact_name": "the contact's full name",
+  "sniper_reason": "meeting_booked | demo_completed | positive_discussion | calendar_detected | barry_suggested | manual",
+  "has_message_angles": false,
+  "angles": [],
+  "actions": ["move_to_sniper"],
   "clarifying_question": null
 }`;
 }

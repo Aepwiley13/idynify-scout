@@ -20,6 +20,7 @@ import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firest
 import { db, auth } from '../../../firebase/config';
 import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
+import { resolveContactStage } from '../../../constants/stageSystem';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const GREEN = '#22c55e';
@@ -284,7 +285,7 @@ export default function EngagementCenter() {
     const unsub = onSnapshot(ref, snap => {
       const docs = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(c => !c.is_archived);
+        .filter(c => !c.is_archived && resolveContactStage(c) === 'basecamp');
       setContacts(docs);
       setLoading(false);
     }, () => setLoading(false));
@@ -406,9 +407,9 @@ export default function EngagementCenter() {
     }}>
       {/* ── Page header ── */}
       <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: T.text }}>Engagement center</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: T.text }}>Basecamp Engagement Center</div>
         <div style={{ fontSize: 12, color: T.textFaint, marginTop: 3 }}>
-          Run campaigns, check-in waves, and product updates across your contacts
+          Run campaigns, check-in waves, and product updates across your Basecamp customers
         </div>
       </div>
 
@@ -596,7 +597,7 @@ export default function EngagementCenter() {
                   color: T.textFaint, fontSize: 13,
                 }}>
                   <Users size={24} style={{ marginBottom: 8, opacity: 0.4 }} />
-                  <div>No contacts yet. Add some from the People tab.</div>
+                  <div>No Basecamp customers yet. Move contacts to Basecamp by setting their type to Customer.</div>
                 </div>
               ) : (
                 <div style={{

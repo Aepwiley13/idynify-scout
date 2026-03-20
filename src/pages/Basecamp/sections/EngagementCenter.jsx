@@ -14,7 +14,8 @@ import {
   Zap, Clock, TrendingUp, MessageSquare,
   Mail, ChevronDown, Eye, Send,
   Calendar, CheckCircle2, RotateCcw,
-  Users, AlertCircle, Radio,
+  Users, AlertCircle, Radio, ArrowLeft,
+  X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../../firebase/config';
@@ -259,6 +260,361 @@ function ScheduleRow({ contact, T }) {
   );
 }
 
+// ─── Preview Panel (inline per-recipient email preview) ──────────────────────
+function PreviewPanel({ contacts, selected, messageBody, templateType, channel, personalization, onClose, onLaunch, launching, T }) {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const recipients = contacts.filter(c => selected.has(c.id));
+  const total = recipients.length;
+
+  if (total === 0) return null;
+
+  const contact = recipients[currentIdx];
+  const firstName = contact.first_name || contact.name?.split(' ')[0] || 'there';
+  const personalizedMsg = messageBody.replace(/\{\{first_name\}\}/gi, firstName);
+  const subject = TEMPLATES[templateType]?.subject || 'Custom message';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 24px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+      }}>
+        <button onClick={onClose} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: 'none', border: 'none', color: T.textMuted,
+          fontSize: 12, cursor: 'pointer', padding: 0,
+        }}>
+          <ArrowLeft size={14} /> Back to campaign
+        </button>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: T.textFaint }}>
+          Previewing {currentIdx + 1} of {total} recipients
+        </span>
+      </div>
+
+      {/* Navigator */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '12px 24px', flexShrink: 0,
+      }}>
+        <button
+          onClick={() => setCurrentIdx(i => Math.max(0, i - 1))}
+          disabled={currentIdx === 0}
+          style={{
+            width: 28, height: 28, borderRadius: 7, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            background: T.surface, border: `1px solid ${T.border2}`,
+            color: currentIdx === 0 ? T.textFaint : T.text,
+            cursor: currentIdx === 0 ? 'default' : 'pointer',
+          }}
+        >
+          <ChevronLeft size={14} />
+        </button>
+
+        {/* Recipient pills */}
+        <div style={{ flex: 1, display: 'flex', gap: 6, overflow: 'auto' }}>
+          {recipients.map((r, i) => {
+            const rFirst = r.first_name || r.name?.split(' ')[0] || '?';
+            const initials = [r.first_name?.[0], r.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '??';
+            return (
+              <button
+                key={r.id}
+                onClick={() => setCurrentIdx(i)}
+                style={{
+                  padding: '4px 10px', borderRadius: 14, flexShrink: 0,
+                  border: `1px solid ${i === currentIdx ? GREEN : T.border2}`,
+                  background: i === currentIdx ? `${GREEN}15` : 'transparent',
+                  color: i === currentIdx ? GREEN : T.textMuted,
+                  fontSize: 11, fontWeight: i === currentIdx ? 600 : 400,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <span style={{
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: `${GREEN}18`, fontSize: 8, fontWeight: 700,
+                  color: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {initials}
+                </span>
+                {rFirst}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={() => setCurrentIdx(i => Math.min(total - 1, i + 1))}
+          disabled={currentIdx === total - 1}
+          style={{
+            width: 28, height: 28, borderRadius: 7, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            background: T.surface, border: `1px solid ${T.border2}`,
+            color: currentIdx === total - 1 ? T.textFaint : T.text,
+            cursor: currentIdx === total - 1 ? 'default' : 'pointer',
+          }}
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
+      {/* Email preview */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }}>
+        <div style={{
+          background: T.cardBg, border: `1px solid ${T.border}`,
+          borderRadius: 12, overflow: 'hidden',
+        }}>
+          {/* Email header */}
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: T.textFaint, width: 32 }}>To:</span>
+              <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>
+                {contact.name || `${contact.first_name} ${contact.last_name}`}
+                {contact.email && <span style={{ color: T.textFaint, fontWeight: 400 }}> &lt;{contact.email}&gt;</span>}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: T.textFaint, width: 32 }}>Subj:</span>
+              <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>{subject}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <span style={{ fontSize: 11, color: T.textFaint, width: 32 }}>Via:</span>
+              <span style={{ fontSize: 11, color: T.textMuted }}>{channel}</span>
+            </div>
+          </div>
+
+          {/* Email body */}
+          <div style={{ padding: '16px 16px 20px' }}>
+            <div style={{
+              fontSize: 13, color: T.text, lineHeight: 1.75,
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            }}>
+              {personalizedMsg}
+            </div>
+          </div>
+
+          {/* Personalization note */}
+          {personalization === 'Barry personalizes each' && (
+            <div style={{
+              padding: '10px 16px', borderTop: `1px solid ${T.border}`,
+              background: `${GREEN}08`, display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <Zap size={12} color={GREEN} />
+              <span style={{ fontSize: 11, color: GREEN }}>
+                Barry will further personalize this using RECON context and Gmail history
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Contact info card */}
+        <div style={{
+          marginTop: 12, padding: '12px 16px',
+          background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 10,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textFaint, letterSpacing: 1, marginBottom: 8 }}>
+            RECIPIENT DETAILS
+          </div>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
+                {contact.name || `${contact.first_name} ${contact.last_name}`}
+              </div>
+              <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
+                {contact.title}{contact.title && contact.company ? ' at ' : ''}{contact.company}
+              </div>
+            </div>
+            {contact.email && (
+              <div>
+                <div style={{ fontSize: 10, color: T.textFaint }}>Email</div>
+                <div style={{ fontSize: 11, color: T.text }}>{contact.email}</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 10, color: T.textFaint }}>Status</div>
+              <div style={{ fontSize: 11, color: STATUS_CONFIG[getContactWaveStatus(contact)]?.color }}>
+                {STATUS_CONFIG[getContactWaveStatus(contact)]?.label}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom action bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 24px', borderTop: `1px solid ${T.border}`,
+        background: T.cardBg, flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 12, color: T.textMuted }}>
+          <strong style={{ color: T.text }}>{total} recipients</strong> ready to launch
+        </span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose} style={{
+            padding: '8px 14px', borderRadius: 8,
+            border: `1px solid ${T.border2}`, background: T.surface,
+            color: T.textMuted, fontSize: 12, cursor: 'pointer',
+          }}>
+            Edit campaign
+          </button>
+          <button
+            onClick={onLaunch}
+            disabled={launching}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 18px', borderRadius: 8,
+              border: `1px solid ${GREEN}`, background: `${GREEN}20`,
+              color: GREEN, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              opacity: launching ? 0.7 : 1,
+            }}
+          >
+            <Send size={13} /> Launch wave →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Launch Center (post-launch review) ──────────────────────────────────────
+function LaunchCenter({ wave, contacts, onDismiss, T }) {
+  const recipients = contacts.filter(c => wave.recipientIds?.includes(c.id));
+  const sentAt = wave.sentAt?.toDate?.() || (wave.sentAt ? new Date(wave.sentAt) : new Date());
+  const dateStr = sentAt.toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Success header */}
+      <div style={{
+        padding: '24px 24px 16px', textAlign: 'center',
+        borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: `${GREEN}18`, border: `2px solid ${GREEN}40`,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 12,
+        }}>
+          <CheckCircle2 size={24} color={GREEN} />
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>Wave Launched!</div>
+        <div style={{ fontSize: 12, color: T.textFaint, marginTop: 4 }}>{dateStr}</div>
+      </div>
+
+      {/* Wave summary */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
+        <div style={{
+          display: 'flex', gap: 10, marginBottom: 16,
+        }}>
+          <StatCard value={wave.stats?.sent || 0} label="Messages sent" color={GREEN} T={T} />
+          <StatCard value={wave.stats?.replied || 0} label="Replies" color={BLUE} T={T} />
+          <StatCard value={wave.stats?.booked || 0} label="Meetings booked" color={AMBER} T={T} />
+        </div>
+
+        {/* Wave details */}
+        <div style={{
+          background: T.cardBg, border: `1px solid ${T.border}`,
+          borderRadius: 12, padding: 16, marginBottom: 16,
+        }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 2 }}>Campaign</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{wave.name}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 2 }}>Channel</div>
+              <div style={{ fontSize: 12, color: T.text }}>{wave.channel}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 2 }}>Personalization</div>
+              <div style={{ fontSize: 12, color: T.text }}>{wave.personalization}</div>
+            </div>
+          </div>
+
+          <div style={{
+            fontSize: 12, color: T.textMuted, lineHeight: 1.6,
+            padding: '10px 12px', background: T.surface,
+            border: `1px solid ${T.border2}`, borderRadius: 8,
+            whiteSpace: 'pre-wrap',
+          }}>
+            {wave.message}
+          </div>
+        </div>
+
+        {/* Recipients list */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: T.textFaint, marginBottom: 10 }}>
+            RECIPIENTS ({recipients.length})
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {recipients.map(contact => {
+              const initials = [contact.first_name?.[0], contact.last_name?.[0]]
+                .filter(Boolean).join('').toUpperCase() || '??';
+              const status = getContactWaveStatus(contact);
+              const cfg = STATUS_CONFIG[status];
+
+              return (
+                <div key={contact.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', background: T.cardBg,
+                  border: `1px solid ${T.border}`, borderRadius: 8,
+                }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: `${GREEN}18`, border: `1.5px solid ${GREEN}40`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 700, color: GREEN, flexShrink: 0,
+                  }}>
+                    {initials}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
+                      {contact.name || `${contact.first_name} ${contact.last_name}`}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.textFaint }}>
+                      {contact.email || contact.title || ''}
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 3,
+                  }}>
+                    <CheckCircle2 size={12} color={GREEN} />
+                    <span style={{ fontSize: 10, color: GREEN }}>Sent</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '12px 24px', borderTop: `1px solid ${T.border}`,
+        background: T.cardBg, flexShrink: 0, gap: 12,
+      }}>
+        <button onClick={onDismiss} style={{
+          padding: '8px 18px', borderRadius: 8,
+          border: `1px solid ${T.border2}`, background: T.surface,
+          color: T.textMuted, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+        }}>
+          New campaign
+        </button>
+        <button onClick={() => onDismiss('past')} style={{
+          padding: '8px 18px', borderRadius: 8,
+          border: `1px solid ${GREEN}`, background: `${GREEN}15`,
+          color: GREEN, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+        }}>
+          View all waves
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function EngagementCenter() {
   const T = useT();
@@ -275,6 +631,8 @@ export default function EngagementCenter() {
   const [waves, setWaves]             = useState([]);
   const [launching, setLaunching]     = useState(false);
   const [launchSuccess, setLaunchSuccess] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [launchedWave, setLaunchedWave] = useState(null);
 
   // ── Load contacts ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -384,14 +742,12 @@ export default function EngagementCenter() {
         },
       };
 
-      await addDoc(collection(db, 'users', user.uid, 'waves'), waveData);
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'waves'), waveData);
 
       setLaunchSuccess(true);
+      setShowPreview(false);
+      setLaunchedWave({ id: docRef.id, ...waveData, sentAt: new Date() });
       setSelected(new Set());
-      setTimeout(() => {
-        setLaunchSuccess(false);
-        setActiveTab('past');
-      }, 2000);
     } catch (err) {
       console.error('Wave launch error:', err);
     } finally {
@@ -399,7 +755,62 @@ export default function EngagementCenter() {
     }
   }, [selected, messageBody, templateType, channel, personalization, activeUser]);
 
+  // ── Open preview ──────────────────────────────────────────────────────────
+  const handleOpenPreview = useCallback(() => {
+    if (selected.size === 0 || !messageBody.trim()) return;
+    setShowPreview(true);
+  }, [selected, messageBody]);
+
+  // ── Dismiss launch center ─────────────────────────────────────────────────
+  const handleDismissLaunchCenter = useCallback((goTo) => {
+    setLaunchedWave(null);
+    setLaunchSuccess(false);
+    if (goTo === 'past') setActiveTab('past');
+    else setActiveTab('new');
+  }, []);
+
   // ─── Render ────────────────────────────────────────────────────────────────
+
+  // Launch Center view (post-launch review)
+  if (launchedWave) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', height: '100%',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}>
+        <LaunchCenter
+          wave={launchedWave}
+          contacts={contacts}
+          onDismiss={handleDismissLaunchCenter}
+          T={T}
+        />
+      </div>
+    );
+  }
+
+  // Preview panel view (pre-launch review)
+  if (showPreview) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', height: '100%',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}>
+        <PreviewPanel
+          contacts={contacts}
+          selected={selected}
+          messageBody={messageBody}
+          templateType={templateType}
+          channel={channel}
+          personalization={personalization}
+          onClose={() => setShowPreview(false)}
+          onLaunch={handleLaunchWave}
+          launching={launching}
+          T={T}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
@@ -532,11 +943,16 @@ export default function EngagementCenter() {
 
                 {/* Preview button */}
                 <button
+                  onClick={handleOpenPreview}
+                  disabled={selected.size === 0 || !messageBody.trim()}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '7px 14px', borderRadius: 8,
-                    border: `1px solid ${T.border2}`, background: T.surface,
-                    color: T.textMuted, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    border: `1px solid ${selected.size > 0 && messageBody.trim() ? GREEN : T.border2}`,
+                    background: selected.size > 0 && messageBody.trim() ? `${GREEN}10` : T.surface,
+                    color: selected.size > 0 && messageBody.trim() ? GREEN : T.textFaint,
+                    fontSize: 12, fontWeight: 500,
+                    cursor: selected.size === 0 || !messageBody.trim() ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <Eye size={13} />
@@ -688,8 +1104,8 @@ export default function EngagementCenter() {
             }
           </span>
           <button
-            onClick={handleLaunchWave}
-            disabled={launching || !messageBody.trim()}
+            onClick={handleOpenPreview}
+            disabled={!messageBody.trim()}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 18px', borderRadius: 8,
@@ -698,7 +1114,7 @@ export default function EngagementCenter() {
               flexShrink: 0,
             }}
           >
-            Preview messages ↗
+            <Eye size={13} /> Preview messages ↗
           </button>
         </div>
       )}

@@ -12,7 +12,8 @@ import { useActiveUserId, useImpersonation } from '../../context/ImpersonationCo
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
-  Target, Plus, Loader, ArrowUpDown, Crosshair, Tag, ChevronDown,
+  Target, Plus, Loader, ArrowUpDown, Crosshair, Tag, ChevronDown, ChevronRight,
+  PanelLeft, Columns, PanelRight,
   CalendarCheck, AlertTriangle, Inbox, Sparkles, Clock, Flame, TrendingUp,
   Factory, MapPin, Filter, MoreHorizontal,
 } from 'lucide-react';
@@ -1016,6 +1017,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   const [listSelected, setListSelected] = useState(null);
   const [panelContactId, setPanelContactId] = useState(null);
   const [panelAutoEngage, setPanelAutoEngage] = useState(false);
+  const [panelLayout, setPanelLayout] = useState(() => localStorage.getItem('al_panelLayout') || 'split'); // 'split' | 'list-full' | 'profile-full'
 
   const listRef = useRef(null);
   const [listScrollPos, setListScrollPos] = useState(0);
@@ -1541,6 +1543,30 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
               >{l}</button>
             ))}
           </div>
+
+          {/* Panel layout controls — desktop only, visible when a profile is open */}
+          {!isMobile && panelContactId && (
+            <div style={{ display: 'flex', gap: 2, background: T.surface, borderRadius: 8, padding: 3 }}>
+              {[
+                ['list-full',    PanelLeft,  'Expand list (hide profile)'],
+                ['split',        Columns,    'Split view'],
+                ['profile-full', PanelRight, 'Expand profile (hide list)'],
+              ].map(([layout, Icon, title]) => (
+                <button
+                  key={layout}
+                  title={title}
+                  onClick={() => { setPanelLayout(layout); localStorage.setItem('al_panelLayout', layout); }}
+                  style={{
+                    padding: '5px 8px', borderRadius: 6, border: 'none',
+                    background: panelLayout === layout ? BRAND.pink : 'transparent',
+                    color: panelLayout === layout ? '#fff' : T.textMuted,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    transition: 'all 0.15s',
+                  }}
+                ><Icon size={13} /></button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Action-oriented tabs */}
@@ -1814,8 +1840,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
 
       {/* ── Content ── */}
       <div style={{ flex: isMobile ? 'none' : 1, display: 'flex', overflow: isMobile ? 'visible' : 'hidden' }}>
-        {/* Left: list/cards */}
-        {!(isMobile && panelContactId) && (
+        {/* Left: list/cards — hidden when profile is in full-screen mode */}
+        {!(isMobile && panelContactId) && panelLayout !== 'profile-full' && (
         <div
           ref={listRef}
           style={{
@@ -1844,7 +1870,10 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   onEngage={() => {
                     savedListScroll.current = listRef.current?.scrollTop ?? 0;
                     if (isMobile) { openMobileProfile(c.id); }
-                    else { setPanelAutoEngage(true); setPanelContactId(c.id); }
+                    else {
+                      if (panelLayout === 'list-full') { setPanelLayout('split'); localStorage.setItem('al_panelLayout', 'split'); }
+                      setPanelAutoEngage(true); setPanelContactId(c.id);
+                    }
                   }}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
@@ -1883,7 +1912,10 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                     setListSelected(c.id);
                     setPanelAutoEngage(false);
                     if (isMobile) openMobileProfile(c.id);
-                    else setPanelContactId(c.id);
+                    else {
+                      if (panelLayout === 'list-full') { setPanelLayout('split'); localStorage.setItem('al_panelLayout', 'split'); }
+                      setPanelContactId(c.id);
+                    }
                   }}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
@@ -1899,11 +1931,34 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         </div>
         )}
 
-        {/* Right: contact profile panel */}
-        {panelContactId && (
+        {/* Divider caret — sits on the border between the two panels in split mode */}
+        {!isMobile && panelContactId && panelLayout === 'split' && (
+          <div style={{ position: 'relative', width: 0, flexShrink: 0, display: 'flex', alignItems: 'center', zIndex: 10 }}>
+            <button
+              title="Expand profile"
+              onClick={() => { setPanelLayout('profile-full'); localStorage.setItem('al_panelLayout', 'profile-full'); }}
+              style={{
+                position: 'absolute', left: -13,
+                width: 26, height: 26, borderRadius: '50%',
+                background: T.cardBg, border: `1px solid ${T.border2}`,
+                boxShadow: `0 2px 8px ${T.isDark ? '#00000060' : '#00000018'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: T.textMuted, padding: 0,
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = BRAND.pink; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = BRAND.pink; }}
+              onMouseLeave={e => { e.currentTarget.style.background = T.cardBg; e.currentTarget.style.color = T.textMuted; e.currentTarget.style.borderColor = T.border2; }}
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
+
+        {/* Right: contact profile panel — hidden when list is in full-screen mode */}
+        {panelContactId && panelLayout !== 'list-full' && (
           <div
             style={{
-              width: isMobile ? '100%' : '52%',
+              width: isMobile ? '100%' : panelLayout === 'profile-full' ? '100%' : '52%',
               flexShrink: 0,
               borderLeft: isMobile ? 'none' : `1px solid ${T.border}`,
               overflowY: 'auto',
@@ -1947,6 +2002,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                       setPanelContactId(null);
                       setListSelected(null);
                       setPanelAutoEngage(false);
+                      setPanelLayout('split');
+                      localStorage.setItem('al_panelLayout', 'split');
                       requestAnimationFrame(() => {
                         if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
                       });
@@ -1955,7 +2012,17 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   >
                     <ChevronLeft size={13} />Close
                   </button>
-                  <span style={{ fontSize: 11, color: T.textFaint }}>Contact Profile</span>
+                  <span style={{ fontSize: 11, color: T.textFaint, flex: 1 }}>Contact Profile</span>
+                  {/* Back-to-list caret when profile is full-screen */}
+                  {panelLayout === 'profile-full' && (
+                    <button
+                      title="Back to split view"
+                      onClick={() => { setPanelLayout('split'); localStorage.setItem('al_panelLayout', 'split'); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 7, padding: '5px 11px', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+                    >
+                      <ChevronLeft size={13} />Show List
+                    </button>
+                  )}
                 </>
               )}
             </div>

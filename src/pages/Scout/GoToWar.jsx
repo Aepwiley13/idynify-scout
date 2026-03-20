@@ -4,37 +4,44 @@
  * Dedicated 8-phase wizard for launching bulk missions against a roster of contacts.
  * NOT a modal — this is a full section inside the Command Center shell.
  *
- * Phase 1: Brief     — Define objective (goal type + mission name)
- * Phase 2: Roster    — Select contacts via checkbox list (new component, not CompanyCard)
- * Phase 3: Approach  — Engagement style + channel [stub — Sprint Day 2]
- * Phase 4: Sequence  — Barry-generated message plan [stub — Sprint Day 2]
- * Phase 5: Approve   — Per-message review + edit [stub — Sprint Day 2]
- * Phase 6: Launch    — Fire [stub — Sprint Day 3]
- * Phase 7: Monitor   — Reply tracking [stub — Sprint Day 3]
- * Phase 8: Debrief   — Outcome recording [stub — Sprint Day 3]
+ * Phase 1: Brief          — Define objective (goal type + mission name)
+ * Phase 2: Roster         — Select contacts via checkbox list
+ * Phase 3: ICP & Companies — ICP input + company list with approve/disapprove
+ * Phase 4: Contacts       — Inline company panel, add decision makers to mission
+ * Phase 5: Sequence       — Import Hunter strategy config + Barry sequence generation
+ * Phase 6: Launch         — Launch mission + manual send feed
+ * Phase 7: Monitor        — Live feed with Queued/Sent/Awaiting Reply
+ * Phase 8: Debrief        — Outcome recording
  *
- * Scout company card audit (Day 1):
- *   CompanyCard is swipe-only and cannot be extended for list+checkbox mode.
- *   Go To War uses a new ContactRosterRow component (see below) for Phase 2.
- *
- * Data model:
- *   mission.roster[n].replyStatus:     'no-reply' | 'replied' | 'bounced'
- *   mission.roster[n].lastContactedAt: Timestamp | null
- *   (replaces the previously-planned `waitingForReply: bool` on the mission root)
+ * Sprint A: Email only. Existing saved contacts/companies. Manual-approved sends.
  */
 
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import {
   Swords, Target, MessageSquare, RefreshCw,
   ChevronRight, ChevronLeft, Check, Search,
-  AlertCircle, Loader, Users,
+  AlertCircle, Loader, Users, Building2, Globe,
+  Linkedin, ThumbsUp, ThumbsDown, UserPlus,
+  ChevronDown, Crosshair, Clock, Zap, ArrowRight,
+  Sparkles, Loader2, Rocket, Send, Eye,
+  MailCheck, Clock3, CheckCircle, XCircle,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { BRAND } from '../../theme/tokens';
+import { BRAND, ASSETS } from '../../theme/tokens';
 import BarryHUD, { PHASE_LABELS } from '../../components/BarryHUD';
+import {
+  OUTCOME_GOALS,
+  ENGAGEMENT_STYLES,
+  MISSION_TIMEFRAMES,
+  NEXT_STEP_TYPES,
+  getLabelById,
+} from '../../constants/structuredFields';
+import StepApprovalCard from '../../components/hunter/StepApprovalCard';
+import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
+import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
 
 const WAR_ACCENT = '#f97316'; // orange — distinct from CC cyan so Go To War feels like action
 const TOTAL_PHASES = 8;
@@ -186,44 +193,6 @@ function ContactRosterRow({ contact, selected, onToggle, T }) {
   );
 }
 
-// ─── Phase stubs (Phases 3–8) ─────────────────────────────────────────────────
-function PhaseStub({ phaseIndex, T }) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 48,
-        textAlign: 'center',
-      }}
-    >
-      <div
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: 14,
-          background: `${WAR_ACCENT}15`,
-          border: `1.5px solid ${WAR_ACCENT}30`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 16,
-        }}
-      >
-        <Swords size={22} color={WAR_ACCENT} />
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 6 }}>
-        Phase {phaseIndex + 1} — {PHASE_LABELS[phaseIndex]}
-      </div>
-      <div style={{ fontSize: 13, color: T.textFaint, maxWidth: 360, lineHeight: 1.6 }}>
-        Building this phase in the current sprint. Complete Phases 1 and 2 to continue.
-      </div>
-    </div>
-  );
-}
 
 // ─── GoToWar ──────────────────────────────────────────────────────────────────
 export default function GoToWar() {
@@ -242,6 +211,45 @@ export default function GoToWar() {
   const [contactsError, setContactsError]     = useState(null);
   const [selected, setSelected]       = useState(new Set());
   const [search, setSearch]           = useState('');
+
+  // Phase 3: ICP & Companies
+  const [objectiveSentence, setObjectiveSentence] = useState('');
+  const [icpGeo, setIcpGeo]               = useState('');
+  const [icpIndustry, setIcpIndustry]     = useState('');
+  const [icpTitle, setIcpTitle]           = useState('');
+  const [icpRevenue, setIcpRevenue]       = useState('');
+  const [companies, setCompanies]         = useState([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [approvedCompanies, setApprovedCompanies] = useState(new Set());
+  const [companySearch, setCompanySearch] = useState('');
+
+  // Phase 4: Contacts — inline company expansion + mission contacts
+  const [expandedCompanyId, setExpandedCompanyId] = useState(null);
+  const [companyContacts, setCompanyContacts]     = useState({});  // companyId → contacts[]
+  const [loadingCompanyContacts, setLoadingCompanyContacts] = useState(null);
+  const [missionContacts, setMissionContacts]     = useState([]); // contacts added to mission
+
+  // Phase 5: Sequence config (imported from Hunter CreateMission)
+  const [outcomeGoal, setOutcomeGoal]         = useState(null);
+  const [engagementStyle, setEngagementStyle] = useState(null);
+  const [timeframe, setTimeframe]             = useState(null);
+  const [nextStepType, setNextStepType]       = useState(null);
+  const [microSequence, setMicroSequence]     = useState(null);
+  const [sequenceLoading, setSequenceLoading] = useState(false);
+  const [sequenceError, setSequenceError]     = useState(null);
+
+  // Phase 6: Launch + Send
+  const [missionLaunched, setMissionLaunched] = useState(false);
+  const [launchingMission, setLaunchingMission] = useState(false);
+  const [activeMissionId, setActiveMissionId] = useState(null);
+  const [sendingStep, setSendingStep]         = useState(null); // contactId being sent
+  const [sentSteps, setSentSteps]             = useState({});   // contactId → Set of step indices sent
+
+  // Phase 7: Monitor — outcomes
+  const [contactOutcomes, setContactOutcomes] = useState({}); // contactId → outcome string
+
+  // Phase 8: Debrief
+  const [debriefNotes, setDebriefNotes] = useState('');
 
   // Load contacts when entering Phase 2
   useEffect(() => {
@@ -265,6 +273,221 @@ export default function GoToWar() {
       setContactsError('Failed to load contacts. Try refreshing.');
     } finally {
       setContactsLoading(false);
+    }
+  }
+
+  // Load companies when entering Phase 3
+  useEffect(() => {
+    if (phase !== 2) return;
+    if (companies.length > 0) return;
+    loadCompanies();
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadCompanies() {
+    setCompaniesLoading(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const snap = await getDocs(
+        query(collection(db, 'users', user.uid, 'companies'), where('status', '==', 'accepted'))
+      );
+      const companyList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setCompanies(companyList);
+    } catch (err) {
+      console.error('[GoToWar] companies load error:', err);
+    } finally {
+      setCompaniesLoading(false);
+    }
+  }
+
+  // Load contacts for a specific company (Phase 4 inline expansion)
+  async function loadCompanyContacts(companyId) {
+    if (companyContacts[companyId]) return; // already loaded
+    setLoadingCompanyContacts(companyId);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const snap = await getDocs(
+        query(collection(db, 'users', user.uid, 'contacts'), where('company_id', '==', companyId))
+      );
+      const contactList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setCompanyContacts((prev) => ({ ...prev, [companyId]: contactList }));
+    } catch (err) {
+      console.error('[GoToWar] company contacts load error:', err);
+    } finally {
+      setLoadingCompanyContacts(null);
+    }
+  }
+
+  // Add contact to mission (Phase 4)
+  function addToMission(contact, company) {
+    if (missionContacts.find((c) => c.contactId === contact.id)) return; // already added
+    setMissionContacts((prev) => [
+      ...prev,
+      {
+        contactId: contact.id,
+        name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || 'Unknown',
+        firstName: contact.firstName || null,
+        lastName: contact.lastName || null,
+        email: contact.email || null,
+        phone: contact.phone || null,
+        title: contact.title || contact.current_position_title || null,
+        companyId: company?.id || contact.company_id || null,
+        companyName: company?.name || contact.company_name || null,
+        addedFrom: 'saved',
+        currentStepIndex: 0,
+        lastTouchDate: null,
+        status: 'active',
+        sequenceStatus: 'pending',
+        stepHistory: [],
+        lastOutcome: null,
+        replyStatus: 'no-reply',
+        lastContactedAt: null,
+        manualOutcome: null,
+      },
+    ]);
+  }
+
+  function removeFromMission(contactId) {
+    setMissionContacts((prev) => prev.filter((c) => c.contactId !== contactId));
+  }
+
+  // Phase 5: Generate sequence from Barry
+  async function generateMissionSequence() {
+    setSequenceLoading(true);
+    setSequenceError(null);
+    try {
+      const user = getEffectiveUser();
+      if (!user) throw new Error('Not authenticated');
+      const token = await user.getIdToken();
+      const response = await fetch('/.netlify/functions/barryGenerateMissionSequence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: token,
+          missionFields: {
+            outcome_goal: outcomeGoal,
+            engagement_style: engagementStyle,
+            timeframe: timeframe,
+            next_step_type: nextStepType,
+            objective_sentence: objectiveSentence || null,
+          },
+          contacts: missionContacts.slice(0, 5),
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to generate sequence');
+      const data = await response.json();
+      if (data.success && data.microSequence) {
+        setMicroSequence(data.microSequence);
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (err) {
+      console.error('[GoToWar] sequence generation error:', err);
+      setSequenceError('Barry could not generate a sequence. You can still launch manually.');
+    } finally {
+      setSequenceLoading(false);
+    }
+  }
+
+  // Phase 6: Launch mission to Firestore
+  async function handleLaunchMission() {
+    setLaunchingMission(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) throw new Error('Not authenticated');
+      const warId = `war_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const missionDoc = {
+        name: missionName || GOAL_OPTIONS.find((g) => g.id === goalId)?.label + ' — ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        userId: user.uid,
+        warId,
+        channel: 'email',
+        objective_sentence: objectiveSentence || null,
+        outcome_goal: outcomeGoal,
+        engagement_style: engagementStyle,
+        timeframe: timeframe,
+        next_step_type: nextStepType,
+        microSequence: microSequence || null,
+        sequence: microSequence ? {
+          steps: microSequence.steps,
+          sequenceRationale: microSequence.sequenceRationale,
+          expectedOutcome: microSequence.expectedOutcome,
+          totalSteps: microSequence.steps?.length || 0,
+          generatedAt: microSequence.generatedAt || new Date().toISOString(),
+        } : null,
+        contacts: missionContacts.map((c) => ({
+          ...c,
+          sequenceStatus: microSequence ? 'active' : 'pending',
+        })),
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'missions'), missionDoc);
+      setActiveMissionId(docRef.id);
+      setMissionLaunched(true);
+
+      // Log timeline events for each contact
+      missionContacts.forEach((c) => {
+        logTimelineEvent({
+          userId: user.uid,
+          contactId: c.contactId,
+          type: 'mission_assigned',
+          actor: ACTORS.USER,
+          preview: missionDoc.name,
+          metadata: { missionId: docRef.id, missionName: missionDoc.name, goalName: goalId },
+        });
+        updateContactStatus({ userId: user.uid, contactId: c.contactId, trigger: STATUS_TRIGGERS.MISSION_ASSIGNED });
+      });
+    } catch (err) {
+      console.error('[GoToWar] launch error:', err);
+      alert('Failed to launch mission. Please try again.');
+    } finally {
+      setLaunchingMission(false);
+    }
+  }
+
+  // Phase 6: Manual send for a specific contact + step
+  async function handleManualSend(contact, stepIndex) {
+    const key = `${contact.contactId}_${stepIndex}`;
+    setSendingStep(key);
+    try {
+      const user = getEffectiveUser();
+      if (!user || !activeMissionId) return;
+      const token = await user.getIdToken();
+      // Call existing Gmail send function
+      await fetch('/.netlify/functions/gmail-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken: token,
+          contactEmail: contact.email,
+          contactName: contact.name,
+          subject: `Step ${stepIndex + 1} — ${missionName || 'Go To War Mission'}`,
+          body: microSequence?.steps?.[stepIndex]?.action || 'Follow up message',
+        }),
+      });
+      // Log to timeline
+      logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.contactId,
+        type: 'sequence_step_sent',
+        actor: ACTORS.USER,
+        preview: `Step ${stepIndex + 1} sent`,
+        metadata: { missionId: activeMissionId, stepIndex },
+      });
+      setSentSteps((prev) => {
+        const next = { ...prev };
+        if (!next[contact.contactId]) next[contact.contactId] = new Set();
+        next[contact.contactId] = new Set([...next[contact.contactId], stepIndex]);
+        return next;
+      });
+    } catch (err) {
+      console.error('[GoToWar] send error:', err);
+    } finally {
+      setSendingStep(null);
     }
   }
 
@@ -299,10 +522,27 @@ export default function GoToWar() {
     );
   });
 
+  // Filtered companies for Phase 3
+  const filteredCompanies = companies.filter((c) => {
+    if (!companySearch) return true;
+    const q = companySearch.toLowerCase();
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.industry?.toLowerCase().includes(q)
+    );
+  });
+
+  // Helpers
+  const allStrategyFieldsSet = outcomeGoal && engagementStyle && timeframe && nextStepType;
+
   // Phase gate: can the user advance?
   const canAdvance = () => {
     if (phase === 0) return goalId !== '';
     if (phase === 1) return selected.size > 0;
+    if (phase === 2) return approvedCompanies.size > 0; // Phase 3: at least 1 approved company
+    if (phase === 3) return missionContacts.length > 0; // Phase 4: at least 1 contact added
+    if (phase === 4) return allStrategyFieldsSet;       // Phase 5: all strategy fields set
+    if (phase === 5) return missionLaunched;             // Phase 6: mission launched
     return true;
   };
 
@@ -593,11 +833,496 @@ export default function GoToWar() {
     </div>
   );
 
+  // ── Phase 3: ICP & Companies ──────────────────────────────────────────────
+  const renderPhase3 = () => (
+    <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+          Describe your ideal target
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+          Tell Barry who you're going after. He'll filter your saved companies to match.
+        </p>
+      </div>
+
+      {/* ICP sentence */}
+      <textarea
+        value={objectiveSentence}
+        onChange={(e) => setObjectiveSentence(e.target.value)}
+        placeholder="e.g. Utah-based commercial construction GCs, CFO or COO, over $20M revenue"
+        rows={3}
+        style={{
+          width: '100%', padding: 12, borderRadius: 10,
+          border: `1.5px solid ${T.border2}`, background: T.cardBg,
+          color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
+          resize: 'vertical', marginBottom: 20, boxSizing: 'border-box',
+        }}
+      />
+
+      {/* Company search */}
+      <div style={{ position: 'relative', marginBottom: 14 }}>
+        <Search size={14} style={{ position: 'absolute', left: 12, top: 11, color: T.textFaint }} />
+        <input
+          type="text"
+          value={companySearch}
+          onChange={(e) => setCompanySearch(e.target.value)}
+          placeholder="Filter companies…"
+          style={{
+            width: '100%', padding: '9px 12px 9px 34px', borderRadius: 9,
+            border: `1.5px solid ${T.border2}`, background: T.cardBg,
+            color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
+      {/* Company list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {companiesLoading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
+            <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+          </div>
+        ) : filteredCompanies.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint, fontSize: 13 }}>
+            {companySearch ? 'No companies match that filter.' : 'No accepted companies found.'}
+          </div>
+        ) : (
+          filteredCompanies.map((c) => {
+            const approved = approvedCompanies.has(c.id);
+            return (
+              <div
+                key={c.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 14px', borderRadius: 10,
+                  border: `1.5px solid ${approved ? '#22c55e40' : T.border2}`,
+                  background: approved ? '#22c55e08' : T.cardBg,
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8, background: `${WAR_ACCENT}12`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Building2 size={16} color={WAR_ACCENT} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {c.name || 'Unnamed Company'}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.textFaint }}>
+                    {[c.industry, c.geo || c.state].filter(Boolean).join(' · ') || 'No details'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setApprovedCompanies((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
+                      return next;
+                    });
+                  }}
+                  style={{
+                    padding: '6px 12px', borderRadius: 7, border: 'none', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                    background: approved ? '#22c55e' : T.border2,
+                    color: approved ? '#fff' : T.textMuted,
+                  }}
+                >
+                  {approved ? <><ThumbsUp size={12} /> Approved</> : <><ThumbsDown size={12} /> Approve</>}
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Phase 4: Contacts ───────────────────────────────────────────────────────
+  const renderPhase4 = () => {
+    const approvedList = companies.filter((c) => approvedCompanies.has(c.id));
+    return (
+      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+            Add decision makers
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+            Expand a company to see contacts. Add the right people to this mission.
+          </p>
+        </div>
+
+        {/* Mission contacts summary */}
+        {missionContacts.length > 0 && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 9, background: `${WAR_ACCENT}10`,
+            border: `1.5px solid ${WAR_ACCENT}30`, marginBottom: 16, fontSize: 13, color: WAR_ACCENT, fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <Users size={14} />
+            {missionContacts.length} contact{missionContacts.length !== 1 ? 's' : ''} in mission
+          </div>
+        )}
+
+        {/* Company accordion */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {approvedList.map((company) => {
+            const expanded = expandedCompanyId === company.id;
+            const contacts = companyContacts[company.id] || [];
+            const loading = loadingCompanyContacts === company.id;
+            return (
+              <div key={company.id} style={{ borderRadius: 10, border: `1.5px solid ${T.border2}`, overflow: 'hidden' }}>
+                {/* Company header */}
+                <div
+                  onClick={() => {
+                    if (expanded) { setExpandedCompanyId(null); return; }
+                    setExpandedCompanyId(company.id);
+                    loadCompanyContacts(company.id);
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+                    cursor: 'pointer', background: expanded ? `${WAR_ACCENT}08` : T.cardBg,
+                  }}
+                >
+                  <Building2 size={15} color={T.textMuted} />
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
+                  <ChevronDown size={14} color={T.textFaint} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </div>
+
+                {/* Contact list */}
+                {expanded && (
+                  <div style={{ borderTop: `1px solid ${T.border}`, padding: '8px 0' }}>
+                    {loading ? (
+                      <div style={{ textAlign: 'center', padding: 20, color: T.textFaint }}>
+                        <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                      </div>
+                    ) : contacts.length === 0 ? (
+                      <div style={{ padding: '12px 14px', fontSize: 12, color: T.textFaint }}>No contacts saved for this company.</div>
+                    ) : (
+                      contacts.map((contact) => {
+                        const inMission = missionContacts.some((mc) => mc.contactId === contact.id);
+                        return (
+                          <div key={contact.id} style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500, color: T.text }}>
+                                {`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || 'Unknown'}
+                              </div>
+                              <div style={{ fontSize: 11, color: T.textFaint }}>
+                                {contact.title || contact.current_position_title || 'No title'} {contact.email ? `· ${contact.email}` : ''}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => inMission ? removeFromMission(contact.id) : addToMission(contact, company)}
+                              style={{
+                                padding: '5px 10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                                background: inMission ? '#ef4444' : WAR_ACCENT,
+                                color: '#fff',
+                              }}
+                            >
+                              {inMission ? 'Remove' : <><UserPlus size={11} /> Add</>}
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Phase 5: Sequence ───────────────────────────────────────────────────────
+  const renderPhase5 = () => {
+    const OptionGrid = ({ items, selected, onSelect, accent }) => (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+        {items.map((item) => {
+          const active = selected === item.id;
+          return (
+            <div
+              key={item.id}
+              onClick={() => onSelect(item.id)}
+              style={{
+                padding: '10px 12px', borderRadius: 9, cursor: 'pointer',
+                border: `1.5px solid ${active ? (accent || WAR_ACCENT) : T.border2}`,
+                background: active ? `${accent || WAR_ACCENT}10` : T.cardBg,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600, color: active ? (accent || WAR_ACCENT) : T.text, marginBottom: 2 }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: T.textFaint, lineHeight: 1.4 }}>{item.description}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    return (
+      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+            Configure the engagement
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+            Set the strategy. Barry will build a multi-step sequence from these choices.
+          </p>
+        </div>
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Outcome Goal</div>
+        <OptionGrid items={OUTCOME_GOALS.slice(0, 6)} selected={outcomeGoal} onSelect={setOutcomeGoal} />
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Engagement Style</div>
+        <OptionGrid items={ENGAGEMENT_STYLES} selected={engagementStyle} onSelect={setEngagementStyle} />
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Timeframe</div>
+        <OptionGrid items={MISSION_TIMEFRAMES} selected={timeframe} onSelect={setTimeframe} />
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Next Step Type</div>
+        <OptionGrid items={NEXT_STEP_TYPES} selected={nextStepType} onSelect={setNextStepType} />
+
+        {/* Generate button */}
+        {allStrategyFieldsSet && (
+          <div style={{ marginTop: 8 }}>
+            <button
+              onClick={generateMissionSequence}
+              disabled={sequenceLoading}
+              style={{
+                width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
+                background: WAR_ACCENT, color: '#fff', fontSize: 14, fontWeight: 700,
+                cursor: sequenceLoading ? 'wait' : 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: sequenceLoading ? 0.7 : 1,
+              }}
+            >
+              {sequenceLoading ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Barry is building…</> : <><Sparkles size={14} /> Generate Sequence</>}
+            </button>
+            {sequenceError && (
+              <div style={{ marginTop: 10, fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={13} /> {sequenceError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sequence preview */}
+        {microSequence && (
+          <div style={{ marginTop: 20, padding: 16, borderRadius: 10, border: `1.5px solid ${WAR_ACCENT}30`, background: `${WAR_ACCENT}06` }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: WAR_ACCENT, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Zap size={14} /> Sequence — {microSequence.steps?.length || 0} steps
+            </div>
+            {microSequence.steps?.map((step, i) => (
+              <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? `1px solid ${T.border}` : 'none' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Step {i + 1}: {step.label || step.type || 'Action'}</div>
+                <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>{step.action || step.description || ''}</div>
+              </div>
+            ))}
+            {microSequence.sequenceRationale && (
+              <div style={{ marginTop: 10, fontSize: 11, color: T.textFaint, fontStyle: 'italic' }}>
+                {microSequence.sequenceRationale}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Phase 6: Launch ─────────────────────────────────────────────────────────
+  const renderPhase6 = () => (
+    <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+          {missionLaunched ? 'Mission is live' : 'Ready to launch'}
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+          {missionLaunched
+            ? 'Send each step manually. Click Send next to a contact to fire the email.'
+            : `${missionContacts.length} contact${missionContacts.length !== 1 ? 's' : ''} queued. Launch the mission to begin sending.`}
+        </p>
+      </div>
+
+      {/* Launch button */}
+      {!missionLaunched && (
+        <button
+          onClick={handleLaunchMission}
+          disabled={launchingMission}
+          style={{
+            width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
+            background: WAR_ACCENT, color: '#fff', fontSize: 15, fontWeight: 700,
+            cursor: launchingMission ? 'wait' : 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: `0 4px 16px ${WAR_ACCENT}40`, marginBottom: 24,
+          }}
+        >
+          {launchingMission ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Launching…</> : <><Rocket size={16} /> Launch Mission</>}
+        </button>
+      )}
+
+      {/* Send feed */}
+      {missionLaunched && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {missionContacts.map((mc) => {
+            const steps = microSequence?.steps || [{ label: 'Initial outreach' }];
+            const contactSent = sentSteps[mc.contactId] || new Set();
+            const nextStepIdx = [...Array(steps.length).keys()].find((i) => !contactSent.has(i)) ?? null;
+            return (
+              <div key={mc.contactId} style={{ padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${T.border2}`, background: T.cardBg }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{mc.name}</div>
+                    <div style={{ fontSize: 11, color: T.textFaint }}>{mc.companyName || ''} {mc.email ? `· ${mc.email}` : ''}</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: contactSent.size === steps.length ? '#22c55e' : WAR_ACCENT, fontWeight: 600 }}>
+                    {contactSent.size}/{steps.length} sent
+                  </div>
+                </div>
+                {nextStepIdx !== null && (
+                  <button
+                    onClick={() => handleManualSend(mc, nextStepIdx)}
+                    disabled={sendingStep === `${mc.contactId}_${nextStepIdx}`}
+                    style={{
+                      width: '100%', padding: '8px 0', borderRadius: 7, border: 'none',
+                      background: `${WAR_ACCENT}15`, color: WAR_ACCENT, fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    }}
+                  >
+                    {sendingStep === `${mc.contactId}_${nextStepIdx}`
+                      ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
+                      : <><Send size={12} /> Send Step {nextStepIdx + 1}</>}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Phase 7: Monitor ────────────────────────────────────────────────────────
+  const renderPhase7 = () => {
+    const outcomeOptions = [
+      { id: 'no_reply', label: 'No Reply', icon: Clock3, color: T.textFaint },
+      { id: 'replied', label: 'Replied', icon: MailCheck, color: '#3b82f6' },
+      { id: 'meeting_booked', label: 'Meeting Booked', icon: CheckCircle, color: '#22c55e' },
+      { id: 'not_interested', label: 'Not Interested', icon: XCircle, color: '#ef4444' },
+    ];
+    return (
+      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+            Track responses
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+            Mark how each contact responded. This helps Barry learn your patterns.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {missionContacts.map((mc) => {
+            const outcome = contactOutcomes[mc.contactId] || null;
+            return (
+              <div key={mc.contactId} style={{ padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${T.border2}`, background: T.cardBg }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 2 }}>{mc.name}</div>
+                <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 10 }}>{mc.companyName || ''}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {outcomeOptions.map((o) => {
+                    const active = outcome === o.id;
+                    const Icon = o.icon;
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() => setContactOutcomes((prev) => ({ ...prev, [mc.contactId]: o.id }))}
+                        style={{
+                          padding: '5px 10px', borderRadius: 6,
+                          border: `1.5px solid ${active ? o.color : T.border2}`,
+                          background: active ? `${o.color}15` : 'transparent',
+                          color: active ? o.color : T.textMuted,
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          fontFamily: 'Inter, system-ui, sans-serif',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <Icon size={11} /> {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Phase 8: Debrief ────────────────────────────────────────────────────────
+  const renderPhase8 = () => {
+    const replied = Object.values(contactOutcomes).filter((o) => o === 'replied' || o === 'meeting_booked').length;
+    const noReply = Object.values(contactOutcomes).filter((o) => o === 'no_reply').length;
+    const notInterested = Object.values(contactOutcomes).filter((o) => o === 'not_interested').length;
+    return (
+      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+            Mission debrief
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+            Review the results and capture lessons for the next wave.
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 24 }}>
+          {[
+            { label: 'Replied / Booked', value: replied, color: '#22c55e' },
+            { label: 'No Reply', value: noReply, color: T.textFaint },
+            { label: 'Not Interested', value: notInterested, color: '#ef4444' },
+          ].map((s) => (
+            <div key={s.label} style={{
+              padding: '14px 12px', borderRadius: 10, border: `1.5px solid ${T.border2}`, background: T.cardBg, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Notes */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Debrief Notes</div>
+        <textarea
+          value={debriefNotes}
+          onChange={(e) => setDebriefNotes(e.target.value)}
+          placeholder="What worked? What would you change next time?"
+          rows={4}
+          style={{
+            width: '100%', padding: 12, borderRadius: 10,
+            border: `1.5px solid ${T.border2}`, background: T.cardBg,
+            color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
+            resize: 'vertical', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+    );
+  };
+
   // ── Render active phase ─────────────────────────────────────────────────────
   const renderPhase = () => {
     if (phase === 0) return renderPhase1();
     if (phase === 1) return renderPhase2();
-    return <PhaseStub phaseIndex={phase} T={T} />;
+    if (phase === 2) return renderPhase3();
+    if (phase === 3) return renderPhase4();
+    if (phase === 4) return renderPhase5();
+    if (phase === 5) return renderPhase6();
+    if (phase === 6) return renderPhase7();
+    if (phase === 7) return renderPhase8();
+    return null;
   };
 
   // ─── Layout ────────────────────────────────────────────────────────────────

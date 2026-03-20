@@ -873,6 +873,47 @@ export const getPath = {
  * }
  */
 
+// ============================================================================
+// GO TO WAR — Schema Documentation (Sprint A)
+// ============================================================================
+
+/**
+ * Mission — Go To War Extension Fields
+ * Stored in users/{userId}/missions/{missionId} document
+ *
+ * Sprint A Decision 4: Add these fields BEFORE any Phase 3+ code.
+ *
+ * {
+ *   warId: string | null,
+ *     // Groups missions launched from the same Go To War session.
+ *     // Enables multi-battlefield support (Utah + Arizona simultaneously).
+ *     // Nullable — single-mission Hunter flows leave this null.
+ *
+ *   channel: 'email' | 'sms' | 'linkedin' | 'phone',
+ *     // Root-level channel field for future multi-channel support.
+ *     // Default: 'email' for Sprint A. Sprint B adds SMS/LinkedIn.
+ *
+ *   objective_sentence: string | null,
+ *     // Freetext ICP objective written by user in Phase 3.
+ *     // e.g. "Utah-based commercial construction GCs, CFO or COO, over $20M revenue"
+ *     // Passed as context to barryGenerateMissionSequence.
+ * }
+ */
+
+/**
+ * Go To War — Mission Contacts Extension
+ * Additional fields on mission.contacts[] entries for Go To War flow.
+ *
+ * {
+ *   companyId: string | null,       // Link to saved company document
+ *   companyName: string | null,     // Denormalized company name
+ *   addedFrom: 'saved' | 'manual',  // How this contact was added
+ *   replyStatus: 'no-reply' | 'replied' | 'bounced',
+ *   lastContactedAt: Timestamp | null,
+ *   manualOutcome: 'no_reply' | 'replied' | 'meeting_booked' | 'not_interested' | null
+ * }
+ */
+
 // ── New Firestore Path Additions ─────────────────────────
 
 export const PEOPLE_FIRST_PATHS = {
@@ -897,5 +938,9 @@ export const PEOPLE_FIRST_PATHS = {
   referral: (userId, referralId) => `users/${userId}/referrals/${referralId}`,
 
   // NBS queue (for morning briefing and notifications)
-  nbsQueue: (userId) => `users/${userId}/nbs_queue`
+  nbsQueue: (userId) => `users/${userId}/nbs_queue`,
+
+  // Go To War — Mission paths
+  missions: (userId) => `users/${userId}/missions`,
+  mission: (userId, missionId) => `users/${userId}/missions/${missionId}`,
 };

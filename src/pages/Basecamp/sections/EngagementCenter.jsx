@@ -476,141 +476,212 @@ function PreviewPanel({ contacts, selected, messageBody, templateType, channel, 
   );
 }
 
-// ─── Launch Center (post-launch review) ──────────────────────────────────────
+// ─── Mission Email Row (individual sent email in launch center) ──────────────
+function MissionEmailRow({ contact, wave, index, T }) {
+  const [expanded, setExpanded] = useState(false);
+  const firstName = contact.first_name || contact.name?.split(' ')[0] || 'there';
+  const personalizedMsg = wave.message.replace(/\{\{first_name\}\}/gi, firstName);
+  const subject = TEMPLATES[wave.type]?.subject || wave.name || 'Custom message';
+  const initials = [contact.first_name?.[0], contact.last_name?.[0]]
+    .filter(Boolean).join('').toUpperCase() || '??';
+  const displayName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
+  const previewText = personalizedMsg.slice(0, 90) + (personalizedMsg.length > 90 ? '...' : '');
+
+  return (
+    <div
+      style={{
+        background: T.cardBg, border: `1px solid ${T.border}`,
+        borderRadius: 10, marginBottom: 6, overflow: 'hidden',
+        animation: `missionSlideIn 0.3s ease ${index * 0.06}s both`,
+      }}
+    >
+      {/* Row — click to expand */}
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 14px', cursor: 'pointer',
+          transition: 'background 0.1s',
+        }}
+      >
+        {/* Status indicator */}
+        <div style={{
+          width: 8, height: 8, borderRadius: '50%', background: GREEN, flexShrink: 0,
+          boxShadow: `0 0 6px ${GREEN}60`,
+        }} />
+
+        {/* Avatar */}
+        <div style={{
+          width: 30, height: 30, borderRadius: '50%',
+          background: `${GREEN}15`, border: `1.5px solid ${GREEN}35`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 700, color: GREEN, flexShrink: 0,
+        }}>
+          {initials}
+        </div>
+
+        {/* To + subject + preview (Gmail-style) */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.text, flexShrink: 0, minWidth: 0 }}>
+            To: {displayName}
+          </span>
+          {contact.email && (
+            <span style={{ fontSize: 11, color: T.textFaint, flexShrink: 0 }}>
+              &lt;{contact.email}&gt;
+            </span>
+          )}
+        </div>
+
+        <div style={{ flex: 2, minWidth: 0, overflow: 'hidden' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{subject}</span>
+          <span style={{ fontSize: 12, color: T.textFaint }}> — {previewText}</span>
+        </div>
+
+        {/* Sent badge */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '3px 8px', borderRadius: 12,
+          background: `${GREEN}12`, flexShrink: 0,
+        }}>
+          <CheckCircle2 size={11} color={GREEN} />
+          <span style={{ fontSize: 10, fontWeight: 600, color: GREEN }}>Sent</span>
+        </div>
+
+        {/* Expand arrow */}
+        <ChevronDown
+          size={14}
+          color={T.textFaint}
+          style={{
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
+            transition: 'transform 0.15s',
+            flexShrink: 0,
+          }}
+        />
+      </div>
+
+      {/* Expanded email body */}
+      {expanded && (
+        <div style={{
+          borderTop: `1px solid ${T.border}`,
+          padding: '14px 16px 16px',
+          marginLeft: 48,
+        }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 10,
+              background: `${GREEN}12`, color: GREEN, fontWeight: 600,
+            }}>
+              {wave.channel}
+            </span>
+            {wave.personalization === 'Barry personalizes each' && (
+              <span style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                background: `${BLUE}12`, color: BLUE, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 3,
+              }}>
+                <Zap size={9} /> Barry personalized
+              </span>
+            )}
+          </div>
+          <div style={{
+            fontSize: 13, color: T.text, lineHeight: 1.75,
+            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          }}>
+            {personalizedMsg}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Launch Center (mission deployment view) ─────────────────────────────────
 function LaunchCenter({ wave, contacts, onDismiss, T }) {
   const recipients = contacts.filter(c => wave.recipientIds?.includes(c.id));
   const sentAt = wave.sentAt?.toDate?.() || (wave.sentAt ? new Date(wave.sentAt) : new Date());
+  const timeStr = sentAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const dateStr = sentAt.toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    weekday: 'short', month: 'short', day: 'numeric',
   });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Success header */}
+      {/* Mission header */}
       <div style={{
-        padding: '24px 24px 16px', textAlign: 'center',
-        borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+        padding: '16px 24px', flexShrink: 0,
+        borderBottom: `1px solid ${T.border}`,
+        display: 'flex', alignItems: 'center', gap: 14,
       }}>
         <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: `${GREEN}18`, border: `2px solid ${GREEN}40`,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          marginBottom: 12,
+          width: 40, height: 40, borderRadius: 10,
+          background: `${GREEN}15`, border: `1.5px solid ${GREEN}35`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <CheckCircle2 size={24} color={GREEN} />
+          <Send size={18} color={GREEN} />
         </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>Wave Launched!</div>
-        <div style={{ fontSize: 12, color: T.textFaint, marginTop: 4 }}>{dateStr}</div>
-      </div>
-
-      {/* Wave summary */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
-        <div style={{
-          display: 'flex', gap: 10, marginBottom: 16,
-        }}>
-          <StatCard value={wave.stats?.sent || 0} label="Messages sent" color={GREEN} T={T} />
-          <StatCard value={wave.stats?.replied || 0} label="Replies" color={BLUE} T={T} />
-          <StatCard value={wave.stats?.booked || 0} label="Meetings booked" color={AMBER} T={T} />
-        </div>
-
-        {/* Wave details */}
-        <div style={{
-          background: T.cardBg, border: `1px solid ${T.border}`,
-          borderRadius: 12, padding: 16, marginBottom: 16,
-        }}>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 2 }}>Campaign</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{wave.name}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 2 }}>Channel</div>
-              <div style={{ fontSize: 12, color: T.text }}>{wave.channel}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: T.textFaint, marginBottom: 2 }}>Personalization</div>
-              <div style={{ fontSize: 12, color: T.text }}>{wave.personalization}</div>
-            </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>
+            Mission Deployed — {wave.name}
           </div>
-
-          <div style={{
-            fontSize: 12, color: T.textMuted, lineHeight: 1.6,
-            padding: '10px 12px', background: T.surface,
-            border: `1px solid ${T.border2}`, borderRadius: 8,
-            whiteSpace: 'pre-wrap',
+          <div style={{ fontSize: 12, color: T.textFaint, marginTop: 2 }}>
+            {recipients.length} emails sent {dateStr} at {timeStr}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onDismiss} style={{
+            padding: '7px 14px', borderRadius: 8,
+            border: `1px solid ${T.border2}`, background: T.surface,
+            color: T.textMuted, fontSize: 12, fontWeight: 500, cursor: 'pointer',
           }}>
-            {wave.message}
-          </div>
-        </div>
-
-        {/* Recipients list */}
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: T.textFaint, marginBottom: 10 }}>
-            RECIPIENTS ({recipients.length})
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-            {recipients.map(contact => {
-              const initials = [contact.first_name?.[0], contact.last_name?.[0]]
-                .filter(Boolean).join('').toUpperCase() || '??';
-              const status = getContactWaveStatus(contact);
-              const cfg = STATUS_CONFIG[status];
-
-              return (
-                <div key={contact.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', background: T.cardBg,
-                  border: `1px solid ${T.border}`, borderRadius: 8,
-                }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: `${GREEN}18`, border: `1.5px solid ${GREEN}40`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 700, color: GREEN, flexShrink: 0,
-                  }}>
-                    {initials}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
-                      {contact.name || `${contact.first_name} ${contact.last_name}`}
-                    </div>
-                    <div style={{ fontSize: 10, color: T.textFaint }}>
-                      {contact.email || contact.title || ''}
-                    </div>
-                  </div>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 3,
-                  }}>
-                    <CheckCircle2 size={12} color={GREEN} />
-                    <span style={{ fontSize: 10, color: GREEN }}>Sent</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            New campaign
+          </button>
+          <button onClick={() => onDismiss('past')} style={{
+            padding: '7px 14px', borderRadius: 8,
+            border: `1px solid ${GREEN}`, background: `${GREEN}15`,
+            color: GREEN, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+          }}>
+            View all waves
+          </button>
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '12px 24px', borderTop: `1px solid ${T.border}`,
-        background: T.cardBg, flexShrink: 0, gap: 12,
-      }}>
-        <button onClick={onDismiss} style={{
-          padding: '8px 18px', borderRadius: 8,
-          border: `1px solid ${T.border2}`, background: T.surface,
-          color: T.textMuted, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-        }}>
-          New campaign
-        </button>
-        <button onClick={() => onDismiss('past')} style={{
-          padding: '8px 18px', borderRadius: 8,
-          border: `1px solid ${GREEN}`, background: `${GREEN}15`,
-          color: GREEN, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-        }}>
-          View all waves
-        </button>
+      {/* Stats bar */}
+      <div style={{ display: 'flex', gap: 10, padding: '14px 24px 0', flexShrink: 0 }}>
+        <StatCard value={wave.stats?.sent || 0} label="Deployed" color={GREEN} T={T} />
+        <StatCard value={wave.stats?.replied || 0} label="Replies" color={BLUE} T={T} />
+        <StatCard value={wave.stats?.booked || 0} label="Booked" color={AMBER} T={T} />
       </div>
+
+      {/* Section label */}
+      <div style={{ padding: '14px 24px 8px', flexShrink: 0 }}>
+        <div style={{
+          fontSize: 11, letterSpacing: 1.5, fontWeight: 700, color: T.textFaint,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <Mail size={12} />
+          SENT MESSAGES
+        </div>
+      </div>
+
+      {/* Email list (Gmail-style) */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }}>
+        {recipients.map((contact, i) => (
+          <MissionEmailRow
+            key={contact.id}
+            contact={contact}
+            wave={wave}
+            index={i}
+            T={T}
+          />
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes missionSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

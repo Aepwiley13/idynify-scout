@@ -1112,14 +1112,14 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         getDocs(collection(db, 'users', user.uid, 'companies')),
         getDocs(collection(db, 'users', user.uid, 'contacts')),
       ];
-      if (mode === 'sniper' || mode === 'hunter') fetches.push(getDocs(collection(db, 'users', user.uid, 'sniper_contacts')));
+      if (mode === 'hunter') fetches.push(getDocs(collection(db, 'users', user.uid, 'sniper_contacts')));
       const [companiesSnapshot, contactsSnapshot, sniperSnapshot] = await Promise.all(fetches);
 
       const companiesMap = {};
       companiesSnapshot.docs.forEach(d => { companiesMap[d.id] = d.data(); });
       setCompanies(companiesMap);
 
-      // Build sniperIdsLocal synchronously so the .filter() below can use it
+      // Build sniperIdsLocal for hunter mode (badge display)
       let sniperIdsLocal = new Set();
       if (sniperSnapshot) {
         sniperIdsLocal = new Set(sniperSnapshot.docs.map(d => d.data().contactRef).filter(Boolean));
@@ -1136,7 +1136,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
-          if (mode === 'sniper') return sniperIdsLocal.has(c.id); // Only contacts explicitly added to Sniper
+          if (mode === 'sniper') return resolveContactStage(c) === 'sniper'; // Sniper: stage-based
           if (mode === 'basecamp') return resolveContactStage(c) === 'basecamp'; // Basecamp: stage-based
           return true; // 'people' — show all
         });

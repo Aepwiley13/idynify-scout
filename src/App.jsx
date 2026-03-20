@@ -78,6 +78,7 @@ import MainLayout from './components/layout/MainLayout';
 
 // Hunter Pages
 import HunterMain from './pages/Hunter/HunterMain';
+import BlitzMode from './pages/Hunter/BlitzMode';
 
 // Basecamp Pages
 import BasecampMain from './pages/Basecamp/BasecampMain';
@@ -516,6 +517,16 @@ function App() {
           element={
             <ProtectedRoute>
               <HunterMain />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Blitz Mode — rapid engagement queue (no MainLayout) */}
+        <Route
+          path="/hunter/blitz"
+          element={
+            <ProtectedRoute>
+              <BlitzMode />
             </ProtectedRoute>
           }
         />

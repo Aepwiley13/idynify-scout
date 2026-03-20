@@ -388,14 +388,49 @@ export default function BarryChatPanel({ userId }) {
         return;
       }
 
-      // Barry couldn't parse a clear action — fall back to normal chat
-      // Re-use the existing fetch path by falling through isn't possible here,
-      // so just let Barry explain what he needs.
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.action?.summary || "I wasn't sure what to do with that — can you be more specific?",
-        has_message_angles: false, angles: []
-      }]);
+      // Barry couldn't parse a clear action — fall back to barryMissionChat for a conversational response
+      const user2 = getEffectiveUser();
+      if (user2) {
+        const authToken2 = await user2.getIdToken();
+        const missionRes = await fetch('/.netlify/functions/barryMissionChat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            authToken: authToken2,
+            message: userMessage,
+            conversationHistory,
+            barryMode: mode,
+            contextStack
+          })
+        });
+        const missionData = await missionRes.json();
+        if (missionData.success) {
+          if (missionData.barry_mode && missionData.barry_mode !== mode) setMode(missionData.barry_mode);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: missionData.response_text || missionData.response || '',
+            has_message_angles: !!missionData.has_message_angles,
+            angles: missionData.angles || [],
+            contact_id: missionData.contact_id || null,
+            intent: missionData.intent || null,
+            step: missionData.step || null
+          }]);
+          setConversationHistory(missionData.updatedHistory || []);
+        } else {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: "I wasn't sure what to do with that — can you be more specific?",
+            has_message_angles: false, angles: []
+          }]);
+        }
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: "I wasn't sure what to do with that — can you be more specific?",
+          has_message_angles: false, angles: []
+        }]);
+      }
 
     } catch (err) {
       console.error('[BarryChatPanel] handleActionMessage failed:', err);

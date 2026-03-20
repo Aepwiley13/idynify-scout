@@ -267,8 +267,13 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
   }
   const icpBlock = icpLines.length > 0 ? icpLines.join('\n') : 'Not configured';
 
-  // Build a concise contact list for the prompt (avoid token overload)
-  const contactSummary = contacts.slice(0, 20).map(c =>
+  // Build a concise contact list for the prompt — sort by most recent interaction first
+  const sortedContacts = [...contacts].sort((a, b) => {
+    const aTime = a.last_interaction ? new Date(a.last_interaction).getTime() : 0;
+    const bTime = b.last_interaction ? new Date(b.last_interaction).getTime() : 0;
+    return bTime - aTime;
+  });
+  const contactSummary = sortedContacts.slice(0, 50).map(c =>
     `  ${c.name} (${c.title || 'unknown'} @ ${c.company || 'unknown'}) — state: ${c.relationship_state}, value: ${c.strategic_value || 'unknown'}, last: ${c.last_interaction ? new Date(c.last_interaction).toLocaleDateString() : 'never'}, hunter: ${c.hunter_status}, id: ${c.id}`
   ).join('\n');
 
@@ -734,6 +739,71 @@ Return valid JSON only:
           console.warn('[barryMissionChat] Could not load context:', ctxErr.message);
           effectiveContextStack = { contacts: [], missions: [], recon: {}, module };
         }
+      }
+
+      // ── Fuzzy name search: if user mentions a name not in the context, find them ──
+      try {
+        const contextNames = (effectiveContextStack?.contacts || []).map(c =>
+          (c.name || '').toLowerCase()
+        );
+        // Extract potential first names / full names from the user's message (simple heuristic)
+        const words = message.replace(/[^a-zA-Z\s]/g, '').split(/\s+/).filter(w => w.length > 1);
+        const possibleNames = words.filter(w => w[0] === w[0].toUpperCase());
+
+        if (possibleNames.length > 0) {
+          const unmatchedNames = possibleNames.filter(name =>
+            !contextNames.some(cn => cn.includes(name.toLowerCase()))
+          );
+
+          if (unmatchedNames.length > 0) {
+            // Query Firestore for contacts matching any unmatched name (by first_name or name)
+            const userRef = db.collection('users').doc(userId);
+            const nameSearchResults = [];
+
+            for (const name of unmatchedNames.slice(0, 3)) {
+              const [byFirstName, byFullName] = await Promise.all([
+                userRef.collection('contacts')
+                  .where('first_name', '==', name)
+                  .limit(3).get(),
+                userRef.collection('contacts')
+                  .where('name', '>=', name)
+                  .where('name', '<=', name + '\uf8ff')
+                  .limit(3).get()
+              ]);
+
+              const seen = new Set((effectiveContextStack?.contacts || []).map(c => c.id));
+              const addResult = (docSnap) => {
+                if (seen.has(docSnap.id)) return;
+                seen.add(docSnap.id);
+                const c = docSnap.data();
+                nameSearchResults.push({
+                  id: docSnap.id,
+                  name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+                  first_name: c.first_name || null,
+                  title: c.title || null,
+                  company: c.company_name || null,
+                  email: c.email || null,
+                  relationship_state: c.relationship_state || 'unaware',
+                  strategic_value: c.strategic_value || null,
+                  last_interaction: c.last_interaction_at || null,
+                  hunter_status: c.hunter_status || 'none',
+                });
+              };
+
+              byFirstName.forEach(addResult);
+              byFullName.forEach(addResult);
+            }
+
+            if (nameSearchResults.length > 0) {
+              effectiveContextStack = {
+                ...effectiveContextStack,
+                contacts: [...(effectiveContextStack?.contacts || []), ...nameSearchResults]
+              };
+            }
+          }
+        }
+      } catch (searchErr) {
+        console.warn('[barryMissionChat] Fuzzy name search failed (non-fatal):', searchErr.message);
       }
 
       let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module);

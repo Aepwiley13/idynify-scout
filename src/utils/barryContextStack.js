@@ -24,7 +24,7 @@ async function getActiveContacts(userId) {
     const snap = await getDocs(
       query(
         collection(db, 'users', userId, 'contacts'),
-        where('hunter_status', 'in', ['deck', 'active_mission', 'engaged_pending']),
+        where('hunter_status', 'in', ['deck', 'active_mission', 'engaged_pending', 'stalled', 'cold']),
         limit(60)
       )
     );

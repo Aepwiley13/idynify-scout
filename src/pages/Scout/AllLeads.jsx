@@ -977,7 +977,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
   const [actionFilter, setActionFilter] = useState(
-    activeFilter || (mode === 'scout' ? 'new' : 'today')
+    activeFilter || (mode === 'scout' ? 'new' : 'all')
   ); // action-oriented lens
 
   // Sync actionFilter when activeFilter prop changes (controlled from parent)
@@ -1313,9 +1313,9 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   let filtered = contacts.filter(c => !c.company_archived);
 
   // Action-oriented lens filter
-  // In people mode (Command Center), skip tab filter when searching so users
-  // can always find any contact regardless of which tab is selected.
-  const skipLensFilter = mode === 'people' && searchTerm;
+  // Skip tab filter when searching so users can always find any contact
+  // regardless of which tab is selected.
+  const skipLensFilter = !!searchTerm;
   if (!skipLensFilter) {
     if (actionFilter === 'today') {
       filtered = filtered.filter(c => {

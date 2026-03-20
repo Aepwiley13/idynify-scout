@@ -167,11 +167,12 @@ const MODULE_RAIL = [
 // ─── Hunter execution sub-nav items ──────────────────────────────────────────
 // These mirror the ACTION_LENSES in AllLeads for execution-focused workflow.
 const HUNTER_ITEMS = [
+  { id: 'blitz',    label: 'Blitz Mode',      Icon: Zap,            desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
   { id: 'all',      label: 'All People',      Icon: Users,          desc: 'Engagement card feed — work your board', filter: 'all'   },
   { id: 'followup', label: 'Follow Up Now',   Icon: AlertTriangle,  desc: 'Overdue engagement queue',          filter: 'follow_up_due' },
   { id: 'today',    label: "Today's Actions", Icon: CalendarCheck,  desc: 'Due follow-ups & priority contacts', filter: 'today'        },
   { id: 'replied',  label: 'Replied',         Icon: Inbox,          desc: 'Contacts who have responded',       filter: 'replied'       },
-  { id: 'active',   label: 'Active',          Icon: Zap,            desc: 'Currently in a sequence',           filter: 'in_mission'    },
+  { id: 'active',   label: 'Active',          Icon: Sparkles,       desc: 'Currently in a sequence',           filter: 'in_mission'    },
   { id: 'new',      label: 'New (Unengaged)', Icon: Sparkles,       desc: 'Fresh contacts, not yet touched',   filter: 'new'           },
 ];
 
@@ -182,6 +183,7 @@ const BARRY_MODULE = 'hunter';
 const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
+// Note: 'blitz' is a full route (/hunter/blitz), not a tab param — excluded here.
 const TAB_MAP = {
   today:    'today',
   followup: 'followup',
@@ -226,6 +228,11 @@ function HunterShellInner({ user }) {
   }, [searchParams, location.state?.activeTab]);
 
   const switchTab = (tabId) => {
+    const item = HUNTER_ITEMS.find(i => i.id === tabId);
+    if (item?.route) {
+      navigate(item.route);
+      return;
+    }
     setActiveTab(tabId);
     setSearchParams({ tab: tabId }, { replace: true });
   };
@@ -537,25 +544,29 @@ function HunterShellInner({ user }) {
           <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
             {HUNTER_ITEMS.map(it => {
               const active = activeTab === it.id;
+              const isBlitz = it.id === 'blitz';
               return (
                 <div
                   key={it.id}
                   onClick={() => switchTab(it.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
-                    borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                    background: active ? T.accentBg : 'transparent',
-                    borderLeft: `2px solid ${active ? BRAND.purple : 'transparent'}`,
+                    borderRadius: 8, cursor: 'pointer', marginBottom: isBlitz ? 6 : 1,
+                    background: isBlitz
+                      ? `linear-gradient(135deg, ${BRAND.purple}22, ${BRAND.cyan}11)`
+                      : active ? T.accentBg : 'transparent',
+                    border: isBlitz ? `1px solid ${BRAND.purple}40` : 'none',
+                    borderLeft: !isBlitz ? `2px solid ${active ? BRAND.purple : 'transparent'}` : undefined,
                     transition: 'all 0.12s',
                   }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                  onMouseEnter={e => { if (!active && !isBlitz) e.currentTarget.style.background = T.surface; }}
+                  onMouseLeave={e => { if (!active && !isBlitz) e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <it.Icon size={13} color={active ? BRAND.purple : T.textFaint} style={{ flexShrink: 0 }} />
+                  <it.Icon size={13} color={isBlitz ? BRAND.purple : active ? BRAND.purple : T.textFaint} style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? BRAND.purple : T.textMuted,
+                      fontSize: 12, fontWeight: (active || isBlitz) ? 600 : 400,
+                      color: (active || isBlitz) ? BRAND.purple : T.textMuted,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.label}

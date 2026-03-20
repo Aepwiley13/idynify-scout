@@ -293,7 +293,7 @@ function App() {
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* Barry ICP Onboarding - First touchpoint after payment */}
-        <Route path="/onboarding/barry" element={<ProtectedRoute withLayout={true}><BarryOnboarding /></ProtectedRoute>} />
+        <Route path="/onboarding/barry" element={<ProtectedRoute><BarryOnboarding /></ProtectedRoute>} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />

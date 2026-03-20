@@ -490,6 +490,7 @@ export const handler = async (event) => {
     await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile);
 
     const responseTime = Date.now() - startTime;
+    const generationTime = responseTime / 1000;
 
     // Log API usage for admin tracking
     await logApiUsage(userId, 'searchCompanies', 'success', {

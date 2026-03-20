@@ -1,7 +1,6 @@
 .barry-onboarding {
-  /* Height fills page-content (MainLayout). Use display:flex + flex-direction:column
-     so the conversation area grows and the input stays anchored to the bottom. */
-  height: calc(100vh - 64px - 4rem); /* viewport minus top-bar minus page-content padding */
+  /* Full-screen standalone layout — no MainLayout wrapper */
+  height: 100vh;
   background: linear-gradient(135deg, #f8f7ff 0%, #f0f0ff 100%);
   display: flex;
   flex-direction: column;

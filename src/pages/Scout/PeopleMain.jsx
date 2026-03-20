@@ -645,14 +645,15 @@ function PeopleShellInner({ user }) {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             flexShrink: 0,
           }}>
-            <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: CC_CYAN, fontWeight: 700, marginBottom: 1 }}>
-                COMMAND CENTER
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: 2, color: CC_CYAN, fontWeight: 700, marginBottom: 1 }}>
+                  COMMAND CENTER
+                </div>
+                <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
               </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
-
+              <NotificationCenter userId={user?.uid} T={T} />
             </div>
-            <NotificationCenter userId={user?.uid} T={T} />
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('cc_subnav_collapsed', 'true'); }}
               title="Collapse sidebar"

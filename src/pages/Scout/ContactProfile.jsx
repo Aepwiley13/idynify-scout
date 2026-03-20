@@ -25,6 +25,7 @@ import EngagementTimeline from '../../components/contacts/EngagementTimeline';
 import InlineEngagementSection from '../../components/contacts/InlineEngagementSection';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
+import HunterActionPanel from '../../components/contacts/HunterActionPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import GameBucketSelector from '../../components/contacts/GameBucketSelector';
 import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
@@ -695,6 +696,15 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
         <PersistentEngageBar
           contact={contact}
           onEngageClick={triggerInlineEngagement}
+        />
+
+        {/* Hunter Action Panel — Move to Sniper when meeting booked / demo done */}
+        <HunterActionPanel
+          contact={contact}
+          onMoved={(result) => {
+            // Update local contact stage so panel hides immediately
+            setContact(prev => ({ ...prev, stage: 'sniper', stage_source: 'manual_override' }));
+          }}
         />
 
         {/* Barry Insight Panel — Step 7 proactive recommendations */}

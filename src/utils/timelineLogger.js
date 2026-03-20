@@ -55,6 +55,8 @@ const TIMELINE_EVENT_TYPES = [
   'next_step_queued',
   'next_step_completed',
   'next_step_dismissed',
+  // Hunter → Sniper stage transition
+  'stage_moved',
   // Operation People First: Brigade System events
   'brigade_changed',
   // Barry Intelligence Upgrade: Relationship guardrail events

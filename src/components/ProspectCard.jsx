@@ -244,7 +244,7 @@ export default function ProspectCard({
                 )}
               </div>
               <div className="p-3 bg-gray-800/50 rounded-lg border border-purple-500/20">
-                <p className="text-purple-400 text-xs mb-1">Company Revenue</p>
+                <p className="text-purple-400 text-xs mb-1">Employees (Est.)</p>
                 <p className="text-purple-200">{prospect.estimated_num_employees || 'Not available'}</p>
               </div>
             </div>

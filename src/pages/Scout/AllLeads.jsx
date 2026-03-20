@@ -15,8 +15,9 @@ import {
   Target, Plus, Loader, ArrowUpDown, Crosshair, Tag, ChevronDown, ChevronRight,
   PanelLeft, Columns, PanelRight,
   CalendarCheck, AlertTriangle, Inbox, Sparkles, Clock, Flame, TrendingUp,
-  Factory, MapPin, Filter, MoreHorizontal,
+  Factory, MapPin, Filter, MoreHorizontal, Archive,
 } from 'lucide-react';
+import { archivePerson } from '../../services/peopleService';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
@@ -365,6 +366,7 @@ function AllLeadsCard({
   isSelected = false, bulkMode = false, onSelect,
   onBrigadeUpdate,
   inSniper = false, onAddToSniper,
+  onArchive,
 }) {
   const T = useT();
   const color = BRAND.pink;
@@ -374,6 +376,9 @@ function AllLeadsCard({
   const btnCfg = CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started;
   const [brigadeOpen, setBrigadeOpen] = useState(false);
   const [brigadeSaving, setBrigadeSaving] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('not_relevant');
+  const [archiving, setArchiving] = useState(false);
 
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
 
@@ -474,8 +479,25 @@ function AllLeadsCard({
     }
   }
 
+  async function handleConfirmArchive(e) {
+    e.stopPropagation();
+    const user = getEffectiveUser();
+    if (!user) return;
+    setArchiving(true);
+    try {
+      await archivePerson(user.uid, contact.id, archiveReason);
+      setShowArchiveConfirm(false);
+      onArchive && onArchive(contact.id);
+    } catch (err) {
+      console.error('[AllLeads] archive failed:', err);
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   function handleCardClick(e) {
     if (brigadeOpen) { setBrigadeOpen(false); return; } // close picker without opening modal
+    if (showArchiveConfirm) { setShowArchiveConfirm(false); return; }
     if (bulkMode) { onSelect && onSelect(contact.id); return; }
     onClick && onClick(e);
   }
@@ -806,6 +828,68 @@ function AllLeadsCard({
               style={{ padding: '7px 9px', borderRadius: 7, border: `1px solid #0077b540`, background: '#0077b510', color: BRIGADE.blue, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
             ><Linkedin size={11} /></button>
           ) : null}
+
+          {/* Archive button — always visible, subtle */}
+          {!bulkMode && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={e => { e.stopPropagation(); setShowArchiveConfirm(o => !o); setBrigadeOpen(false); }}
+                title="Archive contact"
+                style={{
+                  padding: '7px 9px', borderRadius: 7, display: 'flex', alignItems: 'center',
+                  border: showArchiveConfirm ? '1px solid #ef444460' : '1px solid transparent',
+                  background: showArchiveConfirm ? 'rgba(239,68,68,0.08)' : 'transparent',
+                  color: showArchiveConfirm ? '#ef4444' : T.textFaint,
+                  fontSize: 10, cursor: 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!showArchiveConfirm) { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef444440'; e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; } }}
+                onMouseLeave={e => { if (!showArchiveConfirm) { e.currentTarget.style.color = T.textFaint; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent'; } }}
+              >
+                <Archive size={11} />
+              </button>
+
+              {/* Archive confirmation popover */}
+              {showArchiveConfirm && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute', bottom: '110%', right: 0, zIndex: 70,
+                    background: T.cardBg, border: '1px solid #ef444430',
+                    borderRadius: 10, padding: 10, minWidth: 190,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.text, marginBottom: 6 }}>Archive {contact.name?.split(' ')[0]}?</div>
+                  <div style={{ fontSize: 9, color: T.textFaint, marginBottom: 8 }}>They'll be hidden from your pipeline. The company stays active.</div>
+                  <select
+                    value={archiveReason}
+                    onChange={e => setArchiveReason(e.target.value)}
+                    style={{
+                      width: '100%', padding: '5px 7px', borderRadius: 6, marginBottom: 8,
+                      border: `1px solid ${T.border2}`, background: T.surface,
+                      color: T.text, fontSize: 11, cursor: 'pointer',
+                    }}
+                  >
+                    <option value="not_relevant">Not relevant</option>
+                    <option value="duplicate">Duplicate contact</option>
+                    <option value="spam">Spam or invalid</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); setShowArchiveConfirm(false); }}
+                      style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: `1px solid ${T.border2}`, background: 'transparent', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+                    >Cancel</button>
+                    <button
+                      onClick={handleConfirmArchive}
+                      disabled={archiving}
+                      style={{ flex: 1, padding: '5px 0', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 600, cursor: archiving ? 'default' : 'pointer', opacity: archiving ? 0.7 : 1 }}
+                    >{archiving ? '…' : 'Archive'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -813,18 +897,31 @@ function AllLeadsCard({
 }
 
 // ─── AllLeadsRow (Gmail-style) ────────────────────────────────────────────────
-function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick }) {
+function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onArchive }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
   const status = getLeadStatus(contact);
+  const [hovered, setHovered] = useState(false);
+
+  async function handleArchive(e) {
+    e.stopPropagation();
+    const user = getEffectiveUser();
+    if (!user) return;
+    try {
+      await archivePerson(user.uid, contact.id, 'not_relevant');
+      onArchive && onArchive(contact.id);
+    } catch (err) {
+      console.error('[AllLeads] row archive failed:', err);
+    }
+  }
 
   return (
     <div
       onClick={onClick}
       style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 15px', borderBottom: `1px solid ${T.border}`, cursor: 'pointer', background: selected ? T.rowSel : 'transparent', borderLeft: `2px solid ${selected ? BRAND.pink : 'transparent'}`, transition: 'all 0.1s' }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = T.rowHov; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = T.rowHov; setHovered(true); }}
+      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; setHovered(false); }}
     >
       <Av initials={getInitials(contact.name)} color={color} size={30} src={contact.photo_url} />
       <div style={{ width: 128, flexShrink: 0 }}>
@@ -849,8 +946,18 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick }) {
       <div style={{ width: 52, flexShrink: 0, textAlign: 'right' }}>
         {email ? <Mail size={12} color={BRIGADE.blue} /> : <span style={{ fontSize: 10, color: T.textFaint }}>—</span>}
       </div>
-      <div style={{ width: 80, flexShrink: 0, textAlign: 'right', fontSize: 10, color: T.textFaint }}>
-        {getLastAction(contact)}
+      <div style={{ width: 80, flexShrink: 0, textAlign: 'right', fontSize: 10, color: T.textFaint, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+        {hovered ? (
+          <button
+            onClick={handleArchive}
+            title="Archive contact"
+            style={{ padding: '3px 7px', borderRadius: 5, border: '1px solid #ef444440', background: 'rgba(239,68,68,0.06)', color: '#ef4444', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            <Archive size={10} /> Archive
+          </button>
+        ) : (
+          getLastAction(contact)
+        )}
       </div>
     </div>
   );
@@ -1222,6 +1329,12 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // Optimistic brigade update from inline card picker
   function updateContactBrigade(contactId, newBrigade) {
     setContacts(prev => prev.map(c => c.id === contactId ? { ...c, brigade: newBrigade } : c));
+  }
+
+  // Remove archived contact from local list (archive was already written to Firestore by the card)
+  function handleContactArchived(contactId) {
+    setContacts(prev => prev.filter(c => c.id !== contactId));
+    if (listSelected === contactId) setListSelected(null);
   }
 
   // Bulk: toggle one contact in/out of selectedIds
@@ -1888,6 +2001,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   onBrigadeUpdate={updateContactBrigade}
                   inSniper={sniperIds.has(c.id)}
                   onAddToSniper={() => handleAddToSniper(c)}
+                  onArchive={handleContactArchived}
                 />
               ))}
             </div>
@@ -1924,6 +2038,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                         ? () => navigate('/scout?tab=scout-plus', { state: { initialView: 'company-search', searchCompanyName: c.company_name } })
                         : undefined
                   }
+                  onArchive={handleContactArchived}
                 />
               ))}
             </div>

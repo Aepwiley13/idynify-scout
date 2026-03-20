@@ -36,6 +36,7 @@ import WeaponsSection from '../Hunter/sections/WeaponsSection';
 import ArsenalSection from '../Hunter/sections/ArsenalSection';
 import OutcomesSection from '../Hunter/sections/OutcomesSection';
 import GoToWar from './GoToWar';
+import NotificationCenter from '../../components/notifications/NotificationCenter';
 
 // Command Center accent color
 const CC_CYAN = BRAND.cyan;
@@ -418,6 +419,7 @@ function PeopleShellInner({ user }) {
             <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: 0.3 }}>
               Command Center
             </div>
+            <NotificationCenter userId={user?.uid} T={T} />
             <ThemePicker />
             <div
               onClick={() => navigate('/settings')}
@@ -650,6 +652,7 @@ function PeopleShellInner({ user }) {
               <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
 
             </div>
+            <NotificationCenter userId={user?.uid} T={T} />
             <div
               onClick={() => { setSubNavOpen(false); localStorage.setItem('cc_subnav_collapsed', 'true'); }}
               title="Collapse sidebar"

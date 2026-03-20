@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone } from 'lucide-react';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone, X, GitBranch } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { recordReferralReceived } from '../../services/referralIntelligenceService';
 
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const T = useT();
@@ -13,6 +14,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const [contact, setContact] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [referredBy, setReferredBy] = useState(null);
 
   const handleFindContact = async (e) => {
     e.preventDefault();
@@ -75,8 +77,27 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
         source: 'LinkedIn Link',
         match_quality: 100
       };
+      // Set source tracking for referrals
+      if (referredBy) {
+        contactData.source = 'referral';
+        contactData.addedFrom = 'referral';
+        contactData.addedFromSource = referredBy.id;
+      }
+
       await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), contactData);
       await updateCompanyContactCount(companyId, user.uid);
+
+      // Record referral attribution post-save (sequential — needs contactId confirmed)
+      if (referredBy) {
+        await recordReferralReceived(user.uid, {
+          fromContactId: referredBy.id,
+          fromContactName: referredBy.name,
+          toContactId: contactId,
+          toContactName: contact.name || 'Unknown',
+          context: 'Added via LinkedIn Link import'
+        });
+      }
+
       onContactAdded([{ id: contactId, ...contactData }]);
     } catch (err) {
       setError(err.message || 'Failed to save contact. Please try again.');
@@ -203,6 +224,9 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
           {/* Contact card */}
           <ContactCard contact={contact} T={T} />
 
+          {/* Referred By (optional) */}
+          <ReferredByPickerLinkedIn value={referredBy} onChange={setReferredBy} T={T} />
+
           {/* Error on save */}
           {error && (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '10px 13px', background: `${STATUS.red}12`, border: `1px solid ${STATUS.red}40`, borderRadius: 9 }}>
@@ -309,6 +333,129 @@ function ContactCard({ contact, T }) {
           </a>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── ReferredByPickerLinkedIn ───────────────────────────────────────────────
+function ReferredByPickerLinkedIn({ value, onChange, T }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const timerRef = useRef(null);
+
+  const doSearch = async (term) => {
+    if (!term || term.length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const q = query(
+        collection(db, 'users', user.uid, 'contacts'),
+        where('is_archived', '==', false),
+        orderBy('name'),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      const contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const termLower = term.toLowerCase();
+      setResults(contacts.filter(c => {
+        const name = (c.name || '').toLowerCase();
+        const company = (c.company || c.company_name || '').toLowerCase();
+        return name.includes(termLower) || company.includes(termLower);
+      }).slice(0, 6));
+    } catch (err) {
+      console.error('[ReferredByPicker] Search failed:', err);
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    setOpen(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => doSearch(val), 300);
+  };
+
+  if (value) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 9,
+        padding: '10px 13px', borderRadius: 9,
+        background: '#8b5cf615', border: '1px solid #8b5cf640',
+      }}>
+        <GitBranch size={14} color="#7c3aed" />
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>
+          Referred by {value.name}
+        </span>
+        <X size={13} color="#7c3aed" style={{ cursor: 'pointer', opacity: 0.6 }}
+          onClick={() => onChange(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <GitBranch size={11} color={T.textFaint} />
+        Referred by (optional)
+      </div>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: T.input || T.surface, border: `1px solid ${T.border}`,
+        borderRadius: 9, padding: '8px 12px',
+      }}>
+        <Search size={13} color={T.textFaint} />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleInput}
+          onFocus={() => { if (results.length > 0) setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          placeholder="Search contacts who referred this person..."
+          style={{
+            flex: 1, background: 'transparent', border: 'none', outline: 'none',
+            color: T.text, fontSize: 12,
+          }}
+        />
+        {searching && <Loader size={13} color={T.textFaint} style={{ animation: 'spin 1s linear infinite' }} />}
+      </div>
+      {open && results.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+          background: T.cardBg || '#fff', border: `1px solid ${T.border}`,
+          borderRadius: 9, marginTop: 4, maxHeight: 180, overflowY: 'auto',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        }}>
+          {results.map(c => (
+            <div
+              key={c.id}
+              onMouseDown={() => {
+                onChange({ id: c.id, name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() });
+                setSearchTerm('');
+                setOpen(false);
+              }}
+              style={{
+                padding: '8px 14px', cursor: 'pointer', transition: 'background 0.1s',
+                borderBottom: `1px solid ${T.border}`,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = T.surface || '#f9fafb'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 500, color: T.text }}>
+                {c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim()}
+              </div>
+              {(c.company || c.company_name) && (
+                <div style={{ fontSize: 10, color: T.textFaint }}>{c.company || c.company_name}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
-import { collection, addDoc } from 'firebase/firestore';
-import { UserPlus } from 'lucide-react';
+import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { UserPlus, Search, X, Loader } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { recordReferralReceived } from '../../services/referralIntelligenceService';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [formData, setFormData] = useState({
@@ -18,6 +19,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [referredBy, setReferredBy] = useState(null);
 
   const validateForm = () => {
     const newErrors = {};
@@ -68,8 +70,10 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         website: formData.website.trim() || null,
 
         // Source tracking
-        source: 'manual',
+        source: referredBy ? 'referral' : 'manual',
         enrichment_status: 'user_added',
+        addedFrom: referredBy ? 'referral' : 'manual',
+        addedFromSource: referredBy ? referredBy.id : null,
 
         // Scout metadata
         lead_status: 'saved',
@@ -88,6 +92,17 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
       const docRef = await addDoc(contactsRef, contactData);
 
       console.log('✅ Manual contact added:', docRef.id);
+
+      // Record referral attribution (post-save, sequential — needs contactId)
+      if (referredBy) {
+        await recordReferralReceived(user.uid, {
+          fromContactId: referredBy.id,
+          fromContactName: referredBy.name,
+          toContactId: docRef.id,
+          toContactName: formData.name.trim(),
+          context: `Added manually via Scout+`
+        });
+      }
 
       // Notify parent
       onContactAdded([{ id: docRef.id, ...contactData }]);
@@ -111,6 +126,8 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
       });
     }
   };
+
+  const user = getEffectiveUser();
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -255,6 +272,17 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         />
       </div>
 
+      {/* Referred By (Optional) */}
+      <div>
+        <label className="block text-sm font-semibold text-gray-900 mb-2">
+          Referred By
+        </label>
+        <ReferredByPicker value={referredBy} onChange={setReferredBy} />
+        <p className="text-xs text-gray-400 mt-1">
+          Optional — tag who referred this person to track referral attribution.
+        </p>
+      </div>
+
       {/* Action Buttons */}
       <div className="flex gap-3 pt-4">
         <button
@@ -284,5 +312,102 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         </button>
       </div>
     </form>
+  );
+}
+
+// ─── ReferredByPicker ─────────────────────────────────────────────────────
+function ReferredByPicker({ value, onChange }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const timerRef = useRef(null);
+
+  const doSearch = async (term) => {
+    if (!term || term.length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const q = query(
+        collection(db, 'users', user.uid, 'contacts'),
+        where('is_archived', '==', false),
+        orderBy('name'),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      const contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const termLower = term.toLowerCase();
+      setResults(contacts.filter(c => {
+        const name = (c.name || '').toLowerCase();
+        const company = (c.company || c.company_name || '').toLowerCase();
+        return name.includes(termLower) || company.includes(termLower);
+      }).slice(0, 6));
+    } catch (err) {
+      console.error('[ReferredByPicker] Search failed:', err);
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    setOpen(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => doSearch(val), 300);
+  };
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-2 px-4 py-3 rounded-lg border border-purple-300 bg-purple-50">
+        <span className="text-sm text-purple-800 font-medium flex-1">{value.name}</span>
+        <button type="button" onClick={() => onChange(null)} className="text-purple-400 hover:text-purple-600">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
+        <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleInput}
+          onFocus={() => { if (results.length > 0) setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          placeholder="Search existing contacts..."
+          className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
+        />
+        {searching && <Loader className="w-4 h-4 text-gray-400 animate-spin" />}
+      </div>
+      {open && results.length > 0 && (
+        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {results.map(c => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                onChange({ id: c.id, name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() });
+                setSearchTerm('');
+                setOpen(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+            >
+              <div className="text-sm font-medium text-gray-900">
+                {c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim()}
+              </div>
+              {(c.company || c.company_name) && (
+                <div className="text-xs text-gray-400">{c.company || c.company_name}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

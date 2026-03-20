@@ -1311,19 +1311,24 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   let filtered = contacts.filter(c => !c.company_archived);
 
   // Action-oriented lens filter
-  if (actionFilter === 'today') {
-    filtered = filtered.filter(c => {
-      const state = contactStates.get(c.id);
-      return isNBSDueToday(c) || state === 'follow_up_due' || state === 'replied';
-    });
-  } else if (actionFilter === 'follow_up_due') {
-    filtered = filtered.filter(c => contactStates.get(c.id) === 'follow_up_due');
-  } else if (actionFilter === 'replied') {
-    filtered = filtered.filter(c => contactStates.get(c.id) === 'replied');
-  } else if (actionFilter === 'in_mission') {
-    filtered = filtered.filter(c => contactStates.get(c.id) === 'in_mission');
-  } else if (actionFilter === 'new') {
-    filtered = filtered.filter(c => contactStates.get(c.id) === 'not_started');
+  // In people mode (Command Center), skip tab filter when searching so users
+  // can always find any contact regardless of which tab is selected.
+  const skipLensFilter = mode === 'people' && searchTerm;
+  if (!skipLensFilter) {
+    if (actionFilter === 'today') {
+      filtered = filtered.filter(c => {
+        const state = contactStates.get(c.id);
+        return isNBSDueToday(c) || state === 'follow_up_due' || state === 'replied';
+      });
+    } else if (actionFilter === 'follow_up_due') {
+      filtered = filtered.filter(c => contactStates.get(c.id) === 'follow_up_due');
+    } else if (actionFilter === 'replied') {
+      filtered = filtered.filter(c => contactStates.get(c.id) === 'replied');
+    } else if (actionFilter === 'in_mission') {
+      filtered = filtered.filter(c => contactStates.get(c.id) === 'in_mission');
+    } else if (actionFilter === 'new') {
+      filtered = filtered.filter(c => contactStates.get(c.id) === 'not_started');
+    }
   }
   // 'all' — no engagement filter
 

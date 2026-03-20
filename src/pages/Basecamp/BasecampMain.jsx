@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield,
-  Users, Building2,
+  Users, Building2, Zap,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home,
 } from 'lucide-react';
@@ -30,8 +30,9 @@ import { useBarryContext } from '../../context/barryContextStore';
 import { useActiveUser } from '../../context/ImpersonationContext';
 
 // Basecamp sections
-import PeopleSection    from './sections/PeopleSection';
-import CompaniesSection from './sections/CompaniesSection';
+import PeopleSection       from './sections/PeopleSection';
+import CompaniesSection    from './sections/CompaniesSection';
+import EngagementCenter    from './sections/EngagementCenter';
 
 const BASECAMP_GREEN = '#22c55e';
 
@@ -170,8 +171,9 @@ const MODULE_RAIL = [
 
 // ─── BASECAMP sub-nav items ─────────────────────────────────────────────────
 const BASECAMP_ITEMS = [
-  { id: 'people',    label: 'People',    Icon: Users,    desc: 'Your contacts'    },
-  { id: 'companies', label: 'Companies', Icon: Building2, desc: 'Your companies'   },
+  { id: 'people',     label: 'People',     Icon: Users,    desc: 'Your contacts'    },
+  { id: 'companies',  label: 'Companies',  Icon: Building2, desc: 'Your companies'  },
+  { id: 'engage',     label: 'Engage',     Icon: Zap,       desc: 'Run waves'       },
 ];
 
 const SETTINGS_ORANGE = '#faaa20';
@@ -182,6 +184,7 @@ const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 const TAB_MAP = {
   people:    'people',
   companies: 'companies',
+  engage:    'engage',
 };
 
 // ─── BasecampShellInner ─────────────────────────────────────────────────────
@@ -228,6 +231,7 @@ function BasecampShellInner({ user }) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {activeTab === 'people'    && <PeopleSection />}
         {activeTab === 'companies' && <CompaniesSection />}
+        {activeTab === 'engage'    && <EngagementCenter />}
       </div>
     </div>
   );

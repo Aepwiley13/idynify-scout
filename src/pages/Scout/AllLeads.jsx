@@ -8,7 +8,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
-import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
+import { useActiveUserId, useImpersonation, getEffectiveUser } from '../../context/ImpersonationContext';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,

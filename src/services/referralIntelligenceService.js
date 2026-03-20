@@ -43,6 +43,7 @@ import { db } from '../firebase/config';
 import { PEOPLE_PATHS } from '../schemas/peopleSchema';
 import { logTimelineEvent } from '../utils/engagementHistoryLogger';
 import { deriveReferralNbs, deriveIntroNbs, saveNextBestStep } from './nextBestStepService';
+import { createRelationshipNotification, NOTIFICATION_TYPES } from './notificationService';
 
 // ── Constants ────────────────────────────────────────────
 
@@ -173,6 +174,16 @@ export async function recordReferralReceived(userId, {
       }
     }
 
+    // Create relationship notification
+    await createRelationshipNotification(userId, {
+      type: NOTIFICATION_TYPES.REFERRAL_RECEIVED,
+      contactId: fromContactId,
+      contactName: fromContactName,
+      relatedContactId: toContactId,
+      relatedContactName: toContactName,
+      message: context || `${fromContactName} referred ${toContactName} to you`,
+    });
+
     return docRef.id;
   } catch (error) {
     console.error('[ReferralIntelligence] Failed to record referral received:', error);
@@ -278,6 +289,16 @@ export async function updateReferralOutcome(userId, referralId, status, outcomeN
       if (referral.from_contact_id && referral.type === 'received') {
         await updateReferralSourceData(userId, referral.from_contact_id, {
           conversionRecorded: true
+        });
+
+        // Create conversion notification
+        await createRelationshipNotification(userId, {
+          type: NOTIFICATION_TYPES.REFERRAL_CONVERTED,
+          contactId: referral.from_contact_id,
+          contactName: referral.from_contact_name,
+          relatedContactId: referral.to_contact_id,
+          relatedContactName: referral.to_contact_name,
+          message: outcomeNote || `${referral.to_contact_name} converted — referred by ${referral.from_contact_name}`,
         });
       }
     }

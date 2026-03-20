@@ -28,6 +28,7 @@ import BarryInsightsCard from './BarryInsightsCard';
 import SequencePanel from './SequencePanel';
 import LearningToast from '../LearningToast';
 import { EmailDraftCard } from '../shared/EmailDraftCard';
+import AddFromEmailButton from './AddFromEmailButton';
 import './HunterContactDrawer.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
@@ -950,6 +951,14 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                             <div className="thread-message-subject">Re: {msg.subject}</div>
                           )}
                           <p className="thread-message-body">{msg.body}</p>
+                          {msg.isInbound && (
+                            <AddFromEmailButton
+                              fromHeader={msg.from}
+                              onContactAdded={(newContact) => {
+                                console.log('[Hunter] Contact added from email:', newContact.name);
+                              }}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>

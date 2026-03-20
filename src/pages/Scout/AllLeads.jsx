@@ -1472,7 +1472,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: isMobile ? 'auto' : 'hidden', overflowX: 'hidden', position: 'relative', zIndex: 1 }}>
 
       {/* ── Header ── */}
       <div style={{ padding: '18px 22px 0', background: T.navBg, borderBottom: `1px solid ${T.border}` }}>
@@ -1808,14 +1808,14 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: isMobile ? 'none' : 1, display: 'flex', overflow: isMobile ? 'visible' : 'hidden' }}>
         {/* Left: list/cards */}
         {!(isMobile && panelContactId) && (
         <div
           ref={listRef}
           style={{
             flex: 1,
-            overflowY: 'auto',
+            overflowY: isMobile ? 'visible' : 'auto',
             padding: '14px 22px',
             transition: 'flex 0.25s ease',
             minWidth: 0,

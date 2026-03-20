@@ -130,6 +130,20 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     setError(null);
 
     try {
+      // Check for duplicate by email before saving
+      if (formData.email && formData.email.trim()) {
+        const emailQ = query(
+          collection(db, 'users', user.uid, 'contacts'),
+          where('email', '==', formData.email.trim().toLowerCase())
+        );
+        const emailSnap = await getDocs(emailQ);
+        if (!emailSnap.empty) {
+          setError(`A contact with email ${formData.email.trim()} is already in your pipeline.`);
+          setSaving(false);
+          return;
+        }
+      }
+
       // Step 1: Ensure company exists in Saved Companies (if company provided)
       let companyId = null;
       if (formData.company && formData.company.trim()) {

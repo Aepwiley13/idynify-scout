@@ -145,6 +145,31 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
         throw new Error('You must be logged in');
       }
 
+      // Check for duplicate by apollo ID (same doc ID would be used)
+      if (selectedContact.id) {
+        const existingRef = doc(db, 'users', user.uid, 'contacts', selectedContact.id);
+        const existingDoc = await getDoc(existingRef);
+        if (existingDoc.exists()) {
+          setError(`${selectedContact.name} is already in your pipeline.`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Check for duplicate by email
+      if (selectedContact.email) {
+        const emailQ = query(
+          collection(db, 'users', user.uid, 'contacts'),
+          where('email', '==', selectedContact.email)
+        );
+        const emailSnap = await getDocs(emailQ);
+        if (!emailSnap.empty) {
+          setError(`A contact with email ${selectedContact.email} is already in your pipeline.`);
+          setSaving(false);
+          return;
+        }
+      }
+
       // Step 1: Ensure company exists in Saved Companies
       const companyId = await ensureCompanyExists(selectedContact, user.uid);
 

@@ -106,7 +106,21 @@ const ACTION_PATTERNS = [
 ];
 
 function isActionIntent(message) {
-  return ACTION_PATTERNS.some(p => p.test(message));
+  const matched = ACTION_PATTERNS.some(p => p.test(message));
+  if (!matched) return false;
+
+  // Only treat as an action if the message is short (focused intent) or
+  // the action phrase appears at the start. Long compound messages like
+  // "look up Alexander Smart, I need to schedule a meeting" should go
+  // through barryMissionChat's intent taxonomy instead.
+  const wordCount = message.trim().split(/\s+/).length;
+  if (wordCount <= 8) return true;
+
+  // For longer messages, only match if an action pattern matches the beginning
+  return ACTION_PATTERNS.some(p => {
+    const m = message.match(p);
+    return m && m.index !== undefined && m.index < 5;
+  });
 }
 
 // ── Mode configuration ─────────────────────────────────────────────────────────
@@ -389,8 +403,10 @@ export default function BarryChatPanel({ userId }) {
       }
 
       // Barry couldn't parse a clear action — fall back to barryMissionChat for a conversational response
-      const user2 = getEffectiveUser();
-      if (user2) {
+      // IMPORTANT: swallow the barryActions error/summary — never render it to the user
+      try {
+        const user2 = getEffectiveUser();
+        if (!user2) throw new Error('No user');
         const authToken2 = await user2.getIdToken();
         const missionRes = await fetch('/.netlify/functions/barryMissionChat', {
           method: 'POST',
@@ -418,13 +434,10 @@ export default function BarryChatPanel({ userId }) {
           }]);
           setConversationHistory(missionData.updatedHistory || []);
         } else {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: "I wasn't sure what to do with that — can you be more specific?",
-            has_message_angles: false, angles: []
-          }]);
+          throw new Error('Mission chat returned failure');
         }
-      } else {
+      } catch (fallbackErr) {
+        console.warn('[BarryChatPanel] Action fallback to missionChat failed:', fallbackErr.message);
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: "I wasn't sure what to do with that — can you be more specific?",

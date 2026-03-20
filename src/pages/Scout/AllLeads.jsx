@@ -1840,8 +1840,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
 
       {/* ── Content ── */}
       <div style={{ flex: isMobile ? 'none' : 1, display: 'flex', overflow: isMobile ? 'visible' : 'hidden' }}>
-        {/* Left: list/cards — hidden when profile is in full-screen mode */}
-        {!(isMobile && panelContactId) && panelLayout !== 'profile-full' && (
+        {/* Left: list/cards — hidden when profile is in full-screen mode (only if a profile is actually open) */}
+        {!(isMobile && panelContactId) && !(panelLayout === 'profile-full' && panelContactId) && (
         <div
           ref={listRef}
           style={{

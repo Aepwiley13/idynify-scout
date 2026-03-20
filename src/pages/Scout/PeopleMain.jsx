@@ -335,7 +335,7 @@ function PeopleShellInner({ user }) {
         );
       case 'people':
         return (
-          <div style={{ flex: 1, overflow: 'auto' }}>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <AllLeads mode="people" />
           </div>
         );

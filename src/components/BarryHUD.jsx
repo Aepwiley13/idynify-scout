@@ -21,9 +21,9 @@ import { BRAND, ASSETS } from '../theme/tokens';
 export const PHASE_LABELS = [
   'Brief',
   'Roster',
-  'Approach',
+  'ICP & Companies',
+  'Contacts',
   'Sequence',
-  'Approve',
   'Launch',
   'Monitor',
   'Debrief',
@@ -34,16 +34,16 @@ export const PHASE_COACHING = [
   "Define your objective. The cleaner the goal, the sharper the plan I'll build.",
   // Phase 2 — Roster
   "Pick your targets. Choose the contacts you want in this wave.",
-  // Phase 3 — Approach
-  "Here's the approach I'd recommend. Tell me if the tone or channel is off.",
-  // Phase 4 — Sequence
-  "Review the sequence. This is what goes out — step by step, spread over time.",
-  // Phase 5 — Approve
-  "Read every message before it sends. Change anything that doesn't sound like you.",
+  // Phase 3 — ICP & Companies
+  "Describe your ideal target. I'll pull matching companies and contacts from your saved list.",
+  // Phase 4 — Contacts
+  "Click a company to see decision makers. Add the right people to this mission.",
+  // Phase 5 — Sequence
+  "Configure the engagement. I'll build a multi-step sequence you can review and approve.",
   // Phase 6 — Launch
-  "Ready to fire. Hit launch when you're confident in the plan.",
+  "Ready to fire. Review the send schedule, then send each step manually.",
   // Phase 7 — Monitor
-  "You're live. I'll flag replies the moment they land.",
+  "You're live. Track who's been sent, who's replied, and who needs a follow-up.",
   // Phase 8 — Debrief
   "Mark how each one landed. This trains me to do better on the next wave.",
 ];

@@ -8,7 +8,7 @@ import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
-export default function CompanyDetailModal({ company, onClose, onFindMoreContacts }) {
+export default function CompanyDetailModal({ company, onClose, onFindMoreContacts, sourceModule = 'scout' }) {
   const navigate = useNavigate();
   const [enrichedData, setEnrichedData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -881,9 +881,17 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                   </span>
                 )}
               </div>
-              <button className="find-contacts-btn" onClick={onClose}>
-                {company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}
+              <button
+                className="find-contacts-btn"
+                onClick={() => onFindMoreContacts ? onFindMoreContacts(company.id) : onClose()}
+              >
+                {company.contact_count > 0 ? 'View Contacts →' : 'Find Contacts →'}
               </button>
+              {sourceModule !== 'scout' && onFindMoreContacts && (
+                <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-secondary)', textAlign: 'center' }}>
+                  Opens full profile in Scout with title search &amp; enrichment
+                </p>
+              )}
             </div>
           </div>
         </div>

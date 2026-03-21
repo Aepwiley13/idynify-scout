@@ -20,9 +20,10 @@ import { useActiveUser, useImpersonation } from '../../context/ImpersonationCont
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield,
   Users, CalendarCheck, AlertTriangle, Inbox, Zap, Sparkles,
-  Palette, Check, ChevronLeft, ChevronRight,
+  Building2, Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home,
 } from 'lucide-react';
+import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import BottomNav from '../../components/layout/BottomNav';
@@ -167,13 +168,14 @@ const MODULE_RAIL = [
 // ─── Hunter execution sub-nav items ──────────────────────────────────────────
 // These mirror the ACTION_LENSES in AllLeads for execution-focused workflow.
 const HUNTER_ITEMS = [
-  { id: 'blitz',    label: 'Blitz Mode',      Icon: Zap,            desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
-  { id: 'all',      label: 'All People',      Icon: Users,          desc: 'Engagement card feed — work your board', filter: 'all'   },
-  { id: 'followup', label: 'Follow Up Now',   Icon: AlertTriangle,  desc: 'Overdue engagement queue',          filter: 'follow_up_due' },
-  { id: 'today',    label: "Today's Actions", Icon: CalendarCheck,  desc: 'Due follow-ups & priority contacts', filter: 'today'        },
-  { id: 'replied',  label: 'Replied',         Icon: Inbox,          desc: 'Contacts who have responded',       filter: 'replied'       },
-  { id: 'active',   label: 'Active',          Icon: Sparkles,       desc: 'Currently in a sequence',           filter: 'in_mission'    },
-  { id: 'new',      label: 'New (Unengaged)', Icon: Sparkles,       desc: 'Fresh contacts, not yet touched',   filter: 'new'           },
+  { id: 'blitz',     label: 'Blitz Mode',      Icon: Zap,           desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
+  { id: 'all',       label: 'All People',      Icon: Users,         desc: 'Engagement card feed — work your board', filter: 'all'         },
+  { id: 'companies', label: 'Companies',       Icon: Building2,     desc: 'Companies with engaged contacts'                               },
+  { id: 'followup',  label: 'Follow Up Now',   Icon: AlertTriangle, desc: 'Overdue engagement queue',           filter: 'follow_up_due' },
+  { id: 'today',     label: "Today's Actions", Icon: CalendarCheck, desc: 'Due follow-ups & priority contacts',  filter: 'today'         },
+  { id: 'replied',   label: 'Replied',         Icon: Inbox,         desc: 'Contacts who have responded',        filter: 'replied'        },
+  { id: 'active',    label: 'Active',          Icon: Sparkles,      desc: 'Currently in a sequence',            filter: 'in_mission'     },
+  { id: 'new',       label: 'New (Unengaged)', Icon: Sparkles,      desc: 'Fresh contacts, not yet touched',    filter: 'new'            },
 ];
 
 // Orange token for settings accent
@@ -185,12 +187,13 @@ const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
 // Note: 'blitz' is a full route (/hunter/blitz), not a tab param — excluded here.
 const TAB_MAP = {
-  today:    'today',
-  followup: 'followup',
-  replied:  'replied',
-  active:   'active',
-  new:      'new',
-  all:      'all',
+  today:     'today',
+  followup:  'followup',
+  replied:   'replied',
+  active:    'active',
+  new:       'new',
+  all:       'all',
+  companies: 'companies',
 };
 
 // ─── HunterShellInner ─────────────────────────────────────────────────────────
@@ -242,13 +245,22 @@ function HunterShellInner({ user }) {
   const activeItem = HUNTER_ITEMS.find(i => i.id === activeTab) || HUNTER_ITEMS[0];
   const activeFilter = activeItem.filter;
 
-  const renderMain = () => (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <AllLeads mode="hunter" activeFilter={activeFilter} />
+  const renderMain = () => {
+    if (activeTab === 'companies') {
+      return (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <SharedCompaniesView mode="hunter" />
+        </div>
+      );
+    }
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <AllLeads mode="hunter" activeFilter={activeFilter} />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── Mobile layout ─────────────────────────────────────────────────────────────
   if (isMobile) {

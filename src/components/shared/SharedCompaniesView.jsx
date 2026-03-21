@@ -31,6 +31,14 @@ const SOURCE_CFG = {
   sniper: { bg: '#14b8a618', color: '#2dd4bf', border: '#14b8a635', label: 'SNIPER' },
 };
 
+// ─── Number formatters ────────────────────────────────────────────────────────
+function fmtEmployees(value) {
+  if (!value) return null;
+  const n = typeof value === 'string' ? parseInt(value.replace(/[^0-9]/g, ''), 10) : value;
+  if (!n || isNaN(n)) return String(value);
+  return n.toLocaleString();
+}
+
 // ─── SharedCompanyCard ────────────────────────────────────────────────────────
 function SharedCompanyCard({
   company, T, onClick, onFindContacts, onArchive, onRestore,
@@ -39,8 +47,9 @@ function SharedCompanyCard({
   const contactCount = company.contact_count ?? company.contactCount ?? 0;
   const src = sourceBadge ? SOURCE_CFG[sourceBadge] : null;
 
-  const employees = company.apolloEnrichment?.snapshot?.estimated_num_employees
-    || company.employee_count || company.company_size || 'N/A';
+  const rawEmployees = company.apolloEnrichment?.snapshot?.estimated_num_employees
+    || company.employee_count || company.company_size;
+  const employees = rawEmployees ? (fmtEmployees(rawEmployees) || String(rawEmployees)) : 'N/A';
   const founded = company.apolloEnrichment?.snapshot?.founded_year
     || company.founded_year || 'N/A';
   const industry = company.apolloEnrichment?.snapshot?.industry
@@ -343,10 +352,16 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
   }
 
   function handleFindContacts(company) {
-    if (company.contact_count > 0) {
-      navigate(`/scout/company/${company.id}/leads`);
+    // Scout mode: navigate to full company profile page
+    // All other modules: open the detail modal to stay in context
+    if (mode === 'scout') {
+      if (company.contact_count > 0) {
+        navigate(`/scout/company/${company.id}/leads`);
+      } else {
+        navigate(`/scout/company/${company.id}`);
+      }
     } else {
-      navigate(`/scout/company/${company.id}`);
+      handleCardClick(company);
     }
   }
 
@@ -559,6 +574,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
             if (co && co.contact_count > 0) navigate(`/scout/company/${id}/leads`);
             else navigate(`/scout/company/${id}`);
           }}
+          sourceModule={mode}
         />
       )}
     </div>

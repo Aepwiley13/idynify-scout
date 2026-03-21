@@ -170,6 +170,19 @@
   box-shadow: 0 2px 8px rgba(219, 39, 119, 0.3);
 }
 
+.pillar-icon.pillar-orange {
+  background: rgba(249,115,22,0.12);
+  color: #f97316;
+  border: 1px solid rgba(249,115,22,0.28);
+}
+
+.pillar-active .pillar-icon.pillar-orange {
+  background: #f97316;
+  color: #ffffff;
+  border-color: #f97316;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+}
+
 /* ── Settings Item (orange, fluorescent glow) ── */
 .nav-item.settings-item {
   color: #d97706;

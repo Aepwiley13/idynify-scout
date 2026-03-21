@@ -14,7 +14,7 @@
  *   isAdmin  — boolean (optional), shows Admin tile when true
  */
 import { useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, LogOut, X, Brain, Zap, Shield, Target } from 'lucide-react';
+import { Home, Users, Settings, LogOut, X, Brain, Zap, Shield, Target, RotateCcw } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import { useThemeCtx } from '../../theme/ThemeContext';
 import { THEMES } from '../../theme/tokens';
@@ -57,6 +57,10 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
           <button className="more-sheet-item" onClick={() => go('/command-center')}>
             <Users size={22} />
             <span>Command Center</span>
+          </button>
+          <button className="more-sheet-item" onClick={() => go('/fallback')}>
+            <RotateCcw size={22} />
+            <span>Fallback</span>
           </button>
 
           {/* Utility */}

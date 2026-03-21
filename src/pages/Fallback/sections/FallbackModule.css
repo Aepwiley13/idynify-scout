@@ -1,0 +1,14 @@
+/* FallbackModule.css — Companion styles for the Comeback Engine */
+
+@keyframes fb-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes fb-fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fb-pulse-ring { 0%{transform:scale(1);opacity:.8} 100%{transform:scale(2);opacity:0} }
+
+.fb-tab-btn:hover { background: rgba(255,255,255,.04) !important; }
+.fb-row-hover:hover { background: rgba(249,115,22,.05) !important; cursor: pointer; }
+.fb-btn-action:hover { opacity: .82; transform: translateY(-1px); }
+.fb-cadence-card:hover { border-color: rgba(249,115,22,.35) !important; background: rgba(249,115,22,.04) !important; cursor: pointer; }
+
+/* Light theme overrides */
+[data-theme="workspace"] .fb-tab-btn:hover { background: rgba(0,0,0,.04) !important; }
+[data-theme="workspace"] .fb-row-hover:hover { background: rgba(249,115,22,.06) !important; }

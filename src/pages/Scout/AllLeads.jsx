@@ -29,6 +29,18 @@ import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 
+// ─── Engagement Status Sets ───────────────────────────────────────────────────
+// hunter_status values that indicate a contact has been engaged (Scout → Hunter)
+const ENGAGED_HUNTER_STATUSES = new Set([
+  'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation', 'converted',
+]);
+// contact_status values that indicate a contact has been engaged
+const ENGAGED_CONTACT_STATUSES = new Set([
+  'Engaged', 'Awaiting Reply', 'In Conversation', 'Dormant',
+  'Active Mission', 'In Campaign', 'Mission Complete',
+  'Active Customer', 'Past Customer', 'Partner', 'Network',
+]);
+
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 22, style = {} }) {
   const glow = `0 0 ${size * 0.5}px ${BRAND.cyan}50`;
@@ -1189,12 +1201,25 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
-  useEffect(() => { loadAllContacts(); }, []);
+  useEffect(() => {
+    // Wait for Firebase auth to resolve before loading contacts.
+    // auth.currentUser is null on first render when the auth state hasn't
+    // been confirmed yet, which would silently skip loading entirely.
+    const unsubscribe = auth.onAuthStateChanged(firebaseUser => {
+      if (firebaseUser) {
+        loadAllContacts();
+      } else {
+        setLoading(false);
+        navigate('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   async function loadAllContacts() {
     try {
       const user = getEffectiveUser();
-      if (!user) { navigate('/login'); return; }
+      if (!user) { setLoading(false); navigate('/login'); return; }
       // Load companies and contacts in parallel to halve the round-trip time
       const fetches = [
         getDocs(collection(db, 'users', user.uid, 'companies')),

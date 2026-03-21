@@ -6,7 +6,7 @@ _Last updated: 2026-03-19_
 ## Active Sprint: Go To War (Command Center)
 
 **Branch:** `claude/create-alignment-brief-page-vuwR9`
-**Status:** Day 1 in progress
+**Status:** Day 1 complete — all 8 phases implemented and aligned with spec
 
 ### Aaron's Pre-Sprint Locked Calls (all 5 resolved)
 
@@ -24,12 +24,22 @@ _Last updated: 2026-03-19_
 - [x] Go To War route created — `/people?tab=go_to_war`, dedicated view in Command Center
 - [x] Scout company card audit — CompanyCard is a swipe-only component, not extensible for list+checkbox. Verdict: build new `ContactRosterRow` list component for roster phase. See GoToWar.jsx Phase 2.
 - [x] Barry HUD shell built — persistent top strip, 8-phase-aware, real coaching lines in place
+- [x] Phase labels reconciled with spec — Brief, Roster, Approach, Sequence, Approve, Launch, Monitor, Debrief
+- [x] Roster phase consolidated — tabbed UI with Contacts / Companies / Decision Makers sub-tabs
+- [x] Approach phase added — strategy config (outcome goal, engagement style, timeframe, next step type)
+- [x] Sequence phase split — dedicated phase for Barry sequence generation with regenerate option
+- [x] Approve phase added — per-step review with approve/skip/undo per step, all steps must be reviewed before launch
+- [x] Resume banner — checks for active missions on mount, allows resuming mid-flow missions
+- [x] Firestore persistence — send state (stepHistory, currentStepIndex, lastContactedAt, replyStatus) persisted after each manual send
+- [x] Debrief persistence — outcomes and notes saved to Firestore, mission marked as completed
+- [x] Save debrief button — "Complete Mission" CTA on Phase 8
 
 **Lane 3 (Backend / Infra):**
 - [ ] Check if Hunter email send logs a `sent` event to Firebase — **Answer: No.** `gmail-send.js` updates campaign doc status to "sent" but does NOT emit to a Firebase events collection. `emailLog.js` utility exists but is not wired in. This sets scope: Cloud Tasks architecture must include a send-event write to Firestore for Lane 6 reply tracking.
-- [ ] Cloud Tasks architecture — global per-sender queue, 90s minimum interval (IN PROGRESS)
+- [x] 90s global per-sender send throttle — enforced client-side with countdown timer and disabled send buttons during cooldown
+- [ ] Cloud Tasks architecture — server-side global per-sender queue (IN PROGRESS, client-side throttle in place as interim)
 
-**Lanes 2, 4, 5, 6:** Blocked pending Lane 1 + 3 foundations.
+**Lanes 2, 4, 5, 6:** Partially unblocked — Lane 6 reply tracking still needs `emailLog.js` wiring on the backend.
 
 ---
 

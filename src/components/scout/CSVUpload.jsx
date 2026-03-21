@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { auth, db } from '../../firebase/config';
-import { collection, writeBatch, doc } from 'firebase/firestore';
+import { collection, writeBatch, doc, query, where, getDocs } from 'firebase/firestore';
 import { Upload, AlertTriangle, CheckCircle, Users, Building2 } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -231,6 +231,45 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
       const batch = writeBatch(db);
       const addedItems = [];
 
+      // For lead uploads, filter out contacts whose email already exists in the pipeline
+      let itemsToProcess = preview.items;
+      let skippedCount = 0;
+
+      if (uploadType !== 'companies') {
+        const itemsWithEmail = preview.items.filter(c => c.email && c.email.trim());
+        if (itemsWithEmail.length > 0) {
+          const emailList = itemsWithEmail.map(c => c.email.trim().toLowerCase());
+          const duplicateEmails = new Set();
+
+          // Query in chunks of 10 (Firestore 'in' operator limit)
+          for (let i = 0; i < emailList.length; i += 10) {
+            const chunk = emailList.slice(i, i + 10);
+            const q = query(
+              collection(db, 'users', user.uid, 'contacts'),
+              where('email', 'in', chunk)
+            );
+            const snap = await getDocs(q);
+            snap.docs.forEach(d => {
+              const existingEmail = d.data().email?.toLowerCase();
+              if (existingEmail) duplicateEmails.add(existingEmail);
+            });
+          }
+
+          if (duplicateEmails.size > 0) {
+            itemsToProcess = preview.items.filter(
+              c => !c.email || !duplicateEmails.has(c.email.trim().toLowerCase())
+            );
+            skippedCount = preview.items.length - itemsToProcess.length;
+          }
+        }
+
+        if (itemsToProcess.length === 0) {
+          alert(`All ${preview.items.length} contact${preview.items.length > 1 ? 's are' : ' is'} already in your pipeline.`);
+          setUploading(false);
+          return;
+        }
+      }
+
       if (uploadType === 'companies') {
         const companiesRef = collection(db, 'users', user.uid, 'companies');
 
@@ -267,7 +306,7 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
         // Lead / Contact upload (existing flow preserved)
         const contactsRef = collection(db, 'users', user.uid, 'contacts');
 
-        for (const contact of preview.items) {
+        for (const contact of itemsToProcess) {
           const contactData = {
             name: contact.name,
             email: contact.email || null,
@@ -303,6 +342,10 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
 
       const label = uploadType === 'companies' ? 'companies' : 'contacts';
       console.log(`${addedItems.length} ${label} uploaded from CSV`);
+
+      if (skippedCount > 0) {
+        alert(`${addedItems.length} contact${addedItems.length !== 1 ? 's' : ''} imported. ${skippedCount} duplicate${skippedCount !== 1 ? 's were' : ' was'} skipped — ${skippedCount !== 1 ? 'they are' : 'it is'} already in your pipeline.`);
+      }
 
       // Notify parent
       onContactsAdded(addedItems);

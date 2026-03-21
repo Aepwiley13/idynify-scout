@@ -25,6 +25,7 @@ import { formatRelativeTime } from '../../utils/formatRelativeTime';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
 import { resolveContactStage } from '../../constants/stageSystem';
+import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_STATUS_CONFIG } from '../../utils/contactEngageStatus';
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 
@@ -61,61 +62,20 @@ function getLeadStatus(contact) {
   return 'not_contacted';
 }
 
-// Lightweight engagement state derived from document fields only (no Firestore reads).
-// Used for card button color/label and sort order.
-// States: 'not_started' | 'in_mission' | 'follow_up_due' | 'converted'
-//
-// All hunter statuses that represent active engagement (not just 'active_mission').
-const ENGAGED_HUNTER_STATUSES = new Set([
-  'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation'
-]);
-
-// Contact statuses that mean the contact has been engaged — used as a fallback
-// when hunter_status is not yet set (e.g. Scout engage before Barry processes).
-const ENGAGED_CONTACT_STATUSES = new Set([
-  'Engaged', 'Awaiting Reply', 'In Conversation',
-  // Legacy statuses — included so old contacts are correctly classified
-  'In Campaign', 'Active Mission', 'Mission Complete',
-]);
-
+// Unified engagement state — delegates to shared contactEngageStatus.js.
+// Returns: 'converted' | 'replied' | 'active' | 'cold' | 'overdue'
+// (replaces old vocabulary: not_started→cold, in_mission→active, follow_up_due→overdue)
 function deriveCardEngageState(contact) {
-  const contactStatus = contact.contact_status || contact.lead_status || contact.status;
-  const hunterStatus = contact.hunter_status;
-
-  if (contactStatus === 'converted' || contactStatus === 'customer' || hunterStatus === 'converted') return 'converted';
-
-  // Sprint 3: in_conversation → replied (check both hunter and contact status)
-  if (hunterStatus === 'in_conversation' || contactStatus === 'In Conversation') return 'replied';
-
-  if (ENGAGED_HUNTER_STATUSES.has(hunterStatus)) {
-    if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
-      return 'follow_up_due';
-    }
-    return 'in_mission';
-  }
-
-  // Fallback: hunter_status not set yet but contact_status shows prior engagement
-  // (happens between Scout engage click and Barry processing the mission)
-  if (ENGAGED_CONTACT_STATUSES.has(contactStatus)) {
-    if (contact.next_step_due && new Date(contact.next_step_due) < new Date()) {
-      return 'follow_up_due';
-    }
-    return 'in_mission';
-  }
-
-  return 'not_started';
+  return getContactEngageStatus(contact);
 }
 
-// Sort priority: overdue → replied → active mission → not started → converted
-const ENGAGE_SORT_ORDER = { follow_up_due: 0, replied: 1, in_mission: 2, not_started: 3, converted: 4 };
-
-// Button config per engagement state
+// Button config per engagement state (unified vocabulary)
 const CARD_BTN_CONFIG = {
-  not_started:   { label: 'Engage',        bg: `linear-gradient(135deg,${BRAND.pink},#c0146a)` },
-  in_mission:    { label: 'Follow Up',     bg: 'linear-gradient(135deg,#7c3aed,#5b21b6)' },
-  follow_up_due: { label: 'Follow Up Now', bg: 'linear-gradient(135deg,#dc2626,#991b1b)' },
-  replied:       { label: 'Respond',       bg: 'linear-gradient(135deg,#0ea5e9,#0284c7)' },
-  converted:     { label: 'View',          bg: 'linear-gradient(135deg,#10b981,#047857)' },
+  cold:      { label: 'Engage',        bg: `linear-gradient(135deg,${BRAND.pink},#c0146a)` },
+  active:    { label: 'Follow Up',     bg: 'linear-gradient(135deg,#22c55e,#16a34a)' },
+  overdue:   { label: 'Follow Up Now', bg: 'linear-gradient(135deg,#dc2626,#991b1b)' },
+  replied:   { label: 'Respond',       bg: 'linear-gradient(135deg,#0ea5e9,#0284c7)' },
+  converted: { label: 'View Account',  bg: 'linear-gradient(135deg,#10b981,#047857)' },
 };
 
 
@@ -227,13 +187,8 @@ const HUNTER_STATUS_LABELS = {
   in_conversation: 'REPLIED',
 };
 
-const ENGAGE_BADGE_CONFIGS = {
-  not_started:   { label: 'COLD',      bg: '#6b728020', color: '#9ca3af', border: '#6b728040' },
-  in_mission:    { label: 'ACTIVE',    bg: '#7c3aed20', color: '#7c3aed', border: '#7c3aed40' },
-  follow_up_due: { label: 'OVERDUE',   bg: '#dc262620', color: '#dc2626', border: '#dc262640' },
-  replied:       { label: 'REPLIED',   bg: '#0ea5e920', color: '#0ea5e9', border: '#0ea5e940' },
-  converted:     { label: 'CONVERTED', bg: '#10b98120', color: '#10b981', border: '#10b98140' },
-};
+// Badge config now imported from shared contactEngageStatus.js
+const ENGAGE_BADGE_CONFIGS = ENGAGE_BADGE_CONFIG;
 
 // ─── EngageBadge ─────────────────────────────────────────────────────────────
 // hunterStatus: pass contact.hunter_status in Hunter mode for specific labels.
@@ -362,7 +317,7 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engag
 // ─── AllLeadsCard ─────────────────────────────────────────────────────────────
 function AllLeadsCard({
   contact, company, onClick, onCompanyClick, onEngage,
-  engageState = 'not_started', mode = 'people', onReturnToScout,
+  engageState = 'cold', mode = 'people', onReturnToScout,
   isSelected = false, bulkMode = false, onSelect,
   onBrigadeUpdate,
   inSniper = false, onAddToSniper,
@@ -373,7 +328,7 @@ function AllLeadsCard({
   const email = contact.email || contact.work_email;
   const status = getLeadStatus(contact);
   const photo = contact.photo_url;
-  const btnCfg = CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.not_started;
+  const btnCfg = CARD_BTN_CONFIG[engageState] || CARD_BTN_CONFIG.cold;
   const [brigadeOpen, setBrigadeOpen] = useState(false);
   const [brigadeSaving, setBrigadeSaving] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -381,6 +336,13 @@ function AllLeadsCard({
   const [archiving, setArchiving] = useState(false);
 
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
+
+  // Stripe color + days since last contact (spec v1.2 Section 2.2)
+  const stripeColor = ENGAGE_STATUS_CONFIG[engageState]?.color || '#6b7280';
+  const lastContactAt = contact.engagement_summary?.last_contact_at || contact.last_sent_at || contact.hunter_engaged_at;
+  const daysSinceContact = lastContactAt
+    ? Math.floor((Date.now() - new Date(lastContactAt).getTime()) / 86400_000)
+    : null;
 
   // Mission quick-assign state
   const [missionPickerOpen, setMissionPickerOpen] = useState(false);
@@ -508,6 +470,7 @@ function AllLeadsCard({
       style={{
         background: isSelected ? T.accentBg : T.cardBg,
         border: `1px solid ${isSelected ? BRAND.pink : engageState === 'replied' ? ENGAGE_BADGE_CONFIGS.replied.color : T.border}`,
+        borderLeft: `3px solid ${stripeColor}`,
         borderRadius: 14, overflow: 'visible', cursor: 'pointer',
         transition: 'all 0.15s', display: 'flex', flexDirection: 'column',
         position: 'relative',
@@ -543,6 +506,22 @@ function AllLeadsCard({
           </div>
         )}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 50%,transparent 100%)' }} />
+        {/* Days since last contact — bottom-right of photo zone */}
+        {daysSinceContact !== null && (
+          <div style={{
+            position: 'absolute', bottom: 40, right: 8, zIndex: 5,
+            background: 'rgba(0,0,0,0.65)', borderRadius: 6,
+            padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3,
+          }}>
+            <Clock size={9} color={daysSinceContact > 7 ? '#dc2626' : 'rgba(255,255,255,0.7)'} />
+            <span style={{
+              fontSize: 9, fontWeight: 700, lineHeight: 1,
+              color: daysSinceContact > 7 ? '#dc2626' : 'rgba(255,255,255,0.7)',
+            }}>
+              {daysSinceContact}d
+            </span>
+          </div>
+        )}
         {/* Top-right badge: Brigade in hunter mode, SNIPER in sniper mode, lead status elsewhere */}
         {!bulkMode && !isSelected && (
           <div style={{ position: 'absolute', top: 8, right: 8 }}>

@@ -178,7 +178,7 @@ const BASECAMP_ITEMS = [
 
 const SETTINGS_ORANGE = '#faaa20';
 
-const BARRY_MODULE = 'homebase';
+const BARRY_MODULE = 'basecamp';
 const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 const TAB_MAP = {

@@ -29,10 +29,16 @@ export const handler = async (event) => {
   }
 
   try {
-    // Extract OAuth code and state (userId) from query params
+    // Extract OAuth code and state from query params.
+    // State format: "userId" or "userId|return_to_path" (pipe-delimited).
     const params = event.queryStringParameters || {};
     const code = params.code;
-    const userId = params.state;
+    const rawState = params.state || '';
+    const [userId, returnTo] = rawState.split('|');
+    // Sanitize return_to: must start with / and no protocol to prevent open redirect
+    const safeReturnTo = (returnTo && returnTo.startsWith('/') && !returnTo.includes('//'))
+      ? returnTo
+      : null;
 
     if (!code || !userId) {
       console.error('❌ Missing code or state in OAuth callback');
@@ -46,7 +52,7 @@ export const handler = async (event) => {
             <body style="font-family: sans-serif; text-align: center; padding: 50px;">
               <h1>❌ Connection Failed</h1>
               <p>Missing authorization code or user ID.</p>
-              <a href="/hunter">Return to Hunter</a>
+              <a href="${safeReturnTo || '/hunter'}">Return</a>
             </body>
           </html>
         `
@@ -128,11 +134,13 @@ export const handler = async (event) => {
     console.log('✅ Gmail tokens stored successfully for user:', userId);
     console.log('📧 Connected email:', email);
 
-    // Redirect to Hunter dashboard with success message
+    // Redirect to originating module with success message
+    const redirectPath = safeReturnTo || '/hunter';
+    const separator = redirectPath.includes('?') ? '&' : '?';
     return {
       statusCode: 302,
       headers: {
-        'Location': '/hunter?connected=true'
+        'Location': `${redirectPath}${separator}connected=true`
       },
       body: ''
     };
@@ -177,7 +185,7 @@ export const handler = async (event) => {
               <h1 style="color: #e53e3e; margin-bottom: 20px;">❌ Connection Failed</h1>
               <p style="color: #4a5568; font-size: 16px; line-height: 1.6;">${userMessage}</p>
               <div style="margin-top: 30px;">
-                <a href="/hunter" style="background: #3182ce; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">Return to Hunter</a>
+                <a href="${safeReturnTo || '/hunter'}" style="background: #3182ce; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">Return</a>
               </div>
               <p style="margin-top: 30px; font-size: 12px; color: #a0aec0;">
                 If this problem persists, try revoking Idynify Scout's access in your

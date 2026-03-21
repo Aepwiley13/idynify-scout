@@ -18,6 +18,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   HeartPulse, Users, AlertTriangle, Clock, Search,
   Filter, Sparkles, RefreshCw, Plus, Settings,
+  BookOpen, TrendingDown,
 } from 'lucide-react';
 import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -27,6 +28,8 @@ import { filterOutSnoozed } from '../../services/snoozeManager';
 import { snoozeContact, SNOOZE_PRESETS, SNOOZE_REASONS } from '../../services/snoozeManager';
 import CSMCard from './CSMCard';
 import SuccessWizard from './SuccessWizard';
+import InterventionPlaybook from './InterventionPlaybook';
+import MilestoneGapReport from './MilestoneGapReport';
 
 const GREEN = '#22c55e';
 const TEAL  = '#14b8a6';
@@ -183,6 +186,8 @@ export default function CSMDashboard({ userId }) {
   const [hasSuccessPlan, setHasSuccessPlan] = useState(null); // null = loading
   const [showWizard, setShowWizard] = useState(false);
   const [snoozeTarget, setSnoozeTarget] = useState(null);
+  const [playbookTarget, setPlaybookTarget] = useState(null);
+  const [showGapReport, setShowGapReport] = useState(false);
   const [search, setSearch] = useState('');
   const [bucketFilter, setBucketFilter] = useState('all'); // 'all' | 'at_risk' | 'neutral' | 'healthy'
   const [refreshing, setRefreshing] = useState(false);
@@ -352,6 +357,17 @@ export default function CSMDashboard({ userId }) {
           >
             <Settings size={13} color={T.textFaint} />
           </button>
+          <button
+            onClick={() => setShowGapReport(true)}
+            title="Milestone Gap Report"
+            style={{
+              width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`,
+              background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <TrendingDown size={13} color={T.textFaint} />
+          </button>
         </div>
       </div>
 
@@ -418,8 +434,8 @@ export default function CSMDashboard({ userId }) {
               key={c.id}
               contact={c}
               healthResult={healthMap.get(c.id)}
-              onClick={() => {/* TODO: open contact profile */}}
-              onCheckIn={() => {/* TODO: open engage drawer */}}
+              onClick={() => setPlaybookTarget(c)}
+              onCheckIn={() => setPlaybookTarget(c)}
               onSnooze={() => setSnoozeTarget(c)}
             />
           ))}
@@ -433,6 +449,29 @@ export default function CSMDashboard({ userId }) {
           userId={userId}
           onClose={() => setSnoozeTarget(null)}
           T={T}
+        />
+      )}
+
+      {/* Intervention Playbook */}
+      {playbookTarget && (
+        <InterventionPlaybook
+          contact={playbookTarget}
+          healthResult={healthMap.get(playbookTarget.id)}
+          userId={userId}
+          onClose={() => setPlaybookTarget(null)}
+          onDraftMessage={(contact, step) => {
+            // TODO: integrate with EngagementCenter draft composer
+            console.log('[CSM] Draft message requested:', contact.name, step.title);
+          }}
+        />
+      )}
+
+      {/* Milestone Gap Report */}
+      {showGapReport && (
+        <MilestoneGapReport
+          contacts={contacts}
+          onOpenPlaybook={(contact) => { setShowGapReport(false); setPlaybookTarget(contact); }}
+          onClose={() => setShowGapReport(false)}
         />
       )}
 

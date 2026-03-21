@@ -12,3 +12,9 @@
 /* Light theme overrides */
 [data-theme="workspace"] .fb-tab-btn:hover { background: rgba(0,0,0,.04) !important; }
 [data-theme="workspace"] .fb-row-hover:hover { background: rgba(249,115,22,.06) !important; }
+[data-theme="sahara"] .fb-tab-btn:hover { background: rgba(0,0,0,.04) !important; }
+[data-theme="sahara"] .fb-row-hover:hover { background: rgba(249,115,22,.06) !important; }
+
+/* Scrollbar inside the module */
+.fb-module ::-webkit-scrollbar { width: 4px; }
+.fb-module ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.09); border-radius: 2px; }

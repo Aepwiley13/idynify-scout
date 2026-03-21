@@ -107,6 +107,20 @@ mission.roster[n] = {
 
 ---
 
+## Bugs — From Laura Onboarding Session (March 20)
+
+_Source: `docs/client-onboarding-feedback-laura-march20.md`_
+
+| Priority | Bug | Suspected Location |
+|----------|-----|--------------------|
+| **P0** | "Generation time not defined" error during ICP generation | `netlify/functions/barryICPConversation.js` |
+| **P0** | Barry returning only ~10 companies instead of 20–30+ | `barryICPConversation.js` / `barryGenerateContext.js` |
+| **P1** | Y Combinator misclassified under Hospitality | ICP industry classification / scoring logic |
+| **P1** | Contact disappears after LinkedIn import (no UI state feedback) | Scout people view / Firestore write timing |
+| **P2** | "Find more targets" button stalls with no feedback | `DailyLeads.jsx` / Scout company card flow |
+
+---
+
 ## Backlog (Post Go To War)
 
 ### #9 — BarryICPPanel extraction from `DailyLeads.jsx`

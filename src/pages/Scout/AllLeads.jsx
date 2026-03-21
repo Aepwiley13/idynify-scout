@@ -29,6 +29,18 @@ import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 
+// ─── Engagement Status Sets ───────────────────────────────────────────────────
+// hunter_status values that indicate a contact has been engaged (Scout → Hunter)
+const ENGAGED_HUNTER_STATUSES = new Set([
+  'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation', 'converted',
+]);
+// contact_status values that indicate a contact has been engaged
+const ENGAGED_CONTACT_STATUSES = new Set([
+  'Engaged', 'Awaiting Reply', 'In Conversation', 'Dormant',
+  'Active Mission', 'In Campaign', 'Mission Complete',
+  'Active Customer', 'Past Customer', 'Partner', 'Network',
+]);
+
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 22, style = {} }) {
   const glow = `0 0 ${size * 0.5}px ${BRAND.cyan}50`;

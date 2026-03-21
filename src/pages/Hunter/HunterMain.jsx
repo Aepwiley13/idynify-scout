@@ -18,7 +18,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser, useImpersonation } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target, Tent, Shield,
+  Radar, Crosshair, Eye, Target, Tent, Shield, Archive,
   Users, CalendarCheck, AlertTriangle, Inbox, Zap, Sparkles,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home,
@@ -162,6 +162,7 @@ const MODULE_RAIL = [
   { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'       },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements' },
   { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'          },
+  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'       },
 ];
 
 // ─── Hunter execution sub-nav items ──────────────────────────────────────────

@@ -14,7 +14,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target, Tent, Shield,
+  Radar, Crosshair, Eye, Target, Tent, Shield, Archive,
   Zap, Building2, Users, Plus,
   Palette, Check, Settings, ChevronLeft, ChevronRight, Home,
 } from 'lucide-react';
@@ -178,6 +178,7 @@ const NAV_SECTIONS = [
   { id: 'basecamp',       label: 'BASECAMP',        Icon: Tent,      route: '/basecamp',        items: [] },
   { id: 'reinforcements', label: 'REINFORCEMENTS',  Icon: Shield,    route: '/reinforcements',  items: [] },
   { id: 'recon',          label: 'RECON',           Icon: Eye,       route: '/recon',           items: [] },
+  { id: 'fallback',       label: 'FALLBACK',        Icon: Archive,   route: '/fallback',        items: [] },
 ];
 
 // ─── ScoutShellInner ─────────────────────────────────────────────────────────

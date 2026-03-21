@@ -15,7 +15,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target, Tent,
+  Radar, Crosshair, Eye, Target, Tent, Archive,
   Brain, MessageSquare, Shield, Swords, Zap, LayoutDashboard, FileText,
   Palette, Check, ChevronLeft, ChevronRight, Home, Settings, Users,
 } from 'lucide-react';
@@ -168,6 +168,7 @@ const MODULE_RAIL = [
   { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'       },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements' },
   { id: 'recon',          label: 'RECON',          Icon: Eye,       route: null              }, // active module
+  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'       },
 ];
 
 // ─── Recon sub-nav items ──────────────────────────────────────────────────────

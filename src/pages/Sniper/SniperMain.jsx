@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
-  Radar, Crosshair, Eye, Target, Tent, Shield,
+  Radar, Crosshair, Eye, Target, Tent, Shield, Archive,
   LayoutDashboard, Activity, BookOpen, BarChart3, Users, Building2,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home, Trophy,
@@ -171,6 +171,7 @@ const MODULE_RAIL = [
   { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'       },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements' },
   { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'          },
+  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'       },
 ];
 
 // ─── SNIPER sub-nav items ─────────────────────────────────────────────────────

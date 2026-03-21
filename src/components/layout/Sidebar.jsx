@@ -27,7 +27,8 @@ import {
   Sparkles,
   BookOpen,
   Zap,
-  LayoutDashboard
+  LayoutDashboard,
+  RotateCcw
 } from 'lucide-react';
 import { useThemeCtx } from '../../theme/ThemeContext';
 import { THEMES, ASSETS, BRAND } from '../../theme/tokens';
@@ -45,6 +46,7 @@ const SIDEBAR_ROUTE_MODULE_MAP = [
   { prefix: '/people',         module: 'command-center' },
   { prefix: '/basecamp',       module: 'homebase'       },
   { prefix: '/reinforcements', module: 'reinforcements' },
+  { prefix: '/fallback',       module: 'fallback'       },
 ];
 
 function getSidebarModule(pathname) {
@@ -68,6 +70,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     sniper: true,
     basecamp: true,
     reinforcements: true,
+    fallback: true,
   });
   const navigate = useNavigate();
   const location = useLocation();
@@ -389,6 +392,30 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     }
   ];
 
+  const fallbackItems = [
+    {
+      icon: RotateCcw,
+      label: 'Comeback Engine',
+      sublabel: 'Re-engage archived contacts',
+      path: '/fallback',
+      isPrimary: true
+    },
+    {
+      icon: Users,
+      label: 'People',
+      sublabel: 'Archived contacts',
+      path: '/fallback',
+      state: { activeTab: 'people' }
+    },
+    {
+      icon: Building2,
+      label: 'Companies',
+      sublabel: 'Archived companies',
+      path: '/fallback',
+      state: { activeTab: 'companies' }
+    }
+  ];
+
   const renderNavItem = (item) => {
     const active = item.state
       ? isActive(item.path, item.state?.activeTab)
@@ -426,6 +453,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       id === 'sniper'         ? isPathActive('/sniper') :
       id === 'basecamp'       ? isPathActive('/basecamp') :
       id === 'reinforcements' ? isPathActive('/reinforcements') :
+      id === 'fallback'       ? isPathActive('/fallback') :
       false;
 
     return (
@@ -480,6 +508,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         {renderPillar('basecamp',       'BASECAMP',        Home,      'pillar-cyan',   basecampItems)}
         {renderPillar('reinforcements', 'REINFORCEMENTS',  Users,     'pillar-purple', reinforcementsItems)}
         {renderPillar('recon',          'RECON',           Brain,     'pillar-purple', reconItems)}
+        {renderPillar('fallback',       'FALLBACK',        RotateCcw, 'pillar-orange', fallbackItems)}
       </nav>
 
       {/* Settings Link */}

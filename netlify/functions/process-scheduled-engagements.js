@@ -20,6 +20,7 @@ import { schedule } from '@netlify/functions';
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {
@@ -42,7 +43,7 @@ const handler = async () => {
   const startTime = Date.now();
   console.log('⏰ Starting process-scheduled-engagements job');
 
-  const results = { processed: 0, sent: 0, notified: 0, skipped: 0, failed: 0 };
+  const results = { processed: 0, sent: 0, notified: 0, skipped: 0, failed: 0, wavesSent: 0, wavesProcessed: 0 };
   const now = new Date().toISOString();
 
   try {
@@ -56,12 +57,18 @@ const handler = async () => {
         results.failed++;
         console.error(`❌ process-scheduled-engagements: user ${userId} failed:`, userErr.message);
       }
+      try {
+        await processUserScheduledWaves(userId, now, results);
+      } catch (waveErr) {
+        results.failed++;
+        console.error(`❌ process-scheduled-waves: user ${userId} failed:`, waveErr.message);
+      }
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(
       `✅ process-scheduled-engagements complete: ${results.sent} sent, ` +
-      `${results.notified} notified, ${results.failed} failed in ${duration}s`
+      `${results.notified} notified, ${results.wavesSent} wave emails, ${results.failed} failed in ${duration}s`
     );
 
     return {
@@ -280,6 +287,244 @@ async function writeReminderNotification(userId, docRef, eng) {
 
   console.log(`📬 Reminder notification created for user ${userId} contact ${contactId}`);
 }
+
+// ─── Scheduled Wave Processing ───────────────────────────────────────────────
+
+async function processUserScheduledWaves(userId, now, results) {
+  const wavesRef = db.collection('users').doc(userId).collection('waves');
+
+  // Find scheduled waves whose time has passed
+  const dueSnap = await wavesRef
+    .where('status', '==', 'scheduled')
+    .where('scheduledFor', '<=', now)
+    .get();
+
+  if (dueSnap.empty) return;
+
+  for (const waveDoc of dueSnap.docs) {
+    results.wavesProcessed++;
+    const wave = waveDoc.data();
+
+    try {
+      await sendScheduledWave(userId, waveDoc.ref, wave, results);
+    } catch (waveErr) {
+      console.error(
+        `❌ process-scheduled-waves: wave ${waveDoc.id} for user ${userId} failed:`,
+        waveErr.message
+      );
+      results.failed++;
+      await waveDoc.ref.update({
+        status: 'failed',
+        errorMessage: waveErr.message,
+        processedAt: FieldValue.serverTimestamp()
+      }).catch(() => {});
+    }
+  }
+}
+
+async function sendScheduledWave(userId, waveRef, wave, results) {
+  const { recipientIds, message: messageTemplate, subject, channel, type } = wave;
+
+  if (!recipientIds?.length) {
+    await waveRef.update({ status: 'processed', processedAt: FieldValue.serverTimestamp() });
+    return;
+  }
+
+  // Only send email waves via Gmail — other channels get reminder notifications
+  if (channel && channel !== 'via Email') {
+    await db.collection('users').doc(userId).collection('notifications').add({
+      type: 'scheduled_wave_due',
+      waveName: wave.name || 'Scheduled wave',
+      channel,
+      recipientCount: recipientIds.length,
+      reason: 'scheduled_wave_due',
+      createdAt: FieldValue.serverTimestamp(),
+      read: false
+    });
+    await waveRef.update({ status: 'notified', processedAt: FieldValue.serverTimestamp() });
+    results.notified++;
+    return;
+  }
+
+  // Load Gmail OAuth tokens
+  const gmailDoc = await db
+    .collection('users').doc(userId)
+    .collection('integrations').doc('gmail')
+    .get();
+
+  if (!gmailDoc.exists || gmailDoc.data().status !== 'connected') {
+    // Gmail not connected — create reminder
+    await db.collection('users').doc(userId).collection('notifications').add({
+      type: 'scheduled_wave_due',
+      waveName: wave.name || 'Scheduled wave',
+      channel: 'email',
+      recipientCount: recipientIds.length,
+      reason: 'gmail_not_connected',
+      createdAt: FieldValue.serverTimestamp(),
+      read: false
+    });
+    await waveRef.update({ status: 'notified', processedAt: FieldValue.serverTimestamp() });
+    results.notified++;
+    return;
+  }
+
+  const gmailData = gmailDoc.data();
+  let accessToken = gmailData.accessToken;
+  const refreshToken = gmailData.refreshToken;
+
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+  if (!googleClientId || !googleClientSecret || !googleRedirectUri) {
+    throw new Error('Google OAuth not configured');
+  }
+
+  const oauth2Client = new google.auth.OAuth2(googleClientId, googleClientSecret, googleRedirectUri);
+  oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+  // Refresh token if expired
+  if (gmailData.expiresAt && Date.now() >= gmailData.expiresAt - 60000) {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    accessToken = credentials.access_token;
+    await db.collection('users').doc(userId)
+      .collection('integrations').doc('gmail')
+      .update({
+        accessToken,
+        expiresAt: credentials.expiry_date,
+        updatedAt: new Date().toISOString()
+      });
+    oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  }
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const signature = await getGmailSignature(gmail);
+
+  // Load recipient contacts from Firestore
+  let sentCount = 0;
+  const waveSubject = subject || WAVE_SUBJECTS[type] || wave.name || 'Checking in';
+
+  for (const contactId of recipientIds) {
+    try {
+      const contactDoc = await db.collection('users').doc(userId)
+        .collection('contacts').doc(contactId).get();
+
+      if (!contactDoc.exists) continue;
+      const contact = contactDoc.data();
+      if (!contact.email) continue;
+
+      // Personalize message
+      const firstName = contact.first_name || contact.name?.split(' ')[0] || 'there';
+      const personalizedBody = messageTemplate.replace(/\{\{first_name\}\}/gi, firstName);
+      const bodyWithSignature = appendSignature(personalizedBody, signature);
+
+      const displayName = contact.name ||
+        `${contact.first_name || ''} ${contact.last_name || ''}`.trim() ||
+        contact.email;
+
+      // Build RFC 2822 email
+      const emailLines = [
+        `To: ${displayName} <${contact.email}>`,
+        `Subject: ${waveSubject}`,
+        'Content-Type: text/plain; charset=utf-8',
+        'MIME-Version: 1.0',
+        '',
+        bodyWithSignature
+      ];
+      const encodedEmail = Buffer.from(emailLines.join('\n'))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      const existingThreadId = contact.gmail_thread_id || null;
+
+      const gmailResult = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw: encodedEmail,
+          ...(existingThreadId ? { threadId: existingThreadId } : {})
+        }
+      });
+
+      const gmailMessageId = gmailResult.data.id;
+      const gmailThreadId = gmailResult.data.threadId;
+      const sentAt = new Date().toISOString();
+      sentCount++;
+
+      // Update contact
+      const contactUpdate = {
+        gmail_last_message_id: gmailMessageId,
+        hunter_status: 'awaiting_reply',
+        last_sent_at: sentAt,
+        updated_at: sentAt
+      };
+      if (!existingThreadId && gmailThreadId) {
+        contactUpdate.gmail_thread_id = gmailThreadId;
+      }
+      await contactDoc.ref.update(contactUpdate).catch(() => {});
+
+      // Log to email_logs
+      await db.collection('email_logs').add({
+        userId,
+        contactId,
+        toEmail: contact.email,
+        toName: displayName,
+        subject: waveSubject,
+        bodyPreview: personalizedBody.substring(0, 200),
+        gmailMessageId,
+        gmailThreadId: gmailThreadId || null,
+        status: 'sent',
+        sentAt,
+        source: 'scheduled_wave',
+        waveId: waveRef.id,
+      }).catch(() => {});
+
+      // Log timeline event
+      await contactDoc.ref.collection('timeline').add({
+        type: 'message_sent',
+        actor: 'user',
+        timestamp: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        preview: waveSubject,
+        metadata: {
+          channel: 'email',
+          method: 'real',
+          sendResult: 'sent',
+          scheduledSend: true,
+          waveName: wave.name,
+          gmailMessageId,
+          subject: waveSubject,
+        }
+      }).catch(() => {});
+
+      console.log(`✅ Wave email sent to ${contact.email} for user ${userId}`);
+      results.wavesSent++;
+
+      // Small delay between sends
+      await new Promise(r => setTimeout(r, 500));
+
+    } catch (sendErr) {
+      console.error(`❌ Failed wave email to contact ${contactId}:`, sendErr.message);
+    }
+  }
+
+  // Update wave doc
+  await waveRef.update({
+    status: 'processed',
+    'stats.sent': sentCount,
+    sentAt: FieldValue.serverTimestamp(),
+    processedAt: FieldValue.serverTimestamp(),
+  });
+
+  console.log(`✅ Scheduled wave processed: ${sentCount}/${recipientIds.length} sent`);
+}
+
+const WAVE_SUBJECTS = {
+  checkin: 'Checking in',
+  product_update: 'What we just shipped',
+  book_meeting: 'Worth 20 minutes?',
+};
 
 // Schedule: every 15 minutes
 export default schedule('*/15 * * * *', handler);

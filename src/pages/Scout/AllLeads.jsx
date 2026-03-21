@@ -1201,12 +1201,25 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
-  useEffect(() => { loadAllContacts(); }, []);
+  useEffect(() => {
+    // Wait for Firebase auth to resolve before loading contacts.
+    // auth.currentUser is null on first render when the auth state hasn't
+    // been confirmed yet, which would silently skip loading entirely.
+    const unsubscribe = auth.onAuthStateChanged(firebaseUser => {
+      if (firebaseUser) {
+        loadAllContacts();
+      } else {
+        setLoading(false);
+        navigate('/login');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   async function loadAllContacts() {
     try {
       const user = getEffectiveUser();
-      if (!user) { navigate('/login'); return; }
+      if (!user) { setLoading(false); navigate('/login'); return; }
       // Load companies and contacts in parallel to halve the round-trip time
       const fetches = [
         getDocs(collection(db, 'users', user.uid, 'companies')),

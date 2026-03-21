@@ -4,14 +4,14 @@
  * Dedicated 8-phase wizard for launching bulk missions against a roster of contacts.
  * NOT a modal — this is a full section inside the Command Center shell.
  *
- * Phase 1: Brief          — Define objective (goal type + mission name)
- * Phase 2: Roster         — Select contacts via checkbox list
- * Phase 3: ICP & Companies — ICP input + company list with approve/disapprove
- * Phase 4: Contacts       — Inline company panel, add decision makers to mission
- * Phase 5: Sequence       — Import Hunter strategy config + Barry sequence generation
- * Phase 6: Launch         — Launch mission + manual send feed
- * Phase 7: Monitor        — Live feed with Queued/Sent/Awaiting Reply
- * Phase 8: Debrief        — Outcome recording
+ * Phase 1: Brief    — Define objective (goal type + mission name)
+ * Phase 2: Roster   — Select contacts + ICP/company filtering + add decision makers
+ * Phase 3: Approach — Engagement style + channel selection
+ * Phase 4: Sequence — Barry generates multi-step sequence plan
+ * Phase 5: Approve  — Per-step review with StepApprovalCard (edit/skip/approve)
+ * Phase 6: Launch   — Launch mission + manual send feed
+ * Phase 7: Monitor  — Track replies and engagement in real time
+ * Phase 8: Debrief  — Record outcomes, train Barry for next wave
  *
  * Sprint A: Email only. Existing saved contacts/companies. Manual-approved sends.
  */
@@ -229,14 +229,23 @@ export default function GoToWar() {
   const [loadingCompanyContacts, setLoadingCompanyContacts] = useState(null);
   const [missionContacts, setMissionContacts]     = useState([]); // contacts added to mission
 
-  // Phase 5: Sequence config (imported from Hunter CreateMission)
+  // Phase 2: Roster sub-tab (contacts / companies / decision makers)
+  const [rosterTab, setRosterTab] = useState('contacts'); // 'contacts' | 'companies' | 'decision_makers'
+
+  // Phase 3: Approach (strategy config)
   const [outcomeGoal, setOutcomeGoal]         = useState(null);
   const [engagementStyle, setEngagementStyle] = useState(null);
   const [timeframe, setTimeframe]             = useState(null);
   const [nextStepType, setNextStepType]       = useState(null);
+
+  // Phase 4: Sequence generation
   const [microSequence, setMicroSequence]     = useState(null);
   const [sequenceLoading, setSequenceLoading] = useState(false);
   const [sequenceError, setSequenceError]     = useState(null);
+
+  // Phase 5: Approve — per-step review
+  const [approvedSteps, setApprovedSteps]     = useState(new Set()); // set of step indices
+  const [skippedSteps, setSkippedSteps]       = useState(new Set());
 
   // Phase 6: Launch + Send
   const [missionLaunched, setMissionLaunched] = useState(false);
@@ -250,12 +259,117 @@ export default function GoToWar() {
 
   // Phase 8: Debrief
   const [debriefNotes, setDebriefNotes] = useState('');
+  const [debriefSaving, setDebriefSaving] = useState(false);
+  const [debriefSaved, setDebriefSaved] = useState(false);
 
-  // Load contacts when entering Phase 2
+  // Persist debrief outcomes + notes to Firestore
+  async function saveDebrief() {
+    if (!activeMissionId) return;
+    setDebriefSaving(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const missionRef = doc(db, 'users', user.uid, 'missions', activeMissionId);
+      const updatedContacts = missionContacts.map((mc) => ({
+        ...mc,
+        manualOutcome: contactOutcomes[mc.contactId] || null,
+        status: contactOutcomes[mc.contactId] ? 'completed' : mc.status,
+      }));
+      await updateDoc(missionRef, {
+        contacts: updatedContacts,
+        debriefNotes: debriefNotes || null,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      setMissionContacts(updatedContacts);
+      setDebriefSaved(true);
+
+      // Log debrief to timeline for each contact with an outcome
+      Object.entries(contactOutcomes).forEach(([contactId, outcome]) => {
+        logTimelineEvent({
+          userId: user.uid,
+          contactId,
+          type: 'mission_debrief',
+          actor: ACTORS.USER,
+          preview: `Outcome: ${outcome}`,
+          metadata: { missionId: activeMissionId, outcome },
+        });
+      });
+    } catch (err) {
+      console.error('[GoToWar] debrief save error:', err);
+      alert('Failed to save debrief. Please try again.');
+    } finally {
+      setDebriefSaving(false);
+    }
+  }
+
+  // ── Resume banner: check for active missions on mount ───────────────────────
+  const [activeMissions, setActiveMissions] = useState([]);
+  const [resumeBannerVisible, setResumeBannerVisible] = useState(false);
+
+  useEffect(() => {
+    loadActiveMissions();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadActiveMissions() {
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const snap = await getDocs(
+        query(
+          collection(db, 'users', user.uid, 'missions'),
+          where('status', '==', 'active')
+        )
+      );
+      const missions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (missions.length > 0) {
+        setActiveMissions(missions);
+        setResumeBannerVisible(true);
+      }
+    } catch (err) {
+      console.error('[GoToWar] active missions check error:', err);
+    }
+  }
+
+  function resumeMission(mission) {
+    setActiveMissionId(mission.id);
+    setMissionName(mission.name || '');
+    setGoalId(mission.outcome_goal || '');
+    setMissionContacts(mission.contacts || []);
+    setMicroSequence(mission.microSequence || null);
+    setOutcomeGoal(mission.outcome_goal || null);
+    setEngagementStyle(mission.engagement_style || null);
+    setTimeframe(mission.timeframe || null);
+    setNextStepType(mission.next_step_type || null);
+    setMissionLaunched(true);
+    setObjectiveSentence(mission.objective_sentence || '');
+
+    // Rebuild sentSteps from contact stepHistory
+    const rebuilt = {};
+    (mission.contacts || []).forEach((c) => {
+      if (c.stepHistory?.length > 0) {
+        rebuilt[c.contactId] = new Set(c.stepHistory.map((h) => h.stepIndex));
+      }
+    });
+    setSentSteps(rebuilt);
+
+    // Rebuild outcomes
+    const outcomes = {};
+    (mission.contacts || []).forEach((c) => {
+      if (c.manualOutcome) outcomes[c.contactId] = c.manualOutcome;
+    });
+    setContactOutcomes(outcomes);
+
+    setResumeBannerVisible(false);
+    setPhase(5); // Jump to Launch phase (already launched)
+  }
+
+  // Load contacts when entering Phase 2 (Roster)
   useEffect(() => {
     if (phase !== 1) return;
-    if (contacts.length > 0) return; // already loaded
-    loadContacts();
+    if (contacts.length === 0) loadContacts();
+    if (companies.length === 0) loadCompanies();
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadContacts() {
@@ -275,13 +389,6 @@ export default function GoToWar() {
       setContactsLoading(false);
     }
   }
-
-  // Load companies when entering Phase 3
-  useEffect(() => {
-    if (phase !== 2) return;
-    if (companies.length > 0) return;
-    loadCompanies();
-  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadCompanies() {
     setCompaniesLoading(true);
@@ -448,8 +555,31 @@ export default function GoToWar() {
     }
   }
 
+  // ── Send throttle (90s global per-sender) ──────────────────────────────────
+  const [lastSendTime, setLastSendTime] = useState(0);
+  const [throttleRemaining, setThrottleRemaining] = useState(0);
+
+  useEffect(() => {
+    if (throttleRemaining <= 0) return;
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((lastSendTime + 90000 - Date.now()) / 1000));
+      setThrottleRemaining(remaining);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lastSendTime, throttleRemaining]);
+
   // Phase 6: Manual send for a specific contact + step
   async function handleManualSend(contact, stepIndex) {
+    // Enforce 90s global throttle
+    const now = Date.now();
+    const elapsed = now - lastSendTime;
+    if (lastSendTime > 0 && elapsed < 90000) {
+      const wait = Math.ceil((90000 - elapsed) / 1000);
+      setThrottleRemaining(wait);
+      alert(`Send throttle: please wait ${wait}s before sending again. This prevents rate-limiting.`);
+      return;
+    }
+
     const key = `${contact.contactId}_${stepIndex}`;
     setSendingStep(key);
     try {
@@ -469,6 +599,12 @@ export default function GoToWar() {
           body: microSequence?.steps?.[stepIndex]?.action || 'Follow up message',
         }),
       });
+
+      // Update throttle timestamp
+      const sendTime = Date.now();
+      setLastSendTime(sendTime);
+      setThrottleRemaining(90);
+
       // Log to timeline
       logTimelineEvent({
         userId: user.uid,
@@ -478,6 +614,31 @@ export default function GoToWar() {
         preview: `Step ${stepIndex + 1} sent`,
         metadata: { missionId: activeMissionId, stepIndex },
       });
+
+      // Persist send state to Firestore — update mission contact
+      const missionRef = doc(db, 'users', user.uid, 'missions', activeMissionId);
+      const updatedContacts = missionContacts.map((mc) => {
+        if (mc.contactId !== contact.contactId) return mc;
+        const newHistory = [...(mc.stepHistory || []), {
+          stepIndex,
+          sentAt: new Date().toISOString(),
+          actor: 'user',
+        }];
+        return {
+          ...mc,
+          currentStepIndex: stepIndex + 1,
+          lastContactedAt: new Date().toISOString(),
+          replyStatus: 'no-reply',
+          stepHistory: newHistory,
+          status: (stepIndex + 1 >= (microSequence?.steps?.length || 1)) ? 'awaiting_outcome' : 'active',
+        };
+      });
+      await updateDoc(missionRef, {
+        contacts: updatedContacts,
+        updatedAt: new Date().toISOString(),
+      });
+      setMissionContacts(updatedContacts);
+
       setSentSteps((prev) => {
         const next = { ...prev };
         if (!next[contact.contactId]) next[contact.contactId] = new Set();
@@ -537,12 +698,12 @@ export default function GoToWar() {
 
   // Phase gate: can the user advance?
   const canAdvance = () => {
-    if (phase === 0) return goalId !== '';
-    if (phase === 1) return selected.size > 0;
-    if (phase === 2) return approvedCompanies.size > 0; // Phase 3: at least 1 approved company
-    if (phase === 3) return missionContacts.length > 0; // Phase 4: at least 1 contact added
-    if (phase === 4) return allStrategyFieldsSet;       // Phase 5: all strategy fields set
-    if (phase === 5) return missionLaunched;             // Phase 6: mission launched
+    if (phase === 0) return goalId !== '';                           // Brief: goal selected
+    if (phase === 1) return selected.size > 0 || missionContacts.length > 0; // Roster: contacts selected or added
+    if (phase === 2) return allStrategyFieldsSet;                   // Approach: all strategy fields set
+    if (phase === 3) return !!microSequence;                        // Sequence: generated
+    if (phase === 4) return approvedSteps.size + skippedSteps.size === (microSequence?.steps?.length || 0); // Approve: all steps reviewed
+    if (phase === 5) return missionLaunched;                        // Launch: mission launched
     return true;
   };
 
@@ -689,436 +850,346 @@ export default function GoToWar() {
     </div>
   );
 
-  // ── Phase 2: Roster ─────────────────────────────────────────────────────────
-  const renderPhase2 = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ padding: '20px 24px 12px', flexShrink: 0 }}>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: '1.15rem',
-            fontWeight: 700,
-            color: T.text,
-            letterSpacing: '-0.02em',
-            marginBottom: 4,
-          }}
-        >
-          Select your roster
-        </h2>
-        <p style={{ margin: 0, fontSize: 13, color: T.textFaint }}>
-          {selected.size > 0
-            ? `${selected.size} contact${selected.size !== 1 ? 's' : ''} selected`
-            : 'Choose who goes into this wave.'}
-        </p>
-      </div>
-
-      {/* Search bar */}
-      <div style={{ padding: '0 24px 10px', flexShrink: 0 }}>
-        <div style={{ position: 'relative' }}>
-          <Search
-            size={14}
-            color={T.textFaint}
-            style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter by name, company, title…"
-            style={{
-              width: '100%',
-              padding: '8px 12px 8px 32px',
-              borderRadius: 9,
-              border: `1.5px solid ${T.border2}`,
-              background: T.surface,
-              color: T.text,
-              fontSize: 12,
-              outline: 'none',
-              fontFamily: 'Inter, system-ui, sans-serif',
-              boxSizing: 'border-box',
-            }}
-            onFocus={(e) => { e.target.style.borderColor = WAR_ACCENT; }}
-            onBlur={(e) => { e.target.style.borderColor = T.border2; }}
-          />
-        </div>
-      </div>
-
-      {/* Select all row */}
-      {filteredContacts.length > 0 && (
-        <div
-          style={{
-            padding: '4px 24px 8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0,
-          }}
-        >
-          <span style={{ fontSize: 11, color: T.textFaint }}>
-            {filteredContacts.length} contact{filteredContacts.length !== 1 ? 's' : ''}
-            {search ? ' matching' : ''}
-          </span>
-          <button
-            onClick={toggleAll}
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: WAR_ACCENT,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
-            {filteredContacts.every((c) => selected.has(c.id)) ? 'Deselect all' : 'Select all'}
-          </button>
-        </div>
-      )}
-
-      {/* Contact list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
-        {contactsLoading ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              padding: 40,
-              color: T.textFaint,
-              fontSize: 13,
-            }}
-          >
-            <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
-            Loading contacts…
-          </div>
-        ) : contactsError ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '16px 0',
-              color: '#ef4444',
-              fontSize: 13,
-            }}
-          >
-            <AlertCircle size={15} />
-            {contactsError}
-          </div>
-        ) : filteredContacts.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: 40,
-              color: T.textFaint,
-              fontSize: 13,
-            }}
-          >
-            {search ? 'No contacts match that filter.' : 'No contacts found. Add contacts in Scout first.'}
-          </div>
-        ) : (
-          filteredContacts.map((c) => (
-            <ContactRosterRow
-              key={c.id}
-              contact={c}
-              selected={selected.has(c.id)}
-              onToggle={toggleContact}
-              T={T}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-
-  // ── Phase 3: ICP & Companies ──────────────────────────────────────────────
-  const renderPhase3 = () => (
-    <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
-          Describe your ideal target
-        </h2>
-        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
-          Tell Barry who you're going after. He'll filter your saved companies to match.
-        </p>
-      </div>
-
-      {/* ICP sentence */}
-      <textarea
-        value={objectiveSentence}
-        onChange={(e) => setObjectiveSentence(e.target.value)}
-        placeholder="e.g. Utah-based commercial construction GCs, CFO or COO, over $20M revenue"
-        rows={3}
-        style={{
-          width: '100%', padding: 12, borderRadius: 10,
-          border: `1.5px solid ${T.border2}`, background: T.cardBg,
-          color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
-          resize: 'vertical', marginBottom: 20, boxSizing: 'border-box',
-        }}
-      />
-
-      {/* Company search */}
-      <div style={{ position: 'relative', marginBottom: 14 }}>
-        <Search size={14} style={{ position: 'absolute', left: 12, top: 11, color: T.textFaint }} />
-        <input
-          type="text"
-          value={companySearch}
-          onChange={(e) => setCompanySearch(e.target.value)}
-          placeholder="Filter companies…"
-          style={{
-            width: '100%', padding: '9px 12px 9px 34px', borderRadius: 9,
-            border: `1.5px solid ${T.border2}`, background: T.cardBg,
-            color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
-            boxSizing: 'border-box',
-          }}
-        />
-      </div>
-
-      {/* Company list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {companiesLoading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
-            <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
-          </div>
-        ) : filteredCompanies.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: T.textFaint, fontSize: 13 }}>
-            {companySearch ? 'No companies match that filter.' : 'No accepted companies found.'}
-          </div>
-        ) : (
-          filteredCompanies.map((c) => {
-            const approved = approvedCompanies.has(c.id);
-            return (
-              <div
-                key={c.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 10,
-                  border: `1.5px solid ${approved ? '#22c55e40' : T.border2}`,
-                  background: approved ? '#22c55e08' : T.cardBg,
-                }}
-              >
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8, background: `${WAR_ACCENT}12`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  <Building2 size={16} color={WAR_ACCENT} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.name || 'Unnamed Company'}
-                  </div>
-                  <div style={{ fontSize: 11, color: T.textFaint }}>
-                    {[c.industry, c.geo || c.state].filter(Boolean).join(' · ') || 'No details'}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setApprovedCompanies((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
-                      return next;
-                    });
-                  }}
-                  style={{
-                    padding: '6px 12px', borderRadius: 7, border: 'none', fontSize: 12, fontWeight: 600,
-                    cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
-                    background: approved ? '#22c55e' : T.border2,
-                    color: approved ? '#fff' : T.textMuted,
-                  }}
-                >
-                  {approved ? <><ThumbsUp size={12} /> Approved</> : <><ThumbsDown size={12} /> Approve</>}
-                </button>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-
-  // ── Phase 4: Contacts ───────────────────────────────────────────────────────
-  const renderPhase4 = () => {
+  // ── Phase 2: Roster (tabbed — contacts, companies, decision makers) ─────────
+  const renderPhaseRoster = () => {
+    const ROSTER_TABS = [
+      { id: 'contacts', label: 'Contacts', icon: Users },
+      { id: 'companies', label: 'Companies', icon: Building2 },
+      { id: 'decision_makers', label: 'Decision Makers', icon: Crosshair },
+    ];
     const approvedList = companies.filter((c) => approvedCompanies.has(c.id));
+
     return (
-      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
-            Add decision makers
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 24px 12px', flexShrink: 0 }}>
+          <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 4 }}>
+            Build your roster
           </h2>
-          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
-            Expand a company to see contacts. Add the right people to this mission.
+          <p style={{ margin: 0, fontSize: 13, color: T.textFaint }}>
+            {missionContacts.length > 0
+              ? `${selected.size} contacts selected · ${missionContacts.length} decision maker${missionContacts.length !== 1 ? 's' : ''} added`
+              : selected.size > 0
+                ? `${selected.size} contact${selected.size !== 1 ? 's' : ''} selected`
+                : 'Select contacts, approve companies, and add decision makers.'}
           </p>
         </div>
 
-        {/* Mission contacts summary */}
-        {missionContacts.length > 0 && (
-          <div style={{
-            padding: '10px 14px', borderRadius: 9, background: `${WAR_ACCENT}10`,
-            border: `1.5px solid ${WAR_ACCENT}30`, marginBottom: 16, fontSize: 13, color: WAR_ACCENT, fontWeight: 600,
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <Users size={14} />
-            {missionContacts.length} contact{missionContacts.length !== 1 ? 's' : ''} in mission
-          </div>
-        )}
-
-        {/* Company accordion */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {approvedList.map((company) => {
-            const expanded = expandedCompanyId === company.id;
-            const contacts = companyContacts[company.id] || [];
-            const loading = loadingCompanyContacts === company.id;
+        {/* Sub-tabs */}
+        <div style={{ display: 'flex', gap: 4, padding: '0 24px 10px', flexShrink: 0 }}>
+          {ROSTER_TABS.map((tab) => {
+            const active = rosterTab === tab.id;
+            const Icon = tab.icon;
             return (
-              <div key={company.id} style={{ borderRadius: 10, border: `1.5px solid ${T.border2}`, overflow: 'hidden' }}>
-                {/* Company header */}
-                <div
-                  onClick={() => {
-                    if (expanded) { setExpandedCompanyId(null); return; }
-                    setExpandedCompanyId(company.id);
-                    loadCompanyContacts(company.id);
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
-                    cursor: 'pointer', background: expanded ? `${WAR_ACCENT}08` : T.cardBg,
-                  }}
-                >
-                  <Building2 size={15} color={T.textMuted} />
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
-                  <ChevronDown size={14} color={T.textFaint} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-                </div>
-
-                {/* Contact list */}
-                {expanded && (
-                  <div style={{ borderTop: `1px solid ${T.border}`, padding: '8px 0' }}>
-                    {loading ? (
-                      <div style={{ textAlign: 'center', padding: 20, color: T.textFaint }}>
-                        <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                      </div>
-                    ) : contacts.length === 0 ? (
-                      <div style={{ padding: '12px 14px', fontSize: 12, color: T.textFaint }}>No contacts saved for this company.</div>
-                    ) : (
-                      contacts.map((contact) => {
-                        const inMission = missionContacts.some((mc) => mc.contactId === contact.id);
-                        return (
-                          <div key={contact.id} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px',
-                          }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: T.text }}>
-                                {`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || 'Unknown'}
-                              </div>
-                              <div style={{ fontSize: 11, color: T.textFaint }}>
-                                {contact.title || contact.current_position_title || 'No title'} {contact.email ? `· ${contact.email}` : ''}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => inMission ? removeFromMission(contact.id) : addToMission(contact, company)}
-                              style={{
-                                padding: '5px 10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600,
-                                cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
-                                background: inMission ? '#ef4444' : WAR_ACCENT,
-                                color: '#fff',
-                              }}
-                            >
-                              {inMission ? 'Remove' : <><UserPlus size={11} /> Add</>}
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
+              <button
+                key={tab.id}
+                onClick={() => setRosterTab(tab.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 7, fontSize: 11, fontWeight: active ? 600 : 400,
+                  border: `1.5px solid ${active ? WAR_ACCENT : T.border2}`,
+                  background: active ? `${WAR_ACCENT}12` : 'transparent',
+                  color: active ? WAR_ACCENT : T.textMuted,
+                  cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <Icon size={12} /> {tab.label}
+              </button>
             );
           })}
         </div>
-      </div>
-    );
-  };
 
-  // ── Phase 5: Sequence ───────────────────────────────────────────────────────
-  const renderPhase5 = () => {
-    const OptionGrid = ({ items, selected, onSelect, accent }) => (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-        {items.map((item) => {
-          const active = selected === item.id;
-          return (
-            <div
-              key={item.id}
-              onClick={() => onSelect(item.id)}
-              style={{
-                padding: '10px 12px', borderRadius: 9, cursor: 'pointer',
-                border: `1.5px solid ${active ? (accent || WAR_ACCENT) : T.border2}`,
-                background: active ? `${accent || WAR_ACCENT}10` : T.cardBg,
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 600, color: active ? (accent || WAR_ACCENT) : T.text, marginBottom: 2 }}>{item.label}</div>
-              <div style={{ fontSize: 11, color: T.textFaint, lineHeight: 1.4 }}>{item.description}</div>
+        {/* ── Tab: Contacts ────────────────────────────────────────────── */}
+        {rosterTab === 'contacts' && (
+          <>
+            <div style={{ padding: '0 24px 10px', flexShrink: 0 }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} color={T.textFaint} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                <input
+                  type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Filter by name, company, title…"
+                  style={{
+                    width: '100%', padding: '8px 12px 8px 32px', borderRadius: 9,
+                    border: `1.5px solid ${T.border2}`, background: T.surface,
+                    color: T.text, fontSize: 12, outline: 'none',
+                    fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = WAR_ACCENT; }}
+                  onBlur={(e) => { e.target.style.borderColor = T.border2; }}
+                />
+              </div>
             </div>
-          );
-        })}
-      </div>
-    );
+            {filteredContacts.length > 0 && (
+              <div style={{ padding: '4px 24px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: T.textFaint }}>
+                  {filteredContacts.length} contact{filteredContacts.length !== 1 ? 's' : ''}{search ? ' matching' : ''}
+                </span>
+                <button onClick={toggleAll} style={{ fontSize: 11, fontWeight: 600, color: WAR_ACCENT, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  {filteredContacts.every((c) => selected.has(c.id)) ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+            )}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
+              {contactsLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 40, color: T.textFaint, fontSize: 13 }}>
+                  <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading contacts…
+                </div>
+              ) : contactsError ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 0', color: '#ef4444', fontSize: 13 }}>
+                  <AlertCircle size={15} /> {contactsError}
+                </div>
+              ) : filteredContacts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: T.textFaint, fontSize: 13 }}>
+                  {search ? 'No contacts match that filter.' : 'No contacts found. Add contacts in Scout first.'}
+                </div>
+              ) : (
+                filteredContacts.map((c) => (
+                  <ContactRosterRow key={c.id} contact={c} selected={selected.has(c.id)} onToggle={toggleContact} T={T} />
+                ))
+              )}
+            </div>
+          </>
+        )}
 
-    return (
-      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
-            Configure the engagement
-          </h2>
-          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
-            Set the strategy. Barry will build a multi-step sequence from these choices.
-          </p>
-        </div>
-
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Outcome Goal</div>
-        <OptionGrid items={OUTCOME_GOALS.slice(0, 6)} selected={outcomeGoal} onSelect={setOutcomeGoal} />
-
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Engagement Style</div>
-        <OptionGrid items={ENGAGEMENT_STYLES} selected={engagementStyle} onSelect={setEngagementStyle} />
-
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Timeframe</div>
-        <OptionGrid items={MISSION_TIMEFRAMES} selected={timeframe} onSelect={setTimeframe} />
-
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Next Step Type</div>
-        <OptionGrid items={NEXT_STEP_TYPES} selected={nextStepType} onSelect={setNextStepType} />
-
-        {/* Generate button */}
-        {allStrategyFieldsSet && (
-          <div style={{ marginTop: 8 }}>
-            <button
-              onClick={generateMissionSequence}
-              disabled={sequenceLoading}
+        {/* ── Tab: Companies ───────────────────────────────────────────── */}
+        {rosterTab === 'companies' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
+            <textarea
+              value={objectiveSentence} onChange={(e) => setObjectiveSentence(e.target.value)}
+              placeholder="e.g. Utah-based commercial construction GCs, CFO or COO, over $20M revenue"
+              rows={3}
               style={{
-                width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
-                background: WAR_ACCENT, color: '#fff', fontSize: 14, fontWeight: 700,
-                cursor: sequenceLoading ? 'wait' : 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: sequenceLoading ? 0.7 : 1,
+                width: '100%', padding: 12, borderRadius: 10, border: `1.5px solid ${T.border2}`,
+                background: T.cardBg, color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
+                resize: 'vertical', marginBottom: 14, boxSizing: 'border-box',
               }}
-            >
-              {sequenceLoading ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Barry is building…</> : <><Sparkles size={14} /> Generate Sequence</>}
-            </button>
-            {sequenceError && (
-              <div style={{ marginTop: 10, fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertCircle size={13} /> {sequenceError}
+            />
+            <div style={{ position: 'relative', marginBottom: 14 }}>
+              <Search size={14} style={{ position: 'absolute', left: 12, top: 11, color: T.textFaint }} />
+              <input
+                type="text" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)}
+                placeholder="Filter companies…"
+                style={{
+                  width: '100%', padding: '9px 12px 9px 34px', borderRadius: 9,
+                  border: `1.5px solid ${T.border2}`, background: T.cardBg,
+                  color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {companiesLoading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}><Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /></div>
+              ) : filteredCompanies.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: T.textFaint, fontSize: 13 }}>
+                  {companySearch ? 'No companies match that filter.' : 'No accepted companies found.'}
+                </div>
+              ) : (
+                filteredCompanies.map((c) => {
+                  const approved = approvedCompanies.has(c.id);
+                  return (
+                    <div key={c.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
+                      border: `1.5px solid ${approved ? '#22c55e40' : T.border2}`, background: approved ? '#22c55e08' : T.cardBg,
+                    }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: `${WAR_ACCENT}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Building2 size={16} color={WAR_ACCENT} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name || 'Unnamed Company'}</div>
+                        <div style={{ fontSize: 11, color: T.textFaint }}>{[c.industry, c.geo || c.state].filter(Boolean).join(' · ') || 'No details'}</div>
+                      </div>
+                      <button
+                        onClick={() => { setApprovedCompanies((prev) => { const next = new Set(prev); if (next.has(c.id)) next.delete(c.id); else next.add(c.id); return next; }); }}
+                        style={{
+                          padding: '6px 12px', borderRadius: 7, border: 'none', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                          background: approved ? '#22c55e' : T.border2, color: approved ? '#fff' : T.textMuted,
+                        }}
+                      >
+                        {approved ? <><ThumbsUp size={12} /> Approved</> : <><ThumbsDown size={12} /> Approve</>}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Decision Makers ─────────────────────────────────────── */}
+        {rosterTab === 'decision_makers' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px 16px' }}>
+            {missionContacts.length > 0 && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 9, background: `${WAR_ACCENT}10`,
+                border: `1.5px solid ${WAR_ACCENT}30`, marginBottom: 16, fontSize: 13, color: WAR_ACCENT, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <Users size={14} />
+                {missionContacts.length} contact{missionContacts.length !== 1 ? 's' : ''} in mission
+              </div>
+            )}
+            {approvedList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: T.textFaint, fontSize: 13 }}>
+                Approve companies in the Companies tab first, then add decision makers here.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {approvedList.map((company) => {
+                  const expanded = expandedCompanyId === company.id;
+                  const cContacts = companyContacts[company.id] || [];
+                  const loading = loadingCompanyContacts === company.id;
+                  return (
+                    <div key={company.id} style={{ borderRadius: 10, border: `1.5px solid ${T.border2}`, overflow: 'hidden' }}>
+                      <div
+                        onClick={() => { if (expanded) { setExpandedCompanyId(null); return; } setExpandedCompanyId(company.id); loadCompanyContacts(company.id); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer', background: expanded ? `${WAR_ACCENT}08` : T.cardBg }}
+                      >
+                        <Building2 size={15} color={T.textMuted} />
+                        <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
+                        <ChevronDown size={14} color={T.textFaint} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                      </div>
+                      {expanded && (
+                        <div style={{ borderTop: `1px solid ${T.border}`, padding: '8px 0' }}>
+                          {loading ? (
+                            <div style={{ textAlign: 'center', padding: 20, color: T.textFaint }}><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /></div>
+                          ) : cContacts.length === 0 ? (
+                            <div style={{ padding: '12px 14px', fontSize: 12, color: T.textFaint }}>No contacts saved for this company.</div>
+                          ) : (
+                            cContacts.map((contact) => {
+                              const inMission = missionContacts.some((mc) => mc.contactId === contact.id);
+                              return (
+                                <div key={contact.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px' }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: T.text }}>
+                                      {`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.name || 'Unknown'}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: T.textFaint }}>
+                                      {contact.title || contact.current_position_title || 'No title'} {contact.email ? `· ${contact.email}` : ''}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => inMission ? removeFromMission(contact.id) : addToMission(contact, company)}
+                                    style={{
+                                      padding: '5px 10px', borderRadius: 6, border: 'none', fontSize: 11, fontWeight: 600,
+                                      cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                                      background: inMission ? '#ef4444' : WAR_ACCENT, color: '#fff',
+                                    }}
+                                  >
+                                    {inMission ? 'Remove' : <><UserPlus size={11} /> Add</>}
+                                  </button>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
+      </div>
+    );
+  };
 
-        {/* Sequence preview */}
-        {microSequence && (
-          <div style={{ marginTop: 20, padding: 16, borderRadius: 10, border: `1.5px solid ${WAR_ACCENT}30`, background: `${WAR_ACCENT}06` }}>
+  // ── Shared OptionGrid component ──────────────────────────────────────────────
+  const OptionGrid = ({ items, selected, onSelect, accent }) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+      {items.map((item) => {
+        const active = selected === item.id;
+        return (
+          <div
+            key={item.id}
+            onClick={() => onSelect(item.id)}
+            style={{
+              padding: '10px 12px', borderRadius: 9, cursor: 'pointer',
+              border: `1.5px solid ${active ? (accent || WAR_ACCENT) : T.border2}`,
+              background: active ? `${accent || WAR_ACCENT}10` : T.cardBg,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: active ? (accent || WAR_ACCENT) : T.text, marginBottom: 2 }}>{item.label}</div>
+            <div style={{ fontSize: 11, color: T.textFaint, lineHeight: 1.4 }}>{item.description}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // ── Phase 3: Approach (strategy config) ────────────────────────────────────
+  const renderPhaseApproach = () => (
+    <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+          Set your approach
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+          Choose your engagement style and channel. This shapes the sequence Barry builds.
+        </p>
+      </div>
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Outcome Goal</div>
+      <OptionGrid items={OUTCOME_GOALS.slice(0, 6)} selected={outcomeGoal} onSelect={setOutcomeGoal} />
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Engagement Style</div>
+      <OptionGrid items={ENGAGEMENT_STYLES} selected={engagementStyle} onSelect={setEngagementStyle} />
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Timeframe</div>
+      <OptionGrid items={MISSION_TIMEFRAMES} selected={timeframe} onSelect={setTimeframe} />
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Next Step Type</div>
+      <OptionGrid items={NEXT_STEP_TYPES} selected={nextStepType} onSelect={setNextStepType} />
+    </div>
+  );
+
+  // ── Phase 4: Sequence (Barry generates plan) ──────────────────────────────
+  const renderPhaseSequence = () => (
+    <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+          Generate your sequence
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+          Barry will build a multi-step sequence based on your approach. Review the plan before approving.
+        </p>
+      </div>
+
+      {/* Generate button */}
+      {!microSequence && (
+        <button
+          onClick={generateMissionSequence}
+          disabled={sequenceLoading}
+          style={{
+            width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
+            background: WAR_ACCENT, color: '#fff', fontSize: 14, fontWeight: 700,
+            cursor: sequenceLoading ? 'wait' : 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: sequenceLoading ? 0.7 : 1,
+          }}
+        >
+          {sequenceLoading ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Barry is building…</> : <><Sparkles size={14} /> Generate Sequence</>}
+        </button>
+      )}
+      {sequenceError && (
+        <div style={{ marginTop: 10, fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AlertCircle size={13} /> {sequenceError}
+        </div>
+      )}
+
+      {/* Sequence preview */}
+      {microSequence && (
+        <div style={{ marginTop: 4 }}>
+          <div style={{ padding: 16, borderRadius: 10, border: `1.5px solid ${WAR_ACCENT}30`, background: `${WAR_ACCENT}06` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: WAR_ACCENT, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Zap size={14} /> Sequence — {microSequence.steps?.length || 0} steps
             </div>
             {microSequence.steps?.map((step, i) => (
               <div key={i} style={{ padding: '8px 0', borderTop: i > 0 ? `1px solid ${T.border}` : 'none' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Step {i + 1}: {step.label || step.type || 'Action'}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>Step {i + 1}: {step.label || step.stepType || 'Action'}</div>
                 <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>{step.action || step.description || ''}</div>
+                {step.channel && <div style={{ fontSize: 10, color: T.textMuted, marginTop: 2 }}>Channel: {step.channel} {step.suggestedTiming ? `· ${step.suggestedTiming}` : ''}</div>}
               </div>
             ))}
             {microSequence.sequenceRationale && (
@@ -1126,6 +1197,155 @@ export default function GoToWar() {
                 {microSequence.sequenceRationale}
               </div>
             )}
+          </div>
+
+          {/* Regenerate */}
+          <button
+            onClick={generateMissionSequence}
+            disabled={sequenceLoading}
+            style={{
+              marginTop: 12, padding: '8px 16px', borderRadius: 8,
+              border: `1.5px solid ${T.border2}`, background: 'transparent',
+              color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'Inter, system-ui, sans-serif',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {sequenceLoading ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…</> : <><RefreshCw size={12} /> Regenerate</>}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Phase 5: Approve (per-step review) ─────────────────────────────────────
+  const renderPhaseApprove = () => {
+    const steps = microSequence?.steps || [];
+    const allReviewed = approvedSteps.size + skippedSteps.size === steps.length;
+    return (
+      <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: T.text, letterSpacing: '-0.02em', marginBottom: 6 }}>
+            Review each step
+          </h2>
+          <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
+            Approve or skip each step before launch. {approvedSteps.size} approved, {skippedSteps.size} skipped of {steps.length}.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {steps.map((step, i) => {
+            const isApproved = approvedSteps.has(i);
+            const isSkipped = skippedSteps.has(i);
+            return (
+              <div key={i} style={{
+                padding: 16, borderRadius: 10,
+                border: `1.5px solid ${isApproved ? '#22c55e40' : isSkipped ? '#f59e0b40' : T.border2}`,
+                background: isApproved ? '#22c55e06' : isSkipped ? '#f59e0b06' : T.cardBg,
+              }}>
+                {/* Step header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 6,
+                    background: isApproved ? '#22c55e' : isSkipped ? '#f59e0b' : `${WAR_ACCENT}15`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, color: isApproved || isSkipped ? '#fff' : WAR_ACCENT,
+                  }}>
+                    {isApproved ? <Check size={12} /> : isSkipped ? '—' : i + 1}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+                      Step {i + 1}: {step.stepType || step.label || 'Action'}
+                    </div>
+                    <div style={{ fontSize: 11, color: T.textFaint }}>
+                      {step.channel || 'email'} {step.suggestedTiming ? `· ${step.suggestedTiming}` : ''}
+                    </div>
+                  </div>
+                  {(isApproved || isSkipped) && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+                      padding: '2px 7px', borderRadius: 20,
+                      color: isApproved ? '#22c55e' : '#f59e0b',
+                      background: isApproved ? '#22c55e12' : '#f59e0b12',
+                      border: `1px solid ${isApproved ? '#22c55e30' : '#f59e0b30'}`,
+                    }}>
+                      {isApproved ? 'APPROVED' : 'SKIPPED'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Step content */}
+                <div style={{ fontSize: 12, color: T.text, marginBottom: 4, lineHeight: 1.5 }}>
+                  {step.action || step.description || 'No action defined.'}
+                </div>
+                {step.purpose && (
+                  <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 4 }}>
+                    Purpose: {step.purpose}
+                  </div>
+                )}
+                {step.reasoning && (
+                  <div style={{ fontSize: 11, color: T.textFaint, fontStyle: 'italic', marginBottom: 8, display: 'flex', alignItems: 'start', gap: 4 }}>
+                    <Sparkles size={11} style={{ flexShrink: 0, marginTop: 2 }} /> {step.reasoning}
+                  </div>
+                )}
+
+                {/* Actions — only show if not yet reviewed */}
+                {!isApproved && !isSkipped && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      onClick={() => setSkippedSteps((prev) => new Set([...prev, i]))}
+                      style={{
+                        padding: '6px 14px', borderRadius: 7, border: `1.5px solid ${T.border2}`,
+                        background: 'transparent', color: T.textMuted, fontSize: 11, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      Skip
+                    </button>
+                    <button
+                      onClick={() => setApprovedSteps((prev) => new Set([...prev, i]))}
+                      style={{
+                        padding: '6px 14px', borderRadius: 7, border: 'none',
+                        background: '#22c55e', color: '#fff', fontSize: 11, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <Check size={11} /> Approve
+                    </button>
+                  </div>
+                )}
+
+                {/* Undo */}
+                {(isApproved || isSkipped) && (
+                  <button
+                    onClick={() => {
+                      setApprovedSteps((prev) => { const n = new Set(prev); n.delete(i); return n; });
+                      setSkippedSteps((prev) => { const n = new Set(prev); n.delete(i); return n; });
+                    }}
+                    style={{
+                      marginTop: 6, padding: '4px 10px', borderRadius: 5, border: `1px solid ${T.border2}`,
+                      background: 'transparent', color: T.textFaint, fontSize: 10, fontWeight: 500,
+                      cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                    }}
+                  >
+                    Undo
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {allReviewed && (
+          <div style={{
+            marginTop: 16, padding: '10px 14px', borderRadius: 9,
+            background: '#22c55e10', border: `1.5px solid #22c55e30`,
+            fontSize: 13, color: '#22c55e', fontWeight: 600,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <CheckCircle size={14} /> All steps reviewed. Ready to launch.
           </div>
         )}
       </div>
@@ -1163,6 +1383,18 @@ export default function GoToWar() {
         </button>
       )}
 
+      {/* Throttle indicator */}
+      {missionLaunched && throttleRemaining > 0 && (
+        <div style={{
+          padding: '8px 14px', borderRadius: 8, background: `${WAR_ACCENT}08`,
+          border: `1.5px solid ${WAR_ACCENT}25`, marginBottom: 10,
+          fontSize: 12, color: WAR_ACCENT, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <Clock3 size={13} /> Send throttle: {throttleRemaining}s remaining
+        </div>
+      )}
+
       {/* Send feed */}
       {missionLaunched && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1184,10 +1416,11 @@ export default function GoToWar() {
                 {nextStepIdx !== null && (
                   <button
                     onClick={() => handleManualSend(mc, nextStepIdx)}
-                    disabled={sendingStep === `${mc.contactId}_${nextStepIdx}`}
+                    disabled={sendingStep === `${mc.contactId}_${nextStepIdx}` || throttleRemaining > 0}
                     style={{
                       width: '100%', padding: '8px 0', borderRadius: 7, border: 'none',
-                      background: `${WAR_ACCENT}15`, color: WAR_ACCENT, fontSize: 12, fontWeight: 600,
+                      background: throttleRemaining > 0 ? `${T.border2}` : `${WAR_ACCENT}15`,
+                      color: throttleRemaining > 0 ? T.textFaint : WAR_ACCENT, fontSize: 12, fontWeight: 600,
                       cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}
@@ -1305,23 +1538,44 @@ export default function GoToWar() {
             width: '100%', padding: 12, borderRadius: 10,
             border: `1.5px solid ${T.border2}`, background: T.cardBg,
             color: T.text, fontSize: 13, fontFamily: 'Inter, system-ui, sans-serif',
-            resize: 'vertical', boxSizing: 'border-box',
+            resize: 'vertical', boxSizing: 'border-box', marginBottom: 16,
           }}
         />
+
+        {/* Save debrief button */}
+        <button
+          onClick={saveDebrief}
+          disabled={debriefSaving || debriefSaved}
+          style={{
+            width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
+            background: debriefSaved ? '#22c55e' : WAR_ACCENT,
+            color: '#fff', fontSize: 14, fontWeight: 700,
+            cursor: debriefSaving || debriefSaved ? 'default' : 'pointer',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: debriefSaving ? 0.7 : 1,
+          }}
+        >
+          {debriefSaving
+            ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+            : debriefSaved
+              ? <><CheckCircle size={14} /> Debrief Saved</>
+              : <><Swords size={14} /> Complete Mission</>}
+        </button>
       </div>
     );
   };
 
   // ── Render active phase ─────────────────────────────────────────────────────
   const renderPhase = () => {
-    if (phase === 0) return renderPhase1();
-    if (phase === 1) return renderPhase2();
-    if (phase === 2) return renderPhase3();
-    if (phase === 3) return renderPhase4();
-    if (phase === 4) return renderPhase5();
-    if (phase === 5) return renderPhase6();
-    if (phase === 6) return renderPhase7();
-    if (phase === 7) return renderPhase8();
+    if (phase === 0) return renderPhase1();       // Brief
+    if (phase === 1) return renderPhaseRoster();   // Roster (tabbed: contacts / companies / decision makers)
+    if (phase === 2) return renderPhaseApproach(); // Approach (strategy config)
+    if (phase === 3) return renderPhaseSequence(); // Sequence (Barry generates plan)
+    if (phase === 4) return renderPhaseApprove();  // Approve (per-step review)
+    if (phase === 5) return renderPhase6();        // Launch
+    if (phase === 6) return renderPhase7();        // Monitor
+    if (phase === 7) return renderPhase8();        // Debrief
     return null;
   };
 
@@ -1343,6 +1597,51 @@ export default function GoToWar() {
 
       {/* Barry HUD — persistent top strip */}
       <BarryHUD phase={phase} totalPhases={TOTAL_PHASES} />
+
+      {/* Resume banner — shown if active missions exist */}
+      {resumeBannerVisible && activeMissions.length > 0 && (
+        <div style={{
+          padding: '10px 16px', background: `${WAR_ACCENT}08`,
+          borderBottom: `1px solid ${WAR_ACCENT}30`,
+          display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: WAR_ACCENT, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertCircle size={13} /> You have {activeMissions.length} active mission{activeMissions.length !== 1 ? 's' : ''}
+          </div>
+          {activeMissions.map((m) => (
+            <div key={m.id} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+              borderRadius: 8, background: T.cardBg, border: `1.5px solid ${T.border2}`,
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{m.name || 'Unnamed Mission'}</div>
+                <div style={{ fontSize: 11, color: T.textFaint }}>
+                  {m.contacts?.length || 0} contact{(m.contacts?.length || 0) !== 1 ? 's' : ''} · {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : ''}
+                </div>
+              </div>
+              <button
+                onClick={() => resumeMission(m)}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, border: 'none',
+                  background: WAR_ACCENT, color: '#fff', fontSize: 11, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                }}
+              >
+                Resume
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setResumeBannerVisible(false)}
+            style={{
+              fontSize: 11, color: T.textFaint, background: 'none', border: 'none',
+              cursor: 'pointer', padding: 0, alignSelf: 'flex-end',
+            }}
+          >
+            Start new mission instead
+          </button>
+        </div>
+      )}
 
       {/* Phase pills */}
       <div

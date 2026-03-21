@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield,
-  Users, Building2, Archive,
+  Users, Building2, Archive, Sparkles,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home,
 } from 'lucide-react';
@@ -32,6 +32,7 @@ import { useActiveUser } from '../../context/ImpersonationContext';
 // Fallback sections
 import PeopleSection    from './sections/PeopleSection';
 import CompaniesSection from './sections/CompaniesSection';
+import FallbackModule   from './sections/FallbackModule';
 
 const FALLBACK_AMBER = '#f59e0b';
 
@@ -171,6 +172,7 @@ const MODULE_RAIL = [
 
 // ─── FALLBACK sub-nav items ──────────────────────────────────────────────────
 const FALLBACK_ITEMS = [
+  { id: 'comeback',  label: 'Comeback',  Icon: Sparkles,  desc: 'Re-engagement engine'      },
   { id: 'people',    label: 'People',    Icon: Users,     desc: 'Archived & lost people'    },
   { id: 'companies', label: 'Companies', Icon: Building2, desc: 'Archived & lost companies' },
 ];
@@ -181,6 +183,7 @@ const BARRY_MODULE = 'fallback';
 const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 const TAB_MAP = {
+  comeback:  'comeback',
   people:    'people',
   companies: 'companies',
 };
@@ -203,8 +206,8 @@ function FallbackShellInner({ user }) {
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
-  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'people';
-  const initialTab = TAB_MAP[tabParam] || 'people';
+  const tabParam = searchParams.get('tab') || location.state?.activeTab || 'comeback';
+  const initialTab = TAB_MAP[tabParam] || 'comeback';
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('fallback_subnav_collapsed') !== 'true');
@@ -214,7 +217,7 @@ function FallbackShellInner({ user }) {
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
     if (tab && TAB_MAP[tab]) setActiveTab(TAB_MAP[tab]);
-    else if (!tab) setActiveTab('people');
+    else if (!tab) setActiveTab('comeback');
   }, [searchParams, location.state?.activeTab]);
 
   const switchTab = (tabId) => {
@@ -227,6 +230,7 @@ function FallbackShellInner({ user }) {
   const renderMain = () => (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
       <div style={{ flex: 1, overflow: 'auto' }}>
+        {activeTab === 'comeback'  && <FallbackModule />}
         {activeTab === 'people'    && <PeopleSection />}
         {activeTab === 'companies' && <CompaniesSection />}
       </div>

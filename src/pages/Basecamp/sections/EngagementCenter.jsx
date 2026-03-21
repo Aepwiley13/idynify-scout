@@ -127,52 +127,93 @@ function ContactCard({ contact, selected, onToggle, T }) {
   const cfg = STATUS_CONFIG[status];
   const initials = [contact.first_name?.[0], contact.last_name?.[0]].filter(Boolean).join('').toUpperCase() ||
     contact.name?.slice(0, 2).toUpperCase() || '??';
+  const photo = contact.photo_url;
+  const email = contact.email || contact.work_email;
+  const company = contact.company || contact.company_name;
 
   return (
     <div
       onClick={onToggle}
       style={{
-        padding: '12px 14px',
         background: selected ? `${GREEN}08` : T.cardBg,
         border: `1px solid ${selected ? GREEN + '60' : T.border}`,
-        borderRadius: 10, cursor: 'pointer',
+        borderRadius: 14, cursor: 'pointer',
         transition: 'all 0.12s',
         position: 'relative',
+        display: 'flex', flexDirection: 'column',
+        overflow: 'visible',
       }}
+      onMouseEnter={e => { if (!selected) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = T.border2 || T.border; } }}
+      onMouseLeave={e => { if (!selected) { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = T.border; } }}
     >
-      {/* Checkbox */}
-      <div style={{
-        position: 'absolute', top: 10, right: 10,
-        width: 16, height: 16, borderRadius: '50%',
-        border: `1.5px solid ${selected ? GREEN : T.border2}`,
-        background: selected ? GREEN : 'transparent',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.12s',
-      }}>
-        {selected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+      {/* Photo area */}
+      <div style={{ position: 'relative', paddingTop: '90%', borderRadius: '14px 14px 0 0', overflow: 'hidden' }}>
+        {photo ? (
+          <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(155deg,${GREEN}30,${T.cardBg2 || T.cardBg} 80%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: `${GREEN}20`, border: `2px solid ${GREEN}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: GREEN }}>
+              {initials}
+            </div>
+          </div>
+        )}
+        {/* Gradient overlay */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%', background: 'linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.5) 50%,transparent 100%)' }} />
+
+        {/* Status badge top-right */}
+        <div style={{ position: 'absolute', top: 8, right: 8 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
+            background: `${cfg.color}25`, color: cfg.color,
+            border: `1px solid ${cfg.color}50`,
+          }}>
+            {cfg.label.toUpperCase()}
+          </span>
+        </div>
+
+        {/* Selection checkbox top-left */}
+        <div style={{
+          position: 'absolute', top: 8, left: 8,
+          width: 18, height: 18, borderRadius: '50%',
+          border: `2px solid ${selected ? GREEN : 'rgba(255,255,255,0.5)'}`,
+          background: selected ? GREEN : 'rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 0.12s',
+        }}>
+          {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+        </div>
+
+        {/* Name + title over gradient */}
+        <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {contact.name || `${contact.first_name} ${contact.last_name}`}
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 4px rgba(0,0,0,0.9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+            {contact.title}
+          </div>
+        </div>
       </div>
 
-      {/* Avatar */}
-      <div style={{
-        width: 32, height: 32, borderRadius: '50%',
-        background: `${GREEN}18`, border: `1.5px solid ${GREEN}40`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700, color: GREEN, marginBottom: 8,
-      }}>
-        {initials}
-      </div>
-
-      <div style={{ fontSize: 12, fontWeight: 600, color: T.text, lineHeight: 1.3 }}>
-        {contact.name || `${contact.first_name} ${contact.last_name}`}
-      </div>
-      <div style={{ fontSize: 10, color: T.textFaint, marginTop: 2, marginBottom: 8, lineHeight: 1.3 }}>
-        {contact.title}{contact.title && contact.company ? ', ' : ''}{contact.company}
-      </div>
-
-      {/* Status dot */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot }} />
-        <span style={{ fontSize: 10, color: cfg.color, fontWeight: 500 }}>{cfg.label}</span>
+      {/* Info section */}
+      <div style={{ padding: '9px 12px 12px' }}>
+        {company && (
+          <div style={{ fontSize: 9, color: GREEN, background: `${GREEN}18`, borderRadius: 5, padding: '2px 7px', display: 'inline-block', marginBottom: 7, fontWeight: 700 }}>
+            {company}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 11 }}>
+          <Mail size={12} color={T.textFaint} />
+          {email ? (
+            <span style={{ color: T.text, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{email}</span>
+          ) : (
+            <span style={{ color: T.textFaint }}>No email found</span>
+          )}
+        </div>
+        {/* Wave status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot }} />
+          <span style={{ fontSize: 10, color: cfg.color, fontWeight: 500 }}>{cfg.label}</span>
+        </div>
       </div>
     </div>
   );
@@ -1311,7 +1352,7 @@ export default function EngagementCenter() {
               ) : (
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                   gap: 10,
                   paddingBottom: selected.size > 0 ? 80 : 24,
                 }}>

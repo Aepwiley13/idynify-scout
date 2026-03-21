@@ -21,13 +21,13 @@
  *   onDraftMessage — (contact, step) → open draft composer
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   BookOpen, ChevronRight, Check, Clock, Mail,
   Phone, Linkedin, MessageSquare, AlertTriangle,
   ArrowRight, Play, Pause, RotateCcw, X,
 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useT } from '../../theme/ThemeContext';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
@@ -126,46 +126,139 @@ export default function InterventionPlaybook({
   const [selectedPlaybook, setSelectedPlaybook] = useState(suggestedPlaybook.id);
   const playbook = PLAYBOOKS.find(p => p.id === selectedPlaybook) || suggestedPlaybook;
 
-  // Phase tracking — read from contact doc, fallback to empty
-  const phaseState = contact.intervention_phases?.[playbook.id] || {};
-  const completedSteps = new Set(phaseState.completed_steps || []);
-  const [localCompleted, setLocalCompleted] = useState(completedSteps);
+  // ── Subcollection path: users/{userId}/contacts/{contactId}/interventionPlaybooks/{playbookId}
+  const [localCompleted, setLocalCompleted] = useState(new Set());
+  const [playbookDoc, setPlaybookDoc] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load playbook state from subcollection on mount / playbook switch
+  useEffect(() => {
+    if (!contact?.id || !userId) return;
+    setLoading(true);
+    const pbRef = doc(db, 'users', userId, 'contacts', contact.id, 'interventionPlaybooks', playbook.id);
+    getDoc(pbRef).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setPlaybookDoc(data);
+        setLocalCompleted(new Set(data.completed_steps || []));
+      } else {
+        setPlaybookDoc(null);
+        setLocalCompleted(new Set());
+      }
+    }).catch(err => {
+      console.error('[InterventionPlaybook] load failed:', err);
+    }).finally(() => setLoading(false));
+  }, [userId, contact?.id, playbook.id]);
+
+  // Get subcollection doc ref helper
+  function getPbRef() {
+    return doc(db, 'users', userId, 'contacts', contact.id, 'interventionPlaybooks', playbook.id);
+  }
 
   async function toggleStep(stepIndex) {
     const next = new Set(localCompleted);
-    if (next.has(stepIndex)) next.delete(stepIndex);
-    else next.add(stepIndex);
+    const completing = !next.has(stepIndex);
+    if (completing) next.add(stepIndex);
+    else next.delete(stepIndex);
     setLocalCompleted(next);
 
-    // Persist to Firestore
     setSaving(true);
     try {
-      const ref = doc(db, 'users', userId, 'contacts', contact.id);
-      await updateDoc(ref, {
-        [`intervention_phases.${playbook.id}.completed_steps`]: [...next],
-        [`intervention_phases.${playbook.id}.updated_at`]: new Date().toISOString(),
-        [`intervention_phases.${playbook.id}.playbook_name`]: playbook.name,
-      });
+      const pbRef = getPbRef();
+      const now = new Date().toISOString();
+      const step = playbook.steps[stepIndex];
 
-      // Log if step just completed
-      if (next.has(stepIndex) && !completedSteps.has(stepIndex)) {
+      // Build action log entry
+      const logEntry = {
+        action: completing ? 'step_completed' : 'step_unchecked',
+        step_index: stepIndex,
+        step_title: step.title,
+        channel: step.channel,
+        timestamp: now,
+      };
+
+      if (!playbookDoc) {
+        // First interaction — create the subcollection doc
+        await setDoc(pbRef, {
+          playbook_id: playbook.id,
+          playbook_name: playbook.name,
+          status: 'active',
+          started_at: now,
+          updated_at: now,
+          completed_steps: [...next],
+          actionLog: [logEntry],
+          abandoned: false,
+          abandoned_at: null,
+          abandon_reason: null,
+        });
+        setPlaybookDoc({ playbook_id: playbook.id });
+      } else {
+        // Update existing doc — append to actionLog
+        await updateDoc(pbRef, {
+          completed_steps: [...next],
+          updated_at: now,
+          actionLog: arrayUnion(logEntry),
+          // Mark complete if all steps done
+          ...(next.size === playbook.steps.length ? { status: 'completed', completed_at: now } : {}),
+        });
+      }
+
+      // Timeline event for step completion
+      if (completing) {
         await logTimelineEvent({
           userId,
           contactId: contact.id,
           type: 'next_step_completed',
           actor: ACTORS.user,
-          preview: `Playbook step: ${playbook.steps[stepIndex].title}`,
+          preview: `Playbook step: ${step.title}`,
           metadata: {
             playbook_id: playbook.id,
             step_index: stepIndex,
-            step_title: playbook.steps[stepIndex].title,
-            channel: playbook.steps[stepIndex].channel,
+            step_title: step.title,
+            channel: step.channel,
           },
         });
       }
     } catch (err) {
       console.error('[InterventionPlaybook] save failed:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function abandonPlaybook() {
+    if (!playbookDoc) return;
+    setSaving(true);
+    try {
+      const pbRef = getPbRef();
+      const now = new Date().toISOString();
+      await updateDoc(pbRef, {
+        status: 'abandoned',
+        abandoned: true,
+        abandoned_at: now,
+        updated_at: now,
+        actionLog: arrayUnion({
+          action: 'abandoned',
+          timestamp: now,
+          completed_count: localCompleted.size,
+          total_steps: playbook.steps.length,
+        }),
+      });
+
+      await logTimelineEvent({
+        userId,
+        contactId: contact.id,
+        type: 'playbook_abandoned',
+        actor: ACTORS.user,
+        preview: `Abandoned ${playbook.name} (${localCompleted.size}/${playbook.steps.length} steps)`,
+        metadata: { playbook_id: playbook.id },
+      });
+
+      setLocalCompleted(new Set());
+      setPlaybookDoc(null);
+    } catch (err) {
+      console.error('[InterventionPlaybook] abandon failed:', err);
     } finally {
       setSaving(false);
     }
@@ -218,7 +311,7 @@ export default function InterventionPlaybook({
             return (
               <button
                 key={p.id}
-                onClick={() => { setSelectedPlaybook(p.id); setLocalCompleted(new Set(contact.intervention_phases?.[p.id]?.completed_steps || [])); }}
+                onClick={() => setSelectedPlaybook(p.id)}
                 style={{
                   padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: active ? 600 : 400,
                   background: active ? `${p.color}15` : 'transparent',
@@ -336,7 +429,7 @@ export default function InterventionPlaybook({
             {saving ? 'Saving...' : `Best for: ${playbook.bestFor}`}
           </span>
           <button
-            onClick={() => { setLocalCompleted(new Set()); }}
+            onClick={abandonPlaybook}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '5px 10px', borderRadius: 6, fontSize: 11,
@@ -345,7 +438,7 @@ export default function InterventionPlaybook({
             }}
           >
             <RotateCcw size={10} />
-            Reset
+            Abandon
           </button>
         </div>
       </div>

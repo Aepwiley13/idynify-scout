@@ -21,7 +21,7 @@
  *   onClose     — called when wizard is dismissed
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Users, CheckCircle2, Calendar, Mail, Rocket,
   ChevronRight, ChevronLeft, X, Search, Check,
@@ -266,7 +266,7 @@ function StepGmail({ userId, T }) {
   }
 
   // Check on mount
-  useState(() => { checkConnection(); });
+  useEffect(() => { checkConnection(); }, []);
 
   return (
     <div>

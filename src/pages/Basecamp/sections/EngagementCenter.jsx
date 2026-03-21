@@ -17,11 +17,12 @@ import {
   Users, AlertCircle, Radio, ArrowLeft,
   X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../../firebase/config';
 import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
 import { resolveContactStage } from '../../../constants/stageSystem';
+import { checkGmailConnection } from '../../../utils/sendActionResolver';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const GREEN = '#22c55e';
@@ -477,15 +478,27 @@ function PreviewPanel({ contacts, selected, messageBody, templateType, channel, 
 }
 
 // ─── Mission Email Row (individual sent email in launch center) ──────────────
-function MissionEmailRow({ contact, wave, index, T }) {
+function MissionEmailRow({ contact, wave, index, sendResult, T }) {
   const [expanded, setExpanded] = useState(false);
   const firstName = contact.first_name || contact.name?.split(' ')[0] || 'there';
   const personalizedMsg = wave.message.replace(/\{\{first_name\}\}/gi, firstName);
-  const subject = TEMPLATES[wave.type]?.subject || wave.name || 'Custom message';
+  const subject = wave.subject || TEMPLATES[wave.type]?.subject || wave.name || 'Custom message';
   const initials = [contact.first_name?.[0], contact.last_name?.[0]]
     .filter(Boolean).join('').toUpperCase() || '??';
   const displayName = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
   const previewText = personalizedMsg.slice(0, 90) + (personalizedMsg.length > 90 ? '...' : '');
+
+  // Determine send status
+  const status = sendResult?.status || (wave._sending ? 'pending' : wave._scheduled ? 'scheduled' : 'sent');
+  const statusConfig = {
+    sent:      { label: 'Sent',      color: GREEN, icon: CheckCircle2 },
+    failed:    { label: 'Failed',    color: RED,   icon: AlertCircle  },
+    skipped:   { label: 'Skipped',   color: AMBER, icon: AlertCircle  },
+    pending:   { label: 'Sending…',  color: GRAY,  icon: RotateCcw    },
+    scheduled: { label: 'Scheduled', color: BLUE,  icon: Clock        },
+  };
+  const sc = statusConfig[status] || statusConfig.sent;
+  const StatusIcon = sc.icon;
 
   return (
     <div
@@ -506,8 +519,9 @@ function MissionEmailRow({ contact, wave, index, T }) {
       >
         {/* Status indicator */}
         <div style={{
-          width: 8, height: 8, borderRadius: '50%', background: GREEN, flexShrink: 0,
-          boxShadow: `0 0 6px ${GREEN}60`,
+          width: 8, height: 8, borderRadius: '50%', background: sc.color, flexShrink: 0,
+          boxShadow: `0 0 6px ${sc.color}60`,
+          ...(status === 'pending' ? { animation: 'pulse 1.2s ease infinite' } : {}),
         }} />
 
         {/* Avatar */}
@@ -537,14 +551,16 @@ function MissionEmailRow({ contact, wave, index, T }) {
           <span style={{ fontSize: 12, color: T.textFaint }}> — {previewText}</span>
         </div>
 
-        {/* Sent badge */}
+        {/* Status badge */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           padding: '3px 8px', borderRadius: 12,
-          background: `${GREEN}12`, flexShrink: 0,
+          background: `${sc.color}12`, flexShrink: 0,
         }}>
-          <CheckCircle2 size={11} color={GREEN} />
-          <span style={{ fontSize: 10, fontWeight: 600, color: GREEN }}>Sent</span>
+          <StatusIcon size={11} color={sc.color}
+            style={status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}}
+          />
+          <span style={{ fontSize: 10, fontWeight: 600, color: sc.color }}>{sc.label}</span>
         </div>
 
         {/* Expand arrow */}
@@ -596,13 +612,15 @@ function MissionEmailRow({ contact, wave, index, T }) {
 }
 
 // ─── Launch Center (mission deployment view) ─────────────────────────────────
-function LaunchCenter({ wave, contacts, onDismiss, T }) {
+function LaunchCenter({ wave, contacts, onDismiss, sendProgress, launchError, T }) {
   const recipients = contacts.filter(c => wave.recipientIds?.includes(c.id));
   const sentAt = wave.sentAt?.toDate?.() || (wave.sentAt ? new Date(wave.sentAt) : new Date());
   const timeStr = sentAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const dateStr = sentAt.toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   });
+  const isSending = wave._sending;
+  const isScheduled = wave._scheduled;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -621,10 +639,16 @@ function LaunchCenter({ wave, contacts, onDismiss, T }) {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>
-            Mission Deployed — {wave.name}
+            {isScheduled ? `Mission Scheduled — ${wave.name}`
+              : isSending ? `Deploying Mission — ${wave.name}`
+              : `Mission Deployed — ${wave.name}`}
           </div>
           <div style={{ fontSize: 12, color: T.textFaint, marginTop: 2 }}>
-            {recipients.length} emails sent {dateStr} at {timeStr}
+            {isScheduled
+              ? `${recipients.length} emails scheduled for ${dateStr} at ${timeStr}`
+              : isSending
+                ? `Sending ${sendProgress?.sent || 0} of ${recipients.length} emails…`
+                : `${sendProgress?.sent ?? recipients.length} of ${recipients.length} emails sent ${dateStr} at ${timeStr}`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -647,10 +671,38 @@ function LaunchCenter({ wave, contacts, onDismiss, T }) {
 
       {/* Stats bar */}
       <div style={{ display: 'flex', gap: 10, padding: '14px 24px 0', flexShrink: 0 }}>
-        <StatCard value={wave.stats?.sent || 0} label="Deployed" color={GREEN} T={T} />
+        <StatCard value={sendProgress?.sent ?? wave.stats?.sent ?? 0} label="Deployed" color={GREEN} T={T} />
+        <StatCard value={sendProgress?.failed ?? 0} label="Failed" color={sendProgress?.failed > 0 ? RED : GRAY} T={T} />
         <StatCard value={wave.stats?.replied || 0} label="Replies" color={BLUE} T={T} />
-        <StatCard value={wave.stats?.booked || 0} label="Booked" color={AMBER} T={T} />
       </div>
+
+      {/* Error banner */}
+      {launchError && (
+        <div style={{
+          margin: '10px 24px 0', padding: '10px 14px', borderRadius: 8,
+          background: `${RED}10`, border: `1px solid ${RED}30`,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <AlertCircle size={14} color={RED} />
+          <span style={{ fontSize: 12, color: RED }}>{launchError}</span>
+        </div>
+      )}
+
+      {/* Sending progress bar */}
+      {isSending && sendProgress && (
+        <div style={{ padding: '10px 24px 0' }}>
+          <div style={{
+            height: 4, borderRadius: 2, background: T.border,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', borderRadius: 2, background: GREEN,
+              width: `${Math.round((sendProgress.sent / sendProgress.total) * 100)}%`,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        </div>
+      )}
 
       {/* Section label */}
       <div style={{ padding: '14px 24px 8px', flexShrink: 0 }}>
@@ -665,21 +717,29 @@ function LaunchCenter({ wave, contacts, onDismiss, T }) {
 
       {/* Email list (Gmail-style) */}
       <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }}>
-        {recipients.map((contact, i) => (
-          <MissionEmailRow
-            key={contact.id}
-            contact={contact}
-            wave={wave}
-            index={i}
-            T={T}
-          />
-        ))}
+        {recipients.map((contact, i) => {
+          const sendResult = sendProgress?.results?.find(r => r.contactId === contact.id);
+          return (
+            <MissionEmailRow
+              key={contact.id}
+              contact={contact}
+              wave={wave}
+              index={i}
+              sendResult={sendResult}
+              T={T}
+            />
+          );
+        })}
       </div>
 
       <style>{`
         @keyframes missionSlideIn {
           from { opacity: 0; transform: translateY(8px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
         }
       `}</style>
     </div>
@@ -704,6 +764,11 @@ export default function EngagementCenter() {
   const [launchSuccess, setLaunchSuccess] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [launchedWave, setLaunchedWave] = useState(null);
+  const [sendProgress, setSendProgress] = useState(null); // { sent, failed, total, results[] }
+  const [launchError, setLaunchError] = useState(null);
+  const [scheduleMode, setScheduleMode] = useState('now'); // 'now' | 'scheduled'
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('09:00');
 
   // ── Load contacts ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -794,37 +859,137 @@ export default function EngagementCenter() {
     if (!user) return;
 
     setLaunching(true);
+    setLaunchError(null);
+    setSendProgress(null);
+
     try {
       const waveName = TEMPLATES[templateType]?.label || 'Custom wave';
+      const subject = TEMPLATES[templateType]?.subject || waveName;
+      const recipientIds = Array.from(selected);
+      const recipientContacts = contacts.filter(c => selected.has(c.id));
+
+      // If scheduled for later, save to Firestore with pending status
+      if (scheduleMode === 'scheduled' && scheduledDate) {
+        const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`);
+        const waveData = {
+          name: waveName,
+          type: templateType,
+          message: messageBody,
+          subject,
+          channel,
+          personalization,
+          recipientIds,
+          status: 'scheduled',
+          scheduledFor: scheduledFor.toISOString(),
+          createdAt: serverTimestamp(),
+          stats: { sent: 0, replied: 0, booked: 0 },
+        };
+
+        const docRef = await addDoc(collection(db, 'users', user.uid, 'waves'), waveData);
+        setLaunchSuccess(true);
+        setShowPreview(false);
+        setLaunchedWave({
+          id: docRef.id, ...waveData,
+          sentAt: scheduledFor,
+          _scheduled: true,
+        });
+        setSelected(new Set());
+        return;
+      }
+
+      // Check Gmail connection before proceeding
+      const gmailStatus = await checkGmailConnection(user.uid);
+      if (!gmailStatus.connected) {
+        setLaunchError('Gmail not connected. Go to Settings → Integrations to connect Gmail.');
+        setLaunching(false);
+        return;
+      }
+
+      // Create wave doc first (status = sending)
       const waveData = {
         name: waveName,
         type: templateType,
         message: messageBody,
+        subject,
         channel,
         personalization,
-        recipientIds: Array.from(selected),
-        status: 'sent',
+        recipientIds,
+        status: 'sending',
         sentAt: serverTimestamp(),
         createdAt: serverTimestamp(),
-        stats: {
-          sent: selected.size,
-          replied: 0,
-          booked: 0,
-        },
+        stats: { sent: 0, replied: 0, booked: 0 },
       };
 
       const docRef = await addDoc(collection(db, 'users', user.uid, 'waves'), waveData);
 
-      setLaunchSuccess(true);
+      // Show launch center immediately with sending state
       setShowPreview(false);
-      setLaunchedWave({ id: docRef.id, ...waveData, sentAt: new Date() });
+      setLaunchedWave({
+        id: docRef.id, ...waveData,
+        sentAt: new Date(),
+        _sending: true,
+      });
+      setSendProgress({ sent: 0, failed: 0, total: recipientContacts.length, results: [] });
       setSelected(new Set());
+
+      // Build recipients payload
+      const recipients = recipientContacts.map(c => ({
+        contactId: c.id,
+        email: c.email,
+        firstName: c.first_name,
+        lastName: c.last_name,
+        name: c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+        existingThreadId: c.gmail_thread_id || null,
+      }));
+
+      // Call the wave send function
+      const authToken = await user.getIdToken();
+      const response = await fetch('/.netlify/functions/gmail-send-wave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          waveId: docRef.id,
+          subject,
+          messageTemplate: messageBody,
+          recipients,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send wave');
+      }
+
+      // Update progress with final results
+      setSendProgress({
+        sent: data.sent,
+        failed: data.total - data.sent,
+        total: data.total,
+        results: data.results || [],
+      });
+
+      // Update launched wave with final stats
+      setLaunchedWave(prev => ({
+        ...prev,
+        _sending: false,
+        status: 'processed',
+        stats: { sent: data.sent, replied: 0, booked: 0 },
+      }));
+
+      setLaunchSuccess(true);
+
     } catch (err) {
       console.error('Wave launch error:', err);
+      setLaunchError(err.message);
+      // Update wave status if it was partially sent
+      setLaunchedWave(prev => prev ? { ...prev, _sending: false } : null);
     } finally {
       setLaunching(false);
     }
-  }, [selected, messageBody, templateType, channel, personalization, activeUser]);
+  }, [selected, messageBody, templateType, channel, personalization, activeUser, contacts, scheduleMode, scheduledDate, scheduledTime]);
 
   // ── Open preview ──────────────────────────────────────────────────────────
   const handleOpenPreview = useCallback(() => {
@@ -853,6 +1018,8 @@ export default function EngagementCenter() {
           wave={launchedWave}
           contacts={contacts}
           onDismiss={handleDismissLaunchCenter}
+          sendProgress={sendProgress}
+          launchError={launchError}
           T={T}
         />
       </div>
@@ -1010,6 +1177,49 @@ export default function EngagementCenter() {
                   <ChevronDown size={12} color={T.textFaint} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                 </div>
 
+                {/* Schedule toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <button
+                    onClick={() => setScheduleMode(scheduleMode === 'now' ? 'scheduled' : 'now')}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '7px 10px', borderRadius: 8,
+                      border: `1px solid ${scheduleMode === 'scheduled' ? BLUE : T.border2}`,
+                      background: scheduleMode === 'scheduled' ? `${BLUE}10` : T.surface,
+                      color: scheduleMode === 'scheduled' ? BLUE : T.textMuted,
+                      fontSize: 12, cursor: 'pointer',
+                    }}
+                  >
+                    <Clock size={12} />
+                    {scheduleMode === 'scheduled' ? 'Scheduled' : 'Send now'}
+                  </button>
+                  {scheduleMode === 'scheduled' && (
+                    <>
+                      <input
+                        type="date"
+                        value={scheduledDate}
+                        onChange={e => setScheduledDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        style={{
+                          padding: '6px 8px', borderRadius: 8,
+                          border: `1px solid ${T.border2}`, background: T.surface,
+                          color: T.text, fontSize: 12,
+                        }}
+                      />
+                      <input
+                        type="time"
+                        value={scheduledTime}
+                        onChange={e => setScheduledTime(e.target.value)}
+                        style={{
+                          padding: '6px 8px', borderRadius: 8,
+                          border: `1px solid ${T.border2}`, background: T.surface,
+                          color: T.text, fontSize: 12,
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+
                 <div style={{ flex: 1 }} />
 
                 {/* Preview button */}
@@ -1052,6 +1262,18 @@ export default function EngagementCenter() {
                   }
                 </button>
               </div>
+
+              {/* Launch error display */}
+              {launchError && !launchedWave && (
+                <div style={{
+                  marginTop: 10, padding: '8px 12px', borderRadius: 8,
+                  background: `${RED}10`, border: `1px solid ${RED}30`,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <AlertCircle size={13} color={RED} />
+                  <span style={{ fontSize: 12, color: RED }}>{launchError}</span>
+                </div>
+              )}
             </div>
 
             {/* SELECT RECIPIENTS */}

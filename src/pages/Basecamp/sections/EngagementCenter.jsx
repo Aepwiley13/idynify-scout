@@ -23,6 +23,7 @@ import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
 import { resolveContactStage } from '../../../constants/stageSystem';
 import { checkGmailConnection } from '../../../utils/sendActionResolver';
+import { getContactEngageStatus, ENGAGE_STATUS_CONFIG } from '../../../utils/contactEngageStatus';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const GREEN = '#22c55e';
@@ -61,51 +62,10 @@ const CHANNELS = ['via Email', 'via LinkedIn', 'via SMS'];
 const PERSONALIZATION = ['Barry personalizes each', 'Send as-is'];
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
-function getContactWaveStatus(contact) {
-  const now = Date.now();
-  const lastContactAt = contact.engagement_summary?.last_contact_at;
-  const nbsDueAt = contact.next_best_step?.due_at;
-  const contactStatus = contact.contact_status;
-  const warmth = contact.warmth_level;
-
-  // Replied = in conversation recently
-  if (
-    contactStatus === 'In Conversation' ||
-    (lastContactAt && (now - new Date(lastContactAt).getTime()) < 3 * 86400_000 &&
-      contact.engagement_summary?.replies_received > 0)
-  ) return 'replied';
-
-  // Active = contacted within the week
-  if (
-    contactStatus === 'Active Customer' ||
-    contactStatus === 'Engaged' ||
-    (lastContactAt && (now - new Date(lastContactAt).getTime()) < OVERDUE_DAYS * 86400_000)
-  ) return 'active';
-
-  // Cold = never reached out, cold warmth, or New status
-  if (
-    !lastContactAt ||
-    contactStatus === 'New' ||
-    warmth === 'cold'
-  ) return 'cold';
-
-  // Overdue = NBS past due, or Dormant, or just too long
-  if (
-    nbsDueAt && new Date(nbsDueAt).getTime() < now ||
-    contactStatus === 'Dormant' ||
-    contactStatus === 'Awaiting Reply' ||
-    (lastContactAt && (now - new Date(lastContactAt).getTime()) >= OVERDUE_DAYS * 86400_000)
-  ) return 'overdue';
-
-  return 'overdue';
-}
-
-const STATUS_CONFIG = {
-  overdue: { label: 'Overdue', color: RED,   dot: RED   },
-  active:  { label: 'Active',  color: GREEN, dot: GREEN },
-  cold:    { label: 'Cold',    color: AMBER, dot: AMBER },
-  replied: { label: 'Replied', color: BLUE,  dot: BLUE  },
-};
+// Unified status function — delegates to shared utility.
+// See src/utils/contactEngageStatus.js for the canonical implementation.
+const getContactWaveStatus = getContactEngageStatus;
+const STATUS_CONFIG = ENGAGE_STATUS_CONFIG;
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ value, label, color, T }) {

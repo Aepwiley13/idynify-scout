@@ -33,6 +33,7 @@ export const MODULE_CONFIG = {
   homebase:         { color: '#FF2A2A', label: 'GUIDE',     opening: "What do you need to set up or configure today?" },
   reinforcements:   { color: '#FF7A00', label: 'CONNECT',   opening: "Let's find warm intro paths. Who are you trying to reach?" },
   fallback:         { color: '#6b7280', label: 'RECOVER',   opening: "Which closed-lost account should we look at re-engaging?" },
+  basecamp:         { color: '#14b8a6', label: 'CSM',       opening: "I have your full portfolio loaded. Who needs attention today?" },
   default:          { color: BRAND.cyan, label: 'ASSIST',   opening: "What can I help you with?" },
 };
 

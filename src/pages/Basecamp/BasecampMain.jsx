@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield,
-  Users, Building2, Zap,
+  Users, Building2, Zap, HeartPulse, Lock,
   Palette, Check, ChevronLeft, ChevronRight,
   Settings as SettingsIcon, Home,
 } from 'lucide-react';
@@ -29,10 +29,13 @@ import BarryChat, { MODULE_CONFIG } from '../../components/barry/BarryChat';
 import { useBarryContext } from '../../context/barryContextStore';
 import { useActiveUser } from '../../context/ImpersonationContext';
 
+import { useSubscription } from '../../hooks/useSubscription';
+
 // Basecamp sections
 import PeopleSection       from './sections/PeopleSection';
 import CompaniesSection    from './sections/CompaniesSection';
 import EngagementCenter    from './sections/EngagementCenter';
+import CSMDashboard        from '../../components/csm/CSMDashboard';
 
 const BASECAMP_GREEN = '#22c55e';
 
@@ -171,21 +174,60 @@ const MODULE_RAIL = [
 
 // ─── BASECAMP sub-nav items ─────────────────────────────────────────────────
 const BASECAMP_ITEMS = [
-  { id: 'people',     label: 'People',     Icon: Users,    desc: 'Your contacts'    },
-  { id: 'companies',  label: 'Companies',  Icon: Building2, desc: 'Your companies'  },
-  { id: 'engage',     label: 'Engage',     Icon: Zap,       desc: 'Run waves'       },
+  { id: 'people',     label: 'People',     Icon: Users,      desc: 'Your contacts'    },
+  { id: 'companies',  label: 'Companies',  Icon: Building2,  desc: 'Your companies'   },
+  { id: 'engage',     label: 'Engage',     Icon: Zap,        desc: 'Run waves'        },
+  { id: 'csm',        label: 'CSM',        Icon: HeartPulse, desc: 'Customer success'  },
 ];
 
 const SETTINGS_ORANGE = '#faaa20';
 
-const BARRY_MODULE = 'homebase';
+const BARRY_MODULE = 'basecamp';
 const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 const TAB_MAP = {
   people:    'people',
   companies: 'companies',
   engage:    'engage',
+  csm:       'csm',
 };
+
+// ─── CSM Tier Teaser (shown to starter users) ──────────────────────────────
+function CSMTeaser({ T }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '100%', padding: 40, textAlign: 'center',
+    }}>
+      <div style={{
+        width: 64, height: 64, borderRadius: 16,
+        background: `${BASECAMP_GREEN}15`, border: `1px solid ${BASECAMP_GREEN}30`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: 20,
+      }}>
+        <Lock size={28} color={BASECAMP_GREEN} />
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+        Customer Success Module
+      </div>
+      <div style={{ fontSize: 13, color: T.textMuted, maxWidth: 360, lineHeight: 1.6, marginBottom: 20 }}>
+        Track customer health scores, milestone progress, and renewal risk — all in one view.
+        Upgrade to Pro to unlock the CSM module.
+      </div>
+      <a
+        href="/settings?tab=billing"
+        style={{
+          padding: '10px 24px', borderRadius: 8, border: 'none',
+          background: `linear-gradient(135deg,${BASECAMP_GREEN},#14b8a6)`,
+          color: '#fff', fontSize: 13, fontWeight: 600,
+          textDecoration: 'none', display: 'inline-block',
+        }}
+      >
+        Upgrade to Pro
+      </a>
+    </div>
+  );
+}
 
 // ─── BasecampShellInner ─────────────────────────────────────────────────────
 function BasecampShellInner({ user }) {
@@ -194,6 +236,7 @@ function BasecampShellInner({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isProTier, loading: tierLoading } = useSubscription();
 
   const mql = window.matchMedia('(max-width: 768px)');
   const [isMobile, setIsMobile] = useState(() => mql.matches);
@@ -232,6 +275,7 @@ function BasecampShellInner({ user }) {
         {activeTab === 'people'    && <PeopleSection />}
         {activeTab === 'companies' && <CompaniesSection />}
         {activeTab === 'engage'    && <EngagementCenter />}
+        {activeTab === 'csm'       && (isProTier ? <CSMDashboard userId={user?.uid} /> : <CSMTeaser T={T} />)}
       </div>
     </div>
   );

@@ -179,6 +179,7 @@ const MODULE_RAIL = [
   { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'        },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements'  },
   { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'           },
+  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'        },
 ];
 
 // ─── Command Center sub-nav items ─────────────────────────────────────────────

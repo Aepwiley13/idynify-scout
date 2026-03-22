@@ -20,7 +20,7 @@ import {
   Loader, LogOut, Lock, Smartphone, BarChart3, Calendar,
   Key, Zap, ExternalLink, Layers,
   RefreshCw, Star, MessageSquare, Share2,
-  Radar, Crosshair, Eye, Target, Tent,
+  Radar, Crosshair, Eye, Target, Tent, Archive,
   Palette, Check, ChevronLeft, ChevronRight, Home, Settings as SettingsIcon, Clock,
 } from 'lucide-react';
 import { db, auth } from '../firebase/config';
@@ -384,6 +384,7 @@ const MODULE_RAIL = [
   { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'       },
   { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements' },
   { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'          },
+  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'       },
 ];
 
 /* ─── Main component ─────────────────────────────────────────────────────── */

@@ -13,6 +13,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const [searching, setSearching] = useState(false);
   const [contact, setContact] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null); // 'saving' | 'processing' | 'saved' | null
   const [error, setError] = useState(null);
   const [referredBy, setReferredBy] = useState(null);
 
@@ -52,10 +53,12 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const handleConfirmAndSave = async () => {
     if (!contact) return;
     setSaving(true);
+    setSaveStatus('saving');
     setError(null);
     try {
       const user = getEffectiveUser();
       if (!user) throw new Error('You must be logged in');
+      setSaveStatus('processing');
       const companyId = await ensureCompanyExists(contact, user.uid);
       const contactId = contact.id || `apollo_${Date.now()}`;
       const contactData = {
@@ -98,10 +101,12 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
         });
       }
 
+      setSaveStatus('saved');
       onContactAdded([{ id: contactId, ...contactData }]);
     } catch (err) {
       setError(err.message || 'Failed to save contact. Please try again.');
       setSaving(false);
+      setSaveStatus(null);
     }
   };
 
@@ -248,7 +253,9 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s'
               }}
             >
-              {saving ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />Saving...</> : <><CheckCircle size={14} />Save Contact</>}
+              {saving
+                ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />{saveStatus === 'processing' ? 'Processing...' : saveStatus === 'saved' ? 'Saved!' : 'Saving...'}</>
+                : <><CheckCircle size={14} />Save Contact</>}
             </button>
             <button
               onClick={() => { setContact(null); setLinkedinUrl(''); setError(null); }}

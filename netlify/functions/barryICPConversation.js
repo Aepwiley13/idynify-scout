@@ -497,6 +497,13 @@ export const handler = async (event) => {
       console.error('Failed to log API error:', logError);
     }
 
+    // Never expose raw error messages to the frontend
+    const safeMessage = error.message?.includes('API key')
+      || error.message?.includes('not configured')
+      || error.message?.includes('not defined')
+      ? 'Barry hit a temporary issue. Please try again.'
+      : (error.message || 'Something went wrong. Please try again.');
+
     return {
       statusCode: 500,
       headers: {
@@ -505,7 +512,8 @@ export const handler = async (event) => {
       },
       body: JSON.stringify({
         success: false,
-        error: error.message
+        error: safeMessage,
+        generationTime: (Date.now() - startTime) / 1000
       })
     };
   }

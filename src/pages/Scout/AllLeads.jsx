@@ -1249,7 +1249,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {
           const s = c.status || '';
-          const isArchived = ['people_mode_archived', 'people_mode_skipped'].includes(s);
+          const isArchived = c.is_archived === true || ['people_mode_archived', 'people_mode_skipped'].includes(s);
           if (mode === 'fallback') return isArchived; // FallBack: only archived/lost people
           if (isArchived) return false;
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);

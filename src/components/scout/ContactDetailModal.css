@@ -29,9 +29,9 @@
   background: var(--bg-card);
   border-radius: 16px;
   width: 100%;
-  max-width: 800px;
-  max-height: 85vh;
-  min-height: 500px;
+  max-width: 640px;
+  max-height: 78vh;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -80,7 +80,7 @@
 .contact-hero-header {
   position: relative;
   width: 100%;
-  height: 320px;
+  height: 220px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -98,7 +98,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 2rem;
+  padding: 1.25rem;
 }
 
 .contact-hero-content {
@@ -117,7 +117,7 @@
 }
 
 .contact-hero-name {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #ffffff;
   margin: 0;
@@ -127,7 +127,7 @@
 }
 
 .contact-hero-title {
-  font-size: 1.125rem;
+  font-size: 0.9375rem;
   color: rgba(255, 255, 255, 0.95);
   font-weight: 500;
   margin: 0;
@@ -232,7 +232,7 @@
 .quick-actions-bar {
   display: flex;
   gap: 0.875rem;
-  padding: 1.5rem 2rem;
+  padding: 1rem 1.5rem;
   background: var(--bg-card);
   border-bottom: 2px solid var(--bg-secondary);
   position: sticky;
@@ -381,13 +381,13 @@
 
 /* Sections */
 .detail-section {
-  margin-bottom: 2.5rem;
-  padding: 0 2rem 2.5rem 2rem;
+  margin-bottom: 1.75rem;
+  padding: 0 1.5rem 2rem 1.5rem;
   border-bottom: 1px solid var(--bg-secondary);
 }
 
 .detail-section:first-of-type {
-  padding-top: 2rem;
+  padding-top: 1.5rem;
 }
 
 .detail-section:last-child {

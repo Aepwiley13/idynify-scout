@@ -65,7 +65,13 @@ function BarryAvatar({ size = 22, style = {} }) {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function getLeadStatus(contact) {
   const s = contact.contact_status || contact.lead_status || contact.status;
-  if (!s || s === 'saved' || s === 'pending_enrichment' || s === 'active' || s === 'exported') return 'not_contacted';
+  if (!s || s === 'New' || s === 'saved' || s === 'pending_enrichment' || s === 'active' || s === 'exported') return 'not_contacted';
+  // State machine capitalized statuses
+  if (s === 'Engaged' || s === 'In Conversation' || s === 'Active Mission' || s === 'In Campaign' || s === 'Mission Complete') return 'engaged';
+  if (s === 'Awaiting Reply') return 'awaiting_reply';
+  if (s === 'Dormant') return 'snoozed';
+  if (s === 'Active Customer' || s === 'Past Customer' || s === 'Partner' || s === 'Network') return 'in_pipeline';
+  // Legacy lowercase statuses
   if (s === 'contacted' || s === 'engaged') return 'engaged';
   if (s === 'awaiting_reply') return 'awaiting_reply';
   if (s === 'in_pipeline') return 'in_pipeline';

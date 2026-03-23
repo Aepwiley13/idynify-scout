@@ -2,7 +2,7 @@
 .contact-hero-header {
   position: relative;
   width: 100%;
-  height: 320px;
+  height: 220px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -12,7 +12,7 @@
 
 /* Full size variant for profile page */
 .contact-hero-header.full {
-  height: 280px;
+  height: 200px;
 }
 
 .contact-hero-overlay {
@@ -31,7 +31,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 2rem;
+  padding: 1.25rem;
 }
 
 .contact-hero-content {
@@ -52,7 +52,7 @@
 }
 
 .contact-hero-name {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #ffffff;
   margin: 0;
@@ -62,7 +62,7 @@
 }
 
 .contact-hero-title {
-  font-size: 1.125rem;
+  font-size: 0.9375rem;
   color: rgba(255, 255, 255, 0.95);
   font-weight: 500;
   margin: 0;

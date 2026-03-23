@@ -959,7 +959,7 @@ function buildInstantGreeting(icpProfile) {
 
 // ─── BarryICPPanel ────────────────────────────────────────────────────────────
 // Side panel version of ICP chat — user can see the card while chatting
-function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
+function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete, nudgeContext = null }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -1040,8 +1040,11 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
       }
 
       if (!cancelled) {
-        // No prior history — show instant context-aware greeting (no API call needed)
-        setMessages([{ role: 'barry', content: buildInstantGreeting(icpProfile) }]);
+        // No prior history — use nudge context if available, else generic greeting
+        const greeting = nudgeContext
+          ? `I noticed ${nudgeContext.count} of your recent saves are ${nudgeContext.industry} companies. Want me to weight ${nudgeContext.industry} higher in your ICP? I can update your targeting now.`
+          : buildInstantGreeting(icpProfile);
+        setMessages([{ role: 'barry', content: greeting }]);
         setHistoryLoaded(true);
       }
     }
@@ -1520,6 +1523,7 @@ export default function DailyLeads({ onNavigate }) {
   // ── Barry nudge between swipes ───────────────────────────────────────────────
   const [nudgeData, setNudgeData] = useState(null);
   const [showNudge, setShowNudge] = useState(false);
+  const [barryNudgeContext, setBarryNudgeContext] = useState(null); // { industry, count }
 
   // ── Today's saved quick preview ──────────────────────────────────────────────
   const [savedTodayOpen, setSavedTodayOpen] = useState(false);
@@ -2595,7 +2599,7 @@ export default function DailyLeads({ onNavigate }) {
                       <BarryNudgeCard
                         industry={nudgeData.industry}
                         count={nudgeData.count}
-                        onAccept={() => { setShowNudge(false); if (onNavigate) onNavigate('icpsettings'); }}
+                        onAccept={() => { setShowNudge(false); setBarryNudgeContext(nudgeData); setBarryPanelOpen(true); }}
                         onDismiss={() => setShowNudge(false)}
                       />
                     )}
@@ -2844,14 +2848,16 @@ export default function DailyLeads({ onNavigate }) {
         />
       )}
 
-      {/* Barry ICP-aware side panel (manual trigger) */}
+      {/* Barry ICP-aware side panel (manual trigger or nudge) */}
       {barryPanelOpen && (
         <BarryICPPanel
           userId={auth.currentUser?.uid}
           icpProfile={icpProfile}
-          onClose={() => setBarryPanelOpen(false)}
+          nudgeContext={barryNudgeContext}
+          onClose={() => { setBarryPanelOpen(false); setBarryNudgeContext(null); }}
           onSearchComplete={() => {
             setBarryPanelOpen(false);
+            setBarryNudgeContext(null);
             loadTodayLeads();
           }}
         />

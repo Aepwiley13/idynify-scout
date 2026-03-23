@@ -69,6 +69,11 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         address: formData.address.trim() || null,
         website: formData.website.trim() || null,
 
+        // Relationship classification
+        person_type: 'lead',
+        stage: 'scout',
+        stage_source: 'auto',
+
         // Source tracking
         source: referredBy ? 'referral' : 'manual',
         enrichment_status: 'user_added',

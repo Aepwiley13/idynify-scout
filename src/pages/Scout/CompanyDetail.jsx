@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp, Archive, RotateCcw, RefreshCw, Code, ExternalLink, Loader, User } from 'lucide-react';
 import './ScoutMain.css';
 import './CompanyDetail.css';
@@ -750,7 +751,7 @@ export default function CompanyDetail() {
     }
   }
 
-  // Archive this company
+  // Archive this company (with cascade to contacts)
   async function handleArchiveCompany() {
     const confirmed = window.confirm(
       `Archive ${company?.name}? This will move it out of your active pipeline. You can restore it later from the Archived tab.`
@@ -760,18 +761,7 @@ export default function CompanyDetail() {
     setArchiving(true);
     try {
       const userId = getEffectiveUser()?.uid;
-      const companyRef = doc(db, 'users', userId, 'companies', companyId);
-
-      await updateDoc(companyRef, {
-        status: 'archived',
-        archived_at: new Date().toISOString(),
-        activity_log: arrayUnion({
-          type: 'status_changed',
-          from: 'accepted',
-          to: 'archived',
-          timestamp: new Date().toISOString()
-        })
-      });
+      await archiveCompanyWithCascade(userId, companyId);
 
       // Navigate back to saved companies
       navigate('/scout', { state: { activeTab: 'saved-companies' } });
@@ -782,23 +772,12 @@ export default function CompanyDetail() {
     }
   }
 
-  // Restore this company from archive
+  // Restore this company from archive (with cascade to contacts)
   async function handleRestoreCompany() {
     setArchiving(true);
     try {
       const userId = getEffectiveUser()?.uid;
-      const companyRef = doc(db, 'users', userId, 'companies', companyId);
-
-      await updateDoc(companyRef, {
-        status: 'accepted',
-        archived_at: null,
-        activity_log: arrayUnion({
-          type: 'status_changed',
-          from: 'archived',
-          to: 'accepted',
-          timestamp: new Date().toISOString()
-        })
-      });
+      await restoreCompanyWithCascade(userId, companyId);
 
       // Reload company data to reflect new status
       setCompany(prev => ({ ...prev, status: 'accepted' }));

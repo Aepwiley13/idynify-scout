@@ -227,6 +227,7 @@ export default function BarryChatPanel({ userId }) {
   const [pendingIcpChange, setPendingIcpChange] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
   const [pendingPipelineAction, setPendingPipelineAction] = useState(null);
+  const [briefLoading, setBriefLoading] = useState(true);
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
@@ -288,7 +289,10 @@ export default function BarryChatPanel({ userId }) {
       if (saved.mode) setMode(saved.mode);
     }
 
-    // Build context stack first (non-blocking for brief load)
+    // Unblock the UI immediately — user can start typing while brief loads
+    setLoading(false);
+
+    // Build context stack + load brief in the background (non-blocking)
     let stack = null;
     try {
       stack = await buildContextStack(user.uid);
@@ -297,12 +301,14 @@ export default function BarryChatPanel({ userId }) {
       console.warn('[BarryChatPanel] Context stack build failed (non-fatal):', err.message);
     }
 
-    await loadOpeningBrief(user, stack);
+    // Load the opening brief without blocking the chat input
+    loadOpeningBrief(user, stack);
   }
 
   // ── Opening brief ─────────────────────────────────────────────────────────
 
   async function loadOpeningBrief(user, stack) {
+    setBriefLoading(true);
     try {
       const authToken = await user.getIdToken();
 
@@ -333,7 +339,7 @@ export default function BarryChatPanel({ userId }) {
       console.error('[BarryChatPanel] Opening brief failed:', err);
       setFallbackBrief();
     } finally {
-      setLoading(false);
+      setBriefLoading(false);
     }
   }
 
@@ -942,7 +948,7 @@ export default function BarryChatPanel({ userId }) {
         {/* Left: Barry identity */}
         <div className="flex items-center gap-3">
           <div className="relative flex-shrink-0">
-            {loading ? (
+            {briefLoading && !brief ? (
               <>
                 <span className="text-4xl opacity-60 animate-pulse">🐻</span>
                 <div className="absolute inset-0 rounded-full border-2 border-cyan-400/40 animate-ping" />
@@ -979,7 +985,7 @@ export default function BarryChatPanel({ userId }) {
                     : lastMessage.content}
                 </span>
               )}
-              {isCollapsed && loading && (
+              {isCollapsed && briefLoading && !brief && (
                 <span className="text-xs text-gray-500 font-mono animate-pulse ml-1">Loading...</span>
               )}
             </div>
@@ -1005,7 +1011,7 @@ export default function BarryChatPanel({ userId }) {
 
           {/* Opening Brief */}
           <div className="px-5 pt-5 pb-4">
-            {loading ? (
+            {briefLoading && !brief ? (
               <div className="space-y-2" aria-busy="true" aria-label="Barry is thinking">
                 <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-3/4" />
                 <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-full" />
@@ -1014,14 +1020,14 @@ export default function BarryChatPanel({ userId }) {
             ) : (
               <div className="text-gray-200 text-sm leading-relaxed">
                 <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
-                  {brief}
+                  {brief || 'Your pipeline is ready. Tell me what you want to work on.'}
                 </ReactMarkdown>
               </div>
             )}
           </div>
 
           {/* Suggested prompts (shown only when no conversation yet) */}
-          {!loading && !hasConversation && suggestedPrompts.length > 0 && (
+          {!briefLoading && !hasConversation && suggestedPrompts.length > 0 && (
             <div className="px-5 pb-4 flex flex-wrap gap-2">
               {suggestedPrompts.map((prompt, i) => (
                 <button

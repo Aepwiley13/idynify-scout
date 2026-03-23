@@ -11,6 +11,7 @@ export default function CompanyCard({ company, onSwipe }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewTitle, setPreviewTitle] = useState('');
   const cardRef = useRef(null);
+  const swipeDirectionRef = useRef(null);
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
@@ -44,6 +45,7 @@ export default function CompanyCard({ company, onSwipe }) {
     const touch = e.touches[0];
     setIsDragging(true);
     setDragStart({ x: touch.clientX, y: touch.clientY });
+    swipeDirectionRef.current = null;
   };
 
   const handleTouchMove = (e) => {
@@ -52,10 +54,23 @@ export default function CompanyCard({ company, onSwipe }) {
     const touch = e.touches[0];
     const deltaX = touch.clientX - dragStart.x;
     const deltaY = touch.clientY - dragStart.y;
-    setDragOffset({ x: deltaX, y: deltaY });
+
+    // Lock swipe direction after initial movement to prevent diagonal jitter
+    if (!swipeDirectionRef.current) {
+      if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
+        swipeDirectionRef.current = Math.abs(deltaX) >= Math.abs(deltaY) ? 'horizontal' : 'vertical';
+      }
+      return; // Wait until direction is determined before moving card
+    }
+
+    // Only track horizontal swipes; vertical scrolls pass through naturally
+    if (swipeDirectionRef.current === 'horizontal') {
+      setDragOffset({ x: deltaX, y: 0 });
+    }
   };
 
   const handleTouchEnd = () => {
+    swipeDirectionRef.current = null;
     handleMouseUp();
   };
 
@@ -120,7 +135,7 @@ export default function CompanyCard({ company, onSwipe }) {
       <div className="absolute inset-0 flex items-center justify-between px-8 pointer-events-none z-0">
         <div
           className={`transition-all duration-200 ${
-            dragOffset.x < -50 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+            dragOffset.x < -80 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
           }`}
         >
           <div className="bg-red-500 text-white rounded-full p-6 shadow-2xl">
@@ -129,7 +144,7 @@ export default function CompanyCard({ company, onSwipe }) {
         </div>
         <div
           className={`transition-all duration-200 ${
-            dragOffset.x > 50 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+            dragOffset.x > 80 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
           }`}
         >
           <div className="bg-green-500 text-white rounded-full p-6 shadow-2xl">
@@ -143,7 +158,7 @@ export default function CompanyCard({ company, onSwipe }) {
         ref={cardRef}
         className="enterprise-company-card relative z-10"
         style={{
-          transform: `translateX(${dragOffset.x}px) translateY(${dragOffset.y * 0.1}px) rotate(${rotation}deg)`,
+          transform: `translateX(${dragOffset.x}px) rotate(${rotation}deg)`,
           opacity: opacity,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out'
         }}

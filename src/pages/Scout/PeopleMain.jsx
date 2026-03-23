@@ -113,7 +113,7 @@ function ThemePicker({ dropUp = true }) {
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            position: 'absolute', ...(dropUp ? { bottom: 42 } : { top: 42 }), left: 0, width: 226,
+            position: 'absolute', ...(dropUp ? { bottom: 42, left: 0 } : { top: 42, right: 0 }), width: 226,
             background: T.cardBg, border: `1px solid ${T.border2}`,
             borderRadius: 14, padding: 14,
             boxShadow: `0 20px 60px ${T.isDark ? '#00000099' : '#00000020'}`,

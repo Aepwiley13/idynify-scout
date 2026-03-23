@@ -8,7 +8,7 @@ import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
-export default function CompanyDetailModal({ company, onClose, onFindMoreContacts }) {
+export default function CompanyDetailModal({ company, onClose, onFindMoreContacts, sourceModule = 'scout' }) {
   const navigate = useNavigate();
   const [enrichedData, setEnrichedData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -211,6 +211,23 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
     const num = parseFloat(value);
     if (isNaN(num)) return null;
     return num > 0 ? `+${num}%` : `${num}%`;
+  }
+
+  function formatRevenue(value) {
+    if (!value) return null;
+    const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.]/g, '')) : value;
+    if (isNaN(num) || num === 0) return String(value);
+    if (num >= 1e9) return `$${(num / 1e9).toFixed(1)}B`;
+    if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
+    if (num >= 1e3) return `$${(num / 1e3).toFixed(0)}K`;
+    return `$${num.toLocaleString()}`;
+  }
+
+  function formatEmployees(value) {
+    if (!value) return null;
+    const num = typeof value === 'string' ? parseInt(value.replace(/[^0-9]/g, ''), 10) : value;
+    if (isNaN(num) || num === 0) return String(value);
+    return num.toLocaleString();
   }
 
   function handleSelectDecisionMaker(person) {
@@ -444,8 +461,8 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                   <p className="snapshot-label">Employees</p>
                   <p className="snapshot-value">
                     {enrichedData?.snapshot?.employee_count_range ||
-                     enrichedData?.snapshot?.estimated_num_employees ||
-                     company.employee_count ||
+                     formatEmployees(enrichedData?.snapshot?.estimated_num_employees) ||
+                     formatEmployees(company.employee_count) ||
                      company.company_size ||
                      'Not available'}
                   </p>
@@ -458,8 +475,8 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                   <p className="snapshot-label">Revenue</p>
                   <p className="snapshot-value">
                     {enrichedData?.snapshot?.revenue_range ||
-                     enrichedData?.snapshot?.annual_revenue ||
-                     company.revenue ||
+                     formatRevenue(enrichedData?.snapshot?.annual_revenue) ||
+                     formatRevenue(company.revenue) ||
                      'Not available'}
                   </p>
                 </div>
@@ -864,9 +881,17 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                   </span>
                 )}
               </div>
-              <button className="find-contacts-btn" onClick={onClose}>
-                {company.contact_count > 0 ? 'View Contacts' : 'Find Contacts'}
+              <button
+                className="find-contacts-btn"
+                onClick={() => onFindMoreContacts ? onFindMoreContacts(company.id) : onClose()}
+              >
+                {company.contact_count > 0 ? 'View Contacts →' : 'Find Contacts →'}
               </button>
+              {sourceModule !== 'scout' && onFindMoreContacts && (
+                <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-secondary)', textAlign: 'center' }}>
+                  Opens full profile in Scout with title search &amp; enrichment
+                </p>
+              )}
             </div>
           </div>
         </div>

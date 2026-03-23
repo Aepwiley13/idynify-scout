@@ -1019,19 +1019,19 @@ function ContactPhotoCard({ contact, selected, alreadySaved, onClick, badge, foo
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      {/* Photo card — capped at 220px tall so cards never overflow the viewport */}
+      {/* Photo card — portrait aspect ratio so faces display properly */}
       <div
         onClick={onClick}
         style={{
           position: 'relative', width: '100%',
-          height: 'clamp(160px, 30vw, 220px)',
+          aspectRatio: '3 / 4',
           borderRadius: 12, overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
           border: `2px solid ${selected ? BRAND.pink : alreadySaved ? STATUS.green : T.border}`,
           boxShadow: selected ? `0 0 0 3px ${BRAND.pink}30` : alreadySaved ? `0 0 0 3px ${STATUS.green}20` : 'none',
           transition: 'border-color 0.15s, box-shadow 0.15s',
         }}
       >
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center top' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: '50% 15%' }} />
         {/* Gradient overlay */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', background: 'linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.6) 50%,transparent 100%)' }} />
         {/* Leadership badge */}

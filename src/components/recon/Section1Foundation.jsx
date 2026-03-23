@@ -545,7 +545,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         {output.metadata && (
           <div className="recon-metadata">
             <p className="recon-metadata-text">
-              Generated in {output.metadata.generationTime?.toFixed(1)}s |
+              Generated in {output.metadata.generationTime != null ? output.metadata.generationTime.toFixed(1) : '—'}s |
               Model: {output.metadata.model} |
               Tokens: {output.metadata.tokensUsed}
             </p>

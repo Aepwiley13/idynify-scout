@@ -110,14 +110,23 @@ mission.roster[n] = {
 ## Bugs — From Laura Onboarding Session (March 20)
 
 _Source: `docs/client-onboarding-feedback-laura-march20.md`_
+_Fixed: March 22, 2026_
 
-| Priority | Bug | Suspected Location |
-|----------|-----|--------------------|
-| **P0** | "Generation time not defined" error during ICP generation | `netlify/functions/barryICPConversation.js` |
-| **P0** | Barry returning only ~10 companies instead of 20–30+ | `barryICPConversation.js` / `barryGenerateContext.js` |
-| **P1** | Y Combinator misclassified under Hospitality | ICP industry classification / scoring logic |
-| **P1** | Contact disappears after LinkedIn import (no UI state feedback) | Scout people view / Firestore write timing |
-| **P2** | "Find more targets" button stalls with no feedback | `DailyLeads.jsx` / Scout company card flow |
+| Priority | Bug | Status | Fix |
+|----------|-----|--------|-----|
+| **P0** | "Generation time not defined" error during ICP generation | **Fixed** | Sanitized error messages in `barryICPConversation.js`; added null guard in `Section1Foundation.jsx` |
+| **P0** | Barry returning only ~10 companies instead of 20–30+ | **Fixed** | Multi-page Apollo fetch in `search-companies.js` (up to 3 pages, ~150 companies before dedup) |
+| **P1** | Y Combinator misclassified under Hospitality | **Fixed** | Re-enabled industry soft-filter in `search-companies.js` using keyword matching |
+| **P1** | Contact disappears after LinkedIn import (no UI state feedback) | **Fixed** | Added save status states (Saving → Processing → Saved) in `LinkedInLinkSearch.jsx` |
+| **P2** | "Find more targets" button stalls with no feedback | **Fixed** | Added timeout handling, slow-search progress message, and abort recovery in `DailyLeads.jsx` |
+
+### Additional UX Improvements (from Laura feedback)
+
+| Item | Status | Details |
+|------|--------|---------|
+| Onboarding progress indicator | **Added** | 3-step progress bar (Define ICP → Review → Find Targets) in `BarryOnboarding.jsx` |
+| Toast confirmations for key actions | **Added** | Save confirmation toast in `DailyLeads.jsx` swipe flow |
+| Gate unfinished features | **Added** | CSV Upload and Business Card marked "Coming Soon" in `ScoutPlus.jsx` |
 
 ---
 

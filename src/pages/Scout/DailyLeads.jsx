@@ -1396,6 +1396,7 @@ export default function DailyLeads({ onNavigate }) {
   const [showUndo, setShowUndo] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
+  const [actionToast, setActionToast] = useState(null); // { message, type: 'success'|'info' }
 
   // ── ICP profile (for score breakdown) ───────────────────────────────────────
   const [icpProfile, setIcpProfile] = useState(null);
@@ -1571,28 +1572,42 @@ export default function DailyLeads({ onNavigate }) {
         setIsRefreshing(false);
         return;
       }
+      // Timeout after 25s — Netlify functions have a 26s limit
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000);
+
+      // Show progress update if search takes a while
+      const slowTimer = setTimeout(() => setRefreshMessage('Still searching — this can take a moment...'), 8000);
+
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.uid, authToken, companyProfile: profileDoc.data() }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+      clearTimeout(slowTimer);
+
       const data = await response.json();
       if (data.success) {
         if (data.companiesAdded > 0) {
           setRefreshMessage(`Found ${data.companiesAdded} new targets.`);
           setTimeout(() => { setRefreshMessage(''); loadTodayLeads(); }, 1500);
         } else {
-          setRefreshMessage(data.currentQueueSize > 0 ? 'Queue is already full.' : 'No new matches found.');
-          setTimeout(() => setRefreshMessage(''), 3000);
+          setRefreshMessage(data.currentQueueSize > 0 ? 'Queue is already full.' : 'No new matches found. Try adjusting your ICP.');
+          setTimeout(() => setRefreshMessage(''), 4000);
         }
       } else {
         setRefreshMessage(data.error || 'Refresh failed. Try again.');
-        setTimeout(() => setRefreshMessage(''), 3000);
+        setTimeout(() => setRefreshMessage(''), 4000);
       }
     } catch (error) {
       console.error('Error refreshing leads:', error);
-      setRefreshMessage('Refresh failed. Try again.');
-      setTimeout(() => setRefreshMessage(''), 3000);
+      const msg = error.name === 'AbortError'
+        ? 'Search timed out. Barry is still working — check back in a minute.'
+        : 'Refresh failed. Try again.';
+      setRefreshMessage(msg);
+      setTimeout(() => setRefreshMessage(''), 5000);
     } finally {
       setIsRefreshing(false);
     }
@@ -1627,7 +1642,11 @@ export default function DailyLeads({ onNavigate }) {
       await setDoc(swipeProgressRef, { dailySwipeCount: newSwipeCount, lastSwipeDate: today, hasSeenTitleSetup });
       setDailySwipeCount(newSwipeCount);
       setLastSwipeDate(today);
-      if (isInterested) setTotalAcceptedCompanies(totalAcceptedCompanies + 1);
+      if (isInterested) {
+        setTotalAcceptedCompanies(totalAcceptedCompanies + 1);
+        setActionToast({ message: `${company.name} saved`, type: 'success' });
+        setTimeout(() => setActionToast(null), 2500);
+      }
       setLastSwipe({ company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount });
       setShowUndo(true);
       const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
@@ -2097,6 +2116,20 @@ export default function DailyLeads({ onNavigate }) {
             </button>
           </div>
         </div>
+        {/* Action toast — brief confirmation for save/skip actions */}
+        {actionToast && (
+          <div style={{
+            marginBottom: 8, padding: '8px 14px', borderRadius: 8,
+            background: actionToast.type === 'success' ? '#dcfce7' : T.accentBg,
+            border: `1px solid ${actionToast.type === 'success' ? '#86efac' : T.accentBdr}`,
+            color: actionToast.type === 'success' ? '#15803d' : BRAND.pink,
+            fontSize: 12, fontWeight: 600, transition: 'opacity 0.3s ease',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {actionToast.type === 'success' && <span>&#10003;</span>}
+            {actionToast.message}
+          </div>
+        )}
         {refreshMessage && (
           <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: 12 }}>
             {refreshMessage}

@@ -102,41 +102,37 @@ export default function ScoutPlus() {
               </div>
             </button>
 
-            {/* CSV Upload */}
-            <button
-              onClick={() => setCurrentView('csv')}
-              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#22c55e'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
+            {/* CSV Upload — Coming Soon */}
+            <div
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', opacity: 0.55, cursor: 'default', position: 'relative' }}
             >
+              <div style={{ position: 'absolute', top: 12, right: 14, background: '#f59e0b', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.5 }}>COMING SOON</div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                 <div style={{ width: 48, height: 48, background: '#dcfce7', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Upload className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Upload CSV</h3>
-                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Import up to 25 contacts from a spreadsheet. Fast bulk upload.</p>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Import contacts from a spreadsheet. Available soon.</p>
                 </div>
               </div>
-            </button>
+            </div>
 
-            {/* Business Card Capture */}
-            <button
-              onClick={() => setCurrentView('business-card')}
-              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#a855f7'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
+            {/* Business Card Capture — Coming Soon */}
+            <div
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', opacity: 0.55, cursor: 'default', position: 'relative' }}
             >
+              <div style={{ position: 'absolute', top: 12, right: 14, background: '#f59e0b', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.5 }}>COMING SOON</div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                 <div style={{ width: 48, height: 48, background: '#f3e8ff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Camera className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Scan Business Card</h3>
-                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Take a photo or upload an image. Perfect for post-event follow-ups.</p>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Capture contacts from business cards. Available soon.</p>
                 </div>
               </div>
-            </button>
+            </div>
 
             {/* LinkedIn Link */}
             <button

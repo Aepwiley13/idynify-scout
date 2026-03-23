@@ -318,32 +318,55 @@ export const handler = async (event) => {
     let totalFetched = 0;
 
     if (!foundedAgeRange) {
-      // Standard single-page fetch — behavior identical to before this feature
-      const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
-        method: 'POST',
-        headers: getApolloHeaders(),
-        body: JSON.stringify(apolloQuery)
-      });
+      // Multi-page fetch to ensure we get enough results after dedup
+      const MIN_TARGET = 25; // Minimum companies to return to the user
+      const MAX_PAGES = 3;
+      let page = 1;
+      let allCompanies = [];
 
-      if (!apolloResponse.ok) {
-        await logApolloError(apolloResponse, apolloQuery, 'search-companies');
-        console.error('External API request failed:', apolloResponse.status);
-        let userMessage = 'Company search service is temporarily unavailable. Please try again later.';
-        if (apolloResponse.status === 422) {
-          userMessage = 'Invalid search criteria. Please check your company profile settings and try again, or contact support if this persists.';
-        } else if (apolloResponse.status === 429) {
-          userMessage = 'Search service rate limit exceeded. Please try again in a few minutes.';
-        } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
-          userMessage = 'Search service authentication error. Please contact support.';
-        } else if (apolloResponse.status >= 500) {
-          userMessage = 'Search service is experiencing issues. Please try again later.';
+      while (allCompanies.length < MIN_TARGET * 2 && page <= MAX_PAGES) {
+        const pageQuery = { ...apolloQuery, page };
+        const apolloResponse = await fetch(APOLLO_ENDPOINTS.COMPANIES_SEARCH, {
+          method: 'POST',
+          headers: getApolloHeaders(),
+          body: JSON.stringify(pageQuery)
+        });
+
+        if (!apolloResponse.ok) {
+          // On first page failure, throw user-facing error; on subsequent pages, stop gracefully
+          if (page === 1) {
+            await logApolloError(apolloResponse, apolloQuery, 'search-companies');
+            console.error('External API request failed:', apolloResponse.status);
+            let userMessage = 'Company search service is temporarily unavailable. Please try again later.';
+            if (apolloResponse.status === 422) {
+              userMessage = 'Invalid search criteria. Please check your company profile settings and try again, or contact support if this persists.';
+            } else if (apolloResponse.status === 429) {
+              userMessage = 'Search service rate limit exceeded. Please try again in a few minutes.';
+            } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
+              userMessage = 'Search service authentication error. Please contact support.';
+            } else if (apolloResponse.status >= 500) {
+              userMessage = 'Search service is experiencing issues. Please try again later.';
+            }
+            throw new Error(userMessage);
+          }
+          console.warn(`⚠️ Page ${page} fetch failed (status ${apolloResponse.status}), stopping pagination`);
+          break;
         }
-        throw new Error(userMessage);
+
+        const apolloData = await apolloResponse.json();
+        const pageCompanies = apolloData.organizations || [];
+        allCompanies.push(...pageCompanies);
+
+        const totalPages = apolloData.pagination?.total_pages || apolloData.total_pages || 1;
+        console.log(`✅ Page ${page}/${Math.min(totalPages, MAX_PAGES)}: ${pageCompanies.length} companies (total so far: ${allCompanies.length})`);
+
+        // Stop if we've exhausted available pages or got a short page
+        if (page >= totalPages || pageCompanies.length < apolloQuery.per_page) break;
+        page++;
       }
 
-      const apolloData = await apolloResponse.json();
-      companies = apolloData.organizations || [];
-      console.log(`✅ Found ${companies.length} companies from external API`);
+      companies = allCompanies;
+      console.log(`✅ Found ${companies.length} companies from external API (${page} page${page > 1 ? 's' : ''})`);
 
     } else {
       // Waterfall loop — fetch up to MAX_PAGES until we have enough filtered results
@@ -408,42 +431,36 @@ export const handler = async (event) => {
       }))
     };
 
-    // TEMPORARILY DISABLED - External API is not returning industry field reliably
-    // Need to investigate raw response structure first
-    console.log('⚠️  INDUSTRY VALIDATION TEMPORARILY DISABLED');
-    console.log('⚠️  All companies from Apollo will be saved regardless of industry');
-    console.log('⚠️  This is to debug why Apollo returns industry: N/A for all companies');
-
-    /* DISABLED - RE-ENABLE AFTER FIXING APOLLO INDUSTRY FIELD
-    if (requestedIndustries.length > 0) {
-      console.log(`🔍 Validating companies match requested industries: ${requestedIndustries.join(', ')}`);
-
+    // Industry validation: use keyword matching since Apollo's industry field is unreliable.
+    // Check company name + industry + keywords against ICP keywords to filter obvious mismatches.
+    if (requestedIndustries.length > 0 && companyProfile.companyKeywords?.length > 0) {
+      const keywords = companyProfile.companyKeywords.map(k => k.toLowerCase());
+      const industryTerms = requestedIndustries.map(i => i.toLowerCase());
       const beforeCount = companies.length;
-      const filteredCompanies = companies.filter(company => {
-        const companyIndustry = company.industry || company.primary_industry || '';
-        const matches = requestedIndustries.includes(companyIndustry);
 
-        if (!matches) {
-          console.log(`  ❌ Filtering out ${company.name} - Industry: "${companyIndustry}" (not in requested list)`);
-        }
+      companies = companies.filter(company => {
+        // Build searchable text from all available fields
+        const searchText = [
+          company.industry,
+          company.primary_industry,
+          company.short_description,
+          company.name,
+          ...(company.keywords || [])
+        ].filter(Boolean).join(' ').toLowerCase();
 
-        return matches;
+        // Pass if any industry term or keyword matches
+        const matchesIndustry = industryTerms.some(term => searchText.includes(term.split(' ')[0]));
+        const matchesKeyword = keywords.some(kw => searchText.includes(kw));
+
+        // Also pass companies without enough data (don't silently exclude unknowns)
+        const hasNoData = !company.industry && !company.short_description;
+
+        return matchesIndustry || matchesKeyword || hasNoData;
       });
 
-      console.log(`✅ Validation complete: ${filteredCompanies.length}/${beforeCount} companies match requested industries`);
-
-      debugInfo.afterValidation = filteredCompanies.length;
-
-      if (filteredCompanies.length === 0) {
-        console.error('❌ CRITICAL: No companies match requested industries after filtering!');
-        console.error('This likely means Apollo is ignoring the industry filter.');
-        console.error('Check the Apollo query and industry IDs above.');
-        console.error('Debug info:', JSON.stringify(debugInfo, null, 2));
-      }
-
-      companies = filteredCompanies;
+      console.log(`🔍 Industry soft-filter: ${companies.length}/${beforeCount} companies passed (removed ${beforeCount - companies.length} mismatches)`);
+      debugInfo.afterValidation = companies.length;
     }
-    */
 
     // Top-off model: Only add companies if queue needs refilling
     const pendingCount = await countPendingCompanies(userId, authToken);

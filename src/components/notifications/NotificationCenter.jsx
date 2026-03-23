@@ -7,7 +7,7 @@
  *
  * Backed by Firestore: users/{userId}/notifications
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import {
   subscribeToNotifications,
+  getRecentNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   formatNotification,
@@ -38,21 +39,50 @@ const TABS = [
 export default function NotificationCenter({ userId, T }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifications, setUnreadNotifications] = useState([]);
+  const [allNotifications, setAllNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
 
-  // Subscribe to unread notifications
+  // Subscribe to unread notifications for badge count
   useEffect(() => {
     if (!userId) return;
-    const unsub = subscribeToNotifications(userId, setNotifications);
+    const unsub = subscribeToNotifications(userId, setUnreadNotifications);
     return unsub;
   }, [userId]);
 
-  const unreadCount = notifications.length;
+  // Load all recent notifications when panel opens
+  const loadAllNotifications = useCallback(async () => {
+    if (!userId) return;
+    const recent = await getRecentNotifications(userId, 50);
+    setAllNotifications(recent);
+  }, [userId]);
+
+  useEffect(() => {
+    if (open) {
+      loadAllNotifications();
+    }
+  }, [open, loadAllNotifications]);
+
+  // Refresh all notifications when unread list changes (e.g. after mark-read)
+  useEffect(() => {
+    if (open) {
+      loadAllNotifications();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadNotifications]);
+
+  const unreadCount = unreadNotifications.length;
+
+  // Merge: unread first, then read-only entries not already in list
+  const unreadIds = new Set(unreadNotifications.map(n => n.id));
+  const mergedNotifications = [
+    ...unreadNotifications,
+    ...allNotifications.filter(n => !unreadIds.has(n.id)),
+  ];
 
   const filtered = activeTab === 'all'
-    ? notifications
-    : notifications.filter(n => n.category === activeTab);
+    ? mergedNotifications
+    : mergedNotifications.filter(n => n.category === activeTab);
 
   const handleAction = async (notification) => {
     const formatted = formatNotification(notification);
@@ -65,6 +95,7 @@ export default function NotificationCenter({ userId, T }) {
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsRead(userId);
+    await loadAllNotifications();
   };
 
   const iconForType = (type) => {
@@ -184,14 +215,14 @@ export default function NotificationCenter({ userId, T }) {
                 }}
               >
                 {tab.label}
-                {tab.id === 'relationship' && notifications.filter(n => n.category === NOTIFICATION_CATEGORIES.RELATIONSHIP).length > 0 && (
+                {tab.id === 'relationship' && unreadNotifications.filter(n => n.category === NOTIFICATION_CATEGORIES.RELATIONSHIP).length > 0 && (
                   <span style={{
                     marginLeft: 5, minWidth: 14, height: 14, borderRadius: 7,
                     background: '#8b5cf620', color: '#8b5cf6',
                     fontSize: 9, fontWeight: 700, padding: '0 4px',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    {notifications.filter(n => n.category === NOTIFICATION_CATEGORIES.RELATIONSHIP).length}
+                    {unreadNotifications.filter(n => n.category === NOTIFICATION_CATEGORIES.RELATIONSHIP).length}
                   </span>
                 )}
               </button>
@@ -207,12 +238,13 @@ export default function NotificationCenter({ userId, T }) {
               }}>
                 <Bell size={32} color={T.textFaint} style={{ opacity: 0.3 }} />
                 <div style={{ fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
-                  {activeTab === 'all' ? 'No unread notifications' : `No ${activeTab} notifications`}
+                  {activeTab === 'all' ? 'No notifications yet' : `No ${activeTab} notifications`}
                 </div>
               </div>
             ) : (
               filtered.map(notification => {
                 const formatted = formatNotification(notification);
+                const isRead = notification.read === true;
                 return (
                   <div
                     key={notification.id}
@@ -222,10 +254,18 @@ export default function NotificationCenter({ userId, T }) {
                       borderRadius: 10, cursor: 'pointer',
                       transition: 'background 0.1s',
                       borderBottom: `1px solid ${T.border}`,
+                      opacity: isRead ? 0.5 : 1,
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = T.surface || '#f9fafb'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                   >
+                    {/* Unread dot */}
+                    <div style={{
+                      width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                      background: isRead ? 'transparent' : ACCENT,
+                      alignSelf: 'center', marginRight: -4,
+                    }} />
+
                     {/* Icon */}
                     <div style={{
                       width: 32, height: 32, borderRadius: 8, flexShrink: 0,
@@ -267,11 +307,12 @@ export default function NotificationCenter({ userId, T }) {
                     </div>
 
                     {/* Quick action */}
-                    {notification.category === NOTIFICATION_CATEGORIES.TASK && (
+                    {notification.category === NOTIFICATION_CATEGORIES.TASK && !isRead && (
                       <div
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          markNotificationRead(userId, notification.id);
+                          await markNotificationRead(userId, notification.id);
+                          await loadAllNotifications();
                         }}
                         title="Mark as done"
                         style={{

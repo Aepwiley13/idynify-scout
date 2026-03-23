@@ -273,9 +273,17 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
     const bTime = b.last_interaction ? new Date(b.last_interaction).getTime() : 0;
     return bTime - aTime;
   });
-  const contactSummary = sortedContacts.slice(0, 50).map(c =>
-    `  ${c.name} (${c.title || 'unknown'} @ ${c.company || 'unknown'}) — state: ${c.relationship_state}, value: ${c.strategic_value || 'unknown'}, last: ${c.last_interaction ? new Date(c.last_interaction).toLocaleDateString() : 'never'}, hunter: ${c.hunter_status}, id: ${c.id}`
+  const detailedContacts = sortedContacts.slice(0, 100).map(c =>
+    `  ${c.name} (${c.title || '?'} @ ${c.company || '?'}) — status:${c.contact_status || '?'}, stage:${c.stage || 'scout'}, type:${c.person_type || 'lead'}, value:${c.strategic_value || '?'}, last:${c.last_interaction ? new Date(c.last_interaction).toLocaleDateString() : 'never'}, hunter:${c.hunter_status || 'none'}, id:${c.id}`
   ).join('\n');
+  const remainingContacts = sortedContacts.slice(100);
+  const contactIndex = remainingContacts.length > 0
+    ? '\n\nALL OTHER CONTACTS (search by name to find details):\n' +
+      remainingContacts.map(c =>
+        `  ${c.name} @ ${c.company || '?'} [${c.stage || 'scout'}/${c.person_type || 'lead'}] id:${c.id}`
+      ).join('\n')
+    : '';
+  const contactSummary = detailedContacts + contactIndex;
 
   const missionSummary = missions.slice(0, 10).map(m => {
     const contact = contacts.find(c => c.id === m.contactId);
@@ -344,6 +352,7 @@ User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' '
 6. Barry mode affects prioritization, not voice or capability
 7. When generating messages: 4 angles, each genuinely different
 8. Field commander voice in reasoning. Calm guide voice in messages.
+9. ALL contacts — Scout, Hunter, Sniper, Customer (Basecamp), Network, Partner — are in ONE unified database above. Never say a contact "isn't in your system" unless their name genuinely does not appear anywhere in the CONTACTS list. A contact with stage=basecamp or person_type=customer is still fully accessible — search all entries before declaring someone absent.
 
 ━━━ INTENT DETECTION ━━━
 Classify the user's message into one of:

@@ -24,7 +24,7 @@ async function getAllContacts(userId) {
     const snap = await getDocs(
       query(
         collection(db, 'users', userId, 'contacts'),
-        limit(500)
+        limit(1000)
       )
     );
 
@@ -41,6 +41,10 @@ async function getAllContacts(userId) {
         last_interaction: c.last_interaction_at || null,
         last_outcome: c.last_outcome || null,
         hunter_status: c.hunter_status || null,
+        contact_status: c.contact_status || null,
+        person_type: c.person_type || 'lead',
+        stage: c.stage || 'scout',
+        email: c.email || null,
         active_mission_id: c.active_mission_id || null
       };
     });
@@ -72,8 +76,9 @@ async function getActiveMissions(userId) {
 
     return snap.docs.map(d => {
       const m = d.data();
-      const currentStep = (m.steps || []).find(s => s.status === 'current');
-      const completedSteps = (m.steps || []).filter(s => s.status === 'completed');
+      const stepsArr = Array.isArray(m.steps) ? m.steps : [];
+      const currentStep = stepsArr.find(s => s.status === 'current');
+      const completedSteps = stepsArr.filter(s => s.status === 'completed');
       const lastCompleted = completedSteps[completedSteps.length - 1];
 
       return {
@@ -82,7 +87,7 @@ async function getActiveMissions(userId) {
         outcome_goal: m.outcome_goal,
         status: m.status,
         current_step: currentStep?.stepNumber || 1,
-        steps_total: (m.steps || []).length,
+        steps_total: stepsArr.length,
         last_outcome: lastCompleted?.outcome || null,
         barry_reasoning: m.barry_reasoning || null
       };

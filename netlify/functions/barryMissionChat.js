@@ -267,21 +267,47 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
   }
   const icpBlock = icpLines.length > 0 ? icpLines.join('\n') : 'Not configured';
 
-  // Build a concise contact list for the prompt — sort by most recent interaction first
-  const sortedContacts = [...contacts].sort((a, b) => {
+  // Build a concise contact list for the prompt.
+  // Priority: sniper + basecamp contacts always get full detail regardless of recency
+  // (they are the most likely targets for engagement actions like "Bryan Baker in Homebase")
+  const sortedByRecency = [...contacts].sort((a, b) => {
     const aTime = a.last_interaction ? new Date(a.last_interaction).getTime() : 0;
     const bTime = b.last_interaction ? new Date(b.last_interaction).getTime() : 0;
     return bTime - aTime;
   });
-  const detailedContacts = sortedContacts.slice(0, 100).map(c =>
-    `  ${c.name} (${c.title || '?'} @ ${c.company || '?'}) — status:${c.contact_status || '?'}, stage:${c.stage || 'scout'}, type:${c.person_type || 'lead'}, value:${c.strategic_value || '?'}, last:${c.last_interaction ? new Date(c.last_interaction).toLocaleDateString() : 'never'}, hunter:${c.hunter_status || 'none'}, id:${c.id}`
-  ).join('\n');
-  const remainingContacts = sortedContacts.slice(100);
-  const contactIndex = remainingContacts.length > 0
-    ? '\n\nALL OTHER CONTACTS (search by name to find details):\n' +
-      remainingContacts.map(c =>
-        `  ${c.name} @ ${c.company || '?'} [${c.stage || 'scout'}/${c.person_type || 'lead'}] id:${c.id}`
-      ).join('\n')
+
+  const priorityContacts = sortedByRecency.filter(c =>
+    c.stage === 'sniper' || c.stage === 'basecamp'
+  ).slice(0, 40);
+  const priorityIds = new Set(priorityContacts.map(c => c.id));
+  const recentContacts = sortedByRecency
+    .filter(c => !priorityIds.has(c.id))
+    .slice(0, 100 - priorityContacts.length);
+
+  const detailedPool = [...priorityContacts, ...recentContacts];
+  const detailedIds = new Set(detailedPool.map(c => c.id));
+
+  const formatDetailLine = (c) => {
+    const lastDays = c.last_interaction
+      ? Math.floor((Date.now() - new Date(c.last_interaction).getTime()) / 86400000)
+      : null;
+    const lastStr = lastDays === null ? 'never' : lastDays === 0 ? 'today' : `${lastDays}d ago`;
+    return `  ${c.name} (${c.title || '?'} @ ${c.company || '?'}) — status:${c.contact_status || '?'}, stage:${c.stage || 'scout'}, type:${c.person_type || 'lead'}, value:${c.strategic_value || '?'}, last:${lastStr}, hunter:${c.hunter_status || 'none'}, id:${c.id}`;
+  };
+
+  const detailedContacts = detailedPool.map(formatDetailLine).join('\n');
+
+  // Enriched overflow index — includes enough data to reason about who needs attention
+  const overflowContacts = contacts.filter(c => !detailedIds.has(c.id));
+  const contactIndex = overflowContacts.length > 0
+    ? '\n\nALL OTHER CONTACTS:\n' +
+      overflowContacts.map(c => {
+        const lastDays = c.last_interaction
+          ? Math.floor((Date.now() - new Date(c.last_interaction).getTime()) / 86400000)
+          : null;
+        const lastStr = lastDays === null ? 'never' : `${lastDays}d`;
+        return `  ${c.name} @ ${c.company || '?'} | stage:${c.stage || 'scout'} | status:${c.contact_status || '?'} | value:${c.strategic_value || '?'} | last:${lastStr} | hunter:${c.hunter_status || 'none'} | id:${c.id}`;
+      }).join('\n')
     : '';
   const contactSummary = detailedContacts + contactIndex;
 
@@ -362,7 +388,12 @@ Classify the user's message into one of:
 - SCHEDULE: set up a call, book time, send calendar invite
 - RESEARCH: find out about, who is the decision maker, what do we know
 - PIPELINE_CHECK: status of pipeline, how many contacts, what's active
-- MOVE_TO_SNIPER: user wants to move a contact from Hunter to Sniper — signals: "move X to sniper", "X had a meeting", "X is ready to close", "X booked a demo", "move X forward", "X is in the close zone" — OR you detect a calendar event with a Hunter contact
+- MOVE_TO_SNIPER: move contact from Hunter to Sniper — signals: "move X to sniper", "X had a meeting", "X is ready to close", "X booked a demo", "move X forward", "X is in the close zone" — OR you detect a calendar event with a Hunter contact
+- ENGAGE_CONTACT: start working on a contact, kick off outreach, move into active pursuit — signals: "engage X", "let's start on X", "move X to hunter", "start working with X", "kick off X", "go after X", "add X to my pipeline", "let's pursue X"
+- ORGANIZE_PIPELINE: analyze who should move stages or which contacts need attention — signals: "who should move to hunter", "organize my pipeline", "who's ready to close", "who's stalled", "show me who needs attention", "who should I promote", "who's gone cold", "pipeline review"
+- LOG_OUTCOME: record what happened in a call, meeting, or interaction — signals: "X replied", "had a call with X", "X said no", "X went cold", "X booked a meeting", "log that X", "update X's status", "mark X as", "X is now interested"
+- COMPLETE_STEP: mark a mission step as done and advance — signals: "sent the message to X", "done with step 1 for X", "mark X's step complete", "move to next step for X", "finished step X"
+- ADD_NOTE: add context or a note to a contact's profile — signals: "note that X", "add a note to X", "remember that X", "X mentioned", "jot down for X", "X told me"
 - ICP_CHANGE: user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
 - CUSTOM: anything else
 
@@ -455,6 +486,93 @@ For MOVE_TO_SNIPER intent (user asks to move a contact to Sniper, or you detecte
   "has_message_angles": false,
   "angles": [],
   "actions": ["move_to_sniper"],
+  "clarifying_question": null
+}
+
+For ENGAGE_CONTACT intent (user wants to start engaging a specific contact — client shows confirm button):
+{
+  "intent": "ENGAGE_CONTACT",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "Barry's 1-2 sentence rationale — reference their stage, strategic value, and why now is the right move.",
+  "contact_id": "the contact's id from the context above",
+  "contact_name": "the contact's full name",
+  "current_stage": "scout | hunter | basecamp | fallback",
+  "has_message_angles": false,
+  "angles": [],
+  "actions": ["engage_contact"],
+  "clarifying_question": null
+}
+
+For ORGANIZE_PIPELINE intent (Barry surfaces contacts that should move stages — client renders per-contact move buttons):
+{
+  "intent": "ORGANIZE_PIPELINE",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "Barry's 2-3 sentence pipeline analysis — specific numbers, names, honest assessment.",
+  "contact_id": null,
+  "has_message_angles": false,
+  "angles": [],
+  "pipeline_moves": [
+    {
+      "contact_id": "xxx",
+      "contact_name": "Full Name",
+      "current_stage": "scout",
+      "recommended_stage": "hunter",
+      "action_type": "engage_contact",
+      "reason": "High strategic value, 23 days cold, warm relationship state"
+    }
+  ],
+  "actions": ["pipeline_moves"],
+  "clarifying_question": null
+}
+
+For LOG_OUTCOME intent (record what happened — client executes immediately, no confirm needed):
+{
+  "intent": "LOG_OUTCOME",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "Barry's 1-sentence acknowledgment of what was logged.",
+  "contact_id": "the contact's id from the context above",
+  "contact_name": "the contact's full name",
+  "outcome": "positive_reply | negative_reply | meeting_booked | no_reply | call_completed | demo_completed | custom",
+  "outcome_note": "Short description of what happened, extracted from user's message",
+  "status_update": "In Conversation | Awaiting Reply | Dormant | Active Customer | null",
+  "has_message_angles": false,
+  "angles": [],
+  "actions": ["log_outcome"],
+  "clarifying_question": null
+}
+
+For COMPLETE_STEP intent (mark mission step done — client executes immediately, no confirm):
+{
+  "intent": "COMPLETE_STEP",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "Barry's acknowledgment — reference the contact name and what's next.",
+  "contact_id": "the contact's id from the context above",
+  "contact_name": "the contact's full name",
+  "mission_id": "the contact's active_mission_id or null to auto-lookup",
+  "step_number": 1,
+  "outcome": "sent | positive_reply | no_reply | completed",
+  "has_message_angles": false,
+  "angles": [],
+  "actions": ["complete_step"],
+  "clarifying_question": null
+}
+
+For ADD_NOTE intent (save a note on a contact — client executes immediately, no confirm):
+{
+  "intent": "ADD_NOTE",
+  "barry_mode": "${mode}",
+  "step": "execute",
+  "response_text": "Got it — noted for [contact name].",
+  "contact_id": "the contact's id from the context above",
+  "contact_name": "the contact's full name",
+  "note_text": "The exact note text to save, cleaned up from user's message",
+  "has_message_angles": false,
+  "angles": [],
+  "actions": ["add_note"],
   "clarifying_question": null
 }`;
 }

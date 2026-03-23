@@ -145,6 +145,72 @@ const MODE_CONFIG = {
 
 const MODES = ['SUGGEST', 'PRIORITIZE', 'GROWTH'];
 
+// ── PipelineMoveRow — single row in an ORGANIZE_PIPELINE response ─────────────
+
+function PipelineMoveRow({ move, onExecute }) {
+  const [status, setStatus] = useState('idle'); // idle | loading | done | error
+
+  const stageLabels = {
+    scout: 'Scout', hunter: 'Hunter', sniper: 'Sniper',
+    basecamp: 'Homebase', fallback: 'Fallback'
+  };
+
+  const handleMove = async () => {
+    if (status !== 'idle') return;
+    setStatus('loading');
+    try {
+      const actionType = move.action_type === 'engage_contact' ? 'engage_contact' : 'move_stage';
+      const params = actionType === 'move_stage'
+        ? { to_stage: move.recommended_stage, reason: 'organize_pipeline' }
+        : {};
+      const successText = `${move.contact_name} moved to ${stageLabels[move.recommended_stage] || move.recommended_stage}.`;
+      await onExecute({
+        action_type: actionType,
+        contactId: move.contact_id,
+        contactName: move.contact_name,
+        params,
+        successText
+      });
+      setStatus('done');
+    } catch (_) {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-2 px-3 py-2 bg-gray-800/40 border border-gray-700/40 rounded-xl">
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-100 truncate">{move.contact_name}</div>
+        <div className="text-xs text-gray-400 mt-0.5">
+          <span className="text-gray-500">{stageLabels[move.current_stage] || move.current_stage}</span>
+          <span className="mx-1 text-gray-600">→</span>
+          <span className="text-cyan-400">{stageLabels[move.recommended_stage] || move.recommended_stage}</span>
+          {move.reason && <span className="ml-2 text-gray-500">· {move.reason}</span>}
+        </div>
+      </div>
+      <div className="flex-shrink-0">
+        {status === 'idle' && (
+          <button
+            onClick={handleMove}
+            className="px-2.5 py-1 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 rounded-lg text-xs font-mono transition-all"
+          >
+            Move →
+          </button>
+        )}
+        {status === 'loading' && (
+          <span className="text-xs text-gray-500 font-mono">Moving...</span>
+        )}
+        {status === 'done' && (
+          <span className="text-xs text-emerald-400 font-mono">✓ Done</span>
+        )}
+        {status === 'error' && (
+          <span className="text-xs text-red-400 font-mono">✗ Failed</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function BarryChatPanel({ userId }) {
@@ -160,6 +226,7 @@ export default function BarryChatPanel({ userId }) {
   const [contextStack, setContextStack] = useState(null);
   const [pendingIcpChange, setPendingIcpChange] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [pendingPipelineAction, setPendingPipelineAction] = useState(null);
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
@@ -484,6 +551,69 @@ export default function BarryChatPanel({ userId }) {
     }
   }
 
+  // ── Pipeline action execution ──────────────────────────────────────────────
+
+  async function executePipelineAction(pipelineAction) {
+    setSending(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const authToken = await user.getIdToken();
+
+      const res = await fetch('/.netlify/functions/barryPipelineAction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          authToken,
+          action_type: pipelineAction.action_type,
+          contactId: pipelineAction.contactId,
+          params: pipelineAction.params || {}
+        })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // Optimistically update the context stack so Barry's next message sees the change
+        if (pipelineAction.contactId) {
+          setContextStack(prev => {
+            if (!prev?.contacts) return prev;
+            return {
+              ...prev,
+              contacts: prev.contacts.map(c =>
+                c.id === pipelineAction.contactId
+                  ? { ...c, ...(data.updated_fields || {}) }
+                  : c
+              )
+            };
+          });
+        }
+        setMessages(prev => [...prev, {
+          role: 'pipeline_result',
+          success: true,
+          text: pipelineAction.successText || 'Done.',
+          contactName: pipelineAction.contactName,
+          action_type: pipelineAction.action_type
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'pipeline_result',
+          success: false,
+          text: `Couldn't complete that — ${data.error || 'try again'}.`
+        }]);
+      }
+    } catch (err) {
+      console.error('[BarryChatPanel] executePipelineAction failed:', err);
+      setMessages(prev => [...prev, {
+        role: 'pipeline_result',
+        success: false,
+        text: 'Pipeline action failed — try again in a moment.'
+      }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
   // ── Send message ──────────────────────────────────────────────────────────
 
   const sendMessage = async (text) => {
@@ -602,7 +732,6 @@ export default function BarryChatPanel({ userId }) {
 
         // LLM-detected ICP change intent — trigger add/replace confirmation flow
         if (data.intent === 'ICP_CHANGE' && data.new_target && contextStack?.icpProfile) {
-          // Log suppressed response for intent classification tuning
           console.warn('[BarryChatPanel] ICP_CHANGE intercepted — suppressed response_text:', data.response_text || '(empty)', '| new_target:', data.new_target);
           const summary = buildIcpSummary(contextStack.icpProfile);
           setMessages(prev => [...prev, {
@@ -612,6 +741,127 @@ export default function BarryChatPanel({ userId }) {
             angles: []
           }]);
           setPendingIcpChange({ originalMessage: userMessage, newTarget: data.new_target });
+          return;
+        }
+
+        // ── Pipeline action intents — route to barryPipelineAction ──────────
+
+        // MOVE_TO_SNIPER — show confirm bubble (already exists in backend, now wired)
+        if (data.intent === 'MOVE_TO_SNIPER' && data.contact_id && data.actions?.includes('move_to_sniper')) {
+          const pipelineAction = {
+            action_type: 'move_stage',
+            contactId: data.contact_id,
+            contactName: data.contact_name || 'this contact',
+            params: { to_stage: 'sniper', reason: data.sniper_reason || 'barry_suggested' },
+            successText: `${data.contact_name || 'Contact'} moved to Sniper. They're ready for the close.`
+          };
+          setMessages(prev => [...prev, {
+            role: 'pipeline_confirm',
+            pipelineAction,
+            responseText: data.response_text,
+            confirmLabel: `Move ${data.contact_name || 'contact'} to Sniper →`,
+            intent: 'MOVE_TO_SNIPER'
+          }]);
+          setPendingPipelineAction(pipelineAction);
+          setConversationHistory(data.updatedHistory || []);
+          return;
+        }
+
+        // ENGAGE_CONTACT — show confirm bubble
+        if (data.intent === 'ENGAGE_CONTACT' && data.contact_id && data.actions?.includes('engage_contact')) {
+          const pipelineAction = {
+            action_type: 'engage_contact',
+            contactId: data.contact_id,
+            contactName: data.contact_name || 'this contact',
+            params: {},
+            successText: `${data.contact_name || 'Contact'} is now engaged and in Hunter. Mission created — open Hunter to send the first message.`
+          };
+          setMessages(prev => [...prev, {
+            role: 'pipeline_confirm',
+            pipelineAction,
+            responseText: data.response_text,
+            confirmLabel: `Engage ${data.contact_name || 'contact'} →`,
+            intent: 'ENGAGE_CONTACT'
+          }]);
+          setPendingPipelineAction(pipelineAction);
+          setConversationHistory(data.updatedHistory || []);
+          return;
+        }
+
+        // ORGANIZE_PIPELINE — multi-contact move list, no single pending action
+        if (data.intent === 'ORGANIZE_PIPELINE' && data.pipeline_moves?.length > 0) {
+          setMessages(prev => [...prev, {
+            role: 'pipeline_organize',
+            responseText: data.response_text,
+            pipeline_moves: data.pipeline_moves
+          }]);
+          setConversationHistory(data.updatedHistory || []);
+          return;
+        }
+
+        // LOG_OUTCOME — execute immediately, no confirm needed
+        if (data.intent === 'LOG_OUTCOME' && data.contact_id && data.outcome) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: data.response_text || `Logged for ${data.contact_name || 'contact'}.`,
+            has_message_angles: false,
+            angles: []
+          }]);
+          setConversationHistory(data.updatedHistory || []);
+          // Fire and forget — non-blocking
+          executePipelineAction({
+            action_type: 'log_outcome',
+            contactId: data.contact_id,
+            contactName: data.contact_name,
+            params: {
+              outcome: data.outcome,
+              notes: data.outcome_note || null,
+              status_update: data.status_update || null
+            },
+            successText: null
+          }).catch(err => console.warn('[BarryChatPanel] LOG_OUTCOME silent fail:', err.message));
+          return;
+        }
+
+        // COMPLETE_STEP — execute immediately, no confirm needed
+        if (data.intent === 'COMPLETE_STEP' && data.contact_id) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: data.response_text || `Step marked complete for ${data.contact_name || 'contact'}.`,
+            has_message_angles: false,
+            angles: []
+          }]);
+          setConversationHistory(data.updatedHistory || []);
+          executePipelineAction({
+            action_type: 'complete_step',
+            contactId: data.contact_id,
+            contactName: data.contact_name,
+            params: {
+              missionId: data.mission_id || null,
+              step_number: data.step_number || null,
+              outcome: data.outcome || 'sent'
+            },
+            successText: null
+          }).catch(err => console.warn('[BarryChatPanel] COMPLETE_STEP silent fail:', err.message));
+          return;
+        }
+
+        // ADD_NOTE — execute immediately, no confirm needed
+        if (data.intent === 'ADD_NOTE' && data.contact_id && data.note_text) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: data.response_text || `Note saved for ${data.contact_name || 'contact'}.`,
+            has_message_angles: false,
+            angles: []
+          }]);
+          setConversationHistory(data.updatedHistory || []);
+          executePipelineAction({
+            action_type: 'add_note',
+            contactId: data.contact_id,
+            contactName: data.contact_name,
+            params: { note: data.note_text },
+            successText: null
+          }).catch(err => console.warn('[BarryChatPanel] ADD_NOTE silent fail:', err.message));
           return;
         }
 
@@ -810,6 +1060,91 @@ export default function BarryChatPanel({ userId }) {
                           >
                             View in Hunter →
                           </a>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Pipeline action confirm bubble (engage, move_to_sniper) ──
+                  if (msg.role === 'pipeline_confirm') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="text-sm px-3 py-3 leading-relaxed bg-cyan-500/10 text-cyan-200 border border-cyan-500/30 rounded-2xl rounded-tl-sm max-w-[88%]">
+                          {msg.responseText && (
+                            <div className="mb-3 text-gray-200">{msg.responseText}</div>
+                          )}
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={async () => {
+                                const saved = msg.pipelineAction;
+                                setPendingPipelineAction(null);
+                                await executePipelineAction(saved);
+                              }}
+                              className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-mono transition-all"
+                            >
+                              {msg.confirmLabel || 'Confirm →'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPendingPipelineAction(null);
+                                setMessages(prev => [...prev, {
+                                  role: 'assistant',
+                                  content: 'Got it — skipped for now.',
+                                  has_message_angles: false,
+                                  angles: []
+                                }]);
+                              }}
+                              className="px-3 py-1.5 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/40 text-gray-400 rounded-lg text-xs font-mono transition-all"
+                            >
+                              Not yet
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Pipeline action result bubble ──
+                  if (msg.role === 'pipeline_result') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className={`text-sm px-3 py-2 leading-relaxed border rounded-2xl rounded-tl-sm ${
+                          msg.success
+                            ? 'bg-emerald-500/10 text-emerald-200 border-emerald-500/25'
+                            : 'bg-red-500/10 text-red-300 border-red-500/25'
+                        }`}>
+                          {msg.success ? '✓ ' : '✗ '}{msg.text}
+                          {msg.success && msg.action_type === 'engage_contact' && (
+                            <>{' '}<a href="/hunter" className="underline text-emerald-300 hover:text-emerald-100 transition-colors">Open Hunter →</a></>
+                          )}
+                          {msg.success && msg.action_type === 'move_stage' && msg.text?.includes('Sniper') && (
+                            <>{' '}<a href="/sniper" className="underline text-emerald-300 hover:text-emerald-100 transition-colors">Open Sniper →</a></>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Pipeline organize bubble (multi-contact move list) ──
+                  if (msg.role === 'pipeline_organize') {
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="flex flex-col gap-2 max-w-[92%]">
+                          {msg.responseText && (
+                            <div className="text-sm px-3 py-2 leading-relaxed bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                              {msg.responseText}
+                            </div>
+                          )}
+                          {(msg.pipeline_moves || []).map((move, mi) => (
+                            <PipelineMoveRow
+                              key={mi}
+                              move={move}
+                              onExecute={executePipelineAction}
+                            />
+                          ))}
                         </div>
                       </div>
                     );

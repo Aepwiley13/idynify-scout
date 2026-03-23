@@ -5,7 +5,7 @@ import { calculateICPScore } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar } from 'lucide-react';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText } from 'lucide-react';
 import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
@@ -73,6 +73,7 @@ export default function ICPSettings() {
           foundedAgeRange: legacyData?.foundedAgeRange || null,
           managedByBarry: legacyData?.managedByBarry || false,
           lookalikeSeed: legacyData?.lookalikeSeed || null,
+          notes: '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -123,6 +124,7 @@ export default function ICPSettings() {
         scoringWeights: DEFAULT_WEIGHTS,
         foundedAgeRange: null,
         managedByBarry: false,
+        notes: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -986,6 +988,26 @@ export default function ICPSettings() {
               </span>
             </div>
           )}
+        </div>
+
+        {/* Notes Section */}
+        <div className="setting-section">
+          <div className="section-header">
+            <div className="section-title-group">
+              <FileText className="section-icon" />
+              <h3>Notes</h3>
+            </div>
+          </div>
+          <p className="section-description">
+            Add any context, strategy notes, or reminders for this ICP. These are for your reference only.
+          </p>
+          <textarea
+            className="icp-notes-textarea"
+            placeholder="e.g. Focus on post-Series A companies. Avoid Fortune 500. Ideal contact is Head of RevOps or VP Sales..."
+            value={profile.notes || ''}
+            onChange={(e) => setProfile(prev => ({ ...prev, notes: e.target.value }))}
+            rows={4}
+          />
         </div>
 
         {/* Action Buttons */}

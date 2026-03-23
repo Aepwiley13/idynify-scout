@@ -162,6 +162,11 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         company_id: companyId,
         company_name: formData.company.trim() || null,
 
+        // Relationship classification
+        person_type: 'lead',
+        stage: 'scout',
+        stage_source: 'auto',
+
         // Source tracking
         source: 'Scanned Business Card',
         capture_method: 'business_card_ocr',

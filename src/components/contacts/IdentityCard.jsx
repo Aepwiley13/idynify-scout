@@ -600,10 +600,10 @@ export default function IdentityCard({
   async function handleStageSave(stageId) {
     const user = getEffectiveUser();
     if (!user || !contact?.id) return;
-    // Toggle off → revert to auto
-    const isToggleOff = contact.stage === stageId && contact.stage_source === 'manual_override';
-    const newStage = isToggleOff ? null : stageId;
-    const newSource = isToggleOff ? 'auto' : 'manual_override';
+    // null = FieldChip toggle-off (user clicked the active stage) → revert to auto
+    // stageId = user selected a specific stage → manual override
+    const newStage = stageId ?? null;
+    const newSource = stageId ? 'manual_override' : 'auto';
     onUpdate({ ...contact, stage: newStage, stage_source: newSource });
     try {
       setStageSaving(true);

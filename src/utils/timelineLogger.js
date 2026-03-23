@@ -64,7 +64,10 @@ const TIMELINE_EVENT_TYPES = [
   'barry_guardrail_response',
   // Scheduled engagement events
   'message_scheduled',
-  'message_schedule_cancelled'
+  'message_schedule_cancelled',
+  // CSM: Intervention Playbook events
+  'playbook_abandoned',
+  'playbook_completed',
 ];
 
 // Actor types

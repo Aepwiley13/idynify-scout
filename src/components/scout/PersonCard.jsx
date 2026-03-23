@@ -7,6 +7,7 @@ export default function PersonCard({ person, company, onSwipe, barryText }) {
   const [isDragging, setIsDragging] = useState(false);
   const [photoError, setPhotoError] = useState(false);
   const cardRef = useRef(null);
+  const swipeDirectionRef = useRef(null);
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
@@ -32,15 +33,31 @@ export default function PersonCard({ person, company, onSwipe, barryText }) {
     const touch = e.touches[0];
     setIsDragging(true);
     setDragStart({ x: touch.clientX, y: touch.clientY });
+    swipeDirectionRef.current = null;
   };
 
   const handleTouchMove = (e) => {
     if (!isDragging || !dragStart) return;
     const touch = e.touches[0];
-    setDragOffset({ x: touch.clientX - dragStart.x, y: touch.clientY - dragStart.y });
+    const deltaX = touch.clientX - dragStart.x;
+    const deltaY = touch.clientY - dragStart.y;
+
+    // Lock swipe direction after initial movement to prevent diagonal jitter
+    if (!swipeDirectionRef.current) {
+      if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
+        swipeDirectionRef.current = Math.abs(deltaX) >= Math.abs(deltaY) ? 'horizontal' : 'vertical';
+      }
+      return; // Wait until direction is determined before moving card
+    }
+
+    // Only track horizontal swipes; vertical scrolls pass through naturally
+    if (swipeDirectionRef.current === 'horizontal') {
+      setDragOffset({ x: deltaX, y: 0 });
+    }
   };
 
   const handleTouchEnd = () => {
+    swipeDirectionRef.current = null;
     handleMouseUp();
   };
 
@@ -76,12 +93,12 @@ export default function PersonCard({ person, company, onSwipe, barryText }) {
     <div className="relative">
       {/* Swipe Indicators (Behind Card) */}
       <div className="absolute inset-0 flex items-center justify-between px-8 pointer-events-none z-0">
-        <div className={`transition-all duration-200 ${dragOffset.x < -50 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+        <div className={`transition-all duration-200 ${dragOffset.x < -80 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
           <div className="bg-red-500 text-white rounded-full p-6 shadow-2xl">
             <XCircle className="w-16 h-16" strokeWidth={2.5} />
           </div>
         </div>
-        <div className={`transition-all duration-200 ${dragOffset.x > 50 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+        <div className={`transition-all duration-200 ${dragOffset.x > 80 ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
           <div className="bg-green-500 text-white rounded-full p-6 shadow-2xl">
             <CheckCircle className="w-16 h-16" strokeWidth={2.5} />
           </div>
@@ -93,7 +110,7 @@ export default function PersonCard({ person, company, onSwipe, barryText }) {
         ref={cardRef}
         className="enterprise-company-card relative z-10"
         style={{
-          transform: `translateX(${dragOffset.x}px) translateY(${dragOffset.y * 0.1}px) rotate(${rotation}deg)`,
+          transform: `translateX(${dragOffset.x}px) rotate(${rotation}deg)`,
           opacity: opacity,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out'
         }}

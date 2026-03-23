@@ -220,6 +220,7 @@
     0 0 0 1px rgba(0, 0, 0, 0.02);
   cursor: grab;
   user-select: none;
+  touch-action: pan-y;
 }
 
 .enterprise-company-card:active {

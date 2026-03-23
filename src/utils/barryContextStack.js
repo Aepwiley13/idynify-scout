@@ -24,7 +24,7 @@ async function getAllContacts(userId) {
     const snap = await getDocs(
       query(
         collection(db, 'users', userId, 'contacts'),
-        limit(1000)
+        limit(500)
       )
     );
 
@@ -182,13 +182,28 @@ function extractSection(dashboardData, sectionId) {
   return null;
 }
 
+const CONTEXT_CACHE_KEY = 'barry_context_cache';
+const CONTEXT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Build the full context stack for Barry.
+ * Returns a cached version if available and fresh (< 5 min old).
  * @param {string} userId
  * @returns {Promise<Object>} contextStack
  */
 export async function buildContextStack(userId) {
   if (!userId) return emptyStack();
+
+  // Check sessionStorage cache first for instant repeat loads
+  try {
+    const cached = sessionStorage.getItem(CONTEXT_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed.userId === userId && Date.now() - parsed.cachedAt < CONTEXT_CACHE_TTL) {
+        return parsed.stack;
+      }
+    }
+  } catch (_) { /* cache miss — proceed to fresh load */ }
 
   try {
     const [contacts, missions, dashboardDoc, icpProfile] = await Promise.all([
@@ -213,7 +228,7 @@ export async function buildContextStack(userId) {
       outreach_context: extractSection(dashboardData, 'outreachContext')
     } : { confidence: 0, enhanced: false };
 
-    return {
+    const stack = {
       contacts,
       missions,
       recon,
@@ -222,6 +237,17 @@ export async function buildContextStack(userId) {
       user_style: dashboardData?.communicationStyle || null,
       timestamp: new Date().toISOString()
     };
+
+    // Cache in sessionStorage for instant repeat loads
+    try {
+      sessionStorage.setItem(CONTEXT_CACHE_KEY, JSON.stringify({
+        userId,
+        cachedAt: Date.now(),
+        stack
+      }));
+    } catch (_) { /* storage full or unavailable — non-fatal */ }
+
+    return stack;
   } catch (err) {
     console.warn('[barryContextStack] Build failed (non-fatal):', err.message);
     return emptyStack();

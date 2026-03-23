@@ -6,12 +6,14 @@
  *   contactId   — Firestore contact ID (for Load into Hunter)
  *   userId      — Firebase UID (for Load into Hunter)
  *   onLoaded    — Optional callback when Load into Hunter succeeds
+ *   onSendEmail — Optional callback(subject, message, contactId) to send email directly
  *
  * Behaviour:
  *   - Tabs: value_add / direct_ask / soft_reconnect / pattern_interrupt
  *   - ★ star on recommended angle tab
  *   - Editable subject input + message textarea (per-angle state)
  *   - Copy button: copies "Subject: ...\n\n..." to clipboard
+ *   - Send Email: sends the message via Gmail directly from the chat
  *   - Load into Hunter: calls loadIntoHunter utility, shows inline feedback
  *   - If contactId missing: Load into Hunter button is hidden
  */
@@ -20,7 +22,7 @@ import { useState } from 'react';
 import { loadIntoHunter } from '../../utils/loadIntoHunter';
 import './MessageAngleBlock.css';
 
-export default function MessageAngleBlock({ angles, contactId, userId, onLoaded }) {
+export default function MessageAngleBlock({ angles, contactId, userId, onLoaded, onSendEmail }) {
   const defaultId = angles?.find(a => a.recommended)?.id || angles?.[0]?.id || null;
 
   const [selected, setSelected] = useState(defaultId);
@@ -33,6 +35,8 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded 
   const [copied, setCopied] = useState(false);
   const [loadingHunter, setLoadingHunter] = useState(false);
   const [hunterResult, setHunterResult] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
 
   if (!angles || angles.length === 0) return null;
 
@@ -70,6 +74,20 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded 
     setHunterResult(result);
     setLoadingHunter(false);
     if (result.success && onLoaded) onLoaded(result);
+  };
+
+  const handleSendEmail = async () => {
+    if (!contactId || !onSendEmail || sendingEmail) return;
+    setSendingEmail(true);
+    setSendResult(null);
+    try {
+      const result = await onSendEmail(currentSubject, currentMessage, contactId);
+      setSendResult(result);
+    } catch (err) {
+      setSendResult({ success: false, error: err.message });
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const hunterFeedback = () => {
@@ -149,6 +167,16 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded 
           {copied ? '✓ Copied' : 'Copy'}
         </button>
 
+        {contactId && onSendEmail && (
+          <button
+            className="mab-send-btn"
+            onClick={handleSendEmail}
+            disabled={sendingEmail}
+          >
+            {sendingEmail ? 'Sending...' : sendResult?.success ? '✓ Sent' : 'Send Email →'}
+          </button>
+        )}
+
         {contactId && (
           <button
             className="mab-hunter-btn"
@@ -159,6 +187,20 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded 
           </button>
         )}
       </div>
+
+      {/* Inline send feedback */}
+      {sendResult && !sendResult.success && (
+        <div className="mab-feedback mab-feedback--error">
+          {sendResult.error === 'not_connected'
+            ? 'Gmail not connected — connect in Homebase to send directly.'
+            : 'Could not send — try again or copy the message.'}
+        </div>
+      )}
+      {sendResult?.success && (
+        <div className="mab-feedback mab-feedback--success">
+          ✓ Email sent. Check your Gmail sent folder to confirm.
+        </div>
+      )}
 
       {/* Inline Hunter feedback */}
       {hunterFeedback()}

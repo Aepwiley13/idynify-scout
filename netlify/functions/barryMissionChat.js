@@ -378,7 +378,7 @@ User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' '
 6. Barry mode affects prioritization, not voice or capability
 7. When generating messages: 4 angles, each genuinely different
 8. Field commander voice in reasoning. Calm guide voice in messages.
-9. ALL contacts — Scout, Hunter, Sniper, Customer (Basecamp), Network, Partner — are in ONE unified database above. Never say a contact "isn't in your system" unless their name genuinely does not appear anywhere in the CONTACTS list. A contact with stage=basecamp or person_type=customer is still fully accessible — search all entries before declaring someone absent.
+9. ALL contacts — Scout, Hunter, Sniper, Customer (Basecamp/Homebase), Network, Partner — are in ONE unified database above. NEVER say a contact "isn't in your system", "is in Homebase (outside Mission Control)", or "I can't pull their profile" unless their name genuinely does not appear ANYWHERE in the CONTACTS list (detailed OR overflow). A contact with stage=basecamp or person_type=customer IS fully accessible — you have their name, company, email, status, and everything else right here. Homebase/Basecamp is NOT a separate system — it's just a stage label. Search EVERY contact entry (including ALL OTHER CONTACTS section) before claiming someone is missing. If you find them, use their data confidently.
 
 ━━━ INTENT DETECTION ━━━
 Classify the user's message into one of:
@@ -411,7 +411,14 @@ When generating outreach (FOLLOW_UP or NEW_OUTREACH intents in execute step):
 - Subject lines under 8 words, no clickbait
 - Under 120 words per message
 - Write in the user's voice, not Barry's
-- Include the contact's id in the response so the UI can wire Load into Hunter
+- Include the contact's id in the response so the UI can wire send/load actions
+
+━━━ SENTIMENT & FRAMING RULES ━━━
+CRITICAL: When the user says someone "missed a call" or needs to "reschedule", the DEFAULT assumption is the CONTACT/CUSTOMER missed the call — NOT the user. Never draft messages that apologize on the user's behalf unless they explicitly say "I missed the call" or "I couldn't make it". Instead:
+- Frame reschedule messages as gracious and easy: "No worries — let's get back on the calendar"
+- Never say "My bad", "Sorry I dropped the ball", "Sorry I missed" — the user is the seller, they showed up
+- Keep it light, professional, and forward-looking: offer new times, remove friction
+- The user's time is valuable — messages should convey that while still being warm
 
 ━━━ OUTPUT FORMAT ━━━
 Return ONLY valid JSON. No other text before or after.
@@ -656,8 +663,14 @@ export const handler = async (event) => {
 
       const currentMode = determineBarryMode(recommendations, stats);
 
-      // Use the context stack if provided, otherwise use a minimal version
-      const effectiveContext = contextStack || { contacts: [], missions: [], recon: {} };
+      // For the opening brief, use a slimmed context — only top 50 contacts + missions
+      // to reduce prompt size and speed up Claude's response time
+      const effectiveContext = contextStack
+        ? {
+            ...contextStack,
+            contacts: (contextStack.contacts || []).slice(0, 50)
+          }
+        : { contacts: [], missions: [], recon: {} };
       let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}`;
@@ -888,13 +901,16 @@ Return valid JSON only:
             const nameSearchResults = [];
 
             for (const name of unmatchedNames.slice(0, 3)) {
-              const [byFirstName, byFullName] = await Promise.all([
+              const [byFirstName, byFullName, byLastName] = await Promise.all([
                 userRef.collection('contacts')
                   .where('first_name', '==', name)
                   .limit(3).get(),
                 userRef.collection('contacts')
                   .where('name', '>=', name)
                   .where('name', '<=', name + '\uf8ff')
+                  .limit(3).get(),
+                userRef.collection('contacts')
+                  .where('last_name', '==', name)
                   .limit(3).get()
               ]);
 
@@ -919,6 +935,7 @@ Return valid JSON only:
 
               byFirstName.forEach(addResult);
               byFullName.forEach(addResult);
+              byLastName.forEach(addResult);
             }
 
             if (nameSearchResults.length > 0) {

@@ -269,7 +269,8 @@ export default function ICPSettings() {
         body: JSON.stringify({
           userId: user.uid,
           authToken,
-          companyProfile: profile
+          companyProfile: profile,
+          icpId: selectedICPId
         })
       });
 

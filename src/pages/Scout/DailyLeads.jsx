@@ -1534,7 +1534,13 @@ export default function DailyLeads({ onNavigate }) {
       const companiesRef = collection(db, 'users', user.uid, 'companies');
       const q = query(companiesRef, where('status', '==', 'pending'));
       const snapshot = await getDocs(q);
-      const companiesData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allPendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter to companies for the active ICP. Companies with no icpId are legacy (show for all ICPs).
+      const activeId = icps.length > 0 ? icps[0].id : null;
+      const companiesData = activeId
+        ? allPendingData.filter(c => !c.icpId || c.icpId === activeId)
+        : allPendingData;
 
       // Score companies against active ICP
       const scoredData = companiesData.map(c => ({
@@ -1543,8 +1549,8 @@ export default function DailyLeads({ onNavigate }) {
       }));
       scoredData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
 
-      // Save full company list for ICP switching
-      allCompaniesRef.current = scoredData;
+      // Save the full unfiltered pool so ICP switching can re-filter without re-fetching
+      allCompaniesRef.current = allPendingData;
       setCompanies(scoredData);
       setCurrentIndex(0);
 
@@ -1600,13 +1606,19 @@ export default function DailyLeads({ onNavigate }) {
     setRefreshMessage('Barry is finding new targets...');
     try {
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      if (!profileDoc.exists()) {
-        setRefreshMessage('Set up your ICP first to find targets.');
-        setIsRefreshing(false);
-        return;
+
+      // Use the active ICP profile from state (multi-ICP aware), fall back to legacy profile
+      if (!icpProfile) {
+        const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+        const profileDoc = await getDoc(profileRef);
+        if (!profileDoc.exists()) {
+          setRefreshMessage('Set up your ICP first to find targets.');
+          setIsRefreshing(false);
+          return;
+        }
       }
+      const searchProfile = icpProfile;
+
       // Timeout after 25s — Netlify functions have a 26s limit
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 25000);
@@ -1617,7 +1629,7 @@ export default function DailyLeads({ onNavigate }) {
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: profileDoc.data() }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: activeICPId }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1658,14 +1670,14 @@ export default function DailyLeads({ onNavigate }) {
     setIcpProfile(selectedICP);
     setIcpWeights(selectedICP.scoringWeights || DEFAULT_WEIGHTS);
 
-    // Re-score all companies against the new ICP and re-sort
+    // Filter to companies for the selected ICP (legacy companies with no icpId show for all)
     const base = allCompaniesRef.current.length > 0 ? allCompaniesRef.current : companies;
-    const rescored = base.map(c => ({
+    const filtered = base.filter(c => !c.icpId || c.icpId === icpId);
+    const rescored = filtered.map(c => ({
       ...c,
       fit_score: calculateICPScore(c, selectedICP, selectedICP.scoringWeights || DEFAULT_WEIGHTS),
     }));
     rescored.sort((a, b) => b.fit_score - a.fit_score);
-    allCompaniesRef.current = rescored;
     setCompanies(rescored);
     setCurrentIndex(0);
   }, [activeICPId, icpList, companies]);
@@ -1688,6 +1700,7 @@ export default function DailyLeads({ onNavigate }) {
         status: direction === 'right' ? 'accepted' : 'rejected',
         swipedAt: new Date().toISOString(),
         swipeDirection: direction,
+        ...(activeICPId ? { swipedForICPId: activeICPId } : {}),
         ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
         ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
       });

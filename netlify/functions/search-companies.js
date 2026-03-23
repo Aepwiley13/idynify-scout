@@ -230,7 +230,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, companyProfile, adaptiveSignals } = JSON.parse(event.body);
+    const { userId, authToken, companyProfile, icpId, adaptiveSignals } = JSON.parse(event.body);
 
     if (!userId || !authToken || !companyProfile) {
       throw new Error('Missing required parameters');
@@ -504,7 +504,7 @@ export const handler = async (event) => {
     console.log(`📊 Adding ${toAdd.length} companies to reach target of ${TARGET_QUEUE_SIZE}`);
 
     // Save companies to Firestore
-    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile);
+    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile, icpId);
 
     const responseTime = Date.now() - startTime;
     const generationTime = responseTime / 1000;
@@ -807,7 +807,46 @@ async function getExistingCompanyIds(userId, authToken) {
   }
 }
 
-async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile) {
+/**
+ * Generate a factual Barry intel summary from available company data.
+ * No AI — rule-based so it runs inline without latency cost.
+ */
+function buildBarryIntel(company, companyProfile) {
+  const name = company.name || 'This company';
+  const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'this sector';
+  const currentYear = new Date().getFullYear();
+
+  let summary = `${name} is a ${industry} company`;
+
+  if (company.founded_year) {
+    const age = currentYear - company.founded_year;
+    summary += `, founded in ${company.founded_year} (${age}y old)`;
+  }
+
+  const revenue = company.organization_revenue_printed
+    || (company.organization_revenue ? `$${(company.organization_revenue / 1000000).toFixed(1)}M` : null);
+  if (revenue) {
+    summary += ` with ${revenue} in revenue`;
+  }
+
+  summary += '.';
+
+  // ICP fit context
+  const icpHints = [];
+  if (companyProfile.targetTitles?.length > 0) {
+    icpHints.push(`targeting ${companyProfile.targetTitles.slice(0, 2).join(' / ')}`);
+  }
+  if (companyProfile.companySizes?.length > 0) {
+    icpHints.push(`${companyProfile.companySizes[0]} employees`);
+  }
+  if (icpHints.length > 0) {
+    summary += ` Matches your ICP criteria: ${icpHints.join(', ')}.`;
+  }
+
+  return summary;
+}
+
+async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile, icpId) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
@@ -844,13 +883,16 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         console.log(`  ⚠️  NOTE: Apollo search endpoint does NOT return employee_count or location`);
       }
 
-      return {
+      // Use Apollo's actual industry data; fall back to ICP's first industry only if Apollo doesn't provide one
+      const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown';
+
+      const companyObj = {
         // IDs
         apollo_organization_id: company.id,
 
         // Basic Info (what Scout displays)
         name: company.name || 'Unknown Company',
-        industry: companyProfile.industries?.[0] || 'Accounting', // Use selected industry
+        industry,
 
         // Use revenue and founded year (Apollo DOES return these)
         revenue: revenue,
@@ -867,8 +909,16 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         source: 'apollo_api',
 
         // User Actions
-        status: 'pending' // pending | accepted | rejected
+        status: 'pending', // pending | accepted | rejected
+
+        // ICP association — which ICP profile discovered this company
+        ...(icpId ? { icpId } : {}),
+
+        // Barry intel — rule-based summary from available data
+        barry_intel: buildBarryIntel({ ...company, industry }, companyProfile),
       };
+
+      return companyObj;
     });
 
     console.log(`✅ Accepting ALL ${simplifiedCompanies.length} companies (no filtering)`);
@@ -891,7 +941,9 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           logo_url: { stringValue: String(company.logo_url || '') },
           status: { stringValue: 'pending' },
           found_at: { timestampValue: company.found_at },
-          source: { stringValue: 'apollo_api' }
+          source: { stringValue: 'apollo_api' },
+          barry_intel: { stringValue: String(company.barry_intel || '') },
+          ...(company.icpId ? { icpId: { stringValue: String(company.icpId) } } : {})
         }
       };
 

@@ -8,7 +8,8 @@ import {
   Zap, Mail, Phone, MessageSquare, Linkedin, Check,
   ArrowLeft, ArrowRight, Sparkles, Send, Loader, RefreshCw,
   ExternalLink, AlertCircle, Plus, ChevronDown, ChevronUp,
-  Clock, Target, Bookmark, BookmarkCheck, History, Copy, Edit2
+  Clock, Target, Bookmark, BookmarkCheck, History, Copy, Edit2,
+  Link2, Calendar
 } from 'lucide-react';
 import {
   executeSendAction,
@@ -310,6 +311,11 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [allHistoryEvents, setAllHistoryEvents] = useState([]);
   const [allHistoryLoading, setAllHistoryLoading] = useState(false);
 
+  // Booking link
+  const [bookingLink, setBookingLink] = useState(null); // null = not loaded yet
+  const [showBookingPanel, setShowBookingPanel] = useState(false);
+  const [bookingLinkCopied, setBookingLinkCopied] = useState(false);
+
   // Expose trigger method to parent via ref
   useImperativeHandle(ref, () => ({
     triggerFlow() {
@@ -365,6 +371,49 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
     return () => unsubscribe();
   }, [contact?.id]);
+
+  // === Booking Link ===
+  useEffect(() => {
+    async function loadBookingLink() {
+      const user = getEffectiveUser();
+      if (!user) return;
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        setBookingLink(snap.exists() ? (snap.data().bookingLink || '') : '');
+      } catch {
+        setBookingLink('');
+      }
+    }
+    loadBookingLink();
+  }, []);
+
+  function handleCopyBookingLink() {
+    if (!bookingLink) return;
+    navigator.clipboard.writeText(bookingLink).then(() => {
+      setBookingLinkCopied(true);
+      setTimeout(() => setBookingLinkCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  function handleShareBookingLinkEmail() {
+    const contactEmail = contact?.email;
+    const contactName = contact?.firstName || contact?.name?.split(' ')[0] || '';
+    const subject = encodeURIComponent('Book a time with me');
+    const body = encodeURIComponent(
+      `Hi ${contactName},\n\nHere's a link to book a time with me:\n${bookingLink}\n\nLooking forward to connecting!`
+    );
+    const mailto = contactEmail
+      ? `mailto:${contactEmail}?subject=${subject}&body=${body}`
+      : `mailto:?subject=${subject}&body=${body}`;
+    window.open(mailto, '_self');
+  }
+
+  function handleShareBookingLinkText() {
+    const contactPhone = contact?.phone || '';
+    const msg = encodeURIComponent(`Here's a link to book a time with me: ${bookingLink}`);
+    const smsHref = contactPhone ? `sms:${contactPhone}?body=${msg}` : `sms:?body=${msg}`;
+    window.open(smsHref, '_self');
+  }
 
   function activateFlow() {
     resetFlow();
@@ -856,6 +905,17 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
           )}
         </div>
         <div className="ies-section-header-actions">
+          {!flowActive && bookingLink !== null && (
+            <button
+              className="ies-start-btn"
+              style={{ background: 'rgba(250,170,32,0.12)', borderColor: 'rgba(250,170,32,0.3)', color: '#faaa20' }}
+              onClick={() => bookingLink ? setShowBookingPanel(p => !p) : window.location.href = '/settings'}
+              title={bookingLink ? 'Share your booking link with this contact' : 'Add your booking link in Settings'}
+            >
+              <Calendar className="w-4 h-4" />
+              {bookingLink ? 'Share Booking Link' : 'Add Booking Link'}
+            </button>
+          )}
           {!flowActive && (
             <button className="ies-start-btn" onClick={activateFlow}>
               <Zap className="w-4 h-4" />
@@ -872,6 +932,84 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
           </button>
         </div>
       </div>
+
+      {/* ── BOOKING LINK PANEL ── */}
+      {showBookingPanel && bookingLink && !sectionCollapsed && !flowActive && !!(bookingLink) && (
+        <div style={{
+          margin: '0 0 0.75rem 0',
+          padding: '0.875rem 1rem',
+          background: 'rgba(250,170,32,0.07)',
+          border: '1px solid rgba(250,170,32,0.25)',
+          borderRadius: '10px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
+            <Calendar style={{ width: 14, height: 14, color: '#faaa20', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#faaa20', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              Your Booking Link
+            </span>
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+            padding: '0.4rem 0.6rem',
+            background: 'rgba(0,0,0,0.15)',
+            border: '1px solid rgba(250,170,32,0.2)',
+            borderRadius: '7px',
+            marginBottom: '0.625rem',
+            overflow: 'hidden',
+          }}>
+            <Link2 style={{ width: 12, height: 12, color: '#faaa20', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.78rem', color: 'inherit', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, opacity: 0.85 }}>
+              {bookingLink}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleCopyBookingLink}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 600,
+                borderRadius: '7px', border: '1px solid rgba(250,170,32,0.35)',
+                background: bookingLinkCopied ? 'rgba(34,197,94,0.15)' : 'rgba(250,170,32,0.12)',
+                color: bookingLinkCopied ? '#86efac' : '#faaa20',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              {bookingLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {bookingLinkCopied ? 'Copied!' : 'Copy link'}
+            </button>
+            {contact?.email && (
+              <button
+                onClick={handleShareBookingLinkEmail}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 600,
+                  borderRadius: '7px', border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.05)', color: 'inherit',
+                  cursor: 'pointer', opacity: 0.8,
+                }}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Send via Email
+              </button>
+            )}
+            {contact?.phone && (
+              <button
+                onClick={handleShareBookingLinkText}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 600,
+                  borderRadius: '7px', border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.05)', color: 'inherit',
+                  cursor: 'pointer', opacity: 0.8,
+                }}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Send via Text
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── ENGAGEMENT HISTORY ── */}
       {!sectionCollapsed && !flowActive && (

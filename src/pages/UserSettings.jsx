@@ -13,7 +13,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import {
   ArrowLeft, User, Users, Shield, CreditCard, Plug, Settings2,
   Volume2, VolumeX, Mail, CheckCircle, AlertTriangle,
@@ -418,6 +418,12 @@ export default function UserSettings() {
   const [pwResetLoading, setPwResetLoading] = useState(false);
   const [pwResetError, setPwResetError]   = useState(null);
 
+  /* ── booking link ── */
+  const [bookingLink, setBookingLink]         = useState('');
+  const [bookingLinkInput, setBookingLinkInput] = useState('');
+  const [bookingLinkSaving, setBookingLinkSaving] = useState(false);
+  const [bookingLinkSaved, setBookingLinkSaved]   = useState(false);
+
   /* ── billing ── */
   const [billing, setBilling]             = useState(null);
   const [billingLoading, setBillingLoading] = useState(true);
@@ -455,6 +461,7 @@ export default function UserSettings() {
     loadGmailStatus();
     loadCalendarStatus();
     loadBilling();
+    loadBookingLink();
     refreshMfaStatus();
     // Auto-switch to integrations tab if redirected from Calendar OAuth
     const params = new URLSearchParams(window.location.search);
@@ -462,6 +469,30 @@ export default function UserSettings() {
       setActiveTab('integrations');
     }
   }, []);
+
+  async function loadBookingLink() {
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (snap.exists()) {
+        const link = snap.data().bookingLink || '';
+        setBookingLink(link);
+        setBookingLinkInput(link);
+      }
+    } catch { /* non-blocking */ }
+  }
+
+  async function handleSaveBookingLink() {
+    if (bookingLinkSaving) return;
+    setBookingLinkSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { bookingLink: bookingLinkInput.trim() });
+      setBookingLink(bookingLinkInput.trim());
+      setBookingLinkSaved(true);
+      setTimeout(() => setBookingLinkSaved(false), 2500);
+    } catch { /* non-blocking */ }
+    finally { setBookingLinkSaving(false); }
+  }
 
   async function loadBilling() {
     if (!user) return;
@@ -703,6 +734,47 @@ export default function UserSettings() {
                   <span className="us-card-label">Email address</span>
                   <span className="us-card-value">{user?.email || '—'}</span>
                 </div>
+              </div>
+            </section>
+
+            <section className="us-section">
+              <h2 className="us-section-title">Booking Link</h2>
+              <div className="us-card">
+                <div className="us-card-icon" style={{ background: 'rgba(250,170,32,0.12)', borderColor: 'rgba(250,170,32,0.25)', color: '#faaa20' }}>
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div className="us-card-body" style={{ flex: 1 }}>
+                  <span className="us-card-label">Your scheduling link</span>
+                  <span className="us-card-value us-card-value--muted">
+                    Calendly, Cal.com, or any booking URL — share it with contacts in one click
+                  </span>
+                  <input
+                    type="url"
+                    placeholder="https://calendly.com/yourname"
+                    value={bookingLinkInput}
+                    onChange={e => setBookingLinkInput(e.target.value)}
+                    style={{
+                      marginTop: '0.5rem',
+                      width: '100%',
+                      padding: '0.45rem 0.7rem',
+                      fontSize: '0.82rem',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(250,170,32,0.3)',
+                      background: 'rgba(250,170,32,0.05)',
+                      color: 'inherit',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+                <button
+                  className={`us-action-btn ${bookingLinkSaved ? 'us-action-btn--done' : 'us-action-btn--primary'}`}
+                  onClick={handleSaveBookingLink}
+                  disabled={bookingLinkSaving || bookingLinkInput === bookingLink}
+                  style={{ alignSelf: 'flex-end', flexShrink: 0 }}
+                >
+                  {bookingLinkSaving ? <Loader className="w-3.5 h-3.5 animate-spin" /> : bookingLinkSaved ? <CheckCircle className="w-3.5 h-3.5" /> : null}
+                  {bookingLinkSaved ? 'Saved' : 'Save'}
+                </button>
               </div>
             </section>
 

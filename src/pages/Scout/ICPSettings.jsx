@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { calculateICPScore } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
@@ -20,6 +20,12 @@ export default function ICPSettings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [refreshResult, setRefreshResult] = useState(null); // { count: number } | null
 
+  // Multi-ICP state
+  const [icpList, setIcpList] = useState([]);
+  const [selectedICPId, setSelectedICPId] = useState(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+
   // Search states for dropdowns
   const [industrySearch, setIndustrySearch] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
@@ -36,50 +42,132 @@ export default function ICPSettings() {
   ];
 
   useEffect(() => {
-    loadICPProfile();
+    loadICPProfiles();
   }, []);
 
-  async function loadICPProfile() {
+  async function loadICPProfiles() {
     try {
       const user = getEffectiveUser();
-      if (!user) {
-        navigate('/login');
-        return;
+      if (!user) { navigate('/login'); return; }
+
+      // Load from icpProfiles collection
+      const profilesSnap = await getDocs(collection(db, 'users', user.uid, 'icpProfiles'));
+      let icps = profilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+      if (icps.length === 0) {
+        // Migrate from legacy companyProfile/current if it exists
+        const legacyDoc = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
+        const legacyData = legacyDoc.exists() ? legacyDoc.data() : null;
+        const newId = `icp_${Date.now()}`;
+        const newICP = {
+          name: 'My ICP',
+          industries: legacyData?.industries || [],
+          companySizes: legacyData?.companySizes || [],
+          revenueRanges: legacyData?.revenueRanges || [],
+          skipRevenue: legacyData?.skipRevenue || false,
+          locations: legacyData?.locations || [],
+          isNationwide: legacyData?.isNationwide || false,
+          targetTitles: legacyData?.targetTitles || [],
+          scoringWeights: legacyData?.scoringWeights || DEFAULT_WEIGHTS,
+          foundedAgeRange: legacyData?.foundedAgeRange || null,
+          managedByBarry: legacyData?.managedByBarry || false,
+          lookalikeSeed: legacyData?.lookalikeSeed || null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, 'users', user.uid, 'icpProfiles', newId), newICP);
+        icps = [{ id: newId, ...newICP }];
       }
 
-      const profileDoc = await getDoc(
-        doc(db, 'users', user.uid, 'companyProfile', 'current')
-      );
-
-      if (profileDoc.exists()) {
-        const data = profileDoc.data();
-        // Ensure scoring weights exist (for existing profiles)
-        if (!data.scoringWeights) {
-          data.scoringWeights = DEFAULT_WEIGHTS;
-        }
-        // Ensure targetTitles exist (for existing profiles)
-        if (!data.targetTitles) {
-          data.targetTitles = [];
-        }
-        setProfile(data);
-      } else {
-        // No profile yet - set defaults
-        setProfile({
-          industries: [],
-          companySizes: [],
-          revenueRanges: [],
-          skipRevenue: false,
-          locations: [],
-          isNationwide: false,
-          targetTitles: [],
-          scoringWeights: DEFAULT_WEIGHTS,
-          foundedAgeRange: null
-        });
-      }
+      setIcpList(icps);
+      const first = icps[0];
+      setSelectedICPId(first.id);
+      setNameInput(first.name || 'My ICP');
+      applyICPToState(first);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load ICP:', error);
+      console.error('Failed to load ICP profiles:', error);
       setLoading(false);
+    }
+  }
+
+  function applyICPToState(icp) {
+    setProfile({
+      ...icp,
+      scoringWeights: icp.scoringWeights || DEFAULT_WEIGHTS,
+      targetTitles: icp.targetTitles || [],
+    });
+  }
+
+  function selectICP(icp) {
+    setSelectedICPId(icp.id);
+    setNameInput(icp.name || 'My ICP');
+    setEditingName(false);
+    applyICPToState(icp);
+  }
+
+  async function handleCreateICP() {
+    try {
+      const user = getEffectiveUser();
+      const newId = `icp_${Date.now()}`;
+      const newICP = {
+        name: `ICP ${icpList.length + 1}`,
+        industries: [],
+        companySizes: [],
+        revenueRanges: [],
+        skipRevenue: false,
+        locations: [],
+        isNationwide: false,
+        targetTitles: [],
+        scoringWeights: DEFAULT_WEIGHTS,
+        foundedAgeRange: null,
+        managedByBarry: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'users', user.uid, 'icpProfiles', newId), newICP);
+      const newICPWithId = { id: newId, ...newICP };
+      setIcpList(prev => [...prev, newICPWithId]);
+      selectICP(newICPWithId);
+    } catch (error) {
+      console.error('Failed to create ICP:', error);
+      alert('Failed to create ICP. Please try again.');
+    }
+  }
+
+  async function handleDeleteICP(icpId) {
+    if (icpList.length <= 1) {
+      alert('You must have at least one ICP profile.');
+      return;
+    }
+    if (!window.confirm('Delete this ICP? This cannot be undone.')) return;
+    try {
+      const user = getEffectiveUser();
+      await deleteDoc(doc(db, 'users', user.uid, 'icpProfiles', icpId));
+      const newList = icpList.filter(i => i.id !== icpId);
+      setIcpList(newList);
+      if (selectedICPId === icpId) {
+        selectICP(newList[0]);
+      }
+    } catch (error) {
+      console.error('Failed to delete ICP:', error);
+      alert('Failed to delete ICP. Please try again.');
+    }
+  }
+
+  async function handleRenameICP() {
+    if (!nameInput.trim()) return;
+    try {
+      const user = getEffectiveUser();
+      await updateDoc(doc(db, 'users', user.uid, 'icpProfiles', selectedICPId), {
+        name: nameInput.trim(),
+      });
+      setIcpList(prev => prev.map(i => i.id === selectedICPId ? { ...i, name: nameInput.trim() } : i));
+      setProfile(prev => ({ ...prev, name: nameInput.trim() }));
+      setEditingName(false);
+    } catch (error) {
+      console.error('Failed to rename ICP:', error);
     }
   }
 
@@ -95,18 +183,34 @@ export default function ICPSettings() {
         return;
       }
 
-      // Save profile
+      const updatedProfile = {
+        ...profile,
+        name: nameInput.trim() || profile.name || 'My ICP',
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save to icpProfiles collection
       await setDoc(
-        doc(db, 'users', user.uid, 'companyProfile', 'current'),
-        {
-          ...profile,
-          updatedAt: new Date().toISOString()
-        }
+        doc(db, 'users', user.uid, 'icpProfiles', selectedICPId),
+        updatedProfile
       );
+
+      // Sync the first ICP to legacy companyProfile/current for backwards compat
+      const isFirstICP = icpList.length === 0 || icpList[0].id === selectedICPId;
+      if (isFirstICP) {
+        await setDoc(
+          doc(db, 'users', user.uid, 'companyProfile', 'current'),
+          updatedProfile
+        );
+      }
+
+      // Update local list
+      setIcpList(prev => prev.map(i => i.id === selectedICPId ? { ...i, ...updatedProfile } : i));
+      setProfile(updatedProfile);
 
       // Recalculate all company scores with new weights
       if (profile.scoringWeights) {
-        await recalculateAllScores(user.uid, profile, profile.scoringWeights);
+        await recalculateAllScores(user.uid, updatedProfile, updatedProfile.scoringWeights);
       }
 
       setSaveSuccess(true);
@@ -165,7 +269,8 @@ export default function ICPSettings() {
         body: JSON.stringify({
           userId: user.uid,
           authToken,
-          companyProfile: profile
+          companyProfile: profile,
+          icpId: selectedICPId
         })
       });
 
@@ -312,10 +417,57 @@ export default function ICPSettings() {
 
   return (
     <div className="icp-settings">
+      {/* Multi-ICP Selector */}
+      <div className="icp-profile-selector">
+        <div className="icp-tabs-row">
+          {icpList.map(icp => (
+            <div
+              key={icp.id}
+              className={`icp-profile-tab ${selectedICPId === icp.id ? 'icp-profile-tab--active' : ''}`}
+              onClick={() => selectICP(icp)}
+            >
+              {selectedICPId === icp.id && editingName ? (
+                <input
+                  className="icp-name-input"
+                  value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  onBlur={handleRenameICP}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRenameICP(); if (e.key === 'Escape') { setEditingName(false); setNameInput(icp.name || 'My ICP'); } }}
+                  autoFocus
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="icp-tab-name"
+                  onDoubleClick={e => { e.stopPropagation(); if (selectedICPId === icp.id) { setEditingName(true); setNameInput(icp.name || 'My ICP'); } }}
+                  title={selectedICPId === icp.id ? 'Double-click to rename' : ''}
+                >
+                  {icp.name || 'My ICP'}
+                </span>
+              )}
+              {icpList.length > 1 && selectedICPId === icp.id && !editingName && (
+                <button
+                  className="icp-tab-delete"
+                  onClick={e => { e.stopPropagation(); handleDeleteICP(icp.id); }}
+                  title="Delete this ICP"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+          <button className="icp-add-tab-btn" onClick={handleCreateICP} title="Add new ICP">
+            + New ICP
+          </button>
+        </div>
+      </div>
+
       {/* Enterprise Header */}
       <div className="enterprise-header">
         <div className="header-content">
-          <h1 className="page-title">ICP Settings</h1>
+          <h1 className="page-title">
+            {icpList.find(i => i.id === selectedICPId)?.name || 'ICP Settings'}
+          </h1>
           <p className="page-subtitle">Define and refine your Ideal Customer Profile criteria</p>
         </div>
         <div className="header-actions">

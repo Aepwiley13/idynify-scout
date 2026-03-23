@@ -4,7 +4,7 @@
  * UI: idynify-v5 design with theme tokens.
  * Data: Firebase Firestore + Apollo (all original wiring preserved).
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import {
@@ -15,7 +15,7 @@ import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, Mess
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
-import { getScoreBreakdown, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore } from '../../utils/icpScoring';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
@@ -1402,6 +1402,12 @@ export default function DailyLeads({ onNavigate }) {
   const [icpProfile, setIcpProfile] = useState(null);
   const [icpWeights, setIcpWeights] = useState(DEFAULT_WEIGHTS);
 
+  // ── Multi-ICP support ────────────────────────────────────────────────────────
+  const [icpList, setIcpList] = useState([]);
+  const [activeICPId, setActiveICPId] = useState(null);
+  // Store the full company list (unfiltered by ICP) for re-scoring
+  const allCompaniesRef = useRef([]);
+
   // ── Session stats ────────────────────────────────────────────────────────────
   const [sessionReviewed, setSessionReviewed] = useState(0);
   const [sessionSaved, setSessionSaved] = useState(0);
@@ -1497,20 +1503,55 @@ export default function DailyLeads({ onNavigate }) {
       const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
 
+      // Load all ICP profiles for tab switching
+      const icpProfilesSnap = await getDocs(collection(db, 'users', user.uid, 'icpProfiles'));
+      let icps = icpProfilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
       // Load ICP profile (for score breakdown + Barry panel)
       const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
       const profileDoc = await getDoc(profileRef);
-      if (!profileDoc.exists()) { setLoading(false); return; }
-      const profile = profileDoc.data();
-      setIcpProfile(profile);
-      if (profile.scoringWeights) setIcpWeights(profile.scoringWeights);
+      if (!profileDoc.exists() && icps.length === 0) { setLoading(false); return; }
+
+      let activeProfile = profileDoc.exists() ? profileDoc.data() : null;
+
+      // If we have icpProfiles, use the first one as active ICP
+      if (icps.length > 0) {
+        setIcpList(icps);
+        const firstICP = icps[0];
+        setActiveICPId(firstICP.id);
+        activeProfile = firstICP;
+      }
+
+      if (activeProfile) {
+        setIcpProfile(activeProfile);
+        if (activeProfile.scoringWeights) setIcpWeights(activeProfile.scoringWeights);
+      } else {
+        setLoading(false);
+        return;
+      }
 
       const companiesRef = collection(db, 'users', user.uid, 'companies');
       const q = query(companiesRef, where('status', '==', 'pending'));
       const snapshot = await getDocs(q);
-      const companiesData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      companiesData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
-      setCompanies(companiesData);
+      const allPendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter to companies for the active ICP. Companies with no icpId are legacy (show for all ICPs).
+      const activeId = icps.length > 0 ? icps[0].id : null;
+      const companiesData = activeId
+        ? allPendingData.filter(c => !c.icpId || c.icpId === activeId)
+        : allPendingData;
+
+      // Score companies against active ICP
+      const scoredData = companiesData.map(c => ({
+        ...c,
+        fit_score: calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS),
+      }));
+      scoredData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
+
+      // Save the full unfiltered pool so ICP switching can re-filter without re-fetching
+      allCompaniesRef.current = allPendingData;
+      setCompanies(scoredData);
       setCurrentIndex(0);
 
       const acceptedQuery = query(companiesRef, where('status', '==', 'accepted'));
@@ -1565,13 +1606,19 @@ export default function DailyLeads({ onNavigate }) {
     setRefreshMessage('Barry is finding new targets...');
     try {
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      if (!profileDoc.exists()) {
-        setRefreshMessage('Set up your ICP first to find targets.');
-        setIsRefreshing(false);
-        return;
+
+      // Use the active ICP profile from state (multi-ICP aware), fall back to legacy profile
+      if (!icpProfile) {
+        const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+        const profileDoc = await getDoc(profileRef);
+        if (!profileDoc.exists()) {
+          setRefreshMessage('Set up your ICP first to find targets.');
+          setIsRefreshing(false);
+          return;
+        }
       }
+      const searchProfile = icpProfile;
+
       // Timeout after 25s — Netlify functions have a 26s limit
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 25000);
@@ -1582,7 +1629,7 @@ export default function DailyLeads({ onNavigate }) {
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: profileDoc.data() }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: activeICPId }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1613,6 +1660,28 @@ export default function DailyLeads({ onNavigate }) {
     }
   };
 
+  // ── ICP Switching ─────────────────────────────────────────────────────────
+  const handleICPSwitch = useCallback((icpId) => {
+    if (icpId === activeICPId) return;
+    const selectedICP = icpList.find(i => i.id === icpId);
+    if (!selectedICP) return;
+
+    setActiveICPId(icpId);
+    setIcpProfile(selectedICP);
+    setIcpWeights(selectedICP.scoringWeights || DEFAULT_WEIGHTS);
+
+    // Filter to companies for the selected ICP (legacy companies with no icpId show for all)
+    const base = allCompaniesRef.current.length > 0 ? allCompaniesRef.current : companies;
+    const filtered = base.filter(c => !c.icpId || c.icpId === icpId);
+    const rescored = filtered.map(c => ({
+      ...c,
+      fit_score: calculateICPScore(c, selectedICP, selectedICP.scoringWeights || DEFAULT_WEIGHTS),
+    }));
+    rescored.sort((a, b) => b.fit_score - a.fit_score);
+    setCompanies(rescored);
+    setCurrentIndex(0);
+  }, [activeICPId, icpList, companies]);
+
   const handleSwipe = async (direction, feedback = null) => {
     const user = getEffectiveUser();
     if (!user) return;
@@ -1631,6 +1700,7 @@ export default function DailyLeads({ onNavigate }) {
         status: direction === 'right' ? 'accepted' : 'rejected',
         swipedAt: new Date().toISOString(),
         swipeDirection: direction,
+        ...(activeICPId ? { swipedForICPId: activeICPId } : {}),
         ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
         ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
       });
@@ -2094,7 +2164,9 @@ export default function DailyLeads({ onNavigate }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDesktop ? 16 : 14 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Lead Insights</h2>
-            <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>AI-curated prospects matching your ICP</p>
+            <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
+              AI-curated prospects matching {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
+            </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {isDesktop && (
@@ -2135,6 +2207,33 @@ export default function DailyLeads({ onNavigate }) {
             {refreshMessage}
           </div>
         )}
+        {/* ICP tab bar — shown when user has multiple ICPs */}
+        {icpList.length > 1 && (
+          <div style={{
+            display: 'flex', gap: 6, marginBottom: 10,
+            overflowX: 'auto', paddingBottom: 2,
+            msOverflowStyle: 'none', scrollbarWidth: 'none',
+          }}>
+            {icpList.map(icp => (
+              <button
+                key={icp.id}
+                onClick={() => handleICPSwitch(icp.id)}
+                style={{
+                  padding: '5px 14px', borderRadius: 20,
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
+                  background: activeICPId === icp.id ? T.accentBg : T.surface,
+                  color: activeICPId === icp.id ? BRAND.pink : T.textMuted,
+                  transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {icp.name || 'ICP'}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Tab switcher */}
         <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${T.border}` }}>
           {[['companies', 'Companies'], ['people', 'People']].map(([id, label]) => (

@@ -40,8 +40,9 @@ function calculateIndustryMatch(companyIndustry, icpIndustries) {
     return 0;
   }
 
-  // Exact match = 100%, else 0
-  return icpIndustries.includes(companyIndustry) ? 100 : 0;
+  // Case-insensitive exact match = 100%, else 0
+  const normalized = companyIndustry.toLowerCase().trim();
+  return icpIndustries.some(i => i.toLowerCase().trim() === normalized) ? 100 : 0;
 }
 
 /**

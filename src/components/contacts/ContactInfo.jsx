@@ -1,6 +1,10 @@
-import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase, Globe, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { Mail, Phone, Linkedin, MapPin, Building2, Briefcase, Globe, Lock, Plus, Check, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { useSubscription } from '../../hooks/useSubscription';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 import './ContactInfo.css';
 
 const LABEL_PILL_COLORS = {
@@ -10,6 +14,9 @@ const LABEL_PILL_COLORS = {
   home:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)'  },
   other:    { color: '#6b7280', bg: 'rgba(107,114,128,0.10)' },
 };
+
+const EMAIL_LABEL_OPTIONS = ['work', 'personal', 'other'];
+const PHONE_LABEL_OPTIONS = ['mobile', 'work', 'home', 'other'];
 
 function LabelPill({ label }) {
   const c = LABEL_PILL_COLORS[label] || LABEL_PILL_COLORS.other;
@@ -45,8 +52,59 @@ function PhoneLockedBadge() {
   );
 }
 
-export default function ContactInfo({ contact, mode = 'compact' }) {
+function InlineAddField({ type, labelOptions, onSave, onCancel }) {
+  const [value, setValue] = useState('');
+  const [label, setLabel] = useState(labelOptions[0]);
+
+  const placeholder = type === 'email' ? 'email@example.com' : '+1 (555) 123-4567';
+
+  return (
+    <div className="inline-add-field">
+      <select
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        className="inline-add-label-select"
+      >
+        {labelOptions.map(l => (
+          <option key={l} value={l}>{l}</option>
+        ))}
+      </select>
+      <input
+        type={type === 'email' ? 'email' : 'tel'}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        className="inline-add-input"
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && value.trim()) onSave(value.trim(), label);
+          if (e.key === 'Escape') onCancel();
+        }}
+      />
+      <button
+        className="inline-add-save"
+        onClick={() => value.trim() && onSave(value.trim(), label)}
+        disabled={!value.trim()}
+        title="Save"
+      >
+        <Check size={14} />
+      </button>
+      <button
+        className="inline-add-cancel"
+        onClick={onCancel}
+        title="Cancel"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+export default function ContactInfo({ contact, mode = 'compact', onUpdate }) {
   const { isProTier } = useSubscription();
+  const [addingEmail, setAddingEmail] = useState(false);
+  const [addingPhone, setAddingPhone] = useState(false);
+
   // Build email entries from multi-field array or primary field
   const emailEntries = (contact.emails && contact.emails.length > 0)
     ? contact.emails
@@ -76,6 +134,38 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
     return <span className={`email-status ${badge.className}`}>{badge.text}</span>;
   }
 
+  async function handleAddEmail(value, label) {
+    const user = getEffectiveUser();
+    if (!user) return;
+
+    const newEmails = [...emailEntries, { value, label }];
+    const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+
+    try {
+      await updateDoc(contactRef, { emails: newEmails });
+      setAddingEmail(false);
+      if (onUpdate) onUpdate({ ...contact, emails: newEmails });
+    } catch (err) {
+      console.error('Failed to add email:', err);
+    }
+  }
+
+  async function handleAddPhone(value, label) {
+    const user = getEffectiveUser();
+    if (!user) return;
+
+    const newPhones = [...phoneEntries, { value, label }];
+    const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
+
+    try {
+      await updateDoc(contactRef, { phones: newPhones });
+      setAddingPhone(false);
+      if (onUpdate) onUpdate({ ...contact, phones: newPhones });
+    } catch (err) {
+      console.error('Failed to add phone:', err);
+    }
+  }
+
   // For compact mode - used in snapshot
   if (mode === 'compact') {
     return (
@@ -96,6 +186,18 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
               )) : (
                 <span className="info-value-unavailable">Email not available</span>
               )}
+              {addingEmail ? (
+                <InlineAddField
+                  type="email"
+                  labelOptions={EMAIL_LABEL_OPTIONS}
+                  onSave={handleAddEmail}
+                  onCancel={() => setAddingEmail(false)}
+                />
+              ) : (
+                <button className="inline-add-trigger" onClick={() => setAddingEmail(true)}>
+                  <Plus size={12} /> add email
+                </button>
+              )}
             </div>
           </div>
 
@@ -105,13 +207,29 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
             <div className="info-content-compact" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
               {!isProTier ? (
                 <PhoneLockedBadge />
-              ) : phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <LabelPill label={p.label} />
-                  <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
-                </div>
-              )) : (
-                <span className="info-value-unavailable">Phone not available</span>
+              ) : (
+                <>
+                  {phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <LabelPill label={p.label} />
+                      <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
+                    </div>
+                  )) : (
+                    <span className="info-value-unavailable">Phone not available</span>
+                  )}
+                  {addingPhone ? (
+                    <InlineAddField
+                      type="phone"
+                      labelOptions={PHONE_LABEL_OPTIONS}
+                      onSave={handleAddPhone}
+                      onCancel={() => setAddingPhone(false)}
+                    />
+                  ) : (
+                    <button className="inline-add-trigger" onClick={() => setAddingPhone(true)}>
+                      <Plus size={12} /> add phone
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -226,6 +344,18 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
             )) : (
               <span className="info-value-unavailable">Not available</span>
             )}
+            {addingEmail ? (
+              <InlineAddField
+                type="email"
+                labelOptions={EMAIL_LABEL_OPTIONS}
+                onSave={handleAddEmail}
+                onCancel={() => setAddingEmail(false)}
+              />
+            ) : (
+              <button className="inline-add-trigger" onClick={() => setAddingEmail(true)}>
+                <Plus size={12} /> add email
+              </button>
+            )}
           </div>
         </div>
 
@@ -238,13 +368,29 @@ export default function ContactInfo({ contact, mode = 'compact' }) {
             <span className="info-label">Phone</span>
             {!isProTier ? (
               <PhoneLockedBadge />
-            ) : phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <LabelPill label={p.label} />
-                <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
-              </div>
-            )) : (
-              <span className="info-value-unavailable">Not available</span>
+            ) : (
+              <>
+                {phoneEntries.length > 0 ? phoneEntries.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <LabelPill label={p.label} />
+                    <a href={`tel:${p.value}`} className="info-value-link">{p.value}</a>
+                  </div>
+                )) : (
+                  <span className="info-value-unavailable">Not available</span>
+                )}
+                {addingPhone ? (
+                  <InlineAddField
+                    type="phone"
+                    labelOptions={PHONE_LABEL_OPTIONS}
+                    onSave={handleAddPhone}
+                    onCancel={() => setAddingPhone(false)}
+                  />
+                ) : (
+                  <button className="inline-add-trigger" onClick={() => setAddingPhone(true)}>
+                    <Plus size={12} /> add phone
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

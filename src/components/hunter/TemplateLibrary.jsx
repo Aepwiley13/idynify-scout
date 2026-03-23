@@ -19,6 +19,76 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
  * Non-automation: Templates are suggestions. User reviews/edits before sending.
  */
 
+const STARTER_TEMPLATES = [
+  {
+    icon: '🤝',
+    name: 'Thank You + Get Started',
+    subject: 'Great connecting — here\'s how to get started',
+    body: `Hi [FirstName],
+
+Thank you so much for taking the time to meet with me — really enjoyed our conversation and I'm excited about what we can do together.
+
+As promised, here's how you can get started:
+
+1. [Step 1 — e.g., Create your account at [link]]
+2. [Step 2 — e.g., Schedule your onboarding call]
+3. [Step 3 — e.g., Invite your team members]
+
+If you have any questions along the way, don't hesitate to reach out. I'm here to make sure you get the most out of this.
+
+Looking forward to working together!
+
+[Your Name]`,
+    intent: 'onboarding',
+  },
+  {
+    icon: '🎯',
+    name: 'Post-Meeting Follow-Up',
+    subject: 'Great meeting today — next steps',
+    body: `Hi [FirstName],
+
+Great meeting today — really appreciated you walking me through [topic discussed]. A few quick takeaways and next steps from our conversation:
+
+- [Key takeaway 1]
+- [Key takeaway 2]
+- [Action item / next step]
+
+I'll [your next action] by [date]. Let me know if anything changes on your end.
+
+Talk soon,
+[Your Name]`,
+    intent: 'followup',
+  },
+  {
+    icon: '👋',
+    name: 'Warm Introduction',
+    subject: 'Quick intro — [reason]',
+    body: `Hi [FirstName],
+
+Great seeing you at [event/context]. I've been working on [what you do] and I think you'd find it really relevant to [their pain point].
+
+Would love to grab 15 minutes to show you what we're building. What does your calendar look like next week?
+
+[Your Name]`,
+    intent: 'warm',
+  },
+  {
+    icon: '🔄',
+    name: 'Re-engage / Check In',
+    subject: 'Checking in — [topic]',
+    body: `Hi [FirstName],
+
+It's been a little while since we last connected and I wanted to check in. Hope things are going well with [their company/project].
+
+[New update, value-add, or reason to reconnect]
+
+Would love to catch up if you have a few minutes this week.
+
+[Your Name]`,
+    intent: 'followup',
+  },
+];
+
 export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +220,27 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
           <FileText className="w-12 h-12 text-gray-400 mb-3" />
           <p className="text-gray-500">No templates yet</p>
           <p className="text-sm text-gray-400">Create your first template to speed up campaign creation</p>
+
+          {/* Suggested starter templates */}
+          <div className="template-starters">
+            <p className="template-starters-label">Quick start — click to create:</p>
+            <div className="template-starters-grid">
+              {STARTER_TEMPLATES.map((st, i) => (
+                <button
+                  key={i}
+                  className="template-starter-chip"
+                  data-intent={st.intent}
+                  onClick={() => {
+                    setNewTemplate(st);
+                    setShowCreateModal(true);
+                  }}
+                >
+                  <span className="template-starter-icon">{st.icon}</span>
+                  <span>{st.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="template-library-grid">
@@ -229,6 +320,8 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent }) {
                   <option value="warm">Warm</option>
                   <option value="hot">Hot</option>
                   <option value="followup">Follow-up</option>
+                  <option value="thank_you">Thank You</option>
+                  <option value="onboarding">Onboarding / Get Started</option>
                 </select>
               </div>
 

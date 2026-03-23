@@ -925,6 +925,66 @@ export default function BarryChatPanel({ userId }) {
     setMode(next);
   };
 
+  // ── Send email directly from angle block ─────────────────────────────────
+
+  const handleSendEmail = async (subject, message, contactId) => {
+    const user = getEffectiveUser();
+    if (!user) return { success: false, error: 'no_user' };
+
+    // Look up contact email
+    let contactEmail = null;
+    let contactName = null;
+    try {
+      const contactSnap = await getDoc(doc(db, 'users', userId, 'contacts', contactId));
+      if (contactSnap.exists()) {
+        const data = contactSnap.data();
+        contactEmail = data.email || null;
+        contactName = data.name || data.first_name || null;
+      }
+    } catch (_) {}
+
+    if (!contactEmail) return { success: false, error: 'no_email' };
+
+    const authToken = await user.getIdToken();
+    const res = await fetch('/.netlify/functions/barryActions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        authToken,
+        confirm: true,
+        pendingAction: {
+          action_type: 'gmail_send',
+          parameters: {
+            to_email: contactEmail,
+            to_name: contactName,
+            subject,
+            body: message
+          }
+        }
+      })
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      // Check if Gmail not connected
+      if (data.error?.includes('not_connected') || data.error?.includes('OAuth')) {
+        return { success: false, error: 'not_connected' };
+      }
+      return { success: false, error: data.error || 'send_failed' };
+    }
+
+    // Show success in chat
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: `Email sent to ${contactName || contactEmail}. Check your sent folder to confirm delivery.`,
+      has_message_angles: false,
+      angles: []
+    }]);
+
+    return { success: true };
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const modeConfig = MODE_CONFIG[mode] || MODE_CONFIG.SUGGEST;
@@ -1048,7 +1108,7 @@ export default function BarryChatPanel({ userId }) {
               <div
                 ref={threadRef}
                 className="px-5 py-4 overflow-y-auto flex flex-col gap-3"
-                style={{ maxHeight: '40vh' }}
+                style={{ maxHeight: '65vh' }}
                 aria-live="polite"
                 aria-label="Conversation with Barry"
               >
@@ -1289,6 +1349,7 @@ export default function BarryChatPanel({ userId }) {
                             angles={msg.angles}
                             contactId={msg.contact_id}
                             userId={userId}
+                            onSendEmail={handleSendEmail}
                             onLoaded={(result) => {
                               if (result.created) {
                                 setMessages(prev => [...prev, {

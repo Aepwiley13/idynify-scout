@@ -149,8 +149,31 @@
   color: #f9fafb;
 }
 
-.mab-hunter-btn {
+.mab-send-btn {
   flex: 1;
+  padding: 0.45rem 0.875rem;
+  font-size: 0.72rem;
+  font-family: inherit;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 0.5rem;
+  color: #6ee7b7;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.mab-send-btn:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.mab-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mab-hunter-btn {
   padding: 0.45rem 0.875rem;
   font-size: 0.72rem;
   font-family: inherit;

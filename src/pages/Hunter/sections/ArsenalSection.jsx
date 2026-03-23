@@ -3,10 +3,10 @@ import TemplateLibrary from '../../../components/hunter/TemplateLibrary';
 import './ArsenalSection.css';
 
 /**
- * HUNTER WEAPON ROOM - Arsenal Section
+ * ARSENAL - Message Templates Library
  *
- * Purpose: Manage message templates
- * Philosophy: Central template repository organized by type/intent
+ * Stage-organized template management with Barry AI generation.
+ * Templates are grouped by pipeline stage (Scout, Hunter, Sniper, Basecamp, Fallback).
  */
 
 export default function ArsenalSection() {
@@ -16,14 +16,14 @@ export default function ArsenalSection() {
         <div>
           <h2 className="section-title">Message Arsenal</h2>
           <p className="section-description">
-            Save and reuse proven message templates
+            Save and reuse proven message templates — organized by pipeline stage
           </p>
         </div>
       </div>
 
       <div className="arsenal-content">
         <TemplateLibrary
-          onSelectTemplate={null} // No selection in Arsenal view - just management
+          onSelectTemplate={null}
           selectedIntent={null}
         />
       </div>

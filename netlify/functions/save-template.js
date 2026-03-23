@@ -50,6 +50,7 @@ exports.handler = async (event) => {
       subject: template.subject,
       body: template.body,
       intent: template.intent,
+      stage: template.stage || 'hunter', // scout | hunter | sniper | basecamp | fallback
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };

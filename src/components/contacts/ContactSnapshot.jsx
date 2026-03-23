@@ -79,7 +79,7 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
           />
 
           {/* Contact Information (Compact) */}
-          <ContactInfo contact={contact} mode="compact" />
+          <ContactInfo contact={contact} mode="compact" onUpdate={handleContactUpdate} />
 
           {/* Barry Context (Preview) */}
           <BarryContext

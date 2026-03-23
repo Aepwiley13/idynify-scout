@@ -174,3 +174,17 @@
   max-width: 100%;
   width: 100%;
 }
+
+/* ── Dark Mode Overrides ─────────────────────────────────────── */
+body.theme-dark .follow-up-card-barry-note {
+  background: rgba(139, 92, 246, 0.10);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+body.theme-dark .follow-up-barry-text {
+  color: #c8bce0;
+}
+
+body.theme-dark .follow-up-card-type-label {
+  color: #a78bfa;
+}

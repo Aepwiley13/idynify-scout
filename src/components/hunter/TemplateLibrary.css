@@ -1,4 +1,4 @@
-/* HUNTER PHASE 2: Template Library Styles */
+/* ARSENAL: Template Library — Stage-Organized */
 
 .template-library {
   background: var(--bg-card);
@@ -17,7 +17,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .template-library-title {
@@ -52,6 +52,61 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }
+
+/* ── Stage Tabs ──────────────────────────────────────────────── */
+
+.template-stage-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 1.5rem;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.template-stage-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.template-stage-tab:hover:not(.active) {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.template-stage-tab.active {
+  border-color: var(--tab-color);
+  font-weight: 700;
+}
+
+.template-stage-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--bg-card);
+  color: var(--text-faint);
+}
+
+/* ── Template Grid ───────────────────────────────────────────── */
 
 .template-library-empty {
   display: flex;
@@ -94,6 +149,23 @@
   flex: 1;
 }
 
+.template-card-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.template-stage-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .template-intent-badge {
   display: inline-block;
   padding: 0.25rem 0.625rem;
@@ -124,10 +196,27 @@
   color: #a855f7;
 }
 
+.template-intent-badge[data-intent="thank_you"] {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.template-intent-badge[data-intent="onboarding"] {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
 .template-name {
   font-weight: 600;
   color: var(--text-primary);
   font-size: 0.9375rem;
+}
+
+.template-date {
+  font-size: 0.75rem;
+  color: var(--text-faint);
 }
 
 .btn-delete-template {
@@ -185,7 +274,31 @@
   color: #7c3aed;
 }
 
-/* Template Modal */
+/* ── Ask Barry Empty State Button ────────────────────────────── */
+
+.btn-ask-barry-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1.25rem;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, var(--barry-color, #8b5cf6), #ec4899);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-ask-barry-empty:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(236, 72, 153, 0.3);
+}
+
+/* ── Template Modal ──────────────────────────────────────────── */
+
 .template-modal-overlay {
   position: fixed;
   top: 0;
@@ -210,13 +323,18 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: max-width 0.25s ease;
+}
+
+.template-modal-wide {
+  max-width: 960px;
 }
 
 .template-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1.5px solid var(--border);
 }
 
@@ -225,6 +343,32 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+.template-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-ask-barry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-ask-barry:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
 }
 
 .btn-close-modal {
@@ -242,10 +386,17 @@
   color: var(--text-primary);
 }
 
+.template-modal-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
 .template-modal-body {
   padding: 1.5rem;
   overflow-y: auto;
   flex: 1;
+  min-width: 0;
 }
 
 .form-group {
@@ -290,7 +441,7 @@
 .template-modal-footer {
   display: flex;
   gap: 0.75rem;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-top: 1.5px solid var(--border);
 }
 
@@ -334,7 +485,8 @@
   cursor: not-allowed;
 }
 
-/* ── Starter Templates ─────────────────────────────────────── */
+/* ── Starter Templates ───────────────────────────────────────── */
+
 .template-starters {
   margin-top: 1.5rem;
   width: 100%;
@@ -380,15 +532,212 @@
   font-size: 15px;
 }
 
-/* Intent badge colors for new intents */
-.template-intent-badge[data-intent="thank_you"] {
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+/* ── Barry Template Builder Panel ────────────────────────────── */
+
+.barry-template-panel {
+  width: 380px;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1.5px solid var(--border);
+  background: var(--bg-secondary);
 }
 
-.template-intent-badge[data-intent="onboarding"] {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+.barry-template-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.barry-template-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.barry-avatar-mini {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.barry-template-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+  display: block;
+  line-height: 1.2;
+}
+
+.barry-template-mode {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  display: block;
+}
+
+.btn-close-barry {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.btn-close-barry:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.barry-template-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.barry-template-msg {
+  display: flex;
+}
+
+.barry-template-msg.barry {
+  justify-content: flex-start;
+}
+
+.barry-template-msg.user {
+  justify-content: flex-end;
+}
+
+.barry-template-bubble {
+  max-width: 88%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.barry-template-msg.barry .barry-template-bubble {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 14px 4px;
+}
+
+.barry-template-msg.user .barry-template-bubble {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  color: white;
+  border-radius: 14px 14px 4px 14px;
+}
+
+.barry-template-system {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+  padding: 6px 12px;
+  background: rgba(34, 197, 94, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.barry-spinner {
+  animation: barrySpin 1s linear infinite;
+}
+
+@keyframes barrySpin {
+  to { transform: rotate(360deg); }
+}
+
+.barry-template-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.barry-template-input {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  resize: none;
+  min-height: 38px;
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.4;
+  outline: none;
+}
+
+.barry-template-input:focus {
+  border-color: #8b5cf6;
+}
+
+.barry-template-send {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.15s;
+}
+
+.barry-template-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .template-stage-tabs {
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .template-stage-tab {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .template-stage-tab span:not(.template-stage-count) {
+    display: none;
+  }
+
+  .template-library-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .template-modal-wide {
+    max-width: 100%;
+  }
+
+  .template-modal-content {
+    flex-direction: column;
+  }
+
+  .barry-template-panel {
+    width: 100%;
+    min-width: unset;
+    max-height: 300px;
+    border-right: none;
+    border-bottom: 1.5px solid var(--border);
+  }
 }

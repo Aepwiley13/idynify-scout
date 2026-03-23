@@ -16,6 +16,98 @@
 }
 
 /* ========================================
+   MULTI-ICP PROFILE SELECTOR
+   ======================================== */
+.icp-profile-selector {
+  margin-bottom: 1.5rem;
+}
+
+.icp-tabs-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.icp-profile-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border-color, #e5e7eb);
+  background: var(--bg-secondary, #f9fafb);
+  color: var(--text-muted, #6b7280);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.icp-profile-tab:hover {
+  border-color: #e91e8c;
+  color: #e91e8c;
+}
+
+.icp-profile-tab--active {
+  border-color: #e91e8c !important;
+  background: rgba(233, 30, 140, 0.08) !important;
+  color: #e91e8c !important;
+}
+
+.icp-tab-name {
+  cursor: pointer;
+}
+
+.icp-tab-delete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.icp-tab-delete:hover {
+  opacity: 1;
+}
+
+.icp-name-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e91e8c;
+  width: 120px;
+  padding: 0;
+}
+
+.icp-add-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px dashed var(--border-color, #e5e7eb);
+  background: transparent;
+  color: var(--text-muted, #6b7280);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icp-add-tab-btn:hover {
+  border-color: #e91e8c;
+  color: #e91e8c;
+  background: rgba(233, 30, 140, 0.05);
+}
+
+/* ========================================
    ENTERPRISE HEADER
    ======================================== */
 .enterprise-header {

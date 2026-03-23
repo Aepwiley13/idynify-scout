@@ -92,7 +92,7 @@ function BarryAvatar({ size = 28, style = {} }) {
 }
 
 // ─── ThemePicker ──────────────────────────────────────────────────────────────
-function ThemePicker() {
+function ThemePicker({ dropUp = true }) {
   const T = useT();
   const { themeId, setThemeId } = useThemeCtx();
   const [open, setOpen] = useState(false);
@@ -113,7 +113,7 @@ function ThemePicker() {
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            position: 'absolute', bottom: 42, left: 0, width: 226,
+            position: 'absolute', ...(dropUp ? { bottom: 42 } : { top: 42 }), left: 0, width: 226,
             background: T.cardBg, border: `1px solid ${T.border2}`,
             borderRadius: 14, padding: 14,
             boxShadow: `0 20px 60px ${T.isDark ? '#00000099' : '#00000020'}`,
@@ -421,7 +421,7 @@ function PeopleShellInner({ user }) {
               Command Center
             </div>
             <NotificationCenter userId={user?.uid} T={T} />
-            <ThemePicker />
+            <ThemePicker dropUp={false} />
             <div
               onClick={() => navigate('/settings')}
               title="Settings"

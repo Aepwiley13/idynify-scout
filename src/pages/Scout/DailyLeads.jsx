@@ -643,7 +643,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
 }
 
 // ─── QueueListPanel ───────────────────────────────────────────────────────────
-function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose }) {
+function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose, mobile = false }) {
   const T = useT();
   const upcoming = companies.slice(currentIndex);
   const skipped = companies.filter(c => skippedIds.includes(c.id));
@@ -656,6 +656,94 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
       </span>
     );
   };
+
+  if (mobile) {
+    // Bottom-sheet overlay for mobile
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          onClick={onClose}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 490,
+            background: 'rgba(0,0,0,0.45)',
+            animation: 'fadeIn 0.18s ease',
+          }}
+        />
+        {/* Sheet */}
+        <div style={{
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 500,
+          background: T.cardBg, borderTop: `1px solid ${T.border}`,
+          borderRadius: '16px 16px 0 0',
+          display: 'flex', flexDirection: 'column',
+          maxHeight: '70vh',
+          boxShadow: `0 -8px 32px ${T.isDark ? '#00000060' : '#00000018'}`,
+          animation: 'slideUpSheet 0.22s ease',
+        }}>
+          {/* Drag handle */}
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: T.border2 }} />
+          </div>
+          {/* Header */}
+          <div style={{ padding: '8px 18px 10px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>Queue</div>
+              <div style={{ fontSize: 10, color: T.textFaint }}>{upcoming.length} remaining</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 20, lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 16 }}>
+            <div style={{ padding: '8px 0' }}>
+              {upcoming.map((co, i) => (
+                <div
+                  key={co.id}
+                  onClick={() => { onJumpTo(currentIndex + i); onClose(); }}
+                  style={{
+                    padding: '9px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                    borderBottom: `1px solid ${T.border}`,
+                    background: i === 0 ? T.accentBg : 'transparent',
+                  }}
+                >
+                  <div style={{ fontSize: 18, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {i === 0 && '▶ '}{co.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.industry || '—'}</div>
+                  </div>
+                  <ScorePip score={co.fit_score || co.score || 0} />
+                </div>
+              ))}
+              {upcoming.length === 0 && (
+                <div style={{ padding: '24px 18px', textAlign: 'center', color: T.textFaint, fontSize: 12 }}>Queue is empty</div>
+              )}
+            </div>
+            {skipped.length > 0 && (
+              <>
+                <div style={{ padding: '8px 18px 4px', fontSize: 9, letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
+                  SKIPPED THIS SESSION
+                </div>
+                {skipped.map(co => (
+                  <div
+                    key={co.id}
+                    onClick={() => { const idx = companies.findIndex(c => c.id === co.id); if (idx >= 0) { onJumpTo(idx); onClose(); } }}
+                    style={{ padding: '9px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${T.border}`, opacity: 0.7 }}
+                  >
+                    <div style={{ fontSize: 16, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
+                      <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
+                    </div>
+                    <ScorePip score={co.fit_score || co.score || 0} />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div style={{
@@ -871,7 +959,7 @@ function buildInstantGreeting(icpProfile) {
 
 // ─── BarryICPPanel ────────────────────────────────────────────────────────────
 // Side panel version of ICP chat — user can see the card while chatting
-function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
+function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete, nudgeContext = null }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -952,8 +1040,11 @@ function BarryICPPanel({ userId, icpProfile, onClose, onSearchComplete }) {
       }
 
       if (!cancelled) {
-        // No prior history — show instant context-aware greeting (no API call needed)
-        setMessages([{ role: 'barry', content: buildInstantGreeting(icpProfile) }]);
+        // No prior history — use nudge context if available, else generic greeting
+        const greeting = nudgeContext
+          ? `I noticed ${nudgeContext.count} of your recent saves are ${nudgeContext.industry} companies. Want me to weight ${nudgeContext.industry} higher in your ICP? I can update your targeting now.`
+          : buildInstantGreeting(icpProfile);
+        setMessages([{ role: 'barry', content: greeting }]);
         setHistoryLoaded(true);
       }
     }
@@ -1432,6 +1523,7 @@ export default function DailyLeads({ onNavigate }) {
   // ── Barry nudge between swipes ───────────────────────────────────────────────
   const [nudgeData, setNudgeData] = useState(null);
   const [showNudge, setShowNudge] = useState(false);
+  const [barryNudgeContext, setBarryNudgeContext] = useState(null); // { industry, count }
 
   // ── Today's saved quick preview ──────────────────────────────────────────────
   const [savedTodayOpen, setSavedTodayOpen] = useState(false);
@@ -1453,6 +1545,8 @@ export default function DailyLeads({ onNavigate }) {
   const [batchSavedCompanies, setBatchSavedCompanies] = useState([]);
   const [showBatchEnd, setShowBatchEnd] = useState(false);
   const [showICPChat, setShowICPChat] = useState(false);
+  const [consecutiveZeroBatches, setConsecutiveZeroBatches] = useState(0);
+  const [feedbackImpactMsg, setFeedbackImpactMsg] = useState(null);
 
   // ── People Mode state ───────────────────────────────────────────────────────
   const [tab, setTab] = useState('companies');
@@ -1924,6 +2018,25 @@ export default function DailyLeads({ onNavigate }) {
 
   const handleNextBatch = async () => {
     const snapshot = [...batchSavedCompanies];
+    const thisBatchSaves = batchSaves;
+
+    // Track consecutive zero-match batches to surface feedback impact to user
+    if (thisBatchSaves === 0) {
+      const newConsecutive = consecutiveZeroBatches + 1;
+      setConsecutiveZeroBatches(newConsecutive);
+      if (newConsecutive >= 2) {
+        setFeedbackImpactMsg(`Barry has noted ${newConsecutive} batches with no matches — adjusting your targeting now.`);
+        setTimeout(() => setFeedbackImpactMsg(null), 6000);
+      }
+    } else {
+      // Reset streak when user saves at least one company
+      if (consecutiveZeroBatches >= 1) {
+        setFeedbackImpactMsg('Your saves are helping Barry sharpen your queue.');
+        setTimeout(() => setFeedbackImpactMsg(null), 4000);
+      }
+      setConsecutiveZeroBatches(0);
+    }
+
     resetBatch();
     // Advance to next card first (so the UI is responsive)
     if (currentIndex < companies.length - 1) setCurrentIndex(currentIndex + 1);
@@ -2123,6 +2236,52 @@ export default function DailyLeads({ onNavigate }) {
     );
   }
 
+  // ── ICP validation gate ─────────────────────────────────────────────────────
+  // Block entry to Daily Leads if no ICP is configured — prevents confusing zero-match experience
+  if (!icpProfile && icpList.length === 0) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 0, padding: '32px 24px' }}>
+        <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} } @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }`}</style>
+        <div style={{ maxWidth: 380, width: '100%', textAlign: 'center', animation: 'slideUp 0.3s ease' }}>
+          <BarryAvatar size={64} style={{ margin: '0 auto 20px' }} />
+          <div style={{ fontSize: 20, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+            Let's set up your ICP first
+          </div>
+          <p style={{ fontSize: 13, color: T.textFaint, lineHeight: 1.7, marginBottom: 28 }}>
+            Scout needs to know who you're targeting before it can curate your daily leads. Tell Barry who you're after and he'll take it from there.
+          </p>
+          <button
+            onClick={() => navigate('/recon')}
+            style={{
+              width: '100%', padding: '13px',
+              borderRadius: 12,
+              background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+              border: 'none', color: '#fff',
+              fontWeight: 700, fontSize: 14,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              marginBottom: 10,
+            }}
+          >
+            <MessageCircle size={16} />Talk to Barry
+          </button>
+          <button
+            onClick={() => navigate('/recon', { state: { skipBarry: true } })}
+            style={{
+              width: '100%', padding: '10px',
+              borderRadius: 12,
+              background: T.surface, border: `1px solid ${T.border2}`,
+              color: T.textMuted, fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            Set up manually instead
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
       {/* Streak milestone celebration */}
@@ -2205,6 +2364,18 @@ export default function DailyLeads({ onNavigate }) {
         {refreshMessage && (
           <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: 12 }}>
             {refreshMessage}
+          </div>
+        )}
+        {feedbackImpactMsg && !showBatchEnd && (
+          <div style={{
+            marginBottom: 10, padding: '8px 12px', borderRadius: 8,
+            background: T.accentBg, border: `1px solid ${T.accentBdr}`,
+            color: BRAND.pink, fontSize: 12,
+            display: 'flex', alignItems: 'center', gap: 7,
+            animation: 'slideUp 0.3s ease',
+          }}>
+            <BarryAvatar size={16} />
+            {feedbackImpactMsg}
           </div>
         )}
         {/* ICP tab bar — shown when user has multiple ICPs */}
@@ -2303,6 +2474,18 @@ export default function DailyLeads({ onNavigate }) {
               ) : showBatchEnd ? (
                 /* ── Batch end screen ───────────────────────────────────── */
                 <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%' }}>
+                  {feedbackImpactMsg && (
+                    <div style={{
+                      marginBottom: 16, padding: '10px 14px', borderRadius: 10,
+                      background: T.accentBg, border: `1px solid ${T.accentBdr}`,
+                      color: BRAND.pink, fontSize: 12, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      animation: 'slideUp 0.3s ease',
+                    }}>
+                      <BarryAvatar size={20} />
+                      {feedbackImpactMsg}
+                    </div>
+                  )}
                   <BarryAvatar size={52} style={{ margin: '0 auto 18px' }} />
                   {batchSaves === 0 ? (
                     <>
@@ -2416,7 +2599,7 @@ export default function DailyLeads({ onNavigate }) {
                       <BarryNudgeCard
                         industry={nudgeData.industry}
                         count={nudgeData.count}
-                        onAccept={() => { setShowNudge(false); if (onNavigate) onNavigate('icpsettings'); }}
+                        onAccept={() => { setShowNudge(false); setBarryNudgeContext(nudgeData); setBarryPanelOpen(true); }}
                         onDismiss={() => setShowNudge(false)}
                       />
                     )}
@@ -2665,29 +2848,72 @@ export default function DailyLeads({ onNavigate }) {
         />
       )}
 
-      {/* Barry ICP-aware side panel (manual trigger) */}
+      {/* Barry ICP-aware side panel (manual trigger or nudge) */}
       {barryPanelOpen && (
         <BarryICPPanel
           userId={auth.currentUser?.uid}
           icpProfile={icpProfile}
-          onClose={() => setBarryPanelOpen(false)}
+          nudgeContext={barryNudgeContext}
+          onClose={() => { setBarryPanelOpen(false); setBarryNudgeContext(null); }}
           onSearchComplete={() => {
             setBarryPanelOpen(false);
+            setBarryNudgeContext(null);
             loadTodayLeads();
           }}
         />
       )}
 
-      {/* Queue list panel */}
-      {queueListOpen && isDesktop && (
+      {/* Queue list panel — sidebar on desktop, bottom-sheet on mobile */}
+      {queueListOpen && (
         <QueueListPanel
           companies={companies}
           currentIndex={currentIndex}
           skippedIds={skippedInSession}
           onJumpTo={(idx) => setCurrentIndex(idx)}
           onClose={() => setQueueListOpen(false)}
+          mobile={!isDesktop}
         />
       )}
+
+      {/* Mobile queue FAB — floating button visible only on mobile during active swiping */}
+      {!isDesktop && !showBatchEnd && !showSessionSummary && companies.length > 0 && currentIndex < companies.length && tab === 'companies' && (
+        <button
+          onClick={() => setQueueListOpen(o => !o)}
+          style={{
+            position: 'fixed', bottom: 24, right: 16, zIndex: 480,
+            width: 44, height: 44, borderRadius: 22,
+            background: T.cardBg, border: `1.5px solid ${T.border2}`,
+            boxShadow: `0 4px 16px ${T.isDark ? '#00000060' : '#00000020'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <List size={16} color={T.textMuted} />
+          {companies.length - currentIndex > 0 && (
+            <span style={{
+              position: 'absolute', top: -4, right: -4,
+              background: BRAND.pink, color: '#fff',
+              fontSize: 9, fontWeight: 700,
+              borderRadius: 8, padding: '1px 5px',
+              minWidth: 16, textAlign: 'center',
+              border: `1.5px solid ${T.appBg}`,
+            }}>
+              {companies.length - currentIndex}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Keyframe animations */}
+      <style>{`
+        @keyframes slideUpSheet { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes feedbackFlipIn { from { opacity: 0; transform: scaleY(0.9); } to { opacity: 1; transform: scaleY(1); } }
+      `}</style>
     </div>
   );
 }

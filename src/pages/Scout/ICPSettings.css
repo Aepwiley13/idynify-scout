@@ -1030,11 +1030,39 @@
 
 @media (max-width: 768px) {
   .icp-settings {
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.875rem;
+  }
+
+  /* Stack title + refresh button vertically on mobile */
+  .enterprise-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    padding-top: 0;
+    flex-wrap: wrap;
+  }
+
+  .header-refresh-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .header-refresh-success {
+    white-space: normal;
+    font-size: 0.75rem;
   }
 
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.8125rem;
   }
 
   .summary-cards {
@@ -1080,12 +1108,22 @@
 }
 
 @media (max-width: 480px) {
+  .icp-settings {
+    padding: 0.875rem 0.75rem;
+  }
+
   .page-title {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .setting-section {
+    padding: 1rem;
+    border-radius: 12px;
   }
 
   .setting-section h3 {
-    font-size: 1.125rem;
+    font-size: 1rem;
   }
 
   .selected-item,

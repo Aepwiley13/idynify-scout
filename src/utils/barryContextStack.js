@@ -2,7 +2,7 @@
  * barryContextStack.js — Client-side context loader for Barry Mission Control.
  *
  * Loads the full data payload that Barry needs for every chat call:
- *   - Active contacts (from Hunter deck + active missions)
+ *   - All contacts (up to 500, regardless of mode/stage)
  *   - Active missions (status, steps, last outcome)
  *   - RECON data (confidence score + key sections)
  *
@@ -19,13 +19,12 @@ import {
 import { db, auth } from '../firebase/config';
 import { calculateReconConfidence } from './reconConfidence';
 
-async function getActiveContacts(userId) {
+async function getAllContacts(userId) {
   try {
     const snap = await getDocs(
       query(
         collection(db, 'users', userId, 'contacts'),
-        where('hunter_status', 'in', ['deck', 'active_mission', 'engaged_pending', 'stalled', 'cold']),
-        limit(60)
+        limit(500)
       )
     );
 
@@ -41,7 +40,7 @@ async function getActiveContacts(userId) {
         strategic_value: c.strategic_value || null,
         last_interaction: c.last_interaction_at || null,
         last_outcome: c.last_outcome || null,
-        hunter_status: c.hunter_status || 'deck',
+        hunter_status: c.hunter_status || null,
         active_mission_id: c.active_mission_id || null
       };
     });
@@ -188,7 +187,7 @@ export async function buildContextStack(userId) {
 
   try {
     const [contacts, missions, dashboardDoc, icpProfile] = await Promise.all([
-      getActiveContacts(userId),
+      getAllContacts(userId),
       getActiveMissions(userId),
       getDoc(doc(db, 'dashboards', userId)),
       getIcpProfile(userId)

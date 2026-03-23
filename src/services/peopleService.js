@@ -451,6 +451,7 @@ export async function archivePerson(userId, contactId, reason) {
   try {
     await updateDoc(doc(db, PEOPLE_PATHS.person(userId, contactId)), {
       is_archived: true,
+      status: 'people_mode_archived',
       archived_at: new Date().toISOString(),
       archived_reason: reason || 'other',
       updatedAt: new Date().toISOString()

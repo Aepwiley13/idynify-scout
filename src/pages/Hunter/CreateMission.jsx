@@ -51,6 +51,7 @@ export default function CreateMission() {
   const [missionData, setMissionData] = useState(null);
   const [allContacts, setAllContacts] = useState([]);
   const [selectedContactIds, setSelectedContactIds] = useState([]);
+  const [contactSearch, setContactSearch] = useState('');
   const [missionName, setMissionName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -815,31 +816,74 @@ export default function CreateMission() {
               </button>
             </div>
           ) : (
-            <div className="contacts-list">
-              {allContacts.map(contact => (
-                <div
-                  key={contact.id}
-                  className={`contact-item ${selectedContactIds.includes(contact.id) ? 'selected' : ''}`}
-                  onClick={() => toggleContactSelection(contact.id)}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedContactIds.includes(contact.id)}
-                    onChange={() => {}}
-                    className="contact-checkbox"
-                  />
-                  <div className="contact-info">
-                    <div className="contact-name">{contact.firstName} {contact.lastName}</div>
-                    <div className="contact-meta">
-                      {contact.email && contact.email}
-                      {contact.phone && ` • ${contact.phone}`}
-                      {contact.title && ` • ${contact.title}`}
-                      {contact.company_name && ` • ${contact.company_name}`}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              {/* Search bar */}
+              <div className="contact-search-wrap">
+                <input
+                  type="text"
+                  className="contact-search-input"
+                  placeholder="Search by name, email, or company…"
+                  value={contactSearch}
+                  onChange={e => setContactSearch(e.target.value)}
+                />
+              </div>
+
+              {/* Contact cards */}
+              <div className="mission-contacts-list">
+                {allContacts
+                  .filter(contact => {
+                    if (!contactSearch.trim()) return true;
+                    const q = contactSearch.toLowerCase();
+                    const name = (contact.name || `${contact.firstName || contact.first_name || ''} ${contact.lastName || contact.last_name || ''}`).toLowerCase();
+                    const email = (contact.email || contact.work_email || '').toLowerCase();
+                    const company = (contact.company_name || contact.company || '').toLowerCase();
+                    const title = (contact.title || '').toLowerCase();
+                    return name.includes(q) || email.includes(q) || company.includes(q) || title.includes(q);
+                  })
+                  .map(contact => {
+                    const isSelected = selectedContactIds.includes(contact.id);
+                    const displayName = contact.name
+                      || `${contact.firstName || contact.first_name || ''} ${contact.lastName || contact.last_name || ''}`.trim()
+                      || 'Unknown';
+                    const initials = displayName.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+                    const photo = contact.photo_url;
+                    const title = contact.title;
+                    const company = contact.company_name || contact.company;
+                    const email = contact.email || contact.work_email;
+
+                    return (
+                      <div
+                        key={contact.id}
+                        className={`mission-contact-card ${isSelected ? 'selected' : ''}`}
+                        onClick={() => toggleContactSelection(contact.id)}
+                      >
+                        {/* Avatar */}
+                        <div className="mcc-avatar">
+                          {photo ? (
+                            <img src={photo} alt={displayName} className="mcc-avatar-img" />
+                          ) : (
+                            <span className="mcc-avatar-initials">{initials}</span>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="mcc-info">
+                          <div className="mcc-name">{displayName}</div>
+                          {(title || company) && (
+                            <div className="mcc-sub">{[title, company].filter(Boolean).join(' · ')}</div>
+                          )}
+                          {email && <div className="mcc-email">{email}</div>}
+                        </div>
+
+                        {/* Selection indicator */}
+                        <div className={`mcc-check ${isSelected ? 'checked' : ''}`}>
+                          {isSelected && <span>✓</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
           )}
 
           <div className="step-actions">

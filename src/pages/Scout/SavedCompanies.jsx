@@ -7,6 +7,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, writeBatch } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Users, Search, Globe, Linkedin, Target, Archive, RotateCcw, TrendingUp, Award } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
@@ -97,26 +98,7 @@ export default function SavedCompanies({ onSelectCompany }) {
   async function handleArchiveCompany(company) {
     try {
       const userId = getEffectiveUser()?.uid;
-      const now = new Date().toISOString();
-
-      // Archive the company
-      await updateDoc(doc(db, 'users', userId, 'companies', company.id), {
-        status: 'archived', archived_at: now,
-        activity_log: arrayUnion({ type: 'status_changed', from: 'accepted', to: 'archived', timestamp: now }),
-      });
-
-      // Cascade: mark all associated contacts so they no longer show in active views
-      const contactsSnap = await getDocs(
-        query(collection(db, 'users', userId, 'contacts'), where('company_id', '==', company.id))
-      );
-      if (!contactsSnap.empty) {
-        const batch = writeBatch(db);
-        contactsSnap.docs.forEach(d => {
-          batch.update(d.ref, { company_archived: true, company_archived_at: now });
-        });
-        await batch.commit();
-      }
-
+      await archiveCompanyWithCascade(userId, company.id);
       setCompanies(prev => prev.filter(c => c.id !== company.id));
       setArchivedCompanies(prev => [...prev, { ...company, status: 'archived' }]);
     } catch (error) {
@@ -127,23 +109,7 @@ export default function SavedCompanies({ onSelectCompany }) {
   async function handleRestoreCompany(company) {
     try {
       const userId = getEffectiveUser()?.uid;
-      await updateDoc(doc(db, 'users', userId, 'companies', company.id), {
-        status: 'accepted', archived_at: null,
-        activity_log: arrayUnion({ type: 'status_changed', from: 'archived', to: 'accepted', timestamp: new Date().toISOString() }),
-      });
-
-      // Un-cascade: clear company_archived flag on associated contacts
-      const contactsSnap = await getDocs(
-        query(collection(db, 'users', userId, 'contacts'), where('company_id', '==', company.id))
-      );
-      if (!contactsSnap.empty) {
-        const batch = writeBatch(db);
-        contactsSnap.docs.forEach(d => {
-          batch.update(d.ref, { company_archived: false, company_archived_at: null });
-        });
-        await batch.commit();
-      }
-
+      await restoreCompanyWithCascade(userId, company.id);
       setArchivedCompanies(prev => prev.filter(c => c.id !== company.id));
       setCompanies(prev => [...prev, { ...company, status: 'accepted' }]);
     } catch (error) {

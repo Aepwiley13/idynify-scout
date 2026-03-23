@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { Building2, Users, Globe, Search, RotateCcw } from 'lucide-react';
 import { Archive, Linkedin } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
@@ -320,15 +321,12 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
     load();
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Archive / restore (Scout & Command Center modes)
+  // Archive / restore (Scout & Command Center modes) — cascades to contacts
   async function handleArchive(company) {
     const user = getEffectiveUser();
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid, 'companies', company.id), {
-        status: 'archived', archived_at: new Date().toISOString(),
-        activity_log: arrayUnion({ type: 'status_changed', from: 'accepted', to: 'archived', timestamp: new Date().toISOString() }),
-      });
+      await archiveCompanyWithCascade(user.uid, company.id);
       setCompanies(prev => prev.filter(c => c.id !== company.id));
       setArchivedCompanies(prev => [{ ...company, status: 'archived' }, ...prev]);
     } catch (err) { console.error('[SharedCompaniesView] archive error:', err); }
@@ -338,10 +336,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
     const user = getEffectiveUser();
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid, 'companies', company.id), {
-        status: 'accepted', archived_at: null,
-        activity_log: arrayUnion({ type: 'status_changed', from: 'archived', to: 'accepted', timestamp: new Date().toISOString() }),
-      });
+      await restoreCompanyWithCascade(user.uid, company.id);
       setArchivedCompanies(prev => prev.filter(c => c.id !== company.id));
       setCompanies(prev => [{ ...company, status: 'accepted' }, ...prev]);
     } catch (err) { console.error('[SharedCompaniesView] restore error:', err); }

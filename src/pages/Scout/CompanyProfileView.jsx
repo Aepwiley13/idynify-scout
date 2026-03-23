@@ -10,6 +10,7 @@ import {
   setDoc, updateDoc, arrayUnion,
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { useNavigate } from 'react-router-dom';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import {
@@ -352,15 +353,12 @@ export default function CompanyProfileView({ companyId, onBack }) {
     }
   }
 
-  // ── Archive / restore ──────────────────────────────────────────────────────
+  // ── Archive / restore (with cascade to contacts) ─────────────────────────
   async function handleArchive() {
     if (!window.confirm(`Archive ${company?.name}? You can restore it later.`)) return;
     setArchiving(true);
     try {
-      await updateDoc(doc(db, 'users', getEffectiveUser()?.uid, 'companies', companyId), {
-        status: 'archived', archived_at: new Date().toISOString(),
-        activity_log: arrayUnion({ type: 'status_changed', from: 'accepted', to: 'archived', timestamp: new Date().toISOString() }),
-      });
+      await archiveCompanyWithCascade(getEffectiveUser()?.uid, companyId);
       onBack();
     } catch (err) {
       console.error('Archive failed:', err);
@@ -371,10 +369,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
   async function handleRestore() {
     setArchiving(true);
     try {
-      await updateDoc(doc(db, 'users', getEffectiveUser()?.uid, 'companies', companyId), {
-        status: 'accepted', archived_at: null,
-        activity_log: arrayUnion({ type: 'status_changed', from: 'archived', to: 'accepted', timestamp: new Date().toISOString() }),
-      });
+      await restoreCompanyWithCascade(getEffectiveUser()?.uid, companyId);
       setCompany(prev => ({ ...prev, status: 'accepted' }));
       setArchiving(false);
     } catch (err) {

@@ -25,17 +25,68 @@ import EngagementTimeline from '../../components/contacts/EngagementTimeline';
 import InlineEngagementSection from '../../components/contacts/InlineEngagementSection';
 import BarryKnowledgeButton from '../../components/recon/BarryKnowledgeButton';
 import BarryInsightPanel from '../../components/contacts/BarryInsightPanel';
-import HunterActionPanel from '../../components/contacts/HunterActionPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
-import GameBucketSelector from '../../components/contacts/GameBucketSelector';
 import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
 import StageEngagementPanel from '../../components/contacts/StageEngagementPanel';
 import NextBestStep from '../../components/contacts/NextBestStep';
+import StageTabBar from '../../components/contacts/StageTabBar';
+import EngagementScoreRing from '../../components/contacts/EngagementScoreRing';
+import RelationshipArc from '../../components/contacts/RelationshipArc';
+import KeyMetricsGrid from '../../components/contacts/KeyMetricsGrid';
+import ReferralHub from '../../components/contacts/ReferralHub';
+import ReinforcementsPlaybooks from '../../components/contacts/ReinforcementsPlaybooks';
+import { STAGE_MAP } from '../../constants/stageSystem';
+import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { archivePerson } from '../../services/peopleService';
 import './ContactProfile.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+
+// Stage peek card — shown in Action column when user previews a non-active stage.
+// Defined at module scope to avoid React remount on every render.
+function StagePeekCard({ stageId, activeStageId, onBack, T }) {
+  const stage = STAGE_MAP[stageId];
+  const activeStage = STAGE_MAP[activeStageId];
+  if (!stage) return null;
+  return (
+    <div style={{
+      borderRadius: 12,
+      border: `1px solid ${stage.color}40`,
+      background: `${stage.color}08`,
+      padding: '20px 18px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12,
+      marginBottom: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 700, color: stage.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {stage.label} — Preview
+        </span>
+      </div>
+      <p style={{ margin: 0, fontSize: 13, color: T.textMuted, lineHeight: 1.5 }}>
+        {stage.description}
+      </p>
+      <p style={{ margin: 0, fontSize: 11, color: T.textFaint, fontStyle: 'italic' }}>
+        This contact is in <strong style={{ color: T.textMuted }}>{activeStage?.label || activeStageId}</strong>.
+        Click below to return, or use the stage tab to switch previews.
+      </p>
+      <button
+        onClick={onBack}
+        style={{
+          padding: '9px 16px', borderRadius: 9, border: `1px solid ${stage.color}40`,
+          background: `${stage.color}14`, color: stage.color,
+          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6,
+        }}
+      >
+        ← Back to {activeStage?.label || 'Active'} Stage
+      </button>
+    </div>
+  );
+}
 
 export default function ContactProfile({ contactId: propContactId, onClose, autoEngage } = {}) {
   const { contactId: paramContactId } = useParams();
@@ -64,6 +115,10 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiveReason, setArchiveReason] = useState('other');
   const [archiving, setArchiving] = useState(false);
+  // Stage tab bar — which tab is previewed (null = show active stage)
+  const [previewStage, setPreviewStage] = useState(null);
+  // Referral data for KeyMetricsGrid (loaded once when contact loads)
+  const [referralData, setReferralData] = useState(null);
 
   useEffect(() => {
     loadContactProfile();
@@ -80,6 +135,18 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       );
     }
   }, [loading, contact]);
+
+  // Load referral analytics once contact is ready (feeds KeyMetricsGrid)
+  useEffect(() => {
+    if (!contact?.id) return;
+    const user = getEffectiveUser();
+    if (!user) return;
+    let cancelled = false;
+    getContactReferralAnalytics(user.uid, contact.id)
+      .then(d => { if (!cancelled) setReferralData(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [contact?.id]);
 
   // Auto-trigger engage when the panel opens with autoEngage prop set by AllLeads.
   // A ref guards against re-firing if loading/contact re-evaluates after first trigger.
@@ -530,61 +597,55 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
   return (
     <div className="contact-profile-page" style={{ background: T.appBg, minHeight: isPanelMode ? 'unset' : '100vh' }}>
-      {/* Header Navigation — hidden in panel mode (panel host provides its own close bar) */}
+      {/* Header Navigation — hidden in panel mode */}
       {!isPanelMode && (
-      <div
-        className="profile-nav"
-        style={{ borderBottom: `1px solid ${T.border}`, background: T.navBg }}
-      >
-        <div className="profile-nav-inner">
-          <button
-            onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
-            style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 8, padding: '7px 14px', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <ArrowLeft size={13} />Back to People
-          </button>
-          <div style={{ display: 'flex', gap: 9 }}>
+        <div
+          className="profile-nav"
+          style={{ borderBottom: `1px solid ${T.border}`, background: T.navBg }}
+        >
+          <div className="profile-nav-inner">
             <button
-              onClick={handleEnrichContact}
-              disabled={enriching}
-              style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
+              onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+              style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 8, padding: '7px 14px', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+              <ArrowLeft size={13} />Back to People
             </button>
-            <button
-              onClick={() => setShowArchiveModal(true)}
-              style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 9, padding: '8px 14px', fontSize: 13, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <Archive size={13} />Archive
-            </button>
-            <BarryKnowledgeButton variant="compact" />
+            <div style={{ display: 'flex', gap: 9 }}>
+              <button
+                onClick={handleEnrichContact}
+                disabled={enriching}
+                style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
+              >
+                {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+              </button>
+              <button
+                onClick={() => setShowArchiveModal(true)}
+                style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 9, padding: '8px 14px', fontSize: 13, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Archive size={13} />Archive
+              </button>
+              <BarryKnowledgeButton variant="compact" />
+            </div>
           </div>
         </div>
-      </div>
       )}
 
-      {/* "Meet [FirstName]" Structure */}
-      <div className="contact-profile-container">
+      {/* Profile wrapper — full-width, contains banners + 3-col grid */}
+      <div className="contact-profile-wrapper">
 
-        {/* Banners — inside container so they align with centered content on desktop */}
-
-        {/* Success Banner */}
+        {/* ── Banners ── */}
         {enrichSuccess && (
           <div className="enrich-success-banner">
             <CheckCircle className="w-5 h-5" />
             <span>Contact enriched successfully.</span>
           </div>
         )}
-
-        {/* Error Banner */}
         {enrichError && (
           <div className="enrich-error-banner">
             <AlertCircle className="w-5 h-5" />
             <span>{enrichError}</span>
           </div>
         )}
-
-        {/* Manual LinkedIn URL Input - Shows when enrichment couldn't find LinkedIn */}
         {needsManualLinkedIn && (
           <div className="manual-linkedin-banner">
             <div className="manual-linkedin-header">
@@ -609,181 +670,154 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
                   disabled={enriching}
                 />
               </div>
-              <button
-                className="manual-linkedin-submit-btn"
-                onClick={handleManualLinkedInSubmit}
-                disabled={enriching || !manualLinkedInUrl.trim()}
-              >
-                {enriching ? (
-                  <Loader className="w-4 h-4 spinner" />
-                ) : (
-                  <>
-                    <span>Enrich with LinkedIn</span>
-                  </>
-                )}
+              <button className="manual-linkedin-submit-btn" onClick={handleManualLinkedInSubmit} disabled={enriching || !manualLinkedInUrl.trim()}>
+                {enriching ? <Loader className="w-4 h-4 spinner" /> : <span>Enrich with LinkedIn</span>}
               </button>
-              <button
-                className="manual-linkedin-cancel-btn"
-                onClick={handleCancelManualLinkedIn}
-                disabled={enriching}
-              >
-                Skip
-              </button>
+              <button className="manual-linkedin-cancel-btn" onClick={handleCancelManualLinkedIn} disabled={enriching}>Skip</button>
             </div>
             {enrichmentSummary && (
               <div className="manual-linkedin-details">
                 <span className="detail-label">What Barry tried:</span>
                 <ul className="detail-list">
-                  {enrichmentSummary.sources_used?.map((source, i) => (
-                    <li key={i}>{source} search</li>
-                  ))}
-                  {enrichmentSummary.sources_used?.length === 0 && (
-                    <li>Apollo search (no match found)</li>
-                  )}
+                  {enrichmentSummary.sources_used?.map((source, i) => (<li key={i}>{source} search</li>))}
+                  {enrichmentSummary.sources_used?.length === 0 && <li>Apollo search (no match found)</li>}
                 </ul>
               </div>
             )}
           </div>
         )}
-
-        {/* Stale Intelligence Warning - Shows when RECON training is low */}
         {reconStatus.loaded && reconStatus.progress < 40 && !staleDismissed && (
           <div className="stale-intel-warning">
             <div className="stale-intel-content">
               <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
               <div className="stale-intel-text">
                 <span className="stale-intel-title">Limited Intelligence</span>
-                <span className="stale-intel-desc">
-                  Barry's training is only {reconStatus.progress}% complete. Context generation may be generic.
-                </span>
+                <span className="stale-intel-desc">Barry's training is only {reconStatus.progress}% complete. Context generation may be generic.</span>
               </div>
             </div>
             <div className="stale-intel-actions">
-              <button
-                className="stale-intel-train-btn"
-                onClick={() => navigate('/recon')}
-              >
-                <Brain className="w-4 h-4" />
-                <span>Train Barry</span>
-                <ArrowRight className="w-3 h-3" />
+              <button className="stale-intel-train-btn" onClick={() => navigate('/recon')}>
+                <Brain className="w-4 h-4" /><span>Train Barry</span><ArrowRight className="w-3 h-3" />
               </button>
-              <button
-                className="stale-intel-dismiss-btn"
-                onClick={() => setStaleDismissed(true)}
-              >
-                Dismiss
-              </button>
+              <button className="stale-intel-dismiss-btn" onClick={() => setStaleDismissed(true)}>Dismiss</button>
             </div>
           </div>
         )}
 
-        {/* 1. IDENTITY CARD - TOP */}
-        <IdentityCard
-          key={contact.photo_url || 'no-photo'}
-          contact={contact}
-          onRefreshPhoto={handleRefreshPhoto}
-          photoRefreshLoading={photoRefreshLoading}
-          photoRefreshError={photoRefreshError}
-          onUpdate={handleContactUpdate}
-        />
-
-        {/* Contact Status Badge (State Machine) */}
-        <div className="contact-status-row">
-          <span className={`contact-status-badge contact-status-${getContactStatus(contact).toLowerCase().replace(/\s+/g, '-')}`}>
-            {getContactStatus(contact)}
-          </span>
+        {/* ── Stage Tab Bar (full width) ── */}
+        <div className="stage-bar-row">
+          <StageTabBar
+            contact={contact}
+            previewStage={previewStage}
+            onPreviewChange={setPreviewStage}
+          />
         </div>
 
-        {/* PERSISTENT ENGAGE BAR — Always visible, always resumable.
-            Clicking scrolls to + triggers the inline Engagement section. */}
-        <PersistentEngageBar
-          contact={contact}
-          onEngageClick={triggerInlineEngagement}
-          collapsed={engageBarCollapsed}
-          onToggleCollapse={() => setEngageBarCollapsed(v => !v)}
-        />
+        {/* ── Three-column grid ── */}
+        <div className="contact-profile-three-col">
 
-        {/* Hunter Action Panel — Move to Sniper when meeting booked / demo done */}
-        <HunterActionPanel
-          contact={contact}
-          onMoved={(result) => {
-            // Update local contact stage so panel hides immediately
-            setContact(prev => ({ ...prev, stage: 'sniper', stage_source: 'manual_override' }));
-          }}
-        />
-
-        {/* Stage Engagement Panel — goal framing + pipeline progression CTA per stage */}
-        <StageEngagementPanel
-          contact={contact}
-          onMoved={({ stageTo }) =>
-            setContact(prev => ({ ...prev, stage: stageTo, stage_source: 'manual_override' }))
-          }
-        />
-
-        {/* Barry Insight Panel — Step 7 proactive recommendations */}
-        <BarryInsightPanel
-          contactId={contact.id}
-          collapsed={insightPanelCollapsed}
-          onToggleCollapse={() => setInsightPanelCollapsed(v => !v)}
-          onAction={(rec) => {
-            if (['re_engage', 'start_mission', 'approve_next_step', 'switch_channel', 'accelerate_sequence'].includes(rec.action.type)) {
-              triggerInlineEngagement();
-            }
-          }}
-        />
-
-        {/* 3. MEET [FIRSTNAME] - BARRY'S INTELLIGENCE */}
-        {barryContext ? (
-          <MeetSection
-            barryContext={barryContext}
-            contact={contact}
-            onStarterDraft={(starter, intentId) => {
-              const el = document.getElementById('engagement-section');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              requestAnimationFrame(() => requestAnimationFrame(() => {
-                const ref = engagementSectionRef.current;
-                if (ref?.startWithIntent) {
-                  ref.startWithIntent(starter, intentId);
-                } else if (ref?.triggerFlow) {
-                  // Fallback: open the engagement flow so the user can type manually
-                  ref.triggerFlow();
-                }
-              }));
-            }}
-          />
-        ) : generatingContext ? (
-          <div className="barry-loading-state">
-            <Loader className="loading-icon" />
-            <p>Barry is analyzing this contact...</p>
+          {/* LEFT — Intel Column */}
+          <div className="intel-column">
+            <IdentityCard
+              key={contact.photo_url || 'no-photo'}
+              contact={contact}
+              onRefreshPhoto={handleRefreshPhoto}
+              photoRefreshLoading={photoRefreshLoading}
+              photoRefreshError={photoRefreshError}
+              onUpdate={handleContactUpdate}
+            />
+            <RecessiveActions contact={contact} />
+            {barryContext ? (
+              <MeetSection
+                barryContext={barryContext}
+                contact={contact}
+                onStarterDraft={(starter, intentId) => {
+                  const el = document.getElementById('engagement-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  requestAnimationFrame(() => requestAnimationFrame(() => {
+                    const ref = engagementSectionRef.current;
+                    if (ref?.startWithIntent) ref.startWithIntent(starter, intentId);
+                    else if (ref?.triggerFlow) ref.triggerFlow();
+                  }));
+                }}
+              />
+            ) : generatingContext ? (
+              <div className="barry-loading-state">
+                <Loader className="loading-icon" />
+                <p>Barry is analyzing this contact...</p>
+              </div>
+            ) : null}
+            <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
           </div>
-        ) : null}
 
-        {/* 4. ACTIONS - BELOW BARRY */}
-        <RecessiveActions contact={contact} />
+          {/* CENTER — Action Column */}
+          <div className="action-column">
+            <PersistentEngageBar
+              contact={contact}
+              onEngageClick={triggerInlineEngagement}
+              collapsed={engageBarCollapsed}
+              onToggleCollapse={() => setEngageBarCollapsed(v => !v)}
+            />
 
-        {/* 5. INLINE ENGAGEMENT SECTION — Persistent inline flow + history.
-            No modal. No overlay. Fills in-place below Strategic Context. */}
-        <InlineEngagementSection
-          ref={engagementSectionRef}
-          contact={contact}
-          onContactUpdate={handleContactUpdate}
-        />
+            {/* Stage peek (preview mode) vs live action panels */}
+            {previewStage && previewStage !== contact.stage ? (
+              <StagePeekCard
+                stageId={previewStage}
+                activeStageId={contact.stage}
+                onBack={() => setPreviewStage(null)}
+                T={T}
+              />
+            ) : (
+              <>
+                {/* Reinforcements → show playbooks; other stages → standard panels */}
+                {contact.stage === 'reinforcements' ? (
+                  <ReinforcementsPlaybooks contact={contact} />
+                ) : (
+                  <StageEngagementPanel
+                    contact={contact}
+                    onMoved={({ stageTo }) =>
+                      setContact(prev => ({ ...prev, stage: stageTo, stage_source: 'manual_override' }))
+                    }
+                  />
+                )}
+                <BarryInsightPanel
+                  contactId={contact.id}
+                  collapsed={insightPanelCollapsed}
+                  onToggleCollapse={() => setInsightPanelCollapsed(v => !v)}
+                  onAction={(rec) => {
+                    if (['re_engage', 'start_mission', 'approve_next_step', 'switch_channel', 'accelerate_sequence'].includes(rec.action.type)) {
+                      triggerInlineEngagement();
+                    }
+                  }}
+                />
+                <NextBestStep
+                  contact={contact}
+                  onEngageClick={triggerInlineEngagement}
+                  onStepConfirmed={(step) => { console.log('[ContactProfile] Next step confirmed:', step); }}
+                />
+                <InlineEngagementSection
+                  ref={engagementSectionRef}
+                  contact={contact}
+                  onContactUpdate={handleContactUpdate}
+                />
+              </>
+            )}
+          </div>
 
-        {/* 5b. ENGAGEMENT TIMELINE - Full chronological event log */}
-        <EngagementTimeline contactId={contact.id} />
+          {/* RIGHT — History Column */}
+          <div className="history-column">
+            <EngagementScoreRing contact={contact} />
+            <KeyMetricsGrid contact={contact} referralData={referralData} />
+            <RelationshipArc contact={contact} />
+            <EngagementTimeline contactId={contact.id} />
+          </div>
+        </div>
 
-        {/* NEXT BEST STEP — Replaces Missions. Barry proposes. User confirms.
-            Relationships compound instead of resetting. */}
-        <NextBestStep
-          contact={contact}
-          onEngageClick={triggerInlineEngagement}
-          onStepConfirmed={(step) => {
-            console.log('[ContactProfile] Next step confirmed:', step);
-          }}
-        />
+        {/* ── Referral Hub (full width, below three-col grid) ── */}
+        <div className="referral-hub-row">
+          <ReferralHub contact={contact} />
+        </div>
 
-        {/* 6. VIEW DETAILS DRAWER - BOTTOM */}
-        <DetailDrawer contact={contact} onUpdate={handleContactUpdate} />
       </div>
 
       {/* Archive Confirmation Modal */}

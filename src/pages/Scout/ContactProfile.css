@@ -60,16 +60,110 @@
   max-width: 400px;
 }
 
-/* Main Page Container - Barry-First Design */
+/* Main Page Container */
 .contact-profile-page {
-  padding: 2rem;
   max-width: 100%;
   margin: 0 auto;
-  background: #F8F8F6;
   min-height: 100vh;
 }
 
-/* Contact Profile Container - "Meet [FirstName]" Structure */
+/* Full-width wrapper — holds banners, stage bar, and the grid */
+.contact-profile-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+}
+
+/* Stage tab bar row — full width above the three columns */
+.stage-bar-row {
+  margin-bottom: 20px;
+}
+
+/* Three-column grid */
+.contact-profile-three-col {
+  display: grid;
+  grid-template-columns: 300px 1fr 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Intel column (left) */
+.intel-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+/* Action column (center) */
+.action-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* History column (right) */
+.history-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+/* Referral hub row — full width below the three columns */
+.referral-hub-row {
+  margin-top: 24px;
+}
+
+/* Responsive: tablet — stack intel below */
+@media (max-width: 1100px) {
+  .contact-profile-three-col {
+    grid-template-columns: 260px 1fr 240px;
+    gap: 16px;
+  }
+}
+
+/* Responsive: narrow — two columns (intel + action), history below */
+@media (max-width: 860px) {
+  .contact-profile-three-col {
+    grid-template-columns: 1fr 1fr;
+  }
+  .history-column {
+    grid-column: 1 / -1;
+    position: static;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .intel-column {
+    position: static;
+    max-height: none;
+  }
+}
+
+/* Responsive: mobile — single column */
+@media (max-width: 600px) {
+  .contact-profile-wrapper {
+    padding: 12px 12px 32px;
+  }
+  .contact-profile-three-col {
+    grid-template-columns: 1fr;
+  }
+  .intel-column,
+  .history-column {
+    position: static;
+    max-height: none;
+  }
+}
+
+/* Legacy container kept for any remaining references */
 .contact-profile-container {
   max-width: 840px;
   margin: 0 auto;

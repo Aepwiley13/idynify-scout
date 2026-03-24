@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
   ArrowLeft,
@@ -162,11 +162,13 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
       const userId = user.uid;
 
-      // Load contact + referral analytics in one coordinated fetch.
+      // Load contact + referral analytics + timeline in one coordinated fetch.
       // This ensures all three columns read from the same snapshot — no stale metrics.
-      const [contactDoc, referralAnalytics] = await Promise.all([
+      const timelineRef = collection(db, 'users', userId, 'contacts', contactId, 'timeline');
+      const [contactDoc, referralAnalytics, timelineSnap] = await Promise.all([
         getDoc(doc(db, 'users', userId, 'contacts', contactId)),
         getContactReferralAnalytics(userId, contactId).catch(() => null),
+        getDocs(query(timelineRef, orderBy('timestamp', 'desc'), limit(30))).catch(() => null),
       ]);
 
       if (!contactDoc.exists()) {
@@ -177,6 +179,19 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       }
 
       const contactData = { ...contactDoc.data(), id: contactDoc.id };
+
+      // Backfill total_messages_sent from timeline if not yet populated in Firestore.
+      // Covers contacts that existed before the write-path fix was deployed.
+      if (!contactData.engagement_summary?.total_messages_sent && timelineSnap) {
+        const msgCount = timelineSnap.docs.filter(d => d.data().type === 'message_sent').length;
+        if (msgCount > 0) {
+          contactData.engagement_summary = {
+            ...contactData.engagement_summary,
+            total_messages_sent: msgCount,
+          };
+        }
+      }
+
       setContact(contactData);
       if (referralAnalytics) setReferralData(referralAnalytics);
       console.log('✅ Contact profile loaded:', contactData.name);

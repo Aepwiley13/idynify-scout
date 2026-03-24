@@ -274,8 +274,8 @@
 /* ── Expanded Section ── */
 
 .peb-expanded {
-  border-top: 1px solid rgba(107, 114, 128, 0.15);
-  background: rgba(10, 10, 16, 0.55);
+  border-top: 1px solid var(--border, rgba(107, 114, 128, 0.15));
+  background: var(--bg-secondary);
   animation: peb-expand 0.2s ease;
 }
 
@@ -480,14 +480,14 @@
 }
 
 .peb-offplatform-outreach {
-  background: rgba(124, 58, 237, 0.1);
-  border-color: rgba(124, 58, 237, 0.25);
-  color: #a78bfa;
+  background: rgba(55, 138, 221, 0.08);
+  border-color: rgba(55, 138, 221, 0.22);
+  color: #378ADD;
 }
 
 .peb-offplatform-outreach:hover {
-  background: rgba(124, 58, 237, 0.18);
-  border-color: rgba(124, 58, 237, 0.4);
+  background: rgba(55, 138, 221, 0.15);
+  border-color: rgba(55, 138, 221, 0.38);
 }
 
 .peb-offplatform-reply {
@@ -587,10 +587,10 @@
 
 .peb-reply-note {
   width: 100%;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(107, 114, 128, 0.2);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 7px;
-  color: #d1d5db;
+  color: var(--text-primary);
   font-size: 12px;
   line-height: 1.5;
   padding: 8px 10px;
@@ -601,7 +601,7 @@
 }
 
 .peb-reply-note::placeholder {
-  color: var(--text-secondary);
+  color: var(--text-faint);
 }
 
 .peb-reply-note:focus {

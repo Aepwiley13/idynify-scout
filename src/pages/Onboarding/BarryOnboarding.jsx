@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
@@ -428,13 +428,17 @@ export default function BarryOnboarding() {
       {/* Onboarding Progress Indicator */}
       <div className="barry-onboarding-progress">
         {ONBOARDING_STEPS.map((s, i) => (
-          <div key={s.key} className={`progress-step ${i < activeStepIndex ? 'completed' : i === activeStepIndex ? 'active' : ''}`}>
-            <div className="progress-dot">
-              {i < activeStepIndex ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
+          <Fragment key={s.key}>
+            <div className={`progress-step ${i < activeStepIndex ? 'completed' : i === activeStepIndex ? 'active' : ''}`}>
+              <div className="progress-dot">
+                {i < activeStepIndex ? <Check className="w-3 h-3" /> : <span>{i + 1}</span>}
+              </div>
+              <span className="progress-label">{s.label}</span>
             </div>
-            <span className="progress-label">{s.label}</span>
-            {i < ONBOARDING_STEPS.length - 1 && <div className="progress-connector" />}
-          </div>
+            {i < ONBOARDING_STEPS.length - 1 && (
+              <div className={`progress-connector ${i < activeStepIndex ? 'completed' : ''}`} />
+            )}
+          </Fragment>
         ))}
       </div>
 

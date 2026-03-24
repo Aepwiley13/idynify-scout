@@ -92,8 +92,7 @@
   flex-shrink: 0;
 }
 
-.progress-step.completed + .progress-step .progress-connector,
-.progress-step.completed .progress-connector {
+.progress-connector.completed {
   background: #22c55e;
 }
 

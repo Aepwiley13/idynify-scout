@@ -339,14 +339,14 @@ export default function NextBestStep({ contact, onEngageClick, onStepConfirmed }
             onClick={() => onEngageClick && onEngageClick()}
           >
             <Zap className="w-4 h-4" />
-            Open with Barry
+            Complete Step
             <ArrowRight className="w-3 h-3" />
           </button>
           <button
-            className="nbs-act-btn nbs-act-secondary"
-            onClick={() => setActiveStep(null)}
+            className="nbs-act-btn nbs-act-dismiss"
+            onClick={() => setDismissed(true)}
           >
-            View Proposal
+            Dismiss
           </button>
         </div>
       </div>

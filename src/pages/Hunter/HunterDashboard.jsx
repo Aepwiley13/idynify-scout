@@ -28,12 +28,14 @@ import {
   doc, getDoc, updateDoc, onSnapshot
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { ArrowLeft, Target, CheckCircle, Archive as ArchiveIcon, Zap } from 'lucide-react';
+import { ArrowLeft, Target, CheckCircle, Archive as ArchiveIcon, Zap, User, X } from 'lucide-react';
 import HunterCardStack from '../../components/hunter/HunterCardStack';
 import ActiveMissionsView from '../../components/hunter/ActiveMissionsView';
 import QuickMissionAssignModal from '../../components/hunter/QuickMissionAssignModal';
+import ContactProfile from '../../pages/Scout/ContactProfile';
 import { bootstrapContactsForUser } from '../../utils/hunterBootstrap';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
+import { useT } from '../../theme/ThemeContext';
 import './HunterDashboard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
@@ -42,6 +44,7 @@ const STUCK_TIMEOUT_MS = 30_000;
 
 export default function HunterDashboard() {
   const navigate = useNavigate();
+  const T = useT();
   const [tab, setTab] = useState('deck');
   const [deckContacts, setDeckContacts] = useState([]);
   const [activeContacts, setActiveContacts] = useState([]);
@@ -50,6 +53,8 @@ export default function HunterDashboard() {
   const [loading, setLoading] = useState(true);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [reconConfidencePct, setReconConfidencePct] = useState(null);
+  // Full profile panel — opened from deck or active missions
+  const [profileContactId, setProfileContactId] = useState(null);
 
   // Sprint 1.2: Quick mission assign
   const [quickAssignContact, setQuickAssignContact] = useState(null);
@@ -328,6 +333,45 @@ export default function HunterDashboard() {
         </div>
       </div>
 
+      {/* Full profile panel — slides in from right when opened from deck or active missions */}
+      {profileContactId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', justifyContent: 'flex-end' }}>
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setProfileContactId(null)}
+          />
+          <div style={{
+            position: 'relative',
+            width: '100%', maxWidth: 800,
+            height: '100%',
+            background: T.cardBg,
+            borderLeft: `1px solid ${T.border}`,
+            boxShadow: '-12px 0 48px rgba(0,0,0,0.3)',
+            overflowY: 'auto',
+            animation: 'slideInRight 0.22s ease',
+          }}>
+            <button
+              onClick={() => setProfileContactId(null)}
+              style={{
+                position: 'absolute', top: 14, right: 14, zIndex: 10,
+                width: 30, height: 30, borderRadius: '50%',
+                background: 'rgba(107,114,128,0.12)', border: 'none',
+                color: T.textMuted, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <X size={15} />
+            </button>
+            <ContactProfile
+              key={profileContactId}
+              contactId={profileContactId}
+              autoEngage={true}
+              onClose={() => setProfileContactId(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <div className="hunter-content">
         {loading ? (
@@ -351,9 +395,24 @@ export default function HunterDashboard() {
                   onDeckEmpty={() => setTab('active')}
                 />
                 {visibleDeckCount > 0 && (
-                  <p className="hunter-deck-count">
-                    {visibleDeckCount} contact{visibleDeckCount !== 1 ? 's' : ''} remaining
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 8 }}>
+                    <p className="hunter-deck-count" style={{ margin: 0 }}>
+                      {visibleDeckCount} contact{visibleDeckCount !== 1 ? 's' : ''} remaining
+                    </p>
+                    {deckContacts[currentIndex] && (
+                      <button
+                        onClick={() => setProfileContactId(deckContacts[currentIndex].id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                          background: 'rgba(232,25,125,0.08)', border: '1px solid rgba(232,25,125,0.22)',
+                          color: '#e8197d', cursor: 'pointer',
+                        }}
+                      >
+                        <User size={11} /> Open Full Profile
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -364,6 +423,7 @@ export default function HunterDashboard() {
                 contacts={activeContacts}
                 reconConfidencePct={reconConfidencePct}
                 onGoToDeck={() => setTab('deck')}
+                onViewProfile={(id) => setProfileContactId(id)}
                 onMissionComplete={(contact, outcome) => {
                   console.log(`[Hunter] Mission complete for ${contact.name}: ${outcome}`);
                 }}

@@ -13,11 +13,12 @@ import { db, auth } from '../../../firebase/config';
 import {
   User, Building2, Clock, ChevronDown, ChevronUp,
   Plus, Crosshair, Mail, Phone, Calendar, CheckCircle,
-  XCircle, Filter, Search, Trash2, Edit3
+  XCircle, Filter, Search, Trash2, Edit3, Zap, X
 } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { BRAND } from '../../../theme/tokens';
 import { getEffectiveUser } from '../../../context/ImpersonationContext';
+import ContactProfile from '../../Scout/ContactProfile';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -184,6 +185,8 @@ export default function TargetsSection() {
   const [stageFilter, setStageFilter] = useState('all');
   const [loggingTouchFor, setLoggingTouchFor] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  // Full profile panel — opened when user clicks Engage on a target
+  const [profileContactId, setProfileContactId] = useState(null);
 
   const loadContacts = async () => {
     const user = getEffectiveUser();
@@ -391,6 +394,18 @@ export default function TargetsSection() {
                     {/* Actions */}
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
+                        onClick={() => setProfileContactId(contact.contactId || contact.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '6px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                          background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.3)',
+                          color: '#1D9E75', cursor: 'pointer',
+                        }}
+                      >
+                        <Zap size={11} />
+                        Engage
+                      </button>
+                      <button
                         onClick={() => setLoggingTouchFor(contact)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 5,
@@ -433,6 +448,44 @@ export default function TargetsSection() {
             ));
           }}
         />
+      )}
+
+      {/* Full ContactProfile panel — slides in from right when Engage is clicked */}
+      {profileContactId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end' }}>
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setProfileContactId(null)}
+          />
+          <div style={{
+            position: 'relative',
+            width: '100%', maxWidth: 800,
+            height: '100%',
+            background: T.cardBg,
+            borderLeft: `1px solid ${T.border}`,
+            boxShadow: '-12px 0 48px rgba(0,0,0,0.28)',
+            overflowY: 'auto',
+          }}>
+            <button
+              onClick={() => setProfileContactId(null)}
+              style={{
+                position: 'absolute', top: 14, right: 14, zIndex: 10,
+                width: 30, height: 30, borderRadius: '50%',
+                background: 'rgba(107,114,128,0.12)', border: 'none',
+                color: T.textMuted, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <X size={15} />
+            </button>
+            <ContactProfile
+              key={profileContactId}
+              contactId={profileContactId}
+              autoEngage={true}
+              onClose={() => setProfileContactId(null)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

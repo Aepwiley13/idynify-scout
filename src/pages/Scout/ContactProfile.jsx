@@ -35,7 +35,7 @@ import RelationshipArc from '../../components/contacts/RelationshipArc';
 import KeyMetricsGrid from '../../components/contacts/KeyMetricsGrid';
 import ReferralHub from '../../components/contacts/ReferralHub';
 import LinkedInImportModal from '../../components/contacts/LinkedInImportModal';
-import ReinforcementsPlaybooks from '../../components/contacts/ReinforcementsPlaybooks';
+import ReinforcementsEngagementPanel from '../../components/contacts/ReinforcementsEngagementPanel';
 import { STAGE_MAP } from '../../constants/stageSystem';
 import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
 import { useT } from '../../theme/ThemeContext';
@@ -243,7 +243,8 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       // Update contact in Firestore with Barry context
       const contactRef = doc(db, 'users', user.uid, 'contacts', contactData.id);
       await updateDoc(contactRef, {
-        barryContext: result.barryContext
+        barryContext:           result.barryContext,
+        barryContextUpdatedAt:  new Date().toISOString(),
       });
 
       // Update local state
@@ -773,7 +774,18 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
               <>
                 {/* Reinforcements → show playbooks; other stages → standard panels */}
                 {contact.stage === 'reinforcements' ? (
-                  <ReinforcementsPlaybooks contact={contact} />
+                  <ReinforcementsEngagementPanel
+                    contact={contact}
+                    onPrefillCompose={(text) => {
+                      const el = document.getElementById('engagement-section');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      requestAnimationFrame(() => requestAnimationFrame(() => {
+                        const ref = engagementSectionRef.current;
+                        if (ref?.startWithIntent) ref.startWithIntent(text, 'warm');
+                        else if (ref?.triggerFlow) ref.triggerFlow();
+                      }));
+                    }}
+                  />
                 ) : (
                   <StageEngagementPanel
                     contact={contact}

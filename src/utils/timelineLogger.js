@@ -68,6 +68,11 @@ const TIMELINE_EVENT_TYPES = [
   // CSM: Intervention Playbook events
   'playbook_abandoned',
   'playbook_completed',
+  // Reinforcements playbook events
+  'referral_thank_you_sent',
+  'referral_ask_sent',
+  'keep_warm_sent',
+  'recognition_sent',
 ];
 
 // Actor types

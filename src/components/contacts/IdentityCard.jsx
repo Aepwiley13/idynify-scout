@@ -773,6 +773,26 @@ export default function IdentityCard({
             )}
           </div>
 
+          {/* Activity status dot — bottom-right of avatar */}
+          {(() => {
+            const now = Date.now();
+            const thirtyDaysMs = 30 * 86_400_000;
+            const lastActivity = contact.last_message_at || contact.last_contacted_at || null;
+            const isActive = lastActivity
+              ? (now - new Date(lastActivity).getTime()) < thirtyDaysMs
+              : false;
+            return (
+              <div style={{
+                position: 'absolute',
+                bottom: 8, right: 8,
+                width: 12, height: 12, borderRadius: '50%',
+                background: isActive ? '#1D9E75' : '#888888',
+                border: '2px solid var(--card-bg, #fff)',
+                zIndex: 2,
+              }} title={isActive ? 'Active in last 30 days' : 'No recent activity'} />
+            );
+          })()}
+
           {/* Photo action menu */}
           {photoMenuOpen && !photoRefreshLoading && (
             <div

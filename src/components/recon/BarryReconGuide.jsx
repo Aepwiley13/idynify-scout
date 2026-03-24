@@ -198,6 +198,7 @@ export default function BarryReconGuide({
   const [conversation, setConversation] = useState([]); // [{role:'barry'|'user', text:string}]
   const [isOnline] = useState(true);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
 
   // Fetch Barry's intro when section opens
@@ -208,8 +209,12 @@ export default function BarryReconGuide({
     fetchIntro();
   }, [sectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-scroll only within the Barry messages container — never the whole page
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [conversation, coachingData, introMessage]);
 
   const fetchIntro = async () => {
@@ -358,7 +363,7 @@ export default function BarryReconGuide({
       </div>
 
       {/* ── Messages area ── */}
-      <div style={{
+      <div ref={messagesContainerRef} style={{
         flex: 1, overflowY: 'auto', padding: '12px 14px',
         display: 'flex', flexDirection: 'column',
       }}>

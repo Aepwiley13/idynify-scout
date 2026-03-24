@@ -22,7 +22,9 @@ import {
   recordReferralReceived,
   recordReferralSent,
   recordReferralAskedFor,
-  detectReferralOpportunities
+  detectReferralOpportunities,
+  detectLinkedInOpportunities,
+  updateAskedForStatus,
 } from '../../services/referralIntelligenceService';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import ReferralHealthPanel from './ReferralHealthPanel';
@@ -187,7 +189,12 @@ function ReferredOutTab({ records, T }) {
   );
 }
 
-function AskedForTab({ records, T }) {
+function AskedForTab({
+  records, T,
+  decliningId, declineReason,
+  setDecliningId, setDeclineReason,
+  onMarkAccepted, onMarkDeclined,
+}) {
   if (!records || records.length === 0) {
     return (
       <div style={{ padding: '24px 0', textAlign: 'center', color: T.textFaint, fontSize: 12 }}>
@@ -195,6 +202,12 @@ function AskedForTab({ records, T }) {
       </div>
     );
   }
+
+  const actionBtnBase = {
+    padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+    cursor: 'pointer', border: 'none',
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {records.map(r => (
@@ -227,7 +240,58 @@ function AskedForTab({ records, T }) {
                   {r.referral_value}
                 </div>
               )}
+
+              {/* Status actions — only shown on pending cards */}
+              {(!r.ask_status || r.ask_status === 'pending') && decliningId !== r.id && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                  <button
+                    onClick={() => onMarkAccepted(r.id)}
+                    style={{ ...actionBtnBase, background: '#22c55e18', color: '#22c55e' }}
+                  >
+                    Intro made ✓
+                  </button>
+                  <button
+                    onClick={() => { setDecliningId(r.id); setDeclineReason(''); }}
+                    style={{ ...actionBtnBase, background: '#dc262618', color: '#dc2626' }}
+                  >
+                    Declined ✗
+                  </button>
+                </div>
+              )}
+
+              {/* Decline reason inline input */}
+              {decliningId === r.id && (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input
+                    autoFocus
+                    placeholder="Reason (optional)"
+                    value={declineReason}
+                    onChange={e => setDeclineReason(e.target.value)}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', padding: '6px 10px',
+                      borderRadius: 7, border: `1px solid ${T.border}`,
+                      background: T.appBg, color: T.text, fontSize: 12,
+                      fontFamily: 'inherit', outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      onClick={() => onMarkDeclined(r.id, declineReason)}
+                      style={{ ...actionBtnBase, background: '#dc262618', color: '#dc2626' }}
+                    >
+                      Confirm decline
+                    </button>
+                    <button
+                      onClick={() => { setDecliningId(null); setDeclineReason(''); }}
+                      style={{ ...actionBtnBase, background: 'transparent', color: T.textMuted, border: `1px solid ${T.border}` }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
               <AskStatusBadge askStatus={r.ask_status} />
               {r.icp_match_score != null && (
@@ -251,8 +315,9 @@ function AskedForTab({ records, T }) {
 
 // ── ICP Network Scan (Phase 1) ────────────────────────────────────
 
-function NetworkScanSection({ contact, T, onOpenLinkedInImport }) {
+function NetworkScanSection({ contact, T, onOpenLinkedInImport, prefillAskedFor }) {
   const [opportunities, setOpportunities] = useState(null);
+  const [linkedInResults, setLinkedInResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
   async function runScan() {
@@ -260,10 +325,13 @@ function NetworkScanSection({ contact, T, onOpenLinkedInImport }) {
     if (!user) return;
     setLoading(true);
     try {
-      const opps = await detectReferralOpportunities(user.uid);
-      // Filter to opportunities where this contact is the introducer
-      const relevant = opps.filter(o => o.introducer_id === contact.id);
+      const [idynifyOpps, linkedInConns] = await Promise.all([
+        detectReferralOpportunities(user.uid),
+        detectLinkedInOpportunities(user.uid),
+      ]);
+      const relevant = idynifyOpps.filter(o => o.introducer_id === contact.id);
       setOpportunities(relevant);
+      setLinkedInResults(linkedInConns);
     } finally {
       setLoading(false);
     }
@@ -315,13 +383,14 @@ function NetworkScanSection({ contact, T, onOpenLinkedInImport }) {
         <p style={{ fontSize: 11, color: '#e8197d99', margin: 0 }}>
           Barry will scan your contacts for ICP matches that {contact.first_name || contact.name?.split(' ')[0] || 'this contact'} could introduce you to.
         </p>
-      ) : opportunities.length === 0 ? (
+      ) : opportunities.length === 0 && (!linkedInResults || linkedInResults.length === 0) ? (
         <p style={{ fontSize: 11, color: '#e8197d99', margin: 0 }}>
           No ICP matches found in your current contacts. More matches surface as your network grows.
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {opportunities.slice(0, 3).map((opp, i) => (
+          {/* Idynify contacts section */}
+          {opportunities.length > 0 && opportunities.slice(0, 3).map((opp, i) => (
             <div key={i} style={{
               padding: '10px 12px', borderRadius: 9,
               background: '#fff1', border: `1px solid ${BRAND.pink}20`,
@@ -340,7 +409,7 @@ function NetworkScanSection({ contact, T, onOpenLinkedInImport }) {
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', flex: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                 <span style={{
                   fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
                   background: opp.overlap_score >= 5 ? '#22c55e18' : '#f59e0b18',
@@ -359,6 +428,62 @@ function NetworkScanSection({ contact, T, onOpenLinkedInImport }) {
               </div>
             </div>
           ))}
+
+          {/* LinkedIn Network section */}
+          {linkedInResults && linkedInResults.length > 0 && (
+            <>
+              <div style={{
+                marginTop: opportunities.length > 0 ? 8 : 0,
+                fontSize: 10, fontWeight: 700, color: T.textMuted,
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                LinkedIn Network
+              </div>
+              {linkedInResults.map((conn, i) => (
+                <div key={conn.id || i} style={{
+                  padding: '10px 12px', borderRadius: 9,
+                  background: '#fff1', border: `1px solid ${BRAND.pink}20`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text, #f0f0f0)' }}>
+                      {[conn.first_name, conn.last_name].filter(Boolean).join(' ') || 'Unknown'}
+                    </div>
+                    {(conn.title || conn.company) && (
+                      <div style={{ fontSize: 10, color: '#9999aa', marginTop: 1 }}>
+                        {[conn.title, conn.company].filter(Boolean).join(' @ ')}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                      background: conn.icp_tier === 'hot' ? '#22c55e18' : '#f59e0b18',
+                      color: conn.icp_tier === 'hot' ? '#22c55e' : '#f59e0b',
+                    }}>
+                      {conn.icp_tier === 'hot' ? 'Hot' : 'Warm'}
+                      {conn.icp_match_score != null ? ` · ${conn.icp_match_score}%` : ''}
+                    </span>
+                    <button
+                      onClick={() => prefillAskedFor?.({
+                        targetName:    [conn.first_name, conn.last_name].filter(Boolean).join(' '),
+                        targetCompany: conn.company || '',
+                        targetTitle:   conn.title   || '',
+                      })}
+                      style={{
+                        fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6,
+                        background: `${BRAND.pink}18`, border: `1px solid ${BRAND.pink}30`,
+                        color: BRAND.pink, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 3,
+                      }}
+                    >
+                      Ask for intro <ChevronRight size={9} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -390,6 +515,8 @@ export default function ReferralHub({ contact, onOpenLinkedInImport }) {
     referral_value: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [decliningId, setDecliningId] = useState(null);
+  const [declineReason, setDeclineReason] = useState('');
 
   const refreshData = useCallback(async () => {
     if (!contact?.id) return;
@@ -454,7 +581,7 @@ export default function ReferralHub({ contact, onOpenLinkedInImport }) {
           targetTitle:     logForm.targetTitle.trim() || null,
           askedVia:        logForm.askedVia,
           context:         logForm.context.trim() || null,
-          referral_value:  logForm.referral_value.trim() || null,
+          referralValue:   logForm.referral_value.trim() || null,
         });
       }
 
@@ -473,6 +600,40 @@ export default function ReferralHub({ contact, onOpenLinkedInImport }) {
     if (logFormTab === 'referred_out')   return !logForm.referredToName.trim();
     if (logFormTab === 'asked_for')      return !logForm.targetName.trim();
     return false;
+  }
+
+  async function handleMarkAccepted(referralId) {
+    const user = getEffectiveUser();
+    if (!user) return;
+    await updateAskedForStatus(user.uid, referralId, {
+      askStatus:      'asked_again',
+      responseStatus: 'accepted',
+    });
+    await refreshData();
+  }
+
+  async function handleMarkDeclined(referralId, reason) {
+    const user = getEffectiveUser();
+    if (!user) return;
+    await updateAskedForStatus(user.uid, referralId, {
+      askStatus:      'declined',
+      responseStatus: 'declined',
+      declineReason:  reason || null,
+    });
+    setDecliningId(null);
+    setDeclineReason('');
+    await refreshData();
+  }
+
+  function handlePrefillAskedFor({ targetName, targetCompany, targetTitle }) {
+    setActiveTab('asked_for');
+    setLogFormTab('asked_for');
+    setLogForm(f => ({
+      ...f,
+      targetName:    targetName    || '',
+      targetCompany: targetCompany || '',
+      targetTitle:   targetTitle   || '',
+    }));
   }
 
   const tabCounts = {
@@ -756,7 +917,13 @@ export default function ReferralHub({ contact, onOpenLinkedInImport }) {
             )}
             {activeTab === 'asked_for' && (
               <>
-                <AskedForTab records={data?.asked_for_records} T={T} />
+                <AskedForTab
+                  records={data?.asked_for_records} T={T}
+                  decliningId={decliningId} declineReason={declineReason}
+                  setDecliningId={setDecliningId} setDeclineReason={setDeclineReason}
+                  onMarkAccepted={handleMarkAccepted}
+                  onMarkDeclined={handleMarkDeclined}
+                />
                 <LogButton tabId="asked_for" label="Log intro request" />
                 {logFormTab === 'asked_for' && <AskedForForm />}
               </>
@@ -768,6 +935,7 @@ export default function ReferralHub({ contact, onOpenLinkedInImport }) {
                 contact={contact}
                 T={T}
                 onOpenLinkedInImport={onOpenLinkedInImport}
+                prefillAskedFor={handlePrefillAskedFor}
               />
             )}
           </>

@@ -8,7 +8,7 @@
  * behavioral contracts are untouched. Stage drives the profile badge and the
  * Stage dropdown only. Brigade continues to drive Barry's tone and strategy.
  *
- * Stage field: contacts.stage         — 'scout' | 'hunter' | 'sniper' | 'basecamp' | 'fallback'
+ * Stage field: contacts.stage         — 'scout' | 'hunter' | 'sniper' | 'basecamp' | 'reinforcements' | 'fallback'
  * Source field: contacts.stage_source — 'auto' | 'manual_override'
  *
  * Auto-assignment rules (based on person_type):
@@ -57,6 +57,14 @@ export const STAGES = [
     bgColor:     `${MODULE_COLORS.basecamp}14`,
     borderColor: `${MODULE_COLORS.basecamp}35`,
     description: 'Active customer — relationship is live',
+  },
+  {
+    id:          'reinforcements',
+    label:       'Reinforcements',
+    color:       MODULE_COLORS.reinforcements,
+    bgColor:     `${MODULE_COLORS.reinforcements}14`,
+    borderColor: `${MODULE_COLORS.reinforcements}35`,
+    description: 'Network activation — referrals and introductions',
   },
   {
     id:          'fallback',

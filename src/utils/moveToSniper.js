@@ -47,6 +47,7 @@ export async function moveContactToSniper({
   await updateDoc(contactRef, {
     stage: 'sniper',
     stage_source: 'manual_override',
+    stage_entered_at: new Date().toISOString(),
     sniper_moved_at: new Date().toISOString(),
     sniper_moved_reason: reason,
   });

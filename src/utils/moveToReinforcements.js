@@ -44,6 +44,7 @@ export async function moveContactToReinforcements({
   await updateDoc(contactRef, {
     stage: 'reinforcements',
     stage_source: 'manual_override',
+    stage_entered_at: new Date().toISOString(),
     reinforcements_activated_at: new Date().toISOString(),
     reinforcements_move_reason: reason,
   });

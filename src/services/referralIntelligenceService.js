@@ -109,7 +109,8 @@ export async function recordReferralReceived(userId, {
   fromContactName,
   toContactId,
   toContactName,
-  context
+  context,
+  referral_value
 }) {
   try {
     const now = new Date().toISOString();
@@ -123,6 +124,7 @@ export async function recordReferralReceived(userId, {
       to_contact_name: toContactName,
       referral_date: now,
       context: context || null,
+      referral_value: referral_value || null,
       status: 'pending',
       converted_at: null,
       outcome_note: null,
@@ -208,7 +210,8 @@ export async function recordReferralSent(userId, {
   fromContactName,
   toContactId,
   toContactName,
-  context
+  context,
+  referral_value
 }) {
   try {
     const now = new Date().toISOString();
@@ -221,6 +224,7 @@ export async function recordReferralSent(userId, {
       to_contact_name: toContactName,
       referral_date: now,
       context: context || null,
+      referral_value: referral_value || null,
       status: 'pending',
       converted_at: null,
       outcome_note: null,

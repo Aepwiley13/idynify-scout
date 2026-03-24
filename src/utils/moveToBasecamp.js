@@ -46,6 +46,7 @@ export async function moveContactToBasecamp({
   await updateDoc(contactRef, {
     stage: 'basecamp',
     stage_source: 'manual_override',
+    stage_entered_at: new Date().toISOString(),
     basecamp_moved_at: new Date().toISOString(),
     basecamp_moved_reason: reason,
   });

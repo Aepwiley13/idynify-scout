@@ -45,6 +45,7 @@ export async function moveContactToHunter({
   await updateDoc(contactRef, {
     stage: 'hunter',
     stage_source: 'manual_override',
+    stage_entered_at: new Date().toISOString(),
     hunter_moved_at: new Date().toISOString(),
     hunter_moved_reason: reason,
   });

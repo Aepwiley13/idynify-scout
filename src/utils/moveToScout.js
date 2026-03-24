@@ -46,6 +46,7 @@ export async function moveContactToScout({
   await updateDoc(contactRef, {
     stage: 'scout',
     stage_source: 'manual_override',
+    stage_entered_at: new Date().toISOString(),
     scout_reactivated_at: new Date().toISOString(),
     scout_reactivate_reason: reason,
   });

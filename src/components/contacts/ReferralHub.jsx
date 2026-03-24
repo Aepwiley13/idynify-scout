@@ -9,25 +9,31 @@
  * Also surfaces Barry's Phase 1 network scan (contacts already in Idynify
  * that match your ICP and connect to this contact via overlap signals).
  *
- * Phase 2 (CSV upload) and Phase 3 (LinkedIn OAuth) are future sprints.
+ * Phase 2 (CSV upload) — LinkedIn import button wired in this sprint.
+ * Phase 3 (LinkedIn OAuth) — future sprint.
  */
 
-import { useState, useEffect } from 'react';
-import { Users, ArrowRight, GitBranch, Plus, ChevronRight, CheckCircle, Clock, XCircle, Zap } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Users, ArrowRight, GitBranch, Plus, ChevronRight, CheckCircle, Clock, XCircle, Zap, Upload } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import {
   getContactReferralAnalytics,
+  recordReferralReceived,
+  recordReferralSent,
   recordReferralAskedFor,
   detectReferralOpportunities
 } from '../../services/referralIntelligenceService';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import ReferralHealthPanel from './ReferralHealthPanel';
 
 const TABS = [
   { id: 'referred_to_me', label: 'Referred to me' },
   { id: 'referred_out',   label: 'Referred out'   },
   { id: 'asked_for',      label: 'Asked for'       },
 ];
+
+const ASKED_VIA_OPTIONS = ['Email', 'LinkedIn', 'Call', 'Text'];
 
 // ── Status helpers ────────────────────────────────────────────────
 
@@ -77,6 +83,22 @@ function formatRelativeDate(dateStr) {
   if (days < 7)  return `${days}d ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
+}
+
+// ── Shared form styles ────────────────────────────────────────────
+
+function inputStyle(T) {
+  return {
+    width: '100%', boxSizing: 'border-box',
+    padding: '7px 10px', borderRadius: 8,
+    border: `1px solid ${T.border}`, background: T.appBg,
+    color: T.text, fontSize: 12, outline: 'none',
+    fontFamily: 'inherit',
+  };
+}
+
+function labelStyle(T) {
+  return { fontSize: 10, fontWeight: 600, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' };
 }
 
 // ── Tab content components ────────────────────────────────────────
@@ -145,6 +167,11 @@ function ReferredOutTab({ records, T }) {
               </div>
               {r.context && (
                 <div style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>{r.context}</div>
+              )}
+              {r.referral_value && (
+                <div style={{ fontSize: 11, color: BRAND.pink, marginTop: 3, fontWeight: 600 }}>
+                  {r.referral_value}
+                </div>
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
@@ -224,7 +251,7 @@ function AskedForTab({ records, T }) {
 
 // ── ICP Network Scan (Phase 1) ────────────────────────────────────
 
-function NetworkScanSection({ contact, T }) {
+function NetworkScanSection({ contact, T, onOpenLinkedInImport }) {
   const [opportunities, setOpportunities] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -255,19 +282,33 @@ function NetworkScanSection({ contact, T }) {
           <Zap size={13} color={BRAND.pink} />
           <span style={{ fontSize: 12, fontWeight: 700, color: BRAND.pink }}>Barry · Network Scan</span>
         </div>
-        {opportunities === null && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {/* Phase 2: LinkedIn CSV import */}
           <button
-            onClick={runScan}
-            disabled={loading}
+            onClick={onOpenLinkedInImport}
             style={{
               fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7,
-              background: BRAND.pink, border: 'none', color: '#fff',
-              cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+              background: 'transparent', border: `1px solid ${BRAND.pink}40`,
+              color: BRAND.pink, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
             }}
           >
-            {loading ? 'Scanning...' : 'Scan Network →'}
+            <Upload size={10} /> Import LinkedIn
           </button>
-        )}
+          {opportunities === null && (
+            <button
+              onClick={runScan}
+              disabled={loading}
+              style={{
+                fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 7,
+                background: BRAND.pink, border: 'none', color: '#fff',
+                cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Scanning...' : 'Scan Network →'}
+            </button>
+          )}
+        </div>
       </div>
 
       {opportunities === null ? (
@@ -326,11 +367,37 @@ function NetworkScanSection({ contact, T }) {
 
 // ── Main component ────────────────────────────────────────────────
 
-export default function ReferralHub({ contact }) {
+export default function ReferralHub({ contact, onOpenLinkedInImport }) {
   const T = useT();
   const [activeTab, setActiveTab] = useState('referred_to_me');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Log form state
+  const [logFormTab, setLogFormTab] = useState(null); // null | tab id
+  const [logForm, setLogForm] = useState({
+    // Referred to Me fields
+    toContactName: '',
+    // Referred Out fields
+    referredToName: '',
+    // Asked For fields
+    targetName: '',
+    targetCompany: '',
+    targetTitle: '',
+    askedVia: 'Email',
+    // Shared
+    context: '',
+    referral_value: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const refreshData = useCallback(async () => {
+    if (!contact?.id) return;
+    const user = getEffectiveUser();
+    if (!user) return;
+    const d = await getContactReferralAnalytics(user.uid, contact.id).catch(() => null);
+    if (d) setData(d);
+  }, [contact?.id]);
 
   useEffect(() => {
     if (!contact?.id) return;
@@ -345,11 +412,268 @@ export default function ReferralHub({ contact }) {
     return () => { cancelled = true; };
   }, [contact?.id]);
 
+  function openLogForm(tabId) {
+    setLogFormTab(tabId);
+    setLogForm({ toContactName: '', referredToName: '', targetName: '', targetCompany: '', targetTitle: '', askedVia: 'Email', context: '', referral_value: '' });
+  }
+
+  function closeLogForm() {
+    setLogFormTab(null);
+  }
+
+  async function handleLogSubmit() {
+    const user = getEffectiveUser();
+    if (!user || !contact?.id || submitting) return;
+    setSubmitting(true);
+
+    try {
+      if (logFormTab === 'referred_to_me') {
+        await recordReferralReceived(user.uid, {
+          fromContactId:   contact.id,
+          fromContactName: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+          toContactId:     null,
+          toContactName:   logForm.toContactName.trim(),
+          context:         logForm.context.trim() || null,
+          referral_value:  logForm.referral_value.trim() || null,
+        });
+      } else if (logFormTab === 'referred_out') {
+        await recordReferralSent(user.uid, {
+          fromContactId:   contact.id,
+          fromContactName: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+          toContactId:     null,
+          toContactName:   logForm.referredToName.trim(),
+          context:         logForm.context.trim() || null,
+          referral_value:  logForm.referral_value.trim() || null,
+        });
+      } else if (logFormTab === 'asked_for') {
+        await recordReferralAskedFor(user.uid, {
+          fromContactId:   contact.id,
+          fromContactName: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
+          targetName:      logForm.targetName.trim(),
+          targetCompany:   logForm.targetCompany.trim() || null,
+          targetTitle:     logForm.targetTitle.trim() || null,
+          askedVia:        logForm.askedVia,
+          context:         logForm.context.trim() || null,
+          referral_value:  logForm.referral_value.trim() || null,
+        });
+      }
+
+      closeLogForm();
+      await refreshData();
+    } catch (err) {
+      console.error('[ReferralHub] Log submit failed:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function isSubmitDisabled() {
+    if (submitting) return true;
+    if (logFormTab === 'referred_to_me') return !logForm.toContactName.trim();
+    if (logFormTab === 'referred_out')   return !logForm.referredToName.trim();
+    if (logFormTab === 'asked_for')      return !logForm.targetName.trim();
+    return false;
+  }
+
   const tabCounts = {
     referred_to_me: data?.referred_to_me_records?.length ?? 0,
     referred_out:   data?.referred_out_records?.length   ?? 0,
     asked_for:      data?.asked_for_records?.length      ?? 0,
   };
+
+  // ── Inline log forms ──────────────────────────────────────────
+
+  function LogFormWrapper({ children }) {
+    return (
+      <div style={{
+        marginTop: 14, padding: '14px 16px', borderRadius: 10,
+        border: `1px solid ${BRAND.pink}30`, background: `${BRAND.pink}06`,
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        {children}
+        <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+          <button
+            onClick={handleLogSubmit}
+            disabled={isSubmitDisabled()}
+            style={{
+              flex: 1, padding: '7px 0', borderRadius: 8, border: 'none',
+              background: isSubmitDisabled() ? `${BRAND.pink}50` : BRAND.pink,
+              color: '#fff', fontSize: 12, fontWeight: 700,
+              cursor: isSubmitDisabled() ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {submitting ? 'Logging...' : 'Log it'}
+          </button>
+          <button
+            onClick={closeLogForm}
+            style={{
+              padding: '7px 14px', borderRadius: 8,
+              border: `1px solid ${T.border}`, background: 'transparent',
+              color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function ReferredToMeForm() {
+    return (
+      <LogFormWrapper>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Who were you referred to? *</span>
+          <input
+            style={inputStyle(T)}
+            placeholder="Their name"
+            value={logForm.toContactName}
+            onChange={e => setLogForm(f => ({ ...f, toContactName: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Context (optional)</span>
+          <textarea
+            style={{ ...inputStyle(T), resize: 'vertical', minHeight: 52 }}
+            placeholder="Why did they send them your way?"
+            value={logForm.context}
+            onChange={e => setLogForm(f => ({ ...f, context: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Deal value (optional)</span>
+          <input
+            style={inputStyle(T)}
+            placeholder="e.g. $4.8k/yr, $500 one-time, TBD"
+            value={logForm.referral_value}
+            onChange={e => setLogForm(f => ({ ...f, referral_value: e.target.value }))}
+          />
+        </div>
+      </LogFormWrapper>
+    );
+  }
+
+  function ReferredOutForm() {
+    return (
+      <LogFormWrapper>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Who did you refer them to? *</span>
+          <input
+            style={inputStyle(T)}
+            placeholder="Recipient's name"
+            value={logForm.referredToName}
+            onChange={e => setLogForm(f => ({ ...f, referredToName: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Context (optional)</span>
+          <textarea
+            style={{ ...inputStyle(T), resize: 'vertical', minHeight: 52 }}
+            placeholder="Why did you make this intro?"
+            value={logForm.context}
+            onChange={e => setLogForm(f => ({ ...f, context: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Deal value (optional)</span>
+          <input
+            style={inputStyle(T)}
+            placeholder="e.g. $4.8k/yr, $500 one-time, TBD"
+            value={logForm.referral_value}
+            onChange={e => setLogForm(f => ({ ...f, referral_value: e.target.value }))}
+          />
+        </div>
+      </LogFormWrapper>
+    );
+  }
+
+  function AskedForForm() {
+    return (
+      <LogFormWrapper>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={labelStyle(T)}>Who do you want to meet? *</span>
+            <input
+              style={inputStyle(T)}
+              placeholder="Their name"
+              value={logForm.targetName}
+              onChange={e => setLogForm(f => ({ ...f, targetName: e.target.value }))}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={labelStyle(T)}>Their company</span>
+            <input
+              style={inputStyle(T)}
+              placeholder="Company"
+              value={logForm.targetCompany}
+              onChange={e => setLogForm(f => ({ ...f, targetCompany: e.target.value }))}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={labelStyle(T)}>Their title</span>
+            <input
+              style={inputStyle(T)}
+              placeholder="Title"
+              value={logForm.targetTitle}
+              onChange={e => setLogForm(f => ({ ...f, targetTitle: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={labelStyle(T)}>How did you ask?</span>
+            <select
+              style={{ ...inputStyle(T), appearance: 'none' }}
+              value={logForm.askedVia}
+              onChange={e => setLogForm(f => ({ ...f, askedVia: e.target.value }))}
+            >
+              {ASKED_VIA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={labelStyle(T)}>Deal value (optional)</span>
+            <input
+              style={inputStyle(T)}
+              placeholder="$4.8k/yr, TBD…"
+              value={logForm.referral_value}
+              onChange={e => setLogForm(f => ({ ...f, referral_value: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={labelStyle(T)}>Context (optional)</span>
+          <textarea
+            style={{ ...inputStyle(T), resize: 'vertical', minHeight: 52 }}
+            placeholder="Why do you want this intro?"
+            value={logForm.context}
+            onChange={e => setLogForm(f => ({ ...f, context: e.target.value }))}
+          />
+        </div>
+      </LogFormWrapper>
+    );
+  }
+
+  // ── Log button ────────────────────────────────────────────────
+
+  function LogButton({ tabId, label }) {
+    if (logFormTab === tabId) return null;
+    return (
+      <button
+        onClick={() => openLogForm(tabId)}
+        style={{
+          marginTop: 12, width: '100%', padding: '8px 0', borderRadius: 9,
+          border: `1px dashed ${T.border}`, background: 'transparent',
+          color: T.textMuted, fontSize: 11, fontWeight: 600,
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          transition: 'border-color 0.15s, color 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND.pink; e.currentTarget.style.color = BRAND.pink; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMuted; }}
+      >
+        <Plus size={11} /> {label}
+      </button>
+    );
+  }
 
   return (
     <div style={{
@@ -371,12 +695,15 @@ export default function ReferralHub({ contact }) {
           )}
         </div>
 
+        {/* Health metrics — shown once data is loaded */}
+        {!loading && data && <ReferralHealthPanel data={data} />}
+
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 2 }}>
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); closeLogForm(); }}
               style={{
                 padding: '7px 12px',
                 borderRadius: '8px 8px 0 0',
@@ -414,18 +741,34 @@ export default function ReferralHub({ contact }) {
         ) : (
           <>
             {activeTab === 'referred_to_me' && (
-              <ReferredToMeTab records={data?.referred_to_me_records} T={T} />
+              <>
+                <ReferredToMeTab records={data?.referred_to_me_records} T={T} />
+                <LogButton tabId="referred_to_me" label="Log referral received" />
+                {logFormTab === 'referred_to_me' && <ReferredToMeForm />}
+              </>
             )}
             {activeTab === 'referred_out' && (
-              <ReferredOutTab records={data?.referred_out_records} T={T} />
+              <>
+                <ReferredOutTab records={data?.referred_out_records} T={T} />
+                <LogButton tabId="referred_out" label="Log referral sent" />
+                {logFormTab === 'referred_out' && <ReferredOutForm />}
+              </>
             )}
             {activeTab === 'asked_for' && (
-              <AskedForTab records={data?.asked_for_records} T={T} />
+              <>
+                <AskedForTab records={data?.asked_for_records} T={T} />
+                <LogButton tabId="asked_for" label="Log intro request" />
+                {logFormTab === 'asked_for' && <AskedForForm />}
+              </>
             )}
 
-            {/* Network scan — shown on all tabs but most relevant in asked_for */}
+            {/* Network scan — shown on asked_for tab */}
             {activeTab === 'asked_for' && (
-              <NetworkScanSection contact={contact} T={T} />
+              <NetworkScanSection
+                contact={contact}
+                T={T}
+                onOpenLinkedInImport={onOpenLinkedInImport}
+              />
             )}
           </>
         )}

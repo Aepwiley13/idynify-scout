@@ -43,11 +43,24 @@ export default function KeyMetricsGrid({ contact, referralData }) {
     : '—';
   const referralsOut = referralData?.referrals_sent_to_you || 0;
 
-  // Days in current stage — requires stage_entered_at on the contact record.
-  // Falls back to "—" until that field is populated by stage transitions.
+  // Days in current stage — derived from stage-specific move timestamps.
+  // stage_entered_at (added Sprint 2) is authoritative for future transitions;
+  // stage-specific timestamps (hunter_moved_at, etc.) cover existing contacts.
+  function getStageEnteredAt(c) {
+    if (c?.stage_entered_at) return c.stage_entered_at;
+    const map = {
+      scout:          c?.scout_reactivated_at  || c?.created_at,
+      hunter:         c?.hunter_moved_at,
+      sniper:         c?.sniper_moved_at,
+      basecamp:       c?.basecamp_moved_at,
+      reinforcements: c?.reinforcements_activated_at,
+    };
+    return map[c?.stage] || null;
+  }
   let daysInStage = '—';
-  if (contact?.stage_entered_at) {
-    const days = Math.floor((Date.now() - new Date(contact.stage_entered_at).getTime()) / 86_400_000);
+  const stageEnteredAt = getStageEnteredAt(contact);
+  if (stageEnteredAt) {
+    const days = Math.floor((Date.now() - new Date(stageEnteredAt).getTime()) / 86_400_000);
     daysInStage = `${days}d`;
   }
 

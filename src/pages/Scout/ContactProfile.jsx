@@ -34,6 +34,7 @@ import EngagementScoreRing from '../../components/contacts/EngagementScoreRing';
 import RelationshipArc from '../../components/contacts/RelationshipArc';
 import KeyMetricsGrid from '../../components/contacts/KeyMetricsGrid';
 import ReferralHub from '../../components/contacts/ReferralHub';
+import LinkedInImportModal from '../../components/contacts/LinkedInImportModal';
 import ReinforcementsPlaybooks from '../../components/contacts/ReinforcementsPlaybooks';
 import { STAGE_MAP } from '../../constants/stageSystem';
 import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
@@ -113,6 +114,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
   const [photoRefreshLoading, setPhotoRefreshLoading] = useState(false);
   const [photoRefreshError, setPhotoRefreshError] = useState(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showLinkedInImport, setShowLinkedInImport] = useState(false);
   const [archiveReason, setArchiveReason] = useState('other');
   const [archiving, setArchiving] = useState(false);
   // Stage tab bar — which tab is previewed (null = show active stage)
@@ -815,10 +817,20 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
         {/* ── Referral Hub (full width, below three-col grid) ── */}
         <div className="referral-hub-row">
-          <ReferralHub contact={contact} />
+          <ReferralHub
+            contact={contact}
+            onOpenLinkedInImport={() => setShowLinkedInImport(true)}
+          />
         </div>
 
       </div>
+
+      {/* LinkedIn Import Modal */}
+      <LinkedInImportModal
+        isOpen={showLinkedInImport}
+        onClose={() => setShowLinkedInImport(false)}
+        onImportComplete={() => setShowLinkedInImport(false)}
+      />
 
       {/* Archive Confirmation Modal */}
       {showArchiveModal && (

@@ -875,6 +875,32 @@ export async function recordReferralAskedFor(userId, {
  * @param {string} params.responseStatus  - 'no_response' | 'declined' | 'accepted'
  * @param {string} [params.declineReason] - Why they declined (free text)
  */
+/**
+ * Fetch hot and warm LinkedIn connections for a user.
+ * Used by Barry Network Scan to surface ICP matches from the imported network.
+ *
+ * Queries users/{userId}/linkedin_connections where icp_tier is 'hot' or 'warm'.
+ * Results are sorted client-side by icp_match_score descending — no composite
+ * Firestore index required (the `in` filter alone does not need one).
+ *
+ * @param {string} userId
+ * @param {number} [cap=20] - max results to return
+ * @returns {Promise<Array<{ id, first_name, last_name, company, title, icp_match_score, icp_tier, idynify_contact_id }>>}
+ */
+export async function detectLinkedInOpportunities(userId, cap = 20) {
+  try {
+    const col  = collection(db, 'users', userId, 'linkedin_connections');
+    const q    = query(col, where('icp_tier', 'in', ['hot', 'warm']));
+    const snap = await getDocs(q);
+    const results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    results.sort((a, b) => (b.icp_match_score || 0) - (a.icp_match_score || 0));
+    return results.slice(0, cap);
+  } catch (err) {
+    console.error('[ReferralIntelligence] detectLinkedInOpportunities failed:', err);
+    return [];
+  }
+}
+
 export async function updateAskedForStatus(userId, referralId, {
   askStatus,
   responseStatus,

@@ -332,7 +332,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
             )}
             <div className="space-y-2">
               {q.options.map(opt => (
-                <label key={opt} className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-cyan-950/30 transition-all">
+                <label key={opt} className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-gray-100 transition-all">
                   <input
                     type="radio"
                     name={q.id}
@@ -380,9 +380,9 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
                     disabled={!canSelect}
                     className={`p-4 rounded-lg border-2 transition-all text-left ${
                       isSelected
-                        ? 'bg-cyan-500/20 border-gray-300 text-gray-900 font-semibold'
+                        ? 'bg-cyan-100 border-cyan-400 text-gray-900 font-semibold'
                         : canSelect
-                        ? 'bg-cyan-950/30 border-gray-300/30 text-gray-300 hover:border-gray-300/50 hover:bg-gray-50'
+                        ? 'bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                         : 'bg-white/30 border-gray-700/30 text-gray-600 cursor-not-allowed'
                     }`}
                   >
@@ -421,7 +421,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
           )}
           
           {/* Previous Sections Status */}
-          <div className="mt-4 p-4 bg-cyan-950/30 rounded-lg border border-gray-300/30">
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-300/30">
             <p className="text-sm text-gray-900 font-semibold mb-2">Data Available from Previous Sections:</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
               <div className={`p-2 rounded ${sectionsAvailable.section4 ? 'bg-green-500/20 text-green-300' : 'bg-gray-700/20 text-gray-500'}`}>
@@ -475,7 +475,7 @@ export default function Section9Messaging({ initialData = {}, onSave, onComplete
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+            <div className="bg-gray-50 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 📧 Messaging Framework
               </h2>

@@ -268,7 +268,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
           onChange={(e) => handleInputChange(q.id, e.target.value)}
           placeholder={q.placeholder}
           rows={4}
-          className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
+          className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
         />
         {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
         {q.validation?.minLength && (
@@ -328,7 +328,7 @@ export default function Section5PainPointsMotivations({ initialData = {}, onSave
         ) : (
           <>
             {/* Output Display */}
-            <div className="bg-cyan-950/30 border-2 border-gray-300/50 rounded-xl p-4 mb-4">
+            <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 mb-4">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 💢 Pain & Motivation Map
               </h2>

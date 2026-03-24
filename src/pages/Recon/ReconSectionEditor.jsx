@@ -136,7 +136,21 @@ export default function ReconSectionEditor() {
     }
   };
 
+  // Check if form data has at least some meaningful content
+  const hasSubstantiveData = (data) => {
+    if (!data || typeof data !== 'object') return false;
+    return Object.values(data).some(val => {
+      if (Array.isArray(val)) return val.some(v => typeof v === 'string' && v.trim().length > 0);
+      if (typeof val === 'string') return val.trim().length > 0;
+      return val != null;
+    });
+  };
+
   const fetchCoaching = async (savedData) => {
+    // Don't fetch coaching if form is essentially empty — prevents Barry
+    // from showing "no fields populated" warnings on auto-save
+    if (!hasSubstantiveData(savedData)) return;
+
     setCoachingLoading(true);
     setCoaching(null);
     try {
@@ -191,6 +205,14 @@ export default function ReconSectionEditor() {
       if (!user) return;
 
       const dataToSave = data || formData;
+
+      // Prevent completing sections with no data filled in
+      if (!hasSubstantiveData(dataToSave)) {
+        setToastVariant('save');
+        setShowToast(true);
+        return;
+      }
+
       await completeSection(user.uid, 'recon', sectionNum, dataToSave);
 
       setToastVariant('complete');
@@ -198,9 +220,8 @@ export default function ReconSectionEditor() {
 
       await fetchCoaching(dataToSave);
 
-      setTimeout(() => {
-        navigate(parentModule ? `/recon/${parentModule}` : '/recon');
-      }, coaching ? 3500 : 2000);
+      // Don't auto-navigate — let user see Barry's feedback first.
+      // They can use the Back button when ready.
     } catch (error) {
       console.error('Error completing section:', error);
       throw error;

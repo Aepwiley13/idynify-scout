@@ -126,8 +126,7 @@ const SECTION_2_QUESTIONS = [
     question: "Starting price",
     type: "text",
     required: true,
-    placeholder: "$299/month",
-    validation: { pattern: /^\$[\d,]+/ },
+    placeholder: "e.g., $299/month, Free trial then $49/mo",
     helpText: "What's your entry-level price point?",
     barryContext: "Barry uses your price point to filter prospects by budget and calculate ROI messaging."
   },
@@ -379,7 +378,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
               value={value || ''}
               onChange={(e) => handleInputChange(q.id, e.target.value)}
               placeholder={q.placeholder}
-              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
             />
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
             {q.validation?.maxLength && (
@@ -404,7 +403,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
               onChange={(e) => handleInputChange(q.id, e.target.value)}
               placeholder={q.placeholder}
               rows={4}
-              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
+              className={`w-full bg-gray-50 border-2 ${hasError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all font-sans resize-y`}
             />
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
             {q.validation?.minLength && (
@@ -469,7 +468,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
       case 'multi-select':
         const selectedCount = (value || []).length;
         const maxSelections = q.maxSelections || Infinity;
-        
+        const otherSelected = (value || []).includes('Other (specify)');
+
         return (
           <div key={q.id} className="mb-4">
             <label className="block text-lg font-semibold mb-2 text-gray-900">
@@ -491,8 +491,8 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                     onClick={() => handleMultiSelectToggle(q.id, opt)}
                     className={`p-3 rounded-lg border-2 transition-all text-left ${
                       isSelected
-                        ? 'bg-cyan-500/20 border-gray-300 text-gray-900'
-                        : 'bg-cyan-950/30 border-gray-300/30 text-gray-300 hover:border-gray-300/50'
+                        ? 'bg-cyan-100 border-cyan-400 text-gray-900 font-semibold'
+                        : 'bg-gray-100 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
                     {opt}
@@ -500,6 +500,15 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                 );
               })}
             </div>
+            {otherSelected && (
+              <input
+                type="text"
+                value={answers[`${q.id}_other`] || ''}
+                onChange={(e) => handleInputChange(`${q.id}_other`, e.target.value)}
+                placeholder="Please specify..."
+                className="mt-3 w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all"
+              />
+            )}
             {hasError && <p className="text-red-400 text-sm mt-2">{hasError}</p>}
           </div>
         );
@@ -524,7 +533,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                       value={itemValue}
                       onChange={(e) => handleMultiTextChange(q.id, idx, e.target.value)}
                       placeholder={`${q.placeholder || q.question} ${idx + 1}`}
-                      className={`w-full bg-gray-50 border-2 ${itemError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-cyan-700 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
+                      className={`w-full bg-gray-50 border-2 ${itemError ? 'border-red-500' : 'border-gray-300/30'} rounded-xl p-4 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-300 focus:ring-4 focus:ring-blue-400/20 transition-all`}
                     />
                     {itemError && <p className="text-red-400 text-xs mt-1">{itemError}</p>}
                     {q.validation?.maxLength && itemValue && (

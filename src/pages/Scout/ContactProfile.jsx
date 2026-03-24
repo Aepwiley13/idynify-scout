@@ -29,6 +29,7 @@ import HunterActionPanel from '../../components/contacts/HunterActionPanel';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import GameBucketSelector from '../../components/contacts/GameBucketSelector';
 import PersistentEngageBar from '../../components/contacts/PersistentEngageBar';
+import StageEngagementPanel from '../../components/contacts/StageEngagementPanel';
 import NextBestStep from '../../components/contacts/NextBestStep';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
@@ -53,6 +54,8 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
   const [reconStatus, setReconStatus] = useState({ progress: 0, loaded: false });
   const engagementSectionRef = useRef(null);
   const [staleDismissed, setStaleDismissed] = useState(false);
+  const [engageBarCollapsed, setEngageBarCollapsed] = useState(false);
+  const [insightPanelCollapsed, setInsightPanelCollapsed] = useState(false);
   const [needsManualLinkedIn, setNeedsManualLinkedIn] = useState(false);
   const [manualLinkedInUrl, setManualLinkedInUrl] = useState('');
   const [enrichmentSummary, setEnrichmentSummary] = useState(null);
@@ -696,6 +699,8 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
         <PersistentEngageBar
           contact={contact}
           onEngageClick={triggerInlineEngagement}
+          collapsed={engageBarCollapsed}
+          onToggleCollapse={() => setEngageBarCollapsed(v => !v)}
         />
 
         {/* Hunter Action Panel — Move to Sniper when meeting booked / demo done */}
@@ -707,9 +712,19 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
           }}
         />
 
+        {/* Stage Engagement Panel — goal framing + pipeline progression CTA per stage */}
+        <StageEngagementPanel
+          contact={contact}
+          onMoved={({ stageTo }) =>
+            setContact(prev => ({ ...prev, stage: stageTo, stage_source: 'manual_override' }))
+          }
+        />
+
         {/* Barry Insight Panel — Step 7 proactive recommendations */}
         <BarryInsightPanel
           contactId={contact.id}
+          collapsed={insightPanelCollapsed}
+          onToggleCollapse={() => setInsightPanelCollapsed(v => !v)}
           onAction={(rec) => {
             if (['re_engage', 'start_mission', 'approve_next_step', 'switch_channel', 'accelerate_sequence'].includes(rec.action.type)) {
               triggerInlineEngagement();

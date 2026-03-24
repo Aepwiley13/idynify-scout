@@ -219,7 +219,7 @@ const REPLY_CHANNELS = [
   { id: 'other', icon: RefreshCw, label: 'Other' }
 ];
 
-export default function PersistentEngageBar({ contact, onEngageClick }) {
+export default function PersistentEngageBar({ contact, onEngageClick, collapsed, onToggleCollapse }) {
   const [engageState, setEngageState] = useState('not_started');
   const [lastEvents, setLastEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -420,6 +420,41 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
     );
   }
 
+  // Collapsed view — just a slim header strip
+  if (collapsed) {
+    return (
+      <div
+        className={`persistent-engage-bar peb-state-${engageState}`}
+        style={{
+          '--peb-color': config.color,
+          '--peb-bg': config.bgColor,
+          '--peb-border': config.borderColor,
+          '--peb-cta': config.ctaColor,
+        }}
+      >
+        <div className="peb-primary" style={{ cursor: 'pointer' }} onClick={() => onToggleCollapse && onToggleCollapse()}>
+          <div className="peb-status">
+            <div className="peb-status-icon-wrap">
+              <StateIcon className="peb-status-icon" />
+            </div>
+            <div className="peb-status-text">
+              <span className="peb-status-label">{config.label}</span>
+            </div>
+          </div>
+          <div className="peb-actions">
+            <button
+              className="peb-expand-btn"
+              onClick={(e) => { e.stopPropagation(); onToggleCollapse && onToggleCollapse(); }}
+              aria-label="Expand"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`persistent-engage-bar peb-state-${engageState}`}
@@ -502,14 +537,27 @@ export default function PersistentEngageBar({ contact, onEngageClick }) {
             <ArrowRight className="peb-cta-arrow" />
           </button>
 
-          {/* Expand toggle */}
+          {/* Expand toggle (detail section) */}
           <button
             className="peb-expand-btn"
             onClick={() => setExpanded(e => !e)}
-            aria-label={expanded ? 'Collapse' : 'Expand'}
+            aria-label={expanded ? 'Collapse details' : 'Expand details'}
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
+
+          {/* Collapse entire bar to header strip */}
+          {onToggleCollapse && (
+            <button
+              className="peb-expand-btn"
+              onClick={() => onToggleCollapse()}
+              aria-label="Minimize bar"
+              title="Minimize"
+              style={{ opacity: 0.45, fontSize: 16, lineHeight: 1, paddingBottom: 2 }}
+            >
+              −
+            </button>
+          )}
         </div>
       </div>
 

@@ -241,7 +241,7 @@ import { deriveStageFromPersonType } from '../constants/stageSystem';
 export const PERSON_TYPE_IDS = ['lead', 'customer', 'partner', 'network', 'past_customer'];
 export const LEAD_STATUS_IDS  = ['new_lead', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'on_hold'];
 export const ENGAGE_STATUS_IDS = ['never_engaged', 'in_progress', 'awaiting_reply', 'paused'];
-export const NBS_TYPES = ['follow_up', 'channel_switch', 'referral_ask', 'intro_offer', 'check_in', 'close', 'nurture_touch'];
+export const NBS_TYPES = ['follow_up', 'channel_switch', 'referral_ask', 'intro_offer', 'check_in', 'close', 'nurture_touch', 'referral_thank_you', 'referral_ask_intro', 'keep_warm', 'public_recognition'];
 export const NBS_STATUSES = ['pending', 'confirmed', 'completed', 'dismissed'];
 export const OUTCOME_TYPES = ['no_reply', 'replied_positive', 'replied_negative', 'bounced'];
 export const REFERRAL_QUALITY = ['low', 'medium', 'high'];

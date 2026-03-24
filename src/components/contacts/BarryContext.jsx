@@ -2,13 +2,28 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, Loader } from 'lucide-react';
 import './BarryContext.css';
 
+function formatRelativeDate(dateStr) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  if (isNaN(date)) return null;
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
 export default function BarryContext({
   barryContext,
   mode = 'preview',
   onViewFullProfile,
-  loading = false
+  loading = false,
+  updatedAt = null,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  // Full mode: collapsed by default to save Intel column space
+  const [fullExpanded, setFullExpanded] = useState(false);
 
   // Loading state
   if (loading) {
@@ -84,16 +99,25 @@ export default function BarryContext({
   }
 
   // Full mode (for profile page)
+  const relativeTime = formatRelativeDate(updatedAt);
   return (
     <div className="barry-context-card barry-full">
-      <div className="barry-header">
-        <h3 className="barry-title">Context by Barry</h3>
-        <div className="barry-source-badge">
-          <span>Source: Barry</span>
-        </div>
-      </div>
+      <button
+        className="barry-header barry-header--clickable"
+        onClick={() => setFullExpanded(v => !v)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
+      >
+        <h3 className="barry-title" style={{ flex: 1 }}>Barry's Intel</h3>
+        <span style={{ fontSize: 10, color: 'var(--text-faint, #888)', marginRight: 8 }}>
+          {relativeTime ? `Updated ${relativeTime}` : 'Not yet analyzed'}
+        </span>
+        {fullExpanded
+          ? <ChevronUp className="w-5 h-5" />
+          : <ChevronDown className="w-5 h-5" />
+        }
+      </button>
 
-      <div className="barry-content-full">
+      {fullExpanded && <div className="barry-content-full">
         {/* 1. Who You're Meeting */}
         <div className="barry-section">
           <h4 className="barry-section-title">Who You're Meeting</h4>
@@ -142,7 +166,7 @@ export default function BarryContext({
             <p className="barry-reframe-text">{barryContext.calmReframe}</p>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

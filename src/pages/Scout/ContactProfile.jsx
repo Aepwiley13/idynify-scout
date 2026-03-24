@@ -35,7 +35,7 @@ import RelationshipArc from '../../components/contacts/RelationshipArc';
 import KeyMetricsGrid from '../../components/contacts/KeyMetricsGrid';
 import ReferralHub from '../../components/contacts/ReferralHub';
 import LinkedInImportModal from '../../components/contacts/LinkedInImportModal';
-import ReinforcementsPlaybooks from '../../components/contacts/ReinforcementsPlaybooks';
+import ReinforcementsEngagementPanel from '../../components/contacts/ReinforcementsEngagementPanel';
 import { STAGE_MAP } from '../../constants/stageSystem';
 import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
 import { useT } from '../../theme/ThemeContext';
@@ -138,17 +138,8 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
     }
   }, [loading, contact]);
 
-  // Load referral analytics once contact is ready (feeds KeyMetricsGrid)
-  useEffect(() => {
-    if (!contact?.id) return;
-    const user = getEffectiveUser();
-    if (!user) return;
-    let cancelled = false;
-    getContactReferralAnalytics(user.uid, contact.id)
-      .then(d => { if (!cancelled) setReferralData(d); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [contact?.id]);
+  // Referral analytics are now loaded inside loadContactProfile() via Promise.all.
+  // This comment is kept to document the intentional removal of the separate useEffect.
 
   // Auto-trigger engage when the panel opens with autoEngage prop set by AllLeads.
   // A ref guards against re-firing if loading/contact re-evaluates after first trigger.
@@ -171,8 +162,12 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
       const userId = user.uid;
 
-      // Load contact document
-      const contactDoc = await getDoc(doc(db, 'users', userId, 'contacts', contactId));
+      // Load contact + referral analytics in one coordinated fetch.
+      // This ensures all three columns read from the same snapshot — no stale metrics.
+      const [contactDoc, referralAnalytics] = await Promise.all([
+        getDoc(doc(db, 'users', userId, 'contacts', contactId)),
+        getContactReferralAnalytics(userId, contactId).catch(() => null),
+      ]);
 
       if (!contactDoc.exists()) {
         console.error('❌ Contact not found');
@@ -183,6 +178,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
       const contactData = { ...contactDoc.data(), id: contactDoc.id };
       setContact(contactData);
+      if (referralAnalytics) setReferralData(referralAnalytics);
       console.log('✅ Contact profile loaded:', contactData.name);
 
       // Load Barry context if available
@@ -243,7 +239,8 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       // Update contact in Firestore with Barry context
       const contactRef = doc(db, 'users', user.uid, 'contacts', contactData.id);
       await updateDoc(contactRef, {
-        barryContext: result.barryContext
+        barryContext:           result.barryContext,
+        barryContextUpdatedAt:  new Date().toISOString(),
       });
 
       // Update local state
@@ -773,7 +770,18 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
               <>
                 {/* Reinforcements → show playbooks; other stages → standard panels */}
                 {contact.stage === 'reinforcements' ? (
-                  <ReinforcementsPlaybooks contact={contact} />
+                  <ReinforcementsEngagementPanel
+                    contact={contact}
+                    onPrefillCompose={(text) => {
+                      const el = document.getElementById('engagement-section');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      requestAnimationFrame(() => requestAnimationFrame(() => {
+                        const ref = engagementSectionRef.current;
+                        if (ref?.startWithIntent) ref.startWithIntent(text, 'warm');
+                        else if (ref?.triggerFlow) ref.triggerFlow();
+                      }));
+                    }}
+                  />
                 ) : (
                   <StageEngagementPanel
                     contact={contact}

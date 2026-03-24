@@ -209,9 +209,9 @@
 }
 
 .nbs-act-primary {
-  background: var(--nbs-color, #7c3aed);
+  background: #1D9E75; /* Always Barry green — never step-type chrome color */
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(29, 158, 117, 0.2);
 }
 
 .nbs-act-primary:hover:not(:disabled) {

@@ -44,7 +44,7 @@ function getZeroStateConfig(contact) {
     return {
       sublabel: suggestion,
       cta: "Start with Barry's Suggestion",
-      ctaColor: '#7c3aed',
+      ctaColor: '#1D9E75',
       analyzing: false
     };
   }
@@ -54,7 +54,7 @@ function getZeroStateConfig(contact) {
     return {
       sublabel: `Barry knows who ${firstName} is — ready when you are`,
       cta: 'Start Engagement',
-      ctaColor: '#7c3aed',
+      ctaColor: '#1D9E75',
       analyzing: false
     };
   }
@@ -77,17 +77,17 @@ const ENGAGE_STATES = {
     borderColor: 'rgba(107, 114, 128, 0.2)',
     icon: Target,
     cta: 'Start Engagement',             // overridden at render time by getZeroStateConfig()
-    ctaColor: '#7c3aed'                  // overridden at render time by getZeroStateConfig()
+    ctaColor: '#1D9E75'                  // overridden at render time by getZeroStateConfig()
   },
   in_progress: {
     label: 'In Progress',
     sublabel: 'Engagement active — Barry has context loaded',
-    color: '#7c3aed',
-    bgColor: 'rgba(124, 58, 237, 0.06)',
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    color: '#1D9E75',
+    bgColor: 'rgba(29, 158, 117, 0.06)',
+    borderColor: 'rgba(29, 158, 117, 0.25)',
     icon: Zap,
     cta: 'Continue',
-    ctaColor: '#7c3aed'
+    ctaColor: '#1D9E75'
   },
   awaiting_reply: {
     label: 'Awaiting Reply',
@@ -97,7 +97,7 @@ const ENGAGE_STATES = {
     borderColor: 'rgba(245, 158, 11, 0.25)',
     icon: Clock,
     cta: 'Follow Up',
-    ctaColor: '#d97706'
+    ctaColor: '#1D9E75'
   },
   follow_up_due: {
     label: 'Follow-Up Due',
@@ -107,7 +107,7 @@ const ENGAGE_STATES = {
     borderColor: 'rgba(239, 68, 68, 0.25)',
     icon: AlertCircle,
     cta: 'Follow Up Now',
-    ctaColor: '#dc2626'
+    ctaColor: '#1D9E75'
   },
   converted: {
     label: 'Converted',
@@ -400,6 +400,29 @@ export default function PersistentEngageBar({ contact, onEngageClick, collapsed,
   const lastActivity = formatLastActivity(lastEvents);
   const lastEventLabel = getLastEventLabel(lastEvents);
 
+  // NBS active check — suppress Follow-Up Now CTA when Barry has an active queued step.
+  // An NBS is "active" when a next_step_queued event exists and is not yet completed/dismissed.
+  const nbsQueuedEvent = lastEvents.find(e => e.type === 'next_step_queued');
+  const nbsResolvedAfter = nbsQueuedEvent && lastEvents.find(e =>
+    (e.type === 'next_step_completed' || e.type === 'next_step_dismissed') &&
+    new Date(e.timestamp?.toDate?.() || e.timestamp) >
+    new Date(nbsQueuedEvent.timestamp?.toDate?.() || nbsQueuedEvent.timestamp)
+  );
+  const hasActiveNbs = !!(nbsQueuedEvent && !nbsResolvedAfter);
+
+  // When NBS is active on a follow_up_due contact, format a "due X ago" label
+  const followUpDueLabel = (() => {
+    if (engageState !== 'follow_up_due' || !hasActiveNbs) return null;
+    if (nbsQueuedEvent?.metadata?.dueDate) {
+      const due = new Date(nbsQueuedEvent.metadata.dueDate);
+      const hrs = Math.round((Date.now() - due.getTime()) / 3_600_000);
+      if (hrs < 1) return 'Follow-up due just now';
+      if (hrs < 24) return `Follow-up due ${hrs}h ago`;
+      return `Follow-up due ${Math.floor(hrs / 24)}d ago`;
+    }
+    return 'Follow-up due';
+  })();
+
   // Channel availability
   const channelStatus = CHANNELS.map(ch => ({
     ...ch,
@@ -527,15 +550,25 @@ export default function PersistentEngageBar({ contact, onEngageClick, collapsed,
             })}
           </div>
 
-          {/* Main CTA */}
-          <button
-            className="peb-cta-btn"
-            onClick={() => onEngageClick && onEngageClick()}
-          >
-            <Zap className="peb-cta-icon" />
-            <span>{config.cta}</span>
-            <ArrowRight className="peb-cta-arrow" />
-          </button>
+          {/* Main CTA — suppressed when Barry NBS is active on follow_up_due */}
+          {followUpDueLabel ? (
+            <span style={{
+              fontSize: 11, color: '#ef4444', fontWeight: 500,
+              padding: '5px 10px', borderRadius: 6,
+              background: 'rgba(239,68,68,0.08)',
+            }}>
+              {followUpDueLabel}
+            </span>
+          ) : (
+            <button
+              className="peb-cta-btn"
+              onClick={() => onEngageClick && onEngageClick()}
+            >
+              <Zap className="peb-cta-icon" />
+              <span>{config.cta}</span>
+              <ArrowRight className="peb-cta-arrow" />
+            </button>
+          )}
 
           {/* Expand toggle (detail section) */}
           <button

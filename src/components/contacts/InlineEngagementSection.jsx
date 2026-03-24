@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   collection, query, orderBy, limit, onSnapshot,
-  getDocs, updateDoc, doc, addDoc, getDoc
+  getDocs, updateDoc, doc, addDoc, getDoc, deleteDoc, increment
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import {
@@ -497,12 +497,14 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   }
 
   // === Prompt Templates ===
+  const PROMPT_LIMIT = 10;
+
   async function loadSavedPrompts() {
     const user = getEffectiveUser();
     if (!user) return;
     try {
       const promptsRef = collection(db, 'users', user.uid, 'promptTemplates');
-      const q = query(promptsRef, orderBy('createdAt', 'desc'), limit(8));
+      const q = query(promptsRef, orderBy('createdAt', 'desc'), limit(PROMPT_LIMIT));
       const snap = await getDocs(q);
       setSavedPrompts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch { /* non-blocking */ }
@@ -510,19 +512,41 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
   async function handleSavePrompt() {
     if (!userIntent.trim() || savingPrompt) return;
+    if (savedPrompts.length >= PROMPT_LIMIT) return; // enforced in UI too
     setSavingPrompt(true);
     try {
       const user = getEffectiveUser();
       if (!user) return;
       await addDoc(collection(db, 'users', user.uid, 'promptTemplates'), {
-        text: userIntent.trim(),
-        createdAt: new Date()
+        text:        userIntent.trim(),
+        createdAt:   new Date(),
+        usage_count: 0,
       });
       setPromptSaved(true);
       await loadSavedPrompts();
       setTimeout(() => setPromptSaved(false), 2500);
     } catch { /* non-blocking */ }
     finally { setSavingPrompt(false); }
+  }
+
+  async function handleDeletePrompt(promptId) {
+    const user = getEffectiveUser();
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'promptTemplates', promptId));
+      setSavedPrompts(prev => prev.filter(p => p.id !== promptId));
+    } catch { /* non-blocking */ }
+  }
+
+  async function handlePromptChipClick(prompt) {
+    setUserIntent(prompt.text);
+    // Increment usage_count in the background
+    const user = getEffectiveUser();
+    if (user) {
+      updateDoc(doc(db, 'users', user.uid, 'promptTemplates', prompt.id), {
+        usage_count: increment(1),
+      }).catch(() => null);
+    }
   }
 
   // === Barry Message → Template ===
@@ -835,7 +859,19 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
       setSendResult(result);
 
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
-        engagementIntent: engagementIntent
+        engagementIntent:                              engagementIntent,
+        'engagement_summary.total_messages_sent':      increment(1),
+        'engagement_summary.last_contact_at':          new Date().toISOString(),
+      });
+
+      // Reflect the increment immediately in local state so KeyMetricsGrid updates
+      onContactUpdate?.({
+        ...contact,
+        engagement_summary: {
+          ...contact.engagement_summary,
+          total_messages_sent: (contact.engagement_summary?.total_messages_sent || 0) + 1,
+          last_contact_at:     new Date().toISOString(),
+        },
       });
 
       // Trigger Barry context auto-refresh in background so next engagement is smarter
@@ -1158,17 +1194,43 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
               {/* Saved prompts chips */}
               {savedPrompts.length > 0 && (
                 <div className="ies-saved-prompts">
-                  <span className="ies-saved-prompts-label">Saved prompts:</span>
+                  <span className="ies-saved-prompts-label">
+                    Saved prompts
+                    {savedPrompts.length >= PROMPT_LIMIT && (
+                      <span style={{ color: '#f59e0b', marginLeft: 6, fontStyle: 'normal' }}>
+                        — at limit (10). Remove one to save a new prompt.
+                      </span>
+                    )}
+                  </span>
                   <div className="ies-prompt-chips">
-                    {savedPrompts.slice(0, 6).map(p => (
-                      <button
-                        key={p.id}
-                        className="ies-prompt-chip"
-                        onClick={() => setUserIntent(p.text)}
-                        title={p.text}
-                      >
-                        {p.text.length > 45 ? p.text.slice(0, 42) + '…' : p.text}
-                      </button>
+                    {savedPrompts.map(p => (
+                      <span key={p.id} className="ies-prompt-chip-wrapper" style={{ display: 'inline-flex', alignItems: 'center', gap: 0 }}>
+                        <button
+                          className="ies-prompt-chip"
+                          onClick={() => handlePromptChipClick(p)}
+                          title={p.text}
+                          style={{ borderRadius: p ? '20px 0 0 20px' : '20px', borderRight: 'none' }}
+                        >
+                          {p.text.length > 45 ? p.text.slice(0, 42) + '…' : p.text}
+                        </button>
+                        <button
+                          className="ies-prompt-chip-delete"
+                          onClick={() => handleDeletePrompt(p.id)}
+                          title="Delete this saved prompt"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '0.3rem 0.45rem',
+                            background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.2)',
+                            borderLeft: 'none', borderRadius: '0 20px 20px 0',
+                            cursor: 'pointer', fontSize: 11, color: '#9ca3af',
+                            lineHeight: 1,
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af'; e.currentTarget.style.background = 'rgba(124,58,237,0.06)'; }}
+                        >
+                          ×
+                        </button>
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -1198,8 +1260,8 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 <button
                   className={`ies-save-prompt-btn ${promptSaved ? 'saved' : ''}`}
                   onClick={handleSavePrompt}
-                  disabled={!userIntent.trim() || savingPrompt}
-                  title="Save this prompt for future use"
+                  disabled={!userIntent.trim() || savingPrompt || savedPrompts.length >= PROMPT_LIMIT}
+                  title={savedPrompts.length >= PROMPT_LIMIT ? 'Remove a prompt to save a new one' : 'Save this prompt for future use'}
                 >
                   {promptSaved
                     ? <><BookmarkCheck className="w-4 h-4" /> Saved!</>

@@ -109,7 +109,8 @@ export async function recordReferralReceived(userId, {
   fromContactName,
   toContactId,
   toContactName,
-  context
+  context,
+  referral_value
 }) {
   try {
     const now = new Date().toISOString();
@@ -123,6 +124,7 @@ export async function recordReferralReceived(userId, {
       to_contact_name: toContactName,
       referral_date: now,
       context: context || null,
+      referral_value: referral_value || null,
       status: 'pending',
       converted_at: null,
       outcome_note: null,
@@ -208,7 +210,8 @@ export async function recordReferralSent(userId, {
   fromContactName,
   toContactId,
   toContactName,
-  context
+  context,
+  referral_value
 }) {
   try {
     const now = new Date().toISOString();
@@ -221,6 +224,7 @@ export async function recordReferralSent(userId, {
       to_contact_name: toContactName,
       referral_date: now,
       context: context || null,
+      referral_value: referral_value || null,
       status: 'pending',
       converted_at: null,
       outcome_note: null,
@@ -464,7 +468,8 @@ export async function getContactReferralAnalytics(userId, contactId) {
 
     const allReferrals = receivedSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const referralsFromContact = allReferrals.filter(r => r.type === 'received');
-    const referralsToContact = allReferrals.filter(r => r.type === 'sent');
+    const referralsToContact   = allReferrals.filter(r => r.type === 'sent');
+    const askedForRecords      = allReferrals.filter(r => r.type === 'asked_for');
     const convertedFromContact = referralsFromContact.filter(r => r.status === 'converted');
 
     const contactData = contactSnap.exists() ? contactSnap.data() : {};
@@ -481,8 +486,18 @@ export async function getContactReferralAnalytics(userId, contactId) {
       referrals_you_sent_them: referralsToContact.length,
       reciprocal_balance: referralsFromContact.length - referralsToContact.length,
       referral_quality: computeReferralQuality(referralsFromContact),
+      // Three-direction record arrays (for ReferralHub three-tab UI)
+      referred_to_me_records: referralsFromContact.sort((a, b) =>
+        new Date(b.referral_date || b.created_at) - new Date(a.referral_date || a.created_at)
+      ),
+      referred_out_records: referralsToContact.sort((a, b) =>
+        new Date(b.referral_date || b.created_at) - new Date(a.referral_date || a.created_at)
+      ),
+      asked_for_records: askedForRecords.sort((a, b) =>
+        new Date(b.asked_at || b.created_at) - new Date(a.asked_at || a.created_at)
+      ),
       all_referrals: allReferrals.sort((a, b) =>
-        new Date(b.referral_date) - new Date(a.referral_date)
+        new Date(b.referral_date || b.asked_at) - new Date(a.referral_date || a.asked_at)
       ).slice(0, 10)
     };
   } catch (error) {
@@ -762,4 +777,118 @@ function daysSince(dateStr) {
     : new Date(dateStr);
   if (isNaN(date.getTime())) return Infinity;
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// ─────────────────────────────────────────────────────────────────
+// "ASKED FOR" DIRECTION — Intro requests logged against a contact
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Record an intro ask on a contact — "I asked [contact] to introduce me to [target]."
+ *
+ * @param {string} userId
+ * @param {Object} params
+ * @param {string} params.fromContactId       - Contact you're asking to make the intro
+ * @param {string} params.fromContactName     - Their display name
+ * @param {string} params.targetName          - Who you want to meet
+ * @param {string} [params.targetTitle]       - Their title
+ * @param {string} [params.targetCompany]     - Their company
+ * @param {string} [params.targetContactId]   - Contact ID if already in system
+ * @param {number} [params.icpMatchScore]     - ICP match score (0–100)
+ * @param {string} [params.askedVia]          - Channel used for the ask
+ * @param {string} [params.context]           - Why you want the intro
+ * @param {string} [params.referralValue]     - Free-form deal value string
+ * @returns {Promise<string>} Referral record ID
+ */
+export async function recordReferralAskedFor(userId, {
+  fromContactId,
+  fromContactName,
+  targetName,
+  targetTitle,
+  targetCompany,
+  targetContactId,
+  icpMatchScore,
+  askedVia,
+  context,
+  referralValue
+}) {
+  try {
+    const now = new Date().toISOString();
+
+    const referralData = {
+      type: 'asked_for',
+      from_contact_id: fromContactId,
+      from_contact_name: fromContactName,
+      // Target (the person you want to be introduced to)
+      ask_target_contact_id: targetContactId || null,
+      ask_target_name: targetName,
+      ask_target_title: targetTitle || null,
+      ask_target_company: targetCompany || null,
+      icp_match_score: icpMatchScore ?? null,
+      // Ask metadata
+      ask_status: 'pending',
+      response_status: 'no_response',
+      decline_reason: null,
+      asked_via: askedVia || null,
+      asked_at: now,
+      context: context || null,
+      referral_value: referralValue || null,
+      created_at: now,
+      updated_at: now
+    };
+
+    const referralsRef = collection(db, PEOPLE_PATHS.referrals(userId));
+    const docRef = await addDoc(referralsRef, referralData);
+
+    // Log timeline event on the contact you asked
+    if (fromContactId) {
+      await logTimelineEvent({
+        userId,
+        contactId: fromContactId,
+        type: 'referral_ask_sent',
+        actor: 'user',
+        preview: `Asked for intro to ${targetName}`,
+        metadata: {
+          referral_id: docRef.id,
+          target_name: targetName,
+          target_company: targetCompany,
+          icp_match_score: icpMatchScore,
+          context
+        }
+      });
+    }
+
+    return docRef.id;
+  } catch (error) {
+    console.error('[ReferralIntelligence] Failed to record asked-for referral:', error);
+    return null;
+  }
+}
+
+/**
+ * Update the status of an "asked for" intro request.
+ *
+ * @param {string} userId
+ * @param {string} referralId
+ * @param {Object} params
+ * @param {string} params.askStatus       - 'pending' | 'declined' | 'asked_again'
+ * @param {string} params.responseStatus  - 'no_response' | 'declined' | 'accepted'
+ * @param {string} [params.declineReason] - Why they declined (free text)
+ */
+export async function updateAskedForStatus(userId, referralId, {
+  askStatus,
+  responseStatus,
+  declineReason
+}) {
+  try {
+    const referralRef = doc(db, PEOPLE_PATHS.referral(userId, referralId));
+    await updateDoc(referralRef, {
+      ask_status: askStatus,
+      response_status: responseStatus,
+      ...(declineReason ? { decline_reason: declineReason } : {}),
+      updated_at: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[ReferralIntelligence] Failed to update asked-for status:', error);
+  }
 }

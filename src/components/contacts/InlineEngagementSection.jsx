@@ -859,7 +859,19 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
       setSendResult(result);
 
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
-        engagementIntent: engagementIntent
+        engagementIntent:                              engagementIntent,
+        'engagement_summary.total_messages_sent':      increment(1),
+        'engagement_summary.last_contact_at':          new Date().toISOString(),
+      });
+
+      // Reflect the increment immediately in local state so KeyMetricsGrid updates
+      onContactUpdate?.({
+        ...contact,
+        engagement_summary: {
+          ...contact.engagement_summary,
+          total_messages_sent: (contact.engagement_summary?.total_messages_sent || 0) + 1,
+          last_contact_at:     new Date().toISOString(),
+        },
       });
 
       // Trigger Barry context auto-refresh in background so next engagement is smarter

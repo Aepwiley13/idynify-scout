@@ -8,7 +8,7 @@
  */
 
 import { useT } from '../../theme/ThemeContext';
-import { BRAND } from '../../theme/tokens';
+import { COLORS } from '../../constants/colors';
 
 const ARC_STEPS = [
   { label: 'Stranger', states: [null, 'unaware']          },
@@ -56,15 +56,15 @@ export default function RelationshipArc({ contact }) {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <div style={{
                   width: 10, height: 10, borderRadius: '50%',
-                  background: isActive ? BRAND.pink : isPast ? '#22c55e' : T.border2,
-                  border: isActive ? `2px solid ${BRAND.pink}` : 'none',
+                  background: (isActive || isPast) ? COLORS.BARRY : COLORS.NEUTRAL,
+                  border: isActive ? `2px solid ${COLORS.BARRY}` : 'none',
                   flexShrink: 0,
                   transition: 'background 0.3s',
                 }} />
                 <span style={{
                   fontSize: 9,
                   fontWeight: isActive ? 700 : 500,
-                  color: isActive ? BRAND.pink : isPast ? '#22c55e' : T.textFaint,
+                  color: (isActive || isPast) ? COLORS.BARRY : T.textFaint,
                   whiteSpace: 'nowrap',
                 }}>
                   {step.label}
@@ -77,7 +77,7 @@ export default function RelationshipArc({ contact }) {
                 <div style={{
                   flex: 1,
                   height: 2,
-                  background: isPast ? '#22c55e' : T.border,
+                  background: isPast ? COLORS.BARRY : T.border,
                   margin: '0 4px',
                   marginBottom: 13, // align with dots
                   transition: 'background 0.3s',

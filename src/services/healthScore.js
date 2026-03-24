@@ -131,6 +131,15 @@ function scoreSentiment(contact) {
  * @param {Object} contact — Firestore contact document with engagement_summary, nbs_stats, milestones
  * @returns {{ score: number, bucket: string, label: string, color: string, signals: Object }}
  */
+// Relationship arc bonus — applied after weighted score, capped at 100.
+// Ensures a contact at "Trusted" or "Advocate" never scores in the Cold range.
+const RELATIONSHIP_STATE_BONUS = {
+  stranger: 0,
+  known:    10,
+  trusted:  25,
+  advocate: 35,
+};
+
 export function computeHealthScore(contact) {
   const signals = {
     recency:            scoreRecency(contact),
@@ -141,9 +150,12 @@ export function computeHealthScore(contact) {
     sentiment:          scoreSentiment(contact),
   };
 
-  const score = Math.round(
+  const baseScore = Math.round(
     Object.entries(WEIGHTS).reduce((sum, [key, weight]) => sum + (signals[key] || 0) * weight, 0)
   );
+
+  const relationshipBonus = RELATIONSHIP_STATE_BONUS[contact.relationship_state] ?? 0;
+  const score = Math.min(100, baseScore + relationshipBonus);
 
   const bucket = score >= BUCKETS.healthy.min ? 'healthy'
     : score >= BUCKETS.neutral.min ? 'neutral'

@@ -641,6 +641,20 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         </button>
       </div>
 
+      {/* Donations Button */}
+      <a
+        href="https://buy.stripe.com/7sY9ASeNR0tr1Ng25b4ZG01"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`settings-toggle ${isCollapsed ? 'collapsed' : ''}`}
+        title={isCollapsed ? 'Support Us' : ''}
+        aria-label="Support Us — Donations"
+        style={{ textDecoration: 'none' }}
+      >
+        <span style={{ fontSize: 16, lineHeight: 1 }}>💛</span>
+        {!isCollapsed && <span className="settings-toggle-label">Support Us</span>}
+      </a>
+
       {/* Collapse Toggle */}
       <button
         className="collapse-toggle"

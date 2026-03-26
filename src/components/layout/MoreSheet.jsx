@@ -79,6 +79,17 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
             <span style={{ fontSize: 22, lineHeight: 1 }}>{isLightTheme ? '🌙' : '☀️'}</span>
             <span>{isLightTheme ? 'Dark Mode' : 'Light Mode'}</span>
           </button>
+          <a
+            href="https://buy.stripe.com/7sY9ASeNR0tr1Ng25b4ZG01"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="more-sheet-item"
+            style={{ textDecoration: 'none' }}
+            onClick={onClose}
+          >
+            <span style={{ fontSize: 22, lineHeight: 1 }}>💛</span>
+            <span>Support Us</span>
+          </a>
           {isAdmin && (
             <button className="more-sheet-item" onClick={() => go('/admin')}>
               <span style={{ fontSize: 22 }}>🔧</span>

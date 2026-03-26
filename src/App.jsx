@@ -8,6 +8,8 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 
 // Pages
 import Homepage from './pages/Homepage';
+import CampaignIssuesIndex from './pages/Campaign/CampaignIssuesIndex';
+import CampaignIssuePage from './pages/Campaign/CampaignIssuePage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
@@ -278,6 +280,10 @@ function App() {
       {/* WithTheForce button hidden: {user && <MissionControlForce />} */}
       {/* BarryTrigger removed — Barry is now a permanent nav item in each module's icon rail */}
       <Routes>
+        {/* Campaign / Public Issue Pages — no auth required */}
+        <Route path="/issues" element={<CampaignIssuesIndex />} />
+        <Route path="/issues/:slug" element={<CampaignIssuePage />} />
+
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />

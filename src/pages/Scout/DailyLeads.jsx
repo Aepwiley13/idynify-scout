@@ -125,8 +125,9 @@ function RejectionFeedbackFace({ entityName, reasons, setReasons, note, setNote,
   );
 }
 
-function FeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, onSubmit, T, wide }) {
+function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, setScore, onSkip, onSubmit, T, wide }) {
   const toggle = (r) => setReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  const scoreColor = (n) => n <= 3 ? '#ef4444' : n <= 6 ? '#f59e0b' : n <= 8 ? '#10b981' : '#e91e8c';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: wide ? '28px 24px 20px' : '22px 18px 16px', gap: 12, animation: 'feedbackFlipIn 0.25s ease' }}>
       <div style={{ fontSize: 30 }}>🎯</div>
@@ -136,6 +137,40 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, 
         <br />
         <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry find more matches like this.</span>
       </div>
+
+      {/* 1-10 Score Selector */}
+      <div style={{ width: '100%' }}>
+        <div style={{ fontSize: 10, color: T.textFaint, textAlign: 'center', marginBottom: 7, fontWeight: 600, letterSpacing: '0.06em' }}>
+          HOW STRONG IS THIS FIT?
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: wide ? 5 : 4 }}>
+          {[1,2,3,4,5,6,7,8,9,10].map(n => {
+            const c = scoreColor(n);
+            const sel = score === n;
+            return (
+              <button
+                key={n}
+                onClick={e => { e.stopPropagation(); setScore(prev => prev === n ? null : n); }}
+                onMouseDown={e => e.stopPropagation()}
+                style={{
+                  width: wide ? 30 : 26, height: wide ? 30 : 26, borderRadius: '50%',
+                  border: `1.5px solid ${sel ? c : T.border2}`,
+                  background: sel ? `${c}22` : T.surface,
+                  color: sel ? c : T.textFaint,
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  transition: 'all 0.12s', flexShrink: 0,
+                }}
+              >{n}</button>
+            );
+          })}
+        </div>
+        {score && (
+          <div style={{ textAlign: 'center', marginTop: 5, fontSize: 10, color: scoreColor(score), fontWeight: 600 }}>
+            {score <= 3 ? 'Weak fit' : score <= 6 ? 'Decent fit' : score <= 8 ? 'Strong fit' : 'Perfect fit'} — {score}/10
+          </div>
+        )}
+      </div>
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', width: '100%' }}>
         {MATCH_REASONS.map(r => (
           <button
@@ -199,6 +234,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackReasons, setFeedbackReasons] = useState([]);
   const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackScore, setFeedbackScore] = useState(null);
   const [showRejectionFeedback, setShowRejectionFeedback] = useState(false);
   const [rejectionReasons, setRejectionReasons] = useState([]);
   const [rejectionNote, setRejectionNote] = useState('');
@@ -226,7 +262,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
   const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
-  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
+  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }), 280); };
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
@@ -315,6 +351,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
               entityName={company.name}
               reasons={feedbackReasons} setReasons={setFeedbackReasons}
               note={feedbackNote} setNote={setFeedbackNote}
+              score={feedbackScore} setScore={setFeedbackScore}
               onSkip={handleSkipFeedback} onSubmit={handleSendFeedback}
               T={T} wide={wide}
             />
@@ -2251,7 +2288,7 @@ export default function DailyLeads({ onNavigate }) {
             Scout needs to know who you're targeting before it can curate your daily leads. Tell Barry who you're after and he'll take it from there.
           </p>
           <button
-            onClick={() => navigate('/recon')}
+            onClick={() => navigate('/onboarding/barry')}
             style={{
               width: '100%', padding: '13px',
               borderRadius: 12,
@@ -2266,7 +2303,7 @@ export default function DailyLeads({ onNavigate }) {
             <MessageCircle size={16} />Talk to Barry
           </button>
           <button
-            onClick={() => navigate('/recon', { state: { skipBarry: true } })}
+            onClick={() => navigate('/scout?tab=icp-settings')}
             style={{
               width: '100%', padding: '10px',
               borderRadius: 12,
@@ -2637,7 +2674,7 @@ export default function DailyLeads({ onNavigate }) {
                   <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 8 }}>Set Your Target Titles</div>
                   <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>Configure your ICP target titles to start seeing people.</p>
                   <button
-                    onClick={() => navigate('/recon')}
+                    onClick={() => navigate('/scout?tab=icp-settings')}
                     style={{ padding: '8px 20px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, margin: '0 auto' }}
                   >
                     <Settings size={13} />Configure ICP

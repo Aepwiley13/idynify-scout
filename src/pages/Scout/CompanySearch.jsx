@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Search, Building2, Globe, Check, X } from 'lucide-react';
+import CompanyLogo from '../../components/scout/CompanyLogo';
 import './CompanySearch.css';
 
 /**
@@ -412,15 +413,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
 
                   {/* Company Header: logo + name side by side */}
                   <div className="company-header">
-                    <div className="company-logo">
-                      {company.logo_url ? (
-                        <img src={company.logo_url} alt={company.name} />
-                      ) : (
-                        <div className="company-logo-placeholder">
-                          {company.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
+                    <CompanyLogo company={company} size="small" />
                     <h3 className="company-name">{company.name}</h3>
                   </div>
 

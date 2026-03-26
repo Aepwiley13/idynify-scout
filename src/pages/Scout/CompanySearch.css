@@ -2,7 +2,7 @@
 
 .company-search {
   padding: 2rem;
-  max-width: 1200px;
+  max-width: 100%;
   margin: 0 auto;
   /* flex: 1 + min-height: 0 + overflow-y: auto lets this scroll
      inside ScoutMain's overflow:hidden flex shell */
@@ -178,8 +178,8 @@
 
 .results-grid {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 0.625rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
 
 /* Company Result Card — compact horizontal layout */

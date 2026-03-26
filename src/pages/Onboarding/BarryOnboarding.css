@@ -1,7 +1,7 @@
 .barry-onboarding {
   /* Full-screen standalone layout — no MainLayout wrapper */
   height: 100vh;
-  background: linear-gradient(135deg, #f8f7ff 0%, #f0f0ff 100%);
+  background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   border-radius: 12px;
@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: linear-gradient(135deg, #f8f7ff 0%, #f0f0ff 100%);
+  background: var(--bg-primary);
 }
 
 .loading-content {
@@ -42,16 +42,17 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #7c3aed;
+  color: var(--text-secondary);
   font-size: 0.8125rem;
   font-weight: 500;
   padding: 6px 8px;
   border-radius: 8px;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .barry-onboarding-back:hover {
-  background: rgba(124, 58, 237, 0.08);
+  background: var(--surface);
+  color: var(--text-primary);
 }
 
 /* Onboarding Progress Indicator */
@@ -164,19 +165,19 @@
 
 /* Messages */
 .barry-message {
-  background: white;
+  background: var(--bg-card);
   border: 1.5px solid var(--border);
   border-radius: 16px;
   border-top-left-radius: 4px;
   padding: 1rem 1.25rem;
   max-width: 85%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  color: #12082a;
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
 }
 
 .barry-message p {
   margin: 0;
-  color: #12082a;
+  color: var(--text-primary);
   font-size: 0.9375rem;
   line-height: 1.6;
 }

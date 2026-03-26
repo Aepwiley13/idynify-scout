@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
-import { Brain, ArrowRight, Check, RefreshCw } from 'lucide-react';
+import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import ICPConfirmationCard from '../../components/onboarding/ICPConfirmationCard';
 import './BarryOnboarding.css';
@@ -425,9 +425,17 @@ export default function BarryOnboarding() {
 
   return (
     <div className="barry-onboarding">
-      {/* Onboarding Progress Indicator */}
-      <div className="barry-onboarding-progress">
-        {ONBOARDING_STEPS.map((s, i) => (
+      {/* Header: back button + progress */}
+      <div className="barry-onboarding-header">
+        <button
+          className="barry-onboarding-back"
+          onClick={() => navigate('/scout?tab=icp-settings')}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          ICP Settings
+        </button>
+        <div className="barry-onboarding-progress">
+          {ONBOARDING_STEPS.map((s, i) => (
           <Fragment key={s.key}>
             <div className={`progress-step ${i < activeStepIndex ? 'completed' : i === activeStepIndex ? 'active' : ''}`}>
               <div className="progress-dot">
@@ -440,6 +448,7 @@ export default function BarryOnboarding() {
             )}
           </Fragment>
         ))}
+        </div>
       </div>
 
       {/* Conversation Area */}

@@ -27,13 +27,41 @@
   font-size: 0.875rem;
 }
 
+/* Onboarding Header (progress + back button) */
+.barry-onboarding-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px 0;
+  flex-shrink: 0;
+}
+
+.barry-onboarding-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #7c3aed;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.barry-onboarding-back:hover {
+  background: rgba(124, 58, 237, 0.08);
+}
+
 /* Onboarding Progress Indicator */
 .barry-onboarding-progress {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 24px 12px;
+  padding: 12px 24px 12px;
   gap: 0;
+  flex: 1;
   flex-shrink: 0;
 }
 
@@ -143,6 +171,7 @@
   padding: 1rem 1.25rem;
   max-width: 85%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  color: #12082a;
 }
 
 .barry-message p {

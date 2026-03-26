@@ -222,7 +222,7 @@
 
 .nbs-act-secondary {
   background: rgba(255, 255, 255, 0.9);
-  color: var(--text-primary);
+  color: #12082a;
   border: 1.5px solid rgba(107, 114, 128, 0.2);
 }
 

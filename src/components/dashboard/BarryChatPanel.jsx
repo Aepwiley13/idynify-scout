@@ -1200,7 +1200,7 @@ export default function BarryChatPanel({ userId }) {
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
                         <div className="flex flex-col gap-2 max-w-[92%]">
                           {msg.responseText && (
-                            <div className="text-sm px-3 py-2 leading-relaxed bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                            <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                               {msg.responseText}
                             </div>
                           )}
@@ -1336,7 +1336,7 @@ export default function BarryChatPanel({ userId }) {
                       <div className="flex flex-col gap-2 max-w-[88%]">
                         {/* Text portion — always shown if present */}
                         {msg.content && (
-                          <div className="text-sm px-3 py-2 leading-relaxed bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-2xl rounded-tl-sm">
+                          <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                             <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
                               {msg.content}
                             </ReactMarkdown>
@@ -1371,7 +1371,7 @@ export default function BarryChatPanel({ userId }) {
                 {sending && (
                   <div className="flex gap-2" aria-label="Barry is typing">
                     <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                    <div className="bg-gray-800/60 border border-gray-700/50 rounded-2xl rounded-tl-sm px-4 py-3">
+                    <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                       <div className="flex gap-1 items-center">
                         <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                         <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '120ms' }} />

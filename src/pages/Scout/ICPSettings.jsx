@@ -868,7 +868,7 @@ export default function ICPSettings() {
               {/* Industry Weight */}
               <div className="weight-control">
                 <div className="weight-header">
-                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <Building2 className="w-5 h-5" style={{ color: 'var(--accent)' }} />
                   <label className="weight-label">Industry Match</label>
                   <span className="weight-value">{profile.scoringWeights.industry}%</span>
                 </div>
@@ -896,7 +896,7 @@ export default function ICPSettings() {
               {/* Location Weight */}
               <div className="weight-control">
                 <div className="weight-header">
-                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <MapPin className="w-5 h-5" style={{ color: 'var(--accent)' }} />
                   <label className="weight-label">Location Match</label>
                   <span className="weight-value">{profile.scoringWeights.location}%</span>
                 </div>
@@ -924,7 +924,7 @@ export default function ICPSettings() {
               {/* Employee Size Weight */}
               <div className="weight-control">
                 <div className="weight-header">
-                  <Users className="w-5 h-5 text-blue-600" />
+                  <Users className="w-5 h-5" style={{ color: 'var(--accent)' }} />
                   <label className="weight-label">Employee Size Match</label>
                   <span className="weight-value">{profile.scoringWeights.employeeSize}%</span>
                 </div>
@@ -952,7 +952,7 @@ export default function ICPSettings() {
               {/* Revenue Weight */}
               <div className="weight-control">
                 <div className="weight-header">
-                  <TrendingUp className="w-5 h-5 text-blue-600" />
+                  <TrendingUp className="w-5 h-5" style={{ color: 'var(--accent)' }} />
                   <label className="weight-label">Revenue Match</label>
                   <span className="weight-value">{profile.scoringWeights.revenue}%</span>
                 </div>

@@ -2251,7 +2251,7 @@ export default function DailyLeads({ onNavigate }) {
             Scout needs to know who you're targeting before it can curate your daily leads. Tell Barry who you're after and he'll take it from there.
           </p>
           <button
-            onClick={() => navigate('/recon')}
+            onClick={() => navigate('/onboarding/barry')}
             style={{
               width: '100%', padding: '13px',
               borderRadius: 12,
@@ -2266,7 +2266,7 @@ export default function DailyLeads({ onNavigate }) {
             <MessageCircle size={16} />Talk to Barry
           </button>
           <button
-            onClick={() => navigate('/recon', { state: { skipBarry: true } })}
+            onClick={() => navigate('/scout?tab=icp-settings')}
             style={{
               width: '100%', padding: '10px',
               borderRadius: 12,
@@ -2637,7 +2637,7 @@ export default function DailyLeads({ onNavigate }) {
                   <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 8 }}>Set Your Target Titles</div>
                   <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>Configure your ICP target titles to start seeing people.</p>
                   <button
-                    onClick={() => navigate('/recon')}
+                    onClick={() => navigate('/scout?tab=icp-settings')}
                     style={{ padding: '8px 20px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, margin: '0 auto' }}
                   >
                     <Settings size={13} />Configure ICP

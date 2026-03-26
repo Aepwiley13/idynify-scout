@@ -136,6 +136,38 @@ async function loadStats(userId) {
   }
 }
 
+// ── Swipe score intelligence ──────────────────────────────────────────────────
+async function loadSwipeFeedback(userId) {
+  try {
+    const snap = await db.collection('users').doc(userId)
+      .collection('companies')
+      .where('status', '==', 'accepted')
+      .orderBy('swipedAt', 'desc')
+      .limit(50)
+      .get();
+
+    const scored = snap.docs
+      .map(d => d.data())
+      .filter(c => c.barryFeedback?.score != null);
+
+    if (scored.length === 0) return null;
+
+    const avg = (scored.reduce((s, c) => s + c.barryFeedback.score, 0) / scored.length).toFixed(1);
+    const top = scored
+      .filter(c => c.barryFeedback.score >= 8)
+      .slice(0, 5)
+      .map(c => `${c.name} (${c.barryFeedback.score}/10, reasons: ${(c.barryFeedback.reasons || []).join(', ') || 'none'})`);
+    const low = scored
+      .filter(c => c.barryFeedback.score <= 4)
+      .slice(0, 3)
+      .map(c => `${c.name} (${c.barryFeedback.score}/10)`);
+
+    return { avg, total: scored.length, top, low };
+  } catch {
+    return null;
+  }
+}
+
 // ── Mode detection ────────────────────────────────────────────────────────────
 
 function determineBarryMode(recommendations, stats) {
@@ -246,7 +278,7 @@ All fields are optional — only include what the user actually mentioned or con
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null) {
+function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
   const recon = contextStack?.recon || {};
@@ -366,6 +398,15 @@ ${reconContext ? reconContext.slice(0, 2000) : ''}
 ━━━ ICP PROFILE (configured settings) ━━━
 ${icpBlock}
 Reference this when discussing prospecting or targeting. This is the user's confirmed ICP — always use it as the baseline when giving targeting advice or drafting outreach.
+
+━━━ SCOUT SWIPE INTELLIGENCE (user-rated company signals) ━━━
+${swipeFeedback
+  ? `Based on ${swipeFeedback.total} rated companies — avg score: ${swipeFeedback.avg}/10.
+Top-rated (8+): ${swipeFeedback.top.length > 0 ? swipeFeedback.top.join('; ') : 'none yet'}
+Lower-rated (≤4): ${swipeFeedback.low.length > 0 ? swipeFeedback.low.join(', ') : 'none'}
+Use these signals to understand what the user considers a strong fit vs a weak one. When recommending targets or refining ICP, reference patterns from the top-rated companies.`
+  : 'No scored swipes yet — user has not rated any companies with the 1-10 scale.'
+}
 
 User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' ') : 'warm and conversational'}. Write all drafted messages in this style. When style is null, default to warm and conversational.
 
@@ -656,9 +697,10 @@ export const handler = async (event) => {
       // ── Opening Brief Path ─────────────────────────────────────────────────
       console.log('[barryMissionChat] Generating opening brief...');
 
-      const [recommendations, stats] = await Promise.all([
+      const [recommendations, stats, swipeFeedback] = await Promise.all([
         loadServerSideRecommendations(userId),
-        loadStats(userId)
+        loadStats(userId),
+        loadSwipeFeedback(userId)
       ]);
 
       const currentMode = determineBarryMode(recommendations, stats);
@@ -671,7 +713,7 @@ export const handler = async (event) => {
             contacts: (contextStack.contacts || []).slice(0, 50)
           }
         : { contacts: [], missions: [], recon: {} };
-      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext);
+      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext, module, swipeFeedback);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}`;
       }
@@ -950,7 +992,8 @@ Return valid JSON only:
         console.warn('[barryMissionChat] Fuzzy name search failed (non-fatal):', searchErr.message);
       }
 
-      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module);
+      const swipeFeedbackConv = await loadSwipeFeedback(userId).catch(() => null);
+      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module, swipeFeedbackConv);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}\nUse this as live context for the user's current view — prioritise it over generic contact lists above.`;
       }

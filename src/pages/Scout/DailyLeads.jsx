@@ -125,8 +125,9 @@ function RejectionFeedbackFace({ entityName, reasons, setReasons, note, setNote,
   );
 }
 
-function FeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, onSubmit, T, wide }) {
+function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, setScore, onSkip, onSubmit, T, wide }) {
   const toggle = (r) => setReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  const scoreColor = (n) => n <= 3 ? '#ef4444' : n <= 6 ? '#f59e0b' : n <= 8 ? '#10b981' : '#e91e8c';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: wide ? '28px 24px 20px' : '22px 18px 16px', gap: 12, animation: 'feedbackFlipIn 0.25s ease' }}>
       <div style={{ fontSize: 30 }}>🎯</div>
@@ -136,6 +137,40 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, onSkip, 
         <br />
         <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry find more matches like this.</span>
       </div>
+
+      {/* 1-10 Score Selector */}
+      <div style={{ width: '100%' }}>
+        <div style={{ fontSize: 10, color: T.textFaint, textAlign: 'center', marginBottom: 7, fontWeight: 600, letterSpacing: '0.06em' }}>
+          HOW STRONG IS THIS FIT?
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: wide ? 5 : 4 }}>
+          {[1,2,3,4,5,6,7,8,9,10].map(n => {
+            const c = scoreColor(n);
+            const sel = score === n;
+            return (
+              <button
+                key={n}
+                onClick={e => { e.stopPropagation(); setScore(prev => prev === n ? null : n); }}
+                onMouseDown={e => e.stopPropagation()}
+                style={{
+                  width: wide ? 30 : 26, height: wide ? 30 : 26, borderRadius: '50%',
+                  border: `1.5px solid ${sel ? c : T.border2}`,
+                  background: sel ? `${c}22` : T.surface,
+                  color: sel ? c : T.textFaint,
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  transition: 'all 0.12s', flexShrink: 0,
+                }}
+              >{n}</button>
+            );
+          })}
+        </div>
+        {score && (
+          <div style={{ textAlign: 'center', marginTop: 5, fontSize: 10, color: scoreColor(score), fontWeight: 600 }}>
+            {score <= 3 ? 'Weak fit' : score <= 6 ? 'Decent fit' : score <= 8 ? 'Strong fit' : 'Perfect fit'} — {score}/10
+          </div>
+        )}
+      </div>
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', width: '100%' }}>
         {MATCH_REASONS.map(r => (
           <button
@@ -199,6 +234,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackReasons, setFeedbackReasons] = useState([]);
   const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackScore, setFeedbackScore] = useState(null);
   const [showRejectionFeedback, setShowRejectionFeedback] = useState(false);
   const [rejectionReasons, setRejectionReasons] = useState([]);
   const [rejectionNote, setRejectionNote] = useState('');
@@ -226,7 +262,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
   const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
-  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
+  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }), 280); };
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
@@ -315,6 +351,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
               entityName={company.name}
               reasons={feedbackReasons} setReasons={setFeedbackReasons}
               note={feedbackNote} setNote={setFeedbackNote}
+              score={feedbackScore} setScore={setFeedbackScore}
               onSkip={handleSkipFeedback} onSubmit={handleSendFeedback}
               T={T} wide={wide}
             />

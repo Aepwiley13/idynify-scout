@@ -1,7 +1,7 @@
 .barry-onboarding {
   /* Full-screen standalone layout — no MainLayout wrapper */
   height: 100vh;
-  background: linear-gradient(135deg, #f8f7ff 0%, #f0f0ff 100%);
+  background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   border-radius: 12px;
@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: linear-gradient(135deg, #f8f7ff 0%, #f0f0ff 100%);
+  background: var(--bg-primary);
 }
 
 .loading-content {
@@ -27,13 +27,42 @@
   font-size: 0.875rem;
 }
 
+/* Onboarding Header (progress + back button) */
+.barry-onboarding-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px 0;
+  flex-shrink: 0;
+}
+
+.barry-onboarding-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.barry-onboarding-back:hover {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
 /* Onboarding Progress Indicator */
 .barry-onboarding-progress {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px 24px 12px;
+  padding: 12px 24px 12px;
   gap: 0;
+  flex: 1;
   flex-shrink: 0;
 }
 
@@ -136,13 +165,14 @@
 
 /* Messages */
 .barry-message {
-  background: white;
+  background: var(--bg-card);
   border: 1.5px solid var(--border);
   border-radius: 16px;
   border-top-left-radius: 4px;
   padding: 1rem 1.25rem;
   max-width: 85%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card);
+  color: var(--text-primary);
 }
 
 .barry-message p {

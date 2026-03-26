@@ -10,9 +10,11 @@ import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import BarryICPPanel from '../../components/scout/BarryICPPanel';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
+  const [showBarryPanel, setShowBarryPanel] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -516,7 +518,7 @@ export default function ICPSettings() {
               </p>
             </div>
             <button
-              onClick={() => navigate('/onboarding/barry')}
+              onClick={() => setShowBarryPanel(true)}
               className="edit-with-barry-btn"
             >
               <MessageSquare className="w-4 h-4" />
@@ -540,7 +542,7 @@ export default function ICPSettings() {
               </p>
             </div>
             <button
-              onClick={() => navigate('/onboarding/barry')}
+              onClick={() => setShowBarryPanel(true)}
               className="use-barry-btn"
             >
               <MessageSquare className="w-4 h-4" />
@@ -1048,6 +1050,24 @@ export default function ICPSettings() {
           </p>
         </div>
       </div>
+
+      {showBarryPanel && (
+        <BarryICPPanel
+          userId={auth.currentUser?.uid}
+          icpProfile={profile}
+          onClose={() => setShowBarryPanel(false)}
+          onSearchComplete={() => {
+            setShowBarryPanel(false);
+            // Reload profile so ICP Settings reflects Barry's updates
+            const user = getEffectiveUser();
+            if (user) {
+              getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'))
+                .then(snap => { if (snap.exists()) setProfile(snap.data()); })
+                .catch(() => {});
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

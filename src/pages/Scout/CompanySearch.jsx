@@ -410,7 +410,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
                     </div>
                   )}
 
-                  {/* Company Logo */}
+                  {/* Company Header: logo + name side by side */}
                   <div className="company-header">
                     <div className="company-logo">
                       {company.logo_url ? (
@@ -421,10 +421,8 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
                         </div>
                       )}
                     </div>
+                    <h3 className="company-name">{company.name}</h3>
                   </div>
-
-                  {/* Company Name */}
-                  <h3 className="company-name">{company.name}</h3>
 
                   {/* Metadata Grid (2x2) */}
                   <div className="company-meta-grid">

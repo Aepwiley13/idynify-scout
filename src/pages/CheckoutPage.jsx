@@ -64,30 +64,25 @@ export default function CheckoutPage() {
       const isStripeConfigured = import.meta.env.VITE_STRIPE_ENABLED === 'true';
 
       if (isStripeConfigured) {
-        // PRODUCTION MODE: Use real Stripe integration
-        console.log('🔐 Redirecting to Stripe Checkout...');
+        // PRODUCTION MODE: Redirect to Stripe Payment Link
+        console.log('🔐 Redirecting to Stripe Payment Link...');
 
-        // Call Netlify function to create Stripe Checkout Session
-        const response = await fetch('/.netlify/functions/create-checkout-session', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: user.uid,
-            tier: tier, // Pass the selected tier (starter or pro)
-          }),
-        });
+        const paymentLinks = {
+          starter: 'https://buy.stripe.com/8x2bJ2bXtdZGcnmgbQ1gs04',
+          pro: 'https://buy.stripe.com/5kQdRa7Hdg7OafecZE1gs05'
+        };
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create checkout session');
+        const baseUrl = paymentLinks[tier];
+        if (!baseUrl) {
+          throw new Error(`No payment link configured for tier: ${tier}`);
         }
 
-        const { url } = await response.json();
+        const params = new URLSearchParams({
+          client_reference_id: user.uid,
+          prefilled_email: user.email || ''
+        });
 
-        // Redirect to Stripe Checkout
-        window.location.href = url;
+        window.location.href = `${baseUrl}?${params.toString()}`;
       } else {
         // DEVELOPMENT MODE: Simulate payment (for testing without Stripe)
         console.log('⚠️ DEV MODE: Simulating payment (Stripe not configured)');
@@ -112,6 +107,9 @@ export default function CheckoutPage() {
             contactsPerMonth: selectedTier.contacts,
             teamSeats: 1,
             support: tier === 'starter' ? '48-hour email' : '24-hour email'
+          },
+          features: {
+            mobilePhone: tier === 'pro'
           },
           billingCycleDate: new Date().getDate()
         });

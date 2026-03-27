@@ -55,11 +55,19 @@ export const handler = async (event) => {
     switch (stripeEvent.type) {
       case 'checkout.session.completed': {
         const session = stripeEvent.data.object;
-        const userId = session.metadata.userId;
-        const tier = session.metadata.tier || 'starter'; // Default to starter if not specified
+        // Support Stripe Payment Links (client_reference_id) and legacy checkout sessions (metadata.userId)
+        const userId = session.client_reference_id || session.metadata?.userId;
+
+        // Determine tier from payment amount (Payment Links) or metadata (legacy)
+        let tier = session.metadata?.tier;
+        if (!tier) {
+          if (session.amount_total === 2000) tier = 'starter';
+          else if (session.amount_total === 5000) tier = 'pro';
+          else tier = 'starter';
+        }
 
         if (!userId) {
-          console.error('❌ No userId in session metadata');
+          console.error('❌ No userId in client_reference_id or session metadata');
           break;
         }
 

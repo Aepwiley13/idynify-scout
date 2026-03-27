@@ -39,7 +39,10 @@ export const handler = async (event) => {
       throw new Error('Missing required parameters');
     }
 
-    console.log('🔍 LinkedIn URL exact match lookup:', linkedin_url);
+    // Normalize LinkedIn URL: remove trailing slash, strip query params/fragments
+    const normalizedUrl = linkedin_url.trim().replace(/\/+$/, '').split('?')[0].split('#')[0];
+
+    console.log('🔍 LinkedIn URL exact match lookup:', normalizedUrl);
 
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
@@ -76,7 +79,7 @@ export const handler = async (event) => {
     // Call Apollo Person Match API with LinkedIn URL as exact identifier
     // Apollo requires X-Api-Key in header, not in body
     const matchBody = {
-      linkedin_url: linkedin_url
+      linkedin_url: normalizedUrl
     };
 
     console.log('📋 Calling Apollo PEOPLE_MATCH with LinkedIn URL');
@@ -89,14 +92,19 @@ export const handler = async (event) => {
     });
 
     if (!apolloResponse.ok) {
-      const errorText = await logApolloError(apolloResponse, matchBody, 'findContactByLinkedInUrl');
+      await logApolloError(apolloResponse, matchBody, 'findContactByLinkedInUrl');
 
-      // If 404 or no match found, return user-friendly error
       if (apolloResponse.status === 404) {
         throw new Error('PROFILE_NOT_FOUND');
+      } else if (apolloResponse.status === 401 || apolloResponse.status === 403) {
+        throw new Error('APOLLO_AUTH_ERROR');
+      } else if (apolloResponse.status === 422) {
+        throw new Error('APOLLO_INVALID_REQUEST');
+      } else if (apolloResponse.status === 429) {
+        throw new Error('APOLLO_RATE_LIMIT');
+      } else {
+        throw new Error('APOLLO_SERVER_ERROR');
       }
-
-      throw new Error('Apollo API request failed');
     }
 
     const apolloData = await apolloResponse.json();
@@ -126,7 +134,7 @@ export const handler = async (event) => {
       organization_id: person.organization_id || person.organization?.id || null,
       email: person.email || null,
       phone_numbers: person.phone_numbers || [],
-      linkedin_url: person.linkedin_url || linkedin_url,
+      linkedin_url: person.linkedin_url || normalizedUrl,
       photo_url: person.photo_url || null,
 
       // Metadata
@@ -142,7 +150,7 @@ export const handler = async (event) => {
     await logApiUsage(userId, 'findContactByLinkedInUrl', 'success', {
       responseTime,
       metadata: {
-        linkedin_url,
+        linkedin_url: normalizedUrl,
         contactFound: person.name
       }
     });
@@ -177,30 +185,26 @@ export const handler = async (event) => {
       console.error('Failed to log API error:', logError);
     }
 
-    // User-friendly error message for profile not found
-    if (error.message === 'PROFILE_NOT_FOUND') {
-      return {
-        statusCode: 404,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        body: JSON.stringify({
-          success: false,
-          error: 'Unable to retrieve public profile details from this LinkedIn link. Please verify the URL or try again.'
-        })
-      };
-    }
+    const errorMessages = {
+      PROFILE_NOT_FOUND: 'Unable to retrieve public profile details from this LinkedIn link. Please verify the URL or try again.',
+      APOLLO_AUTH_ERROR: 'Contact lookup service is misconfigured. Please contact support.',
+      APOLLO_INVALID_REQUEST: 'The LinkedIn URL format is not supported. Please paste the full profile URL (e.g. https://linkedin.com/in/username).',
+      APOLLO_RATE_LIMIT: 'Too many requests. Please wait a moment and try again.',
+      APOLLO_SERVER_ERROR: 'The contact lookup service is temporarily unavailable. Please try again shortly.'
+    };
+
+    const statusCode = error.message === 'PROFILE_NOT_FOUND' ? 404 : 500;
+    const friendlyMessage = errorMessages[error.message] || error.message || 'Failed to lookup LinkedIn profile';
 
     return {
-      statusCode: 500,
+      statusCode,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({
         success: false,
-        error: error.message || 'Failed to lookup LinkedIn profile'
+        error: friendlyMessage
       })
     };
   }

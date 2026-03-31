@@ -79,7 +79,8 @@ export const handler = async (event) => {
     // Call Apollo Person Match API with LinkedIn URL as exact identifier
     // Apollo requires X-Api-Key in header, not in body
     const matchBody = {
-      linkedin_url: normalizedUrl
+      linkedin_url: normalizedUrl,
+      reveal_personal_emails: true
     };
 
     console.log('📋 Calling Apollo PEOPLE_MATCH with LinkedIn URL');
@@ -114,7 +115,13 @@ export const handler = async (event) => {
       throw new Error('PROFILE_NOT_FOUND');
     }
 
-    console.log(`✅ Found exact match: ${person.name}`);
+    // Build full name from parts if the top-level name field is missing
+    const fullName = person.name ||
+      (person.first_name && person.last_name
+        ? `${person.first_name} ${person.last_name}`.trim()
+        : person.first_name || person.last_name || null);
+
+    console.log(`✅ Found exact match: ${fullName || '(name unavailable)'}`);
 
     // Extract ONLY the required preview fields (minimal data)
     const contact = {
@@ -123,7 +130,7 @@ export const handler = async (event) => {
       apollo_person_id: person.id,
 
       // Required preview fields ONLY
-      name: person.name || 'Unknown',
+      name: fullName || null,
       title: person.title || person.headline || null,
       organization_name: person.organization_name || person.organization?.name || null,
       location: person.city && person.state

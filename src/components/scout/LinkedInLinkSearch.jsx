@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone, X, GitBranch } from 'lucide-react';
+import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, Mail, Phone, X, GitBranch, Pencil } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -16,6 +16,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const [saveStatus, setSaveStatus] = useState(null); // 'saving' | 'processing' | 'saved' | null
   const [error, setError] = useState(null);
   const [referredBy, setReferredBy] = useState(null);
+  const [contactEdits, setContactEdits] = useState({});
 
   const handleFindContact = async (e) => {
     e.preventDefault();
@@ -43,6 +44,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       if (!data.success) throw new Error(data.error || 'Failed to find contact');
       if (!data.contact) throw new Error('Unable to retrieve profile details. Please verify the URL and try again.');
       setContact(data.contact);
+      setContactEdits({});
     } catch (err) {
       setError(err.message || 'Search failed. Please try again.');
     } finally {
@@ -52,6 +54,11 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
 
   const handleConfirmAndSave = async () => {
     if (!contact) return;
+    const effectiveName = contactEdits.name || contact.name;
+    if (!effectiveName || !effectiveName.trim()) {
+      setError('Please enter the contact\'s name before saving.');
+      return;
+    }
     setSaving(true);
     setSaveStatus('saving');
     setError(null);
@@ -59,22 +66,23 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       const user = getEffectiveUser();
       if (!user) throw new Error('You must be logged in');
       setSaveStatus('processing');
-      const companyId = await ensureCompanyExists(contact, user.uid);
+      const mergedContact = { ...contact, ...contactEdits };
+      const companyId = await ensureCompanyExists(mergedContact, user.uid);
       const contactId = contact.id || `apollo_${Date.now()}`;
       const contactData = {
         apollo_person_id: contact.id,
-        name: contact.name || 'Unknown',
-        title: contact.title || '',
-        email: contact.email || null,
-        phone: contact.phone_numbers?.[0]?.sanitized_number || null,
-        linkedin_url: contact.linkedin_url || null,
-        photo_url: contact.photo_url || null,
+        name: mergedContact.name || 'Unknown',
+        title: mergedContact.title || '',
+        email: mergedContact.email || null,
+        phone: mergedContact.phone_numbers?.[0]?.sanitized_number || null,
+        linkedin_url: mergedContact.linkedin_url || null,
+        photo_url: mergedContact.photo_url || null,
         company_id: companyId,
-        company_name: contact.organization_name || null,
-        company_industry: contact.organization?.industry || null,
-        department: contact.departments?.[0] || null,
-        seniority: contact.seniority || null,
-        location: contact.location || null,
+        company_name: mergedContact.organization_name || null,
+        company_industry: mergedContact.organization?.industry || null,
+        department: mergedContact.departments?.[0] || null,
+        seniority: mergedContact.seniority || null,
+        location: mergedContact.location || null,
         status: 'active',
         saved_at: new Date().toISOString(),
         source: 'LinkedIn Link',
@@ -96,7 +104,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
           fromContactId: referredBy.id,
           fromContactName: referredBy.name,
           toContactId: contactId,
-          toContactName: contact.name || 'Unknown',
+          toContactName: mergedContact.name || 'Unknown',
           context: 'Added via LinkedIn Link import'
         });
       }
@@ -227,7 +235,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
           </div>
 
           {/* Contact card */}
-          <ContactCard contact={contact} T={T} />
+          <ContactCard contact={contact} edits={contactEdits} onEdit={setContactEdits} T={T} />
 
           {/* Referred By (optional) */}
           <ReferredByPickerLinkedIn value={referredBy} onChange={setReferredBy} T={T} />
@@ -258,7 +266,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
                 : <><CheckCircle size={14} />Save Contact</>}
             </button>
             <button
-              onClick={() => { setContact(null); setLinkedinUrl(''); setError(null); }}
+              onClick={() => { setContact(null); setLinkedinUrl(''); setError(null); setContactEdits({}); }}
               disabled={saving}
               style={{ padding: '11px 18px', borderRadius: 9, border: `1.5px solid ${T.border}`, background: 'transparent', color: T.textMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
             >
@@ -272,27 +280,66 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
 }
 
 // ─── ContactCard ──────────────────────────────────────────────────────────────
-function ContactCard({ contact, T }) {
-  const photo = contact.photo_url;
-  const email = contact.email;
-  const phone = contact.phone_numbers?.[0]?.sanitized_number || contact.phone;
+function ContactCard({ contact, edits, onEdit, T }) {
+  const merged = { ...contact, ...edits };
+  const photo = merged.photo_url;
+  const email = merged.email;
+  const phone = merged.phone_numbers?.[0]?.sanitized_number || merged.phone;
+
+  const missingFields = [];
+  if (!merged.name) missingFields.push('name');
+  if (!merged.title) missingFields.push('title');
+  if (!merged.organization_name) missingFields.push('company');
+
+  const setField = (field, value) => onEdit(prev => ({ ...prev, [field]: value }));
 
   return (
     <div style={{ borderRadius: 14, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.cardBg }}>
+
+      {/* Incomplete data warning */}
+      {missingFields.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '9px 14px', background: `${STATUS.yellow || '#f59e0b'}12`, borderBottom: `1px solid ${STATUS.yellow || '#f59e0b'}30` }}>
+          <AlertCircle size={14} color={STATUS.yellow || '#f59e0b'} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 11, color: STATUS.yellow || '#f59e0b', lineHeight: 1.5 }}>
+            Some fields couldn't be retrieved from Apollo ({missingFields.join(', ')}). Fill them in below before saving.
+          </span>
+        </div>
+      )}
+
       {/* Header row: avatar + name/title + badge */}
       <div style={{ padding: '16px 16px 14px', display: 'flex', alignItems: 'center', gap: 14, background: `linear-gradient(135deg,#0077b510 0%,${T.cardBg} 100%)`, borderBottom: `1px solid ${T.border}` }}>
         {/* Avatar */}
-        <div style={{ flexShrink: 0, width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', border: '2.5px solid #0077b540', background: '#0077b515', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ flexShrink: 0, width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', border: '2.5px solid #0077b540', background: '#0077b515', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {photo ? (
-            <img src={photo} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
+            <img src={photo} alt={merged.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
           ) : (
-            <Linkedin size={36} color="#0077b5" />
+            <Linkedin size={30} color="#0077b5" />
           )}
         </div>
         {/* Name + title */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: T.text, lineHeight: 1.2, marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
-          <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.4 }}>{contact.title || 'Title not available'}</div>
+          {merged.name ? (
+            <div style={{ fontSize: 17, fontWeight: 800, color: T.text, lineHeight: 1.2, marginBottom: 4, wordBreak: 'break-word' }}>{merged.name}</div>
+          ) : (
+            <EditableField
+              placeholder="Enter full name"
+              value={edits.name || ''}
+              onChange={v => setField('name', v)}
+              T={T}
+              inputStyle={{ fontSize: 15, fontWeight: 700 }}
+            />
+          )}
+          {merged.title ? (
+            <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.4 }}>{merged.title}</div>
+          ) : (
+            <EditableField
+              placeholder="Enter job title"
+              value={edits.title || ''}
+              onChange={v => setField('title', v)}
+              T={T}
+              inputStyle={{ fontSize: 12 }}
+            />
+          )}
         </div>
         {/* EXACT MATCH badge */}
         <div style={{ flexShrink: 0, background: '#0077b5', borderRadius: 6, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -303,17 +350,28 @@ function ContactCard({ contact, T }) {
 
       {/* Details */}
       <div style={{ padding: '13px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {contact.organization_name && (
+        {merged.organization_name ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.textMuted }}>
             <Building2 size={13} color={T.textFaint} />
-            <span>{contact.organization_name}</span>
-            {contact.organization?.industry && <span style={{ color: T.textFaint }}>· {contact.organization.industry}</span>}
+            <span>{merged.organization_name}</span>
+            {merged.organization?.industry && <span style={{ color: T.textFaint }}>· {merged.organization.industry}</span>}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Building2 size={13} color={T.textFaint} style={{ flexShrink: 0 }} />
+            <EditableField
+              placeholder="Enter company name"
+              value={edits.organization_name || ''}
+              onChange={v => setField('organization_name', v)}
+              T={T}
+              inputStyle={{ fontSize: 12 }}
+            />
           </div>
         )}
-        {contact.location && (
+        {merged.location && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.textMuted }}>
             <MapPin size={13} color={T.textFaint} />
-            <span>{contact.location}</span>
+            <span>{merged.location}</span>
           </div>
         )}
         {email && (
@@ -328,9 +386,9 @@ function ContactCard({ contact, T }) {
             <span>{phone}</span>
           </div>
         )}
-        {contact.linkedin_url && (
+        {merged.linkedin_url && (
           <a
-            href={contact.linkedin_url}
+            href={merged.linkedin_url}
             target="_blank"
             rel="noopener noreferrer"
             style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#0077b5', textDecoration: 'none', marginTop: 2, padding: '7px 10px', background: '#0077b510', border: '1px solid #0077b530', borderRadius: 7 }}
@@ -340,6 +398,27 @@ function ContactCard({ contact, T }) {
           </a>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── EditableField ────────────────────────────────────────────────────────────
+function EditableField({ value, onChange, placeholder, T, inputStyle = {} }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+      <Pencil size={11} color={T.textFaint} style={{ flexShrink: 0 }} />
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          flex: 1, minWidth: 0, background: 'transparent',
+          border: 'none', borderBottom: `1px dashed ${T.border}`,
+          outline: 'none', color: T.text, padding: '2px 0',
+          ...inputStyle
+        }}
+      />
     </div>
   );
 }

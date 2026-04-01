@@ -773,7 +773,10 @@ async function getExistingCompanyIds(userId, authToken) {
           collectionId: 'companies'
         }],
         select: {
-          fields: [{ fieldPath: 'apollo_organization_id' }]
+          fields: [
+            { fieldPath: 'apollo_organization_id' },
+            { fieldPath: 'status' }
+          ]
         }
       }
     };
@@ -796,6 +799,13 @@ async function getExistingCompanyIds(userId, authToken) {
 
     const ids = queryResults
       .filter(result => result.document)
+      .filter(result => {
+        // Only block re-discovery of companies that are still in the queue (pending)
+        // or already saved (accepted). Rejected companies can re-enter the queue after
+        // an ICP change so the user gets a fresh look with the updated criteria.
+        const status = result.document.fields?.status?.stringValue;
+        return status === 'pending' || status === 'accepted';
+      })
       .map(result => result.document.fields?.apollo_organization_id?.stringValue)
       .filter(id => id);
 
@@ -886,6 +896,22 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       // Use Apollo's actual industry data; fall back to ICP's first industry only if Apollo doesn't provide one
       const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown';
 
+      // Extract location from all available Apollo fields
+      const hqLocation = extractSimpleLocation(company) !== 'Location not available'
+        ? extractSimpleLocation(company)
+        : null;
+
+      // Extract employee count from available Apollo fields
+      // Apollo search endpoint returns estimated_num_employees on some results
+      const employeeCount = company.estimated_num_employees
+        || company.num_employees
+        || null;
+
+      // Extract state from location for ICP scoring
+      const locationState = company.headquarters_location?.state
+        || company.primary_location?.state
+        || null;
+
       const companyObj = {
         // IDs
         apollo_organization_id: company.id,
@@ -898,6 +924,13 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         revenue: revenue,
         founded_year: foundedYear,
         phone: phone,
+
+        // Location — extracted from multiple Apollo fields
+        hq_location: hqLocation,
+        location: locationState, // state string used for ICP location scoring
+
+        // Employee count — may be null for some Apollo results
+        employee_count: employeeCount ? String(employeeCount) : null,
 
         // Links (critical for user research)
         website_url: company.website_url || (company.primary_domain ? `https://${company.primary_domain}` : null),
@@ -939,6 +972,9 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           linkedin_url: { stringValue: String(company.linkedin_url || '') },
           website_url: { stringValue: String(company.website_url || '') },
           logo_url: { stringValue: String(company.logo_url || '') },
+          hq_location: { stringValue: String(company.hq_location || '') },
+          location: { stringValue: String(company.location || '') },
+          employee_count: { stringValue: String(company.employee_count || '') },
           status: { stringValue: 'pending' },
           found_at: { timestampValue: company.found_at },
           source: { stringValue: 'apollo_api' },

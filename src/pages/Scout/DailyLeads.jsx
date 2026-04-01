@@ -959,7 +959,7 @@ function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
 
 // ─── DailyLeads ──────────────────────────────────────────────────────────────
 // ─── ICP Reclarification Modal ────────────────────────────────────────────────
-function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
+function IcpReclarificationModal({ userId, activeICPId, onClose, onSearchComplete }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -1020,9 +1020,23 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
       const user = getEffectiveUser();
       if (!user) { onSearchComplete(); return; }
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      const baseProfile = profileDoc.exists() ? profileDoc.data() : {};
+
+      // Read from the active icpProfiles doc (new system) so Barry's updates persist correctly.
+      // Fall back to legacy companyProfile/current only if no icpProfiles entry exists yet.
+      let baseProfile = {};
+      let icpDocRef = null;
+      if (activeICPId) {
+        icpDocRef = doc(db, 'users', user.uid, 'icpProfiles', activeICPId);
+        const icpDoc = await getDoc(icpDocRef);
+        if (icpDoc.exists()) baseProfile = icpDoc.data();
+      }
+      if (!icpDocRef) {
+        const legacyRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+        const legacyDoc = await getDoc(legacyRef);
+        if (legacyDoc.exists()) baseProfile = legacyDoc.data();
+        icpDocRef = legacyRef;
+      }
+
       const mergedProfile = {
         ...baseProfile,
         ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
@@ -1032,12 +1046,19 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };
+
       // Persist the refined ICP so it shows in ICP Settings and survives page refreshes
-      await setDoc(profileRef, mergedProfile);
+      await setDoc(icpDocRef, mergedProfile);
+
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile }),
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: mergedProfile,
+          ...(activeICPId ? { icpId: activeICPId } : {}),
+        }),
       });
     } catch (err) {
       console.error('ICP search error:', err);
@@ -1519,9 +1540,8 @@ export default function DailyLeads({ onNavigate }) {
       }
       setLastSwipe({ company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount });
       setShowUndo(true);
-      const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const icpProfileDoc = await getDoc(icpProfileRef);
-      const icpTitles = icpProfileDoc.exists() ? icpProfileDoc.data().targetTitles || [] : [];
+      // Use the active ICP profile already loaded in state — no extra Firestore read needed
+      const icpTitles = icpProfile?.targetTitles || [];
       if (direction === 'right' && icpTitles.length > 0) {
         const formattedTitles = icpTitles.map((title, index) => ({ title, rank: index + 1, score: 100 - (index * 10) }));
         await updateDoc(companyRef, { selected_titles: formattedTitles, titles_updated_at: new Date().toISOString(), titles_source: 'icp_auto' });
@@ -2546,6 +2566,7 @@ export default function DailyLeads({ onNavigate }) {
       {showICPChat && (
         <IcpReclarificationModal
           userId={auth.currentUser?.uid}
+          activeICPId={activeICPId}
           onClose={() => setShowICPChat(false)}
           onSearchComplete={() => {
             resetBatch();

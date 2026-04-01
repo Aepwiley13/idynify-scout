@@ -58,7 +58,7 @@ const handler = async (event) => {
         const profile = user.profile;
 
         // Call search-companies to top off their queue
-        const refreshResult = await refreshUserQueue(user.userId, authToken, profile);
+        const refreshResult = await refreshUserQueue(user.userId, authToken, profile, user.icpId);
 
         console.log(`✅ User ${user.userId}: ${refreshResult.companiesAdded} companies added (queue: ${refreshResult.currentQueueSize})`);
 
@@ -137,7 +137,7 @@ async function getActiveUsers(projectId) {
 
     const activeUsers = [];
 
-    // For each user, check if they have a companyProfile
+    // For each user, check if they have ICP profiles
     for (const userDoc of users) {
       try {
         const userId = userDoc.name.split('/').pop();
@@ -145,7 +145,55 @@ async function getActiveUsers(projectId) {
         // Get user's email from profile
         const userEmail = userDoc.fields?.email?.stringValue || null;
 
-        // Get company profile
+        // First, try the new icpProfiles subcollection (current system)
+        const icpProfilesResponse = await fetch(`${firestoreUrl}/users/${userId}/icpProfiles`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (icpProfilesResponse.ok) {
+          const icpData = await icpProfilesResponse.json();
+          const icpDocs = (icpData.documents || []).filter(d => d.fields);
+
+          if (icpDocs.length > 0) {
+            // Use the first ICP profile (primary). Sort by createdAt ascending to match app logic.
+            const sorted = icpDocs.sort((a, b) => {
+              const aTime = a.fields?.createdAt?.timestampValue || a.fields?.createdAt?.stringValue || '';
+              const bTime = b.fields?.createdAt?.timestampValue || b.fields?.createdAt?.stringValue || '';
+              return aTime.localeCompare(bTime);
+            });
+            const primaryICP = sorted[0];
+            const icpId = primaryICP.name.split('/').pop();
+
+            const profile = {
+              industries: primaryICP.fields?.industries?.arrayValue?.values?.map(v => v.stringValue) || [],
+              companySizes: primaryICP.fields?.companySizes?.arrayValue?.values?.map(v => v.stringValue) || [],
+              revenueRanges: primaryICP.fields?.revenueRanges?.arrayValue?.values?.map(v => v.stringValue) || [],
+              locations: primaryICP.fields?.locations?.arrayValue?.values?.map(v => v.stringValue) || [],
+              isNationwide: primaryICP.fields?.isNationwide?.booleanValue || false,
+              skipRevenue: primaryICP.fields?.skipRevenue?.booleanValue || false,
+              targetTitles: primaryICP.fields?.targetTitles?.arrayValue?.values?.map(v => v.stringValue) || [],
+              foundedAgeRange: primaryICP.fields?.foundedAgeRange ? {
+                minAge: primaryICP.fields.foundedAgeRange.mapValue?.fields?.minAge?.integerValue
+                  ? parseInt(primaryICP.fields.foundedAgeRange.mapValue.fields.minAge.integerValue)
+                  : null,
+                maxAge: primaryICP.fields.foundedAgeRange.mapValue?.fields?.maxAge?.integerValue
+                  ? parseInt(primaryICP.fields.foundedAgeRange.mapValue.fields.maxAge.integerValue)
+                  : null,
+              } : null,
+            };
+
+            // Only include users with at least one ICP criterion defined
+            if (profile.industries.length > 0 || profile.companySizes.length > 0 || profile.locations.length > 0) {
+              activeUsers.push({ userId, email: userEmail, profile, icpId });
+            }
+            continue; // Skip legacy fallback for this user
+          }
+        }
+
+        // Fallback: legacy companyProfile/current for users not yet on new system
         const profileResponse = await fetch(`${firestoreUrl}/users/${userId}/companyProfile/current`, {
           method: 'GET',
           headers: {
@@ -156,23 +204,18 @@ async function getActiveUsers(projectId) {
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
 
-          // Extract profile fields
           const profile = {
             industries: profileData.fields?.industries?.arrayValue?.values?.map(v => v.stringValue) || [],
             companySizes: profileData.fields?.companySizes?.arrayValue?.values?.map(v => v.stringValue) || [],
             revenueRanges: profileData.fields?.revenueRanges?.arrayValue?.values?.map(v => v.stringValue) || [],
             locations: profileData.fields?.locations?.arrayValue?.values?.map(v => v.stringValue) || [],
             isNationwide: profileData.fields?.isNationwide?.booleanValue || false,
-            skipRevenue: profileData.fields?.skipRevenue?.booleanValue || false
+            skipRevenue: profileData.fields?.skipRevenue?.booleanValue || false,
+            targetTitles: profileData.fields?.targetTitles?.arrayValue?.values?.map(v => v.stringValue) || [],
           };
 
-          // Only include users with at least one ICP criterion defined
           if (profile.industries.length > 0 || profile.companySizes.length > 0 || profile.locations.length > 0) {
-            activeUsers.push({
-              userId,
-              email: userEmail,
-              profile
-            });
+            activeUsers.push({ userId, email: userEmail, profile });
           }
         }
       } catch (profileError) {
@@ -202,7 +245,7 @@ async function getServiceAccountToken() {
 /**
  * Refresh a user's company queue using the search-companies logic
  */
-async function refreshUserQueue(userId, authToken, companyProfile) {
+async function refreshUserQueue(userId, authToken, companyProfile, icpId) {
   try {
     // Call the search-companies function
     const searchResponse = await fetch(`${process.env.URL}/.netlify/functions/search-companies`, {
@@ -213,7 +256,8 @@ async function refreshUserQueue(userId, authToken, companyProfile) {
       body: JSON.stringify({
         userId,
         authToken,
-        companyProfile
+        companyProfile,
+        ...(icpId ? { icpId } : {})
       })
     });
 

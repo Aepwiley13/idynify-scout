@@ -43,6 +43,7 @@ import {
 import StepApprovalCard from '../../components/hunter/StepApprovalCard';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMachine';
+import { canAdvancePhase } from '../../utils/missionPhaseGate';
 
 const WAR_ACCENT = '#f97316'; // orange — distinct from CC cyan so Go To War feels like action
 const TOTAL_PHASES = 8;
@@ -731,15 +732,10 @@ export default function GoToWar() {
   const allStrategyFieldsSet = outcomeGoal && engagementStyle && timeframe && nextStepType;
 
   // Phase gate: can the user advance?
-  const canAdvance = () => {
-    if (phase === 0) return goalId !== '';                           // Brief: goal selected
-    if (phase === 1) return selected.size > 0 || missionContacts.length > 0; // Roster: contacts selected or added
-    if (phase === 2) return allStrategyFieldsSet;                   // Approach: all strategy fields set
-    if (phase === 3) return !!(microSequence?.steps?.length > 0);   // Sequence: generated with steps
-    if (phase === 4) return approvedSteps.size + skippedSteps.size === (microSequence?.steps?.length || 0); // Approve: all steps reviewed
-    if (phase === 5) return missionLaunched;                        // Launch: mission launched
-    return true;
-  };
+  const canAdvance = () => canAdvancePhase(phase, {
+    goalId, selected, missionContacts, allStrategyFieldsSet,
+    microSequence, approvedSteps, skippedSteps, missionLaunched,
+  });
 
   // ── Phase 1: Brief ──────────────────────────────────────────────────────────
   const renderPhase1 = () => (

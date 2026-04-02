@@ -9,6 +9,7 @@ import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestam
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import { useActiveUserId, useImpersonation, getEffectiveUser } from '../../context/ImpersonationContext';
+import { SCOUT_DRAWER_NAV_ITEMS } from '../../constants/scoutNavConfig';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
   Phone, X, Zap, ExternalLink, ChevronLeft, Menu, RotateCcw, RefreshCw, MessageSquare,
@@ -2241,8 +2242,6 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             onClick={() => setDrawerOpen(false)}
             style={{ position: 'fixed', inset: 0, background: '#00000060', zIndex: 200 }}
           />
-          {/* TODO: drawer nav links are currently hardcoded — should pull from
-              a shared nav config in a future refactor to avoid drift. */}
           <div
             role="dialog"
             aria-modal="true"
@@ -2260,12 +2259,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             >
               <ChevronLeft size={16} />Back to list
             </div>
-            {[
-              { label: 'Daily Discoveries', tab: 'daily-leads' },
-              { label: 'Saved Companies',   tab: 'saved-companies' },
-              { label: 'Scout+',            tab: 'scout-plus' },
-              { label: 'ICP Settings',      tab: 'icp-settings' },
-            ].map(item => (
+            {SCOUT_DRAWER_NAV_ITEMS.map(item => (
               <div
                 key={item.tab}
                 onClick={() => { setDrawerOpen(false); navigate(`/scout?tab=${item.tab}`); }}

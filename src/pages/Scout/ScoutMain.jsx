@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
+import { SCOUT_TAB_TO_ITEM, SCOUT_ITEM_TO_TAB } from '../../constants/scoutNavConfig';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield, Archive,
   Zap, Building2, Users, Plus,
@@ -198,25 +199,9 @@ function ScoutShellInner({ user }) {
     return () => mql.removeEventListener('change', handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tab ↔ internal item ID mapping
-  const TAB_TO_ITEM = {
-    'daily-leads':     'daily',
-    'saved-companies': 'saved',
-    'all-leads':       'all',
-    'icp-settings':    'icpsettings',
-    'scout-plus':      'scoutplus',
-    'company-search':  'scoutplus',
-  };
-  // Build ITEM_TO_TAB explicitly — deriving it from Object.fromEntries(TAB_TO_ITEM) is
-  // unsafe because both 'scout-plus' and 'company-search' map to 'scoutplus', causing
-  // the last entry ('company-search') to win and produce the wrong canonical URL.
-  const ITEM_TO_TAB = {
-    'daily':       'daily-leads',
-    'saved':       'saved-companies',
-    'all':         'all-leads',
-    'icpsettings': 'icp-settings',
-    'scoutplus':   'scout-plus',
-  };
+  // Tab ↔ internal item ID mapping (sourced from shared scoutNavConfig)
+  const TAB_TO_ITEM = SCOUT_TAB_TO_ITEM;
+  const ITEM_TO_TAB = SCOUT_ITEM_TO_TAB;
 
   // Read tab from URL (?tab=company-search) with fallback to legacy location.state
   const tabParam = searchParams.get('tab') || location.state?.activeTab || 'all-leads';

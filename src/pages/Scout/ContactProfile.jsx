@@ -223,6 +223,17 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       // Get auth token
       const authToken = await user.getIdToken();
 
+      // Load company data if the contact is linked to one
+      let companyData = null;
+      if (contactData.company_id) {
+        try {
+          const companyDoc = await getDoc(doc(db, 'users', user.uid, 'companies', contactData.company_id));
+          if (companyDoc.exists()) companyData = { id: companyDoc.id, ...companyDoc.data() };
+        } catch {
+          // Non-critical — proceed without company data
+        }
+      }
+
       console.log('🐻 Calling Barry to generate context...');
 
       // Call barryGenerateContext Netlify function
@@ -235,7 +246,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
           userId: user.uid,
           authToken: authToken,
           contact: contactData,
-          companyData: null // TODO: Load company data if needed
+          companyData,
         })
       });
 

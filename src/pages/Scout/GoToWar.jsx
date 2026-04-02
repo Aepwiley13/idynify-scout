@@ -16,7 +16,7 @@
  * Sprint A: Email only. Existing saved contacts/companies. Manual-approved sends.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, where, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -200,6 +200,11 @@ export default function GoToWar() {
   const T = useT();
   const navigate = useNavigate();
 
+  // Abort controllers — cancel in-flight requests on phase transitions or remounts
+  const sequenceAbortRef     = useRef(null);
+  const contactsLoadingRef   = useRef(false);
+  const companiesLoadingRef  = useRef(false);
+
   // Phase state (0-indexed)
   const [phase, setPhase] = useState(0);
 
@@ -312,6 +317,11 @@ export default function GoToWar() {
 
   useEffect(() => {
     loadActiveMissions();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadActiveMissions();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadActiveMissions() {
@@ -370,11 +380,13 @@ export default function GoToWar() {
   // Load contacts when entering Phase 2 (Roster)
   useEffect(() => {
     if (phase !== 1) return;
-    if (contacts.length === 0) loadContacts();
-    if (companies.length === 0) loadCompanies();
+    if (contacts.length === 0 && !contactsLoadingRef.current) loadContacts();
+    if (companies.length === 0 && !companiesLoadingRef.current) loadCompanies();
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadContacts() {
+    if (contactsLoadingRef.current) return;
+    contactsLoadingRef.current = true;
     setContactsLoading(true);
     setContactsError(null);
     try {
@@ -388,11 +400,14 @@ export default function GoToWar() {
       console.error('[GoToWar] contacts load error:', err);
       setContactsError('Failed to load contacts. Try refreshing.');
     } finally {
+      contactsLoadingRef.current = false;
       setContactsLoading(false);
     }
   }
 
   async function loadCompanies() {
+    if (companiesLoadingRef.current) return;
+    companiesLoadingRef.current = true;
     setCompaniesLoading(true);
     try {
       const user = getEffectiveUser();
@@ -405,6 +420,7 @@ export default function GoToWar() {
     } catch (err) {
       console.error('[GoToWar] companies load error:', err);
     } finally {
+      companiesLoadingRef.current = false;
       setCompaniesLoading(false);
     }
   }
@@ -467,6 +483,11 @@ export default function GoToWar() {
 
   // Phase 5: Generate sequence from Barry
   async function generateMissionSequence() {
+    // Cancel any in-flight request before starting a new one
+    if (sequenceAbortRef.current) sequenceAbortRef.current.abort();
+    const controller = new AbortController();
+    sequenceAbortRef.current = controller;
+
     setSequenceLoading(true);
     setSequenceError(null);
     try {
@@ -488,6 +509,7 @@ export default function GoToWar() {
           },
           contacts: missionContacts.slice(0, 5),
         }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error('Failed to generate sequence');
       const data = await response.json();
@@ -497,6 +519,7 @@ export default function GoToWar() {
         throw new Error(data.error || 'Unknown error');
       }
     } catch (err) {
+      if (err.name === 'AbortError') return; // Intentionally cancelled — no state update needed
       console.error('[GoToWar] sequence generation error:', err);
       setMicroSequence(null);
       setSequenceError('Barry could not generate a sequence. You can try again or launch manually.');

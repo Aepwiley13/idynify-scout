@@ -275,11 +275,18 @@ function PeopleShellInner({ user }) {
   const initialSection = (tabParam && TAB_MAP[tabParam]) || 'people';
   const [activeSection, setActiveSection] = useState(initialSection);
 
-  // Sync section when URL params change
+  // Sync section when URL params change; redirect unknown tab values to default
   useEffect(() => {
     const tab = searchParams.get('tab') || location.state?.activeTab;
-    if (tab && TAB_MAP[tab]) setActiveSection(TAB_MAP[tab]);
-    else if (!tab) setActiveSection('people');
+    if (tab && TAB_MAP[tab]) {
+      setActiveSection(TAB_MAP[tab]);
+    } else if (tab && !TAB_MAP[tab]) {
+      // Unknown tab — silently redirect to default rather than rendering nothing
+      setSearchParams({}, { replace: true });
+      setActiveSection('people');
+    } else {
+      setActiveSection('people');
+    }
   }, [searchParams, location.state?.activeTab]);
 
   const switchSection = (sectionId) => {

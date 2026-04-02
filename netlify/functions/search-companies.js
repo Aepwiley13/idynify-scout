@@ -462,14 +462,15 @@ export const handler = async (event) => {
       debugInfo.afterValidation = companies.length;
     }
 
-    // Top-off model: Only add companies if queue needs refilling
-    const pendingCount = await countPendingCompanies(userId, authToken);
+    // Top-off model: Only add companies if this ICP's stack needs refilling.
+    // Each ICP gets its own 50-slot quota — icpId scopes the count to that stack only.
+    const pendingCount = await countPendingCompanies(userId, authToken, icpId || null);
     const TARGET_QUEUE_SIZE = 50;
 
-    console.log(`📊 Current pending companies: ${pendingCount}`);
+    console.log(`📊 Current pending companies${icpId ? ` (ICP: ${icpId})` : ''}: ${pendingCount}`);
 
     if (pendingCount >= TARGET_QUEUE_SIZE) {
-      console.log(`✅ Queue is full (${pendingCount}/${TARGET_QUEUE_SIZE}). No new companies needed.`);
+      console.log(`✅ Queue is full (${pendingCount}/${TARGET_QUEUE_SIZE})${icpId ? ` for ICP ${icpId}` : ''}. No new companies needed.`);
 
       return {
         statusCode: 200,
@@ -700,9 +701,11 @@ function convertRevenueToNumeric(revenueRange) {
 }
 
 /**
- * Count pending companies in the queue
+ * Count pending companies in the queue.
+ * When icpId is provided the count is scoped to that ICP stack only,
+ * giving each stack its own 50-company quota instead of sharing one pool.
  */
-async function countPendingCompanies(userId, authToken) {
+async function countPendingCompanies(userId, authToken, icpId) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
@@ -713,18 +716,42 @@ async function countPendingCompanies(userId, authToken) {
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
-    const queryBody = {
-      structuredQuery: {
-        from: [{
-          collectionId: 'companies'
-        }],
-        where: {
+    // When an icpId is supplied, filter to that stack only so each ICP gets its own 50-slot quota.
+    // Without icpId (legacy / single-ICP users) we count all pending companies.
+    const whereClause = icpId
+      ? {
+          compositeFilter: {
+            op: 'AND',
+            filters: [
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'status' },
+                  op: 'EQUAL',
+                  value: { stringValue: 'pending' }
+                }
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'icpId' },
+                  op: 'EQUAL',
+                  value: { stringValue: icpId }
+                }
+              }
+            ]
+          }
+        }
+      : {
           fieldFilter: {
             field: { fieldPath: 'status' },
             op: 'EQUAL',
             value: { stringValue: 'pending' }
           }
-        }
+        };
+
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: 'companies' }],
+        where: whereClause
       }
     };
 

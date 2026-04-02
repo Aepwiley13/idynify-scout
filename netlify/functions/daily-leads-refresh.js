@@ -33,10 +33,21 @@ const handler = async (event) => {
       throw new Error('Firebase credentials not configured');
     }
 
-    // Get all active users (users with companyProfile/current)
+    // activeUsers is a flat list of { userId, email, profile, icpId } — one entry per ICP.
+    // Group by userId so we process all stacks for a user together and send one email.
     const activeUsers = await getActiveUsers(projectId);
 
-    console.log(`📊 Found ${activeUsers.length} active users with ICP profiles`);
+    // Deduplicate entries: group ICP entries by userId
+    const userMap = new Map();
+    for (const entry of activeUsers) {
+      if (!userMap.has(entry.userId)) {
+        userMap.set(entry.userId, { userId: entry.userId, email: entry.email, icps: [] });
+      }
+      userMap.get(entry.userId).icps.push({ profile: entry.profile, icpId: entry.icpId });
+    }
+
+    const uniqueUsers = Array.from(userMap.values());
+    console.log(`📊 Found ${uniqueUsers.length} active users — ${activeUsers.length} ICP stacks total`);
 
     const results = {
       processed: 0,
@@ -46,45 +57,47 @@ const handler = async (event) => {
       errors: []
     };
 
-    // Process each user
-    for (const user of activeUsers) {
+    // Process each user — top off every ICP stack, send one aggregated email
+    for (const user of uniqueUsers) {
       try {
         results.processed++;
 
-        // Get user's auth token (use service account for scheduled jobs)
         const authToken = await getServiceAccountToken();
 
-        // Get user's ICP profile
-        const profile = user.profile;
+        let totalAdded = 0;
+        let totalQueueSize = 0;
 
-        // Call search-companies to top off their queue
-        const refreshResult = await refreshUserQueue(user.userId, authToken, profile, user.icpId);
+        // Top off each ICP stack independently
+        for (const { profile, icpId } of user.icps) {
+          try {
+            const refreshResult = await refreshUserQueue(user.userId, authToken, profile, icpId);
+            totalAdded += refreshResult.companiesAdded || 0;
+            totalQueueSize += refreshResult.currentQueueSize || 0;
 
-        console.log(`✅ User ${user.userId}: ${refreshResult.companiesAdded} companies added (queue: ${refreshResult.currentQueueSize})`);
+            console.log(`  ✅ User ${user.userId} ICP ${icpId || 'legacy'}: +${refreshResult.companiesAdded} companies (queue: ${refreshResult.currentQueueSize})`);
 
-        // Log the refresh
-        await logRefresh(user.userId, authToken, refreshResult);
+            await logRefresh(user.userId, authToken, { ...refreshResult, icpId });
+          } catch (icpError) {
+            console.error(`  ❌ ICP ${icpId} for user ${user.userId}:`, icpError.message);
+            // Continue with other stacks — don't abort the whole user
+          }
+        }
 
-        if (refreshResult.companiesAdded > 0 || refreshResult.currentQueueSize > 0) {
+        if (totalAdded > 0 || totalQueueSize > 0) {
           results.refreshed++;
 
-          // Send email notification
-          const emailSent = await sendDailyEmail(user.email, user.userId, refreshResult.currentQueueSize);
-
+          // Send one email per user summarising all stacks
+          const emailSent = await sendDailyEmail(user.email, user.userId, totalQueueSize);
           if (emailSent) {
             results.emailed++;
-            console.log(`📧 Email sent to ${user.email}`);
+            console.log(`📧 Email sent to ${user.email} (${totalQueueSize} total pending across ${user.icps.length} stack${user.icps.length !== 1 ? 's' : ''})`);
           }
         }
 
       } catch (userError) {
         results.failed++;
-        results.errors.push({
-          userId: user.userId,
-          error: userError.message
-        });
+        results.errors.push({ userId: user.userId, error: userError.message });
         console.error(`❌ Error processing user ${user.userId}:`, userError);
-        // Continue with next user
       }
     }
 

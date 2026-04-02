@@ -1366,7 +1366,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     // Optimistic update
     setContacts(prev => prev.map(c => ids.includes(c.id) ? { ...c, brigade: brigadeId } : c));
     // Persist
-    await Promise.all(ids.map(id => {
+    const results = await Promise.allSettled(ids.map(id => {
       const contact = contacts.find(c => c.id === id);
       return onBrigadeChange({
         userId: user.uid,
@@ -1374,8 +1374,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         fromBrigade: contact?.brigade || null,
         toBrigade: brigadeId,
         contactName: contact?.name || null,
-      }).catch(err => console.error('[AllLeads] bulk brigade error:', err));
+      });
     }));
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length > 0) {
+      console.error('[AllLeads] bulk brigade errors:', failed.map(f => f.reason));
+      alert(`${failed.length} of ${ids.length} contacts failed to update. Please try again.`);
+    }
     // Selection intentionally preserved so user can export or continue working
   }
 

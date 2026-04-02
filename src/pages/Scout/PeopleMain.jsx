@@ -291,9 +291,11 @@ function PeopleShellInner({ user }) {
   const [missions, setMissions] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [missionsLoading, setMissionsLoading] = useState(true);
+  const [missionsLoadError, setMissionsLoadError] = useState(null);
 
   useEffect(() => {
     async function loadData() {
+      setMissionsLoadError(null);
       try {
         if (!user?.uid) return;
         const uid = user.uid;
@@ -311,6 +313,7 @@ function PeopleShellInner({ user }) {
         setCampaigns(campaignsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
         console.error('Error loading Command Center data:', err);
+        setMissionsLoadError('Failed to load missions. Check your connection and try refreshing.');
       } finally {
         setMissionsLoading(false);
       }
@@ -326,6 +329,15 @@ function PeopleShellInner({ user }) {
   const renderMain = () => {
     switch (activeSection) {
       case 'missions':
+        if (missionsLoadError) {
+          return (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+              <div style={{ fontSize: 13, color: '#ef4444', textAlign: 'center', maxWidth: 320 }}>
+                {missionsLoadError}
+              </div>
+            </div>
+          );
+        }
         if (!missionsLoading && !hasActiveMissions) {
           return <EmptyMissionsCTA navigate={navigate} T={T} />;
         }

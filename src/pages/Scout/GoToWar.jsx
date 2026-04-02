@@ -17,6 +17,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, where, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -197,6 +198,7 @@ function ContactRosterRow({ contact, selected, onToggle, T }) {
 // ─── GoToWar ──────────────────────────────────────────────────────────────────
 export default function GoToWar() {
   const T = useT();
+  const navigate = useNavigate();
 
   // Phase state (0-indexed)
   const [phase, setPhase] = useState(0);
@@ -429,6 +431,10 @@ export default function GoToWar() {
   // Add contact to mission (Phase 4)
   function addToMission(contact, company) {
     if (missionContacts.find((c) => c.contactId === contact.id)) return; // already added
+    if (!contact.email) {
+      alert(`${contact.firstName || contact.name || 'This contact'} has no email address and won't receive email outreach. Add an email before including them in a mission.`);
+      return;
+    }
     setMissionContacts((prev) => [
       ...prev,
       {
@@ -492,7 +498,8 @@ export default function GoToWar() {
       }
     } catch (err) {
       console.error('[GoToWar] sequence generation error:', err);
-      setSequenceError('Barry could not generate a sequence. You can still launch manually.');
+      setMicroSequence(null);
+      setSequenceError('Barry could not generate a sequence. You can try again or launch manually.');
     } finally {
       setSequenceLoading(false);
     }
@@ -585,6 +592,10 @@ export default function GoToWar() {
     try {
       const user = getEffectiveUser();
       if (!user || !activeMissionId) return;
+      if (!microSequence?.steps?.[stepIndex]) {
+        console.error('[GoToWar] handleManualSend: step not found', { stepIndex });
+        return;
+      }
       const token = await user.getIdToken();
       // Call existing Gmail send function
       await fetch('/.netlify/functions/gmail-send', {
@@ -701,7 +712,7 @@ export default function GoToWar() {
     if (phase === 0) return goalId !== '';                           // Brief: goal selected
     if (phase === 1) return selected.size > 0 || missionContacts.length > 0; // Roster: contacts selected or added
     if (phase === 2) return allStrategyFieldsSet;                   // Approach: all strategy fields set
-    if (phase === 3) return !!microSequence;                        // Sequence: generated
+    if (phase === 3) return !!(microSequence?.steps?.length > 0);   // Sequence: generated with steps
     if (phase === 4) return approvedSteps.size + skippedSteps.size === (microSequence?.steps?.length || 0); // Approve: all steps reviewed
     if (phase === 5) return missionLaunched;                        // Launch: mission launched
     return true;
@@ -1173,8 +1184,22 @@ export default function GoToWar() {
         </button>
       )}
       {sequenceError && (
-        <div style={{ marginTop: 10, fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <AlertCircle size={13} /> {sequenceError}
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertCircle size={13} /> {sequenceError}
+          </div>
+          <button
+            onClick={() => { setSequenceError(null); generateMissionSequence(); }}
+            disabled={sequenceLoading}
+            style={{
+              alignSelf: 'flex-start', padding: '6px 14px', borderRadius: 8,
+              border: `1.5px solid #ef4444`, background: 'transparent',
+              color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <RefreshCw size={12} /> Try Again
+          </button>
         </div>
       )}
 
@@ -1742,7 +1767,11 @@ export default function GoToWar() {
         {/* Next / Launch */}
         <button
           onClick={() => {
-            if (phase < TOTAL_PHASES - 1) setPhase((p) => p + 1);
+            if (phase === TOTAL_PHASES - 1) {
+              navigate('/command-center?tab=missions');
+            } else {
+              setPhase((p) => p + 1);
+            }
           }}
           disabled={!canAdvance()}
           style={{

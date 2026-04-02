@@ -29,6 +29,27 @@ import { getStaleContacts } from './utils/contactUtils.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Safely extract the first valid JSON object from a string.
+ * Walks brace depth instead of using a greedy regex, so nested objects
+ * and extra surrounding text can't corrupt the result.
+ */
+function extractJson(text) {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        try { return JSON.parse(text.slice(start, i + 1)); } catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
 function daysSince(dateVal) {
   if (!dateVal) return Infinity;
   const date = dateVal?.toDate ? dateVal.toDate() : new Date(dateVal);
@@ -39,8 +60,8 @@ function daysSince(dateVal) {
 // ── Auth verification ─────────────────────────────────────────────────────────
 
 async function verifyAuthToken(authToken, userId) {
-  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-  if (!firebaseApiKey) throw new Error('Firebase API key not configured');
+  const firebaseApiKey = process.env.FIREBASE_API_KEY;
+  if (!firebaseApiKey) throw new Error('Firebase API key not configured (set FIREBASE_API_KEY in server env)');
 
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
@@ -764,8 +785,7 @@ Return valid JSON only:
         );
 
         const rawText = claudeResponse.content[0].text;
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        parsed = extractJson(rawText);
         if (!parsed?.response_text) throw new Error('Invalid brief structure');
 
       } catch (err) {
@@ -848,8 +868,7 @@ Return valid JSON only:
         );
 
         const rawText = icpResponse.content[0].text;
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        icpParsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        icpParsed = extractJson(rawText);
         if (!icpParsed?.response_text) throw new Error('Invalid ICP response structure');
 
       } catch (err) {
@@ -1019,10 +1038,8 @@ Return valid JSON only:
         );
 
         const rawText = chatResponse.content[0].text;
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
-        } else {
+        parsed = extractJson(rawText);
+        if (!parsed) {
           throw new Error('No JSON in response');
         }
       } catch (err) {

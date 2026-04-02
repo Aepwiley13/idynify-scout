@@ -182,8 +182,12 @@ function extractSection(dashboardData, sectionId) {
   return null;
 }
 
-const CONTEXT_CACHE_KEY = 'barry_context_cache';
 const CONTEXT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Per-user cache key prevents cross-user cache collisions (e.g. impersonation)
+function getCacheKey(userId) {
+  return `barry_context_cache_${userId}`;
+}
 
 /**
  * Build the full context stack for Barry.
@@ -196,10 +200,10 @@ export async function buildContextStack(userId) {
 
   // Check sessionStorage cache first for instant repeat loads
   try {
-    const cached = sessionStorage.getItem(CONTEXT_CACHE_KEY);
+    const cached = sessionStorage.getItem(getCacheKey(userId));
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed.userId === userId && Date.now() - parsed.cachedAt < CONTEXT_CACHE_TTL) {
+      if (Date.now() - parsed.cachedAt < CONTEXT_CACHE_TTL) {
         return parsed.stack;
       }
     }
@@ -240,8 +244,7 @@ export async function buildContextStack(userId) {
 
     // Cache in sessionStorage for instant repeat loads
     try {
-      sessionStorage.setItem(CONTEXT_CACHE_KEY, JSON.stringify({
-        userId,
+      sessionStorage.setItem(getCacheKey(userId), JSON.stringify({
         cachedAt: Date.now(),
         stack
       }));

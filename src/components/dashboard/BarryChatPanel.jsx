@@ -310,7 +310,11 @@ export default function BarryChatPanel({ userId }) {
   async function loadOpeningBrief(user, stack) {
     setBriefLoading(true);
     try {
-      const authToken = await user.getIdToken();
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryChatPanel] getIdToken failed (loadOpeningBrief):', tokenErr.message);
+        setFallbackBrief(); setBriefLoading(false); return;
+      }
 
       const res = await fetch('/.netlify/functions/barryMissionChat', {
         method: 'POST',
@@ -358,7 +362,11 @@ export default function BarryChatPanel({ userId }) {
     try {
       const user = getEffectiveUser();
       if (!user) { setSending(false); return; }
-      const authToken = await user.getIdToken();
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryChatPanel] getIdToken failed (processIcpUpdate):', tokenErr.message);
+        setSending(false); return;
+      }
 
       // Use the ICP reclarification backend path to extract icp_params
       const res = await fetch('/.netlify/functions/barryMissionChat', {
@@ -415,7 +423,11 @@ export default function BarryChatPanel({ userId }) {
     try {
       const user = getEffectiveUser();
       if (!user) { setSending(false); return; }
-      const authToken = await user.getIdToken();
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryChatPanel] getIdToken failed (handleActionMessage):', tokenErr.message);
+        setSending(false); return;
+      }
 
       // Pull context from the last angle block Barry generated
       const lastAngleMsg = [...messages].reverse().find(m => m.has_message_angles && m.angles?.length > 0);
@@ -480,7 +492,10 @@ export default function BarryChatPanel({ userId }) {
       try {
         const user2 = getEffectiveUser();
         if (!user2) throw new Error('No user');
-        const authToken2 = await user2.getIdToken();
+        let authToken2;
+        try { authToken2 = await user2.getIdToken(); } catch (tokenErr) {
+          throw new Error('Auth token refresh failed: ' + tokenErr.message);
+        }
         const missionRes = await fetch('/.netlify/functions/barryMissionChat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -535,7 +550,11 @@ export default function BarryChatPanel({ userId }) {
     try {
       const user = getEffectiveUser();
       if (!user) return;
-      const authToken = await user.getIdToken();
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryChatPanel] getIdToken failed (executeConfirmedAction):', tokenErr.message);
+        setSending(false); return;
+      }
 
       const res = await fetch('/.netlify/functions/barryActions', {
         method: 'POST',
@@ -564,7 +583,11 @@ export default function BarryChatPanel({ userId }) {
     try {
       const user = getEffectiveUser();
       if (!user) return;
-      const authToken = await user.getIdToken();
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryChatPanel] getIdToken failed (executePipelineAction):', tokenErr.message);
+        setSending(false); return;
+      }
 
       const res = await fetch('/.netlify/functions/barryPipelineAction', {
         method: 'POST',
@@ -713,7 +736,15 @@ export default function BarryChatPanel({ userId }) {
       const user = getEffectiveUser();
       if (!user) { setSending(false); return; }
 
-      const authToken = await user.getIdToken();
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryChatPanel] getIdToken failed (sendMessage):', tokenErr.message);
+        setMessages(prev => [...prev, {
+          role: 'assistant', content: 'Session expired — please refresh the page.',
+          has_message_angles: false, angles: []
+        }]);
+        setSending(false); return;
+      }
 
       const res = await fetch('/.netlify/functions/barryMissionChat', {
         method: 'POST',

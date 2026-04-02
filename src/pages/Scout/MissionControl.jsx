@@ -150,6 +150,7 @@ export default function MissionControl() {
   const deprioritizeTimerRef = useRef(null);
   const toastCountRef = useRef(0);
   const deprioritizedIdsRef = useRef(new Set()); // for canvas dim — no re-render needed
+  const isMountedRef = useRef(true);
 
   useEffect(() => { loadData(); }, []);
   useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
@@ -165,9 +166,13 @@ export default function MissionControl() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [outreachTarget, missionTarget]);
 
-  // Clean up deprioritize timer on unmount
+  // Clean up deprioritize timer and mark unmounted
   useEffect(() => {
-    return () => clearTimeout(deprioritizeTimerRef.current);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(deprioritizeTimerRef.current);
+    };
   }, []);
 
   // Barry dossier briefing — fetch when target opens, cache per session
@@ -176,28 +181,36 @@ export default function MissionControl() {
     const id = selectedTarget.id;
     if (barryBriefings[id]) return;
 
+    const controller = new AbortController();
+
     async function fetchBriefing() {
       setBarryLoading(true);
       try {
         const user = auth.currentUser;
         if (!user) return;
-        const authToken = await user.getIdToken();
+        let authToken;
+        try { authToken = await user.getIdToken(); } catch (tokenErr) {
+          console.warn('[MissionControl] getIdToken failed (fetchBriefing):', tokenErr.message);
+          return;
+        }
         const resp = await fetch('/.netlify/functions/barryDossierBriefing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ authToken, userId: user.uid, company: selectedTarget, icpProfile }),
+          signal: controller.signal,
         });
         const data = await resp.json();
         if (data.briefing) {
           setBarryBriefings((prev) => ({ ...prev, [id]: data.briefing }));
         }
       } catch (err) {
-        console.error('Barry briefing error:', err);
+        if (err.name !== 'AbortError') console.error('Barry briefing error:', err);
       } finally {
-        setBarryLoading(false);
+        if (!controller.signal.aborted) setBarryLoading(false);
       }
     }
     fetchBriefing();
+    return () => controller.abort();
   }, [selectedTarget?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
@@ -211,14 +224,6 @@ export default function MissionControl() {
       const profile = profileDoc.exists() ? profileDoc.data() : null;
       setIcpProfile(profile);
       const allCompanies = companiesSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      // DEBUG — report exact Firebase field names so we can verify alignment
-      if (allCompanies.length > 0) {
-        console.log('[MissionControl] Raw Firebase company (first):', allCompanies[0]);
-        console.log('[MissionControl] Field names found:', Object.keys(allCompanies[0]));
-        console.log('[MissionControl] status samples:', allCompanies.slice(0, 5).map((c) => c.status));
-        console.log('[MissionControl] fit_score samples:', allCompanies.slice(0, 5).map((c) => c.fit_score));
-      }
 
       setCompanies(allCompanies);
       setLoading(false);
@@ -252,7 +257,9 @@ export default function MissionControl() {
     if (deprioritizeConfirm === companyId) return;
     setDeprioritizeConfirm(companyId);
     clearTimeout(deprioritizeTimerRef.current);
-    deprioritizeTimerRef.current = setTimeout(() => setDeprioritizeConfirm(null), 5000);
+    deprioritizeTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) setDeprioritizeConfirm(null);
+    }, 5000);
   }
 
   function handleDeprioritizeCancel() {

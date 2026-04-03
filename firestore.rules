@@ -39,5 +39,12 @@ service cloud.firestore {
     match /impersonationSessions/{sessionId} {
       allow read, write: if false;
     }
+
+    // Endorsements - public read (campaign site lists endorsers without auth)
+    // All writes go through the admin backend via Firebase Admin SDK (bypasses rules)
+    match /endorsements/{endorsementId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

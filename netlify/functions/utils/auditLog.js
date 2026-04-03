@@ -132,7 +132,6 @@ export const AUDIT_ACTIONS = {
   SUPER_ADMIN_VIEW_AUDIT_LOGS: 'super_admin_view_audit_logs',
 
   // Admin actions
-  ENDORSEMENT_REMOVED: 'endorsement_removed',
   VIEW_USER_DETAIL: 'view_user_detail',
   VIEW_USER_CONTACTS: 'view_user_contacts',
   VIEW_CONTACT_DETAIL: 'view_contact_detail',
@@ -191,7 +190,6 @@ export const ACTION_LABELS = {
   [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_RESET_PERMISSIONS]: 'Repaired: Reset Permissions',
   [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_FLUSH_CACHE]: 'Repaired: Flushed Cache',
   [AUDIT_ACTIONS.SUPER_ADMIN_VIEW_AUDIT_LOGS]: 'Viewed Audit Logs (Super Admin)',
-  [AUDIT_ACTIONS.ENDORSEMENT_REMOVED]: 'Removed Endorsement',
   [AUDIT_ACTIONS.VIEW_USER_DETAIL]: 'Viewed User',
   [AUDIT_ACTIONS.VIEW_USER_CONTACTS]: 'Viewed User Contacts',
   [AUDIT_ACTIONS.VIEW_CONTACT_DETAIL]: 'Viewed Contact Detail',

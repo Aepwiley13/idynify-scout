@@ -56,7 +56,6 @@ import SuperAdminDashboard from './pages/Admin/SuperAdminDashboard';
 import TenantHealth from './pages/Admin/TenantHealth';
 import RepairTools from './pages/Admin/RepairTools';
 import SuperAdminAuditLogs from './pages/Admin/SuperAdminAuditLogs';
-import EndorsementAdmin from './pages/Admin/EndorsementAdmin';
 import DiagnosticDashboardInit from './pages/DiagnosticDashboardInit';
 
 // Components
@@ -640,14 +639,6 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <EmailInsights />
-            </ProtectedAdminRoute>
-          }
-        />
-        <Route
-          path="/admin/endorsements"
-          element={
-            <ProtectedAdminRoute>
-              <EndorsementAdmin />
             </ProtectedAdminRoute>
           }
         />

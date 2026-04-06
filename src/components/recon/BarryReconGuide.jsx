@@ -83,14 +83,20 @@ function CoachingCard({ coaching, T }) {
   const qualityColor = coaching.quality === 'strong'
     ? BRAND.cyan
     : coaching.quality === 'weak'
-    ? '#f59e0b'
-    : '#dc2626';
+    ? 'var(--status-warning)'
+    : 'var(--status-error)';
 
   const qualityBg = coaching.quality === 'strong'
     ? `${BRAND.cyan}0d`
     : coaching.quality === 'weak'
-    ? '#f59e0b0d'
-    : '#dc26260d';
+    ? 'var(--status-warning-bg)'
+    : 'var(--status-error-bg)';
+
+  const qualityBorderColor = coaching.quality === 'strong'
+    ? `${BRAND.cyan}25`
+    : coaching.quality === 'weak'
+    ? 'var(--status-warning)'
+    : 'var(--status-error)';
 
   const isGap = coaching.quality === 'incomplete' && coaching.gap_warning;
 
@@ -98,7 +104,7 @@ function CoachingCard({ coaching, T }) {
     <div style={{
       marginTop: 8,
       background: qualityBg,
-      border: `1px solid ${qualityColor}25`,
+      border: `1px solid ${qualityBorderColor}`,
       borderLeft: `3px solid ${qualityColor}`,
       borderRadius: '0 8px 8px 0',
       padding: '10px 12px',
@@ -120,8 +126,8 @@ function CoachingCard({ coaching, T }) {
         {coaching.confidenceImpact !== 0 && coaching.confidenceImpact != null && (
           <span style={{
             fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4,
-            color: coaching.confidenceImpact > 0 ? '#065f46' : '#92400e',
-            background: coaching.confidenceImpact > 0 ? '#d1fae5' : '#fde68a',
+            color: coaching.confidenceImpact > 0 ? 'var(--status-success-text)' : 'var(--status-warning-text)',
+            background: coaching.confidenceImpact > 0 ? 'var(--status-success-bg)' : 'var(--status-warning-bg)',
           }}>
             {coaching.confidenceImpact > 0 ? `↑ context` : `↓ context`}
           </span>
@@ -130,8 +136,8 @@ function CoachingCard({ coaching, T }) {
 
       {isGap ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <AlertTriangle size={12} color="#dc2626" />
-          <p style={{ fontSize: 12, color: '#7f1d1d', lineHeight: 1.6, margin: 0 }}>
+          <AlertTriangle size={12} color="var(--status-error)" />
+          <p style={{ fontSize: 12, color: 'var(--status-error-text)', lineHeight: 1.6, margin: 0 }}>
             {coaching.gap_warning}
           </p>
         </div>
@@ -145,7 +151,7 @@ function CoachingCard({ coaching, T }) {
               <div style={{ height: 1, background: `${qualityColor}20`, margin: '8px 0' }} />
               <p style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.6, margin: 0,
                 fontStyle: 'italic',
-                color: coaching.quality === 'weak' ? '#78350f' : T.textMuted,
+                color: coaching.quality === 'weak' ? 'var(--status-warning-text)' : T.textMuted,
               }}>
                 {coaching.inference}
               </p>

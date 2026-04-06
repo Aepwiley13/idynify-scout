@@ -73,7 +73,7 @@
 }
 
 .recon-primary-btn {
-  background: #3b82f6;
+  background: var(--accent);
   color: #ffffff;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -85,12 +85,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 2px 4px var(--accent-border);
 }
 
 .recon-primary-btn:hover:not(:disabled) {
-  background: #2563eb;
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  background: var(--accent);
+  opacity: 0.88;
+  box-shadow: 0 4px 8px var(--accent-border);
 }
 
 .recon-primary-btn:disabled {
@@ -217,7 +218,7 @@
 }
 
 .recon-form-required {
-  color: #dc2626;
+  color: var(--status-error);
   margin-left: 0.25rem;
 }
 
@@ -246,20 +247,20 @@
 .recon-form-textarea:focus,
 .recon-form-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
 .recon-form-input.error,
 .recon-form-textarea.error,
 .recon-form-select.error {
-  border-color: #dc2626;
+  border-color: var(--status-error);
 }
 
 .recon-form-input.error:focus,
 .recon-form-textarea.error:focus,
 .recon-form-select.error:focus {
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  box-shadow: 0 0 0 3px var(--status-error-bg);
 }
 
 .recon-form-textarea {
@@ -268,7 +269,7 @@
 }
 
 .recon-form-error {
-  color: #dc2626;
+  color: var(--status-error);
   font-size: 0.75rem;
   margin-top: 0.25rem;
   display: flex;
@@ -284,11 +285,11 @@
 }
 
 .recon-char-count.warning {
-  color: #f59e0b;
+  color: var(--status-warning);
 }
 
 .recon-char-count.error {
-  color: #dc2626;
+  color: var(--status-error);
 }
 
 /* ========================================
@@ -312,18 +313,18 @@
 }
 
 .recon-radio-option:hover {
-  border-color: #3b82f6;
+  border-color: var(--accent);
   background: var(--bg-secondary);
 }
 
 .recon-radio-option.selected {
-  border-color: #3b82f6;
-  background: rgba(59,130,246,0.08);
+  border-color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .recon-radio-option input[type="radio"] {
   margin-right: 0.75rem;
-  accent-color: #3b82f6;
+  accent-color: var(--accent);
 }
 
 .recon-radio-option label {

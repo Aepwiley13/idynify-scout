@@ -4,9 +4,9 @@
 
 .barry-coaching-response {
   margin-top: 20px;
-  background: rgba(124,58,237,0.08);
+  background: var(--accent-bg);
   border: 1px solid var(--border);
-  border-left: 3px solid #7c3aed;
+  border-left: 3px solid var(--accent);
   border-radius: 0 12px 12px 0;
   padding: 14px 16px;
   animation: bcr-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -14,14 +14,14 @@
 }
 
 .barry-coaching-response.bcr--weak {
-  border-left-color: #d97706;
-  background: rgba(250,170,32,0.08);
+  border-left-color: var(--status-warning);
+  background: var(--status-warning-bg);
   border-color: var(--border);
 }
 
 .barry-coaching-response.bcr--incomplete {
-  border-left-color: #dc2626;
-  background: rgba(220,38,38,0.06);
+  border-left-color: var(--status-error);
+  background: var(--status-error-bg);
   border-color: var(--border);
 }
 
@@ -45,24 +45,24 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #7c3aed;
+  color: var(--accent);
   flex-shrink: 0;
   padding: 2px 7px;
-  background: rgba(147,51,234,0.12);
+  background: var(--accent-bg);
   border-radius: 4px;
-  border: 1px solid rgba(147,51,234,0.25);
+  border: 1px solid var(--accent-border);
 }
 
 .bcr--weak .bcr-attribution {
-  color: #d97706;
-  background: rgba(245,158,11,0.12);
-  border-color: rgba(245,158,11,0.25);
+  color: var(--status-warning);
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning);
 }
 
 .bcr--incomplete .bcr-attribution {
-  color: #dc2626;
-  background: rgba(220,38,38,0.10);
-  border-color: rgba(220,38,38,0.22);
+  color: var(--status-error);
+  background: var(--status-error-bg);
+  border-color: var(--status-error);
 }
 
 .bcr-headline {
@@ -82,13 +82,13 @@
 }
 
 .bcr-delta--up {
-  color: #065f46;
-  background: rgba(16,185,129,0.12);
+  color: var(--status-success-text);
+  background: var(--status-success-bg);
 }
 
 .bcr-delta--down {
-  color: #92400e;
-  background: rgba(245,158,11,0.25);
+  color: var(--status-warning-text);
+  background: var(--status-warning-bg);
 }
 
 /* ── Mirror ───────────────────────────────────────────────────────────────── */
@@ -123,7 +123,7 @@
 }
 
 .bcr-inference--weak {
-  color: #78350f;
+  color: var(--status-warning-text);
 }
 
 /* ── Gap Warning ──────────────────────────────────────────────────────────── */
@@ -135,12 +135,12 @@
 }
 
 .bcr-gap-icon {
-  color: #dc2626;
+  color: var(--status-error);
 }
 
 .bcr-gap-text {
   font-size: 12.5px;
-  color: #7f1d1d;
+  color: var(--status-error-text);
   line-height: 1.6;
   margin: 0;
 }
@@ -149,7 +149,7 @@
   align-self: flex-start;
   font-size: 12px;
   font-weight: 600;
-  color: #dc2626;
+  color: var(--status-error);
   background: none;
   border: none;
   padding: 0;
@@ -160,7 +160,7 @@
 }
 
 .bcr-gap-link:hover {
-  color: #991b1b;
+  color: var(--status-error-text);
 }
 
 /* ── Output Preview ───────────────────────────────────────────────────────── */
@@ -175,7 +175,7 @@
   gap: 5px;
   font-size: 11.5px;
   font-weight: 600;
-  color: #00c4cc;
+  color: var(--status-info);
   background: none;
   border: none;
   padding: 0;
@@ -185,7 +185,7 @@
 }
 
 .bcr-preview-toggle:hover {
-  color: #0099a8;
+  color: var(--status-info-text);
 }
 
 .bcr-preview-card {

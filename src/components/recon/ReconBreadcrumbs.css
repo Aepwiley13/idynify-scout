@@ -21,7 +21,7 @@
 }
 
 .recon-breadcrumb-separator {
-  color: #d1d5db;
+  color: var(--border-2);
   flex-shrink: 0;
 }
 
@@ -43,7 +43,7 @@
 }
 
 .recon-breadcrumb-link:hover {
-  color: #9333ea;
+  color: var(--accent);
 }
 
 .recon-breadcrumb-icon {

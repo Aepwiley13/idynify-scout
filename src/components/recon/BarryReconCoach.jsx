@@ -364,8 +364,8 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
                 onClick={() => setSectionComplete(true)}
                 style={{
                   padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                  border: `1px solid ${RECON_INDIGO}35`, background: `${RECON_INDIGO}10`,
-                  color: RECON_INDIGO, cursor: 'pointer',
+                  border: '1px solid var(--accent-border)', background: 'var(--accent-bg)',
+                  color: 'var(--accent)', cursor: 'pointer',
                 }}
               >
                 I'm done with this section →

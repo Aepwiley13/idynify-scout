@@ -72,7 +72,7 @@
 }
 
 .barry-training-stat-value.purple {
-  color: #9333ea;
+  color: var(--accent);
 }
 
 .barry-training-stat-value.dark {
@@ -80,15 +80,15 @@
 }
 
 .barry-training-stat-value.emerald {
-  color: #059669;
+  color: var(--status-success-text);
 }
 
 .barry-training-stat-value.amber {
-  color: #d97706;
+  color: var(--status-warning-text);
 }
 
 .barry-training-stat-value.red {
-  color: #ef4444;
+  color: var(--status-error-text);
 }
 
 .barry-training-progress-bar {
@@ -101,7 +101,7 @@
 
 .barry-training-progress-fill {
   height: 100%;
-  background: linear-gradient(to right, #a855f7, #7c3aed);
+  background: linear-gradient(to right, var(--accent-border), var(--accent));
   border-radius: 999px;
   transition: width 0.7s ease;
 }
@@ -169,16 +169,16 @@
 }
 
 .barry-dimension-status-icon.trained svg {
-  color: #059669;
+  color: var(--status-success-text);
 }
 
 .barry-dimension-status-icon.partial {
-  background: rgba(245,158,11,0.12);
-  border: 1px solid rgba(245,158,11,0.25);
+  background: var(--status-warning-bg);
+  border: 1px solid var(--status-warning);
 }
 
 .barry-dimension-status-icon.partial svg {
-  color: #f59e0b;
+  color: var(--status-warning-text);
 }
 
 .barry-dimension-status-icon.untrained {
@@ -217,15 +217,15 @@
 }
 
 .barry-dimension-badge.trained {
-  background: rgba(16,185,129,0.07);
-  color: #047857;
-  border-color: rgba(16,185,129,0.25);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-color: var(--status-success);
 }
 
 .barry-dimension-badge.partial {
-  background: rgba(250,170,32,0.08);
-  color: #b45309;
-  border-color: rgba(245,158,11,0.25);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border-color: var(--status-warning);
 }
 
 .barry-dimension-badge.untrained {
@@ -251,25 +251,25 @@
 }
 
 .barry-dimension-impact.trained {
-  background: rgba(16,185,129,0.07);
-  color: #047857;
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
 }
 
 .barry-dimension-impact.partial {
-  background: rgba(250,170,32,0.08);
-  color: #b45309;
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
 }
 
 .barry-dimension-impact.untrained {
-  background: rgba(220,38,38,0.06);
-  color: #dc2626;
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
 }
 
 /* ── What Barry Can Do Section ─────────── */
 .barry-capabilities {
-  background: rgba(124,58,237,0.08);
+  background: var(--accent-bg);
   border-radius: 0.75rem;
-  border: 1.5px solid rgba(147,51,234,0.15);
+  border: 1.5px solid var(--accent-border);
   padding: 1.25rem;
   margin-bottom: 2rem;
 }
@@ -277,7 +277,7 @@
 .barry-capabilities h3 {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #581c87;
+  color: var(--accent);
   margin: 0 0 0.75rem 0;
 }
 
@@ -301,28 +301,28 @@
 }
 
 .barry-capability-item svg.success {
-  color: #059669;
+  color: var(--status-success);
 }
 
 .barry-capability-item svg.info {
-  color: #a855f7;
+  color: var(--accent);
 }
 
 .barry-capability-item p {
   font-size: 0.75rem;
-  color: #581c87;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .barry-capabilities-divider {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid rgba(147,51,234,0.15);
+  border-top: 1px solid var(--accent-border);
 }
 
 .barry-capabilities-remaining p {
   font-size: 0.75rem;
-  color: #7c3aed;
+  color: var(--accent);
   margin: 0;
 }
 
@@ -341,7 +341,7 @@
   width: 50px;
   height: 50px;
   border: 4px solid var(--border);
-  border-top-color: #9333ea;
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: barry-spin 1s linear infinite;
 }

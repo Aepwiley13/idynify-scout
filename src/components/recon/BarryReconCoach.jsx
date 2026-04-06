@@ -22,17 +22,15 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
-const RECON_INDIGO = '#5A3FFF';
-
 function BarryAvatar({ size = 28 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: `linear-gradient(135deg,${BRAND.pink},${RECON_INDIGO})`,
-      border: `2px solid ${RECON_INDIGO}50`,
+      background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+      border: `2px solid ${BRAND.cyan}40`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0, overflow: 'hidden',
-      boxShadow: `0 0 ${size * 0.5}px ${RECON_INDIGO}50`,
+      boxShadow: `0 0 ${size * 0.5}px ${BRAND.cyan}35`,
     }}>
       <img
         src={ASSETS.barryAvatar}
@@ -197,7 +195,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 400,
         zIndex: 499,
         background: T.cardBg,
-        borderLeft: `1px solid ${RECON_INDIGO}30`,
+        borderLeft: `1px solid ${BRAND.pink}30`,
         display: 'flex', flexDirection: 'column',
         boxShadow: `-8px 0 40px rgba(0,0,0,0.35)`,
         animation: 'reconCoachSlideIn 0.22s ease',
@@ -214,14 +212,14 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
         {/* Header */}
         <div style={{
           padding: '14px 18px', flexShrink: 0,
-          background: `linear-gradient(135deg,${RECON_INDIGO}18,${RECON_INDIGO}08)`,
-          borderBottom: `1px solid ${RECON_INDIGO}30`,
+          background: `linear-gradient(135deg,${BRAND.pink}18,${BRAND.pink}08)`,
+          borderBottom: `1px solid ${BRAND.pink}30`,
           display: 'flex', alignItems: 'center', gap: 11,
         }}>
           <BarryAvatar size={36} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: T.text }}>Barry</div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: RECON_INDIGO, marginTop: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: BRAND.pink, marginTop: 1 }}>
               COACH — {isSection0 ? 'USER PROFILE' : sectionLabel?.toUpperCase()}
             </div>
           </div>
@@ -247,7 +245,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
                   maxWidth: '83%', padding: '9px 13px',
                   borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   background: msg.role === 'user'
-                    ? `linear-gradient(135deg,${RECON_INDIGO},${RECON_INDIGO}cc)`
+                    ? `linear-gradient(135deg,${BRAND.pink},${BRAND.pink}cc)`
                     : T.surface,
                   color: msg.role === 'user' ? '#fff' : T.text,
                   fontSize: 13, lineHeight: 1.6,
@@ -263,7 +261,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <BarryAvatar size={24} />
               <div style={{ padding: '9px 13px', borderRadius: '16px 16px 16px 4px', background: T.surface, border: `1px solid ${T.border2}` }}>
-                <Loader size={14} color={RECON_INDIGO} style={{ animation: 'reconSpin 1s linear infinite' }} />
+                <Loader size={14} color={BRAND.pink} style={{ animation: 'reconSpin 1s linear infinite' }} />
               </div>
             </div>
           )}
@@ -272,18 +270,18 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
           {sectionComplete && !loading && (
             <div style={{
               borderRadius: 14, overflow: 'hidden',
-              border: `1px solid ${RECON_INDIGO}35`,
+              border: `1px solid ${BRAND.pink}35`,
               marginTop: 8,
             }}>
               {/* Snapshot header */}
               <div style={{
                 padding: '12px 16px',
-                background: `${RECON_INDIGO}15`,
-                borderBottom: `1px solid ${RECON_INDIGO}20`,
+                background: `${BRAND.pink}15`,
+                borderBottom: `1px solid ${BRAND.pink}20`,
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                <CheckCircle size={15} color={RECON_INDIGO} style={{ flexShrink: 0 }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: RECON_INDIGO }}>
+                <CheckCircle size={15} color={BRAND.pink} style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.pink }}>
                   {isSection0 ? 'Profile saved' : 'Section complete'}
                 </div>
               </div>
@@ -333,7 +331,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
                   onClick={onComplete}
                   style={{
                     flex: 1, padding: '8px 12px', borderRadius: 9,
-                    background: RECON_INDIGO, border: 'none',
+                    background: BRAND.pink, border: 'none',
                     color: '#fff', fontSize: 12, fontWeight: 700,
                     cursor: 'pointer', display: 'flex', alignItems: 'center',
                     justifyContent: 'center', gap: 5,
@@ -401,7 +399,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
             disabled={loading || !input.trim() || sectionComplete}
             style={{
               padding: '10px 14px', borderRadius: 10,
-              background: `linear-gradient(135deg,${RECON_INDIGO},${RECON_INDIGO}cc)`,
+              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.pink}cc)`,
               border: 'none', color: '#fff',
               cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
               opacity: loading || !input.trim() ? 0.45 : 1,

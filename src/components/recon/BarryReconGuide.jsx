@@ -80,20 +80,21 @@ function CoachingCard({ coaching, T }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   if (!coaching?.quality || !coaching?.mirror) return null;
 
+  // BRAND.cyan (#00c4cc) is 1.5:1 on white — use a darker teal on light themes
   const qualityColor = coaching.quality === 'strong'
-    ? BRAND.cyan
+    ? (T.isDark ? BRAND.cyan : '#0a7a80')
     : coaching.quality === 'weak'
     ? 'var(--status-warning)'
     : 'var(--status-error)';
 
   const qualityBg = coaching.quality === 'strong'
-    ? `${BRAND.cyan}0d`
+    ? 'var(--status-info, rgba(0,196,204,0.07))'
     : coaching.quality === 'weak'
     ? 'var(--status-warning-bg)'
     : 'var(--status-error-bg)';
 
   const qualityBorderColor = coaching.quality === 'strong'
-    ? `${BRAND.cyan}25`
+    ? 'var(--status-info, rgba(0,196,204,0.25))'
     : coaching.quality === 'weak'
     ? 'var(--status-warning)'
     : 'var(--status-error)';

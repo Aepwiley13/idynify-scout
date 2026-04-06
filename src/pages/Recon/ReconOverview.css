@@ -1076,25 +1076,25 @@
 /* ── Tile icon colors ────────────────────────────────────────────────────── */
 
 .km-tile-icon { flex-shrink: 0; }
-.km-tile-icon--strong   { color: #10b981; }
-.km-tile-icon--weak     { color: #d97706; }
+.km-tile-icon--strong   { color: var(--status-success); }
+.km-tile-icon--weak     { color: var(--status-warning); }
 .km-tile-icon--stale    { color: var(--text-secondary); }
-.km-tile-icon--conflict { color: #ea580c; }
-.km-tile-icon--empty    { color: #4b5563; }
+.km-tile-icon--conflict { color: #c2410c; }
+.km-tile-icon--empty    { color: var(--text-secondary); }
 
 /* ── Tile label colors per state ─────────────────────────────────────────── */
 
-.km-label--strong   { color: #10b981; }
-.km-label--weak     { color: #d97706; }
+.km-label--strong   { color: var(--status-success-text); }
+.km-label--weak     { color: var(--status-warning-text); }
 .km-label--stale    { color: var(--text-secondary); }
-.km-label--conflict { color: #ea580c; }
-.km-label--empty    { color: #4b5563; }
+.km-label--conflict { color: #c2410c; }
+.km-label--empty    { color: var(--text-secondary); }
 
 /* ── Tooltip content additions ───────────────────────────────────────────── */
 
 .recon-heatmap-tooltip-body {
   font-size: 11px;
-  color: #d1d5db;
+  color: var(--tooltip-text);
   line-height: 1.5;
   margin: 4px 0 6px;
 }

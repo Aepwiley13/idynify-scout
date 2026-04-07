@@ -1000,9 +1000,9 @@ const ACTION_LENSES = [
 // Scout-specific lenses — Scout is about discovery, not engagement workflow.
 // Only show tabs relevant to finding and managing new leads.
 const SCOUT_LENSES = [
-  { id: 'new',           label: 'New (Unengaged)',   Icon: Sparkles,      color: '#10b981' },
-  { id: 'in_mission',    label: 'Active',           Icon: Zap,           color: '#7c3aed' },
   { id: 'all',           label: 'All People',       Icon: Users,         color: null },
+  { id: 'in_mission',    label: 'Active',           Icon: Zap,           color: '#7c3aed' },
+  { id: 'new',           label: 'New (Unengaged)',   Icon: Sparkles,      color: '#10b981' },
 ];
 
 // Legacy: keep BRIGADE_LENSES available for backward compat if needed elsewhere
@@ -1089,7 +1089,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
   const [actionFilter, setActionFilter] = useState(
-    activeFilter || (mode === 'scout' ? 'new' : 'all')
+    activeFilter || 'all'
   ); // action-oriented lens
 
   // Sync actionFilter when activeFilter prop changes (controlled from parent)

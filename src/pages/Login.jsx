@@ -21,7 +21,7 @@ export default function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate('/mission-control-v2');
+      navigate('/scout');
     } catch (error) {
       if (error.code === 'auth/multi-factor-auth-required') {
         // MFA is enrolled — prompt for TOTP code
@@ -42,7 +42,7 @@ export default function Login() {
 
     try {
       await resolveMfaSignIn(mfaError, mfaCode);
-      navigate('/mission-control-v2');
+      navigate('/scout');
     } catch (err) {
       setError('Invalid verification code. Please try again.');
     } finally {

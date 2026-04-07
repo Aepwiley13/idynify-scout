@@ -253,8 +253,8 @@ function App() {
       return <Navigate to="/checkout" />;
     }
 
-    // ✅ If user has paid, always go to Mission Control V2
-    return <Navigate to="/mission-control-v2" />;
+    // ✅ If user has paid, always go to Scout People page
+    return <Navigate to="/scout" />;
   };
 
   if (loading) {
@@ -281,7 +281,7 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/scout" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/mission-control-v2" />} />
 

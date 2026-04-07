@@ -230,11 +230,11 @@ function EngageBadge({ state, hunterStatus }) {
 // ─── Person Modal ─────────────────────────────────────────────────────────────
 function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engageState = 'not_started' }) {
   const T = useT();
-  const { isProTier } = useSubscription();
+  const { isProTier, hasPhoneAccess } = useSubscription();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
   const emailVerified = contact.email_status === 'verified';
-  const phone = isProTier
+  const phone = hasPhoneAccess
     ? (contact.phone_mobile || contact.phone_direct || contact.phone)
     : null;
   const status = getLeadStatus(contact);
@@ -298,7 +298,7 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engag
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8, fontSize: 13, color: T.textFaint }}>
-              <Phone size={15} />{isProTier
+              <Phone size={15} />{hasPhoneAccess
                 ? (phone || 'Phone not available')
                 : <span style={{ color: '#a78bfa', fontSize: 12, cursor: 'pointer' }} onClick={() => window.location.href = '/checkout?tier=pro'}>Pro plan — upgrade to view</span>
               }
@@ -1063,7 +1063,7 @@ function ContactProfileView({ contactId, onBack }) {
 //       'hunter' (active_mission only, purple Follow Up + Return to Scout)
 export default function AllLeads({ mode = 'people', activeFilter = null }) {
   const T = useT();
-  const { isProTier } = useSubscription();
+  const { isProTier, hasPhoneAccess } = useSubscription();
   const navigate = useNavigate();
   const impersonatedUserId = useActiveUserId();
   const { isImpersonating, isReadOnly } = useImpersonation();
@@ -1394,7 +1394,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     const rows = list.map(c => {
       const co = companies[c.company_id];
       const brigadeLabel = c.brigade ? (BRIGADE_MAP[c.brigade]?.label || c.brigade) : '';
-      return [c.name || '', c.title || '', co?.name || c.company_name || '', c.email || c.work_email || '', isProTier ? (c.phone_mobile || c.phone_direct || c.phone || '') : '', c.linkedin_url || '', brigadeLabel].map(f => `"${f}"`).join(',');
+      return [c.name || '', c.title || '', co?.name || c.company_name || '', c.email || c.work_email || '', hasPhoneAccess ? (c.phone_mobile || c.phone_direct || c.phone || '') : '', c.linkedin_url || '', brigadeLabel].map(f => `"${f}"`).join(',');
     });
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

@@ -57,7 +57,7 @@ const ENGAGEMENT_INTENTS = [
 
 export default function HunterContactDrawer({ contact, isOpen, onClose, onContactUpdate }) {
   const navigate = useNavigate();
-  const { isProTier } = useSubscription();
+  const { isProTier, hasPhoneAccess } = useSubscription();
 
   // View states
   const [activeView, setActiveView] = useState('main');
@@ -1315,12 +1315,12 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 </button>
                 <button
                   className="weapon-btn"
-                  onClick={() => isProTier ? handleSelectWeapon('text') : navigate('/checkout?tier=pro')}
-                  title={!isProTier ? 'Upgrade to Pro to send texts' : undefined}
+                  onClick={() => hasPhoneAccess ? handleSelectWeapon('text') : navigate('/checkout?tier=pro')}
+                  title={!hasPhoneAccess ? 'Upgrade to Pro to send texts' : undefined}
                 >
                   <MessageSquare className="w-6 h-6" />
                   <span>Text</span>
-                  {!isProTier
+                  {!hasPhoneAccess
                     ? <span className="weapon-badge" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 3 }}><Lock size={10} /> Pro</span>
                     : <span className="weapon-badge-alt">Opens App</span>
                   }
@@ -1337,13 +1337,13 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 </button>
                 <button
                   className="weapon-btn"
-                  onClick={() => isProTier ? handleSelectWeapon('call') : navigate('/checkout?tier=pro')}
-                  disabled={isProTier && !hasPhone}
-                  title={!isProTier ? 'Upgrade to Pro to call contacts' : undefined}
+                  onClick={() => hasPhoneAccess ? handleSelectWeapon('call') : navigate('/checkout?tier=pro')}
+                  disabled={hasPhoneAccess && !hasPhone}
+                  title={!hasPhoneAccess ? 'Upgrade to Pro to call contacts' : undefined}
                 >
                   <Phone className="w-6 h-6" />
                   <span>Call</span>
-                  {!isProTier
+                  {!hasPhoneAccess
                     ? <span className="weapon-badge" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 3 }}><Lock size={10} /> Pro</span>
                     : !hasPhone
                       ? <span className="weapon-disabled">No phone</span>

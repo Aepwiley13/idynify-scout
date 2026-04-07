@@ -14,8 +14,8 @@ export default function LeadDetail({ lead, onClose }) {
   const [processing, setProcessing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const { isProTier } = useSubscription();
-  const phone = isProTier ? (lead.phone_mobile || lead.phone || null) : null;
+  const { isProTier, hasPhoneAccess } = useSubscription();
+  const phone = hasPhoneAccess ? (lead.phone_mobile || lead.phone || null) : null;
 
   const handleAccurate = async () => {
     const user = getEffectiveUser();
@@ -162,7 +162,7 @@ export default function LeadDetail({ lead, onClose }) {
       'Last Name': lead.last_name,
       Title: lead.title,
       Email: lead.email,
-      Phone: isProTier ? (lead.phone_mobile || lead.phone || '') : '',
+      Phone: hasPhoneAccess ? (lead.phone_mobile || lead.phone || '') : '',
       Company: lead.company_name,
       Industry: lead.industry,
       'Company Size': lead.company_size,
@@ -186,7 +186,7 @@ export default function LeadDetail({ lead, onClose }) {
   };
 
   const handleCallNow = () => {
-    if (!isProTier) {
+    if (!hasPhoneAccess) {
       alert('Upgrade to Pro to call contacts directly');
       return;
     }
@@ -234,7 +234,7 @@ export default function LeadDetail({ lead, onClose }) {
 
             <div>
               <div className="text-gray-500 text-sm mb-1">Phone</div>
-              <div className="text-white">{isProTier
+              <div className="text-white">{hasPhoneAccess
                 ? (phone || 'Not available')
                 : <span className="text-purple-400 cursor-pointer text-sm" onClick={() => window.location.href = '/checkout?tier=pro'}>Pro plan — upgrade to view</span>
               }</div>
@@ -333,9 +333,9 @@ export default function LeadDetail({ lead, onClose }) {
 
           <button
             onClick={handleCallNow}
-            disabled={!isProTier || !phone}
+            disabled={!hasPhoneAccess || !phone}
             className={`py-4 rounded-lg font-bold transition-colors ${
-              isProTier && phone
+              hasPhoneAccess && phone
                 ? 'bg-cyan-600 text-white hover:bg-cyan-500'
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}

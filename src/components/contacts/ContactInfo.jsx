@@ -101,7 +101,7 @@ function InlineAddField({ type, labelOptions, onSave, onCancel }) {
 }
 
 export default function ContactInfo({ contact, mode = 'compact', onUpdate }) {
-  const { isProTier } = useSubscription();
+  const { isProTier, hasPhoneAccess } = useSubscription();
   const [addingEmail, setAddingEmail] = useState(false);
   const [addingPhone, setAddingPhone] = useState(false);
 
@@ -205,7 +205,7 @@ export default function ContactInfo({ contact, mode = 'compact', onUpdate }) {
           <div className="info-item-compact">
             <Phone className="info-icon-compact" />
             <div className="info-content-compact" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
-              {!isProTier ? (
+              {!hasPhoneAccess ? (
                 <PhoneLockedBadge />
               ) : (
                 <>

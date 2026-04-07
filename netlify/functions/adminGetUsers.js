@@ -220,6 +220,7 @@ async function aggregateUserData(uid) {
   // Fire all reads concurrently
   const [
     authUser,
+    mainUserDoc,
     usageDoc,
     icpDoc,
     progressDoc,
@@ -231,6 +232,7 @@ async function aggregateUserData(uid) {
     leadsCount
   ] = await Promise.allSettled([
     auth.getUser(uid),
+    userRef.get(),
     userRef.collection('apiUsage').doc('summary').get(),
     userRef.collection('companyProfile').doc('current').get(),
     userRef.collection('scoutProgress').doc('swipes').get(),
@@ -246,6 +248,7 @@ async function aggregateUserData(uid) {
   const val = (settled) => settled.status === 'fulfilled' ? settled.value : null;
 
   const authData = val(authUser);
+  const mainData = val(mainUserDoc)?.exists ? val(mainUserDoc).data() : {};
   const usageData = val(usageDoc);
   const icpData = val(icpDoc);
   const progressData = val(progressDoc);
@@ -256,6 +259,8 @@ async function aggregateUserData(uid) {
     email: authData?.email || null,
     signupDate: authData?.metadata?.creationTime || null,
     lastLogin: authData?.metadata?.lastSignInTime || null,
+    subscriptionTier: mainData?.subscriptionTier || 'starter',
+    phoneAccess: mainData?.features?.mobilePhone === true,
 
     scout: {
       companiesTotal: val(companiesTotal)?.data().count ?? 0,
@@ -337,7 +342,9 @@ function calculatePlatformStats(users) {
     activeUsers: 0,
     totalCredits: 0,
     totalCompanies: 0,
-    totalContacts: 0
+    totalContacts: 0,
+    phoneAccessGrantedCount: 0,
+    maxPhoneGrants: 25
   };
 
   users.forEach(user => {
@@ -353,6 +360,11 @@ function calculatePlatformStats(users) {
     stats.totalCredits += user.credits?.total ?? 0;
     stats.totalCompanies += user.scout?.companiesTotal ?? 0;
     stats.totalContacts += user.scout?.contactsTotal ?? 0;
+
+    // Count Starter users with manually granted phone access
+    if (user.subscriptionTier === 'starter' && user.phoneAccess) {
+      stats.phoneAccessGrantedCount++;
+    }
   });
 
   return stats;

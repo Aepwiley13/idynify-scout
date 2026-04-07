@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { Users, TrendingUp, Database, Building2, Filter, Search, FileText, Mail, LayoutDashboard } from 'lucide-react';
+import { Users, TrendingUp, Database, Building2, Filter, Search, FileText, Mail, LayoutDashboard, Phone } from 'lucide-react';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -19,6 +19,11 @@ export default function AdminDashboard() {
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'active' | 'inactive'
   const [sortBy, setSortBy] = useState('lastLogin'); // 'lastLogin' | 'totalCredits' | 'signupDate' | 'email'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+
+  // Account management: per-user loading states and inline feedback
+  const [tierPending, setTierPending] = useState({}); // { [uid]: true }
+  const [phonePending, setPhonePending] = useState({}); // { [uid]: true }
+  const [actionFeedback, setActionFeedback] = useState({}); // { [uid]: { message, type } }
 
   useEffect(() => {
     loadAllUsers();
@@ -146,6 +151,70 @@ export default function AdminDashboard() {
     }
   };
 
+  const showFeedback = (uid, message, type = 'success') => {
+    setActionFeedback(prev => ({ ...prev, [uid]: { message, type } }));
+    setTimeout(() => setActionFeedback(prev => {
+      const next = { ...prev };
+      delete next[uid];
+      return next;
+    }), 3000);
+  };
+
+  const adminFetch = async (fnName, body) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error('Not authenticated');
+    const authToken = await currentUser.getIdToken();
+    const response = await fetch(`/.netlify/functions/${fnName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify(body)
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) throw new Error(json.error || `${fnName} failed`);
+    return json;
+  };
+
+  const handleTierChange = async (uid, newTier) => {
+    const currentTier = users.find(u => u.uid === uid)?.subscriptionTier;
+    if (tierPending[uid] || currentTier === newTier) return;
+    setTierPending(prev => ({ ...prev, [uid]: true }));
+    try {
+      await adminFetch('adminUpdateUserTier', { targetUserId: uid, newTier });
+      const hadPhoneAccess = users.find(u => u.uid === uid)?.phoneAccess;
+      const wasStarter = currentTier === 'starter';
+      setUsers(prev => prev.map(u => u.uid === uid
+        ? { ...u, subscriptionTier: newTier, phoneAccess: newTier === 'pro' }
+        : u
+      ));
+      // If upgrading a Starter user who had manual phone grant, remove from count
+      if (wasStarter && hadPhoneAccess && platformStats) {
+        setPlatformStats(prev => ({ ...prev, phoneAccessGrantedCount: Math.max(0, prev.phoneAccessGrantedCount - 1) }));
+      }
+      showFeedback(uid, `Tier updated to ${newTier}`);
+    } catch (err) {
+      showFeedback(uid, err.message || 'Failed to update tier', 'error');
+    } finally {
+      setTierPending(prev => ({ ...prev, [uid]: false }));
+    }
+  };
+
+  const handleTogglePhoneAccess = async (uid, grant) => {
+    if (phonePending[uid]) return;
+    setPhonePending(prev => ({ ...prev, [uid]: true }));
+    try {
+      const result = await adminFetch('adminTogglePhoneAccess', { targetUserId: uid, grant });
+      setUsers(prev => prev.map(u => u.uid === uid ? { ...u, phoneAccess: grant } : u));
+      if (platformStats) {
+        setPlatformStats(prev => ({ ...prev, phoneAccessGrantedCount: result.data?.grantedCount ?? prev.phoneAccessGrantedCount }));
+      }
+      showFeedback(uid, grant ? 'Phone access granted' : 'Phone access revoked');
+    } catch (err) {
+      showFeedback(uid, err.message || 'Failed to toggle phone access', 'error');
+    } finally {
+      setPhonePending(prev => ({ ...prev, [uid]: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="admin-dashboard-loading">
@@ -253,6 +322,20 @@ export default function AdminDashboard() {
               <p className="stat-detail">{platformStats.totalContacts.toLocaleString()} contacts</p>
             </div>
           </div>
+
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
+              <Phone className="w-6 h-6" />
+            </div>
+            <div className="stat-content">
+              <p className="stat-label">Phone Access (Starter)</p>
+              <p className="stat-value">
+                {platformStats.phoneAccessGrantedCount ?? 0}
+                <span style={{ fontSize: '0.55em', color: '#6b7280', fontWeight: 400 }}> / {platformStats.maxPhoneGrants ?? 25}</span>
+              </p>
+              <p className="stat-detail">manual grants remaining: {(platformStats.maxPhoneGrants ?? 25) - (platformStats.phoneAccessGrantedCount ?? 0)}</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -296,6 +379,7 @@ export default function AdminDashboard() {
               <th onClick={() => toggleSort('email')} className="sortable">
                 User {sortBy === 'email' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
+              <th>Tier / Phone</th>
               <th>Scout</th>
               <th>Recon</th>
               <th onClick={() => toggleSort('totalCredits')} className="sortable">
@@ -314,6 +398,63 @@ export default function AdminDashboard() {
                   <div className="user-info">
                     <p className="user-email">{user.email || 'No email'}</p>
                     <p className="user-uid">{user.uid}</p>
+                    {actionFeedback[user.uid] && (
+                      <p style={{ fontSize: 11, marginTop: 3, color: actionFeedback[user.uid].type === 'error' ? '#f87171' : '#4ade80' }}>
+                        {actionFeedback[user.uid].message}
+                      </p>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 140 }}>
+                    {/* Tier badge + change control */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className={`badge ${user.subscriptionTier === 'pro' ? 'badge-success' : 'badge-info'}`}>
+                        {user.subscriptionTier === 'pro' ? 'Pro' : 'Starter'}
+                      </span>
+                      <select
+                        value={user.subscriptionTier || 'starter'}
+                        disabled={tierPending[user.uid]}
+                        onChange={(e) => handleTierChange(user.uid, e.target.value)}
+                        style={{ fontSize: 11, padding: '2px 4px', background: '#1f2937', color: '#d1d5db', border: '1px solid #374151', borderRadius: 4, cursor: 'pointer' }}
+                      >
+                        <option value="starter">→ Starter</option>
+                        <option value="pro">→ Pro</option>
+                      </select>
+                      {tierPending[user.uid] && <span style={{ fontSize: 10, color: '#9ca3af' }}>...</span>}
+                    </div>
+
+                    {/* Phone access toggle (only meaningful for Starter users) */}
+                    {user.subscriptionTier !== 'pro' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Phone size={11} style={{ color: user.phoneAccess ? '#22c55e' : '#6b7280' }} />
+                        <span style={{ fontSize: 11, color: user.phoneAccess ? '#22c55e' : '#6b7280' }}>
+                          {user.phoneAccess ? 'Phone on' : 'Phone off'}
+                        </span>
+                        <button
+                          disabled={phonePending[user.uid] || (!user.phoneAccess && (platformStats?.phoneAccessGrantedCount ?? 0) >= (platformStats?.maxPhoneGrants ?? 25))}
+                          onClick={() => handleTogglePhoneAccess(user.uid, !user.phoneAccess)}
+                          style={{
+                            fontSize: 10,
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: user.phoneAccess ? '#7f1d1d' : '#14532d',
+                            color: user.phoneAccess ? '#fca5a5' : '#86efac',
+                            opacity: phonePending[user.uid] ? 0.5 : 1
+                          }}
+                        >
+                          {phonePending[user.uid] ? '...' : user.phoneAccess ? 'Revoke' : 'Grant'}
+                        </button>
+                      </div>
+                    )}
+                    {user.subscriptionTier === 'pro' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Phone size={11} style={{ color: '#22c55e' }} />
+                        <span style={{ fontSize: 11, color: '#22c55e' }}>Phone included</span>
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td>

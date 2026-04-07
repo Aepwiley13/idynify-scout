@@ -132,6 +132,8 @@ export const AUDIT_ACTIONS = {
   SUPER_ADMIN_VIEW_AUDIT_LOGS: 'super_admin_view_audit_logs',
 
   // Admin actions
+  ADMIN_VIEW_USER_ICP: 'admin_view_user_icp',
+  ADMIN_UPDATE_USER_ICP: 'admin_update_user_icp',
   VIEW_USER_DETAIL: 'view_user_detail',
   VIEW_USER_CONTACTS: 'view_user_contacts',
   VIEW_CONTACT_DETAIL: 'view_contact_detail',
@@ -190,6 +192,8 @@ export const ACTION_LABELS = {
   [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_RESET_PERMISSIONS]: 'Repaired: Reset Permissions',
   [AUDIT_ACTIONS.SUPER_ADMIN_REPAIR_FLUSH_CACHE]: 'Repaired: Flushed Cache',
   [AUDIT_ACTIONS.SUPER_ADMIN_VIEW_AUDIT_LOGS]: 'Viewed Audit Logs (Super Admin)',
+  [AUDIT_ACTIONS.ADMIN_VIEW_USER_ICP]: 'Viewed User ICP Profiles',
+  [AUDIT_ACTIONS.ADMIN_UPDATE_USER_ICP]: 'Updated User ICP Settings',
   [AUDIT_ACTIONS.VIEW_USER_DETAIL]: 'Viewed User',
   [AUDIT_ACTIONS.VIEW_USER_CONTACTS]: 'Viewed User Contacts',
   [AUDIT_ACTIONS.VIEW_CONTACT_DETAIL]: 'Viewed Contact Detail',

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound, Ban, CheckCircle } from 'lucide-react';
+import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound, Ban, CheckCircle, Settings } from 'lucide-react';
 import UserContacts from '../../components/UserContacts';
 import BarryConversationsView from '../../components/admin/BarryConversationsView';
 import './UserDetail.css';
@@ -343,6 +343,15 @@ export default function UserDetail() {
             <span>{resettingPassword ? 'Sending...' : 'Reset Password'}</span>
           </button>
           <button
+            onClick={() => navigate(`/admin/user/${uid}/icp`)}
+            className="impersonate-button"
+            title="Edit this user's ICP settings"
+            style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1.5px solid var(--border)' }}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Edit ICP</span>
+          </button>
+          <button
             onClick={handleStartImpersonation}
             disabled={startingImpersonation || user.accountStatus === 'suspended'}
             className="impersonate-button"
@@ -456,7 +465,23 @@ export default function UserDetail() {
           </div>
 
           <div className="icp-info">
-            <h3>ICP Configuration</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0 }}>ICP Configuration</h3>
+              <button
+                onClick={() => navigate(`/admin/user/${uid}/icp`)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                  padding: '0.35rem 0.75rem',
+                  background: '#eff6ff', color: '#1d4ed8',
+                  border: '1.5px solid #bfdbfe', borderRadius: 6,
+                  fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer'
+                }}
+                title="Edit this user's ICP settings"
+              >
+                <Settings style={{ width: 14, height: 14 }} />
+                Edit ICP Settings
+              </button>
+            </div>
             <div className="icp-grid">
               <div className="icp-item">
                 <p className="icp-label">Industries</p>

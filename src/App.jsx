@@ -48,6 +48,7 @@ import ContactProfile from './pages/Scout/ContactProfile';
 import ScoutGame from './pages/Scout/ScoutGame';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
+import AdminICPEditor from './pages/Admin/AdminICPEditor';
 import AdminPingTest from './pages/Admin/AdminPingTest';
 import ApiActivity from './pages/Admin/ApiActivity';
 import AuditLogs from './pages/Admin/AuditLogs';
@@ -623,6 +624,14 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <UserDetail />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/user/:uid/icp"
+          element={
+            <ProtectedAdminRoute>
+              <AdminICPEditor />
             </ProtectedAdminRoute>
           }
         />

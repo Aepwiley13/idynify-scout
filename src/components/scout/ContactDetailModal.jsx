@@ -22,7 +22,7 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
   const [formData, setFormData] = useState({
     name: contact.name || '',
     email: contact.email || '',
-    phone: contact.phone || '',
+    phone: contact.phone_mobile || contact.phone || '',
     company: contact.company_name || contact.company || '',
     title: contact.title || '',
     linkedin_url: contact.linkedin_url || '',
@@ -113,7 +113,7 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
       const updateData = {
         name: formData.name.trim(),
         email: formData.email.trim() || null,
-        phone: formData.phone.trim() || null,
+        phone_mobile: formData.phone.trim() || null,
         title: formData.title.trim() || null,
         linkedin_url: formData.linkedin_url.trim() || null,
         address: formData.address.trim() || null,
@@ -435,7 +435,7 @@ export default function ContactDetailModal({ contact, onClose, onUpdate }) {
                     placeholder="+1 (555) 123-4567"
                   />
                 ) : (
-                  <p className="info-value">{contact.phone || 'Not provided'}</p>
+                  <p className="info-value">{contact.phone_mobile || contact.phone || 'Not provided'}</p>
                 )}
               </div>
 

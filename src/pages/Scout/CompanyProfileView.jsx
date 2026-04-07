@@ -7,7 +7,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   collection, query, where, getDocs, doc, getDoc,
-  setDoc, updateDoc, arrayUnion,
+  updateDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
@@ -247,19 +247,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     setApprovingContactIds(prev => new Set(prev).add(contact.id));
     try {
       const user = getEffectiveUser();
-      const contactDocId = `${companyId}_${contact.id}`;
-      await setDoc(doc(db, 'users', user.uid, 'contacts', contactDocId), {
-        apollo_person_id: contact.id,
-        name: contact.name || 'Unknown', title: contact.title || '',
-        email: contact.email || null, phone: contact.phone_numbers?.[0] || null,
-        linkedin_url: contact.linkedin_url || null,
-        company_id: companyId, company_name: company.name,
-        company_industry: company.industry || null,
-        lead_owner: user.uid,
-        status: 'pending_enrichment',
-        saved_at: new Date().toISOString(), source: 'apollo_people_search',
-      });
-      await enrichContact(user.uid, contact.id);
+      await enrichContact(user.uid, contact, 'apollo_people_search');
       await loadContacts();
     } catch (err) {
       console.error('Failed to approve contact:', err);
@@ -275,19 +263,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
       const user = getEffectiveUser();
       const toApprove = searchResults.filter(c => selectedContactIds.has(c.id));
       for (const c of toApprove) {
-        const id = `${companyId}_${c.id}`;
-        await setDoc(doc(db, 'users', user.uid, 'contacts', id), {
-          apollo_person_id: c.id,
-          name: c.name || 'Unknown', title: c.title || '',
-          email: c.email || null, phone: c.phone_numbers?.[0] || null,
-          linkedin_url: c.linkedin_url || null,
-          company_id: companyId, company_name: company.name,
-          company_industry: company.industry || null,
-          lead_owner: user.uid,
-          status: 'pending_enrichment',
-          saved_at: new Date().toISOString(), source: 'apollo_people_search',
-        });
-        await enrichContact(user.uid, c.id);
+        await enrichContact(user.uid, c, 'apollo_people_search');
       }
       await loadContacts();
       setSelectedContactIds(new Set());
@@ -298,25 +274,35 @@ export default function CompanyProfileView({ companyId, onBack }) {
     }
   }
 
-  async function enrichContact(userId, apolloPersonId) {
+  // Delegates all Firestore writes to the server-side enrichContact function
+  // (Firebase Admin SDK) so impersonation sessions are not blocked by security rules.
+  async function enrichContact(userId, contact, source) {
     try {
       const authToken = await auth.currentUser.getIdToken();
-      const res = await fetch('/.netlify/functions/enrichContact', {
+      const contactData = {
+        name: contact.name || 'Unknown',
+        title: contact.title || '',
+        email: contact.email || null,
+        phone: contact.phone_numbers?.[0] || contact.phone || null,
+        linkedin_url: contact.linkedin_url || null,
+        photo_url: contact.photo_url || null,
+        company_name: company.name,
+        company_industry: company.industry || null,
+        source: source || 'apollo_people_search',
+        department: contact.department || null,
+        seniority: contact.seniority || null,
+      };
+      await fetch('/.netlify/functions/enrichContact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, authToken, contactId: apolloPersonId }),
+        body: JSON.stringify({
+          userId,
+          authToken,
+          contactId: contact.id,
+          contactData,
+          companyId,
+        }),
       });
-      const data = await res.json();
-      const contactDocId = `${companyId}_${apolloPersonId}`;
-      if (data.success) {
-        await updateDoc(doc(db, 'users', userId, 'contacts', contactDocId), {
-          ...data.enrichedData, status: 'active', enriched_at: new Date().toISOString(),
-        });
-      } else {
-        await updateDoc(doc(db, 'users', userId, 'contacts', contactDocId), {
-          status: 'enrichment_failed',
-        });
-      }
     } catch {
       /* enrichment errors are non-fatal */
     }
@@ -329,20 +315,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
     try {
       const user = getEffectiveUser();
       for (const person of selectedDecisionMakers) {
-        const id = `${companyId}_${person.id}`;
-        await setDoc(doc(db, 'users', user.uid, 'contacts', id), {
-          apollo_person_id: person.id,
-          name: person.name || 'Unknown', title: person.title || '',
-          email: person.email || null, phone: person.phone || null,
-          linkedin_url: person.linkedin_url || null, photo_url: person.photo_url || null,
-          company_id: companyId, company_name: company.name,
-          company_industry: company.industry || null,
-          department: person.department || null, seniority: person.seniority || null,
-          lead_owner: user.uid,
-          status: 'pending_enrichment',
-          saved_at: new Date().toISOString(), source: 'decision_makers',
-        });
-        await enrichContact(user.uid, person.id);
+        await enrichContact(user.uid, person, 'decision_makers');
       }
       await loadContacts();
       setSelectedDecisionMakers([]);

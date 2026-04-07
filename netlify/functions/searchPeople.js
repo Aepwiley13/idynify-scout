@@ -3,6 +3,7 @@ import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apo
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { expandTitlesWithSynonyms } from './utils/titleSynonyms.js';
+import { verifyAuthToken } from './utils/verifyAuthToken.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -24,37 +25,12 @@ export const handler = async (event) => {
     console.log('🔍 Searching for people at organization:', organizationId);
     console.log('📋 Target titles:', titles);
 
+    // Verify auth token — supports admin impersonation
+    await verifyAuthToken(authToken, userId);
+    console.log('✅ Auth token verified');
+
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
-
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    if (!firebaseApiKey) {
-      console.error('❌ FIREBASE_API_KEY not configured');
-      throw new Error('Firebase API key not configured');
-    }
-
-    // Verify Firebase Auth token
-    const verifyResponse = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: authToken })
-      }
-    );
-
-    if (!verifyResponse.ok) {
-      throw new Error('Invalid authentication token');
-    }
-
-    const verifyData = await verifyResponse.json();
-    const tokenUserId = verifyData.users[0].localId;
-
-    if (tokenUserId !== userId) {
-      throw new Error('Token does not match user ID');
-    }
-
-    console.log('✅ Auth token verified');
 
     // Step 1: Search Apollo API for contact candidates
     const limit = maxResults || 10;

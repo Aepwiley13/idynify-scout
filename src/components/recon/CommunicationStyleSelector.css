@@ -71,13 +71,13 @@
 }
 
 .css-option:hover {
-  border-color: #c084fc;
-  background: rgba(124,58,237,0.08);
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
 }
 
 .css-option--selected {
-  border-color: #a855f7;
-  background: rgba(124,58,237,0.08);
+  border-color: var(--accent);
+  background: var(--accent-bg);
 }
 
 .css-radio {
@@ -101,8 +101,8 @@
 }
 
 .css-option--selected .css-option-dot {
-  border-color: #a855f7;
-  background: #a855f7;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .css-option--selected .css-option-dot::after {
@@ -128,7 +128,7 @@
 }
 
 .css-option--selected .css-option-label {
-  color: #7e22ce;
+  color: var(--accent);
 }
 
 .css-option-desc {

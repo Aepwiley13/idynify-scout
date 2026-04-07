@@ -619,9 +619,9 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
       {/* Inline error banner */}
       {inlineError && (
-        <div className="recon-card" style={{ background: '#fef2f2', border: '1.5px solid #fecaca', color: '#b91c1c', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="recon-card" style={{ background: 'var(--status-error-bg)', border: '1.5px solid var(--status-error)', color: 'var(--status-error-text)', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>⚠</span> {inlineError}
-          <button onClick={() => setInlineError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', fontWeight: 700 }}>✕</button>
+          <button onClick={() => setInlineError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--status-error-text)', fontWeight: 700 }}>✕</button>
         </div>
       )}
 

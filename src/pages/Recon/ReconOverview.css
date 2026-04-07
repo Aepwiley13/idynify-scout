@@ -310,8 +310,8 @@
 }
 
 .recon-heatmap-tooltip-content {
-  background: #111827;
-  color: #ffffff;
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
   font-size: 0.625rem;
   padding: 0.5rem 0.625rem;
   border-radius: 0.5rem;
@@ -337,9 +337,9 @@
 
 /* ── Train Next Card ───────────────────── */
 .recon-train-next {
-  background: linear-gradient(to bottom right, #faf5ff, #ede9fe);
+  background: var(--accent-bg);
   border-radius: 0.75rem;
-  border: 1.5px solid rgba(147,51,234,0.15);
+  border: 1.5px solid var(--accent-border);
   padding: 1.25rem;
 }
 
@@ -1067,34 +1067,34 @@
 
 /* ── 5-state tile backgrounds ────────────────────────────────────────────── */
 
-.km-tile--empty    { background: #1a1a1a; }
-.km-tile--weak     { background: #2d2200; }
-.km-tile--strong   { background: #0d2b1a; }
-.km-tile--stale    { background: #1a1f2b; }
-.km-tile--conflict { background: #2d1800; }
+.km-tile--empty    { background: var(--km-tile-empty); }
+.km-tile--weak     { background: var(--km-tile-weak); }
+.km-tile--strong   { background: var(--km-tile-strong); }
+.km-tile--stale    { background: var(--km-tile-stale); }
+.km-tile--conflict { background: var(--km-tile-conflict); }
 
 /* ── Tile icon colors ────────────────────────────────────────────────────── */
 
 .km-tile-icon { flex-shrink: 0; }
-.km-tile-icon--strong   { color: #10b981; }
-.km-tile-icon--weak     { color: #d97706; }
+.km-tile-icon--strong   { color: var(--status-success); }
+.km-tile-icon--weak     { color: var(--status-warning); }
 .km-tile-icon--stale    { color: var(--text-secondary); }
-.km-tile-icon--conflict { color: #ea580c; }
-.km-tile-icon--empty    { color: #4b5563; }
+.km-tile-icon--conflict { color: #c2410c; }
+.km-tile-icon--empty    { color: var(--text-secondary); }
 
 /* ── Tile label colors per state ─────────────────────────────────────────── */
 
-.km-label--strong   { color: #10b981; }
-.km-label--weak     { color: #d97706; }
+.km-label--strong   { color: var(--status-success-text); }
+.km-label--weak     { color: var(--status-warning-text); }
 .km-label--stale    { color: var(--text-secondary); }
-.km-label--conflict { color: #ea580c; }
-.km-label--empty    { color: #4b5563; }
+.km-label--conflict { color: #c2410c; }
+.km-label--empty    { color: var(--text-secondary); }
 
 /* ── Tooltip content additions ───────────────────────────────────────────── */
 
 .recon-heatmap-tooltip-body {
   font-size: 11px;
-  color: #d1d5db;
+  color: var(--tooltip-text);
   line-height: 1.5;
   margin: 4px 0 6px;
 }

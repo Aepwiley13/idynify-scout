@@ -298,8 +298,8 @@
    ======================================== */
 .info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  grid-template-columns: 1fr;
+  gap: 1rem;
 }
 
 .info-item {
@@ -322,12 +322,44 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .info-value-mono {
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 0.875rem;
   color: var(--text-secondary);
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.info-value-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.copy-uid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.copy-uid-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 
 /* ========================================
@@ -659,4 +691,118 @@
   .credits-value {
     font-size: 2.5rem;
   }
+}
+
+/* ========================================
+   ADMIN ACTION MODAL
+   ======================================== */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.admin-modal {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.admin-modal-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.75rem 0;
+}
+
+.admin-modal-message {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.25rem 0;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.admin-modal-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  resize: vertical;
+  font-family: inherit;
+  margin-bottom: 1.25rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.admin-modal-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.admin-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.admin-modal-btn-cancel {
+  padding: 0.65rem 1.25rem;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-modal-btn-cancel:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.admin-modal-btn-confirm {
+  padding: 0.65rem 1.25rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.admin-modal-btn-confirm:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.admin-modal-btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-modal-btn-confirm.danger {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.admin-modal-btn-confirm.danger:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
 }

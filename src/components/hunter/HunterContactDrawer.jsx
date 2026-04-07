@@ -363,7 +363,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
             company_industry: contact.company_industry || contact.industry,
             seniority: contact.seniority,
             email: contact.email,
-            phone: contact.phone || contact.phone_mobile,
+            phone: contact.phone_mobile || contact.phone,
             linkedin_url: contact.linkedin_url
           }
         })
@@ -523,7 +523,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           firstName: contact.firstName || null,
           lastName: contact.lastName || null,
           email: contact.email || null,
-          phone: contact.phone || contact.phone_mobile || null,
+          phone: contact.phone_mobile || contact.phone || null,
           linkedin_url: contact.linkedin_url || null,
           gmail_thread_id: contact.gmail_thread_id || null
         },

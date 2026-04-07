@@ -8,11 +8,14 @@ import { callNetlifyFunction } from '../utils/apiClient';
 import LearningToast from './LearningToast';
 import Papa from 'papaparse';
 import { getEffectiveUser } from '../context/ImpersonationContext';
+import { useSubscription } from '../hooks/useSubscription';
 
 export default function LeadDetail({ lead, onClose }) {
   const [processing, setProcessing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const { isProTier } = useSubscription();
+  const phone = isProTier ? (lead.phone_mobile || lead.phone || null) : null;
 
   const handleAccurate = async () => {
     const user = getEffectiveUser();
@@ -159,7 +162,7 @@ export default function LeadDetail({ lead, onClose }) {
       'Last Name': lead.last_name,
       Title: lead.title,
       Email: lead.email,
-      Phone: lead.phone,
+      Phone: isProTier ? (lead.phone_mobile || lead.phone || '') : '',
       Company: lead.company_name,
       Industry: lead.industry,
       'Company Size': lead.company_size,
@@ -183,8 +186,12 @@ export default function LeadDetail({ lead, onClose }) {
   };
 
   const handleCallNow = () => {
-    if (lead.phone) {
-      window.location.href = `tel:${lead.phone}`;
+    if (!isProTier) {
+      alert('Upgrade to Pro to call contacts directly');
+      return;
+    }
+    if (phone) {
+      window.location.href = `tel:${phone}`;
     } else {
       alert('No phone number available for this lead');
     }
@@ -227,7 +234,10 @@ export default function LeadDetail({ lead, onClose }) {
 
             <div>
               <div className="text-gray-500 text-sm mb-1">Phone</div>
-              <div className="text-white">{lead.phone || 'Not available'}</div>
+              <div className="text-white">{isProTier
+                ? (phone || 'Not available')
+                : <span className="text-purple-400 cursor-pointer text-sm" onClick={() => window.location.href = '/checkout?tier=pro'}>Pro plan — upgrade to view</span>
+              }</div>
             </div>
 
             <div>
@@ -323,9 +333,9 @@ export default function LeadDetail({ lead, onClose }) {
 
           <button
             onClick={handleCallNow}
-            disabled={!lead.phone}
+            disabled={!isProTier || !phone}
             className={`py-4 rounded-lg font-bold transition-colors ${
-              lead.phone
+              isProTier && phone
                 ? 'bg-cyan-600 text-white hover:bg-cyan-500'
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}

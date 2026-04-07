@@ -185,7 +185,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
         name: selectedContact.name || 'Unknown',
         title: selectedContact.title || selectedContact.headline || '',
         email: selectedContact.email || null,
-        phone: selectedContact.phone_numbers?.[0]?.sanitized_number || null,
+        phone_mobile: selectedContact.phone_numbers?.[0]?.sanitized_number || null,
         linkedin_url: selectedContact.linkedin_url || null,
         facebook_url: selectedContact.facebook_url || null,
         photo_url: selectedContact.photo_url || null,

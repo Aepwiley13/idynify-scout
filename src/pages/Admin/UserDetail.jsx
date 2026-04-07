@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase/config';
 import { fetchAllUsers } from '../../utils/adminAuth';
-import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound, Ban, CheckCircle, Settings } from 'lucide-react';
+import { ArrowLeft, User, Building2, Target, Database, Calendar, TrendingUp, Eye, KeyRound, Ban, CheckCircle, Settings, Copy } from 'lucide-react';
 import UserContacts from '../../components/UserContacts';
 import BarryConversationsView from '../../components/admin/BarryConversationsView';
 import './UserDetail.css';
@@ -17,6 +17,9 @@ export default function UserDetail() {
   const [resettingPassword, setResettingPassword] = useState(false);
   const [suspendingAccount, setSuspendingAccount] = useState(false);
   const [reactivatingAccount, setReactivatingAccount] = useState(false);
+  const [modal, setModal] = useState(null);
+  const [modalInput, setModalInput] = useState('');
+  const [uidCopied, setUidCopied] = useState(false);
 
   useEffect(() => {
     loadUserDetail();
@@ -72,214 +75,218 @@ export default function UserDetail() {
     return `${Math.floor(diffDays / 30)} months ago`;
   };
 
-  const handleStartImpersonation = async () => {
-    const reason = prompt('Please provide a reason for impersonation (e.g., "User reported bug with XYZ feature"):');
+  const handleStartImpersonation = () => {
+    setModalInput('');
+    setModal({
+      type: 'reason',
+      title: 'Start View as User Session',
+      message: `Enter a reason for viewing as ${user.email}:`,
+      placeholder: 'e.g., "User reported bug with XYZ feature"',
+      onSubmit: (reason) => {
+        setModal({
+          type: 'confirm',
+          title: 'Confirm View as User',
+          message: `Start session for ${user.email}?\n\nReason: ${reason}\n\nThis session will last 30 minutes and all actions will be logged.`,
+          onConfirm: () => executeImpersonation(reason),
+        });
+      },
+    });
+  };
 
-    if (!reason || reason.trim() === '') {
-      alert('A reason is required to start impersonation');
-      return;
-    }
-
-    if (!confirm(`Start impersonation session for ${user.email}?\n\nReason: ${reason}\n\nThis session will last 30 minutes and all actions will be logged.`)) {
-      return;
-    }
-
+  const executeImpersonation = async (reason) => {
+    setModal(null);
     try {
       setStartingImpersonation(true);
-
       const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('Not authenticated');
-      }
-
+      if (!currentUser) throw new Error('Not authenticated');
       const authToken = await currentUser.getIdToken();
-
       const response = await fetch('/.netlify/functions/adminStartImpersonation', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          authToken,
-          targetUserId: uid,
-          reason: reason.trim()
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authToken, targetUserId: uid, reason }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to start impersonation');
       }
-
-      const data = await response.json();
-
-      alert(`Impersonation session started successfully!\n\nViewing as: ${user.email}\nExpires in: 30 minutes\n\nYou will be redirected to the main dashboard.`);
-
-      // Redirect to main dashboard as the impersonated user
-      window.location.href = '/';
-
+      setModal({
+        type: 'alert',
+        title: 'Session Started',
+        message: `Viewing as: ${user.email}\nExpires in: 30 minutes\n\nYou will be redirected to the main dashboard.`,
+        onOk: () => { window.location.href = '/'; },
+      });
     } catch (error) {
       console.error('Error starting impersonation:', error);
-      alert(`Failed to start impersonation: ${error.message}`);
+      setModal({
+        type: 'alert',
+        title: 'Error',
+        message: `Failed to start impersonation: ${error.message}`,
+        onOk: () => setModal(null),
+      });
     } finally {
       setStartingImpersonation(false);
     }
   };
 
-  const handleResetPassword = async () => {
-    const reason = prompt('Please provide a reason for resetting this user\'s password:');
+  const handleResetPassword = () => {
+    setModalInput('');
+    setModal({
+      type: 'reason',
+      title: 'Reset Password',
+      message: `Enter a reason for resetting ${user.email}'s password:`,
+      placeholder: 'e.g., "User locked out of account"',
+      onSubmit: (reason) => {
+        setModal({
+          type: 'confirm',
+          title: 'Confirm Password Reset',
+          message: `Send password reset email to ${user.email}?\n\nReason: ${reason}\n\nThe user will receive an email with instructions to reset their password.`,
+          onConfirm: () => executeResetPassword(reason),
+        });
+      },
+    });
+  };
 
-    if (!reason || reason.trim() === '') {
-      alert('A reason is required to reset password');
-      return;
-    }
-
-    if (!confirm(`Send password reset email to ${user.email}?\n\nReason: ${reason}\n\nThe user will receive an email with instructions to reset their password.`)) {
-      return;
-    }
-
+  const executeResetPassword = async (reason) => {
+    setModal(null);
     try {
       setResettingPassword(true);
-
       const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('Not authenticated');
-      }
-
+      if (!currentUser) throw new Error('Not authenticated');
       const authToken = await currentUser.getIdToken();
-
       const response = await fetch('/.netlify/functions/adminResetUserPassword', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          authToken,
-          targetUserId: uid,
-          reason: reason.trim()
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authToken, targetUserId: uid, reason }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send password reset email');
-      }
-
-      alert(`Password reset email sent successfully to ${user.email}!\n\nThe user will receive instructions to reset their password.`);
-
+      if (!response.ok) throw new Error(data.error || 'Failed to send password reset email');
+      setModal({
+        type: 'alert',
+        title: 'Password Reset Sent',
+        message: `Password reset email sent successfully to ${user.email}!\n\nThe user will receive instructions to reset their password.`,
+        onOk: () => setModal(null),
+      });
     } catch (error) {
       console.error('Error resetting password:', error);
-      alert(`Failed to send password reset email: ${error.message}`);
+      setModal({
+        type: 'alert',
+        title: 'Error',
+        message: `Failed to send password reset email: ${error.message}`,
+        onOk: () => setModal(null),
+      });
     } finally {
       setResettingPassword(false);
     }
   };
 
-  const handleSuspendAccount = async () => {
-    const reason = prompt('Please provide a reason for suspending this account:');
+  const handleSuspendAccount = () => {
+    setModalInput('');
+    setModal({
+      type: 'reason',
+      title: 'Suspend Account',
+      message: `Enter a reason for suspending ${user.email}'s account:`,
+      placeholder: 'e.g., "Violation of terms of service"',
+      onSubmit: (reason) => {
+        setModal({
+          type: 'confirm',
+          title: 'Confirm Suspend Account',
+          message: `Suspend account for ${user.email}?\n\nReason: ${reason}\n\nThis will:\n- Immediately revoke all active sessions\n- Disable login access\n- Require admin reactivation\n\nThis action will be logged.`,
+          onConfirm: () => executeSuspendAccount(reason),
+          danger: true,
+        });
+      },
+    });
+  };
 
-    if (!reason || reason.trim() === '') {
-      alert('A reason is required to suspend the account');
-      return;
-    }
-
-    if (!confirm(`Suspend account for ${user.email}?\n\nReason: ${reason}\n\nThis will:\n- Immediately revoke all active sessions\n- Disable login access\n- Require admin reactivation\n\nThis action will be logged.`)) {
-      return;
-    }
-
+  const executeSuspendAccount = async (reason) => {
+    setModal(null);
     try {
       setSuspendingAccount(true);
-
       const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('Not authenticated');
-      }
-
+      if (!currentUser) throw new Error('Not authenticated');
       const authToken = await currentUser.getIdToken();
-
       const response = await fetch('/.netlify/functions/adminSuspendAccount', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          authToken,
-          targetUserId: uid,
-          reason: reason.trim()
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authToken, targetUserId: uid, reason }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to suspend account');
-      }
-
-      alert(`Account suspended successfully!\n\nUser: ${user.email}\nAll active sessions have been revoked.\n\nRefreshing page...`);
-
-      // Reload to show updated status
-      window.location.reload();
-
+      if (!response.ok) throw new Error(data.error || 'Failed to suspend account');
+      setModal({
+        type: 'alert',
+        title: 'Account Suspended',
+        message: `Account suspended successfully!\n\nUser: ${user.email}\nAll active sessions have been revoked.`,
+        onOk: () => { setModal(null); window.location.reload(); },
+      });
     } catch (error) {
       console.error('Error suspending account:', error);
-      alert(`Failed to suspend account: ${error.message}`);
+      setModal({
+        type: 'alert',
+        title: 'Error',
+        message: `Failed to suspend account: ${error.message}`,
+        onOk: () => setModal(null),
+      });
     } finally {
       setSuspendingAccount(false);
     }
   };
 
-  const handleReactivateAccount = async () => {
-    const reason = prompt('Please provide a reason for reactivating this account:');
+  const handleReactivateAccount = () => {
+    setModalInput('');
+    setModal({
+      type: 'reason',
+      title: 'Reactivate Account',
+      message: `Enter a reason for reactivating ${user.email}'s account:`,
+      placeholder: 'e.g., "Issue resolved, restoring access"',
+      onSubmit: (reason) => {
+        setModal({
+          type: 'confirm',
+          title: 'Confirm Reactivate Account',
+          message: `Reactivate account for ${user.email}?\n\nReason: ${reason}\n\nThis will restore full access to the account. This action will be logged.`,
+          onConfirm: () => executeReactivateAccount(reason),
+        });
+      },
+    });
+  };
 
-    if (!reason || reason.trim() === '') {
-      alert('A reason is required to reactivate the account');
-      return;
-    }
-
-    if (!confirm(`Reactivate account for ${user.email}?\n\nReason: ${reason}\n\nThis will restore full access to the account.\n\nThis action will be logged.`)) {
-      return;
-    }
-
+  const executeReactivateAccount = async (reason) => {
+    setModal(null);
     try {
       setReactivatingAccount(true);
-
       const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('Not authenticated');
-      }
-
+      if (!currentUser) throw new Error('Not authenticated');
       const authToken = await currentUser.getIdToken();
-
       const response = await fetch('/.netlify/functions/adminReactivateAccount', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          authToken,
-          targetUserId: uid,
-          reason: reason.trim()
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authToken, targetUserId: uid, reason }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to reactivate account');
-      }
-
-      alert(`Account reactivated successfully!\n\nUser: ${user.email}\nThe user can now log in again.\n\nRefreshing page...`);
-
-      // Reload to show updated status
-      window.location.reload();
-
+      if (!response.ok) throw new Error(data.error || 'Failed to reactivate account');
+      setModal({
+        type: 'alert',
+        title: 'Account Reactivated',
+        message: `Account reactivated successfully!\n\nUser: ${user.email}\nThe user can now log in again.`,
+        onOk: () => { setModal(null); window.location.reload(); },
+      });
     } catch (error) {
       console.error('Error reactivating account:', error);
-      alert(`Failed to reactivate account: ${error.message}`);
+      setModal({
+        type: 'alert',
+        title: 'Error',
+        message: `Failed to reactivate account: ${error.message}`,
+        onOk: () => setModal(null),
+      });
     } finally {
       setReactivatingAccount(false);
     }
+  };
+
+  const handleCopyUid = () => {
+    navigator.clipboard.writeText(user.uid).then(() => {
+      setUidCopied(true);
+      setTimeout(() => setUidCopied(false), 2000);
+    });
   };
 
   if (loading) {
@@ -305,6 +312,54 @@ export default function UserDetail() {
 
   return (
     <div className="user-detail">
+      {/* Admin Action Modal */}
+      {modal && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal">
+            <h3 className="admin-modal-title">{modal.title}</h3>
+            <p className="admin-modal-message">{modal.message}</p>
+            {modal.type === 'reason' && (
+              <textarea
+                className="admin-modal-input"
+                placeholder={modal.placeholder}
+                value={modalInput}
+                onChange={e => setModalInput(e.target.value)}
+                rows={3}
+                autoFocus
+              />
+            )}
+            <div className="admin-modal-actions">
+              {modal.type === 'reason' && (
+                <>
+                  <button className="admin-modal-btn-cancel" onClick={() => setModal(null)}>Cancel</button>
+                  <button
+                    className="admin-modal-btn-confirm"
+                    onClick={() => { if (modalInput.trim()) modal.onSubmit(modalInput.trim()); }}
+                    disabled={!modalInput.trim()}
+                  >
+                    Continue
+                  </button>
+                </>
+              )}
+              {modal.type === 'confirm' && (
+                <>
+                  <button className="admin-modal-btn-cancel" onClick={() => setModal(null)}>Cancel</button>
+                  <button
+                    className={`admin-modal-btn-confirm${modal.danger ? ' danger' : ''}`}
+                    onClick={modal.onConfirm}
+                  >
+                    Confirm
+                  </button>
+                </>
+              )}
+              {modal.type === 'alert' && (
+                <button className="admin-modal-btn-confirm" onClick={modal.onOk}>OK</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header with Back Button */}
       <div className="detail-header">
         <button onClick={() => navigate('/admin')} className="back-button">
@@ -406,7 +461,13 @@ export default function UserDetail() {
             </div>
             <div className="info-item">
               <p className="info-label">User ID</p>
-              <p className="info-value info-value-mono">{user.uid}</p>
+              <div className="info-value-row">
+                <p className="info-value info-value-mono">{user.uid}</p>
+                <button className="copy-uid-btn" onClick={handleCopyUid} title="Copy UID">
+                  <Copy className="w-3 h-3" />
+                  {uidCopied ? 'Copied!' : ''}
+                </button>
+              </div>
             </div>
             <div className="info-item">
               <p className="info-label">Signup Date</p>

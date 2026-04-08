@@ -146,6 +146,7 @@ export const handler = async (event) => {
           const userDoc = usersSnapshot.docs[0];
           await userDoc.ref.update({
             subscriptionStatus: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
           });
           console.log(`✅ Updated subscription status for user: ${userDoc.id}`);
         }
@@ -166,6 +167,7 @@ export const handler = async (event) => {
           await userDoc.ref.update({
             subscriptionStatus: 'canceled',
             hasCompletedPayment: false,
+            cancelAtPeriodEnd: false,
           });
           console.log(`❌ Subscription canceled for user: ${userDoc.id}`);
         }

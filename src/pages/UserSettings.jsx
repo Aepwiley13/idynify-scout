@@ -427,6 +427,9 @@ export default function UserSettings() {
   /* ── billing ── */
   const [billing, setBilling]             = useState(null);
   const [billingLoading, setBillingLoading] = useState(true);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError]     = useState(null);
+  const [cancelStep, setCancelStep]       = useState('idle'); // 'idle' | 'confirm' | 'done'
 
   /* ── gmail ── */
   const [gmailStatus, setGmailStatus]     = useState(null);
@@ -508,12 +511,35 @@ export default function UserSettings() {
           billingDate:      d.billingDate        || null,
           nextBillingDate:  d.nextBillingDate    || null,
           stripeCustomerId: d.stripeCustomerId   || null,
+          cancelAtPeriodEnd: d.cancelAtPeriodEnd || false,
         });
       }
     } catch (err) {
       console.error('[UserSettings] loadBilling error:', err);
     } finally {
       setBillingLoading(false);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!user) return;
+    setCancelLoading(true);
+    setCancelError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/cancel-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, idToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Cancellation failed');
+      setCancelStep('done');
+      await loadBilling();
+    } catch (err) {
+      setCancelError(err.message);
+    } finally {
+      setCancelLoading(false);
     }
   }
 
@@ -1020,6 +1046,79 @@ export default function UserSettings() {
                       </span>
                     </div>
                   </div>
+                </section>
+
+                <section className="us-section">
+                  <h2 className="us-section-title">Cancel subscription</h2>
+                  {billing?.cancelAtPeriodEnd || cancelStep === 'done' ? (
+                    <div className="us-card" style={{ borderColor: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.06)' }}>
+                      <div className="us-card-icon" style={{ background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.25)', color: '#fde68a' }}>
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <div className="us-card-body">
+                        <span className="us-card-label" style={{ color: '#fde68a' }}>Cancellation scheduled</span>
+                        <span className="us-card-value us-card-value--muted">
+                          Your plan will remain active until{' '}
+                          {billing?.nextBillingDate
+                            ? new Date(billing.nextBillingDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                            : 'the end of your billing period'}
+                          . No further charges will be made.
+                        </span>
+                      </div>
+                    </div>
+                  ) : cancelStep === 'confirm' ? (
+                    <div className="us-card" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="us-card-icon" style={{ background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', color: '#fca5a5' }}>
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
+                        <div className="us-card-body">
+                          <span className="us-card-label" style={{ color: '#fca5a5' }}>Are you sure you want to cancel?</span>
+                          <span className="us-card-value us-card-value--muted">
+                            You'll keep full access until the end of your current billing period. After that, your account will revert to the free tier.
+                          </span>
+                        </div>
+                      </div>
+                      {cancelError && (
+                        <span style={{ fontSize: 12, color: '#fca5a5' }}>{cancelError}</span>
+                      )}
+                      <div style={{ display: 'flex', gap: '0.625rem' }}>
+                        <button
+                          className="us-action-btn us-action-btn--primary"
+                          onClick={() => { setCancelStep('idle'); setCancelError(null); }}
+                          disabled={cancelLoading}
+                        >
+                          Keep my plan
+                        </button>
+                        <button
+                          className="us-action-btn"
+                          style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#fca5a5' }}
+                          onClick={handleCancelSubscription}
+                          disabled={cancelLoading}
+                        >
+                          {cancelLoading ? <Loader className="w-3.5 h-3.5 animate-spin" /> : null}
+                          {cancelLoading ? 'Canceling…' : 'Yes, cancel subscription'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="us-card us-card--muted">
+                      <div className="us-card-icon" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.18)', color: '#fca5a5' }}>
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <div className="us-card-body">
+                        <span className="us-card-label">Cancel your subscription</span>
+                        <span className="us-card-value us-card-value--muted">You'll keep access until the end of your billing period.</span>
+                      </div>
+                      <button
+                        className="us-action-btn"
+                        style={{ borderColor: 'rgba(239,68,68,0.35)', color: '#fca5a5', flexShrink: 0 }}
+                        onClick={() => setCancelStep('confirm')}
+                      >
+                        Cancel plan
+                      </button>
+                    </div>
+                  )}
                 </section>
 
                 <section className="us-section">

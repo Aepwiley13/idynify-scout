@@ -959,7 +959,7 @@ function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
 
 // ─── DailyLeads ──────────────────────────────────────────────────────────────
 // ─── ICP Reclarification Modal ────────────────────────────────────────────────
-function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
+function IcpReclarificationModal({ userId, activeICPId, onClose, onSearchComplete }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -1020,9 +1020,23 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
       const user = getEffectiveUser();
       if (!user) { onSearchComplete(); return; }
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      const baseProfile = profileDoc.exists() ? profileDoc.data() : {};
+
+      // Read from the active icpProfiles doc (new system) so Barry's updates persist correctly.
+      // Fall back to legacy companyProfile/current only if no icpProfiles entry exists yet.
+      let baseProfile = {};
+      let icpDocRef = null;
+      if (activeICPId) {
+        icpDocRef = doc(db, 'users', user.uid, 'icpProfiles', activeICPId);
+        const icpDoc = await getDoc(icpDocRef);
+        if (icpDoc.exists()) baseProfile = icpDoc.data();
+      }
+      if (!icpDocRef) {
+        const legacyRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
+        const legacyDoc = await getDoc(legacyRef);
+        if (legacyDoc.exists()) baseProfile = legacyDoc.data();
+        icpDocRef = legacyRef;
+      }
+
       const mergedProfile = {
         ...baseProfile,
         ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
@@ -1032,12 +1046,19 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };
+
       // Persist the refined ICP so it shows in ICP Settings and survives page refreshes
-      await setDoc(profileRef, mergedProfile);
+      await setDoc(icpDocRef, mergedProfile);
+
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile }),
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: mergedProfile,
+          ...(activeICPId ? { icpId: activeICPId } : {}),
+        }),
       });
     } catch (err) {
       console.error('ICP search error:', err);
@@ -1202,6 +1223,8 @@ export default function DailyLeads({ onNavigate }) {
   // ── Multi-ICP support ────────────────────────────────────────────────────────
   const [icpList, setIcpList] = useState([]);
   const [activeICPId, setActiveICPId] = useState(null);
+  // Per-ICP pending counts derived from loaded data — { [icpId]: number, __legacy__: number }
+  const [icpPendingCounts, setIcpPendingCounts] = useState({});
   // Store the full company list (unfiltered by ICP) for re-scoring
   const allCompaniesRef = useRef([]);
 
@@ -1335,6 +1358,15 @@ export default function DailyLeads({ onNavigate }) {
       const q = query(companiesRef, where('status', '==', 'pending'));
       const snapshot = await getDocs(q);
       const allPendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Derive per-ICP pending counts from the loaded data (no extra Firestore reads).
+      // Legacy companies (no icpId) are counted under '__legacy__' and shown for every ICP.
+      const counts = {};
+      for (const c of allPendingData) {
+        const key = c.icpId || '__legacy__';
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      setIcpPendingCounts(counts);
 
       // Filter to companies for the active ICP. Companies with no icpId are legacy (show for all ICPs).
       const activeId = icps.length > 0 ? icps[0].id : null;
@@ -1480,6 +1512,8 @@ export default function DailyLeads({ onNavigate }) {
     rescored.sort((a, b) => b.fit_score - a.fit_score);
     setCompanies(rescored);
     setCurrentIndex(0);
+    // Reset batch state so the new stack starts fresh
+    resetBatch();
   }, [activeICPId, icpList, companies]);
 
   const handleSwipe = async (direction, feedback = null) => {
@@ -1504,6 +1538,13 @@ export default function DailyLeads({ onNavigate }) {
         ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
         ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
       });
+
+      // Decrement this stack's pending count so tab badges stay accurate in real time
+      const countKey = company.icpId || '__legacy__';
+      setIcpPendingCounts(prev => ({
+        ...prev,
+        [countKey]: Math.max(0, (prev[countKey] || 1) - 1),
+      }));
       const isInterested = direction === 'right';
       const newSwipeCount = isInterested
         ? (lastSwipeDate === today ? dailySwipeCount + 1 : 1)
@@ -1519,9 +1560,8 @@ export default function DailyLeads({ onNavigate }) {
       }
       setLastSwipe({ company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount });
       setShowUndo(true);
-      const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const icpProfileDoc = await getDoc(icpProfileRef);
-      const icpTitles = icpProfileDoc.exists() ? icpProfileDoc.data().targetTitles || [] : [];
+      // Use the active ICP profile already loaded in state — no extra Firestore read needed
+      const icpTitles = icpProfile?.targetTitles || [];
       if (direction === 'right' && icpTitles.length > 0) {
         const formattedTitles = icpTitles.map((title, index) => ({ title, rank: index + 1, score: 100 - (index * 10) }));
         await updateDoc(companyRef, { selected_titles: formattedTitles, titles_updated_at: new Date().toISOString(), titles_source: 'icp_auto' });
@@ -1744,9 +1784,26 @@ export default function DailyLeads({ onNavigate }) {
     }
 
     resetBatch();
-    // Advance to next card first (so the UI is responsive)
-    if (currentIndex < companies.length - 1) setCurrentIndex(currentIndex + 1);
-    else loadTodayLeads();
+
+    if (currentIndex < companies.length - 1) {
+      // Still cards left in this ICP's stack — keep going
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      // This stack is exhausted. Try to switch to the next ICP that has pending companies
+      // rather than silently jumping back to ICP 1.
+      const pool = allCompaniesRef.current;
+      const nextICP = icpList.find(icp =>
+        icp.id !== activeICPId &&
+        pool.some(c => !c.icpId || c.icpId === icp.id)
+      );
+      if (nextICP) {
+        handleICPSwitch(nextICP.id);
+      } else {
+        // All stacks empty — do a full reload (will refresh from Firestore)
+        loadTodayLeads();
+      }
+    }
+
     // Fire adaptive search in background
     triggerAdaptiveSearch(snapshot);
   };
@@ -2091,23 +2148,45 @@ export default function DailyLeads({ onNavigate }) {
             overflowX: 'auto', paddingBottom: 2,
             msOverflowStyle: 'none', scrollbarWidth: 'none',
           }}>
-            {icpList.map(icp => (
-              <button
-                key={icp.id}
-                onClick={() => handleICPSwitch(icp.id)}
-                style={{
-                  padding: '5px 14px', borderRadius: 20,
-                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
-                  background: activeICPId === icp.id ? T.accentBg : T.surface,
-                  color: activeICPId === icp.id ? BRAND.pink : T.textMuted,
-                  transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {icp.name || 'ICP'}
-              </button>
-            ))}
+            {icpList.map(icp => {
+              const isActive = activeICPId === icp.id;
+              // Pending count: own icpId bucket + legacy bucket (for primary/first ICP)
+              const ownCount = icpPendingCounts[icp.id] || 0;
+              const legacyCount = icpList[0]?.id === icp.id ? (icpPendingCounts['__legacy__'] || 0) : 0;
+              const pendingCount = ownCount + legacyCount;
+              const isEmpty = pendingCount === 0;
+              return (
+                <button
+                  key={icp.id}
+                  onClick={() => handleICPSwitch(icp.id)}
+                  style={{
+                    padding: '5px 14px', borderRadius: 20,
+                    fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: `1.5px solid ${isActive ? BRAND.pink : isEmpty ? T.border : T.border2}`,
+                    background: isActive ? T.accentBg : T.surface,
+                    color: isActive ? BRAND.pink : isEmpty ? T.textFaint : T.textMuted,
+                    transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
+                    WebkitTapHighlightColor: 'transparent',
+                    opacity: isEmpty && !isActive ? 0.6 : 1,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  {icp.name || 'ICP'}
+                  {/* Count badge */}
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, lineHeight: 1,
+                    padding: '2px 6px', borderRadius: 10,
+                    background: isActive
+                      ? `${BRAND.pink}25`
+                      : isEmpty ? `${T.border}` : `${T.border2}`,
+                    color: isActive ? BRAND.pink : isEmpty ? T.textFaint : T.textMuted,
+                    minWidth: 18, textAlign: 'center',
+                  }}>
+                    {isEmpty ? '·' : pendingCount}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -2179,110 +2258,156 @@ export default function DailyLeads({ onNavigate }) {
                 />
               ) : showBatchEnd ? (
                 /* ── Batch end screen ───────────────────────────────────── */
-                <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%' }}>
-                  {feedbackImpactMsg && (
-                    <div style={{
-                      marginBottom: 16, padding: '10px 14px', borderRadius: 10,
-                      background: T.accentBg, border: `1px solid ${T.accentBdr}`,
-                      color: BRAND.pink, fontSize: 12, fontWeight: 500,
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      animation: 'slideUp 0.3s ease',
-                    }}>
-                      <BarryAvatar size={20} />
-                      {feedbackImpactMsg}
+                (() => {
+                  // Find the next ICP stack that still has companies in the loaded pool
+                  const pool = allCompaniesRef.current;
+                  const nextStack = icpList.find(icp =>
+                    icp.id !== activeICPId &&
+                    pool.some(c => !c.icpId || c.icpId === icp.id)
+                  );
+                  const activeICPName = icpList.find(i => i.id === activeICPId)?.name || null;
+
+                  return (
+                    <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%' }}>
+                      {feedbackImpactMsg && (
+                        <div style={{
+                          marginBottom: 16, padding: '10px 14px', borderRadius: 10,
+                          background: T.accentBg, border: `1px solid ${T.accentBdr}`,
+                          color: BRAND.pink, fontSize: 12, fontWeight: 500,
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          animation: 'slideUp 0.3s ease',
+                        }}>
+                          <BarryAvatar size={20} />
+                          {feedbackImpactMsg}
+                        </div>
+                      )}
+                      <BarryAvatar size={52} style={{ margin: '0 auto 18px' }} />
+
+                      {/* ICP context label */}
+                      {activeICPName && icpList.length > 1 && (
+                        <div style={{
+                          display: 'inline-block', marginBottom: 14,
+                          padding: '3px 12px', borderRadius: 20,
+                          background: T.accentBg, border: `1px solid ${BRAND.pink}40`,
+                          fontSize: 10, fontWeight: 700, color: BRAND.pink, letterSpacing: 1,
+                        }}>
+                          {activeICPName.toUpperCase()}
+                        </div>
+                      )}
+
+                      {batchSaves === 0 ? (
+                        <>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                            Let me sharpen your targeting
+                          </div>
+                          <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
+                            None of those felt right{activeICPName ? ` for ${activeICPName}` : ''} — that's useful data. Let's talk through who you're actually looking for.
+                          </p>
+                          <button
+                            onClick={() => setShowICPChat(true)}
+                            style={{
+                              width: '100%', padding: '13px', borderRadius: 12,
+                              background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                              border: 'none', color: '#fff',
+                              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              marginBottom: 10,
+                            }}
+                          >
+                            <MessageCircle size={16} />Talk to Barry
+                          </button>
+                          <button
+                            onClick={handleNextBatch}
+                            style={{ width: '100%', padding: '10px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer' }}
+                          >
+                            Skip — keep swiping
+                          </button>
+                        </>
+                      ) : batchSaves >= BATCH_SIZE ? (
+                        <>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                            Perfect 10 — you're locked in!
+                          </div>
+                          <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
+                            Every company matched{activeICPName ? ` for ${activeICPName}` : ''}. I'm finding more exactly like these.
+                          </p>
+                          <button
+                            onClick={handleNextBatch}
+                            style={{
+                              width: '100%', padding: '13px', borderRadius: 12,
+                              background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                              border: 'none', color: '#fff',
+                              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            }}
+                          >
+                            <ArrowRight size={16} />Next Batch
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
+                            Good eye — {batchSaves} of 10 matched
+                          </div>
+                          <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
+                            Using your saves to find more companies like {batchSavedCompanies[0]?.name || 'those'}.
+                          </p>
+                          <button
+                            onClick={handleNextBatch}
+                            style={{
+                              width: '100%', padding: '13px', borderRadius: 12,
+                              background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
+                              border: 'none', color: '#fff',
+                              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                              marginBottom: 10,
+                            }}
+                          >
+                            <ArrowRight size={16} />Find More Like These
+                          </button>
+                          <button
+                            onClick={() => setShowICPChat(true)}
+                            style={{ width: '100%', padding: '10px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                          >
+                            <MessageCircle size={13} />Refine with Barry
+                          </button>
+                        </>
+                      )}
+
+                      {batchSaves > 0 && (
+                        <div style={{ marginTop: 16, fontSize: 11, color: T.textFaint }}>
+                          {batchSaves} {batchSaves === 1 ? 'company' : 'companies'} added to your hunt list
+                        </div>
+                      )}
+
+                      {/* Switch to next non-empty stack if one exists */}
+                      {nextStack && (
+                        <button
+                          onClick={() => { resetBatch(); handleICPSwitch(nextStack.id); }}
+                          style={{
+                            marginTop: 14, width: '100%', padding: '10px', borderRadius: 12,
+                            background: T.surface, border: `1px solid ${T.border2}`,
+                            color: T.textMuted, fontSize: 12, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}
+                        >
+                          <ArrowRight size={13} />Switch to {nextStack.name}
+                          <span style={{
+                            fontSize: 10, fontWeight: 700,
+                            padding: '1px 6px', borderRadius: 8,
+                            background: T.border2, color: T.textFaint,
+                          }}>
+                            {(() => {
+                              const oc = icpPendingCounts[nextStack.id] || 0;
+                              const lc = icpList[0]?.id === nextStack.id ? (icpPendingCounts['__legacy__'] || 0) : 0;
+                              return oc + lc;
+                            })()} left
+                          </span>
+                        </button>
+                      )}
                     </div>
-                  )}
-                  <BarryAvatar size={52} style={{ margin: '0 auto 18px' }} />
-                  {batchSaves === 0 ? (
-                    <>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
-                        Let me sharpen your targeting
-                      </div>
-                      <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
-                        None of those felt right — that's useful data. Let's talk through who you're actually looking for so I can find better matches.
-                      </p>
-                      <button
-                        onClick={() => setShowICPChat(true)}
-                        style={{
-                          width: '100%', padding: '13px',
-                          borderRadius: 12,
-                          background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
-                          border: 'none', color: '#fff',
-                          fontWeight: 700, fontSize: 14,
-                          cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <MessageCircle size={16} />Talk to Barry
-                      </button>
-                      <button
-                        onClick={handleNextBatch}
-                        style={{ width: '100%', padding: '10px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer' }}
-                      >
-                        Skip — keep swiping
-                      </button>
-                    </>
-                  ) : batchSaves >= BATCH_SIZE ? (
-                    <>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
-                        Perfect 10 — you're locked in!
-                      </div>
-                      <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
-                        Every company matched. I'm finding more exactly like these.
-                      </p>
-                      <button
-                        onClick={handleNextBatch}
-                        style={{
-                          width: '100%', padding: '13px',
-                          borderRadius: 12,
-                          background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
-                          border: 'none', color: '#fff',
-                          fontWeight: 700, fontSize: 14,
-                          cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        }}
-                      >
-                        <ArrowRight size={16} />Next Batch
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 8 }}>
-                        Good eye — {batchSaves} of 10 matched
-                      </div>
-                      <p style={{ fontSize: 13, color: T.textFaint, marginBottom: 24, lineHeight: 1.65 }}>
-                        Using your saves to find more companies like {batchSavedCompanies[0]?.name || 'those'}.
-                      </p>
-                      <button
-                        onClick={handleNextBatch}
-                        style={{
-                          width: '100%', padding: '13px',
-                          borderRadius: 12,
-                          background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`,
-                          border: 'none', color: '#fff',
-                          fontWeight: 700, fontSize: 14,
-                          cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                          marginBottom: 10,
-                        }}
-                      >
-                        <ArrowRight size={16} />Find More Like These
-                      </button>
-                      <button
-                        onClick={() => setShowICPChat(true)}
-                        style={{ width: '100%', padding: '10px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                      >
-                        <MessageCircle size={13} />Refine with Barry
-                      </button>
-                    </>
-                  )}
-                  {batchSaves > 0 && (
-                    <div style={{ marginTop: 16, fontSize: 11, color: T.textFaint }}>
-                      {batchSaves} {batchSaves === 1 ? 'company' : 'companies'} added to your hunt list
-                    </div>
-                  )}
-                </div>
+                  );
+                })()
               ) : (
                 <>
                   {renderBatchDots()}
@@ -2546,6 +2671,7 @@ export default function DailyLeads({ onNavigate }) {
       {showICPChat && (
         <IcpReclarificationModal
           userId={auth.currentUser?.uid}
+          activeICPId={activeICPId}
           onClose={() => setShowICPChat(false)}
           onSearchComplete={() => {
             resetBatch();

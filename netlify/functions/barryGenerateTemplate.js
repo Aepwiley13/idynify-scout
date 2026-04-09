@@ -48,7 +48,7 @@ const STAGE_CONTEXT = {
 };
 
 function buildSystemPrompt(stage) {
-  const ctx = STAGE_CONTEXT[stage] || STAGE_CONTEXT.hunter;
+  const ctx = STAGE_CONTEXT[stage] || STAGE_CONTEXT.scout;
 
   return `You are Barry, the AI assistant for Idynify — a sales engagement platform. You're helping the user create an email template for the "${ctx.label}" stage of their pipeline.
 

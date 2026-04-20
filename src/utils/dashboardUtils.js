@@ -31,7 +31,21 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
 
     // Check if this is a new completion (before updating)
     const wasAlreadyCompleted = sections[sectionIndex].status === 'completed';
-    const isBeingCompleted = updates.status === 'completed';
+    let isBeingCompleted = updates.status === 'completed';
+
+    // Guard: only mark completed if the section data is non-empty.
+    // Prevents a false Completed badge when an edge-case write failure stores null data.
+    if (isBeingCompleted && updates.data != null) {
+      const dataValues = typeof updates.data === 'object'
+        ? Object.values(updates.data)
+        : [updates.data];
+      const hasNonEmpty = dataValues.some(v => v != null && v !== '' && !(Array.isArray(v) && v.length === 0));
+      if (!hasNonEmpty) {
+        console.warn(`⚠ Section ${sectionId}: completion blocked — data payload is empty`);
+        isBeingCompleted = false;
+        updates = { ...updates, status: 'in_progress' };
+      }
+    }
 
     // Update section
     sections[sectionIndex] = {
@@ -207,6 +221,13 @@ export async function getDashboardState(userId) {
 
     const data = dashboardDoc.data();
 
+    // Skip all migrations if this document is already up-to-date.
+    // migratedV2 is written once below after migrations run — prevents
+    // a Firestore read+write on every session for every user.
+    if (data.migratedV2) {
+      return data;
+    }
+
     // Migration: Auto-unlock next modules if previous module is completed
     const modules = data.modules || [];
     let needsUpdate = false;
@@ -244,17 +265,14 @@ export async function getDashboardState(userId) {
       }
     }
 
-    // Save migration changes
-    if (needsUpdate) {
-      await updateDoc(dashboardRef, {
-        modules,
-        lastUpdatedAt: new Date().toISOString()
-      });
-      console.log('✅ Dashboard state migrated and updated');
-      return { ...data, modules };
-    }
-
-    return data;
+    // Save migration changes and stamp migratedV2 so this block never runs again.
+    await updateDoc(dashboardRef, {
+      ...(needsUpdate ? { modules } : {}),
+      migratedV2: true,
+      lastUpdatedAt: new Date().toISOString()
+    });
+    console.log('✅ Dashboard state migrated and updated (migratedV2 stamped)');
+    return { ...data, modules, migratedV2: true };
   } catch (error) {
     console.error('❌ Error getting dashboard state:', error);
     throw error;

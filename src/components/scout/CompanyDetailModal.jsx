@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User } from 'lucide-react';
+import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User, Phone } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
@@ -493,8 +493,16 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
               <div className="snapshot-item">
                 <MapPin className="snapshot-icon" />
                 <div>
-                  <p className="snapshot-label">Location</p>
+                  <p className="snapshot-label">Address</p>
                   <p className="snapshot-value">{enrichedData?.snapshot?.location?.full || company.location || 'Not available'}</p>
+                </div>
+              </div>
+
+              <div className="snapshot-item">
+                <Phone className="snapshot-icon" />
+                <div>
+                  <p className="snapshot-label">Phone</p>
+                  <p className="snapshot-value">{enrichedData?.snapshot?.phone || 'Not available'}</p>
                 </div>
               </div>
             </div>

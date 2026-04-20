@@ -621,7 +621,7 @@
   height: 28px;
   border: 2px solid var(--border);
   border-radius: 6px;
-  background: var(--bg-card);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;

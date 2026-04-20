@@ -14,7 +14,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Brain, CheckCircle2, Clock, AlertTriangle, Lock } from 'lucide-react';
-import { auth } from '../../firebase/config';
+import { auth, db } from '../../firebase/config';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import ReconFeedbackToast from '../../components/recon/ReconFeedbackToast';
 import BarryReconGuide from '../../components/recon/BarryReconGuide';
@@ -240,6 +241,20 @@ export default function ReconSectionEditor() {
       setShowToast(true);
 
       const coachResult = await fetchCoaching(dataToSave);
+
+      // Persist RECON session record (non-blocking)
+      addDoc(collection(db, 'users', user.uid, 'recon_sessions'), {
+        type: 'recon',
+        sectionId: sectionNum,
+        sectionTitle: SECTION_TITLES[sectionNum] || `Section ${sectionNum}`,
+        summary: `Completed Section ${sectionNum}: ${SECTION_TITLES[sectionNum] || ''}`,
+        context: { sectionId: sectionNum, module: parentModule || 'recon' },
+        messages: [
+          { role: 'assistant', content: coachResult ? JSON.stringify(coachResult).slice(0, 800) : null },
+        ].filter(m => m.content),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }).catch(err => console.warn('[ReconSectionEditor] Could not persist session:', err.message));
 
       setTimeout(() => {
         navigate(parentModule ? `/recon/${parentModule}` : '/recon');

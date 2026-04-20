@@ -22,7 +22,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { auth, db } from '../../firebase/config';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { buildContextStack } from '../../utils/barryContextStack';
 import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
@@ -54,6 +54,44 @@ async function loadConversation(userId) {
     console.warn('[BarryChatPanel] Could not load conversation:', err.message);
   }
   return null;
+}
+
+// ── Per-session history (barry_sessions subcollection) ─────────────────────────
+
+async function createSessionDoc(userId, sessionId, module) {
+  try {
+    await setDoc(doc(db, 'users', userId, 'barry_sessions', sessionId), {
+      type: 'mission_control',
+      module: module || 'mission-control',
+      summary: null,
+      messages: [],
+      messageCount: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('[BarryChatPanel] Could not create session doc:', err.message);
+  }
+}
+
+async function updateSessionDoc(userId, sessionId, messages, summary) {
+  try {
+    const assistantMsgs = messages.filter(m => m.role === 'assistant');
+    const derivedSummary = summary
+      || (assistantMsgs[0]?.content ? assistantMsgs[0].content.slice(0, 120) : null);
+    await setDoc(doc(db, 'users', userId, 'barry_sessions', sessionId), {
+      messages: messages.slice(-30).map(m => ({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content.slice(0, 500) : '',
+        has_message_angles: m.has_message_angles || false,
+      })),
+      messageCount: messages.length,
+      summary: derivedSummary,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[BarryChatPanel] Could not update session doc:', err.message);
+  }
 }
 
 // ── ICP intent helpers (pure, outside component) ───────────────────────────────
@@ -233,6 +271,7 @@ export default function BarryChatPanel({ userId }) {
   const inputRef = useRef(null);
   const conversationHistoryRef = useRef(conversationHistory);
   const modeRef = useRef(mode);
+  const sessionIdRef = useRef(null);
 
   useEffect(() => { conversationHistoryRef.current = conversationHistory; }, [conversationHistory]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -263,6 +302,9 @@ export default function BarryChatPanel({ userId }) {
     if (messages.length === 0 || !userId) return;
     const timer = setTimeout(() => {
       saveConversation(userId, messages, conversationHistoryRef.current, modeRef.current);
+      if (sessionIdRef.current) {
+        updateSessionDoc(userId, sessionIdRef.current, messages, null);
+      }
     }, 800);
     return () => clearTimeout(timer);
   }, [messages, userId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -280,6 +322,11 @@ export default function BarryChatPanel({ userId }) {
   async function initPanel() {
     const user = getEffectiveUser();
     if (!user) { setLoading(false); return; }
+
+    // Create a new session doc for this visit
+    const newSessionId = crypto.randomUUID();
+    sessionIdRef.current = newSessionId;
+    createSessionDoc(user.uid, newSessionId, 'mission-control');
 
     // Restore saved conversation before loading the fresh brief
     const saved = await loadConversation(user.uid);

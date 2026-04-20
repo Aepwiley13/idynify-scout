@@ -1,0 +1,251 @@
+.bsh-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.bsh-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bsh-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 92vw;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.25);
+}
+
+.bsh-drawer.open {
+  transform: translateX(0);
+}
+
+/* Header */
+.bsh-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.125rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.bsh-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bsh-header-icon {
+  color: #9333ea;
+}
+
+.bsh-header-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.bsh-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bsh-close-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+}
+
+/* Search */
+.bsh-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.bsh-search-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.bsh-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.bsh-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Body */
+.bsh-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0;
+}
+
+/* Loading / empty */
+.bsh-loading,
+.bsh-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.bsh-loading p,
+.bsh-empty p {
+  margin: 0;
+}
+
+.bsh-loading-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: #9333ea;
+  animation: bsh-spin 0.7s linear infinite;
+}
+
+@keyframes bsh-spin {
+  to { transform: rotate(360deg); }
+}
+
+.bsh-empty svg {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* Section */
+.bsh-section {
+  margin-bottom: 0.25rem;
+}
+
+.bsh-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0.5rem 1rem 0.25rem;
+  margin: 0;
+}
+
+/* Row */
+.bsh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1rem;
+  cursor: pointer;
+  transition: background 0.12s;
+  gap: 0.5rem;
+}
+
+.bsh-row:hover {
+  background: rgba(147, 51, 234, 0.05);
+}
+
+.bsh-row:focus-visible {
+  outline: 2px solid #9333ea;
+  outline-offset: -2px;
+}
+
+.bsh-row-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.bsh-row-icon {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.bsh-row-icon.recon  { color: #6366f1; }
+.bsh-row-icon.mission { color: #9333ea; }
+.bsh-row-icon.hunter  { color: #ec4899; }
+
+.bsh-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.bsh-row-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bsh-row-summary {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin: 0.1rem 0 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bsh-row-right {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.bsh-row-time {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.bsh-row-arrow {
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.bsh-row:hover .bsh-row-arrow {
+  opacity: 1;
+}

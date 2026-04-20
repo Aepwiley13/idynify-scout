@@ -45,6 +45,7 @@ function SharedCompanyCard({
   company, T, onClick, onFindContacts, onArchive, onRestore,
   isArchived = false, sourceBadge = null,
 }) {
+  const navigate = useNavigate();
   const contactCount = company.contact_count ?? company.contactCount ?? 0;
   const src = sourceBadge ? SOURCE_CFG[sourceBadge] : null;
 
@@ -89,12 +90,19 @@ function SharedCompanyCard({
               {company.apolloEnrichment?.snapshot?.industry || company.industry || 'Unknown'}
             </div>
           </div>
-          {/* Contact count badge */}
+          {/* Contact count badge — tappable: navigates to company contacts */}
           {contactCount > 0 && (
-            <div style={{
-              fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green,
-              borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0,
-            }}>
+            <div
+              style={{
+                fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green,
+                borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`,
+                flexShrink: 0, cursor: 'pointer',
+              }}
+              onClick={e => {
+                e.stopPropagation();
+                navigate(`/scout/company/${company.id}/leads`);
+              }}
+            >
               {contactCount} contact{contactCount !== 1 ? 's' : ''}
             </div>
           )}

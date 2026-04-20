@@ -8,8 +8,13 @@
  * context warning in Active Missions.
  */
 
+import { SECTION_WEIGHTS } from '../shared/reconHealthConstants';
+
+const TOTAL_WEIGHT = Object.values(SECTION_WEIGHTS).reduce((sum, w) => sum + w, 0);
+
 /**
  * Calculate RECON confidence from the dashboard Firestore doc.
+ * Uses section weights so high-impact sections (1, 2, 3, 5) move the score more.
  * @param {Object} dashboardData - Firestore dashboard document data
  * @returns {number} 0–100
  */
@@ -19,15 +24,18 @@ export function calculateReconConfidence(dashboardData) {
   const reconModule = dashboardData.modules.find(m => m.id === 'recon');
   if (!reconModule?.sections || reconModule.sections.length === 0) return 0;
 
-  const sections = reconModule.sections;
-  const completed = sections.filter(s => {
-    if (s.status !== 'completed' || !s.data) return false;
-    if (typeof s.data === 'string') return s.data.trim().length > 50;
-    if (typeof s.data === 'object') return Object.keys(s.data).length > 0;
-    return false;
-  });
+  let completedWeight = 0;
+  for (const s of reconModule.sections) {
+    const hasData =
+      s.status === 'completed' &&
+      s.data &&
+      (typeof s.data === 'string' ? s.data.trim().length > 50 : Object.keys(s.data).length > 0);
+    if (hasData) {
+      completedWeight += SECTION_WEIGHTS[s.id] ?? 0;
+    }
+  }
 
-  return Math.round((completed.length / sections.length) * 100);
+  return Math.round((completedWeight / TOTAL_WEIGHT) * 100);
 }
 
 /**

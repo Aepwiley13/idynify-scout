@@ -366,12 +366,15 @@ export default function ReconOverview() {
         </p>
       </div>
 
-      {/* ── Knowledge Map ─────────────────────────────────────────────────── */}
+      {/* ── Barry's Knowledge ─────────────────────────────────────────────── */}
       <div className="recon-knowledge-map">
         <div className="recon-heatmap-header">
           <div className="recon-heatmap-title">
             <Sparkles size={16} />
-            <h2>Knowledge Map</h2>
+            <div>
+              <h2>Barry&apos;s Knowledge</h2>
+              <p className="recon-section-subtitle">What Barry knows about your business — powers every response.</p>
+            </div>
           </div>
           <div className="recon-heatmap-legend">
             <span className="recon-legend-item"><span className="recon-legend-dot km-state--strong" /> Trained</span>
@@ -460,9 +463,11 @@ export default function ReconOverview() {
         <CommunicationStyleSelector userId={auth.currentUser?.uid} />
       </div>
 
-      {/* ── Training Modules ──────────────────────────────────────────────── */}
+      {/* ── Your Training Path ────────────────────────────────────────────── */}
+      <hr className="recon-section-divider" />
       <div className="recon-modules-section">
-        <h2 className="recon-section-title">Training Modules</h2>
+        <h2 className="recon-section-title">Your Training Path</h2>
+        <p className="recon-section-subtitle">Complete these modules to give Barry full context for your market.</p>
         <div className="recon-modules-grid">
           {RECON_MODULES.map((mod) => {
             const status = getModuleStatus(mod);

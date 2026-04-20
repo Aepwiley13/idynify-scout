@@ -18,6 +18,7 @@ import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore } from '../../utils/icpScoring';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { calculateReconConfidence } from '../../utils/reconConfidence';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -1037,7 +1038,7 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile, reconConfidence }),
       });
     } catch (err) {
       console.error('ICP search error:', err);
@@ -1226,6 +1227,9 @@ export default function DailyLeads({ onNavigate }) {
   const [streakDays, setStreakDays] = useState(0);
   const [showStreakMilestone, setShowStreakMilestone] = useState(null);
 
+  // ── RECON confidence (scales search queue size) ──────────────────────────────
+  const [reconConfidence, setReconConfidence] = useState(0);
+
   // ── Barry nudge between swipes ───────────────────────────────────────────────
   const [nudgeData, setNudgeData] = useState(null);
   const [showNudge, setShowNudge] = useState(false);
@@ -1302,6 +1306,10 @@ export default function DailyLeads({ onNavigate }) {
     try {
       const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
+
+      // Load RECON confidence to scale search queue size
+      const dashSnap = await getDoc(doc(db, 'dashboards', user.uid));
+      if (dashSnap.exists()) setReconConfidence(calculateReconConfidence(dashSnap.data()));
 
       // Load all ICP profiles for tab switching
       const icpProfilesSnap = await getDocs(collection(db, 'users', user.uid, 'icpProfiles'));
@@ -1429,7 +1437,7 @@ export default function DailyLeads({ onNavigate }) {
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: activeICPId }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: activeICPId, reconConfidence }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1715,6 +1723,7 @@ export default function DailyLeads({ onNavigate }) {
           authToken,
           companyProfile: profileDoc.data(),
           adaptiveSignals: { savedIndustries, savedTitles },
+          reconConfidence,
         }),
       }).catch(err => console.error('Adaptive search error:', err));
     } catch (err) {

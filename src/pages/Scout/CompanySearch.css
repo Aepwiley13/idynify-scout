@@ -179,7 +179,7 @@
 .results-grid {
   display: grid;
   gap: 0.625rem;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 /* Company Result Card — compact horizontal layout */
@@ -274,6 +274,8 @@
   line-height: 1.25;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  min-width: 0;
+  flex: 1;
 }
 
 /* Metadata Grid — single compact row */
@@ -304,10 +306,10 @@
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
-  max-width: 120px;
+  max-width: none;
 }
 
 /* Website & LinkedIn Buttons */

@@ -160,20 +160,30 @@ async function loadStats(userId) {
 // ── Swipe score intelligence ──────────────────────────────────────────────────
 async function loadSwipeFeedback(userId) {
   try {
-    const snap = await db.collection('users').doc(userId)
-      .collection('companies')
-      .where('status', '==', 'accepted')
-      .orderBy('swipedAt', 'desc')
-      .limit(50)
-      .get();
+    const [acceptedSnap, rejectedSnap] = await Promise.all([
+      db.collection('users').doc(userId)
+        .collection('companies')
+        .where('status', '==', 'accepted')
+        .orderBy('swipedAt', 'desc')
+        .limit(50)
+        .get(),
+      db.collection('users').doc(userId)
+        .collection('companies')
+        .where('status', '==', 'rejected')
+        .orderBy('swipedAt', 'desc')
+        .limit(20)
+        .get(),
+    ]);
 
-    const scored = snap.docs
-      .map(d => d.data())
-      .filter(c => c.barryFeedback?.score != null);
+    const accepted = acceptedSnap.docs.map(d => d.data());
+    const rejected = rejectedSnap.docs.map(d => d.data());
 
-    if (scored.length === 0) return null;
+    const scored = accepted.filter(c => c.barryFeedback?.score != null);
+    if (scored.length === 0 && accepted.length === 0 && rejected.length === 0) return null;
 
-    const avg = (scored.reduce((s, c) => s + c.barryFeedback.score, 0) / scored.length).toFixed(1);
+    const avg = scored.length > 0
+      ? (scored.reduce((s, c) => s + c.barryFeedback.score, 0) / scored.length).toFixed(1)
+      : null;
     const top = scored
       .filter(c => c.barryFeedback.score >= 8)
       .slice(0, 5)
@@ -183,7 +193,23 @@ async function loadSwipeFeedback(userId) {
       .slice(0, 3)
       .map(c => `${c.name} (${c.barryFeedback.score}/10)`);
 
-    return { avg, total: scored.length, top, low };
+    // Collect the 5 most recent user-written notes from each direction
+    const notestoward = accepted
+      .filter(c => c.barryFeedback?.note?.trim())
+      .slice(0, 5)
+      .map(c => `"${c.barryFeedback.note.trim().slice(0, 150)}" (re: ${c.name || 'company'})`);
+    const notesaway = rejected
+      .filter(c => c.barryRejectionFeedback?.note?.trim())
+      .slice(0, 5)
+      .map(c => `"${c.barryRejectionFeedback.note.trim().slice(0, 150)}" (re: ${c.name || 'company'})`);
+
+    return {
+      avg,
+      total: scored.length,
+      top,
+      low,
+      notes: { toward: notestoward, away: notesaway },
+    };
   } catch {
     return null;
   }
@@ -215,7 +241,7 @@ function detectModeShift(contextStack, intent, currentMode) {
 
 // ── ICP reclarification prompt ────────────────────────────────────────────────
 
-function buildIcpReclarificationPrompt(icpProfile) {
+function buildIcpReclarificationPrompt(icpProfile, swipeNotes = null) {
   // Build a human-readable summary of the current ICP settings if available
   let currentIcpBlock = '';
   if (icpProfile) {
@@ -294,7 +320,12 @@ icp_params format:
 - targetTitles: array of specific job titles they sell to
 - companyKeywords: descriptive terms (e.g. ["startup", "b2b", "agency", "saas", "enterprise"])
 
-All fields are optional — only include what the user actually mentioned or confirmed. ${hasExistingIcp ? 'Start by acknowledging the current ICP settings.' : 'Start with the first targeted question.'}`;
+All fields are optional — only include what the user actually mentioned or confirmed. ${hasExistingIcp ? 'Start by acknowledging the current ICP settings.' : 'Start with the first targeted question.'}
+${swipeNotes?.toward?.length > 0 || swipeNotes?.away?.length > 0 ? `
+SIGNALS FROM PAST SWIPE NOTES (user-written feedback on companies they've reviewed):
+${swipeNotes.toward?.length > 0 ? `Weight toward — signals from companies they accepted:\n${swipeNotes.toward.map(n => `  • ${n}`).join('\n')}` : ''}
+${swipeNotes.away?.length > 0 ? `Weight away from — signals from companies they rejected:\n${swipeNotes.away.map(n => `  • ${n}`).join('\n')}` : ''}
+Use these as implicit ICP signals when refining targeting. Reference them if they align with or contradict what the user says.` : ''}`;
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -415,6 +446,10 @@ ${recon.pain_points ? `Pain points: ${recon.pain_points}` : 'Pain points: not se
 ${recon.icp ? `ICP snapshot: ${recon.icp}` : 'ICP snapshot: not set'}
 ${recon.value_proposition ? `Value prop: ${recon.value_proposition}` : 'Value prop: not set'}
 ${reconContext ? reconContext.slice(0, 2000) : ''}
+${/* Two-speed context: opening brief uses only reconContext (server-compiled full sections).
+   Conversation turns receive BOTH the structured client fields above AND reconContext.
+   Additive by design — structured fields give Barry named references; compiled string gives full section text.
+   After Cluster C's extractSection() fix, both paths are now correctly populated. */ ''}
 
 ━━━ ICP PROFILE (configured settings) ━━━
 ${icpBlock}
@@ -422,10 +457,12 @@ Reference this when discussing prospecting or targeting. This is the user's conf
 
 ━━━ SCOUT SWIPE INTELLIGENCE (user-rated company signals) ━━━
 ${swipeFeedback
-  ? `Based on ${swipeFeedback.total} rated companies — avg score: ${swipeFeedback.avg}/10.
+  ? `${swipeFeedback.avg != null ? `Based on ${swipeFeedback.total} rated companies — avg score: ${swipeFeedback.avg}/10.` : ''}
 Top-rated (8+): ${swipeFeedback.top.length > 0 ? swipeFeedback.top.join('; ') : 'none yet'}
 Lower-rated (≤4): ${swipeFeedback.low.length > 0 ? swipeFeedback.low.join(', ') : 'none'}
-Use these signals to understand what the user considers a strong fit vs a weak one. When recommending targets or refining ICP, reference patterns from the top-rated companies.`
+${swipeFeedback.notes?.toward?.length > 0 ? `Signals to weight toward (user notes on accepted companies):\n${swipeFeedback.notes.toward.map(n => `  • ${n}`).join('\n')}` : ''}
+${swipeFeedback.notes?.away?.length > 0 ? `Signals to weight away from (user notes on rejected companies):\n${swipeFeedback.notes.away.map(n => `  • ${n}`).join('\n')}` : ''}
+Use these signals to understand what the user considers a strong fit vs a weak one. When recommending targets or refining ICP, reference patterns from the top-rated companies and user-written notes.`
   : 'No scored swipes yet — user has not rated any companies with the 1-10 scale.'
 }
 
@@ -843,7 +880,8 @@ Return valid JSON only:
         }
       }
 
-      const icpSystemPrompt = buildIcpReclarificationPrompt(resolvedIcpProfile);
+      const icpSwipeFeedback = await loadSwipeFeedback(userId).catch(() => null);
+      const icpSystemPrompt = buildIcpReclarificationPrompt(resolvedIcpProfile, icpSwipeFeedback?.notes);
       const isOpening = message === '__ICP_RECLARIFICATION__';
 
       const icpMessages = isOpening

@@ -177,7 +177,7 @@ export default function ReconSectionEditor() {
     setCoaching(null);
     try {
       const user = getEffectiveUser();
-      if (!user) return;
+      if (!user) return null;
       const authToken = await user.getIdToken();
 
       const res = await fetch('/.netlify/functions/barry-coach-section', {
@@ -194,8 +194,10 @@ export default function ReconSectionEditor() {
       if (!res.ok) throw new Error(`Coaching fetch failed: ${res.status}`);
       const { coaching: c } = await res.json();
       setCoaching(c);
+      return c;
     } catch (err) {
       console.error('[ReconSectionEditor] coaching fetch error:', err);
+      return null;
     } finally {
       setCoachingLoading(false);
     }
@@ -237,11 +239,11 @@ export default function ReconSectionEditor() {
       setToastVariant('complete');
       setShowToast(true);
 
-      await fetchCoaching(dataToSave);
+      const coachResult = await fetchCoaching(dataToSave);
 
       setTimeout(() => {
         navigate(parentModule ? `/recon/${parentModule}` : '/recon');
-      }, coaching ? 3500 : 2000);
+      }, coachResult ? 3500 : 2000);
     } catch (error) {
       console.error('Error completing section:', error);
       throw error;

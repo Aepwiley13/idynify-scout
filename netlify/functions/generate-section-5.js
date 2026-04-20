@@ -155,18 +155,33 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     const responseText = message.content[0].text;
     console.log('✅ Claude response received:', responseText.substring(0, 200));
 
-    // Parse JSON response
+    // Parse JSON response — sanitize control chars then try markdown fence fallback
     let output;
     try {
-      // Try to parse directly first
-      output = JSON.parse(responseText);
+      const sanitized = responseText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+      output = JSON.parse(sanitized);
     } catch (e) {
-      // If direct parse fails, try to extract JSON from markdown fences
-      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No valid JSON found in Claude response');
+      const fenceMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const objectMatch = responseText.match(/\{[\s\S]*\}/);
+      const fallbackText = fenceMatch?.[1]?.trim() || objectMatch?.[0];
+      if (!fallbackText) {
+        console.error('❌ No valid JSON found in Claude response');
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Generation failed — please try again.' })
+        };
       }
-      output = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+      try {
+        output = JSON.parse(fallbackText);
+      } catch (secondErr) {
+        console.error('❌ JSON parse failed (both stages):', secondErr.message);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Generation failed — please try again.' })
+        };
+      }
     }
 
     // Validate schema

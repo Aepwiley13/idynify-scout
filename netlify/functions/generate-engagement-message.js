@@ -417,30 +417,45 @@ Generate the messages now. Respond ONLY with valid JSON.`;
 
     const claudeResponse = await createMessageWithRetry(anthropic, {
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2000,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     });
 
     const responseText = claudeResponse.content[0].text;
     console.log('✅ Claude response received');
 
-    // Parse the JSON response
+    // Parse the JSON response — two-stage fallback to handle control characters and markdown fences
     let result;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
+      // Stage 1: direct parse after stripping common control characters that break V8's JSON.parse
+      const sanitized = responseText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+      const jsonMatch = sanitized.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in response');
+      result = JSON.parse(jsonMatch[0]);
+    } catch (firstErr) {
+      try {
+        // Stage 2: extract from markdown fence
+        const fenceMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (!fenceMatch) throw new Error('No JSON block found');
+        result = JSON.parse(fenceMatch[1].trim());
+      } catch (secondErr) {
+        console.error('❌ Failed to parse Claude response (both stages):', secondErr.message);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Message generation failed — please try again.' })
+        };
       }
+    }
 
-      // Validate structure
-      if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) { // Accept 3+ (humor may be omitted by Claude)
-        throw new Error('Invalid response structure');
-      }
-    } catch (parseError) {
-      console.error('❌ Failed to parse Claude response:', parseError);
-      throw new Error('Failed to generate valid messages');
+    // Validate structure
+    if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) {
+      console.error('❌ Invalid response structure — missing messages array');
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Message generation returned incomplete results — please try again.' })
+      };
     }
 
     // Log API usage

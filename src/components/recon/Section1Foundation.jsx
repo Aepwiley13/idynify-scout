@@ -288,7 +288,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
         setShowOutput(true);
 
         if (onComplete) {
-          await onComplete(data.output);
+          await onComplete({ ...answers, ...data.output, rawAnswers: answers });
         } else {
           await updateDoc(doc(db, 'users', user.uid), {
             section1Output: data.output,

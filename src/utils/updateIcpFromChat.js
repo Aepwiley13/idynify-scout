@@ -5,7 +5,7 @@
  * Merges or overwrites companyProfile/current based on the action.
  */
 
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 /**
@@ -44,6 +44,32 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
   }
 
   await setDoc(profileRef, newProfile);
+
+  // Sync to icpProfiles collection so Scout ICP Settings reflects Barry's update.
+  // ICPSettings.jsx reads from icpProfiles; it only syncs the first (oldest) ICP
+  // back to companyProfile/current on save, so we must write in both directions.
+  try {
+    const icpSnap = await getDocs(
+      query(collection(db, 'users', userId, 'icpProfiles'), orderBy('createdAt', 'asc'), limit(1))
+    );
+    if (!icpSnap.empty) {
+      const primaryDoc = icpSnap.docs[0];
+      const existing = primaryDoc.data();
+      await setDoc(primaryDoc.ref, {
+        ...existing,
+        industries: newProfile.industries ?? existing.industries,
+        companySizes: newProfile.companySizes ?? existing.companySizes,
+        locations: newProfile.locations ?? existing.locations,
+        targetTitles: newProfile.targetTitles ?? existing.targetTitles,
+        companyKeywords: newProfile.companyKeywords ?? existing.companyKeywords,
+        managedByBarry: true,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  } catch (syncErr) {
+    console.warn('[updateIcpFromChat] icpProfiles sync failed (non-fatal):', syncErr.message);
+  }
+
   return newProfile;
 }
 

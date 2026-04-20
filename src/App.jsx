@@ -100,6 +100,7 @@ import MissionDetail from './pages/Hunter/MissionDetail';
 
 // Barry Onboarding
 import BarryOnboarding from './pages/Onboarding/BarryOnboarding';
+import ReconOnboardingWizard from './pages/Onboarding/ReconOnboardingWizard';
 
 // User Settings
 import UserSettings from './pages/UserSettings';
@@ -253,8 +254,11 @@ function App() {
       return <Navigate to="/checkout" />;
     }
 
-    // ✅ If user has paid, always go to Mission Control V2
-    return <Navigate to="/mission-control-v2" />;
+    // Return users skip the wizard; new users go through onboarding
+    if (userData?.onboardingComplete) {
+      return <Navigate to="/mission-control-v2" />;
+    }
+    return <Navigate to="/onboarding" />;
   };
 
   if (loading) {
@@ -293,7 +297,9 @@ function App() {
         <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
-        {/* Barry ICP Onboarding - First touchpoint after payment */}
+        {/* RECON-first onboarding wizard — post-payment entry point */}
+        <Route path="/onboarding" element={<ProtectedRoute><ReconOnboardingWizard /></ProtectedRoute>} />
+        {/* Barry ICP Onboarding - legacy, kept for deep links */}
         <Route path="/onboarding/barry" element={<ProtectedRoute><BarryOnboarding /></ProtectedRoute>} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}

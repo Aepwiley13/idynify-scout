@@ -16,6 +16,7 @@ import {
   Star,
   Zap,
   Archive,
+  Building2,
 } from 'lucide-react';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import MeetSection from '../../components/contacts/MeetSection';
@@ -732,6 +733,19 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
           {/* LEFT — Intel Column */}
           <div className="intel-column">
+            {contact.company_id && (
+              <div
+                className="contact-company-context-card"
+                onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter') navigate(`/scout/company/${contact.company_id}`); }}
+              >
+                <Building2 size={14} className="contact-company-icon" />
+                <span className="contact-company-name">{contact.company_name || 'View Company'}</span>
+                <ArrowRight size={12} className="contact-company-arrow" />
+              </div>
+            )}
             <IdentityCard
               key={contact.photo_url || 'no-photo'}
               contact={contact}

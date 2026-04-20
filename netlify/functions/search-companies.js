@@ -230,7 +230,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, companyProfile, icpId, adaptiveSignals } = JSON.parse(event.body);
+    const { userId, authToken, companyProfile, icpId, adaptiveSignals, reconConfidence = 0 } = JSON.parse(event.body);
 
     if (!userId || !authToken || !companyProfile) {
       throw new Error('Missing required parameters');
@@ -378,7 +378,7 @@ export const handler = async (event) => {
 
       console.log(`🔍 foundedAgeRange active (minAge:${foundedAgeRange.minAge}, maxAge:${foundedAgeRange.maxAge}) — running waterfall fetch`);
 
-      const QUEUE_TARGET = 50; // matches TARGET_QUEUE_SIZE below
+      const QUEUE_TARGET = Math.min(50 + Math.floor(reconConfidence * 0.5), 100);
       while (filtered.length < QUEUE_TARGET && page <= MAX_PAGES && page <= totalPages) {
         const { organizations, totalPages: tp } = await fetchApolloPage(apolloQuery, page);
         totalPages = tp;
@@ -464,7 +464,7 @@ export const handler = async (event) => {
 
     // Top-off model: Only add companies if queue needs refilling
     const pendingCount = await countPendingCompanies(userId, authToken);
-    const TARGET_QUEUE_SIZE = 50;
+    const TARGET_QUEUE_SIZE = Math.min(50 + Math.floor(reconConfidence * 0.5), 100);
 
     console.log(`📊 Current pending companies: ${pendingCount}`);
 

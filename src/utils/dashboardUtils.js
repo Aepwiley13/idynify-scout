@@ -31,7 +31,21 @@ export async function updateSectionStatus(userId, moduleId, sectionId, updates) 
 
     // Check if this is a new completion (before updating)
     const wasAlreadyCompleted = sections[sectionIndex].status === 'completed';
-    const isBeingCompleted = updates.status === 'completed';
+    let isBeingCompleted = updates.status === 'completed';
+
+    // Guard: only mark completed if the section data is non-empty.
+    // Prevents a false Completed badge when an edge-case write failure stores null data.
+    if (isBeingCompleted && updates.data != null) {
+      const dataValues = typeof updates.data === 'object'
+        ? Object.values(updates.data)
+        : [updates.data];
+      const hasNonEmpty = dataValues.some(v => v != null && v !== '' && !(Array.isArray(v) && v.length === 0));
+      if (!hasNonEmpty) {
+        console.warn(`⚠ Section ${sectionId}: completion blocked — data payload is empty`);
+        isBeingCompleted = false;
+        updates = { ...updates, status: 'in_progress' };
+      }
+    }
 
     // Update section
     sections[sectionIndex] = {

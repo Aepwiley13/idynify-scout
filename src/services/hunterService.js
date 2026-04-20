@@ -1,4 +1,5 @@
 import { auth, db } from '../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
 
 /**
  * Track campaign outcome
@@ -29,25 +30,25 @@ export const trackOutcome = async ({ campaignId, contactId, outcome }) => {
 };
 
 /**
- * Get completed RECON sections for current user
+ * Get completed RECON sections for current user.
+ * Returns a map of sectionId → true for every completed section.
  */
 export const getCompletedReconSections = async () => {
   const user = auth.currentUser;
   if (!user) return {};
 
-  const reconRef = db.collection(`dashboards/${user.uid}/modules`).doc('recon');
-  const reconDoc = await reconRef.get();
+  const dashboardDoc = await getDoc(doc(db, 'dashboards', user.uid));
 
-  if (!reconDoc.exists) return {};
+  if (!dashboardDoc.exists()) return {};
+
+  const data = dashboardDoc.data();
+  const reconModule = (data.modules || []).find(m => m.id === 'recon');
+  if (!reconModule?.sections) return {};
 
   const sections = {};
-  const data = reconDoc.data();
-
-  if (data.sections) {
-    for (const [key, section] of Object.entries(data.sections)) {
-      if (section.isComplete) {
-        sections[key] = true;
-      }
+  for (const section of reconModule.sections) {
+    if (section.status === 'completed') {
+      sections[section.sectionId] = true;
     }
   }
 

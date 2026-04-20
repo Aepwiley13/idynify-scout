@@ -13,7 +13,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Brain, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Brain, CheckCircle2, Clock, AlertTriangle, Lock } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import ReconBreadcrumbs from '../../components/recon/ReconBreadcrumbs';
 import ReconFeedbackToast from '../../components/recon/ReconFeedbackToast';
@@ -69,6 +69,33 @@ const STATUS_CONFIG = {
   completed: { label: 'Completed', color: '#10b981', Icon: CheckCircle2 },
 };
 
+const SECTION_TITLES = {
+  1: 'Business Foundation',
+  2: 'Product Deep Dive',
+  3: 'Target Market Firmographics',
+  4: 'Ideal Customer Psychographics',
+  5: 'Pain Points & Motivations',
+  6: 'Buying Behavior & Triggers',
+  7: 'Decision Process',
+  8: 'Competitive Landscape',
+  9: 'Messaging & Value Proposition',
+  10: 'Behavioral Signals',
+};
+
+// Why Barry needs the prerequisite section before unlocking the current one.
+// Sequential model: section N unlocks when N-1 is complete.
+const SECTION_PREREQ_REASONS = {
+  2: 'Barry needs your Business Foundation to understand what you sell before mapping your product in detail.',
+  3: 'Barry uses your product details to identify the right market segments — complete Section 2 first.',
+  4: 'Barry needs your market definition to understand who you target before building a psychographic profile.',
+  5: 'Barry uses the psychographic profile to understand buyer mindset before pinpointing the pain points that drive action.',
+  6: 'Barry connects your pain points to the buying triggers and objections he coaches you through — complete Section 5 first.',
+  7: 'Barry uses your foundation sections to understand your business context before mapping the decision process.',
+  8: 'Barry needs your target market and positioning before building competitive differentiation angles.',
+  9: "Barry needs your Messaging & Voice answers before coaching you through Competitive Intel — he uses your tone and positioning as the foundation for competitive differentiation.",
+  10: 'Barry uses your earlier RECON data to contextualize behavioral signals and buying triggers.',
+};
+
 export default function ReconSectionEditor() {
   const T = useT();
   const navigate = useNavigate();
@@ -76,9 +103,12 @@ export default function ReconSectionEditor() {
 
   const [section, setSection] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [blockedSection, setBlockedSection] = useState(null);
   const [formData, setFormData] = useState({});
   const [showToast, setShowToast] = useState(false);
   const [toastVariant, setToastVariant] = useState('save');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [coaching, setCoaching] = useState(null);
   const [coachingLoading, setCoachingLoading] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -117,8 +147,14 @@ export default function ReconSectionEditor() {
       const sectionData = await getSectionData(user.uid, 'recon', sectionNum);
 
       if (!sectionData || !sectionData.unlocked) {
-        navigatedAway = true;
-        navigate(parentModule ? `/recon/${parentModule}` : '/recon');
+        const prereqId = sectionNum - 1;
+        setBlockedSection({
+          lockedTitle: SECTION_TITLES[sectionNum] || `Section ${sectionNum}`,
+          prereqId,
+          prereqTitle: SECTION_TITLES[prereqId] || `Section ${prereqId}`,
+          reason: SECTION_PREREQ_REASONS[sectionNum] || 'Complete the previous section to unlock this one.',
+        });
+        setLoading(false);
         return;
       }
 
@@ -166,6 +202,8 @@ export default function ReconSectionEditor() {
   };
 
   const handleSave = async (data) => {
+    setIsSaving(true);
+    setSaveError(null);
     try {
       const user = getEffectiveUser();
       if (!user) return;
@@ -175,12 +213,15 @@ export default function ReconSectionEditor() {
 
       if (data) setFormData(data);
 
+      setIsSaving(false);
       setToastVariant('save');
       setShowToast(true);
 
       fetchCoaching(dataToSave);
     } catch (error) {
       console.error('Error saving:', error);
+      setIsSaving(false);
+      setSaveError('Save failed — check your connection and try again.');
       throw error;
     }
   };
@@ -227,6 +268,88 @@ export default function ReconSectionEditor() {
         }} />
         <style>{`@keyframes recon-spin { to { transform: rotate(360deg); } }`}</style>
         <p style={{ fontSize: 13, color: T.textMuted, fontWeight: 600 }}>Loading Section...</p>
+      </div>
+    );
+  }
+
+  if (blockedSection) {
+    return (
+      <div style={{
+        background: T.appBg, minHeight: '100vh',
+        fontFamily: 'Inter, system-ui, sans-serif', color: T.text,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 24px',
+      }}>
+        <div style={{
+          maxWidth: 520, width: '100%',
+          background: T.cardBg,
+          border: `1px solid ${T.border}`,
+          borderRadius: 16, padding: '36px 32px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12,
+            background: `${RECON_INDIGO}15`,
+            border: `1px solid ${RECON_INDIGO}30`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: 20,
+          }}>
+            <Lock size={22} color={RECON_INDIGO} />
+          </div>
+
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: T.text, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+            {blockedSection.lockedTitle} is locked
+          </h2>
+
+          <p style={{ fontSize: 14, color: T.textMuted, lineHeight: 1.6, margin: '0 0 24px' }}>
+            {blockedSection.reason}
+          </p>
+
+          <div style={{
+            background: T.isDark ? `${RECON_INDIGO}10` : `${RECON_INDIGO}07`,
+            border: `1px solid ${RECON_INDIGO}25`,
+            borderRadius: 10, padding: '14px 16px',
+            marginBottom: 24,
+          }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: RECON_INDIGO, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Complete first
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: T.text, margin: 0 }}>
+              Section {blockedSection.prereqId}: {blockedSection.prereqTitle}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => navigate(`/recon/section/${blockedSection.prereqId}`)}
+              style={{
+                flex: 1, padding: '12px 16px',
+                background: RECON_INDIGO, color: '#fff',
+                border: 'none', borderRadius: 10,
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+            >
+              Go to Section {blockedSection.prereqId} →
+            </button>
+            <button
+              onClick={() => navigate(parentModule ? `/recon/${parentModule}` : '/recon')}
+              style={{
+                padding: '12px 16px',
+                background: T.surface, color: T.textMuted,
+                border: `1px solid ${T.border2}`, borderRadius: 10,
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = RECON_INDIGO; e.currentTarget.style.color = RECON_INDIGO; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.color = T.textMuted; }}
+            >
+              Back
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -303,8 +426,41 @@ export default function ReconSectionEditor() {
               <Brain size={11} />
               Section {section.order}
             </div>
+
+            {/* Save status indicator */}
+            {isSaving && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px',
+                background: '#f59e0b15', border: '1px solid #f59e0b30',
+                borderRadius: 20, fontSize: 11, fontWeight: 600, color: '#f59e0b',
+              }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  border: '1.5px solid #f59e0b40', borderTop: '1.5px solid #f59e0b',
+                  animation: 'recon-spin 0.7s linear infinite',
+                }} />
+                Saving…
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Save error banner */}
+        {saveError && !isSaving && (
+          <div style={{
+            marginTop: 8, padding: '8px 12px',
+            background: '#dc262610', border: '1px solid #dc262630',
+            borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#dc2626',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span>⚠ {saveError}</span>
+            <button
+              onClick={() => setSaveError(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: 16, lineHeight: 1, padding: '0 4px' }}
+            >×</button>
+          </div>
+        )}
 
         {/* Title row */}
         <div style={{ marginTop: 10 }}>

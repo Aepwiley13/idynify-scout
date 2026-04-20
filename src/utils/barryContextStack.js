@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { calculateReconConfidence } from './reconConfidence';
+import { RECON_SECTION_MAP } from './reconSectionMap';
 
 async function getAllContacts(userId) {
   try {
@@ -174,7 +175,7 @@ function extractSection(dashboardData, sectionId) {
   if (!dashboardData?.modules) return null;
   const reconModule = dashboardData.modules.find(m => m.id === 'recon');
   if (!reconModule?.sections) return null;
-  const section = reconModule.sections.find(s => s.id === sectionId);
+  const section = reconModule.sections.find(s => s.sectionId === sectionId);
   if (!section?.data || section.status !== 'completed') return null;
 
   if (typeof section.data === 'string') return section.data.slice(0, 300);
@@ -226,10 +227,11 @@ export async function buildContextStack(userId) {
     const recon = dashboardData ? {
       confidence: reconConfidence,
       enhanced: reconConfidence >= 40,
-      pain_points: extractSection(dashboardData, 'painPoints'),
-      icp: extractSection(dashboardData, 'icp'),
-      value_proposition: extractSection(dashboardData, 'valueProposition'),
-      outreach_context: extractSection(dashboardData, 'outreachContext')
+      icp: extractSection(dashboardData, RECON_SECTION_MAP.icp),
+      value_proposition: extractSection(dashboardData, RECON_SECTION_MAP.valueProposition),
+      psychographics: extractSection(dashboardData, RECON_SECTION_MAP.psychographics),
+      pain_points: extractSection(dashboardData, RECON_SECTION_MAP.painPoints),
+      outreach_context: extractSection(dashboardData, RECON_SECTION_MAP.outreachContext)
     } : { confidence: 0, enhanced: false };
 
     const stack = {

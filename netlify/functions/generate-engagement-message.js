@@ -152,7 +152,8 @@ export const handler = async (event) => {
           section5 = reconModule.sections.find(s => s.sectionId === 5);
           section9 = reconModule.sections.find(s => s.sectionId === 9);
 
-          if (section5 || section9) {
+          if ((section5?.status === 'completed' && section5?.data) ||
+              (section9?.status === 'completed' && section9?.data)) {
             reconLoaded = true;
             console.log('✅ RECON data loaded');
           }
@@ -248,8 +249,8 @@ export const handler = async (event) => {
     // Build RECON context string
     let reconContext = '';
     if (reconLoaded) {
-      if (section5?.userInput) {
-        const s5 = section5.userInput;
+      if (section5?.data && section5.status === 'completed') {
+        const s5 = section5.data;
         reconContext += `
 USER'S CUSTOMER INTELLIGENCE (from RECON):
 - Primary customer pain point: ${s5.primaryPain || 'Not specified'}
@@ -258,10 +259,11 @@ USER'S CUSTOMER INTELLIGENCE (from RECON):
 - Why previous solutions failed: ${s5.whyFailed || 'Not specified'}
 - What triggers urgency: ${s5.urgentTrigger || 'Not specified'}
 `;
+        console.log('✅ Section 5 pain points context assembled');
       }
 
-      if (section9?.userInput) {
-        const s9 = section9.userInput;
+      if (section9?.data && section9.status === 'completed') {
+        const s9 = section9.data;
         reconContext += `
 USER'S MESSAGING PREFERENCES:
 - Email tone: ${s9.emailTone || 'Professional'}
@@ -271,6 +273,7 @@ USER'S MESSAGING PREFERENCES:
 - Social proof emphasis: ${s9.socialProofEmphasis || 'Moderate'}
 - Personalization level: ${s9.personalizationLevel || 'Highly personalized'}
 `;
+        console.log('✅ Section 9 messaging preferences context assembled');
       }
     }
 
@@ -414,30 +417,45 @@ Generate the messages now. Respond ONLY with valid JSON.`;
 
     const claudeResponse = await createMessageWithRetry(anthropic, {
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2000,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     });
 
     const responseText = claudeResponse.content[0].text;
     console.log('✅ Claude response received');
 
-    // Parse the JSON response
+    // Parse the JSON response — two-stage fallback to handle control characters and markdown fences
     let result;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
+      // Stage 1: direct parse after stripping common control characters that break V8's JSON.parse
+      const sanitized = responseText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+      const jsonMatch = sanitized.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in response');
+      result = JSON.parse(jsonMatch[0]);
+    } catch (firstErr) {
+      try {
+        // Stage 2: extract from markdown fence
+        const fenceMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (!fenceMatch) throw new Error('No JSON block found');
+        result = JSON.parse(fenceMatch[1].trim());
+      } catch (secondErr) {
+        console.error('❌ Failed to parse Claude response (both stages):', secondErr.message);
+        return {
+          statusCode: 500,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: false, error: 'Message generation failed — please try again.' })
+        };
       }
+    }
 
-      // Validate structure
-      if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) { // Accept 3+ (humor may be omitted by Claude)
-        throw new Error('Invalid response structure');
-      }
-    } catch (parseError) {
-      console.error('❌ Failed to parse Claude response:', parseError);
-      throw new Error('Failed to generate valid messages');
+    // Validate structure
+    if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) {
+      console.error('❌ Invalid response structure — missing messages array');
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: false, error: 'Message generation returned incomplete results — please try again.' })
+      };
     }
 
     // Log API usage

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
@@ -118,6 +118,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [showOutput, setShowOutput] = useState(false);
+  const outputRef = useRef(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [inlineError, setInlineError] = useState(null);
 
@@ -159,6 +160,13 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
 
     return () => clearTimeout(autoSaveTimer);
   }, [answers, hasUnsavedChanges]);
+
+  // Scroll to output when generation completes
+  useEffect(() => {
+    if (showOutput && outputRef.current) {
+      outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showOutput]);
 
   const handleManualSave = async () => {
     try {
@@ -570,9 +578,27 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
     );
   };
 
+  if (generating && !showOutput) {
+    return (
+      /* Skeleton loader — holds layout stable during generation */
+      <div className="animate-pulse space-y-4 p-4">
+        <div className="h-8 bg-gray-700/40 rounded-xl w-3/4" />
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-700/30 rounded w-full" />
+          <div className="h-4 bg-gray-700/30 rounded w-5/6" />
+          <div className="h-4 bg-gray-700/30 rounded w-4/5" />
+        </div>
+        <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+        <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+        <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+        <p className="text-center text-gray-500 text-sm pt-2">Barry is analyzing your answers...</p>
+      </div>
+    );
+  }
+
   if (showOutput && output) {
     return (
-      <div className="space-y-4">
+      <div ref={outputRef} className="space-y-4">
         <div className="recon-success-banner">
           <span className="recon-success-icon">✅</span>
           <div className="recon-success-text">

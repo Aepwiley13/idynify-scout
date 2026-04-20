@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import './ReconEnterprise.css';
@@ -68,6 +68,7 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [showOutput, setShowOutput] = useState(false);
+  const outputRef = useRef(null);
   const [validationErrors, setValidationErrors] = useState({});
   const [lastSaved, setLastSaved] = useState(null);
 
@@ -86,6 +87,13 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
 
     return () => clearInterval(autoSave);
   }, [answers]);
+
+  // Scroll to output when generation completes
+  useEffect(() => {
+    if (showOutput && outputRef.current) {
+      outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showOutput]);
 
   const saveAnswers = async () => {
     const user = getEffectiveUser();
@@ -264,9 +272,27 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
     );
   };
 
+  if (generating && !showOutput) {
+    return (
+      /* Skeleton loader — holds layout stable during generation */
+      <div className="animate-pulse space-y-4 p-4">
+        <div className="h-8 bg-gray-700/40 rounded-xl w-3/4" />
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-700/30 rounded w-full" />
+          <div className="h-4 bg-gray-700/30 rounded w-5/6" />
+          <div className="h-4 bg-gray-700/30 rounded w-4/5" />
+        </div>
+        <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+        <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+        <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+        <p className="text-center text-gray-500 text-sm pt-2">Barry is analyzing your answers...</p>
+      </div>
+    );
+  }
+
   if (showOutput && output) {
     return (
-      <div className="space-y-4">
+      <div ref={outputRef} className="space-y-4">
         <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-xl p-4 border border-green-500/30">
           <h3 className="text-xl font-bold text-green-400 mb-2">✅ SECTION 10 COMPLETE</h3>
           <p className="text-sm text-gray-400">Behavioral Signals Intelligence Generated</p>

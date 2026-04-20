@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import ReconTooltip from './ReconTooltip';
@@ -177,6 +177,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
   const [validationErrors, setValidationErrors] = useState({});
   const [lastSaved, setLastSaved] = useState(null);
   const [showOutput, setShowOutput] = useState(false);
+  const outputRef = useRef(null);
 
   // Load existing data on mount
   useEffect(() => {
@@ -194,6 +195,13 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
 
     return () => clearInterval(autoSave);
   }, [answers]);
+
+  // Scroll to output when generation completes
+  useEffect(() => {
+    if (showOutput && outputRef.current) {
+      outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showOutput]);
 
   const saveAnswers = async () => {
     const user = getEffectiveUser();
@@ -571,7 +579,21 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
         )}
 
         {/* Questions or Output */}
-        {!showOutput ? (
+        {generating && !showOutput ? (
+          /* Skeleton loader — holds layout stable during generation */
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-700/40 rounded-xl w-3/4" />
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-700/30 rounded w-full" />
+              <div className="h-4 bg-gray-700/30 rounded w-5/6" />
+              <div className="h-4 bg-gray-700/30 rounded w-4/5" />
+            </div>
+            <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+            <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+            <div className="h-24 bg-gray-700/20 rounded-xl w-full" />
+            <p className="text-center text-gray-500 text-sm pt-2">Barry is analyzing your answers...</p>
+          </div>
+        ) : !showOutput ? (
           <>
             {/* Questions */}
             <div className="space-y-4">
@@ -590,7 +612,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
             </div>
           </>
         ) : (
-          <>
+          <div ref={outputRef}>
             {/* Success Message */}
             <div className="bg-gradient-to-br from-green-900/20 to-cyan-900/20 backdrop-blur-xl rounded-xl p-4 border border-green-500/30 mb-4">
               <h3 className="text-xl font-bold text-green-400 mb-2">✅ SECTION 2 COMPLETE</h3>
@@ -667,7 +689,7 @@ export default function Section2ProductDeepDive({ initialData = {}, onSave, onCo
                 ✅ CONTINUE →
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

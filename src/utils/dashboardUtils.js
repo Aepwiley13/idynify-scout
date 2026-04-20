@@ -1,6 +1,10 @@
-import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  doc, updateDoc, getDoc, setDoc,
+  collection, getDocs, writeBatch, serverTimestamp,
+} from 'firebase/firestore';
 import { db } from '../firebase/config';
 import dashboardSchemaData from '../schemas/dashboardSchema.json';
+import { DEFAULT_ICP_ID } from './reconSectionMap';
 
 /**
  * Update a section's status and data
@@ -221,57 +225,146 @@ export async function getDashboardState(userId) {
 
     const data = dashboardDoc.data();
 
-    // Skip all migrations if this document is already up-to-date.
-    // migratedV2 is written once below after migrations run — prevents
-    // a Firestore read+write on every session for every user.
-    if (data.migratedV2) {
+    // Hot path: both migrations complete — no reads or writes needed.
+    if (data.migratedV2 && data.migratedMultiICP) {
       return data;
     }
 
-    // Migration: Auto-unlock next modules if previous module is completed
-    const modules = data.modules || [];
-    let needsUpdate = false;
+    let modules = [...(data.modules || [])];
+    let needsModuleUpdate = false;
 
-    for (let i = 0; i < modules.length - 1; i++) {
-      const currentModule = modules[i];
-      const nextModule = modules[i + 1];
-
-      // If current module is completed and next module is locked, unlock it
-      if (currentModule.status === 'completed' && !nextModule.unlocked) {
-        console.log(`🔧 Migration: Unlocking ${nextModule.id} because ${currentModule.id} is completed`);
-        nextModule.unlocked = true;
-        nextModule.status = 'not_started';
-        if (nextModule.sections && nextModule.sections.length > 0) {
-          nextModule.sections[0].unlocked = true;
+    // --- V2 migration: run once if migratedV2 not yet stamped ---
+    if (!data.migratedV2) {
+      for (let i = 0; i < modules.length - 1; i++) {
+        const currentModule = modules[i];
+        const nextModule = modules[i + 1];
+        if (currentModule.status === 'completed' && !nextModule.unlocked) {
+          console.log(`🔧 Migration: Unlocking ${nextModule.id} because ${currentModule.id} is completed`);
+          nextModule.unlocked = true;
+          nextModule.status = 'not_started';
+          if (nextModule.sections && nextModule.sections.length > 0) {
+            nextModule.sections[0].unlocked = true;
+          }
+          needsModuleUpdate = true;
         }
-        needsUpdate = true;
       }
-    }
 
-    // Migration: Unlock RECON module-entry sections (7, 8, 9, 10) for existing users.
-    // These sections belong to independent modules (Buying Signals, Competitive Intel,
-    // Messaging & Voice) that should be accessible without completing every prior section.
-    // The schema now initialises them as unlocked:true but existing Firestore documents
-    // still carry unlocked:false from before this change.
-    const MODULE_ENTRY_SECTIONS = new Set([7, 8, 9, 10]);
-    const reconModule = modules.find(m => m.id === 'recon');
-    if (reconModule?.sections) {
-      for (const section of reconModule.sections) {
-        if (MODULE_ENTRY_SECTIONS.has(section.sectionId) && !section.unlocked) {
-          console.log(`🔧 Migration: Unlocking RECON section ${section.sectionId} (module entry point)`);
-          section.unlocked = true;
-          needsUpdate = true;
+      const MODULE_ENTRY_SECTIONS = new Set([7, 8, 9, 10]);
+      const reconModule = modules.find(m => m.id === 'recon');
+      if (reconModule?.sections) {
+        for (const section of reconModule.sections) {
+          if (MODULE_ENTRY_SECTIONS.has(section.sectionId) && !section.unlocked) {
+            console.log(`🔧 Migration: Unlocking RECON section ${section.sectionId} (module entry point)`);
+            section.unlocked = true;
+            needsModuleUpdate = true;
+          }
         }
       }
     }
 
-    // Save migration changes and stamp migratedV2 so this block never runs again.
+    // --- Multi-ICP migration: run once if migratedMultiICP not yet stamped ---
+    if (!data.migratedMultiICP) {
+      // Step 1: extract Section 9 data from in-memory modules before any writes
+      const reconMod = modules.find(m => m.id === 'recon');
+      const section9 = reconMod?.sections?.find(s => s.sectionId === 9);
+      const messagingData = section9?.data || null;
+
+      // Step 2: resolve active ICP profile
+      const icpProfilesRef = collection(db, 'users', userId, 'icpProfiles');
+      const icpSnap = await getDocs(icpProfilesRef);
+      const batch = writeBatch(db);
+      let activeProfileId = DEFAULT_ICP_ID;
+      let activeProfileData = {};
+
+      if (icpSnap.empty) {
+        // No profiles yet — create default from companyProfile/current
+        const cpSnap = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
+        const cpData = cpSnap.exists() ? cpSnap.data() : {};
+        activeProfileData = cpData;
+        batch.set(doc(db, 'users', userId, 'icpProfiles', DEFAULT_ICP_ID), {
+          ...cpData,
+          id: DEFAULT_ICP_ID,
+          name: cpData.name || 'Default',
+          isActive: true,
+          status: 'active',
+          messaging: messagingData || null,
+          messagingProgress: messagingData ? 100 : 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        const profiles = icpSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const existingActive = profiles.find(p => p.isActive === true);
+
+        if (!existingActive) {
+          // Promote oldest profile by createdAt
+          const sorted = [...profiles].sort((a, b) => {
+            const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+            const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+            return ta - tb;
+          });
+          activeProfileId = sorted[0].id;
+          activeProfileData = sorted[0];
+        } else {
+          activeProfileId = existingActive.id;
+          activeProfileData = existingActive;
+        }
+
+        // One batch.update per profile — each document appears exactly once
+        for (const p of profiles) {
+          const isActive = p.id === activeProfileId;
+          batch.update(doc(db, 'users', userId, 'icpProfiles', p.id), {
+            isActive,
+            status: isActive ? 'active' : (p.status || 'inactive'),
+            ...(isActive && messagingData && !p.messaging
+              ? { messaging: messagingData, messagingProgress: 100 }
+              : {}),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // Step 3: stamp messaging_migrated on Section 9 in the modules array
+      if (messagingData) {
+        const modIdx = modules.findIndex(m => m.id === 'recon');
+        if (modIdx !== -1) {
+          const secIdx = modules[modIdx].sections.findIndex(s => s.sectionId === 9);
+          if (secIdx !== -1) {
+            modules[modIdx].sections[secIdx] = {
+              ...modules[modIdx].sections[secIdx],
+              messaging_migrated: true,
+            };
+            needsModuleUpdate = true;
+          }
+        }
+      }
+
+      // Step 4: overwrite bridge cache with active profile data
+      batch.set(doc(db, 'users', userId, 'companyProfile', 'current'), {
+        ...activeProfileData,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Step 5: stamp both flags on dashboard in the same atomic batch
+      batch.update(dashboardRef, {
+        ...(needsModuleUpdate ? { modules } : {}),
+        ...(!data.migratedV2 ? { migratedV2: true } : {}),
+        migratedMultiICP: true,
+        lastUpdatedAt: new Date().toISOString(),
+      });
+
+      await batch.commit();
+      console.log('✅ Multi-ICP migration complete (migratedMultiICP stamped)');
+      return { ...data, modules, migratedV2: true, migratedMultiICP: true };
+    }
+
+    // V2-only migration path (migratedMultiICP was already true)
     await updateDoc(dashboardRef, {
-      ...(needsUpdate ? { modules } : {}),
+      ...(needsModuleUpdate ? { modules } : {}),
       migratedV2: true,
-      lastUpdatedAt: new Date().toISOString()
+      lastUpdatedAt: new Date().toISOString(),
     });
-    console.log('✅ Dashboard state migrated and updated (migratedV2 stamped)');
+    console.log('✅ Dashboard state migrated (migratedV2 stamped)');
     return { ...data, modules, migratedV2: true };
   } catch (error) {
     console.error('❌ Error getting dashboard state:', error);

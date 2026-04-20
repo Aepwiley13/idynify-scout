@@ -154,7 +154,7 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
       setShowOutput(true);
 
       if (onComplete) {
-        await onComplete(data.output);
+        await onComplete({ ...answers, ...data.output, rawAnswers: answers });
       }
 
     } catch (err) {

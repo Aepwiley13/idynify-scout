@@ -217,7 +217,7 @@ export default function Section6BuyingBehaviorTriggers({ initialData = {}, onSav
         'reconProgress.section6LastSaved': new Date()
       });
       setLastSaved(new Date());
-      if (onSave) onSave(answers);
+      if (onSave) await onSave(answers);
     } catch (err) {
       console.error('Error saving answers:', err);
     }
@@ -342,7 +342,7 @@ export default function Section6BuyingBehaviorTriggers({ initialData = {}, onSav
       setShowOutput(true);
 
       if (onComplete) {
-        onComplete(data.output);
+        await onComplete({ ...answers, ...data.output, rawAnswers: answers });
       }
 
     } catch (err) {

@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
-import { User, Menu, Settings, LogOut } from 'lucide-react';
+import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
+import { User, Menu, Settings, LogOut, History } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import './MainLayout.css';
 
@@ -12,6 +13,7 @@ const MainLayout = ({ children, user }) => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -118,6 +120,15 @@ const MainLayout = ({ children, user }) => {
           </div>
 
           <div className="top-bar-right">
+            {/* Barry session history */}
+            <button
+              className="topbar-settings-btn"
+              onClick={() => setHistoryOpen(true)}
+              aria-label="Barry session history"
+              title="Session History"
+            >
+              <History size={20} />
+            </button>
             {/* Settings shortcut — visible on mobile portrait at top of screen */}
             <button
               className={`topbar-settings-btn ${location.pathname === '/settings' ? 'active' : ''}`}
@@ -157,6 +168,9 @@ const MainLayout = ({ children, user }) => {
 
       {/* More Sheet — slide-up overlay for secondary navigation on mobile */}
       <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+
+      {/* Barry session history panel */}
+      <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 };

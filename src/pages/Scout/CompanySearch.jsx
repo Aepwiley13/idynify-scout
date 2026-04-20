@@ -403,48 +403,47 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
                   className={`company-result-card ${isSelected ? 'selected' : ''}`}
                   onClick={() => handleSelectCompany(company.apollo_organization_id)}
                 >
-                  {/* Selection Indicator */}
-                  {isSelected && (
-                    <div className="selection-indicator">
-                      <Check className="w-5 h-5" />
-                    </div>
-                  )}
-
-                  {/* Company Header: logo + name side by side */}
-                  <div className="company-header">
-                    <div className="company-logo">
-                      {company.logo_url ? (
-                        <img src={company.logo_url} alt={company.name} />
-                      ) : (
-                        <div className="company-logo-placeholder">
-                          {company.name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <h3 className="company-name">{company.name}</h3>
+                  {/* Logo Banner — full-width top section */}
+                  <div className="company-logo-banner">
+                    {company.logo_url ? (
+                      <img src={company.logo_url} alt={company.name} />
+                    ) : (
+                      <div className="company-logo-placeholder">
+                        {company.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {isSelected && (
+                      <div className="selection-indicator">
+                        <Check className="w-5 h-5" />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Metadata Grid (2x2) */}
-                  <div className="company-meta-grid">
-                    <div className="meta-cell">
-                      <div className="meta-label">INDUSTRY</div>
-                      <div className="meta-value">{company.industry || 'Not available'}</div>
-                    </div>
-                    <div className="meta-cell">
-                      <div className="meta-label">EMPLOYEES</div>
-                      <div className="meta-value">
-                        {company.employee_count > 0
-                          ? company.employee_count.toLocaleString()
-                          : 'Not available'}
+                  {/* Info Section — name + meta */}
+                  <div className="company-card-info">
+                    <h3 className="company-name">{company.name}</h3>
+
+                    <div className="company-meta-grid">
+                      <div className="meta-cell">
+                        <div className="meta-label">INDUSTRY</div>
+                        <div className="meta-value">{company.industry || 'Not available'}</div>
                       </div>
-                    </div>
-                    <div className="meta-cell">
-                      <div className="meta-label">REVENUE</div>
-                      <div className="meta-value">{company.revenue || 'Not available'}</div>
-                    </div>
-                    <div className="meta-cell">
-                      <div className="meta-label">FOUNDED</div>
-                      <div className="meta-value">{company.founded_year || 'Not available'}</div>
+                      <div className="meta-cell">
+                        <div className="meta-label">EMPLOYEES</div>
+                        <div className="meta-value">
+                          {company.employee_count > 0
+                            ? company.employee_count.toLocaleString()
+                            : 'Not available'}
+                        </div>
+                      </div>
+                      <div className="meta-cell">
+                        <div className="meta-label">REVENUE</div>
+                        <div className="meta-value">{company.revenue || 'Not available'}</div>
+                      </div>
+                      <div className="meta-cell">
+                        <div className="meta-label">FOUNDED</div>
+                        <div className="meta-value">{company.founded_year || 'Not available'}</div>
+                      </div>
                     </div>
                   </div>
 

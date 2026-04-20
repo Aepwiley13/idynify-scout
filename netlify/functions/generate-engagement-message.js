@@ -152,7 +152,8 @@ export const handler = async (event) => {
           section5 = reconModule.sections.find(s => s.sectionId === 5);
           section9 = reconModule.sections.find(s => s.sectionId === 9);
 
-          if (section5 || section9) {
+          if ((section5?.status === 'completed' && section5?.data) ||
+              (section9?.status === 'completed' && section9?.data)) {
             reconLoaded = true;
             console.log('✅ RECON data loaded');
           }
@@ -248,8 +249,8 @@ export const handler = async (event) => {
     // Build RECON context string
     let reconContext = '';
     if (reconLoaded) {
-      if (section5?.userInput) {
-        const s5 = section5.userInput;
+      if (section5?.data && section5.status === 'completed') {
+        const s5 = section5.data;
         reconContext += `
 USER'S CUSTOMER INTELLIGENCE (from RECON):
 - Primary customer pain point: ${s5.primaryPain || 'Not specified'}
@@ -258,10 +259,11 @@ USER'S CUSTOMER INTELLIGENCE (from RECON):
 - Why previous solutions failed: ${s5.whyFailed || 'Not specified'}
 - What triggers urgency: ${s5.urgentTrigger || 'Not specified'}
 `;
+        console.log('✅ Section 5 pain points context assembled');
       }
 
-      if (section9?.userInput) {
-        const s9 = section9.userInput;
+      if (section9?.data && section9.status === 'completed') {
+        const s9 = section9.data;
         reconContext += `
 USER'S MESSAGING PREFERENCES:
 - Email tone: ${s9.emailTone || 'Professional'}
@@ -271,6 +273,7 @@ USER'S MESSAGING PREFERENCES:
 - Social proof emphasis: ${s9.socialProofEmphasis || 'Moderate'}
 - Personalization level: ${s9.personalizationLevel || 'Highly personalized'}
 `;
+        console.log('✅ Section 9 messaging preferences context assembled');
       }
     }
 

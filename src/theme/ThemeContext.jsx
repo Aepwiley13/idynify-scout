@@ -5,7 +5,7 @@
  * Theme preference persists to localStorage as 'idynify_theme' (full theme ID).
  * Firestore is used as secondary persistence (keeps existing user prefs in sync).
  *
- * Default: 'mission' (Space theme) on first visit.
+ * Default: 'workspace' (Clean Workspace theme) on first visit.
  *
  * Usage:
  *   const T = useT();                              // get current theme token set
@@ -21,18 +21,18 @@ const LS_KEY = "idynify_theme";
 
 /** Resolve a stored value (full themeId or legacy 'light'/'dark') → valid themeId */
 function resolveThemeId(stored) {
-  if (!stored) return "mission";
+  if (!stored) return "workspace";
   if (THEMES[stored]) return stored;
   // Legacy: 'dark' → mission, 'light' → workspace
   if (stored === "dark")  return "mission";
   if (stored === "light") return "workspace";
-  return "mission";
+  return "workspace";
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 export const ThemeCtx = createContext({
-  T: THEMES.mission,
-  themeId: "mission",
+  T: THEMES.workspace,
+  themeId: "workspace",
   setThemeId: () => {},
 });
 
@@ -41,13 +41,13 @@ export const useThemeCtx = () => useContext(ThemeCtx);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function ThemeProvider({ children }) {
-  // Initialize from localStorage; fall back to 'mission' (Space) if unset
+  // Initialize from localStorage; fall back to 'workspace' (Clean Workspace) if unset
   const [themeId, setThemeIdState] = useState(() => {
     try {
       const stored = localStorage.getItem(LS_KEY);
       return resolveThemeId(stored);
     } catch {
-      return "mission";
+      return "workspace";
     }
   });
 
@@ -109,7 +109,7 @@ export function ThemeProvider({ children }) {
     }
   }, []);
 
-  const T = THEMES[themeId] ?? THEMES.mission;
+  const T = THEMES[themeId] ?? THEMES.workspace;
 
   return (
     <ThemeCtx.Provider value={{ T, themeId, setThemeId }}>

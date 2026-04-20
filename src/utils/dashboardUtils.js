@@ -227,6 +227,23 @@ export async function getDashboardState(userId) {
       }
     }
 
+    // Migration: Unlock RECON module-entry sections (7, 8, 9, 10) for existing users.
+    // These sections belong to independent modules (Buying Signals, Competitive Intel,
+    // Messaging & Voice) that should be accessible without completing every prior section.
+    // The schema now initialises them as unlocked:true but existing Firestore documents
+    // still carry unlocked:false from before this change.
+    const MODULE_ENTRY_SECTIONS = new Set([7, 8, 9, 10]);
+    const reconModule = modules.find(m => m.id === 'recon');
+    if (reconModule?.sections) {
+      for (const section of reconModule.sections) {
+        if (MODULE_ENTRY_SECTIONS.has(section.sectionId) && !section.unlocked) {
+          console.log(`🔧 Migration: Unlocking RECON section ${section.sectionId} (module entry point)`);
+          section.unlocked = true;
+          needsUpdate = true;
+        }
+      }
+    }
+
     // Save migration changes
     if (needsUpdate) {
       await updateDoc(dashboardRef, {

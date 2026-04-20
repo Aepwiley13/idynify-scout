@@ -624,7 +624,7 @@ export default function Section7DecisionProcess({ initialData = {}, onSave, onCo
                 ✏️ Edit Answers
               </button>
               <button
-                onClick={() => navigate('/recon/section-8')}
+                onClick={() => navigate('/recon/section/8')}
                 className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →

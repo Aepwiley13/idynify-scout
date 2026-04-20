@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase/config';
+import { auth, db } from '../../firebase/config';
 import './ReconEnterprise.css';
+import { doc, updateDoc } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const SECTION_10_QUESTIONS = [
@@ -68,6 +69,7 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
   const [error, setError] = useState(null);
   const [showOutput, setShowOutput] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [lastSaved, setLastSaved] = useState(null);
 
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
@@ -76,9 +78,28 @@ export default function Section10BehavioralSignals({ initialData = {}, onSave, o
     }
   }, [initialData]);
 
+  // Auto-save every 30 seconds
+  useEffect(() => {
+    const autoSave = setInterval(() => {
+      saveAnswers();
+    }, 30000);
+
+    return () => clearInterval(autoSave);
+  }, [answers]);
+
   const saveAnswers = async () => {
-    if (onSave) {
-      await onSave(answers);
+    const user = getEffectiveUser();
+    if (!user) return;
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        section10Answers: answers,
+        'reconProgress.section10LastSaved': new Date()
+      });
+      setLastSaved(new Date());
+      if (onSave) await onSave(answers);
+    } catch (err) {
+      console.error('Error saving answers:', err);
     }
   };
 

@@ -40,6 +40,7 @@ export default function CompanyDetail() {
   const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     loadCompanyData();
     loadApprovedContacts();
   }, [companyId]);

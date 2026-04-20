@@ -578,7 +578,7 @@ export default function Section4IdealCustomerPsychographics({ initialData = {}, 
                 ✏️ Edit Answers
               </button>
               <button
-                onClick={() => navigate('/recon/section-5')}
+                onClick={() => navigate('/recon/section/5')}
                 className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →

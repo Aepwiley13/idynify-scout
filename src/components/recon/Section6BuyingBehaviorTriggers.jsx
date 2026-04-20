@@ -622,7 +622,7 @@ export default function Section6BuyingBehaviorTriggers({ initialData = {}, onSav
                 ✏️ Edit Answers
               </button>
               <button
-                onClick={() => navigate('/recon/section-7')}
+                onClick={() => navigate('/recon/section/7')}
                 className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-8 rounded-xl transition-all transform hover:scale-105"
               >
                 Next Section →

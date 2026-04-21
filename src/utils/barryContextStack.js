@@ -18,7 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { calculateReconConfidence } from './reconConfidence';
-import { RECON_SECTION_MAP } from './reconSectionMap';
+import { RECON_SECTION_MAP, DEFAULT_ICP_ID } from './reconSectionMap';
 
 async function getAllContacts(userId) {
   try {
@@ -55,14 +55,33 @@ async function getAllContacts(userId) {
   }
 }
 
-async function getIcpProfile(userId) {
+/**
+ * Returns the active ICP profile from icpProfiles where isActive:true + status:'active'.
+ * Falls back to companyProfile/current if no active profile exists (pre-migration users).
+ */
+async function getActiveMessagingProfile(userId) {
   try {
-    const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-    return profileDoc.exists() ? profileDoc.data() : null;
+    const snap = await getDocs(query(
+      collection(db, 'users', userId, 'icpProfiles'),
+      where('isActive', '==', true),
+      where('status', '==', 'active'),
+      limit(1)
+    ));
+    if (!snap.empty) {
+      return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    }
+    // Pre-migration fallback: read bridge cache directly
+    const cpDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
+    return cpDoc.exists() ? { id: DEFAULT_ICP_ID, ...cpDoc.data() } : null;
   } catch (err) {
-    console.warn('[barryContextStack] Failed to load ICP profile:', err.message);
+    console.warn('[barryContextStack] Failed to load active ICP profile:', err.message);
     return null;
   }
+}
+
+// Kept for call-site compatibility; delegates to getActiveMessagingProfile.
+async function getIcpProfile(userId) {
+  return getActiveMessagingProfile(userId);
 }
 
 async function getActiveMissions(userId) {
@@ -224,6 +243,16 @@ export async function buildContextStack(userId) {
     const dashboardData = dashboardDoc.exists() ? dashboardDoc.data() : null;
     const reconConfidence = calculateReconConfidence(dashboardData);
 
+    // Section 9 (outreach_context) resolves from the active ICP profile's messaging
+    // field so multi-ICP users always get the right voice. Falls back to the
+    // dashboard aggregate for pre-migration users who have no icpProfile yet.
+    const activeMessaging = icpProfile?.messaging;
+    const outreachContext = activeMessaging
+      ? (typeof activeMessaging === 'string'
+          ? activeMessaging.slice(0, 300)
+          : JSON.stringify(activeMessaging).slice(0, 300))
+      : extractSection(dashboardData, RECON_SECTION_MAP.outreachContext);
+
     const recon = dashboardData ? {
       confidence: reconConfidence,
       enhanced: reconConfidence >= 40,
@@ -231,7 +260,7 @@ export async function buildContextStack(userId) {
       value_proposition: extractSection(dashboardData, RECON_SECTION_MAP.valueProposition),
       psychographics: extractSection(dashboardData, RECON_SECTION_MAP.psychographics),
       pain_points: extractSection(dashboardData, RECON_SECTION_MAP.painPoints),
-      outreach_context: extractSection(dashboardData, RECON_SECTION_MAP.outreachContext)
+      outreach_context: outreachContext,
     } : { confidence: 0, enhanced: false };
 
     const stack = {

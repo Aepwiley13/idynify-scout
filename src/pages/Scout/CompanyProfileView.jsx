@@ -566,10 +566,10 @@ export default function CompanyProfileView({ companyId, onBack }) {
                 <Linkedin size={11} />LinkedIn
               </button>
             )}
-            {snap.phone && (
-              <button onClick={() => window.location.href = `tel:${snap.phone}`}
+            {(snap.phone || company?.phone) && (
+              <button onClick={() => window.location.href = `tel:${snap.phone || company?.phone}`}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer' }}>
-                <Phone size={11} />{snap.phone}
+                <Phone size={11} />{snap.phone || company?.phone}
               </button>
             )}
           </div>
@@ -581,8 +581,8 @@ export default function CompanyProfileView({ companyId, onBack }) {
               <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: 0.3, textTransform: 'uppercase' }}>Company Overview</span>
             </div>
             <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>
-              {snap.description
-                ? snap.description
+              {(snap.description || company?.description)
+                ? (snap.description || company?.description)
                 : enriching
                   ? <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Loading overview…</span>
                   : <span style={{ color: T.textFaint, fontStyle: 'italic' }}>No overview available.</span>

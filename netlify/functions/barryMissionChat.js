@@ -26,6 +26,7 @@ import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
+import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -241,7 +242,7 @@ function detectModeShift(contextStack, intent, currentMode) {
 
 // ── ICP reclarification prompt ────────────────────────────────────────────────
 
-function buildIcpReclarificationPrompt(icpProfile, swipeNotes = null) {
+function buildIcpReclarificationPrompt(icpProfile, swipeNotes = null, reconScore = 0) {
   // Build a human-readable summary of the current ICP settings if available
   let currentIcpBlock = '';
   if (icpProfile) {
@@ -272,12 +273,25 @@ Do NOT ask from scratch if settings already exist. Start by acknowledging what's
     }
   }
 
-  const hasExistingIcp = currentIcpBlock.length > 0;
+  // A user is "ICP-aware" if they have formal filter fields saved OR if RECON is rich
+  // enough that Barry already knows who they target. Never ask from scratch in either case.
+  const hasFormalIcp = currentIcpBlock.length > 0;
+  const hasExistingIcp = hasFormalIcp || reconScore >= 60;
+
+  const situationBlock = hasFormalIcp
+    ? currentIcpBlock
+    : reconScore >= 60
+    ? `
+SITUATION: The user wants to refine their target profile. They have not saved formal ICP filter fields, but their RECON training is complete enough (${reconScore}%) that you already know who they target.
+Start by describing who you understand their ideal customer to be based on RECON context — company type, size, and role — then ask if this is still accurate or if they want to shift anything.
+Do NOT ask them to define targeting from scratch. You already know it.
+`
+    : `
+SITUATION: The user wants to define or refine their target company profile. Your job: have a focused, natural conversation to understand who they actually want to reach — then give the ICP parameters to run a better search.
+`;
 
   return `You are Barry, an expert B2B sales intelligence AI. You are sharp, warm, and direct.
-${hasExistingIcp ? currentIcpBlock : `
-SITUATION: The user wants to define or refine their target company profile. Your job: have a focused, natural conversation to understand who they actually want to reach — then give the ICP parameters to run a better search.
-`}
+${situationBlock}
 YOUR GOAL: Extract or confirm clear signals about:
 1. Industry / type of company they target
 2. Company size (employees, stage, or revenue range)
@@ -320,7 +334,7 @@ icp_params format:
 - targetTitles: array of specific job titles they sell to
 - companyKeywords: descriptive terms (e.g. ["startup", "b2b", "agency", "saas", "enterprise"])
 
-All fields are optional — only include what the user actually mentioned or confirmed. ${hasExistingIcp ? 'Start by acknowledging the current ICP settings.' : 'Start with the first targeted question.'}
+All fields are optional — only include what the user actually mentioned or confirmed. ${hasFormalIcp ? 'Start by acknowledging the current ICP settings.' : hasExistingIcp ? 'Start by summarising who you understand their ideal customer to be from RECON.' : 'Start with the first targeted question.'}
 ${swipeNotes?.toward?.length > 0 || swipeNotes?.away?.length > 0 ? `
 SIGNALS FROM PAST SWIPE NOTES (user-written feedback on companies they've reviewed):
 ${swipeNotes.toward?.length > 0 ? `Weight toward — signals from companies they accepted:\n${swipeNotes.toward.map(n => `  • ${n}`).join('\n')}` : ''}
@@ -330,7 +344,7 @@ Use these as implicit ICP signals when refining targeting. Reference them if the
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null) {
+function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null, capabilityBlock = null) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
   const recon = contextStack?.recon || {};
@@ -338,18 +352,22 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
   const icpProfile = contextStack?.icpProfile || null;
   const calendarEvents = contextStack?.calendarEvents || [];
 
-  // Build ICP summary block from structured profile (same field set as buildIcpReclarificationPrompt)
-  const icpLines = [];
-  if (icpProfile) {
-    if (icpProfile.industries?.length) icpLines.push(`Industries: ${icpProfile.industries.join(', ')}`);
-    if (icpProfile.isNationwide) icpLines.push('Locations: Nationwide (all US)');
-    else if (icpProfile.locations?.length) icpLines.push(`Locations: ${icpProfile.locations.join(', ')}`);
-    if (icpProfile.companySizes?.length) icpLines.push(`Company sizes: ${icpProfile.companySizes.join(', ')}`);
-    if (icpProfile.targetTitles?.length) icpLines.push(`Target titles: ${icpProfile.targetTitles.join(', ')}`);
-    if (icpProfile.companyKeywords?.length) icpLines.push(`Keywords: ${icpProfile.companyKeywords.join(', ')}`);
-    if (icpProfile.lookalikeSeed?.name) icpLines.push(`Lookalike anchor: ${icpProfile.lookalikeSeed.name}`);
-  }
-  const icpBlock = icpLines.length > 0 ? icpLines.join('\n') : 'Not configured';
+  // Capability block replaces the binary "Not configured" ICP check.
+  // Passed in from the handler after buildCapabilityBlock() is called with dashboardData.
+  // Falls back to a minimal inline block if not provided (e.g. older call sites).
+  const icpBlock = capabilityBlock || (() => {
+    const lines = [];
+    if (icpProfile) {
+      if (icpProfile.industries?.length) lines.push(`Industries: ${icpProfile.industries.join(', ')}`);
+      if (icpProfile.isNationwide) lines.push('Locations: Nationwide (all US)');
+      else if (icpProfile.locations?.length) lines.push(`Locations: ${icpProfile.locations.join(', ')}`);
+      if (icpProfile.companySizes?.length) lines.push(`Company sizes: ${icpProfile.companySizes.join(', ')}`);
+      if (icpProfile.targetTitles?.length) lines.push(`Target titles: ${icpProfile.targetTitles.join(', ')}`);
+      if (icpProfile.companyKeywords?.length) lines.push(`Keywords: ${icpProfile.companyKeywords.join(', ')}`);
+      if (icpProfile.lookalikeSeed?.name) lines.push(`Lookalike anchor: ${icpProfile.lookalikeSeed.name}`);
+    }
+    return lines.length > 0 ? lines.join('\n') : 'Not configured';
+  })();
 
   // Build a concise contact list for the prompt.
   // Priority: sniper + basecamp contacts always get full detail regardless of recency
@@ -451,9 +469,9 @@ ${/* Two-speed context: opening brief uses only reconContext (server-compiled fu
    Additive by design — structured fields give Barry named references; compiled string gives full section text.
    After Cluster C's extractSection() fix, both paths are now correctly populated. */ ''}
 
-━━━ ICP PROFILE (configured settings) ━━━
+━━━ ICP PROFILE & CAPABILITY STATE ━━━
 ${icpBlock}
-Reference this when discussing prospecting or targeting. This is the user's confirmed ICP — always use it as the baseline when giving targeting advice or drafting outreach.
+Reference this when discussing prospecting or targeting. Use the formal filter fields when saved; use RECON intelligence as the targeting baseline when formal fields are absent but RECON is complete.
 
 ━━━ SCOUT SWIPE INTELLIGENCE (user-rated company signals) ━━━
 ${swipeFeedback
@@ -740,14 +758,23 @@ export const handler = async (event) => {
 
     // ── Load RECON server-side (for additional context / security) ────────────
     let reconContext = '';
+    let dashboardData = null;
     try {
       const dashboardDoc = await db.collection('dashboards').doc(userId).get();
       if (dashboardDoc.exists) {
-        reconContext = compileReconForPrompt(dashboardDoc.data()) || '';
+        dashboardData = dashboardDoc.data();
+        reconContext = compileReconForPrompt(dashboardData) || '';
       }
     } catch (err) {
       console.warn('[barryMissionChat] RECON load skipped:', err.message);
     }
+
+    const serviceProfileCount = contextStack?.serviceProfiles?.length || 0;
+    const capabilityBlock = buildCapabilityBlock(
+      dashboardData,
+      contextStack?.icpProfile || null,
+      serviceProfileCount
+    );
 
     const isOpeningBrief = !message || message === '__OPENING_BRIEF__';
 
@@ -771,7 +798,7 @@ export const handler = async (event) => {
             contacts: (contextStack.contacts || []).slice(0, 50)
           }
         : { contacts: [], missions: [], recon: {} };
-      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext, module, swipeFeedback);
+      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext, module, swipeFeedback, capabilityBlock);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}`;
       }
@@ -881,12 +908,15 @@ Return valid JSON only:
       }
 
       const icpSwipeFeedback = await loadSwipeFeedback(userId).catch(() => null);
-      const icpSystemPrompt = buildIcpReclarificationPrompt(resolvedIcpProfile, icpSwipeFeedback?.notes);
+      const { score: reconScore } = computeReconState(dashboardData);
+      const icpSystemPrompt = buildIcpReclarificationPrompt(resolvedIcpProfile, icpSwipeFeedback?.notes, reconScore);
       const isOpening = message === '__ICP_RECLARIFICATION__';
 
       const icpMessages = isOpening
         ? [{ role: 'user', content: resolvedIcpProfile
             ? 'Review my current ICP settings and confirm what you see, then ask if I want to refine anything.'
+            : reconScore >= 60
+            ? 'Based on what you know from my RECON training, describe who you understand my ideal customer to be, then ask if that is still accurate.'
             : 'Help me define who I should be targeting.' }]
         : [...conversationHistory.slice(-10), { role: 'user', content: message }];
 
@@ -1050,7 +1080,7 @@ Return valid JSON only:
       }
 
       const swipeFeedbackConv = await loadSwipeFeedback(userId).catch(() => null);
-      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module, swipeFeedbackConv);
+      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module, swipeFeedbackConv, capabilityBlock);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}\nUse this as live context for the user's current view — prioritise it over generic contact lists above.`;
       }

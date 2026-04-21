@@ -13,12 +13,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import {
   ArrowLeft, User, Users, Shield, CreditCard, Plug, Settings2,
   Volume2, VolumeX, Mail, CheckCircle, AlertTriangle,
   Loader, LogOut, Lock, Smartphone, BarChart3, Calendar,
-  Key, Zap, ExternalLink, Layers,
+  Key, Zap, ExternalLink, Layers, Briefcase, Plus, Star as StarIcon,
   RefreshCw, Star, MessageSquare, Share2,
   Radar, Crosshair, Eye, Target, Tent, Archive,
   Palette, Check, ChevronLeft, ChevronRight, Home, Settings as SettingsIcon, Clock,
@@ -38,6 +38,7 @@ import BottomNav from '../components/layout/BottomNav';
 import MoreSheet from '../components/layout/MoreSheet';
 import BarryChat, { MODULE_CONFIG } from '../components/barry/BarryChat';
 import { useBarryContext } from '../context/barryContextStore';
+import ServiceProfileSetup from '../components/serviceProfiles/ServiceProfileSetup';
 import './UserSettings.css';
 
 /* ─── accent ─────────────────────────────────────────────────────────────── */
@@ -49,12 +50,13 @@ const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 /* ─── constants ─────────────────────────────────────────────────────────── */
 const TABS = [
-  { id: 'account',      label: 'Account',      icon: User      },
-  { id: 'security',     label: 'Security',      icon: Shield    },
-  { id: 'billing',      label: 'Billing',       icon: CreditCard },
-  { id: 'integrations', label: 'Integrations',  icon: Plug      },
-  { id: 'hunter',       label: 'Hunter',        icon: Settings2 },
-  { id: 'appearance',   label: 'Appearance',    icon: Palette   },
+  { id: 'account',      label: 'Account',       icon: User      },
+  { id: 'security',     label: 'Security',       icon: Shield    },
+  { id: 'billing',      label: 'Billing',        icon: CreditCard },
+  { id: 'integrations', label: 'Integrations',   icon: Plug      },
+  { id: 'services',     label: 'Your Services',  icon: Briefcase },
+  { id: 'hunter',       label: 'Hunter',         icon: Settings2 },
+  { id: 'appearance',   label: 'Appearance',     icon: Palette   },
 ];
 
 const PLAN_LABELS  = { starter: 'Starter', pro: 'Pro' };
@@ -422,6 +424,11 @@ export default function UserSettings() {
   const [bookingLink, setBookingLink]         = useState('');
   const [bookingLinkInput, setBookingLinkInput] = useState('');
   const [bookingLinkSaving, setBookingLinkSaving] = useState(false);
+
+  /* ── service profiles ── */
+  const [serviceProfiles, setServiceProfiles] = useState([]);
+  const [serviceProfilesLoading, setServiceProfilesLoading] = useState(false);
+  const [showServiceSetup, setShowServiceSetup] = useState(false);
   const [bookingLinkSaved, setBookingLinkSaved]   = useState(false);
 
   /* ── billing ── */
@@ -469,6 +476,51 @@ export default function UserSettings() {
       setActiveTab('integrations');
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'services') loadServiceProfiles();
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadServiceProfiles() {
+    if (!user) return;
+    setServiceProfilesLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'users', user.uid, 'serviceProfiles'));
+      const profiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      profiles.sort((a, b) => {
+        if (a.isDefault) return -1;
+        if (b.isDefault) return 1;
+        const aT = a.createdAt?.toMillis?.() ?? 0;
+        const bT = b.createdAt?.toMillis?.() ?? 0;
+        return aT - bT;
+      });
+      setServiceProfiles(profiles);
+    } catch (err) {
+      console.warn('[UserSettings] loadServiceProfiles failed:', err.message);
+    } finally {
+      setServiceProfilesLoading(false);
+    }
+  }
+
+  async function handleSetServiceDefault(profileId) {
+    if (!user) return;
+    const batch = writeBatch(db);
+    serviceProfiles.forEach(p => {
+      batch.update(doc(db, 'users', user.uid, 'serviceProfiles', p.id), {
+        isDefault: p.id === profileId,
+        updatedAt: serverTimestamp(),
+      });
+    });
+    await batch.commit();
+    setServiceProfiles(prev => prev.map(p => ({ ...p, isDefault: p.id === profileId })));
+  }
+
+  async function handleDeleteServiceProfile(profileId) {
+    if (!user) return;
+    const { deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'users', user.uid, 'serviceProfiles', profileId));
+    setServiceProfiles(prev => prev.filter(p => p.id !== profileId));
+  }
 
   async function loadBookingLink() {
     if (!user) return;
@@ -1158,6 +1210,87 @@ export default function UserSettings() {
           <AppearancePanel />
         )}
 
+        {/* ══ YOUR SERVICES ══ */}
+        {activeTab === 'services' && (
+          <div className="us-section-stack">
+            <section className="us-section">
+              <div className="us-section-header">
+                <h2 className="us-section-title">Your Services</h2>
+                <button
+                  className="us-action-btn us-action-btn--primary"
+                  onClick={() => setShowServiceSetup(true)}
+                  disabled={serviceProfiles.length >= 5}
+                  title={serviceProfiles.length >= 5 ? 'Maximum of 5 service profiles reached' : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+                >
+                  <Plus style={{ width: 13, height: 13 }} />
+                  Add Service
+                </button>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 0.75rem', lineHeight: 1.5 }}>
+                Barry uses these when crafting first-touch outreach. Each profile has its own value prop, pain points, and positioning so Barry stays relevant for every service you offer.
+                {serviceProfiles.length >= 5 && <span style={{ color: '#f59e0b' }}> Maximum of 5 reached.</span>}
+              </p>
+
+              {serviceProfilesLoading && (
+                <div style={{ color: '#64748b', fontSize: '0.8125rem', padding: '1rem 0' }}>Loading…</div>
+              )}
+
+              {!serviceProfilesLoading && serviceProfiles.length === 0 && (
+                <div className="us-card us-card--muted" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                    <Briefcase style={{ width: 16, height: 16, color: '#475569' }} />
+                    <span className="us-card-label" style={{ color: '#64748b' }}>No service profiles yet</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0 }}>
+                    Add your first service and Barry will use it to craft more relevant outreach. Takes under 10 minutes.
+                  </p>
+                </div>
+              )}
+
+              {serviceProfiles.map(profile => (
+                <div key={profile.id} className={`us-card${profile.isDefault ? ' us-service-card--default' : ''}`} style={{ alignItems: 'flex-start', gap: '0.875rem', padding: '0.875rem 1rem' }}>
+                  <div className="us-card-icon" style={{ background: profile.isDefault ? 'rgba(250,170,32,0.12)' : 'rgba(99,102,241,0.08)', borderColor: profile.isDefault ? 'rgba(250,170,32,0.3)' : 'rgba(99,102,241,0.15)', color: profile.isDefault ? '#faaa20' : '#a5b4fc', marginTop: '0.125rem' }}>
+                    <Briefcase style={{ width: 16, height: 16 }} />
+                  </div>
+                  <div className="us-card-body" style={{ gap: '0.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="us-card-label">{profile.name || 'Unnamed service'}</span>
+                      {profile.isDefault && (
+                        <span style={{ fontSize: '0.625rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(250,170,32,0.15)', color: '#faaa20', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Default</span>
+                      )}
+                    </div>
+                    <span className="us-card-value us-card-value--muted" style={{ WebkitLineClamp: 2, overflow: 'hidden', display: '-webkit-box', WebkitBoxOrient: 'vertical' }}>
+                      {profile.description || '—'}
+                    </span>
+                    {profile.primaryBuyer && (
+                      <span style={{ fontSize: '0.6875rem', color: '#475569' }}>Buyer: {profile.primaryBuyer}</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', flexShrink: 0 }}>
+                    {!profile.isDefault && (
+                      <button
+                        className="us-action-btn"
+                        onClick={() => handleSetServiceDefault(profile.id)}
+                        style={{ fontSize: '0.6875rem', whiteSpace: 'nowrap' }}
+                      >
+                        Set default
+                      </button>
+                    )}
+                    <button
+                      className="us-action-btn us-action-btn--danger"
+                      onClick={() => handleDeleteServiceProfile(profile.id)}
+                      style={{ fontSize: '0.6875rem' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </section>
+          </div>
+        )}
+
         {/* ══ HUNTER ══ */}
         {activeTab === 'hunter' && (
           <div className="us-section-stack">
@@ -1301,6 +1434,12 @@ export default function UserSettings() {
         {/* Cross-module bottom nav */}
         <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
         <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+        {showServiceSetup && (
+          <ServiceProfileSetup
+            onComplete={() => { setShowServiceSetup(false); loadServiceProfiles(); }}
+            onDismiss={() => setShowServiceSetup(false)}
+          />
+        )}
       </div>
     );
   }
@@ -1554,6 +1693,13 @@ export default function UserSettings() {
           {renderPanel()}
         </div>
       </div>
+
+      {showServiceSetup && (
+        <ServiceProfileSetup
+          onComplete={() => { setShowServiceSetup(false); loadServiceProfiles(); }}
+          onDismiss={() => setShowServiceSetup(false)}
+        />
+      )}
     </div>
   );
 }

@@ -135,6 +135,15 @@ export async function assembleBarryContext(db, userId, contactId) {
         last_session_next_step: contact.engage_state?.last_barry_session?.next_step || null,
       },
 
+      // Top-level convenience field: most recent session summary, used by Hunter
+      // to surface "pickup where left off" context in Barry's opening message.
+      // Primary: engage_state.last_barry_session.summary (updated after every session).
+      // Fallback: most recent barry_sessions document summary (for older contacts).
+      lastSessionSummary:
+        contact.engage_state?.last_barry_session?.summary ||
+        recentSessions[0]?.session_summary ||
+        null,
+
       stats: {
         total_sessions: engageSummary.total_sessions || 0,
         total_sent: engageSummary.total_messages_sent || 0,

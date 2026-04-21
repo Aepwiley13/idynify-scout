@@ -29,6 +29,7 @@ import { resolveContactStage } from '../../constants/stageSystem';
 import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_STATUS_CONFIG } from '../../utils/contactEngageStatus';
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
+import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
 
 // ─── Engagement Status Sets ───────────────────────────────────────────────────
 // hunter_status values that indicate a contact has been engaged (Scout → Hunter)
@@ -198,6 +199,33 @@ function Av({ initials, color = BRAND.pink, size = 36, src }) {
   );
 }
 
+// ─── Service profile signal chip heuristic ───────────────────────────────────
+// Client-side only — uses Apollo data already on the contact document.
+function getSignalChip(contact, serviceProfiles = []) {
+  if (!serviceProfiles.length) return null;
+
+  const nameLower = (p) => (p.name || '').toLowerCase();
+  const descLower = (p) => (p.description || '').toLowerCase();
+  const isWebProfile = (p) => nameLower(p).includes('web') || descLower(p).includes('website');
+
+  const webProfile = serviceProfiles.find(isWebProfile);
+  const empCount = contact.num_employees || contact.employee_count || null;
+  if (webProfile && empCount !== null && Number(empCount) < 10) {
+    return { label: 'Small business — website angle', serviceId: webProfile.id };
+  }
+
+  const jobStartDate = contact.job_start_date || contact.employment_start_date || null;
+  if (jobStartDate) {
+    const msSinceStart = Date.now() - new Date(jobStartDate).getTime();
+    const daysSince = msSinceStart / (1000 * 60 * 60 * 24);
+    if (daysSince >= 0 && daysSince < 180) {
+      return { label: 'New role — timing signal', serviceId: null };
+    }
+  }
+
+  return null;
+}
+
 // ─── EngageBadge constants (module-scope — not recreated per render) ──────────
 const HUNTER_STATUS_LABELS = {
   active_mission:  'ACTIVE MISSION',
@@ -347,6 +375,7 @@ function AllLeadsCard({
   onBrigadeUpdate,
   inSniper = false, onAddToSniper,
   onArchive,
+  signalChip = null,
 }) {
   const T = useT();
   const color = BRAND.pink;
@@ -603,14 +632,24 @@ function AllLeadsCard({
 
       {/* Info section */}
       <div style={{ padding: '9px 12px 12px' }}>
-        {(company?.name || contact.company_name) && (
-          <div
-            onClick={e => { e.stopPropagation(); onCompanyClick && onCompanyClick(); }}
-            style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '2px 7px', display: 'inline-block', marginBottom: 7, fontWeight: 700, cursor: onCompanyClick ? 'pointer' : 'default', textDecoration: onCompanyClick ? 'underline' : 'none', textDecorationColor: `${color}60` }}
-          >
-            {company?.name || contact.company_name}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: (company?.name || contact.company_name || signalChip) ? 7 : 0 }}>
+          {(company?.name || contact.company_name) && (
+            <div
+              onClick={e => { e.stopPropagation(); onCompanyClick && onCompanyClick(); }}
+              style={{ fontSize: 9, color, background: `${color}18`, borderRadius: 5, padding: '2px 7px', fontWeight: 700, cursor: onCompanyClick ? 'pointer' : 'default', textDecoration: onCompanyClick ? 'underline' : 'none', textDecorationColor: `${color}60` }}
+            >
+              {company?.name || contact.company_name}
+            </div>
+          )}
+          {signalChip && (
+            <div
+              title="Barry engagement signal"
+              style={{ fontSize: 8, color: '#faaa20', background: 'rgba(250,170,32,0.12)', border: '1px solid rgba(250,170,32,0.25)', borderRadius: 5, padding: '1px 6px', fontWeight: 600, letterSpacing: '0.01em', display: 'flex', alignItems: 'center', gap: 3 }}
+            >
+              ⚡ {signalChip.label}
+            </div>
+          )}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, fontSize: 11 }}>
           <Mail size={12} color={T.textFaint} />
           {email ? (
@@ -1085,6 +1124,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   const [companies, setCompanies] = useState({});
   const [loading, setLoading] = useState(true);
   const [sniperIds, setSniperIds] = useState(new Set()); // contactRef IDs already in SNIPER
+  const [serviceProfiles, setServiceProfiles] = useState([]);
 
   // UI
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'list'
@@ -1123,6 +1163,10 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
 
   // LinkedIn modal
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
+
+  // First Touch modal
+  const [firstTouchContact, setFirstTouchContact] = useState(null);
+  const [firstTouchInitialServiceId, setFirstTouchInitialServiceId] = useState(null);
 
   // Modal / profile
   const [modal, setModal] = useState(null);
@@ -1239,6 +1283,11 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         getDocs(collection(db, 'users', user.uid, 'companies')),
         getDocs(collection(db, 'users', user.uid, 'contacts')),
       ];
+
+      // Load service profiles alongside (non-blocking — used for signal chips)
+      getDocs(collection(db, 'users', user.uid, 'serviceProfiles'))
+        .then(snap => setServiceProfiles(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+        .catch(() => {});
       if (mode === 'hunter') fetches.push(getDocs(collection(db, 'users', user.uid, 'sniper_contacts')));
       const [companiesSnapshot, contactsSnapshot, sniperSnapshot] = await Promise.all(fetches);
 
@@ -2000,8 +2049,15 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   onClick={() => isMobile ? openMobileProfile(c.id) : setModal(c)}
                   onEngage={() => {
                     savedListScroll.current = listRef.current?.scrollTop ?? 0;
-                    if (isMobile) { openMobileProfile(c.id); }
-                    else {
+                    const engageState = deriveCardEngageState(c);
+                    if (mode === 'scout' && engageState === 'cold') {
+                      setFirstTouchContact(c);
+                      setFirstTouchInitialServiceId(
+                        serviceProfiles.find(p => p.isDefault)?.id || null
+                      );
+                    } else if (isMobile) {
+                      openMobileProfile(c.id);
+                    } else {
                       if (panelLayout === 'list-full') { setPanelLayout('split'); localStorage.setItem('al_panelLayout', 'split'); }
                       setPanelAutoEngage(true); setPanelContactId(c.id);
                     }
@@ -2020,6 +2076,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   inSniper={sniperIds.has(c.id)}
                   onAddToSniper={() => handleAddToSniper(c)}
                   onArchive={handleContactArchived}
+                  signalChip={getSignalChip(c, serviceProfiles)}
                 />
               ))}
             </div>
@@ -2309,6 +2366,20 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         </div>
       )}
 
+      {/* ── First Touch Modal ── */}
+      {firstTouchContact && (
+        <FirstTouchModal
+          contact={firstTouchContact}
+          serviceProfiles={serviceProfiles}
+          initialServiceId={firstTouchInitialServiceId}
+          onDismiss={() => setFirstTouchContact(null)}
+          onSentToHunter={({ missionId, contactId }) => {
+            setFirstTouchContact(null);
+            navigate('/hunter', { state: { openMissionId: missionId, openContactId: contactId } });
+          }}
+        />
+      )}
+
       {/* ── Person Modal ── */}
       {modal && (
         <PersonModal
@@ -2317,9 +2388,18 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           engageState={deriveCardEngageState(modal)}
           onClose={() => setModal(null)}
           onEngage={() => {
-            setModal(null);
-            setPanelAutoEngage(true);
-            setPanelContactId(modal.id);
+            const engageState = deriveCardEngageState(modal);
+            if (mode === 'scout' && engageState === 'cold') {
+              setModal(null);
+              setFirstTouchContact(modal);
+              setFirstTouchInitialServiceId(
+                serviceProfiles.find(p => p.isDefault)?.id || null
+              );
+            } else {
+              setModal(null);
+              setPanelAutoEngage(true);
+              setPanelContactId(modal.id);
+            }
           }}
           onOpenProfile={() => {
             setModal(null);

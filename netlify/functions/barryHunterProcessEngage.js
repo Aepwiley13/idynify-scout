@@ -118,6 +118,10 @@ async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal,
     ? '\nIMPORTANT: This is a first-contact with no prior history and no intake data. Flag this in barry_reasoning by saying you have limited context and that completing the intake will sharpen the draft.'
     : '';
 
+  const lastInteractionBlock = lastSessionSummary
+    ? `\n\n━━━ LAST INTERACTION WITH THIS CONTACT ━━━\n${lastSessionSummary}${daysSinceLastContact !== null ? `\nDays since last touchpoint: ${daysSinceLastContact}` : ''}\nWhen opening your reasoning (barry_reasoning), lead with what was last tried and what the outcome was. Reference this context naturally — do not re-introduce yourself or start from zero.`
+    : '';
+
   const prompt = `You are Barry, Idynify's AI sales intelligence assistant operating in Hunter mode.
 
 Your job: generate one message draft in four distinct angles for the user to choose from.
@@ -126,7 +130,7 @@ Context:
 - Contact: ${name}, ${contact.title || 'unknown title'} at ${contact.company_name || 'unknown company'}
 - Relationship state: ${contact.relationship_state || 'unaware'}
 - Outcome goal: ${outcomeGoal}
-- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${strategyGuidance}${guardrailModifier ? `\n${guardrailModifier}` : ''}${intakeContext}${limitedContextNote}
+- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${lastInteractionBlock}${strategyGuidance}${guardrailModifier ? `\n${guardrailModifier}` : ''}${intakeContext}${limitedContextNote}
 
 Rules:
 1. Every message must contain at least one specific detail from the contact or context. No generic templates.
@@ -292,7 +296,14 @@ export const handler = async (event) => {
       console.warn('[barryHunterProcessEngage] Barry memory unavailable:', memErr.message);
     }
 
-    // 3b. Strategy recommendation (Sprint 4 — pre-generation intelligence)
+    // 3b. Last session summary for "pickup where left off" prompt block
+    const lastSessionSummary = barryFullContext?.lastSessionSummary || null;
+    const lastContactAt = barryFullContext?.stats?.last_contact_at;
+    const daysSinceLastContact = lastContactAt
+      ? Math.floor((Date.now() - new Date(lastContactAt).getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+
+    // 3c. Strategy recommendation (Sprint 4 — pre-generation intelligence)
     let strategyGuidance = '';
     let strategyRecommendation = null;
     try {
@@ -312,7 +323,7 @@ export const handler = async (event) => {
       console.warn('[barryHunterProcessEngage] Strategy recommendation failed (non-blocking):', recErr.message);
     }
 
-    // 3c. Guardrail prompt modifier (Sprint 2 — wire user's guardrail response into generation)
+    // 3d. Guardrail prompt modifier (Sprint 2 — wire user's guardrail response into generation)
     let guardrailModifier = '';
     if (guardrailAction && barryWarning) {
       guardrailModifier = getGuardrailPromptModifier(guardrailAction, barryWarning.type, contact);

@@ -30,6 +30,7 @@ import HunterMicroIntake from './HunterMicroIntake';
 import { predictNextOutcomeGoal } from '../../utils/nextOutcomeGoal';
 import './MissionCard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getActiveIcpId } from '../../utils/getActiveIcpId';
 
 // ── CTA labels for the Send button (dynamic by outcome_goal) ────────────────
 const MISSION_CTA_LABELS = {
@@ -216,7 +217,10 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
     setNextStepError(null);
 
     try {
-      const authToken = await user.getIdToken();
+      const [authToken, activeIcpId] = await Promise.all([
+        user.getIdToken(),
+        getActiveIcpId(user.uid),
+      ]);
       const res = await fetch('/.netlify/functions/barryHunterGenerateStep', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,7 +230,8 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
           contactId: contact.id,
           missionId,
           stepIndex: nextIdx,
-          previousOutcome: outcomeId
+          previousOutcome: outcomeId,
+          icpId: activeIcpId,
         })
       });
 

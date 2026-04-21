@@ -26,6 +26,7 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
+import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 
 // Barry's step adaptation map (spec-exact)
 const STEP_ADAPTATION = {
@@ -86,8 +87,9 @@ export const handler = async (event) => {
     const authToken = body.authToken;
     const contactId = body.contactId;
     missionId = body.missionId;
-    stepIndex = body.stepIndex;  // 0-based index of the step to generate
-    const previousOutcome = body.previousOutcome;  // outcome id from previous step
+    stepIndex = body.stepIndex;
+    const previousOutcome = body.previousOutcome;
+    const icpId = body.icpId || DEFAULT_ICP_ID;
 
     if (!userId || !authToken || !contactId || !missionId || stepIndex === undefined) {
       throw new Error('Missing required parameters');
@@ -132,11 +134,13 @@ export const handler = async (event) => {
     let barryMemoryContext = '';
     let strategyGuidance = '';
     try {
-      const [dashboardDoc, barryCtx] = await Promise.all([
+      const [dashboardDoc, barryCtx, icpDoc] = await Promise.all([
         db.collection('dashboards').doc(userId).get(),
-        assembleBarryContext(db, userId, contactId)
+        assembleBarryContext(db, userId, contactId),
+        db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get(),
       ]);
-      if (dashboardDoc.exists) reconContext = compileReconForPrompt(dashboardDoc.data()) || '';
+      const icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
+      if (dashboardDoc.exists) reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging) || '';
       barryMemoryContext = barryCtx.promptContext || '';
 
       // Get strategy recommendation using full contact + attribution data

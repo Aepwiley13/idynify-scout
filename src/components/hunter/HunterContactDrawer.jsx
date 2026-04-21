@@ -8,6 +8,7 @@ import {
   ExternalLink, Calendar, AlertCircle, Lock, Clock
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
+import { getActiveIcpId } from '../../utils/getActiveIcpId';
 import {
   executeSendAction,
   resolveSendMethod,
@@ -709,7 +710,10 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
         return;
       }
 
-      const token = await user.getIdToken();
+      const [token, activeIcpId] = await Promise.all([
+        user.getIdToken(),
+        getActiveIcpId(user.uid),
+      ]);
       const missionFields = {
         outcome_goal: mission.outcome_goal || null,
         engagement_style: mission.engagement_style || null,
@@ -743,7 +747,8 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               stepPlan,
               stepIndex: i,
               stepHistory: [],
-              previousOutcome: null
+              previousOutcome: null,
+              icpId: activeIcpId,
             })
           });
           const data = await response.json();

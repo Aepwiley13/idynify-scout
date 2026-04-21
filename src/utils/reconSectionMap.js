@@ -18,10 +18,13 @@ export const RECON_SECTION_MAP = {
   outreachContext: 9,  // Messaging & Value Proposition — core messaging, voice, proof points
 };
 
+// Section 9 is per-ICP; sections 1–8 are shared user-level intelligence.
+export const MESSAGING_SECTION_ID = 9;
+export const ICP_LEVEL_SECTIONS = [9];
+
 /**
  * Default ICP ID for existing single-ICP users.
- * Cluster F (Multi-ICP Architecture) will replace 'default' with real profile IDs.
- * All RECON writes and Barry context reads should tag icpId now so the migration
- * in Cluster F is a field update, not a structural rewrite.
+ * Cluster F migration promotes this to a real icpProfiles document.
+ * All company writes tag icpId with this value when no explicit profile is active.
  */
 export const DEFAULT_ICP_ID = 'default';

@@ -22,6 +22,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
+import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -227,7 +228,8 @@ export const handler = async (event) => {
     contactId = body.contactId;
     userId = body.userId;
     const authToken = body.authToken;
-    const guardrailAction = body.guardrailAction || null; // User's response to a guardrail warning
+    const guardrailAction = body.guardrailAction || null;
+    const icpId = body.icpId || DEFAULT_ICP_ID;
 
     if (!contactId || !userId || !authToken) {
       throw new Error('Missing required parameters: contactId, userId, authToken');
@@ -261,12 +263,16 @@ export const handler = async (event) => {
       console.warn('[barryHunterProcessEngage] Guardrail check failed (non-blocking):', guardrailErr.message);
     }
 
-    // 2. Load RECON data (non-fatal)
+    // 2. Load RECON data + active ICP messaging (non-fatal)
     let reconContext = '';
     try {
-      const dashboardDoc = await db.collection('dashboards').doc(userId).get();
+      const [dashboardDoc, icpDoc] = await Promise.all([
+        db.collection('dashboards').doc(userId).get(),
+        db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get(),
+      ]);
+      const icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
-        reconContext = compileReconForPrompt(dashboardDoc.data()) || '';
+        reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging) || '';
       }
     } catch (err) {
       console.warn('[barryHunterProcessEngage] RECON load skipped:', err.message);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
+import { getActiveIcpId } from '../../utils/getActiveIcpId';
 import {
   Sparkles,
   Loader2,
@@ -101,7 +102,10 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
       const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
-      const token = await user.getIdToken();
+      const [token, activeIcpId] = await Promise.all([
+        user.getIdToken(),
+        getActiveIcpId(user.uid),
+      ]);
       const step = plan.steps[stepIndex];
       const state = getContactSequenceState(missionData, contact.id);
 
@@ -141,7 +145,8 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
           stepPlan: step,
           stepIndex,
           stepHistory: state?.stepHistory || [],
-          previousOutcome: state?.lastOutcome || null
+          previousOutcome: state?.lastOutcome || null,
+          icpId: activeIcpId,
         })
       });
 

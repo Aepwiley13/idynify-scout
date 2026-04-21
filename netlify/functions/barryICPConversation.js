@@ -378,7 +378,10 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, action, userInput, currentStep, conversationHistory, existingICP, pendingICP } = JSON.parse(event.body);
+    const { userId, authToken, action, userInput, currentStep, conversationHistory, existingICP, pendingICP, icpId } = JSON.parse(event.body);
+    // icpId scopes which profile's existingICP the client resolved — used for logging;
+    // Firestore writes remain client-side (no writes added to this function)
+    if (icpId) console.log('🐻 Barry ICP Conversation - icpId:', icpId);
 
     if (!userId || !authToken) {
       throw new Error('Missing required parameters');

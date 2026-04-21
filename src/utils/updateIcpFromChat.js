@@ -5,8 +5,9 @@
  * Merges or overwrites companyProfile/current based on the action.
  */
 
-import { doc, setDoc, getDocs, collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDocs, collection, query, where, limit, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { DEFAULT_ICP_ID } from './reconSectionMap';
 
 /**
  * Apply a confirmed ICP delta from Barry chat to companyProfile/current.
@@ -45,27 +46,40 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
 
   await setDoc(profileRef, newProfile);
 
-  // Sync to icpProfiles collection so Scout ICP Settings reflects Barry's update.
-  // ICPSettings.jsx reads from icpProfiles; it only syncs the first (oldest) ICP
-  // back to companyProfile/current on save, so we must write in both directions.
+  // Sync Barry's write-back to the ACTIVE icpProfiles document and keep the
+  // bridge cache (companyProfile/current) in sync so all reads stay consistent.
   try {
     const icpSnap = await getDocs(
-      query(collection(db, 'users', userId, 'icpProfiles'), orderBy('createdAt', 'asc'), limit(1))
+      query(
+        collection(db, 'users', userId, 'icpProfiles'),
+        where('isActive', '==', true),
+        where('status', '==', 'active'),
+        limit(1)
+      )
     );
-    if (!icpSnap.empty) {
-      const primaryDoc = icpSnap.docs[0];
-      const existing = primaryDoc.data();
-      await setDoc(primaryDoc.ref, {
-        ...existing,
-        industries: newProfile.industries ?? existing.industries,
-        companySizes: newProfile.companySizes ?? existing.companySizes,
-        locations: newProfile.locations ?? existing.locations,
-        targetTitles: newProfile.targetTitles ?? existing.targetTitles,
-        companyKeywords: newProfile.companyKeywords ?? existing.companyKeywords,
-        managedByBarry: true,
-        updatedAt: new Date().toISOString(),
-      });
-    }
+
+    // If no active profile found, fall back to the default profile doc
+    const targetRef = icpSnap.empty
+      ? doc(db, 'users', userId, 'icpProfiles', DEFAULT_ICP_ID)
+      : icpSnap.docs[0].ref;
+    const existing = icpSnap.empty ? {} : (icpSnap.docs[0].data() || {});
+
+    const updatedIcpProfile = {
+      ...existing,
+      industries: newProfile.industries ?? existing.industries,
+      companySizes: newProfile.companySizes ?? existing.companySizes,
+      locations: newProfile.locations ?? existing.locations,
+      targetTitles: newProfile.targetTitles ?? existing.targetTitles,
+      companyKeywords: newProfile.companyKeywords ?? existing.companyKeywords,
+      managedByBarry: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await setDoc(targetRef, updatedIcpProfile);
+
+    // Keep bridge cache current so context stack reads see the latest data
+    await setDoc(profileRef, { ...updatedIcpProfile, lastModified: Timestamp.now() });
+    return { ...updatedIcpProfile, lastModified: Timestamp.now() };
   } catch (syncErr) {
     console.warn('[updateIcpFromChat] icpProfiles sync failed (non-fatal):', syncErr.message);
   }

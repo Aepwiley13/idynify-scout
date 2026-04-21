@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, onSnapshot, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
+import { getActiveIcpId } from '../../utils/getActiveIcpId';
 import {
   ArrowLeft,
   Target,
@@ -292,7 +293,10 @@ export default function MissionDetail() {
         suggestedTiming: s.suggestedTiming || '',
       }));
       if (stepsToGenerate.length > 0) {
-        const authToken = await user.getIdToken();
+        const [authToken, activeIcpId] = await Promise.all([
+          user.getIdToken(),
+          getActiveIcpId(user.uid),
+        ]);
         fetch('/.netlify/functions/barryGenerateSequenceStep', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -302,6 +306,7 @@ export default function MissionDetail() {
             missionId,
             contactId: contact.id,
             steps: stepsToGenerate,
+            icpId: activeIcpId,
           }),
         }).catch(err => console.warn('[MissionDetail] personalization fire-and-forget error:', err));
       }

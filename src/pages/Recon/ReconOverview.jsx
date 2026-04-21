@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { initializeDashboard } from '../../utils/dashboardUtils';
 import {
   Brain,
@@ -43,17 +43,6 @@ const RECON_MODULES = [
     sectionNames: ['Business Foundation', 'Product Deep Dive', 'Target Market', 'Customer Psychographics'],
     impactAreas: ['Scout lead scoring', 'Barry prospect matching', 'Hunter targeting'],
     path: '/recon/icp-intelligence'
-  },
-  {
-    id: 'messaging',
-    title: 'Messaging & Voice',
-    description: 'Define your value proposition, messaging framework, and brand voice for all outreach.',
-    icon: MessageSquare,
-    color: 'blue',
-    sections: [9],
-    sectionNames: ['Messaging & Value Proposition'],
-    impactAreas: ['Hunter message quality', 'Barry conversation starters', 'Campaign personalization'],
-    path: '/recon/messaging'
   },
   {
     id: 'objections',
@@ -243,6 +232,7 @@ export default function ReconOverview() {
   const [sections, setSections] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [currentIcp, setCurrentIcp] = useState(null);
+  const [icpProfiles, setIcpProfiles] = useState([]);
 
   // Score delta — compare current score to last stored score in localStorage
   const [scoreDelta, setScoreDelta] = useState(null);
@@ -277,16 +267,19 @@ export default function ReconOverview() {
       if (!user) { navigate('/login'); return; }
 
       await initializeDashboard(user.uid);
-      const [dashSnap, icpSnap] = await Promise.all([
+      const [dashSnap, icpSnap, icpProfilesSnap] = await Promise.all([
         getDoc(doc(db, 'dashboards', user.uid)),
         getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current')),
+        getDocs(collection(db, 'users', user.uid, 'icpProfiles')),
       ]);
 
       const dash = dashSnap.exists() ? dashSnap.data() : null;
       const icp  = icpSnap.exists()  ? icpSnap.data()  : null;
+      const profiles = icpProfilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       setDashboardData(dash);
       setCurrentIcp(icp);
+      setIcpProfiles(profiles);
       setSections(dash?.modules?.find((m) => m.id === 'recon')?.sections || []);
     } catch (err) {
       console.error('Error loading RECON data:', err);
@@ -468,12 +461,13 @@ export default function ReconOverview() {
       <div className="recon-modules-section">
         <h2 className="recon-section-title">Your Training Path</h2>
         <p className="recon-section-subtitle">Complete these modules to give Barry full context for your market.</p>
+        <p className="recon-foundation-note">Your Intelligence Foundation — shared across all ICP profiles</p>
         <div className="recon-modules-grid">
           {RECON_MODULES.map((mod) => {
             const status = getModuleStatus(mod);
             const progress = getModuleProgress(mod);
             const IconComponent = mod.icon;
-            const isHighPriority = ['icp-intelligence', 'messaging'].includes(mod.id);
+            const isHighPriority = ['icp-intelligence'].includes(mod.id);
             const needsAlert = isHighPriority && status !== 'complete';
 
             return (
@@ -527,6 +521,66 @@ export default function ReconOverview() {
             );
           })}
         </div>
+      </div>
+
+      {/* ── Messaging Profiles ────────────────────────────────────────────── */}
+      <hr className="recon-section-divider" />
+      <div className="recon-modules-section">
+        <div className="recon-heatmap-header" style={{ marginBottom: '1rem' }}>
+          <div className="recon-heatmap-title">
+            <MessageSquare size={16} />
+            <div>
+              <h2>Messaging Profiles</h2>
+              <p className="recon-section-subtitle">Section 9 of RECON — one per ICP profile, each with its own voice and value prop.</p>
+            </div>
+          </div>
+          <button
+            className="recon-messaging-manage-btn"
+            onClick={() => navigate('/scout?tab=icp-settings')}
+          >
+            Manage profiles <ArrowRight size={12} />
+          </button>
+        </div>
+
+        {icpProfiles.length === 0 ? (
+          <div className="recon-messaging-empty">
+            <MessageSquare size={20} className="recon-messaging-empty-icon" />
+            <p>No ICP profiles yet. Create your first profile in ICP Settings.</p>
+            <button className="recon-messaging-empty-btn" onClick={() => navigate('/scout?tab=icp-settings')}>
+              Go to ICP Settings
+            </button>
+          </div>
+        ) : (
+          <div className="recon-messaging-grid">
+            {icpProfiles.map(icp => {
+              const pct = icp.messagingProgress || 0;
+              const isActive = icp.isActive && icp.status === 'active';
+              const isReady = icp.status === 'inactive';
+              const isPending = icp.status === 'pending' || (!icp.status && pct < 100);
+              return (
+                <div
+                  key={icp.id}
+                  className={`recon-messaging-card ${isActive ? 'recon-messaging-card--active' : ''}`}
+                  onClick={() => navigate('/scout?tab=icp-settings')}
+                >
+                  <div className="recon-messaging-card-header">
+                    <span className="recon-messaging-card-name">{icp.name || 'My ICP'}</span>
+                    {isActive && <span className="recon-messaging-badge recon-messaging-badge--active">Active</span>}
+                    {isReady && <span className="recon-messaging-badge recon-messaging-badge--ready">Ready</span>}
+                    {isPending && <span className="recon-messaging-badge recon-messaging-badge--pending">Setup needed</span>}
+                  </div>
+                  <div className="recon-messaging-progress-track">
+                    <div
+                      className={`recon-messaging-progress-fill ${isActive ? 'fill--active' : isPending ? 'fill--pending' : 'fill--ready'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className="recon-messaging-pct">{pct}% complete</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Platform Impact ───────────────────────────────────────────────── */}

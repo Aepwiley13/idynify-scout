@@ -21,6 +21,7 @@ import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
 import './QuickMissionAssignModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getActiveIcpId } from '../../utils/getActiveIcpId';
 
 export default function QuickMissionAssignModal({ contact, onClose, onNavigateCreate }) {
   const [missions, setMissions] = useState([]);
@@ -120,7 +121,10 @@ export default function QuickMissionAssignModal({ contact, onClose, onNavigateCr
       const stepsToGenerate = _getSteps(mission);
       if (!stepsToGenerate.length) return;
 
-      const token = await user.getIdToken();
+      const [token, activeIcpId] = await Promise.all([
+        user.getIdToken(),
+        getActiveIcpId(user.uid),
+      ]);
       const missionFields = {
         outcome_goal: mission.outcome_goal || null,
         engagement_style: mission.engagement_style || null,
@@ -154,6 +158,7 @@ export default function QuickMissionAssignModal({ contact, onClose, onNavigateCr
               stepIndex: i,
               stepHistory: [],
               previousOutcome: null,
+              icpId: activeIcpId,
             }),
           });
           const data = await res.json();

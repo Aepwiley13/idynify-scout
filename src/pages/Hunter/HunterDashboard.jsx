@@ -29,6 +29,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { ArrowLeft, Target, CheckCircle, Archive as ArchiveIcon, Zap } from 'lucide-react';
+import { getActiveIcpId } from '../../utils/getActiveIcpId';
 import HunterCardStack from '../../components/hunter/HunterCardStack';
 import ActiveMissionsView from '../../components/hunter/ActiveMissionsView';
 import QuickMissionAssignModal from '../../components/hunter/QuickMissionAssignModal';
@@ -194,11 +195,14 @@ export default function HunterDashboard() {
 
   async function processEngageBackground(user, contact) {
     try {
-      const authToken = await user.getIdToken();
+      const [authToken, activeIcpId] = await Promise.all([
+        user.getIdToken(),
+        getActiveIcpId(user.uid),
+      ]);
       const res = await fetch('/.netlify/functions/barryHunterProcessEngage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, contactId: contact.id })
+        body: JSON.stringify({ userId: user.uid, authToken, contactId: contact.id, icpId: activeIcpId })
       });
       const data = await res.json();
       if (!data.success) console.warn('[Hunter] Process engage error:', data.error);

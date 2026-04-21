@@ -1,6 +1,7 @@
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
+import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 
 // ---------------------------------------------------------------------------
 // Post-fetch age filter helpers
@@ -912,7 +913,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         status: 'pending', // pending | accepted | rejected
 
         // ICP association — which ICP profile discovered this company
-        ...(icpId ? { icpId } : {}),
+        icpId: icpId || DEFAULT_ICP_ID,
 
         // Barry intel — rule-based summary from available data
         barry_intel: buildBarryIntel({ ...company, industry }, companyProfile),
@@ -943,7 +944,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           found_at: { timestampValue: company.found_at },
           source: { stringValue: 'apollo_api' },
           barry_intel: { stringValue: String(company.barry_intel || '') },
-          ...(company.icpId ? { icpId: { stringValue: String(company.icpId) } } : {})
+          icpId: { stringValue: String(company.icpId || DEFAULT_ICP_ID) }
         }
       };
 

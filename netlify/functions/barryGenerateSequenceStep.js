@@ -4,6 +4,7 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
+import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 
 /**
  * BARRY SEQUENCE STEP CONTENT GENERATOR (Step 5)
@@ -49,8 +50,10 @@ export const handler = async (event) => {
       stepPlan,
       stepIndex,
       stepHistory,
-      previousOutcome
+      previousOutcome,
+      icpId: rawIcpId,
     } = JSON.parse(event.body);
+    const icpId = rawIcpId || DEFAULT_ICP_ID;
 
     if (!userId || !authToken || !contact || !missionFields || !stepPlan) {
       throw new Error('Missing required parameters');
@@ -118,12 +121,16 @@ export const handler = async (event) => {
       console.warn('⚠️ Non-fatal: Could not load Barry intelligence layers:', err.message);
     }
 
-    // ─── Fetch RECON training data ───
+    // ─── Fetch RECON training data + active ICP messaging ───
     let reconContext = '';
     try {
-      const dashboardDoc = await db.collection('dashboards').doc(userId).get();
+      const [dashboardDoc, icpDoc] = await Promise.all([
+        db.collection('dashboards').doc(userId).get(),
+        db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get(),
+      ]);
+      const icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
-        reconContext = compileReconForPrompt(dashboardDoc.data());
+        reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging);
         if (reconContext) {
           console.log('🧠 RECON training data loaded');
         }

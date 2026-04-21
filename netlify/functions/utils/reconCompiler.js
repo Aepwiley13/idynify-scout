@@ -8,9 +8,13 @@
 /**
  * Compile RECON data from a dashboard document into a prompt context string.
  * @param {Object} dashboardData - The dashboard Firestore document data
+ * @param {Object|null} icpMessaging - Optional per-ICP messaging object from
+ *   icpProfiles/{id}/messaging. When provided it replaces the Section 9 block
+ *   from the dashboard so Barry always uses the active profile's voice.
+ *   Pass null (default) for backward-compatible behaviour.
  * @returns {string} Prompt-ready context string, or empty string if no RECON data
  */
-function compileReconForPrompt(dashboardData) {
+function compileReconForPrompt(dashboardData, icpMessaging = null) {
   if (!dashboardData || !dashboardData.modules) return '';
 
   const reconModule = dashboardData.modules.find(m => m.id === 'recon');
@@ -111,8 +115,8 @@ function compileReconForPrompt(dashboardData) {
     parts.push('');
   }
 
-  // Section 9: Messaging
-  const s9 = getCompleted(sections, 9);
+  // Section 9: Messaging — prefer per-ICP override, fall back to dashboard aggregate
+  const s9 = icpMessaging || getCompleted(sections, 9);
   if (s9) {
     parts.push('MESSAGING & VALUE PROPOSITION:');
     Object.entries(s9).forEach(([key, val]) => {

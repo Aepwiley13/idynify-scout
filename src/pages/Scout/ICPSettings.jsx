@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { calculateICPScore } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
@@ -12,6 +12,7 @@ import './ICPSettings.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import BarryICPPanel from '../../components/scout/BarryICPPanel';
 import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
+import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
@@ -152,25 +153,7 @@ export default function ICPSettings() {
   async function handleSetActive(icpId) {
     try {
       const user = getEffectiveUser();
-      const batch = writeBatch(db);
-      icpList.forEach(icp => {
-        const isTarget = icp.id === icpId;
-        batch.update(doc(db, 'users', user.uid, 'icpProfiles', icp.id), {
-          isActive: isTarget,
-          status: isTarget ? 'active' : (icp.status === 'active' ? 'inactive' : icp.status),
-          updatedAt: new Date().toISOString(),
-        });
-      });
-      const targetIcp = icpList.find(i => i.id === icpId);
-      if (targetIcp) {
-        batch.set(doc(db, 'users', user.uid, 'companyProfile', 'current'), {
-          ...targetIcp,
-          isActive: true,
-          status: 'active',
-          updatedAt: new Date().toISOString(),
-        });
-      }
-      await batch.commit();
+      await setActiveIcpProfile(user.uid, icpId, {}, icpList);
       setIcpList(prev => prev.map(i => ({
         ...i,
         isActive: i.id === icpId,
@@ -433,6 +416,9 @@ export default function ICPSettings() {
       profile.scoringWeights.employeeSize + profile.scoringWeights.revenue
     : 100;
 
+  const selectedIcpData = icpList.find(i => i.id === selectedICPId) || null;
+  const showProfileActionBar = selectedIcpData && !(selectedIcpData.isActive && selectedIcpData.status === 'active');
+
   if (loading) {
     return (
       <div className="icp-settings-loading">
@@ -516,39 +502,35 @@ export default function ICPSettings() {
         </div>
 
         {/* Profile action bar — shown for non-active selected profiles */}
-        {selectedICPId && (() => {
-          const sel = icpList.find(i => i.id === selectedICPId);
-          if (!sel || (sel.isActive && sel.status === 'active')) return null;
-          return (
-            <div className="icp-profile-actions">
-              {sel.status === 'pending' && (
-                <>
-                  <span className="icp-profile-action-note">
-                    Messaging setup {sel.messagingProgress || 0}% complete
-                  </span>
-                  <button
-                    className="icp-finish-setup-btn"
-                    onClick={() => { setMessagingFlowIcpId(selectedICPId); setShowMessagingFlow(true); }}
-                  >
-                    Finish setup
-                  </button>
-                </>
-              )}
-              {sel.status === 'inactive' && (
-                <>
-                  <span className="icp-profile-action-note">Ready to activate</span>
-                  <button
-                    className="icp-set-active-btn"
-                    onClick={() => handleSetActive(selectedICPId)}
-                  >
-                    <Zap size={13} />
-                    Set as Active
-                  </button>
-                </>
-              )}
-            </div>
-          );
-        })()}
+        {showProfileActionBar && (
+          <div className="icp-profile-actions">
+            {selectedIcpData.status === 'pending' && (
+              <>
+                <span className="icp-profile-action-note">
+                  Messaging setup {selectedIcpData.messagingProgress || 0}% complete
+                </span>
+                <button
+                  className="icp-finish-setup-btn"
+                  onClick={() => { setMessagingFlowIcpId(selectedICPId); setShowMessagingFlow(true); }}
+                >
+                  Finish setup
+                </button>
+              </>
+            )}
+            {selectedIcpData.status === 'inactive' && (
+              <>
+                <span className="icp-profile-action-note">Ready to activate</span>
+                <button
+                  className="icp-set-active-btn"
+                  onClick={() => handleSetActive(selectedICPId)}
+                >
+                  <Zap size={13} />
+                  Set as Active
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Enterprise Header */}
@@ -1157,6 +1139,7 @@ export default function ICPSettings() {
         <Section9MessagingFlow
           icpId={messagingFlowIcpId}
           icpName={icpList.find(i => i.id === messagingFlowIcpId)?.name || 'New Profile'}
+          icpList={icpList}
           existingAnswers={icpList.find(i => i.id === messagingFlowIcpId)?.messaging || {}}
           onComplete={({ activated, icpId: completedId }) => {
             setShowMessagingFlow(false);

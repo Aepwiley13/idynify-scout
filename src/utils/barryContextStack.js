@@ -79,7 +79,6 @@ async function getActiveMessagingProfile(userId) {
   }
 }
 
-// Kept for call-site compatibility; delegates to getActiveMessagingProfile.
 async function getIcpProfile(userId) {
   return getActiveMessagingProfile(userId);
 }
@@ -248,9 +247,7 @@ export async function buildContextStack(userId) {
     // dashboard aggregate for pre-migration users who have no icpProfile yet.
     const activeMessaging = icpProfile?.messaging;
     const outreachContext = activeMessaging
-      ? (typeof activeMessaging === 'string'
-          ? activeMessaging.slice(0, 300)
-          : JSON.stringify(activeMessaging).slice(0, 300))
+      ? JSON.stringify(activeMessaging).slice(0, 300)
       : extractSection(dashboardData, RECON_SECTION_MAP.outreachContext);
 
     const recon = dashboardData ? {

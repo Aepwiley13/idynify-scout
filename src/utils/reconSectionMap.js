@@ -28,3 +28,10 @@ export const ICP_LEVEL_SECTIONS = [9];
  * All company writes tag icpId with this value when no explicit profile is active.
  */
 export const DEFAULT_ICP_ID = 'default';
+
+/**
+ * Default Service Profile ID — used as fallback when no specific service is
+ * selected in the First Touch flow and when a user has no configured profiles.
+ * Barry treats this as "general services — use RECON context only."
+ */
+export const DEFAULT_SERVICE_ID = 'default';

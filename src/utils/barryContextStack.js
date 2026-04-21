@@ -13,7 +13,7 @@
  */
 
 import {
-  collection, query, where, limit,
+  collection, query, where, limit, orderBy,
   getDocs, doc, getDoc
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
@@ -113,6 +113,22 @@ async function getActiveMissions(userId) {
     });
   } catch (err) {
     console.warn('[barryContextStack] Failed to load missions:', err.message);
+    return [];
+  }
+}
+
+async function getServiceProfiles(userId) {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'users', userId, 'serviceProfiles'),
+        orderBy('createdAt', 'asc'),
+        limit(5)
+      )
+    );
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('[barryContextStack] Failed to load service profiles:', err.message);
     return [];
   }
 }
@@ -229,11 +245,12 @@ export async function buildContextStack(userId) {
   } catch (_) { /* cache miss — proceed to fresh load */ }
 
   try {
-    const [contacts, missions, dashboardDoc, icpProfile] = await Promise.all([
+    const [contacts, missions, dashboardDoc, icpProfile, serviceProfiles] = await Promise.all([
       getAllContacts(userId),
       getActiveMissions(userId),
       getDoc(doc(db, 'dashboards', userId)),
-      getIcpProfile(userId)
+      getIcpProfile(userId),
+      getServiceProfiles(userId),
     ]);
 
     // Load calendar context after contacts are resolved (needs contact list for matching)
@@ -265,6 +282,7 @@ export async function buildContextStack(userId) {
       missions,
       recon,
       icpProfile: icpProfile || null,
+      serviceProfiles,
       calendarEvents,
       user_style: dashboardData?.communicationStyle || null,
       timestamp: new Date().toISOString()
@@ -291,6 +309,7 @@ function emptyStack() {
     missions: [],
     recon: { confidence: 0, enhanced: false },
     icpProfile: null,
+    serviceProfiles: [],
     calendarEvents: [],
     timestamp: new Date().toISOString()
   };

@@ -1323,10 +1323,10 @@ export default function DailyLeads({ onNavigate }) {
 
       let activeProfile = profileDoc.exists() ? profileDoc.data() : null;
 
-      // If we have icpProfiles, use the first one as active ICP
+      // Use the explicitly active ICP profile, falling back to the first one
       if (icps.length > 0) {
         setIcpList(icps);
-        const firstICP = icps[0];
+        const firstICP = icps.find(i => i.isActive && i.status === 'active') || icps[0];
         setActiveICPId(firstICP.id);
         activeProfile = firstICP;
       }
@@ -1345,7 +1345,7 @@ export default function DailyLeads({ onNavigate }) {
       const allPendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
       // Filter to companies for the active ICP. Companies with no icpId are legacy (show for all ICPs).
-      const activeId = icps.length > 0 ? icps[0].id : null;
+      const activeId = icps.length > 0 ? (icps.find(i => i.isActive && i.status === 'active') || icps[0]).id : null;
       const companiesData = activeId
         ? allPendingData.filter(c => !c.icpId || c.icpId === activeId)
         : allPendingData;
@@ -2093,14 +2093,14 @@ export default function DailyLeads({ onNavigate }) {
             {feedbackImpactMsg}
           </div>
         )}
-        {/* ICP tab bar — shown when user has multiple ICPs */}
-        {icpList.length > 1 && (
+        {/* ICP tab bar — shown when user has multiple non-pending ICPs */}
+        {icpList.filter(i => i.status !== 'pending').length > 1 && (
           <div style={{
             display: 'flex', gap: 6, marginBottom: 10,
             overflowX: 'auto', paddingBottom: 2,
             msOverflowStyle: 'none', scrollbarWidth: 'none',
           }}>
-            {icpList.map(icp => (
+            {icpList.filter(i => i.status !== 'pending').map(icp => (
               <button
                 key={icp.id}
                 onClick={() => handleICPSwitch(icp.id)}

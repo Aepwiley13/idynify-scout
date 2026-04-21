@@ -29,6 +29,7 @@ import { resolveContactStage } from '../../constants/stageSystem';
 import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_STATUS_CONFIG } from '../../utils/contactEngageStatus';
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
+import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
 
 // ─── Engagement Status Sets ───────────────────────────────────────────────────
 // hunter_status values that indicate a contact has been engaged (Scout → Hunter)
@@ -1163,6 +1164,10 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // LinkedIn modal
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
 
+  // First Touch modal
+  const [firstTouchContact, setFirstTouchContact] = useState(null);
+  const [firstTouchInitialServiceId, setFirstTouchInitialServiceId] = useState(null);
+
   // Modal / profile
   const [modal, setModal] = useState(null);
   const [listSelected, setListSelected] = useState(null);
@@ -2044,8 +2049,15 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   onClick={() => isMobile ? openMobileProfile(c.id) : setModal(c)}
                   onEngage={() => {
                     savedListScroll.current = listRef.current?.scrollTop ?? 0;
-                    if (isMobile) { openMobileProfile(c.id); }
-                    else {
+                    const engageState = deriveCardEngageState(c);
+                    if (mode === 'scout' && engageState === 'cold') {
+                      setFirstTouchContact(c);
+                      setFirstTouchInitialServiceId(
+                        serviceProfiles.find(p => p.isDefault)?.id || null
+                      );
+                    } else if (isMobile) {
+                      openMobileProfile(c.id);
+                    } else {
                       if (panelLayout === 'list-full') { setPanelLayout('split'); localStorage.setItem('al_panelLayout', 'split'); }
                       setPanelAutoEngage(true); setPanelContactId(c.id);
                     }
@@ -2354,6 +2366,20 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         </div>
       )}
 
+      {/* ── First Touch Modal ── */}
+      {firstTouchContact && (
+        <FirstTouchModal
+          contact={firstTouchContact}
+          serviceProfiles={serviceProfiles}
+          initialServiceId={firstTouchInitialServiceId}
+          onDismiss={() => setFirstTouchContact(null)}
+          onSentToHunter={({ missionId, contactId }) => {
+            setFirstTouchContact(null);
+            navigate('/hunter', { state: { openMissionId: missionId, openContactId: contactId } });
+          }}
+        />
+      )}
+
       {/* ── Person Modal ── */}
       {modal && (
         <PersonModal
@@ -2362,9 +2388,18 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           engageState={deriveCardEngageState(modal)}
           onClose={() => setModal(null)}
           onEngage={() => {
-            setModal(null);
-            setPanelAutoEngage(true);
-            setPanelContactId(modal.id);
+            const engageState = deriveCardEngageState(modal);
+            if (mode === 'scout' && engageState === 'cold') {
+              setModal(null);
+              setFirstTouchContact(modal);
+              setFirstTouchInitialServiceId(
+                serviceProfiles.find(p => p.isDefault)?.id || null
+              );
+            } else {
+              setModal(null);
+              setPanelAutoEngage(true);
+              setPanelContactId(modal.id);
+            }
           }}
           onOpenProfile={() => {
             setModal(null);

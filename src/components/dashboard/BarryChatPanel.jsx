@@ -5,8 +5,8 @@
  *
  * On mount:
  *   1. Builds context stack (contacts + missions + RECON from Firestore)
- *   2. Calls barryMissionChat with message='__OPENING_BRIEF__'
- *   3. Renders the opening brief + suggested prompts
+ *   2. Calls barryOrientationBrief (cached 10 min in sessionStorage)
+ *   3. Renders the orientation brief + suggested prompts
  *
  * Conversation:
  *   - Free-text command input (Enter to send)
@@ -352,37 +352,65 @@ export default function BarryChatPanel({ userId }) {
     loadOpeningBrief(user, stack);
   }
 
-  // ── Opening brief ─────────────────────────────────────────────────────────
+  // ── Opening brief (orientation) ───────────────────────────────────────────
 
-  async function loadOpeningBrief(user, stack) {
+  const ORIENTATION_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+  const orientationCacheKey = userId ? `barry_orientation_${userId}` : null;
+
+  async function loadOpeningBrief(user, _stack) {
     setBriefLoading(true);
     try {
+      // Check sessionStorage cache — skip API call if still warm
+      if (orientationCacheKey) {
+        try {
+          const cached = sessionStorage.getItem(orientationCacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Date.now() - parsed.cachedAt < ORIENTATION_CACHE_TTL) {
+              setBrief(parsed.brief);
+              setSuggestedPrompts(parsed.suggestedPrompts);
+              if (parsed.mode) setMode(parsed.mode);
+              setBriefLoading(false);
+              return;
+            }
+          }
+        } catch (_) { /* cache miss — proceed to fresh load */ }
+      }
+
       let authToken;
       try { authToken = await user.getIdToken(); } catch (tokenErr) {
         console.warn('[BarryChatPanel] getIdToken failed (loadOpeningBrief):', tokenErr.message);
         setFallbackBrief(); setBriefLoading(false); return;
       }
 
-      const res = await fetch('/.netlify/functions/barryMissionChat', {
+      const res = await fetch('/.netlify/functions/barryOrientationBrief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          authToken,
-          message: '__OPENING_BRIEF__',
-          contextStack: stack || null
-        })
+        body: JSON.stringify({ userId, authToken }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        // Update mode from server determination
-        if (data.mode || data.barry_mode) {
-          setMode(data.mode || data.barry_mode);
+        const brief = data.brief || data.response_text || '';
+        const prompts = data.suggestedPrompts || [];
+        const mode = data.mode || data.barry_mode || null;
+
+        setBrief(brief);
+        setSuggestedPrompts(prompts);
+        if (mode) setMode(mode);
+
+        // Cache the result
+        if (orientationCacheKey) {
+          try {
+            sessionStorage.setItem(orientationCacheKey, JSON.stringify({
+              cachedAt: Date.now(),
+              brief,
+              suggestedPrompts: prompts,
+              mode,
+            }));
+          } catch (_) { /* storage full — non-fatal */ }
         }
-        setBrief(data.brief || data.response_text || '');
-        setSuggestedPrompts(data.suggestedPrompts || []);
       } else {
         setFallbackBrief();
       }

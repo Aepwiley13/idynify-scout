@@ -90,7 +90,7 @@ function StagePeekCard({ stageId, activeStageId, onBack, T }) {
   );
 }
 
-export default function ContactProfile({ contactId: propContactId, onClose, autoEngage } = {}) {
+export default function ContactProfile({ contactId: propContactId, onClose, autoEngage, autoEngageContext = null, onReadyForHunter = null } = {}) {
   const { contactId: paramContactId } = useParams();
   const contactId = propContactId || paramContactId;
   const navigate = useNavigate();
@@ -151,6 +151,23 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       triggerInlineEngagement();
     }
   }, [loading, contact, autoEngage]);
+
+  // Auto-start with First Touch context when handed off from FirstTouchModal.
+  const autoEngageContextConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!loading && contact && autoEngageContext && !autoEngageContextConsumedRef.current) {
+      autoEngageContextConsumedRef.current = true;
+      const { userIntent, toneContext, engagementIntent } = autoEngageContext;
+      const intentText = toneContext
+        ? `${userIntent}. [Preferred tone: ${toneContext}]`
+        : userIntent;
+      const el = document.getElementById('engagement-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        engagementSectionRef.current?.startWithIntent(intentText, engagementIntent);
+      }));
+    }
+  }, [loading, contact, autoEngageContext]);
 
   async function loadContactProfile() {
     try {
@@ -838,6 +855,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
                   ref={engagementSectionRef}
                   contact={contact}
                   onContactUpdate={handleContactUpdate}
+                  onReadyForHunter={onReadyForHunter}
                 />
               </>
             )}

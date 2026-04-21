@@ -30,6 +30,7 @@ import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
+import { loadIntoHunter } from '../../utils/loadIntoHunter';
 
 // ─── Engagement Status Sets ───────────────────────────────────────────────────
 // hunter_status values that indicate a contact has been engaged (Scout → Hunter)
@@ -1166,7 +1167,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
 
   // First Touch modal
   const [firstTouchContact, setFirstTouchContact] = useState(null);
-  const [firstTouchInitialServiceId, setFirstTouchInitialServiceId] = useState(null);
+  const [firstTouchContext, setFirstTouchContext] = useState(null); // { engagementIntent, userIntent, toneContext, contactId }
 
   // Modal / profile
   const [modal, setModal] = useState(null);
@@ -1359,6 +1360,22 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       await loadAllContacts();
     } catch (err) {
       console.error('[AllLeads] resetContactToScout error:', err);
+    }
+  }
+
+  async function handleReadyForHunter({ sentMessage, subject, contactId }) {
+    const user = getEffectiveUser();
+    if (!user) return;
+    try {
+      await loadIntoHunter({
+        contactId,
+        subject,
+        message: sentMessage,
+        angleId: 'first_touch',
+        userId: user.uid,
+      });
+    } catch (err) {
+      console.error('[AllLeads] handleReadyForHunter error:', err);
     }
   }
 
@@ -2052,9 +2069,6 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                     const engageState = deriveCardEngageState(c);
                     if (mode === 'scout' && engageState === 'cold') {
                       setFirstTouchContact(c);
-                      setFirstTouchInitialServiceId(
-                        serviceProfiles.find(p => p.isDefault)?.id || null
-                      );
                     } else if (isMobile) {
                       openMobileProfile(c.id);
                     } else {
@@ -2220,10 +2234,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
               key={panelContactId}
               contactId={panelContactId}
               autoEngage={panelAutoEngage}
+              autoEngageContext={firstTouchContext?.contactId === panelContactId ? firstTouchContext : null}
+              onReadyForHunter={handleReadyForHunter}
               onClose={() => isMobile ? closeMobileProfile() : (() => {
                 setPanelContactId(null);
                 setListSelected(null);
                 setPanelAutoEngage(false);
+                setFirstTouchContext(null);
                 requestAnimationFrame(() => {
                   if (listRef.current) listRef.current.scrollTop = savedListScroll.current;
                 });
@@ -2370,12 +2387,17 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       {firstTouchContact && (
         <FirstTouchModal
           contact={firstTouchContact}
-          serviceProfiles={serviceProfiles}
-          initialServiceId={firstTouchInitialServiceId}
           onDismiss={() => setFirstTouchContact(null)}
-          onSentToHunter={({ missionId, contactId }) => {
+          onComplete={({ engagementIntent, userIntent, toneContext }) => {
+            const contactId = firstTouchContact.id;
             setFirstTouchContact(null);
-            navigate('/hunter', { state: { openMissionId: missionId, openContactId: contactId } });
+            setFirstTouchContext({ engagementIntent, userIntent, toneContext, contactId });
+            if (panelLayout === 'list-full') {
+              setPanelLayout('split');
+              localStorage.setItem('al_panelLayout', 'split');
+            }
+            setPanelAutoEngage(false);
+            setPanelContactId(contactId);
           }}
         />
       )}
@@ -2392,9 +2414,6 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             if (mode === 'scout' && engageState === 'cold') {
               setModal(null);
               setFirstTouchContact(modal);
-              setFirstTouchInitialServiceId(
-                serviceProfiles.find(p => p.isDefault)?.id || null
-              );
             } else {
               setModal(null);
               setPanelAutoEngage(true);

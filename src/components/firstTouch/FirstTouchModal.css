@@ -426,6 +426,40 @@
   opacity: 0.9;
 }
 
+/* Option list (Q1 / Q2 tappable chips) */
+.ft-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ft-option-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.75rem 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: #e2e8f0;
+  line-height: 1.4;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%;
+}
+
+.ft-option-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.ft-option-card--selected {
+  border-color: #faaa20;
+  background: rgba(250, 170, 32, 0.07);
+  color: #faaa20;
+}
+
 /* Error */
 .ft-error {
   font-size: 0.8125rem;

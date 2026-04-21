@@ -195,7 +195,7 @@ function AllHistoryEntry({ event }) {
 // ── Main Component ─────────────────────────────────────────
 
 const InlineEngagementSection = forwardRef(function InlineEngagementSection(
-  { contact, onContactUpdate },
+  { contact, onContactUpdate, onReadyForHunter = null },
   ref
 ) {
   // History
@@ -224,6 +224,8 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   const [subject, setSubject] = useState('');
   const [generationError, setGenerationError] = useState(null);
   const [sendResult, setSendResult] = useState(null);
+  const [showHunterPrompt, setShowHunterPrompt] = useState(false);
+  const [hunterPayload, setHunterPayload] = useState(null);
   const [loading, setLoading] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -883,6 +885,11 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
       setReviewStep(false);
       setResultStep(true);
 
+      if (onReadyForHunter && (result.result === SEND_RESULT.SENT || result.result === SEND_RESULT.OPENED)) {
+        setHunterPayload({ sentMessage: message, subject, contactId: contact.id });
+        setShowHunterPrompt(true);
+      }
+
     } catch (error) {
       setSendResult({ result: SEND_RESULT.FAILED, error: error.message });
       setReviewStep(false);
@@ -893,11 +900,15 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   }
 
   function handleDone() {
+    setShowHunterPrompt(false);
+    setHunterPayload(null);
     setFlowActive(false);
     resetFlow();
   }
 
   function handleSendAnother() {
+    setShowHunterPrompt(false);
+    setHunterPayload(null);
     resetFlow();
     setFlowActive(true);
     checkGmailStatus();
@@ -1759,6 +1770,31 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                   Send Another
                 </button>
               </div>
+
+              {showHunterPrompt && hunterPayload && (
+                <div className="ies-hunter-prompt">
+                  <p className="ies-hunter-prompt__text">
+                    Move to Hunter for follow-up sequence?
+                  </p>
+                  <div className="ies-hunter-prompt__actions">
+                    <button
+                      className="ies-hunter-prompt__yes"
+                      onClick={() => {
+                        onReadyForHunter(hunterPayload);
+                        setShowHunterPrompt(false);
+                      }}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      className="ies-hunter-prompt__no"
+                      onClick={() => setShowHunterPrompt(false)}
+                    >
+                      No
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -76,8 +76,6 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
     };
 
     await setDoc(targetRef, updatedIcpProfile);
-
-    // Keep bridge cache current so context stack reads see the latest data
     await setDoc(profileRef, { ...updatedIcpProfile, lastModified: Timestamp.now() });
     return { ...updatedIcpProfile, lastModified: Timestamp.now() };
   } catch (syncErr) {

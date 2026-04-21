@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, getDocs, collection, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import './Section9MessagingFlow.css';
 
 const QUESTIONS = [
@@ -50,7 +51,7 @@ const QUESTIONS = [
   },
 ];
 
-export default function Section9MessagingFlow({ icpId, icpName, onComplete, onDismiss, existingAnswers = {} }) {
+export default function Section9MessagingFlow({ icpId, icpName, icpList = [], onComplete, onDismiss, existingAnswers = {} }) {
   const [step, setStep] = useState(() => {
     // Resume from the first unanswered question
     const firstUnanswered = QUESTIONS.findIndex(q => !existingAnswers[q.id]);
@@ -107,30 +108,12 @@ export default function Section9MessagingFlow({ icpId, icpName, onComplete, onDi
       setActivating(true);
       const user = getEffectiveUser();
       if (!user) return;
-
-      const allSnap = await getDocs(collection(db, 'users', user.uid, 'icpProfiles'));
-      const batch = writeBatch(db);
-
-      allSnap.docs.forEach(d => {
-        const isTarget = d.id === icpId;
-        batch.update(doc(db, 'users', user.uid, 'icpProfiles', d.id), {
-          isActive: isTarget,
-          status: isTarget ? 'active' : (d.data().status === 'active' ? 'inactive' : (d.data().status || 'inactive')),
-          updatedAt: new Date().toISOString(),
-        });
-      });
-
-      const targetData = allSnap.docs.find(d => d.id === icpId)?.data() || {};
-      batch.set(doc(db, 'users', user.uid, 'companyProfile', 'current'), {
-        ...targetData,
-        messaging: answers,
-        messagingProgress: 100,
-        isActive: true,
-        status: 'active',
-        updatedAt: new Date().toISOString(),
-      });
-
-      await batch.commit();
+      await setActiveIcpProfile(
+        user.uid,
+        icpId,
+        { messaging: answers, messagingProgress: 100 },
+        icpList.length ? icpList : null
+      );
       onComplete?.({ activated: true, icpId, answers });
     } catch (err) {
       console.error('[Section9MessagingFlow] activate failed:', err.message);

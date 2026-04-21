@@ -230,7 +230,7 @@ export async function getDashboardState(userId) {
       return data;
     }
 
-    let modules = [...(data.modules || [])];
+    let modules = (data.modules || []).map(m => ({ ...m, sections: (m.sections || []).map(s => ({ ...s })) }));
     let needsModuleUpdate = false;
 
     // --- V2 migration: run once if migratedV2 not yet stamped ---

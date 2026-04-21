@@ -1321,6 +1321,65 @@
   color: #7c3aed;
 }
 
+/* ── Hunter handoff prompt (shown after send) ── */
+.ies-hunter-prompt {
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  background: rgba(250, 170, 32, 0.06);
+  border: 1px solid rgba(250, 170, 32, 0.2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.ies-hunter-prompt__text {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.ies-hunter-prompt__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ies-hunter-prompt__yes {
+  flex: 1;
+  padding: 0.4rem 0.875rem;
+  border-radius: 7px;
+  border: none;
+  background: linear-gradient(135deg, #faaa20, #f59e0b);
+  color: #1a1a2e;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+
+.ies-hunter-prompt__yes:hover {
+  opacity: 0.88;
+}
+
+.ies-hunter-prompt__no {
+  padding: 0.4rem 0.875rem;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.ies-hunter-prompt__no:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* ── Spinner ── */
 .ies-spinner {
   animation: ies-spin 1s linear infinite;

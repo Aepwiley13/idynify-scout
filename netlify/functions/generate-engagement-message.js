@@ -76,7 +76,8 @@ export const handler = async (event) => {
       engagementIntent,  // Prospect / Warm / Customer / Partner
       contact,           // Basic contact info passed from frontend
       barryContext,      // Existing Barry context (if available)
-      guardrailAction    // User's response to a guardrail warning (Sprint 2 wiring)
+      guardrailAction,   // User's response to a guardrail warning (Sprint 2 wiring)
+      serviceProfileId   // Optional — specific service profile to angle toward
     } = JSON.parse(event.body);
 
     // Validate required fields
@@ -136,8 +137,10 @@ export const handler = async (event) => {
       }
     }
 
-    // 2. Load RECON data (Sections 5 & 9)
+    // 2. Load RECON data (Sections 3, 5, 8, 9)
+    let section3 = null;
     let section5 = null;
+    let section8 = null;
     let section9 = null;
     let reconLoaded = false;
 
@@ -149,7 +152,9 @@ export const handler = async (event) => {
         const reconModule = dashboardData.modules?.find(m => m.id === 'recon');
 
         if (reconModule && reconModule.sections) {
+          section3 = reconModule.sections.find(s => s.sectionId === 3);
           section5 = reconModule.sections.find(s => s.sectionId === 5);
+          section8 = reconModule.sections.find(s => s.sectionId === 8);
           section9 = reconModule.sections.find(s => s.sectionId === 9);
 
           if ((section5?.status === 'completed' && section5?.data) ||
@@ -173,6 +178,29 @@ export const handler = async (event) => {
       }
     } catch (profileError) {
       console.log('⚠️ No user profile available');
+    }
+
+    // 4a. Load service profile (optional — angles Barry toward a specific offering)
+    let serviceProfile = null;
+    try {
+      if (serviceProfileId && serviceProfileId !== 'default') {
+        const spDoc = await db.collection('users').doc(userId)
+          .collection('serviceProfiles').doc(serviceProfileId).get();
+        if (spDoc.exists) {
+          serviceProfile = { id: spDoc.id, ...spDoc.data() };
+          console.log('✅ Service profile loaded:', serviceProfile.name);
+        }
+      } else {
+        const spSnap = await db.collection('users').doc(userId)
+          .collection('serviceProfiles').where('isDefault', '==', true).limit(1).get();
+        if (!spSnap.empty) {
+          const d = spSnap.docs[0];
+          serviceProfile = { id: d.id, ...d.data() };
+          console.log('✅ Default service profile loaded:', serviceProfile.name);
+        }
+      }
+    } catch (spError) {
+      console.log('⚠️ No service profile available');
     }
 
     // 4. Load Barry's memory context (Sprint 0 — gives Barry history awareness)
@@ -277,6 +305,53 @@ USER'S MESSAGING PREFERENCES:
       }
     }
 
+    // Build SERVICE CONTEXT block (conditional on service profile)
+    let serviceContextBlock = '';
+    if (serviceProfile) {
+      const painPointsText = Array.isArray(serviceProfile.painPoints)
+        ? serviceProfile.painPoints.join('; ')
+        : (serviceProfile.painPoints || '');
+      serviceContextBlock = `
+SERVICE CONTEXT (angle toward this specific offering):
+- Service: ${serviceProfile.name}
+- Description: ${serviceProfile.description || 'Not specified'}
+${painPointsText ? `- Problems it solves: ${painPointsText}` : ''}
+${serviceProfile.primaryBuyer ? `- Primary buyer: ${serviceProfile.primaryBuyer}` : ''}
+${serviceProfile.positioningNote ? `- Positioning note: ${serviceProfile.positioningNote}` : ''}
+`;
+      console.log('✅ Service context block assembled');
+    }
+
+    // Build TARGET MARKET CONTEXT block (conditional on RECON section 3)
+    let targetMarketBlock = '';
+    if (section3?.status === 'completed' && section3?.data) {
+      const s3 = section3.data;
+      const lines = [];
+      if (s3.companySize?.length)       lines.push(`- Target company size: ${Array.isArray(s3.companySize) ? s3.companySize.join(', ') : s3.companySize}`);
+      if (s3.targetIndustries?.length)  lines.push(`- Target industries: ${Array.isArray(s3.targetIndustries) ? s3.targetIndustries.join(', ') : s3.targetIndustries}`);
+      if (s3.growthStage?.length)       lines.push(`- Growth stage: ${Array.isArray(s3.growthStage) ? s3.growthStage.join(', ') : s3.growthStage}`);
+      if (s3.revenueRange?.length)      lines.push(`- Revenue range: ${Array.isArray(s3.revenueRange) ? s3.revenueRange.join(', ') : s3.revenueRange}`);
+      if (s3.companyType)               lines.push(`- Company type: ${s3.companyType}`);
+      if (lines.length > 0) {
+        targetMarketBlock = `
+TARGET MARKET CONTEXT (confirm fit and reference it naturally — e.g. "companies at your stage"):
+${lines.join('\n')}
+`;
+        console.log('✅ Target market context block assembled');
+      }
+    }
+
+    // Build COMPETITIVE CONTEXT block (conditional on RECON section 8)
+    let competitiveBlock = '';
+    if (section8?.status === 'completed' && section8?.data) {
+      const s8Summary = JSON.stringify(section8.data).slice(0, 600);
+      competitiveBlock = `
+COMPETITIVE CONTEXT (use when positioning against known alternatives — do not name competitors unless the message clearly warrants it):
+${s8Summary}
+`;
+      console.log('✅ Competitive context block assembled');
+    }
+
     // Build Barry context string (if available)
     let barryContextString = '';
     const existingBarryContext = barryContext || fullContact.barryContext;
@@ -316,11 +391,17 @@ BARRY'S EXISTING ANALYSIS OF THIS CONTACT:
       apiKey: anthropicApiKey
     });
 
+    const jobStartDateLine = (() => {
+      if (!fullContact.job_start_date) return '';
+      const daysInRole = Math.floor((Date.now() - new Date(fullContact.job_start_date).getTime()) / 86400000);
+      return `\n- In current role since: ${fullContact.job_start_date} (${daysInRole} days ago)`;
+    })();
+
     const prompt = `You are Barry, an expert B2B engagement assistant. Your job is to help the user reach out to a contact with highly personalized, context-aware messages.
 
 THE USER'S GOAL (THIS IS THE PRIMARY DRIVER):
 "${userIntent}"
-
+${serviceContextBlock}
 CONTACT INFORMATION:
 - Name: ${fullName}
 - Title: ${title || 'Not specified'}
@@ -329,7 +410,7 @@ CONTACT INFORMATION:
 - Seniority: ${seniority || 'Not specified'}
 - Email: ${fullContact.email || 'Not available'}
 - Phone: ${fullContact.phone || fullContact.phone_mobile || 'Not available'}
-- LinkedIn: ${fullContact.linkedin_url || 'Not available'}
+- LinkedIn: ${fullContact.linkedin_url || 'Not available'}${jobStartDateLine}
 
 RELATIONSHIP CONTEXT:
 ${toneGuidance}
@@ -346,6 +427,8 @@ Calibrate messaging accordingly:
 - High-value contacts: Extra care on tone, subject lines, and personalization
 - Delegate contacts: Orient around the decision-maker they represent
 ` : ''}
+${targetMarketBlock}
+${competitiveBlock}
 ${barryContextString}
 ${reconContext}
 ${barryMemoryContext}

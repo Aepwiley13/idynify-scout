@@ -82,12 +82,14 @@ export default function CompanyProfileView({ companyId, onBack }) {
   const [addingPeopleToCompany, setAddingPeopleToCompany] = useState(false);
   const [addPeopleSuccess, setAddPeopleSuccess] = useState(false);
   const searchTimeoutRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     if (!companyId) return;
     // Reset UI state when switching companies so nothing stays hidden
     setShowKeywords(true);
     setEnrichedData(null);
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     loadCompany();
     loadContacts();
   }, [companyId]);
@@ -527,7 +529,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
       )}
 
       {/* ── Scrollable body ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* ── Company info card ── */}
         <div style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden' }}>

@@ -278,6 +278,9 @@ export async function buildContextStack(userId) {
       }));
     } catch (_) { /* storage full or unavailable — non-fatal */ }
 
+    // DEBUG — remove before marking PR ready
+    console.log('[barryContextStack] assembled:', JSON.stringify({ outreach_context: recon.outreach_context, icpProfile: { id: icpProfile?.id, messaging: icpProfile?.messaging } }, null, 2));
+
     return stack;
   } catch (err) {
     console.warn('[barryContextStack] Build failed (non-fatal):', err.message);

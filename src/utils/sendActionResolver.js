@@ -192,12 +192,34 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
 }
 
 /**
- * OPTION B: Open Gmail web compose + copy draft to clipboard.
+ * OPTION B (Outlook): Open Outlook via mailto: link.
+ * Works with desktop Outlook and any system-default mail client.
+ * Pre-fills To, Subject, CC, and Body so the user just hits Send.
+ */
+export function openOutlookEmail({ contact, subject, body, ccRecipients }) {
+  const to = contact.email || '';
+  const ccString = (ccRecipients || []).map(r => r.email).join(',');
+
+  const parts = [];
+  if (subject) parts.push(`subject=${encodeURIComponent(subject)}`);
+  if (body)    parts.push(`body=${encodeURIComponent(body)}`);
+  if (ccString) parts.push(`cc=${encodeURIComponent(ccString)}`);
+
+  const mailtoUrl = `mailto:${to}${parts.length ? '?' + parts.join('&') : ''}`;
+  window.location.href = mailtoUrl;
+
+  return {
+    result: SEND_RESULT.OPENED,
+    message: 'Outlook opened — email pre-filled and ready to send',
+    clipboardCopied: false
+  };
+}
+
+/**
+ * OPTION B (Gmail): Open Gmail web compose + copy draft to clipboard.
  * Used when Gmail is not integrated. Opens Gmail in a new tab with
  * To/Subject pre-filled and copies the full draft to clipboard so
  * the user can paste the body without relying on URL length limits.
- * Does NOT use mailto: to avoid triggering Apple Mail or other
- * native mail clients set as the OS default.
  */
 export function openNativeEmail({ contact, subject, body, ccRecipients }) {
   const to = contact.email || '';
@@ -567,8 +589,9 @@ export async function executeSendAction({
 export function getActionLabels(channel, method) {
   const labels = {
     email: {
-      real: { button: 'Send Email', success: 'Email sent', icon: 'Mail' },
-      native: { button: 'Open in Gmail', success: 'Gmail opened — draft copied to clipboard', icon: 'ExternalLink' }
+      real:    { button: 'Send Email',       success: 'Email sent',                                    icon: 'Mail' },
+      native:  { button: 'Open in Gmail',    success: 'Gmail opened — draft copied to clipboard',      icon: 'ExternalLink' },
+      outlook: { button: 'Open in Outlook',  success: 'Outlook opened — email pre-filled',             icon: 'Mail' }
     },
     text: {
       native: { button: 'Open Text Message', success: 'SMS app opened', icon: 'ExternalLink' }

@@ -53,7 +53,8 @@ const darkStyles = {
   copyBtn:     'flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors',
   copyBtnTop:  'flex-shrink-0 text-xs font-mono text-gray-500 hover:text-cyan-300 transition-colors disabled:opacity-30',
   gmailSection:'px-4 py-3',
-  gmailBtn:    'w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-bold transition-all shadow-lg shadow-cyan-500/30',
+  gmailBtn:    'flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono text-xs font-bold transition-all shadow-lg shadow-cyan-500/30',
+  outlookBtn:  'flex-1 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-300 font-mono text-xs font-bold transition-all',
 };
 
 const lightStyles = {
@@ -73,7 +74,8 @@ const lightStyles = {
   copyBtn:     'flex-shrink-0 text-xs font-mono text-gray-400 hover:text-gray-600 transition-colors',
   copyBtnTop:  'flex-shrink-0 text-xs font-mono text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30',
   gmailSection:'px-4 py-3',
-  gmailBtn:    'w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white font-mono text-xs font-bold transition-all',
+  gmailBtn:    'flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white font-mono text-xs font-bold transition-all',
+  outlookBtn:  'flex-1 py-2.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-mono text-xs font-bold transition-all',
 };
 
 // ── Email Draft Card ───────────────────────────────────────
@@ -116,6 +118,14 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId, t
     const params = new URLSearchParams({ view: 'cm', fs: '1', su: subject, body });
     if (toEmail) params.set('to', toEmail);
     window.open(`https://mail.google.com/mail/?${params.toString()}`, '_blank');
+  };
+
+  const openInOutlook = () => {
+    const parts = [];
+    if (subject) parts.push(`subject=${encodeURIComponent(subject)}`);
+    if (body)    parts.push(`body=${encodeURIComponent(body)}`);
+    const mailtoUrl = `mailto:${toEmail}${parts.length ? '?' + parts.join('&') : ''}`;
+    window.location.href = mailtoUrl;
   };
 
   return (
@@ -198,14 +208,16 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId, t
           </div>
         </div>
 
-        {/* Open in Gmail — primary action */}
+        {/* Open in email client */}
         <div className={s.gmailSection}>
-          <button
-            onClick={openInGmail}
-            className={s.gmailBtn}
-          >
-            Open in Gmail →
-          </button>
+          <div className="flex gap-2">
+            <button onClick={openInOutlook} className={s.outlookBtn}>
+              Open in Outlook →
+            </button>
+            <button onClick={openInGmail} className={s.gmailBtn}>
+              Open in Gmail →
+            </button>
+          </div>
         </div>
       </div>
     </div>

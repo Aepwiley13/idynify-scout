@@ -14,7 +14,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { computeReconState } from './utils/reconCapability.js';
 
 async function verifyAuthToken(authToken, userId) {
-  const firebaseApiKey = process.env.FIREBASE_API_KEY;
+  const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
   if (!firebaseApiKey) throw new Error('Firebase API key not configured (set FIREBASE_API_KEY)');
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,

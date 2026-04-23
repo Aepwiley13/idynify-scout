@@ -1,12 +1,15 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { getScoreBreakdown } from '../../utils/icpScoring';
 import { getActiveMissions, assignCompanyToMission } from '../../services/missionService';
 import { generateOpeningMessage, copyToClipboard } from '../../services/outreachService';
 import { deprioritizeCompany } from '../../services/statusService';
+import { getContactEngageStatus } from '../../utils/contactEngageStatus';
 import OutreachConsole from './OutreachConsole';
 import MissionAssignModal from './MissionAssignModal';
+import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
+import ContactProfile from './ContactProfile';
 import './MissionControl.css';
 
 const ICP_SCORE_THRESHOLD = 70;
@@ -134,10 +137,14 @@ export default function MissionControl() {
   const [collapsedSections, setCollapsedSections] = useState({});
 
   // Phase 3 state
-  const [outreachTarget, setOutreachTarget] = useState(null);   // company for outreach modal
+  const [outreachTarget, setOutreachTarget] = useState(null);   // company for outreach modal (legacy)
   const [missionTarget, setMissionTarget] = useState(null);      // company for assign modal
   const [deprioritizeConfirm, setDeprioritizeConfirm] = useState(null); // companyId pending confirm
   const [toasts, setToasts] = useState([]);
+  const [firstTouchContact, setFirstTouchContact] = useState(null);
+  const [firstTouchContext, setFirstTouchContext] = useState(null);
+  const [contactPanelId, setContactPanelId] = useState(null);
+  const [contactPanelAutoEngage, setContactPanelAutoEngage] = useState(false);
 
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -250,6 +257,39 @@ export default function MissionControl() {
     const id = ++toastCountRef.current;
     setToasts((prev) => [...prev.slice(-2), { id, message, type }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }
+
+  // ── Engage Company — queries primary contact, routes to FirstTouch or ContactProfile ──
+  async function handleEngageCompany(company) {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'users', user.uid, 'contacts'), where('company_id', '==', company.id))
+      );
+
+      if (snap.empty) {
+        addToast(`No contacts saved for ${company.name || 'this company'}. Find a contact in Scout first.`, 'info');
+        return;
+      }
+
+      // Sort client-side by strategic_value desc — avoids requiring a composite Firestore index
+      const contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      contacts.sort((a, b) => (b.strategic_value || 0) - (a.strategic_value || 0));
+      const primary = contacts[0];
+
+      const engageState = getContactEngageStatus(primary);
+      if (engageState === 'cold') {
+        setFirstTouchContact(primary);
+      } else {
+        setContactPanelAutoEngage(true);
+        setContactPanelId(primary.id);
+      }
+    } catch (err) {
+      console.error('[MissionControl] handleEngageCompany error:', err);
+      addToast('Could not load contact data. Try again.', 'error');
+    }
   }
 
   // ── Deprioritize Handlers ─────────────────────────────────────────────────
@@ -619,7 +659,7 @@ export default function MissionControl() {
           {/* INITIATE CONTACT */}
           <button
             className="mc-dossier-action-btn initiate"
-            onClick={() => setOutreachTarget(company)}
+            onClick={() => handleEngageCompany(company)}
           >
             <span className="mc-dossier-action-icon">◈</span>
             INITIATE CONTACT
@@ -889,7 +929,7 @@ export default function MissionControl() {
         <div className="mc-mission-card-actions">
           <button
             className="mc-card-action-btn initiate"
-            onClick={() => setOutreachTarget(company)}
+            onClick={() => handleEngageCompany(company)}
           >
             ◈ CONTACT
           </button>
@@ -1107,6 +1147,33 @@ export default function MissionControl() {
           company={missionTarget}
           onClose={() => setMissionTarget(null)}
           onSuccess={handleMissionAssignSuccess}
+        />
+      )}
+
+      {firstTouchContact && (
+        <FirstTouchModal
+          contact={firstTouchContact}
+          onDismiss={() => setFirstTouchContact(null)}
+          onComplete={({ engagementIntent, userIntent, toneContext }) => {
+            const contactId = firstTouchContact.id;
+            setFirstTouchContact(null);
+            setFirstTouchContext({ engagementIntent, userIntent, toneContext, contactId });
+            setContactPanelAutoEngage(false);
+            setContactPanelId(contactId);
+          }}
+        />
+      )}
+
+      {contactPanelId && (
+        <ContactProfile
+          contactId={contactPanelId}
+          onClose={() => {
+            setContactPanelId(null);
+            setFirstTouchContext(null);
+            setContactPanelAutoEngage(false);
+          }}
+          autoEngage={contactPanelAutoEngage}
+          autoEngageContext={firstTouchContext?.contactId === contactPanelId ? firstTouchContext : null}
         />
       )}
 

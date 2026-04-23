@@ -12,7 +12,7 @@
  * - No false-positive success states allowed
  */
 
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { logTimelineEvent, ACTORS } from './timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS } from './contactStateMachine';
@@ -544,9 +544,12 @@ export async function executeSendAction({
     // Auto-set a follow-up reminder so the OVERDUE indicator fires if no reply arrives
     const FOLLOW_UP_DAYS = 3;
     const nextDue = new Date(Date.now() + FOLLOW_UP_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
     updateDoc(doc(db, 'users', userId, 'contacts', contact.id), {
       next_step_due: nextDue,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
+      'engagement_summary.last_contact_at': now,
+      'engagement_summary.total_messages_sent': increment(1),
     }).catch(() => {}); // fire-and-forget — non-fatal
   }
 

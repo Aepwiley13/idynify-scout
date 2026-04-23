@@ -192,8 +192,8 @@ export default function MessageAngleBlock({ angles, contactId, userId, onLoaded,
       {sendResult && !sendResult.success && (
         <div className="mab-feedback mab-feedback--error">
           {sendResult.error === 'not_connected'
-            ? 'Gmail not connected — connect in Homebase to send directly.'
-            : 'Could not send — try again or copy the message.'}
+            ? 'Gmail not connected — copy the message and paste into Outlook or Gmail, or connect Gmail in Homebase.'
+            : 'Could not send — copy the message and paste into your email client.'}
         </div>
       )}
       {sendResult?.success && (

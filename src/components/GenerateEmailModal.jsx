@@ -70,6 +70,21 @@ export default function GenerateEmailModal({ prospect, icpData, onClose, onGener
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleOpenInOutlook = () => {
+    // Parse "Subject: ..." from the first line if present, otherwise use full text as body
+    const subjectMatch = generatedEmail.match(/^Subject:\s*(.+)$/m);
+    const parsedSubject = subjectMatch ? subjectMatch[1].trim() : '';
+    const parsedBody = subjectMatch
+      ? generatedEmail.slice(generatedEmail.indexOf(subjectMatch[0]) + subjectMatch[0].length).trim()
+      : generatedEmail;
+
+    const toEmail = prospect.email || '';
+    const parts = [];
+    if (parsedSubject) parts.push(`subject=${encodeURIComponent(parsedSubject)}`);
+    if (parsedBody)    parts.push(`body=${encodeURIComponent(parsedBody)}`);
+    window.location.href = `mailto:${toEmail}${parts.length ? '?' + parts.join('&') : ''}`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-xl border border-purple-500/30 max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -159,16 +174,24 @@ export default function GenerateEmailModal({ prospect, icpData, onClose, onGener
               <div className="bg-gray-800 rounded-lg p-4 border border-purple-500/30">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-purple-200 font-semibold">Generated Email</h3>
-                  <button
-                    onClick={handleCopy}
-                    className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                      copied
-                        ? 'bg-green-600 text-white'
-                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                    }`}
-                  >
-                    {copied ? '✓ Copied!' : '📋 Copy'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleOpenInOutlook}
+                      className="px-3 py-1 rounded-lg text-sm transition-colors bg-gray-700 text-purple-200 hover:bg-gray-600 border border-purple-500/30"
+                    >
+                      Open in Outlook →
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                        copied
+                          ? 'bg-green-600 text-white'
+                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                    >
+                      {copied ? '✓ Copied!' : '📋 Copy'}
+                    </button>
+                  </div>
                 </div>
                 <div className="text-purple-200 whitespace-pre-wrap font-mono text-sm">
                   {generatedEmail}

@@ -490,11 +490,11 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         <div style={{ display: 'flex', gap: 8, padding: wide ? '12px 14px 14px' : '10px 12px 12px' }}>
           <button
             onClick={handleRejectClick}
-            style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: 'none', background: STATUS.red, color: '#fff', fontSize: wide ? 13 : 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           ><X size={14} />Not a Match</button>
           <button
             onClick={handleMatchClick}
-            style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: 'none', background: STATUS.green, color: '#fff', fontSize: wide ? 13 : 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           ><Check size={14} />This is a Match</button>
         </div>
       </div>
@@ -637,11 +637,11 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
         <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px 6px' : '11px 12px 6px' }}>
           <button
             onClick={handleRejectClick}
-            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: 'none', background: STATUS.red, color: '#fff', fontSize: wide ? 14 : 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><X size={15} />Not a Match</button>
           <button
             onClick={handleMatchClick}
-            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: 'none', background: STATUS.green, color: '#fff', fontSize: wide ? 14 : 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
           ><Check size={15} />This is a Match</button>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', padding: wide ? '6px 16px 8px' : '4px 12px 6px' }}>
@@ -649,9 +649,6 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
             onClick={e => { e.stopPropagation(); onSkip(); }}
             style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
           >⊙ Skip for Today</button>
-        </div>
-        <div style={{ textAlign: 'center', padding: '4px 0 12px', fontSize: 10, color: T.textGhost }}>
-          Drag left or right, or use the buttons above
         </div>
       </div>
     </div>
@@ -1922,21 +1919,25 @@ export default function DailyLeads({ onNavigate }) {
     </div>
   );
 
-  // Progress dots
+  // Progress dots — active dot tracks current card position
   const renderDots = (total, current) => {
     const displayTotal = Math.min(total, 8);
-    const remaining = total - current;
+    const activeDot = Math.min(current, displayTotal - 1);
     return (
       <div style={{ display: 'flex', gap: 5, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
         {Array.from({ length: displayTotal }).map((_, i) => (
           <div key={i} style={{
-            width: i === 0 ? 18 : 7, height: 7, borderRadius: 4,
-            background: i < remaining ? (i === 0 ? BRAND.pink : T.isDark ? '#ffffff30' : '#00000020') : T.isDark ? '#ffffff0d' : '#00000010',
+            width: i === activeDot ? 18 : 7, height: 7, borderRadius: 4,
+            background: i < activeDot
+              ? (T.isDark ? '#ffffff40' : '#00000030')
+              : i === activeDot
+                ? BRAND.pink
+                : (T.isDark ? '#ffffff0d' : '#00000010'),
             transition: 'all 0.3s',
           }} />
         ))}
         {total > 8 && <span style={{ fontSize: 10, color: T.textFaint }}>+{total - 8}</span>}
-        <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 4 }}>{current}/{total}</span>
+        <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 4 }}>{current + 1}/{total}</span>
       </div>
     );
   };
@@ -2329,10 +2330,6 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
-                    <span>← Sharpens targeting</span>
-                    <span>Add to hunt list →</span>
-                  </div>
                 </>
               )}
             </>
@@ -2390,10 +2387,6 @@ export default function DailyLeads({ onNavigate }) {
                       onSkip={() => handlePersonSwipe('skip')}
                       wide={isDesktop}
                     />
-                  </div>
-                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
-                    <span>← Not this person</span>
-                    <span>Save to engage →</span>
                   </div>
                 </>
               )}

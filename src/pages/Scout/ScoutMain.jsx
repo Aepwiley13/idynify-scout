@@ -301,7 +301,7 @@ function ScoutShellInner({ user }) {
   const MOBILE_BOTTOM_NAV = [
     { id: 'daily',       label: 'Daily',   Icon: Zap       },
     { id: 'saved',       label: 'Saved',   Icon: Building2 },
-    { id: 'all',         label: 'People',  Icon: Users     },
+    { id: 'all',         label: 'Contacts', Icon: Users     },
     { id: 'scoutplus',   label: 'Scout+',  Icon: Plus      },
     { id: 'icpsettings', label: 'ICP',     Icon: Settings  },
   ];

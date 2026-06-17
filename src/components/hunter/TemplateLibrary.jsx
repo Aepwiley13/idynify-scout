@@ -288,7 +288,7 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent, init
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState(initialStage || 'all');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createStage, setCreateStage] = useState('hunter');
+  const [createStage, setCreateStage] = useState('scout');
   const [newTemplate, setNewTemplate] = useState({
     name: '',
     subject: '',
@@ -339,7 +339,7 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent, init
   }
 
   function openCreateModal(stage) {
-    const stageToUse = stage && stage !== 'all' ? stage : 'hunter';
+    const stageToUse = stage && stage !== 'all' ? stage : 'scout';
     setCreateStage(stageToUse);
     setNewTemplate({
       name: '',
@@ -355,9 +355,10 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent, init
     setShowCreateModal(true);
   }
 
-  function openBarryChat() {
+  function openBarryChat(stageOverride) {
     setShowBarryChat(true);
-    const stageLabel = STAGE_TABS.find(s => s.id === createStage)?.label || 'Hunter';
+    const stage = stageOverride || createStage;
+    const stageLabel = STAGE_TABS.find(s => s.id === stage)?.label || 'Scout';
     setBarryMessages([{
       role: 'barry',
       content: `I'll help you create a ${stageLabel} template. What kind of email do you need? For example:\n\n• "Post-demo follow-up to get them to sign up"\n• "Cold intro for SaaS founders"\n• "Win-back email for churned customers"\n\nTell me what you want to say and I'll draft it for you.`,
@@ -596,7 +597,8 @@ export default function TemplateLibrary({ onSelectTemplate, selectedIntent, init
             className="btn-ask-barry-empty"
             onClick={() => {
               openCreateModal(activeStage);
-              setTimeout(() => openBarryChat(), 100);
+              const stageToUse = activeStage && activeStage !== 'all' ? activeStage : 'scout';
+              setTimeout(() => openBarryChat(stageToUse), 100);
             }}
             style={{ '--barry-color': activeTab?.color || '#8b5cf6' }}
           >

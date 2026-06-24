@@ -261,6 +261,19 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   // ICP factor breakdown (calculated live from stored profile)
   const breakdown = (icpProfile && company) ? getScoreBreakdown(company, icpProfile, icpWeights || DEFAULT_WEIGHTS) : null;
 
+  const configuredFactors = icpProfile ? {
+    industry: (icpProfile.industries || []).length > 0,
+    location: (icpProfile.locations || []).length > 0 || icpProfile.isNationwide,
+    employeeSize: (icpProfile.companySizes || []).length > 0,
+    revenue: (icpProfile.revenueRanges || []).length > 0,
+  } : {};
+  const factorPills = breakdown ? [
+    { key: 'industry', label: 'Industry', data: breakdown.industry },
+    { key: 'location', label: 'Location', data: breakdown.location },
+    { key: 'employeeSize', label: 'Size', data: breakdown.employeeSize },
+    { key: 'revenue', label: 'Revenue', data: breakdown.revenue },
+  ].filter(f => configuredFactors[f.key]) : [];
+
   // HQ and CEO — try multiple Apollo field names
   const hqLocation = company.hq_location
     || (company.headquarters_city ? `${company.headquarters_city}${company.headquarters_state ? ', ' + company.headquarters_state : ''}` : null)
@@ -430,6 +443,41 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
             </div>
           )}
         </div>
+
+        {/* ICP Factor Pills — always visible */}
+        {factorPills.length > 0 && (
+          <div style={{
+            padding: wide ? '8px 18px' : '6px 14px',
+            borderBottom: `1px solid ${T.border}`,
+            display: 'flex', flexWrap: 'wrap', gap: 5,
+          }}>
+            {factorPills.map(({ key, label, data }) => {
+              const pillColor = data.match === 100 ? STATUS.green
+                : data.match === 50 ? STATUS.amber
+                : STATUS.red;
+              const symbol = data.match === 100 ? '✓'
+                : data.match === 50 ? '≈'
+                : '✗';
+              return (
+                <span
+                  key={key}
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 600,
+                    padding: '2px 7px',
+                    borderRadius: 7,
+                    background: `${pillColor}18`,
+                    border: `1px solid ${pillColor}30`,
+                    color: pillColor,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label} {symbol}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Score breakdown — expanded */}
         {showBreakdown && breakdown && (

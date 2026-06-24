@@ -26,6 +26,7 @@ export default function ImprovedScoutQuestionnaire() {
     painPoints: "",
     valueProposition: ""
   });
+  const [validationErrors, setValidationErrors] = useState({});
 
   const industryOptions = [
     "Technology / Software / SaaS",
@@ -245,51 +246,59 @@ export default function ImprovedScoutQuestionnaire() {
         ? prev[field].filter(item => item !== value)
         : [...prev[field], value]
     }));
+    const errorKey = ['locationScope', 'targetStates', 'targetCities'].includes(field) ? 'location' : field;
+    setValidationErrors(prev => {
+      if (!prev[errorKey]) return prev;
+      const next = { ...prev };
+      delete next[errorKey];
+      return next;
+    });
   };
 
   const handleInputChange = (field, value) => {
     setAnswers(prev => ({ ...prev, [field]: value }));
+    const errorKey = field === 'otherJobTitles' ? 'jobTitles' : field;
+    setValidationErrors(prev => {
+      if (!prev[errorKey]) return prev;
+      const next = { ...prev };
+      delete next[errorKey];
+      return next;
+    });
   };
 
   const validateSection = () => {
+    const errors = {};
     if (currentSection === 1) {
       if (!answers.goal.trim()) {
-        alert("Please enter your 90-day goal");
-        return false;
+        errors.goal = 'Enter your 90-day goal — e.g., "Sign 50 new customers" or "Book 20 demos"';
       }
     } else if (currentSection === 2) {
       if (answers.industries.length === 0) {
-        alert("Please select at least one industry");
-        return false;
+        errors.industries = "Select at least one industry your ideal customers belong to";
       }
       if (answers.jobTitles.length === 0 && !answers.otherJobTitles.trim()) {
-        alert("Please select at least one job title or enter custom titles");
-        return false;
+        errors.jobTitles = 'Select at least one title or type custom ones — e.g., VP Sales, Head of Marketing';
       }
       if (answers.companySizes.length === 0) {
-        alert("Please select at least one company size");
-        return false;
+        errors.companySizes = "Select at least one company size range";
       }
     } else if (currentSection === 3) {
       if (answers.locationScope.length === 0 && answers.targetStates.length === 0 && answers.targetCities.length === 0) {
-        alert("Please select at least one location option");
-        return false;
+        errors.location = 'Choose "All US", "Remote", or pick specific states/metros';
       }
     } else if (currentSection === 4) {
       if (!answers.perfectFitCompanies.trim()) {
-        alert("Please name 2-3 perfect fit companies");
-        return false;
+        errors.perfectFitCompanies = 'Name 2-3 companies — e.g., "Acme Corp, TechFlow Inc"';
       }
       if (!answers.painPoints.trim()) {
-        alert("Please describe the pain points your customers have");
-        return false;
+        errors.painPoints = 'Describe the problems they face — e.g., "Spending 60% of time prospecting"';
       }
       if (!answers.valueProposition.trim()) {
-        alert("Please describe how you solve their problems");
-        return false;
+        errors.valueProposition = 'One sentence on how you help — e.g., "We deliver 30 qualified leads daily"';
       }
     }
-    return true;
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleNext = () => {
@@ -304,6 +313,7 @@ export default function ImprovedScoutQuestionnaire() {
 
   const handleBack = () => {
     if (currentSection > 1) {
+      setValidationErrors({});
       setCurrentSection(currentSection - 1);
     }
   };
@@ -349,6 +359,69 @@ export default function ImprovedScoutQuestionnaire() {
       alert("Error saving your data. Please try again.");
     }
   };
+
+  const FieldError = ({ fieldKey }) => {
+    const msg = validationErrors[fieldKey];
+    if (!msg) return null;
+    return (
+      <div className="mt-2 flex items-start gap-2 text-red-400 text-sm font-mono">
+        <span className="text-red-500 mt-0.5 flex-shrink-0">&#9888;</span>
+        <span>{msg}</span>
+      </div>
+    );
+  };
+
+  const calculateICPStrength = () => {
+    let strength = 0;
+    const segments = [];
+    if (answers.goal.trim()) {
+      strength += 10;
+      segments.push('Goal set');
+    }
+    if (answers.industries.length > 0) {
+      strength += 20;
+      segments.push(`${answers.industries.length} industr${answers.industries.length === 1 ? 'y' : 'ies'}`);
+    }
+    if (answers.jobTitles.length > 0 || answers.otherJobTitles.trim()) {
+      const count = answers.jobTitles.length + (answers.otherJobTitles.trim() ? answers.otherJobTitles.split(',').filter(t => t.trim()).length : 0);
+      strength += 15;
+      segments.push(`${count} title${count !== 1 ? 's' : ''}`);
+    }
+    if (answers.companySizes.length > 0) {
+      strength += 15;
+      segments.push(`${answers.companySizes.length} size${answers.companySizes.length !== 1 ? 's' : ''}`);
+    }
+    if (answers.locationScope.length > 0 || answers.targetStates.length > 0 || answers.targetCities.length > 0) {
+      strength += 10;
+      const locLabel = answers.locationScope.includes('All US') ? 'Nationwide'
+        : answers.locationScope.includes('Remote') ? 'Remote'
+        : `${answers.targetStates.length + answers.targetCities.length} location${(answers.targetStates.length + answers.targetCities.length) !== 1 ? 's' : ''}`;
+      segments.push(locLabel);
+    }
+    if (answers.perfectFitCompanies.trim()) {
+      strength += 15;
+      segments.push('Fit examples');
+    }
+    if (answers.painPoints.trim()) {
+      strength += 10;
+      segments.push('Pain points');
+    }
+    if (answers.valueProposition.trim()) {
+      strength += 5;
+      segments.push('Value prop');
+    }
+    return { strength, segments };
+  };
+
+  const { strength: icpStrength, segments: icpSegments } = calculateICPStrength();
+  const strengthLabel = icpStrength >= 80 ? 'MISSION READY'
+    : icpStrength >= 50 ? 'GETTING DIALED IN'
+    : icpStrength >= 20 ? 'WARMING UP'
+    : 'JUST GETTING STARTED';
+  const strengthColor = icpStrength >= 80 ? 'from-green-400 to-emerald-500'
+    : icpStrength >= 50 ? 'from-cyan-400 to-blue-500'
+    : icpStrength >= 20 ? 'from-amber-400 to-orange-500'
+    : 'from-red-400 to-pink-500';
 
   const progress = (currentSection / 4) * 100;
 
@@ -512,8 +585,9 @@ export default function ImprovedScoutQuestionnaire() {
                   value={answers.goal}
                   onChange={(e) => handleInputChange('goal', e.target.value)}
                   placeholder="Enter your 90-day goal"
-                  className="w-full bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono"
+                  className={`w-full bg-cyan-950/50 border-2 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:ring-4 transition-all font-mono ${validationErrors.goal ? 'border-red-400/60 focus:border-red-400 focus:ring-red-400/20' : 'border-cyan-500/30 focus:border-cyan-400 focus:ring-cyan-400/20'}`}
                 />
+                <FieldError fieldKey="goal" />
               </div>
 
               <div className="mb-6">
@@ -587,6 +661,7 @@ export default function ImprovedScoutQuestionnaire() {
                     />
                   </div>
                 </div>
+                <FieldError fieldKey="industries" />
               </div>
 
               {/* JOB TITLES */}
@@ -640,6 +715,7 @@ export default function ImprovedScoutQuestionnaire() {
                     ✓ {answers.jobTitles.length} title{answers.jobTitles.length !== 1 ? 's' : ''} selected
                   </div>
                 )}
+                <FieldError fieldKey="jobTitles" />
               </div>
 
               {/* COMPANY SIZES */}
@@ -660,6 +736,7 @@ export default function ImprovedScoutQuestionnaire() {
                     </label>
                   ))}
                 </div>
+                <FieldError fieldKey="companySizes" />
               </div>
             </div>
           </div>
@@ -777,6 +854,7 @@ export default function ImprovedScoutQuestionnaire() {
                   </p>
                 </div>
               )}
+              <FieldError fieldKey="location" />
             </div>
           </div>
         )}
@@ -816,8 +894,9 @@ export default function ImprovedScoutQuestionnaire() {
                   value={answers.perfectFitCompanies}
                   onChange={(e) => handleInputChange('perfectFitCompanies', e.target.value)}
                   placeholder="e.g., Acme Corp, TechFlow Inc, or 'Fast-growing SaaS companies with 50-200 employees'"
-                  className="w-full bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono h-24 resize-none"
+                  className={`w-full bg-cyan-950/50 border-2 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:ring-4 transition-all font-mono h-24 resize-none ${validationErrors.perfectFitCompanies ? 'border-red-400/60 focus:border-red-400 focus:ring-red-400/20' : 'border-cyan-500/30 focus:border-cyan-400 focus:ring-cyan-400/20'}`}
                 />
+                <FieldError fieldKey="perfectFitCompanies" />
               </div>
 
               <div className="mb-6">
@@ -846,8 +925,9 @@ export default function ImprovedScoutQuestionnaire() {
                   value={answers.painPoints}
                   onChange={(e) => handleInputChange('painPoints', e.target.value)}
                   placeholder="e.g., Sales teams spend 60% of time prospecting instead of selling. They can't find qualified leads..."
-                  className="w-full bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono h-32 resize-none"
+                  className={`w-full bg-cyan-950/50 border-2 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:ring-4 transition-all font-mono h-32 resize-none ${validationErrors.painPoints ? 'border-red-400/60 focus:border-red-400 focus:ring-red-400/20' : 'border-cyan-500/30 focus:border-cyan-400 focus:ring-cyan-400/20'}`}
                 />
+                <FieldError fieldKey="painPoints" />
               </div>
 
               <div className="mb-6">
@@ -861,8 +941,9 @@ export default function ImprovedScoutQuestionnaire() {
                   value={answers.valueProposition}
                   onChange={(e) => handleInputChange('valueProposition', e.target.value)}
                   placeholder="e.g., We identify your ICP in 5 minutes and deliver 30 qualified leads daily. Save 10+ hours/week on prospecting..."
-                  className="w-full bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono h-32 resize-none"
+                  className={`w-full bg-cyan-950/50 border-2 rounded-xl p-4 text-white placeholder-cyan-700 focus:outline-none focus:ring-4 transition-all font-mono h-32 resize-none ${validationErrors.valueProposition ? 'border-red-400/60 focus:border-red-400 focus:ring-red-400/20' : 'border-cyan-500/30 focus:border-cyan-400 focus:ring-cyan-400/20'}`}
                 />
+                <FieldError fieldKey="valueProposition" />
               </div>
             </div>
           </div>
@@ -884,6 +965,38 @@ export default function ImprovedScoutQuestionnaire() {
           >
             {currentSection === 4 ? "🚀 LAUNCH MISSION" : "NEXT →"}
           </button>
+        </div>
+      </div>
+
+      {/* ICP Definition Strength — sticky footer */}
+      <div className="sticky bottom-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-xl border-t border-cyan-500/30 px-6 py-3">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-xs font-mono text-cyan-400 tracking-wider">
+              ICP STRENGTH: {strengthLabel}
+            </span>
+            <span className="text-xs font-mono text-cyan-300 font-bold">
+              {icpStrength}%
+            </span>
+          </div>
+          <div className="w-full bg-cyan-950/30 rounded-full h-2 border border-cyan-500/20">
+            <div
+              className={`bg-gradient-to-r ${strengthColor} h-2 rounded-full transition-all duration-300`}
+              style={{ width: `${icpStrength}%` }}
+            />
+          </div>
+          {icpSegments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {icpSegments.map(seg => (
+                <span
+                  key={seg}
+                  className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300"
+                >
+                  {seg}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

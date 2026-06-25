@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import ICPConfirmationCard from '../../components/onboarding/ICPConfirmationCard';
+import BarryAutoICPFlow from '../../components/scout/BarryAutoICPFlow';
 import './BarryOnboarding.css';
 
 const DEFAULT_WEIGHTS = {
@@ -68,7 +69,7 @@ function buildReturnGreeting(icpData) {
 export default function BarryOnboarding() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState('welcome'); // welcome, asking, clarifying, confirming, saving
+  const [step, setStep] = useState('welcome'); // welcome, auto_icp, asking, clarifying, confirming, saving
   const [userInput, setUserInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationHistory, setConversationHistory] = useState([]);
@@ -453,14 +454,46 @@ export default function BarryOnboarding() {
 
       {/* Conversation Area */}
       <div className="barry-conversation">
+        {/* Auto-ICP Flow */}
+        {step === 'auto_icp' && (
+          <div style={{ padding: '16px 0' }}>
+            <BarryAutoICPFlow
+              onComplete={(icpDoc) => {
+                setSavedICP(icpDoc);
+                setStep('saving');
+                setTimeout(() => navigate('/scout', { state: { activeTab: 'daily-leads' } }), 2500);
+              }}
+              onSkip={(draftICP) => {
+                setStep('asking');
+                if (draftICP) setExtractedICP(draftICP);
+              }}
+            />
+          </div>
+        )}
+
         {/* Initial Barry Message */}
-        {conversationHistory.length === 0 && (
+        {conversationHistory.length === 0 && step !== 'auto_icp' && (
           <div className="barry-message-container">
             <div className="message-avatar">
               <Brain className="w-5 h-5 text-purple-600" />
             </div>
             <div className="barry-message">
               {barryMessage}
+
+              {!existingICP && step === 'asking' && conversationHistory.length === 0 && (
+                <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(124, 58, 237, 0.1)', border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 12 }}>
+                  <p style={{ fontSize: 13, color: '#a78bfa', marginBottom: 8, fontWeight: 600 }}>Quick start option:</p>
+                  <button
+                    onClick={() => setStep('auto_icp')}
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #00c4cc)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%' }}
+                  >
+                    Auto-build from my website
+                  </button>
+                  <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>
+                    Or just tell me who you're hunting below
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -19,6 +19,8 @@ import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore } from '../../utils/icpScoring';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
+import BarryDailyBriefing from '../../components/scout/BarryDailyBriefing';
+import { trackSwipeAgreement } from '../../utils/barryAutonomyTracker';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -476,6 +478,23 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
                 </span>
               );
             })}
+          </div>
+        )}
+
+        {/* Barry recommendation badge */}
+        {company.barryRecommendation && (
+          <div style={{
+            padding: wide ? '4px 18px' : '4px 14px',
+            borderBottom: `1px solid ${T.border}`,
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 7,
+              background: company.barryRecommendation === 'approve' ? `${STATUS.green}18` : company.barryRecommendation === 'reject' ? `${STATUS.red}18` : `${STATUS.amber}18`,
+              border: `1px solid ${company.barryRecommendation === 'approve' ? STATUS.green : company.barryRecommendation === 'reject' ? STATUS.red : STATUS.amber}30`,
+              color: company.barryRecommendation === 'approve' ? STATUS.green : company.barryRecommendation === 'reject' ? STATUS.red : STATUS.amber,
+            }}>
+              Barry: {company.barryRecommendation === 'approve' ? 'Match' : company.barryRecommendation === 'reject' ? 'Skip' : 'Review'}
+            </span>
           </div>
         )}
 
@@ -1286,6 +1305,9 @@ export default function DailyLeads({ onNavigate }) {
   // ── Today's saved quick preview ──────────────────────────────────────────────
   const [savedTodayOpen, setSavedTodayOpen] = useState(false);
 
+  // ── Barry Daily Briefing ────────────────────────────────────────────────────
+  const [dailyBriefing, setDailyBriefing] = useState(null);
+
   // ── Session summary ──────────────────────────────────────────────────────────
   const [showSessionSummary, setShowSessionSummary] = useState(false);
 
@@ -1444,6 +1466,12 @@ export default function DailyLeads({ onNavigate }) {
         }
       }
 
+      // Load Barry's daily briefing
+      try {
+        const briefingSnap = await getDoc(doc(db, 'users', user.uid, 'barryBriefings', today));
+        if (briefingSnap.exists()) setDailyBriefing(briefingSnap.data());
+      } catch (e) { console.warn('Briefing load failed:', e); }
+
       // Show keyboard hint once
       const hintSeen = localStorage.getItem('scout_keyhint_seen');
       if (!hintSeen) { setShowKeyHint(true); localStorage.setItem('scout_keyhint_seen', '1'); }
@@ -1575,6 +1603,11 @@ export default function DailyLeads({ onNavigate }) {
       }
       setLastSwipe({ company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount });
       setShowUndo(true);
+
+      // Track agreement with Barry's recommendation
+      if (company.barryRecommendation) {
+        trackSwipeAgreement(user.uid, company.id, direction === 'right' ? 'accepted' : 'rejected', company.barryRecommendation).catch(() => {});
+      }
       const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
       const icpProfileDoc = await getDoc(icpProfileRef);
       const icpTitles = icpProfileDoc.exists() ? icpProfileDoc.data().targetTitles || [] : [];
@@ -2197,6 +2230,14 @@ export default function DailyLeads({ onNavigate }) {
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
             <>
+              {/* Barry Daily Briefing */}
+              {dailyBriefing && (
+                <BarryDailyBriefing
+                  briefing={dailyBriefing}
+                  userId={getEffectiveUser()?.uid}
+                />
+              )}
+
               {companies.length === 0 ? (
                 /* Empty queue — session summary if we reviewed something, else find more */
                 showSessionSummary || sessionReviewed > 0 ? (

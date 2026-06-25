@@ -8,15 +8,19 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText, Zap } from 'lucide-react';
 import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { getBarryLearningState, setAutonomyLevel } from '../../utils/barryAutonomyTracker';
 import './ICPSettings.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import BarryICPPanel from '../../components/scout/BarryICPPanel';
+import BarryAutoICPFlow from '../../components/scout/BarryAutoICPFlow';
 import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
   const [showBarryPanel, setShowBarryPanel] = useState(false);
+  const [showAutoICP, setShowAutoICP] = useState(false);
+  const [barryLearning, setBarryLearning] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +53,19 @@ export default function ICPSettings() {
 
   useEffect(() => {
     loadICPProfiles();
+    loadBarryLearning();
   }, []);
+
+  async function loadBarryLearning() {
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const state = await getBarryLearningState(user.uid);
+      setBarryLearning(state);
+    } catch (e) {
+      console.warn('Failed to load Barry learning state:', e);
+    }
+  }
 
   async function loadICPProfiles() {
     try {
@@ -608,13 +624,22 @@ export default function ICPSettings() {
                 Let Barry guide you through defining your ICP conversationally.
               </p>
             </div>
-            <button
-              onClick={() => setShowBarryPanel(true)}
-              className="use-barry-btn"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Talk to Barry</span>
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowAutoICP(true)}
+                className="use-barry-btn"
+              >
+                <Zap className="w-4 h-4" />
+                <span>Auto-Build from Website</span>
+              </button>
+              <button
+                onClick={() => setShowBarryPanel(true)}
+                className="use-barry-btn"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Talk to Barry</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1091,6 +1116,69 @@ export default function ICPSettings() {
             </div>
           )}
 
+          {/* Barry Learning Section */}
+          <div className="settings-section" style={{ marginBottom: 24 }}>
+            <h3 className="section-title">
+              <Brain className="w-5 h-5" />
+              <span>Barry Learning</span>
+            </h3>
+            {barryLearning ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="summary-card">
+                  <div className="summary-content">
+                    <p className="summary-label">Swipes Analyzed</p>
+                    <p className="summary-value">{barryLearning.totalSwipesAnalyzed || 0}</p>
+                  </div>
+                </div>
+                <div className="summary-card">
+                  <div className="summary-content">
+                    <p className="summary-label">Agreement Rate</p>
+                    <p className="summary-value">{barryLearning.agreementRate || 0}%</p>
+                  </div>
+                </div>
+                <div className="summary-card" style={{ gridColumn: 'span 2' }}>
+                  <div className="summary-content">
+                    <p className="summary-label">Autonomy Level</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                      <select
+                        value={barryLearning.autonomyLevel || 'disabled'}
+                        onChange={async (e) => {
+                          const user = getEffectiveUser();
+                          if (!user) return;
+                          await setAutonomyLevel(user.uid, e.target.value);
+                          setBarryLearning(prev => ({ ...prev, autonomyLevel: e.target.value }));
+                        }}
+                        className="icp-select"
+                        style={{ flex: 1 }}
+                      >
+                        <option value="disabled">Disabled</option>
+                        <option value="recommend_only">Recommend Only</option>
+                        <option value="auto_triage">Auto-Triage</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                {barryLearning.learnedWeights && (
+                  <div className="summary-card" style={{ gridColumn: 'span 2' }}>
+                    <div className="summary-content">
+                      <p className="summary-label">Learned Weights</p>
+                      <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                        Industry: {barryLearning.learnedWeights.industry}% &middot;
+                        Location: {barryLearning.learnedWeights.location}% &middot;
+                        Size: {barryLearning.learnedWeights.employeeSize}% &middot;
+                        Revenue: {barryLearning.learnedWeights.revenue}%
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: '#6b7280' }}>
+                Barry hasn't started learning yet. Enable "Recommend Only" mode and swipe 10+ leads to begin.
+              </p>
+            )}
+          </div>
+
           <div className="action-buttons">
             <button
               onClick={handleSaveChanges}
@@ -1117,6 +1205,31 @@ export default function ICPSettings() {
           </p>
         </div>
       </div>
+
+      {showAutoICP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-950 border border-cyan-500/30 rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <BarryAutoICPFlow
+              onComplete={(icpDoc, icpId) => {
+                setShowAutoICP(false);
+                loadICPProfiles();
+              }}
+              onSkip={(draftICP) => {
+                setShowAutoICP(false);
+                if (draftICP) {
+                  setShowBarryPanel(true);
+                }
+              }}
+            />
+            <button
+              onClick={() => setShowAutoICP(false)}
+              className="mt-4 w-full text-center text-gray-500 hover:text-gray-300 text-sm py-2"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {showBarryPanel && (
         <BarryICPPanel

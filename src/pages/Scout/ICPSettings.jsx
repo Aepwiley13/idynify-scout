@@ -11,12 +11,14 @@ import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import BarryICPPanel from '../../components/scout/BarryICPPanel';
+import BarryAutoICPFlow from '../../components/scout/BarryAutoICPFlow';
 import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
   const [showBarryPanel, setShowBarryPanel] = useState(false);
+  const [showAutoICP, setShowAutoICP] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -608,13 +610,22 @@ export default function ICPSettings() {
                 Let Barry guide you through defining your ICP conversationally.
               </p>
             </div>
-            <button
-              onClick={() => setShowBarryPanel(true)}
-              className="use-barry-btn"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Talk to Barry</span>
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowAutoICP(true)}
+                className="use-barry-btn"
+              >
+                <Zap className="w-4 h-4" />
+                <span>Auto-Build from Website</span>
+              </button>
+              <button
+                onClick={() => setShowBarryPanel(true)}
+                className="use-barry-btn"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Talk to Barry</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1117,6 +1128,31 @@ export default function ICPSettings() {
           </p>
         </div>
       </div>
+
+      {showAutoICP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-950 border border-cyan-500/30 rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <BarryAutoICPFlow
+              onComplete={(icpDoc, icpId) => {
+                setShowAutoICP(false);
+                loadICPProfiles();
+              }}
+              onSkip={(draftICP) => {
+                setShowAutoICP(false);
+                if (draftICP) {
+                  setShowBarryPanel(true);
+                }
+              }}
+            />
+            <button
+              onClick={() => setShowAutoICP(false)}
+              className="mt-4 w-full text-center text-gray-500 hover:text-gray-300 text-sm py-2"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {showBarryPanel && (
         <BarryICPPanel

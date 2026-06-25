@@ -41,6 +41,17 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 5. **What would make this experience feel more magical?**
 
 
+### Would You Switch?
+
+**Would you use Auto-ICP instead of manually creating an ICP?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
+
+
 ### Regression Checks
 
 - [ ] Existing questionnaire still works
@@ -77,6 +88,17 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 5. **At what point would you allow Barry to make decisions automatically?**
 
 
+### Would You Switch?
+
+**Would you rely on Barry's adaptive learning instead of manually reviewing every lead?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
+
+
 ---
 
 ## Recommend Only Mode
@@ -98,6 +120,17 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 
 
 3. **What signals should Barry consider that it currently misses?**
+
+
+### Would You Switch?
+
+**Would you rely on Recommend Only instead of reviewing every lead yourself?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
 
 
 ---
@@ -126,6 +159,30 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 4. **What would increase your trust level?**
 
 
+### Would You Switch?
+
+**Would you enable Auto-Triage on a real account with live prospects?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
+
+
+### Trust Thresholds
+
+**At what confidence level would you enable Auto-Triage?**
+
+- [ ] Never
+- [ ] 70%
+- [ ] 80%
+- [ ] 90%
+- [ ] 95%+
+
+**How many bad recommendations would it take before you disable Barry?**
+
+
 ---
 
 ## Daily Briefing
@@ -150,6 +207,17 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 
 
 4. **What would make it your preferred starting point each day?**
+
+
+### Would You Switch?
+
+**Would you use the Daily Briefing as your primary starting point instead of going directly to the dashboard?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
 
 
 ---
@@ -184,6 +252,17 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 5. **What improvements would increase approval rates?**
 
 
+### Would You Switch?
+
+**Would you use Barry-generated outreach instead of writing emails from scratch?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
+
+
 ---
 
 ## Draft Review Workflow
@@ -209,6 +288,53 @@ Complete all scoring sections and provide written feedback for each area. Rate i
 
 4. **How can we reduce the number of edits required?**
 
+
+### Would You Switch?
+
+**Would you use the draft review workflow instead of your current outreach review process?**
+
+- [ ] Yes
+- [ ] No
+- [ ] Not Yet
+
+If No or Not Yet, explain why:
+
+
+---
+
+## Actual Effort Measurement
+
+Estimate the time you spend on each task. Your numbers will be used to calculate whether we hit the 50%+ effort reduction goal.
+
+### Before Barry (Current Process)
+
+| Task | Minutes |
+|------|:-------:|
+| Building ICP | |
+| Reviewing 100 leads | |
+| Finding contacts per company | |
+| Writing outreach per prospect | |
+
+### After Barry (New Process)
+
+| Task | Minutes |
+|------|:-------:|
+| Building ICP | |
+| Reviewing 100 leads | |
+| Finding contacts per company | |
+| Writing outreach per prospect | |
+
+### Calculated Reduction
+
+| Task | Before | After | Reduction % |
+|------|:------:|:-----:|:-----------:|
+| Building ICP | | | |
+| Reviewing 100 leads | | | |
+| Finding contacts per company | | | |
+| Writing outreach per prospect | | | |
+| **Overall Average** | | | |
+
+*Release goal: 50%+ reduction across all tasks.*
 
 ---
 

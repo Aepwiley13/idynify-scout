@@ -7,6 +7,7 @@ import { ArrowLeft, Mail, Send, CheckCircle, Clock, Edit3, Save, X, Loader, Aler
 import OutcomeTracker from '../../components/hunter/OutcomeTracker';
 import FollowUpComposer from '../../components/hunter/FollowUpComposer';
 import OutcomeSuggestions from '../../components/hunter/OutcomeSuggestions';
+import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 
 export default function CampaignDetail() {
   const navigate = useNavigate();
@@ -104,54 +105,68 @@ export default function CampaignDetail() {
 
     try {
       const user = getEffectiveUser();
-      const authToken = await user.getIdToken();
+      if (!user) throw new Error('Not authenticated');
+
       const items = campaign.contacts || campaign.messages;
       const message = items[index];
+      const contactName = message.contactName || message.name || '';
 
-      const response = await fetch('/.netlify/functions/gmail-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          campaignId: campaign.id,
-          messageIndex: index,
-          subject: message.subject,
-          body: message.body,
-          toEmail: message.contactEmail,
-          toName: message.contactName
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send email');
-      }
-
-      const data = await response.json();
-
-      // Update local state (support both structures)
-      const updatedItems = [...items];
-      updatedItems[index] = {
-        ...updatedItems[index],
-        status: 'sent',
-        sentAt: data.sentAt,
-        gmailMessageId: data.gmailMessageId
+      const sendContact = {
+        id: message.contactId,
+        email: message.contactEmail || message.email,
+        firstName: contactName.split(' ')[0] || '',
+        lastName: contactName.split(' ').slice(1).join(' ') || '',
       };
 
-      const updateField = campaign.contacts ? 'contacts' : 'messages';
-      setCampaign({
-        ...campaign,
-        [updateField]: updatedItems,
-        status: 'in_progress'
+      const result = await executeSendAction({
+        channel: CHANNELS.EMAIL,
+        userId: user.uid,
+        contact: sendContact,
+        subject: message.subject,
+        body: message.body,
       });
 
-      setShowSendConfirm(null);
+      if (result.result === SEND_RESULT.SENT) {
+        const sentAt = result.sentAt || new Date().toISOString();
+        const gmailMessageId = result.gmailMessageId || null;
 
-      // Show success toast
-      setTimeout(() => {
-        alert(`✓ Email sent to ${message.contactName}`);
-      }, 100);
+        const updatedItems = [...items];
+        updatedItems[index] = {
+          ...updatedItems[index],
+          status: 'sent',
+          sentAt,
+          gmailMessageId,
+        };
+
+        const allSent = updatedItems.every(m => m.status === 'sent');
+        const campaignStatus = allSent ? 'completed' : 'in_progress';
+        const updateField = campaign.contacts ? 'contacts' : 'messages';
+
+        await updateDoc(doc(db, 'users', user.uid, 'campaigns', campaignId), {
+          [updateField]: updatedItems,
+          status: campaignStatus,
+          updatedAt: new Date().toISOString(),
+          ...(allSent ? { completedAt: new Date().toISOString() } : {}),
+        });
+
+        setCampaign({
+          ...campaign,
+          [updateField]: updatedItems,
+          status: campaignStatus,
+        });
+
+        setShowSendConfirm(null);
+        setTimeout(() => {
+          alert(`✓ Email sent to ${contactName}`);
+        }, 100);
+      } else if (result.result === SEND_RESULT.OPENED) {
+        setShowSendConfirm(null);
+        setTimeout(() => {
+          alert(result.message || 'Email app opened — complete the send there.');
+        }, 100);
+      } else {
+        throw new Error(result.error || result.reason || 'Failed to send email');
+      }
 
     } catch (err) {
       console.error('Error sending email:', err);

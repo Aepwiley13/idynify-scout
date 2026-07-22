@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Loader } from 'lucide-react';
-import { auth } from '../../firebase/config';
+import { addDoc, collection } from 'firebase/firestore';
+import { db, auth } from '../../firebase/config';
 import './FollowUpComposer.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 
 /**
  * HUNTER PHASE 2: Follow-Up Composer
@@ -84,27 +86,67 @@ export default function FollowUpComposer({
       const user = getEffectiveUser();
       if (!user) return;
 
-      const idToken = await user.getIdToken();
-      const response = await fetch('/.netlify/functions/send-followup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          idToken,
-          contactId: contact.contactId,
-          originalCampaignId: originalCampaign.id,
-          subject,
-          body,
-          toEmail: contact.email,
-          toName: contact.name
-        })
+      const contactName = contact.name || contact.contactName || '';
+      const contactEmail = contact.email || contact.contactEmail || '';
+      const contactId = contact.contactId;
+
+      const sendContact = {
+        id: contactId,
+        email: contactEmail,
+        firstName: contactName.split(' ')[0] || '',
+        lastName: contactName.split(' ').slice(1).join(' ') || '',
+      };
+
+      const result = await executeSendAction({
+        channel: CHANNELS.EMAIL,
+        userId: user.uid,
+        contact: sendContact,
+        subject,
+        body,
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (result.result === SEND_RESULT.SENT) {
+        const sentAt = new Date();
+        const campaignData = {
+          name: `Follow-up: ${contactName}`,
+          weapon: 'email',
+          engagementIntent: 'followup',
+          parentCampaignId: originalCampaign.id,
+          contacts: [{
+            contactId,
+            name: contactName,
+            email: contactEmail,
+            subject,
+            body,
+            status: 'sent',
+            sentAt,
+            gmailMessageId: result.gmailMessageId || null,
+            outcome: null,
+            outcomeMarkedAt: null,
+            outcomeLocked: false,
+            outcomeLockedAt: null,
+          }],
+          createdAt: sentAt,
+          userId: user.uid,
+        };
+
+        const campaignRef = await addDoc(
+          collection(db, 'users', user.uid, 'campaigns'),
+          campaignData
+        );
+
         if (onFollowUpCreated) {
-          onFollowUpCreated(data);
+          onFollowUpCreated({
+            campaignId: campaignRef.id,
+            gmailMessageId: result.gmailMessageId,
+            sentAt: sentAt.toISOString(),
+          });
         }
         onClose();
+      } else if (result.result === SEND_RESULT.OPENED) {
+        alert(result.message || 'Email app opened — complete the send there.');
+      } else {
+        throw new Error(result.error || result.reason || 'Failed to send follow-up');
       }
     } catch (error) {
       console.error('Failed to send follow-up:', error);

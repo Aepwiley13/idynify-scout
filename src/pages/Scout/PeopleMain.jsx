@@ -19,7 +19,7 @@ import { db, auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield, Users, Building2,
-  Zap, Archive, BarChart3, Swords,
+  Zap, Archive, BarChart3, Swords, Mail,
   Palette, Check, ChevronLeft, ChevronRight, Home,
   Settings as SettingsIcon, Plus,
 } from 'lucide-react';
@@ -187,6 +187,7 @@ const CC_ITEMS = [
   { id: 'people',     label: 'People',       Icon: Users,     desc: 'Full contacts roster — all view'  },
   { id: 'companies',  label: 'Companies',    Icon: Building2, desc: 'Full accounts roster — all view'  },
   { id: 'missions',   label: 'Missions',     Icon: Zap,       desc: 'Create and manage missions'       },
+  { id: 'campaigns',  label: 'Campaigns',    Icon: Mail,      desc: 'Send emails to multiple contacts', route: '/hunter/campaign/new' },
   { id: 'go_to_war',  label: 'Go To War',    Icon: Swords,    desc: '8-phase bulk mission launcher'    },
   { id: 'weapons',    label: 'Weapons',      Icon: Crosshair, desc: 'Channel selector, message builder' },
   { id: 'arsenal',    label: 'Arsenal',      Icon: Archive,   desc: 'Saved message templates library'  },
@@ -443,7 +444,7 @@ function PeopleShellInner({ user }) {
               return (
                 <button
                   key={item.id}
-                  onClick={() => switchSection(item.id)}
+                  onClick={() => item.route ? navigate(item.route) : switchSection(item.id)}
                   style={{
                     flexShrink: 0, padding: '7px 12px', border: 'none', borderRadius: 8,
                     background: active ? `${CC_CYAN}18` : 'transparent',
@@ -676,7 +677,7 @@ function PeopleShellInner({ user }) {
               return (
                 <div
                   key={it.id}
-                  onClick={() => switchSection(it.id)}
+                  onClick={() => it.route ? navigate(it.route) : switchSection(it.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
                     borderRadius: 8, marginBottom: 1, cursor: 'pointer',

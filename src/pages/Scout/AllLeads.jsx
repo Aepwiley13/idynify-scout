@@ -30,7 +30,10 @@ import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
+import BulkComposeModal from '../../components/scout/BulkComposeModal';
 import { loadIntoHunter } from '../../utils/loadIntoHunter';
+
+const MAX_CONTACTS = 25;
 
 // ─── Engagement Status Sets ───────────────────────────────────────────────────
 // hunter_status values that indicate a contact has been engaged (Scout → Hunter)
@@ -1164,6 +1167,9 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
 
   // LinkedIn modal
   const [showLinkedInModal, setShowLinkedInModal] = useState(false);
+
+  // Bulk Compose modal
+  const [showBulkCompose, setShowBulkCompose] = useState(false);
 
   // First Touch modal
   const [firstTouchContact, setFirstTouchContact] = useState(null);
@@ -2304,6 +2310,22 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             onClick={() => exportSelectedToCSV(finalContacts.filter(c => selectedIds.has(c.id)))}
             style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           ><Download size={12} />Export</button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => selectedIds.size <= MAX_CONTACTS && setShowBulkCompose(true)}
+              disabled={selectedIds.size > MAX_CONTACTS}
+              title={selectedIds.size > MAX_CONTACTS ? 'Maximum 25 contacts per bulk send' : ''}
+              style={{
+                padding: '6px 14px', borderRadius: 8, border: 'none',
+                background: selectedIds.size > MAX_CONTACTS ? T.surface : `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
+                color: selectedIds.size > MAX_CONTACTS ? T.textFaint : '#fff',
+                fontSize: 11, fontWeight: 700,
+                cursor: selectedIds.size > MAX_CONTACTS ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+                opacity: selectedIds.size > MAX_CONTACTS ? 0.5 : 1,
+              }}
+            ><Mail size={12} />Compose Email</button>
+          </div>
           <button
             onClick={() => { setSelectedIds(new Set()); setBulkBrigadeOpen(false); }}
             style={{ padding: '6px 11px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
@@ -2425,6 +2447,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             setPanelAutoEngage(false);
             setPanelContactId(modal.id);
           }}
+        />
+      )}
+
+      {showBulkCompose && (
+        <BulkComposeModal
+          contacts={finalContacts.filter(c => selectedIds.has(c.id))}
+          onClose={() => setShowBulkCompose(false)}
         />
       )}
     </div>

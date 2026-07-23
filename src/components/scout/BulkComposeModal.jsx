@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
-import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
+import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 const MAX_CONTACTS = 25;
 
@@ -11,6 +12,10 @@ function getContactEmail(c) {
 
 function getContactName(c) {
   return c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
+}
+
+function getFirstName(c) {
+  return c.firstName || c.name?.split(' ')[0] || '';
 }
 
 export default function BulkComposeModal({ contacts, onClose }) {
@@ -37,10 +42,14 @@ export default function BulkComposeModal({ contacts, onClose }) {
     setLoading(true);
     try {
       if (personalizeWithBarry) {
+        const user = getEffectiveUser();
+        const authToken = await user.getIdToken();
         const res = await fetch('/.netlify/functions/barryBulkPersonalize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            userId: user.uid,
+            authToken,
             contacts: contacts.map(c => ({
               contactId: c.id,
               firstName: c.firstName || c.name?.split(' ')[0] || '',
@@ -96,11 +105,13 @@ export default function BulkComposeModal({ contacts, onClose }) {
   function handleSend() {
     const payload = previews
       .filter(p => getContactEmail(p.contact))
-      .map(p => ({
-        contact: p.contact,
-        subject,
-        body: p.openingLine ? `${p.openingLine}\n\n${body}` : body,
-      }));
+      .map(p => {
+        const greeting = `Hi ${getFirstName(p.contact)},`;
+        const parts = [greeting];
+        if (p.openingLine) parts.push(p.openingLine);
+        parts.push(body);
+        return { contact: p.contact, subject, body: parts.join('\n\n') };
+      });
     setSendPayload(payload);
     setSendStarted(true);
     setStep(3);
@@ -357,6 +368,7 @@ export default function BulkComposeModal({ contacts, onClose }) {
                           border: `1px solid ${T.border}`, fontSize: 13, color: T.text,
                           lineHeight: 1.5,
                         }}>
+                          <div style={{ fontWeight: 600, marginBottom: 6 }}>Hi {getFirstName(p.contact)},</div>
                           {personalizeWithBarry && p.openingLine !== undefined && (
                             <div style={{ marginBottom: 8 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>

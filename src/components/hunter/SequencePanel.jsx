@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../../firebase/config';
+import { db } from '../../firebase/config';
 import { getActiveIcpId } from '../../utils/getActiveIcpId';
 import {
   Sparkles,
@@ -404,7 +404,7 @@ function GeneratedContentReview({ content, step, stepIndex, contact, onSent, onB
       return;
     }
 
-    const user = auth.currentUser;
+    const user = getEffectiveUser();
     if (!user) {
       setFeedback({ type: 'error', message: 'You are not signed in. Please sign in and try again.' });
       setSending(false);

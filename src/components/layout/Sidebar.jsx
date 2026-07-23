@@ -139,7 +139,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     {
       icon: Zap,
       label: 'Missions',
-      sublabel: 'Create and manage campaigns',
+      sublabel: 'Create and manage missions',
       path: '/command-center',
       state: { activeTab: 'missions' }
     },

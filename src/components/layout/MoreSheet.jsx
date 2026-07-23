@@ -58,6 +58,10 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
             <Users size={22} />
             <span>Command Center</span>
           </button>
+          <button className="more-sheet-item" onClick={() => go('/command-center?tab=missions')}>
+            <Target size={22} />
+            <span>Missions</span>
+          </button>
           <button className="more-sheet-item" onClick={() => go('/fallback')}>
             <RotateCcw size={22} />
             <span>Fallback</span>

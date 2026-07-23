@@ -144,6 +144,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       state: { activeTab: 'missions' }
     },
     {
+      icon: Mail,
+      label: 'Campaigns',
+      sublabel: 'Send emails to multiple contacts',
+      path: '/hunter/campaign/new'
+    },
+    {
       icon: Crosshair,
       label: 'Weapons',
       sublabel: 'Channel selector, message builder',

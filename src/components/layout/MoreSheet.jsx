@@ -14,7 +14,7 @@
  *   isAdmin  — boolean (optional), shows Admin tile when true
  */
 import { useNavigate } from 'react-router-dom';
-import { Home, Users, Settings, LogOut, X, Brain, Zap, Shield, Target, RotateCcw } from 'lucide-react';
+import { Home, Users, Settings, LogOut, X, Brain, Zap, Shield, Target, RotateCcw, Mail } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import { useThemeCtx } from '../../theme/ThemeContext';
 import { THEMES } from '../../theme/tokens';
@@ -61,6 +61,10 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
           <button className="more-sheet-item" onClick={() => go('/command-center?tab=missions')}>
             <Target size={22} />
             <span>Missions</span>
+          </button>
+          <button className="more-sheet-item" onClick={() => go('/hunter/campaign/new')}>
+            <Mail size={22} />
+            <span>Campaigns</span>
           </button>
           <button className="more-sheet-item" onClick={() => go('/fallback')}>
             <RotateCcw size={22} />

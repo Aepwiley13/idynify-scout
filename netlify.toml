@@ -41,6 +41,9 @@
 [functions."adminGetUsers"]
   timeout = 26
 
+[functions."barryBulkPersonalize"]
+  timeout = 26
+
 [dev]
   framework = "#custom"
   command = "npm run dev"

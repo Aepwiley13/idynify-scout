@@ -411,7 +411,7 @@ function GeneratedContentReview({ content, step, stepIndex, contact, onSent, onB
       return;
     }
 
-    // See PHASE2-KNOWN-ISSUES.md — three data constraints flow through this path that Phase 2 depends on.
+    // See PHASE2-KNOWN-ISSUES.md — the data constraints flow through this path that Phase 2 depends on.
     // executeSendAction takes a single object (channel, userId, contact, subject, body) — NOT positional args.
     const result = await executeSendAction({
       channel,

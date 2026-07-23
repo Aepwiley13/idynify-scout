@@ -107,7 +107,7 @@ export default function EmailWeapon({ onBack }) {
     const selectedContacts = allContacts.filter(c => selectedContactIds.includes(c.id));
     const templatedMessages = selectedContacts.map(contact => ({
       contactId: contact.id,
-      contactName: `${contact.firstName} ${contact.lastName}`,
+      contactName: contact.name || `${contact.firstName || contact.first_name || ''} ${contact.lastName || contact.last_name || ''}`.trim(),
       contactEmail: contact.email,
       companyName: contact.company_name || '',
       title: contact.title || '',

@@ -30,6 +30,7 @@ import {
   STEP_OUTCOME_LABELS,
   SEQUENCE_STATUS
 } from '../../utils/sequenceEngine';
+import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import StepApprovalCard from './StepApprovalCard';
 import OutcomePrompt from './OutcomePrompt';
 import './SequencePanel.css';
@@ -368,14 +369,76 @@ function GeneratedContentReview({ content, step, stepIndex, contact, onSent, onB
   const [subject, setSubject] = useState(content.subject || '');
   const [body, setBody] = useState(content.body || '');
   const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState(null); // { type: 'error', message } — success advances & unmounts
 
   const firstName = contact.firstName || 'this person';
 
+  // Map a sequence step's channel to a send channel.
+  // phone/calendar are record-only; anything not listed is explicitly unsupported.
+  // (Calendar-from-sequence is deferred — see PHASE2-KNOWN-ISSUES.md item 4.)
+  const CHANNEL_MAP = {
+    email: CHANNELS.EMAIL,
+    linkedin: CHANNELS.LINKEDIN,
+    text: CHANNELS.TEXT,
+    sms: CHANNELS.TEXT
+  };
+
   async function handleSend() {
     setSending(true);
-    // The actual send happens through the existing weapon system
-    // We just record that the step was sent in the sequence
-    onSent();
+    setFeedback(null);
+
+    // Record-only channels: nothing is sent — mark the step complete and advance.
+    if (content.channel === 'phone' || content.channel === 'calendar') {
+      onSent();
+      setSending(false);
+      return;
+    }
+
+    const channel = CHANNEL_MAP[content.channel];
+
+    // Unrecognized channel: do not send, do not advance. (Default-deny.)
+    if (!channel) {
+      console.warn(`[SequencePanel] Unsupported sequence channel: ${content.channel}`);
+      setFeedback({ type: 'error', message: `This step's channel (${content.channel}) isn't supported for sending.` });
+      setSending(false);
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      setFeedback({ type: 'error', message: 'You are not signed in. Please sign in and try again.' });
+      setSending(false);
+      return;
+    }
+
+    // See PHASE2-KNOWN-ISSUES.md — three data constraints flow through this path that Phase 2 depends on.
+    // executeSendAction takes a single object (channel, userId, contact, subject, body) — NOT positional args.
+    const result = await executeSendAction({
+      channel,
+      userId: user.uid,
+      contact,
+      subject,
+      body
+    });
+
+    // Gating rule: advance the sequence ONLY on SENT or OPENED. Everything else holds the step.
+    // Written as an allow-list, not an enumeration of failures, so future SEND_RESULT types
+    // can't fall through to a false success.
+    if (result.result === SEND_RESULT.SENT || result.result === SEND_RESULT.OPENED) {
+      setFeedback({ type: 'success', message: result.message || 'Sent.' });
+      onSent();
+    } else if (result.result === SEND_RESULT.UNAVAILABLE) {
+      const message = channel === CHANNELS.EMAIL
+        ? 'No email address on file for this contact'
+        : channel === CHANNELS.LINKEDIN
+          ? 'No LinkedIn profile on file for this contact'
+          : (result.reason || 'This channel is unavailable for this contact');
+      setFeedback({ type: 'error', message });
+    } else {
+      // FAILED — or any future non-success result. Step stays on its current index.
+      setFeedback({ type: 'error', message: result.error || 'Send failed. This step was not marked as sent.' });
+    }
+
     setSending(false);
   }
 
@@ -414,6 +477,13 @@ function GeneratedContentReview({ content, step, stepIndex, contact, onSent, onB
           rows={content.channel === 'text' ? 3 : 6}
         />
       </div>
+
+      {feedback && (
+        <div className={`content-send-feedback content-send-feedback-${feedback.type}`}>
+          {feedback.type === 'error' && <AlertCircle className="w-4 h-4" />}
+          <span>{feedback.message}</span>
+        </div>
+      )}
 
       <div className="content-review-actions">
         <button className="btn-secondary-seq" onClick={onBack}>

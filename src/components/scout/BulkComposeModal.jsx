@@ -563,7 +563,7 @@ export default function BulkComposeModal({
             )}
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>
-                Compose Campaign
+                Compose Cadence
               </div>
               <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
                 Step {step} of 3 — {stepLabels[step - 1]} · {contacts.length} contact{contacts.length !== 1 ? 's' : ''}

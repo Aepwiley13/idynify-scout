@@ -1,12 +1,12 @@
 /**
- * BulkSendExecutor — Phase 1 Workstream C: Scout Bulk Send loop + progress UI.
+ * BulkSendExecutor — Scout Campaign bulk send loop + progress UI.
  *
  * Receives the final array of { contact, subject, body } from BulkComposeModal
  * (Step 3) and sends to each contact sequentially through executeSendAction —
  * the unified send pipeline (auth, token refresh, timeline logging, state
  * machine, email_logs). Never calls gmail-send-* functions directly.
  *
- * Loop rules (Phase 1 brief):
+ * Loop rules:
  *   - Sequential, with a mandatory 1500ms delay between sends. Do not remove
  *     it — it protects the user's Gmail account from rate limiting/spam flags.
  *   - Per-contact status: pending → sending → sent | opened | failed.
@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  Send, CheckCircle2, XCircle, Mail, Clock, Loader, RotateCcw, AlertTriangle,
+  Send, CheckCircle2, XCircle, Mail, Clock, Loader, RotateCcw, AlertTriangle, UserPlus,
 } from 'lucide-react';
 import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -48,10 +48,9 @@ function getContactName(contact) {
     || 'Unknown';
 }
 
-export default function BulkSendExecutor({ payload, T: themeProp }) {
-  // Theme may arrive as a prop (Phase 1 modal) or from context (Phase 1.5 modal)
-  const themeFromContext = useT();
-  const T = themeProp || themeFromContext;
+export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts }) {
+  const TContext = useT();
+  const T = TProp || TContext;
   // contactId → { status, reason }
   const [statuses, setStatuses] = useState(() =>
     Object.fromEntries((payload || []).map((p) => [p.contact.id, { status: 'pending' }]))
@@ -67,18 +66,15 @@ export default function BulkSendExecutor({ payload, T: themeProp }) {
     setStatuses((prev) => ({ ...prev, [contactId]: { status, reason } }));
   }
 
-  // attachment ({ data, filename, mimeType }) and cc (email string) are
-  // optional per payload item (Phase 1.5 "Send with attachment" path) —
-  // omitted for Phase 1 sends, which behave exactly as before.
-  async function sendOne({ contact, subject, body, attachment, cc }) {
+  async function sendOne(item) {
+    const { contact, subject, body, attachment, cc } = item;
     setContactStatus(contact.id, 'sending');
     try {
       const userId = getEffectiveUser()?.uid;
-      const res = await executeSendAction({
-        channel: CHANNELS.EMAIL, userId, contact, subject, body,
-        ...(attachment ? { attachment } : {}),
-        ...(cc ? { cc } : {}),
-      });
+      const args = { channel: CHANNELS.EMAIL, userId, contact, subject, body };
+      if (attachment) args.attachment = attachment;
+      if (cc) args.cc = cc;
+      const res = await executeSendAction(args);
 
       switch (res?.result) {
         case SEND_RESULT.SENT:
@@ -97,8 +93,6 @@ export default function BulkSendExecutor({ payload, T: themeProp }) {
           setContactStatus(contact.id, 'failed', `Unexpected result: ${res?.result || 'none'}`);
       }
     } catch (err) {
-      // The loop must never abort — an unhandled error marks this contact
-      // failed and the next contact still gets attempted.
       setContactStatus(contact.id, 'failed', err?.message || 'Send failed');
     }
   }
@@ -173,12 +167,12 @@ export default function BulkSendExecutor({ payload, T: themeProp }) {
               ? 'Sending — do not close this tab'
               : complete && counts.opened > 0
                 ? `${counts.sent} via Gmail, ${counts.opened} opened in mail app`
-                : complete ? 'All sends complete' : ''}
+                : complete ? 'Campaign complete' : ''}
           </div>
         </div>
       </div>
 
-      {/* ─── Progress bar: "X of Y sent" ─── */}
+      {/* ─── Progress bar ─── */}
       <div>
         <div style={{
           display: 'flex', justifyContent: 'space-between',
@@ -288,6 +282,23 @@ export default function BulkSendExecutor({ payload, T: themeProp }) {
             Retry failed ({counts.failed})
           </button>
         </div>
+      )}
+
+      {/* ─── Add more contacts button (post-campaign) ─── */}
+      {complete && !running && onAddMoreContacts && (
+        <button
+          onClick={onAddMoreContacts}
+          style={{
+            padding: '9px 16px', borderRadius: 10,
+            border: `1px solid ${T.border}`,
+            background: T.surface, color: T.text,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <UserPlus size={13} />
+          Add more contacts to this campaign
+        </button>
       )}
 
       <style>{`

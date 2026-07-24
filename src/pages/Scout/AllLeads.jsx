@@ -2041,6 +2041,19 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         ><Download size={12} />Export CSV</button>
       </div>
 
+      {/* ── Bulk selection banner ── */}
+      {bulkMode && selectedIds.size === 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 22px',
+          background: `${BRAND.cyan}10`, borderBottom: `1px solid ${BRAND.cyan}30`,
+          fontSize: 12, color: BRAND.cyan, fontWeight: 600,
+        }}>
+          <Target size={14} />
+          Click contacts to select them, then use the action bar below.
+        </div>
+      )}
+
       {/* ── Content ── */}
       <div style={{ flex: isMobile ? 'none' : 1, display: 'flex', overflow: isMobile ? 'visible' : 'hidden' }}>
         {/* Left: list/cards — hidden when profile is in full-screen mode (only if a profile is actually open) */}
@@ -2259,7 +2272,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       {/* ── Bulk Action Bar ── */}
       {selectedIds.size > 0 && (
         <div style={{
-          position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
           background: T.cardBg, border: `1px solid ${BRAND.pink}40`,
           borderRadius: 12, padding: '10px 16px',
           display: 'flex', alignItems: 'center', gap: 10,
@@ -2453,6 +2466,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       {showBulkCompose && (
         <BulkComposeModal
           contacts={finalContacts.filter(c => selectedIds.has(c.id))}
+          allContacts={contacts}
           onClose={() => setShowBulkCompose(false)}
         />
       )}

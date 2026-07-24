@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, Paperclip, FileText, Upload, Users } from 'lucide-react';
+import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, Paperclip, FileText, Upload, Users, Search, Plus, Trash2 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { checkGmailConnection } from '../../utils/sendActionResolver';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
 
 const MAX_CONTACTS = 25;
@@ -29,10 +31,18 @@ function replacePersonalizeTags(template, replacement) {
   return template.replace(/\{\{personalize\}\}/gi, replacement);
 }
 
-export default function BulkComposeModal({ contacts, onClose }) {
+export default function BulkComposeModal({ contacts: initialContacts, allContacts = [], onClose }) {
   const T = useT();
   const [step, setStep] = useState(1);
   const [activePath, setActivePath] = useState('write_your_own');
+
+  // ─── Selected contacts (mutable via in-modal search) ───
+  const [selectedContacts, setSelectedContacts] = useState(initialContacts);
+
+  // ─── In-modal search state ───
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef(null);
 
   // ─── Path 1 state (Write your own) ───
   const [subject, setSubject] = useState('');
@@ -48,6 +58,7 @@ export default function BulkComposeModal({ contacts, onClose }) {
   const fileInputRef = useRef(null);
   const dropZoneRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+  const p2BodyRef = useRef(null);
 
   // ─── Gmail connection status ───
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -75,12 +86,88 @@ export default function BulkComposeModal({ contacts, onClose }) {
   const [sendStarted, setSendStarted] = useState(false);
   const [sendPayload, setSendPayload] = useState(null);
 
+  // ─── Draft state ───
+  const [draftId, setDraftId] = useState(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // ─── Load draft on mount ───
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = getEffectiveUser();
+        if (!user) { setDraftLoaded(true); return; }
+        const draftRef = doc(db, 'users', user.uid, 'campaignDrafts', 'latest');
+        const snap = await getDoc(draftRef);
+        if (snap.exists()) {
+          const d = snap.data();
+          const age = Date.now() - (d.updatedAt?.toMillis?.() || 0);
+          if (age < 7 * 24 * 60 * 60 * 1000) {
+            setDraftId('latest');
+            setActivePath(d.activePath || 'write_your_own');
+            if (d.subject) setSubject(d.subject);
+            if (d.body) setBody(d.body);
+            if (d.p2Subject) setP2Subject(d.p2Subject);
+            if (d.p2Body) setP2Body(d.p2Body);
+            if (d.cc) setCc(d.cc);
+            if (typeof d.personalizeWithBarry === 'boolean') setPersonalizeWithBarry(d.personalizeWithBarry);
+          }
+        }
+      } catch {
+        // draft load failure is non-critical
+      } finally {
+        setDraftLoaded(true);
+      }
+    })();
+  }, []);
+
+  const contacts = selectedContacts;
   const contactsWithEmail = contacts.filter(c => getContactEmail(c));
   const contactsWithoutEmail = contacts.filter(c => !getContactEmail(c));
 
   const isPath2 = activePath === 'send_with_attachment';
   const activeSubject = isPath2 ? p2Subject : subject;
   const activeBody = isPath2 ? p2Body : body;
+
+  // ─── In-modal search: filter allContacts by query, exclude already selected ───
+  const selectedIdSet = new Set(contacts.map(c => c.id));
+  const searchResults = searchQuery.trim().length >= 2
+    ? allContacts
+        .filter(c => !selectedIdSet.has(c.id))
+        .filter(c => {
+          const q = searchQuery.toLowerCase();
+          return (
+            getContactName(c).toLowerCase().includes(q) ||
+            (getContactEmail(c) || '').toLowerCase().includes(q) ||
+            (c.company_name || c.company || '').toLowerCase().includes(q)
+          );
+        })
+        .slice(0, 8)
+    : [];
+
+  function addContact(contact) {
+    if (contacts.length >= MAX_CONTACTS) return;
+    setSelectedContacts(prev => [...prev, contact]);
+    setSearchQuery('');
+  }
+
+  function removeContact(contactId) {
+    setSelectedContacts(prev => prev.filter(c => c.id !== contactId));
+  }
+
+  // ─── Insert {{personalize}} at cursor ───
+  function insertPersonalizeTag() {
+    const textarea = p2BodyRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const tag = '{{personalize}}';
+    const newBody = p2Body.slice(0, start) + tag + p2Body.slice(end);
+    setP2Body(newBody);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + tag.length, start + tag.length);
+    });
+  }
 
   // ─── PDF upload handling ───
   function validateAndReadFile(file) {
@@ -139,6 +226,9 @@ export default function BulkComposeModal({ contacts, onClose }) {
               industry: c.industry || '',
               job_start_date: c.job_start_date || null,
               barryContext: c.barryContext || null,
+              relationship_state: c.relationship_state || null,
+              warmth_level: c.warmth_level || null,
+              known_contact: c.known_contact || false,
             })),
             sharedBody: body,
           }),
@@ -192,6 +282,9 @@ export default function BulkComposeModal({ contacts, onClose }) {
               industry: c.industry || '',
               job_start_date: c.job_start_date || null,
               barryContext: c.barryContext || null,
+              relationship_state: c.relationship_state || null,
+              warmth_level: c.warmth_level || null,
+              known_contact: c.known_contact || false,
             })),
             sharedBody: p2Body,
           }),
@@ -265,11 +358,48 @@ export default function BulkComposeModal({ contacts, onClose }) {
     setSendPayload(payload);
     setSendStarted(true);
     setStep(3);
+    deleteDraft();
+  }
+
+  // ─── Draft persistence ───
+  async function saveDraft() {
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const draftRef = doc(db, 'users', user.uid, 'campaignDrafts', 'latest');
+      await setDoc(draftRef, {
+        activePath,
+        subject,
+        body,
+        p2Subject,
+        p2Body,
+        cc,
+        personalizeWithBarry,
+        contactIds: contacts.map(c => c.id),
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      // draft save failure is non-critical
+    }
+  }
+
+  async function deleteDraft() {
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+      const draftRef = doc(db, 'users', user.uid, 'campaignDrafts', 'latest');
+      await deleteDoc(draftRef);
+    } catch {
+      // draft delete failure is non-critical
+    }
   }
 
   function handleClose() {
     if (step === 3 && sendStarted) {
       if (!window.confirm('Sends in progress — closing will not cancel emails already sent.')) return;
+    }
+    if (step < 3 && (subject || body || p2Subject || p2Body)) {
+      saveDraft();
     }
     onClose();
   }
@@ -408,7 +538,7 @@ export default function BulkComposeModal({ contacts, onClose }) {
             )}
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>
-                Compose Bulk Email
+                Compose Campaign
               </div>
               <div style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
                 Step {step} of 3 — {stepLabels[step - 1]} · {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
@@ -518,18 +648,32 @@ export default function BulkComposeModal({ contacts, onClose }) {
                       Example: "Hi {'{{personalize}}'}, I wanted to reach out because..."
                     </div>
                     <textarea
+                      ref={p2BodyRef}
                       value={p2Body} onChange={e => setP2Body(e.target.value)}
                       placeholder="Write your message..."
                       rows={6} style={{ ...inputStyle, resize: 'vertical', minHeight: 100, fontFamily: 'inherit' }}
                     />
-                    {hasPersonalizeTag(p2Body) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                        <Sparkles size={12} style={{ color: BRAND.cyan }} />
-                        <span style={{ fontSize: 11, color: BRAND.cyan, fontWeight: 600 }}>
-                          {'{{personalize}}'} detected — Barry will generate contact-specific text
-                        </span>
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                      <button
+                        onClick={insertPersonalizeTag}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
+                          background: `${BRAND.cyan}08`, color: BRAND.cyan,
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <Plus size={10} />Personalize
+                      </button>
+                      {hasPersonalizeTag(p2Body) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Sparkles size={12} style={{ color: BRAND.cyan }} />
+                          <span style={{ fontSize: 11, color: BRAND.cyan, fontWeight: 600 }}>
+                            {'{{personalize}}'} detected — Barry will generate contact-specific text
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <div style={{ fontSize: 11, color: T.textFaint, marginTop: 6 }}>
                       Tip: use one {'{{personalize}}'} tag per message for best results.
                     </div>
@@ -590,26 +734,113 @@ export default function BulkComposeModal({ contacts, onClose }) {
                       type="email" style={inputStyle}
                     />
                   </div>
-
-                  {/* Section D — Recipients */}
-                  <div style={{ marginTop: 18 }}>
-                    <label style={sectionLabel}>Recipients</label>
-                    <div style={{
-                      padding: '10px 14px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border}`,
-                      display: 'flex', alignItems: 'center', gap: 8,
-                    }}>
-                      <Users size={14} style={{ color: T.textFaint }} />
-                      <span style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>{contacts.length}</span>
-                      <span style={{ fontSize: 12, color: T.textFaint }}>contact{contacts.length !== 1 ? 's' : ''} selected</span>
-                      {contactsWithEmail.length < contacts.length && (
-                        <span style={{ fontSize: 11, color: BRAND.pink, marginLeft: 'auto' }}>
-                          {contactsWithoutEmail.length} without email
-                        </span>
-                      )}
-                    </div>
-                  </div>
                 </>
               )}
+
+              {/* ─── Recipients with search ─── */}
+              <div style={{ marginTop: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label style={{ ...sectionLabel, marginBottom: 0 }}>Recipients</label>
+                  {contacts.length < MAX_CONTACTS && allContacts.length > 0 && (
+                    <button
+                      onClick={() => { setSearchOpen(o => !o); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
+                      style={{
+                        padding: '3px 10px', borderRadius: 6, border: `1px solid ${T.border}`,
+                        background: 'transparent', color: T.textMuted,
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <Plus size={10} />Add
+                    </button>
+                  )}
+                </div>
+
+                {/* Search input */}
+                {searchOpen && (
+                  <div style={{ marginBottom: 8, position: 'relative' }}>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: T.textFaint }} />
+                      <input
+                        ref={searchInputRef}
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Search by name, company, or email..."
+                        style={{ ...inputStyle, paddingLeft: 30, fontSize: 12 }}
+                      />
+                    </div>
+                    {searchResults.length > 0 && (
+                      <div style={{
+                        marginTop: 4, borderRadius: 8, border: `1px solid ${T.border}`,
+                        background: T.cardBg, maxHeight: 160, overflowY: 'auto',
+                      }}>
+                        {searchResults.map(c => (
+                          <div
+                            key={c.id}
+                            onClick={() => addContact(c)}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '7px 10px', cursor: 'pointer',
+                              borderBottom: `1px solid ${T.border}`,
+                            }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {getContactName(c)}
+                              </div>
+                              <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {getContactEmail(c) || c.company_name || c.company || ''}
+                              </div>
+                            </div>
+                            <Plus size={12} style={{ color: BRAND.cyan, flexShrink: 0 }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                      <div style={{ marginTop: 4, padding: '8px 10px', fontSize: 11, color: T.textFaint, textAlign: 'center' }}>
+                        No matching contacts found
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected recipients list */}
+                <div style={{
+                  borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface,
+                  maxHeight: 140, overflowY: 'auto',
+                }}>
+                  {contacts.map((c, i) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        borderBottom: i < contacts.length - 1 ? `1px solid ${T.border}` : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <Users size={11} style={{ color: T.textFaint, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {getContactName(c)}
+                        </span>
+                        {!getContactEmail(c) && (
+                          <span style={{ fontSize: 9, color: BRAND.pink, fontWeight: 600 }}>no email</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeContact(c.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, padding: 2, display: 'flex' }}
+                      ><X size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+                {contacts.length >= MAX_CONTACTS && (
+                  <div style={{ fontSize: 10, color: BRAND.pink, marginTop: 4 }}>
+                    Maximum {MAX_CONTACTS} contacts per campaign
+                  </div>
+                )}
+              </div>
 
               {/* ─── Missing email warning (both paths) ─── */}
               {contactsWithoutEmail.length > 0 && (
@@ -629,11 +860,11 @@ export default function BulkComposeModal({ contacts, onClose }) {
               <button onClick={handleClose} style={btnSecondary}>Cancel</button>
               <button
                 onClick={handlePreview}
-                disabled={!composeValid || loading}
+                disabled={!composeValid || loading || contacts.length === 0}
                 style={{
                   ...btnPrimary,
-                  opacity: (!composeValid || loading) ? 0.5 : 1,
-                  cursor: (!composeValid || loading) ? 'not-allowed' : 'pointer',
+                  opacity: (!composeValid || loading || contacts.length === 0) ? 0.5 : 1,
+                  cursor: (!composeValid || loading || contacts.length === 0) ? 'not-allowed' : 'pointer',
                 }}
               >
                 {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}
@@ -770,7 +1001,7 @@ export default function BulkComposeModal({ contacts, onClose }) {
           </>
         )}
 
-        {/* ─── Step 3: Send (BulkSendExecutor — Workstream C) ─── */}
+        {/* ─── Step 3: Send (BulkSendExecutor — Campaign) ─── */}
         {step === 3 && (
           <div style={bodySection}>
             <BulkSendExecutor

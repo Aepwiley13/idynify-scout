@@ -72,25 +72,32 @@ export function prepareAttachment(attachment) {
   return { part: { data: normalized, filename: sanitizeFilename(filename), mimeType: 'application/pdf' } };
 }
 
+function toHtml(text) {
+  return text
+    .split(/\n\n+/)
+    .map(para => '<p>' + para.replace(/\n/g, '<br>') + '</p>')
+    .join('');
+}
+
 /**
  * Build the RFC 2822 message for the Gmail API.
- * Without an attachment this produces exactly the same plain-text format as
- * before Phase 1.5 — no regression for existing callers. With an attachment
- * it produces a multipart/mixed message: a text/plain part for the body and
- * an application/pdf part with Content-Disposition: attachment.
+ * Body is converted to HTML for proper paragraph/line-break rendering.
+ * With an attachment it produces a multipart/mixed message: an HTML part
+ * for the body and an application/pdf part with Content-Disposition: attachment.
  * Exported for testing.
  */
 export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment }) {
   const lines = [`To: ${recipientName} <${toEmail}>`];
   if (ccHeader) lines.push(`Cc: ${ccHeader}`);
+  const htmlBody = toHtml(bodyText);
 
   if (!attachment) {
     lines.push(
       `Subject: ${subject}`,
-      'Content-Type: text/plain; charset=utf-8',
+      'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
       '',
-      bodyText
+      htmlBody
     );
     return lines.join('\n');
   }
@@ -105,9 +112,9 @@ export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHea
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
     `--${boundary}`,
-    'Content-Type: text/plain; charset=utf-8',
+    'Content-Type: text/html; charset=utf-8',
     '',
-    bodyText,
+    htmlBody,
     '',
     `--${boundary}`,
     `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,

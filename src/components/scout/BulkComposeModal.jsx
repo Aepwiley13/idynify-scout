@@ -88,6 +88,7 @@ export default function BulkComposeModal({
   const [loading, setLoading] = useState(false);
   const [previews, setPreviews] = useState(null);
   const [sendStarted, setSendStarted] = useState(false);
+  const [sendComplete, setSendComplete] = useState(false);
   const [sendPayload, setSendPayload] = useState(null);
 
   // ─── Draft state ───
@@ -402,6 +403,7 @@ export default function BulkComposeModal({
 
   function handleAddMoreContacts() {
     setSendStarted(false);
+    setSendComplete(false);
     setSendPayload(null);
     setPreviews(null);
     setSelectedContacts([]);
@@ -409,7 +411,7 @@ export default function BulkComposeModal({
   }
 
   function handleClose() {
-    if (step === 3 && sendStarted) {
+    if (step === 3 && sendStarted && !sendComplete) {
       if (!window.confirm('Sends in progress — closing will not cancel emails already sent.')) return;
     }
     if (step < 3 && (subject || body || p2Subject || p2Body)) {
@@ -1034,6 +1036,7 @@ export default function BulkComposeModal({
               payload={sendPayload}
               T={T}
               onAddMoreContacts={handleAddMoreContacts}
+              onComplete={() => setSendComplete(true)}
             />
           </div>
         )}

@@ -50,7 +50,7 @@ function getContactName(contact) {
     || 'Unknown';
 }
 
-export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts }) {
+export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts, onComplete }) {
   const TContext = useT();
   const T = TProp || TContext;
   // contactId → { status, reason }
@@ -108,6 +108,7 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts 
     }
     setRunning(false);
     setComplete(true);
+    onComplete?.();
   }
 
   useEffect(() => {

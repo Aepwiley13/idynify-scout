@@ -42,15 +42,15 @@ const base = {
 const PDF_B64 = btoa('%PDF-1.4 test');
 
 describe('buildRawEmail', () => {
-  it('produces the exact pre-1.5 plain-text format with no attachment and no cc', () => {
+  it('produces HTML format with no attachment and no cc', () => {
     const raw = buildRawEmail({ ...base, ccHeader: null, attachment: null });
     expect(raw).toBe(
       'To: Jane Doe <jane@acme.com>\n' +
       'Subject: Quick question\n' +
-      'Content-Type: text/plain; charset=utf-8\n' +
+      'Content-Type: text/html; charset=utf-8\n' +
       'MIME-Version: 1.0\n' +
       '\n' +
-      'Hello Jane,\n\nHere is the message.'
+      '<p>Hello Jane,</p><p>Here is the message.</p>'
     );
   });
 
@@ -75,8 +75,8 @@ describe('buildRawEmail', () => {
     expect(raw.split(`--${boundary}\n`).length - 1).toBe(2);
     expect(raw).toContain(`--${boundary}--`);
 
-    // Text part carries the body
-    expect(raw).toContain('Content-Type: text/plain; charset=utf-8\n\nHello Jane,');
+    // HTML part carries the body
+    expect(raw).toContain('Content-Type: text/html; charset=utf-8\n\n<p>Hello Jane,</p>');
 
     // PDF part
     expect(raw).toContain('Content-Type: application/pdf; name="guide.pdf"');

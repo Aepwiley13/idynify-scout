@@ -27,6 +27,13 @@ vi.mock('../../src/context/ImpersonationContext', () => ({
   getEffectiveUser: () => ({ uid: 'user-1' }),
 }));
 
+vi.mock('../../src/theme/ThemeContext', () => ({
+  useT: () => ({
+    cardBg: '#101', surface: '#202', border: '#303',
+    text: '#fee', textMuted: '#abc', textFaint: '#889',
+  }),
+}));
+
 import BulkSendExecutor, { SEND_DELAY_MS } from '../components/scout/BulkSendExecutor';
 
 const T = {
@@ -162,6 +169,31 @@ describe('BulkSendExecutor send loop', () => {
     expect(mockExecuteSendAction.mock.calls[3][0].contact.id).toBe('c2');
     expect(screen.getByText('3 sent, 0 failed')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Retry failed/ })).not.toBeInTheDocument();
+  });
+
+  it('passes per-item attachment and cc through to executeSendAction (Phase 1.5)', async () => {
+    const attachment = { data: 'QUJD', filename: 'guide.pdf', mimeType: 'application/pdf' };
+    const items = [
+      { ...makeItem(1), attachment, cc: 'boss@x.com' },
+      makeItem(2), // no attachment/cc — Phase 1 shape
+    ];
+    render(<BulkSendExecutor payload={items} T={T} />);
+    await flush();
+    await advance(SEND_DELAY_MS);
+
+    const [first] = mockExecuteSendAction.mock.calls[0];
+    expect(first.attachment).toEqual(attachment);
+    expect(first.cc).toBe('boss@x.com');
+
+    const [second] = mockExecuteSendAction.mock.calls[1];
+    expect('attachment' in second).toBe(false);
+    expect('cc' in second).toBe(false);
+  });
+
+  it('falls back to the theme context when no T prop is passed', async () => {
+    render(<BulkSendExecutor payload={[makeItem(1)]} />);
+    await flush();
+    expect(screen.getByText('1 sent, 0 failed')).toBeInTheDocument();
   });
 
   it('renders an empty state when payload is empty', () => {

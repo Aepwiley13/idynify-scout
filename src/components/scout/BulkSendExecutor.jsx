@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { useT } from '../../theme/ThemeContext';
 
 export const SEND_DELAY_MS = 1500; // mandatory inter-send delay — do not remove
 
@@ -47,7 +48,10 @@ function getContactName(contact) {
     || 'Unknown';
 }
 
-export default function BulkSendExecutor({ payload, T }) {
+export default function BulkSendExecutor({ payload, T: themeProp }) {
+  // Theme may arrive as a prop (Phase 1 modal) or from context (Phase 1.5 modal)
+  const themeFromContext = useT();
+  const T = themeProp || themeFromContext;
   // contactId → { status, reason }
   const [statuses, setStatuses] = useState(() =>
     Object.fromEntries((payload || []).map((p) => [p.contact.id, { status: 'pending' }]))
@@ -63,12 +67,17 @@ export default function BulkSendExecutor({ payload, T }) {
     setStatuses((prev) => ({ ...prev, [contactId]: { status, reason } }));
   }
 
-  async function sendOne({ contact, subject, body }) {
+  // attachment ({ data, filename, mimeType }) and cc (email string) are
+  // optional per payload item (Phase 1.5 "Send with attachment" path) —
+  // omitted for Phase 1 sends, which behave exactly as before.
+  async function sendOne({ contact, subject, body, attachment, cc }) {
     setContactStatus(contact.id, 'sending');
     try {
       const userId = getEffectiveUser()?.uid;
       const res = await executeSendAction({
         channel: CHANNELS.EMAIL, userId, contact, subject, body,
+        ...(attachment ? { attachment } : {}),
+        ...(cc ? { cc } : {}),
       });
 
       switch (res?.result) {

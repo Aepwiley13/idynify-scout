@@ -143,7 +143,7 @@ export async function resolveSendMethod(channel, userId, contact) {
 /**
  * OPTION A: Send email via Gmail API
  */
-export async function sendEmailViaGmail({ userId, contact, subject, body, ccRecipients }) {
+export async function sendEmailViaGmail({ userId, contact, subject, body, ccRecipients, attachment, cc }) {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('Not authenticated');
@@ -166,6 +166,8 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
         // Preserve the existing Gmail thread for follow-ups (Sprint 3)
         existingThreadId: contact.gmail_thread_id || null,
         ccEmails: ccEmails.length > 0 ? ccEmails : undefined,
+        ...(attachment ? { attachment } : {}),
+        ...(cc ? { cc } : {}),
       })
     });
 
@@ -434,6 +436,8 @@ export async function executeSendAction({
   engagementIntent,
   strategy,
   ccRecipients,
+  attachment,
+  cc,
   // Calendar-specific params
   startDateTime,
   endDateTime,
@@ -457,7 +461,7 @@ export async function executeSendAction({
     case CHANNELS.EMAIL:
       if (resolution.method === 'real') {
         // Option A: Real Gmail send
-        sendResult = await sendEmailViaGmail({ userId, contact, subject, body, ccRecipients });
+        sendResult = await sendEmailViaGmail({ userId, contact, subject, body, ccRecipients, attachment, cc });
         activityType = sendResult.result === SEND_RESULT.SENT ? 'email_sent' : 'email_failed';
       } else {
         // Option B: Native mailto

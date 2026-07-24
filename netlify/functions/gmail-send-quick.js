@@ -29,6 +29,98 @@ if (getApps().length === 0) {
 
 const db = getFirestore();
 
+// Phase 1.5: attachment cap enforced server-side. NOTE: Netlify synchronous
+// functions cap the request payload at ~6MB, so base64-encoded PDFs larger
+// than ~4.3MB never reach this handler — see the Phase 1.5 flag on this.
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/** Strip characters that would break or inject into MIME headers. */
+function sanitizeFilename(filename) {
+  const cleaned = String(filename || '').replace(/[\r\n"\\]/g, '').trim().slice(0, 200);
+  return cleaned || 'attachment.pdf';
+}
+
+/**
+ * Validate and normalize the optional attachment input
+ * ({ data: base64 string, filename, mimeType: 'application/pdf' }).
+ * Returns { error } on invalid input, or { part } ready for buildRawEmail.
+ * Exported for testing.
+ */
+export function prepareAttachment(attachment) {
+  if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) {
+    return { error: 'attachment must be an object with data and filename' };
+  }
+  const { data, filename, mimeType } = attachment;
+  if (typeof data !== 'string' || !data.trim()) {
+    return { error: 'attachment.data must be a base64-encoded string' };
+  }
+  if (!filename || typeof filename !== 'string') {
+    return { error: 'attachment.filename is required' };
+  }
+  if (mimeType && mimeType !== 'application/pdf') {
+    return { error: 'Only PDF attachments (application/pdf) are supported' };
+  }
+  // Accept an optional data-URL prefix and strip whitespace/newlines
+  const normalized = data.replace(/^data:application\/pdf;base64,/, '').replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) {
+    return { error: 'attachment.data is not valid base64' };
+  }
+  const sizeBytes = Math.floor((normalized.length * 3) / 4);
+  if (sizeBytes > MAX_ATTACHMENT_BYTES) {
+    return { error: 'Attachment exceeds the 10MB limit' };
+  }
+  return { part: { data: normalized, filename: sanitizeFilename(filename), mimeType: 'application/pdf' } };
+}
+
+/**
+ * Build the RFC 2822 message for the Gmail API.
+ * Without an attachment this produces exactly the same plain-text format as
+ * before Phase 1.5 — no regression for existing callers. With an attachment
+ * it produces a multipart/mixed message: a text/plain part for the body and
+ * an application/pdf part with Content-Disposition: attachment.
+ * Exported for testing.
+ */
+export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment }) {
+  const lines = [`To: ${recipientName} <${toEmail}>`];
+  if (ccHeader) lines.push(`Cc: ${ccHeader}`);
+
+  if (!attachment) {
+    lines.push(
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'MIME-Version: 1.0',
+      '',
+      bodyText
+    );
+    return lines.join('\n');
+  }
+
+  const boundary = `idynify_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  // RFC 2045: base64 content lines must stay short — wrap at 76 chars
+  const wrappedData = attachment.data.replace(/(.{76})/g, '$1\n');
+
+  lines.push(
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    bodyText,
+    '',
+    `--${boundary}`,
+    `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+    'Content-Transfer-Encoding: base64',
+    `Content-Disposition: attachment; filename="${attachment.filename}"`,
+    '',
+    wrappedData,
+    `--${boundary}--`,
+    ''
+  );
+  return lines.join('\n');
+}
+
 export const handler = async (event) => {
   // CORS headers
   const headers = {
@@ -57,7 +149,9 @@ export const handler = async (event) => {
     // existing Gmail thread (follow-up reply). gmail_thread_id in Firestore is
     // preserved; only gmail_last_message_id and last_sent_at are updated.
     // ccEmails: optional array of { name, email } objects to CC.
-    const { userId, authToken, toEmail, toName, subject, body, contactId, existingThreadId, ccEmails } = JSON.parse(event.body);
+    // cc: optional single CC email string (Phase 1.5) — merged with ccEmails.
+    // attachment: optional { data: base64, filename, mimeType: 'application/pdf' } (Phase 1.5).
+    const { userId, authToken, toEmail, toName, subject, body, contactId, existingThreadId, ccEmails, cc, attachment } = JSON.parse(event.body);
 
     // Validate required fields
     if (!userId || !authToken || !toEmail || !subject || !body) {
@@ -68,6 +162,36 @@ export const handler = async (event) => {
           error: 'Missing required parameters: userId, authToken, toEmail, subject, body'
         })
       };
+    }
+
+    // Merge the Phase 1.5 single `cc` string into the CC list (deduplicated)
+    const ccList = Array.isArray(ccEmails) ? [...ccEmails] : [];
+    if (cc !== undefined && cc !== null && cc !== '') {
+      const ccTrimmed = typeof cc === 'string' ? cc.trim() : '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ccTrimmed)) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'cc must be a valid email address' })
+        };
+      }
+      if (!ccList.some(r => r.email === ccTrimmed)) {
+        ccList.push({ email: ccTrimmed });
+      }
+    }
+
+    // Validate and normalize the optional attachment
+    let attachmentPart = null;
+    if (attachment !== undefined && attachment !== null) {
+      const { error: attachmentError, part } = prepareAttachment(attachment);
+      if (attachmentError) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: attachmentError })
+        };
+      }
+      attachmentPart = part;
     }
 
     console.log(`📧 Quick send email to ${toName || toEmail} from user ${userId}`);
@@ -199,23 +323,19 @@ export const handler = async (event) => {
     const signature = await getGmailSignature(gmail);
     const bodyWithSignature = appendSignature(body, signature);
 
-    // Create email in RFC 2822 format
+    // Create email in RFC 2822 format (multipart/mixed when a PDF is attached)
     const recipientName = toName || toEmail;
-    const emailLines = [
-      `To: ${recipientName} <${toEmail}>`,
-    ];
-    if (ccEmails && ccEmails.length > 0) {
-      const ccHeader = ccEmails.map(r => r.name && r.name !== r.email ? `${r.name} <${r.email}>` : r.email).join(', ');
-      emailLines.push(`Cc: ${ccHeader}`);
-    }
-    emailLines.push(
-      `Subject: ${subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      'MIME-Version: 1.0',
-      '',
-      bodyWithSignature
-    );
-    const email = emailLines.join('\n');
+    const ccHeader = ccList.length > 0
+      ? ccList.map(r => r.name && r.name !== r.email ? `${r.name} <${r.email}>` : r.email).join(', ')
+      : null;
+    const email = buildRawEmail({
+      toEmail,
+      recipientName,
+      subject,
+      bodyText: bodyWithSignature,
+      ccHeader,
+      attachment: attachmentPart
+    });
 
     // Encode email in base64url format (required by Gmail API)
     const encodedEmail = Buffer.from(email)
@@ -282,7 +402,8 @@ export const handler = async (event) => {
         status: 'sent',
         sentAt,
         source: 'quick_engage',
-        ...(ccEmails && ccEmails.length > 0 && { ccEmails: ccEmails.map(r => r.email) })
+        ...(ccList.length > 0 && { ccEmails: ccList.map(r => r.email) }),
+        ...(attachmentPart && { attachmentFilename: attachmentPart.filename })
       });
     } catch (logError) {
       console.warn('Failed to log email, non-blocking:', logError);

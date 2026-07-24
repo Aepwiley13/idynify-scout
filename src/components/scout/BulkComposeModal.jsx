@@ -1,12 +1,13 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, Paperclip, FileText, Upload, Users } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { checkGmailConnection } from '../../utils/sendActionResolver';
 import BulkSendExecutor from './BulkSendExecutor';
 
 const MAX_CONTACTS = 25;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB — Netlify 6MB payload cap + base64 inflation
 
 function getContactEmail(c) {
   return c.email || c.work_email || '';
@@ -48,6 +49,26 @@ export default function BulkComposeModal({ contacts, onClose }) {
   const dropZoneRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
+  // ─── Gmail connection status ───
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailChecking, setGmailChecking] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = getEffectiveUser();
+        if (!user) return;
+        setGmailChecking(true);
+        const status = await checkGmailConnection(user.uid);
+        setGmailConnected(status.connected);
+      } catch {
+        setGmailConnected(false);
+      } finally {
+        setGmailChecking(false);
+      }
+    })();
+  }, []);
+
   // ─── Shared state ───
   const [loading, setLoading] = useState(false);
   const [previews, setPreviews] = useState(null);
@@ -69,7 +90,7 @@ export default function BulkComposeModal({ contacts, onClose }) {
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      setAttachmentError(`File exceeds 10MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB).`);
+      setAttachmentError(`File exceeds 4MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB).`);
       return;
     }
     const reader = new FileReader();
@@ -259,7 +280,7 @@ export default function BulkComposeModal({ contacts, onClose }) {
 
   // ─── Compose validity ───
   const path1Valid = subject.trim() && body.trim();
-  const path2Valid = p2Body.trim();
+  const path2Valid = p2Body.trim() && gmailConnected;
   const composeValid = isPath2 ? path2Valid : path1Valid;
 
   // ─── Styles ───
@@ -469,6 +490,18 @@ export default function BulkComposeModal({ contacts, onClose }) {
               {/* ─── Path 2: Send with attachment ─── */}
               {activePath === 'send_with_attachment' && (
                 <>
+                  {!gmailChecking && !gmailConnected && (
+                    <div style={{
+                      marginBottom: 16, padding: '12px 14px', borderRadius: 10,
+                      background: `${BRAND.pink}10`, border: `1px solid ${BRAND.pink}30`,
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      fontSize: 12, color: BRAND.pink, lineHeight: 1.5,
+                    }}>
+                      <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                      Gmail connection required to send attachments. Connect Gmail in Settings.
+                    </div>
+                  )}
+
                   {/* Section A — Message */}
                   <label style={sectionLabel}>Subject (optional)</label>
                   <input value={p2Subject} onChange={e => setP2Subject(e.target.value)} placeholder="Email subject line" style={inputStyle} />
@@ -497,11 +530,14 @@ export default function BulkComposeModal({ contacts, onClose }) {
                         </span>
                       </div>
                     )}
+                    <div style={{ fontSize: 11, color: T.textFaint, marginTop: 6 }}>
+                      Tip: use one {'{{personalize}}'} tag per message for best results.
+                    </div>
                   </div>
 
                   {/* Section B — Attachment */}
                   <div style={{ marginTop: 18 }}>
-                    <label style={sectionLabel}>Attachment (optional, PDF only, max 10MB)</label>
+                    <label style={sectionLabel}>Attachment (optional, PDF only, max 4MB)</label>
                     {!attachment ? (
                       <div
                         ref={dropZoneRef}

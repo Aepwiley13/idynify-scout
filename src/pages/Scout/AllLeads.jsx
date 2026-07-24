@@ -2026,11 +2026,11 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             <option value="warmth">By Warmth</option>
           </select>
         </div>
-        {/* Select mode toggle */}
+        {/* Start Cadence / bulk select toggle */}
         <button
           onClick={() => { setBulkMode(m => { if (m) { setSelectedIds(new Set()); } return !m; }); }}
-          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${bulkMode ? T.accentBdr : T.border}`, background: bulkMode ? T.accentBg : 'transparent', color: bulkMode ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >{bulkMode ? `Selecting (${selectedIds.size})` : 'Select'}</button>
+          style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: bulkMode ? T.accentBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: bulkMode ? BRAND.pink : '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, whiteSpace: 'nowrap' }}
+        ><RefreshCw size={12} />{bulkMode ? `Selecting (${selectedIds.size})` : 'Start Cadence'}</button>
         <button
           onClick={() => setShowLinkedInModal(true)}
           style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,#0077b5,#005f8e)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}

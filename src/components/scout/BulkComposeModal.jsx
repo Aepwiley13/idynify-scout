@@ -92,11 +92,10 @@ export default function BulkComposeModal({
   const [sendPayload, setSendPayload] = useState(null);
 
   // ─── Draft state ───
-  const [draftId, setDraftId] = useState(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
-  const [draftRestored, setDraftRestored] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState(null);
 
-  // ─── Load draft on mount ───
+  // ─── Check for draft on mount (do not auto-apply) ───
   useEffect(() => {
     (async () => {
       try {
@@ -108,15 +107,7 @@ export default function BulkComposeModal({
           const d = snap.data();
           const age = Date.now() - (d.updatedAt?.toMillis?.() || 0);
           if (age < 7 * 24 * 60 * 60 * 1000) {
-            setDraftId('latest');
-            setDraftRestored(true);
-            setActivePath(d.activePath || 'write_your_own');
-            if (d.subject) setSubject(d.subject);
-            if (d.body) setBody(d.body);
-            if (d.p2Subject) setP2Subject(d.p2Subject);
-            if (d.p2Body) setP2Body(d.p2Body);
-            if (d.cc) setCc(d.cc);
-            if (typeof d.personalizeWithBarry === 'boolean') setPersonalizeWithBarry(d.personalizeWithBarry);
+            setPendingDraft(d);
           }
         }
       } catch {
@@ -126,6 +117,24 @@ export default function BulkComposeModal({
       }
     })();
   }, []);
+
+  function resumeDraft() {
+    if (!pendingDraft) return;
+    const d = pendingDraft;
+    setActivePath(d.activePath || 'write_your_own');
+    if (d.subject) setSubject(d.subject);
+    if (d.body) setBody(d.body);
+    if (d.p2Subject) setP2Subject(d.p2Subject);
+    if (d.p2Body) setP2Body(d.p2Body);
+    if (d.cc) setCc(d.cc);
+    if (typeof d.personalizeWithBarry === 'boolean') setPersonalizeWithBarry(d.personalizeWithBarry);
+    setPendingDraft(null);
+  }
+
+  function dismissDraft() {
+    setPendingDraft(null);
+    deleteDraft();
+  }
 
   const contacts = selectedContacts;
   const contactsWithEmail = contacts.filter(c => getContactEmail(c));
@@ -572,14 +581,34 @@ export default function BulkComposeModal({
           <>
             <div style={bodySection}>
               {/* ─── Draft resume banner ─── */}
-              {draftRestored && (
+              {pendingDraft && (
                 <div style={{
-                  marginBottom: 14, padding: '10px 14px', borderRadius: 10,
+                  marginBottom: 14, padding: '12px 14px', borderRadius: 10,
                   background: `${BRAND.cyan}10`, border: `1px solid ${BRAND.cyan}30`,
-                  fontSize: 12, color: BRAND.cyan, lineHeight: 1.5,
+                  fontSize: 12, lineHeight: 1.5,
                 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Draft restored</div>
-                  Your previous contacts were not saved — please re-select recipients.
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: BRAND.cyan }}>You have a previous draft</div>
+                  <div style={{ color: T.textMuted, marginBottom: 10 }}>
+                    Subject: {pendingDraft.subject || '(empty)'} — Would you like to resume or start fresh?
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={resumeDraft}
+                      style={{
+                        padding: '6px 14px', borderRadius: 7, border: 'none',
+                        background: BRAND.cyan, color: '#fff',
+                        fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >Resume previous draft</button>
+                    <button
+                      onClick={dismissDraft}
+                      style={{
+                        padding: '6px 14px', borderRadius: 7,
+                        border: `1px solid ${T.border}`, background: 'transparent',
+                        color: T.textMuted, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >Start fresh</button>
+                  </div>
                 </div>
               )}
 
@@ -767,9 +796,18 @@ export default function BulkComposeModal({
 
               {/* ─── Recipients with search ─── */}
               <div style={{ marginTop: 18 }}>
+                {contacts.length === 0 && (
+                  <div style={{
+                    marginBottom: 8, padding: '8px 12px', borderRadius: 8,
+                    background: `${BRAND.pink}08`, border: `1px solid ${BRAND.pink}20`,
+                    fontSize: 11, color: T.textMuted, lineHeight: 1.5,
+                  }}>
+                    Add contacts below, or go to Scout → People to select contacts and click Start Cadence.
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label style={{ ...sectionLabel, marginBottom: 0 }}>Recipients</label>
-                  {contacts.length < MAX_CONTACTS && allContacts.length > 0 && (
+                  {contacts.length > 0 && contacts.length < MAX_CONTACTS && allContacts.length > 0 && (
                     <button
                       onClick={() => { setSearchOpen(o => !o); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
                       style={{
@@ -784,8 +822,8 @@ export default function BulkComposeModal({
                   )}
                 </div>
 
-                {/* Search input */}
-                {searchOpen && (
+                {/* Search input — always visible when zero contacts, toggleable otherwise */}
+                {(searchOpen || contacts.length === 0) && (
                   <div style={{ marginBottom: 8, position: 'relative' }}>
                     <div style={{ position: 'relative' }}>
                       <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: T.textFaint }} />
@@ -793,7 +831,7 @@ export default function BulkComposeModal({
                         ref={searchInputRef}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search by name, company, or email..."
+                        placeholder={contacts.length === 0 ? 'Search for contacts to add to this cadence' : 'Search by name, company, or email...'}
                         style={{ ...inputStyle, paddingLeft: 30, fontSize: 12 }}
                       />
                     </div>

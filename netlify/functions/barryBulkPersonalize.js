@@ -18,6 +18,16 @@
  * Deliberately does NOT load barry_memory, engagement history, or strategy
  * recommendations — this is bulk generation, not deep single-contact
  * personalization (see Phase 1 brief).
+ *
+ * Phase 1.5: optional `mode` parameter.
+ *   - 'opening_line' (default): existing behavior — a standalone opening line
+ *     prepended before the shared body.
+ *   - 'inline_personalize': sharedBody contains a {{personalize}} marker; the
+ *     generated text replaces the marker and must fit grammatically into the
+ *     surrounding sentence. Output shape is unchanged — `openingLine` carries
+ *     the replacement text. One replacement per contact: if the body contains
+ *     multiple {{personalize}} tags, context is taken from the first tag and
+ *     the same replacement text applies to all of them.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -27,6 +37,9 @@ import { logApiUsage } from './utils/logApiUsage.js';
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_CONTACTS = 25;
 const PER_CONTACT_TIMEOUT_MS = 15000;
+
+export const MODES = { OPENING_LINE: 'opening_line', INLINE_PERSONALIZE: 'inline_personalize' };
+export const PERSONALIZE_TAG = '{{personalize}}';
 
 const HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
@@ -140,6 +153,85 @@ RULES:
 Return ONLY the opening line text. No quotes around it, no labels, no explanation.`;
 }
 
+/**
+ * Locate the first {{personalize}} tag in the body and pull the sentence
+ * before and after it, so Barry can generate replacement text that fits the
+ * surrounding grammar. Returns null if the body has no tag. Exported for testing.
+ */
+export function extractTagContext(sharedBody) {
+  if (typeof sharedBody !== 'string') return null;
+  const idx = sharedBody.indexOf(PERSONALIZE_TAG);
+  if (idx === -1) return null;
+
+  const before = sharedBody.slice(0, idx);
+  const after = sharedBody.slice(idx + PERSONALIZE_TAG.length);
+  const beforeParts = before.split(/(?<=[.!?\n])/).map((s) => s.trim()).filter(Boolean);
+  const afterParts = after.split(/(?<=[.!?\n])/).map((s) => s.trim()).filter(Boolean);
+
+  return {
+    sentenceBefore: beforeParts.length > 0 ? beforeParts[beforeParts.length - 1] : '',
+    sentenceAfter: afterParts.length > 0 ? afterParts[0] : '',
+    tagCount: sharedBody.split(PERSONALIZE_TAG).length - 1,
+  };
+}
+
+/**
+ * Prompt variant for mode 'inline_personalize': generate replacement text for
+ * the {{personalize}} marker that fits grammatically into the surrounding
+ * sentence, instead of a standalone opening line. Exported for testing.
+ */
+export function buildInlinePersonalizePrompt(contact, sharedBody, tagContext, reconBlock, userContext) {
+  const firstName = clip(contact.firstName, 100);
+  const title = clip(contact.title, 150);
+  const company = clip(contact.company, 150);
+  const industry = clip(contact.industry, 150);
+  const tenure = monthsInRole(contact.job_start_date);
+  const personaSummary = clip(contact.barryContext?.personaSummary, 500);
+
+  const hasCriticalFields = Boolean(title || company);
+
+  const contactLines = [
+    firstName ? `First name: ${firstName}` : null,
+    title ? `Title: ${title}` : null,
+    company ? `Company: ${company}` : null,
+    industry ? `Industry: ${industry}` : null,
+    tenure ? `Tenure: ${tenure}` : null,
+    personaSummary ? `Persona: ${personaSummary}` : null,
+  ].filter(Boolean);
+
+  const senderLine = [
+    clip(userContext?.name, 100) ? `Sender: ${clip(userContext.name, 100)}` : null,
+    clip(userContext?.company, 150) ? `Sender's company: ${clip(userContext.company, 150)}` : null,
+  ].filter(Boolean).join('\n');
+
+  const specificityRule = hasCriticalFields
+    ? 'Reference something specific about this contact — their role, company, industry, or timing signal. Pick the strongest single angle.'
+    : 'Very little is known about this contact. Write warm, genuine, generic text. Do NOT invent details about their role or company — no guessing, no placeholders.';
+
+  return `You are Barry, an expert B2B outreach copywriter. The sender wrote one email that every recipient receives. It contains a ${PERSONALIZE_TAG} marker where a contact-specific line belongs. Write ONLY the replacement text for that marker.
+
+CONTACT:
+${contactLines.length > 0 ? contactLines.join('\n') : 'No details available.'}
+
+${senderLine ? `${senderLine}\n\n` : ''}${reconBlock ? `SENDER'S BUSINESS INTELLIGENCE (for relevance — do not quote verbatim):\n${reconBlock}\n\n` : ''}FULL MESSAGE (the ${PERSONALIZE_TAG} marker shows exactly where your text will be inserted):
+"""
+${clip(sharedBody, 2000)}
+"""
+
+THE MARKER'S IMMEDIATE SURROUNDINGS:
+Text before the marker: "${tagContext.sentenceBefore || '(start of message)'}"
+Text after the marker: "${tagContext.sentenceAfter || '(end of message)'}"
+
+RULES:
+1. 1-2 sentences maximum. Your text replaces the marker verbatim — nothing else in the message changes.
+2. It must fit grammatically between the text before and after the marker. Read the result aloud in your head: capitalization, punctuation, and flow must work exactly as inserted.
+3. ${specificityRule}
+4. Do not repeat or paraphrase anything already in the message.
+5. No greeting and no sign-off unless the surrounding text grammatically requires it.
+
+Return ONLY the replacement text. No quotes around it, no labels, no explanation.`;
+}
+
 /** Normalize model output to a clean opening line. Exported for testing. */
 export function cleanOpeningLine(text) {
   if (typeof text !== 'string') return null;
@@ -154,7 +246,7 @@ export function cleanOpeningLine(text) {
   return line || null;
 }
 
-async function generateForContact(anthropic, contact, sharedBody, reconBlock, userContext) {
+async function generateForContact(anthropic, contact, sharedBody, reconBlock, userContext, mode, tagContext) {
   const contactId = contact?.contactId ?? null;
 
   if (!contact || typeof contact !== 'object' || !contactId) {
@@ -165,7 +257,9 @@ async function generateForContact(anthropic, contact, sharedBody, reconBlock, us
   const timeout = setTimeout(() => controller.abort(), PER_CONTACT_TIMEOUT_MS);
 
   try {
-    const prompt = buildPrompt(contact, sharedBody, reconBlock, userContext);
+    const prompt = mode === MODES.INLINE_PERSONALIZE
+      ? buildInlinePersonalizePrompt(contact, sharedBody, tagContext, reconBlock, userContext)
+      : buildPrompt(contact, sharedBody, reconBlock, userContext);
     const response = await anthropic.messages.create(
       {
         model: MODEL,
@@ -205,8 +299,11 @@ export const handler = async (event) => {
     }
 
     userId = body.userId;
-    const { authToken, contacts, sharedBody, recon, userContext } = body;
+    const { authToken, contacts, sharedBody, recon, userContext, mode = MODES.OPENING_LINE } = body;
 
+    if (!Object.values(MODES).includes(mode)) {
+      return respond(400, { error: `Invalid mode "${mode}" — must be one of: ${Object.values(MODES).join(', ')}` });
+    }
     if (!userId || !authToken) {
       return respond(401, { error: 'Missing required parameters: userId, authToken' });
     }
@@ -218,6 +315,10 @@ export const handler = async (event) => {
     }
     if (typeof sharedBody !== 'string' || !sharedBody.trim()) {
       return respond(400, { error: 'sharedBody is required' });
+    }
+    const tagContext = mode === MODES.INLINE_PERSONALIZE ? extractTagContext(sharedBody) : null;
+    if (mode === MODES.INLINE_PERSONALIZE && !tagContext) {
+      return respond(400, { error: `sharedBody must contain at least one ${PERSONALIZE_TAG} tag in inline_personalize mode` });
     }
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY not configured');
@@ -235,7 +336,7 @@ export const handler = async (event) => {
     // One Claude call per contact, all in parallel. generateForContact never
     // throws — a single contact's failure must not fail the batch.
     const results = await Promise.all(
-      contacts.map((contact) => generateForContact(anthropic, contact, sharedBody, reconBlock, userContext))
+      contacts.map((contact) => generateForContact(anthropic, contact, sharedBody, reconBlock, userContext, mode, tagContext))
     );
 
     const successCount = results.filter((r) => r.success).length;
@@ -247,6 +348,7 @@ export const handler = async (event) => {
         successCount,
         failCount: contacts.length - successCount,
         reconUsed: !!reconBlock,
+        mode,
       },
     });
 

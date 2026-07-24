@@ -32,9 +32,13 @@ vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({
 import {
   handler,
   buildPrompt,
+  buildInlinePersonalizePrompt,
   buildReconBlock,
   cleanOpeningLine,
   monthsInRole,
+  extractTagContext,
+  MODES,
+  PERSONALIZE_TAG,
 } from '../../netlify/functions/barryBulkPersonalize.js';
 
 // Default mock: echo back a line that references the company named in the prompt,
@@ -166,6 +170,67 @@ describe('barryBulkPersonalize handler', () => {
     expect(results[0].success).toBe(true);
     expect(results[1]).toEqual({ contactId: null, openingLine: null, success: false, error: 'Missing contactId' });
     expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('inline_personalize mode (Phase 1.5)', () => {
+  const inlineBody = `Hi ${PERSONALIZE_TAG}, I wanted to share our new onboarding guide. The attached PDF covers the details.`;
+
+  it('rejects an unknown mode with 400', async () => {
+    const res = await handler(makeEvent({ mode: 'full_email' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/Invalid mode/);
+  });
+
+  it('rejects inline_personalize when the body has no tag', async () => {
+    const res = await handler(makeEvent({ mode: MODES.INLINE_PERSONALIZE, sharedBody: 'No tag here.' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toContain(PERSONALIZE_TAG);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('uses the inline prompt variant with the tag surroundings as context', async () => {
+    const res = await handler(makeEvent({ mode: MODES.INLINE_PERSONALIZE, sharedBody: inlineBody }));
+    expect(res.statusCode).toBe(200);
+    const { results } = JSON.parse(res.body);
+    expect(results).toHaveLength(3);
+    expect(results.every(r => r.success)).toBe(true);
+
+    const prompt = mockCreate.mock.calls[0][0].messages[0].content;
+    expect(prompt).toContain('replacement text for that marker');
+    expect(prompt).toContain('Text before the marker: "Hi"');
+    expect(prompt).toContain('Text after the marker: ", I wanted to share our new onboarding guide."');
+    expect(prompt).toContain(PERSONALIZE_TAG);
+    expect(prompt).toContain('fit grammatically');
+    // Still one Haiku call per contact
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+  });
+
+  it('defaults to opening_line mode — existing prompt is unchanged when mode is omitted', async () => {
+    await handler(makeEvent());
+    const prompt = mockCreate.mock.calls[0][0].messages[0].content;
+    expect(prompt).toContain('personalized opening line');
+    expect(prompt).not.toContain('replacement text for that marker');
+  });
+
+  it('extractTagContext pulls sentence context and counts tags', () => {
+    const ctx = extractTagContext(`First point made here. Also, ${PERSONALIZE_TAG} which is why I'm writing. More text.`);
+    expect(ctx.sentenceBefore).toBe('Also,');
+    expect(ctx.sentenceAfter).toBe("which is why I'm writing.");
+    expect(ctx.tagCount).toBe(1);
+
+    const multi = extractTagContext(`${PERSONALIZE_TAG} start. Middle. ${PERSONALIZE_TAG} end.`);
+    expect(multi.tagCount).toBe(2);
+    expect(multi.sentenceBefore).toBe('');
+
+    expect(extractTagContext('no tag')).toBeNull();
+    expect(extractTagContext(null)).toBeNull();
+  });
+
+  it('inline prompt still switches to the generic variant for bare contacts', () => {
+    const ctx = extractTagContext(inlineBody);
+    const prompt = buildInlinePersonalizePrompt({ contactId: 'x', firstName: 'Sam' }, inlineBody, ctx, null, null);
+    expect(prompt).toContain('Do NOT invent details');
   });
 });
 

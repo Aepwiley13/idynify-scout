@@ -20,8 +20,10 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Send, CheckCircle2, XCircle, Mail, Clock, Loader, RotateCcw, AlertTriangle, UserPlus,
 } from 'lucide-react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { db } from '../../firebase/config';
 import { useT } from '../../theme/ThemeContext';
 
 export const SEND_DELAY_MS = 1500; // mandatory inter-send delay — do not remove
@@ -136,6 +138,56 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts 
   });
   const delivered = counts.sent + counts.opened;
   const failedContacts = items.filter((p) => statuses[p.contact.id]?.status === 'failed');
+
+  // ─── Cadence record write ───
+  // Fire-and-forget: once the campaign completes, persist a single history
+  // record to users/{uid}/cadences for the Cadences dashboard. Additive only —
+  // never blocks the UI and never surfaces errors (the send already succeeded).
+  const cadenceWrittenRef = useRef(false);
+  useEffect(() => {
+    if (!complete || items.length === 0 || cadenceWrittenRef.current) return;
+    cadenceWrittenRef.current = true;
+
+    (async () => {
+      try {
+        const userId = getEffectiveUser()?.uid;
+        if (!userId) return;
+
+        const contacts = items.map((p) => {
+          const entry = statuses[p.contact.id] || {};
+          return {
+            contactId: p.contact.id,
+            name: getContactName(p.contact),
+            email: p.contact.email || p.contact.work_email || '',
+            status: entry.status || 'pending',
+            reason: entry.reason ?? null,
+            gmailMessageId: entry.gmailMessageId ?? null,
+          };
+        });
+
+        const name = `Cadence - ${new Date().toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', year: 'numeric',
+        })}`;
+
+        await addDoc(collection(db, 'users', userId, 'cadences'), {
+          userId,
+          name,
+          subject: items[0].subject || '',
+          body: items[0].body || '',
+          contactCount: items.length,
+          contacts,
+          sentCount: counts.sent,
+          openedCount: counts.opened,
+          failedCount: counts.failed,
+          createdAt: serverTimestamp(),
+          completedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('[BulkSendExecutor] Failed to write cadence record', err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complete]);
 
   if (total === 0) {
     return (

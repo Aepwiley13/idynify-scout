@@ -104,6 +104,17 @@ export function buildReconBlock(recon) {
   return lines.length > 0 ? lines.join('\n') : null;
 }
 
+/** Map warmth_level to a tone instruction. */
+function toneDirective(warmthLevel, knownContact) {
+  if (knownContact) return 'This is someone the sender already knows — write as if continuing a relationship, not introducing yourself.';
+  switch (warmthLevel) {
+    case 'hot': return 'Tone: direct and familiar. Skip preamble — get to the point like someone they already talk to.';
+    case 'warm': return 'Tone: personal and conversational. They have some existing connection — lean into it.';
+    case 'cold':
+    default: return 'Tone: professional and respectful. This is a first touch — earn attention, don\'t assume familiarity.';
+  }
+}
+
 /** Build the per-contact prompt. Exported for testing. */
 export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
   const firstName = clip(contact.firstName, 100);
@@ -112,6 +123,9 @@ export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
   const industry = clip(contact.industry, 150);
   const tenure = monthsInRole(contact.job_start_date);
   const personaSummary = clip(contact.barryContext?.personaSummary, 500);
+  const warmthLevel = contact.warmth_level || null;
+  const relationshipState = contact.relationship_state || null;
+  const knownContact = contact.known_contact || false;
 
   const hasCriticalFields = Boolean(title || company);
 
@@ -122,6 +136,8 @@ export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
     industry ? `Industry: ${industry}` : null,
     tenure ? `Tenure: ${tenure}${tenure.startsWith('less') || parseInt(tenure, 10) < 6 ? ' (recently started — a timing signal worth referencing)' : ''}` : null,
     personaSummary ? `Persona: ${personaSummary}` : null,
+    relationshipState ? `Relationship: ${clip(relationshipState, 100)}` : null,
+    warmthLevel ? `Warmth: ${warmthLevel}` : null,
   ].filter(Boolean);
 
   const senderLine = [
@@ -148,7 +164,7 @@ RULES:
 2. ${specificityRule}
 3. Do not repeat or paraphrase anything already in the shared body — your line sets it up.
 4. It must read naturally when placed immediately before the shared body.
-5. Tone: confident, peer-to-peer, like someone who did their homework. Not salesy, no buzzwords, no flattery-bombing.
+5. ${toneDirective(warmthLevel, knownContact)}
 
 Return ONLY the opening line text. No quotes around it, no labels, no explanation.`;
 }
@@ -187,6 +203,9 @@ export function buildInlinePersonalizePrompt(contact, sharedBody, tagContext, re
   const industry = clip(contact.industry, 150);
   const tenure = monthsInRole(contact.job_start_date);
   const personaSummary = clip(contact.barryContext?.personaSummary, 500);
+  const warmthLevel = contact.warmth_level || null;
+  const relationshipState = contact.relationship_state || null;
+  const knownContact = contact.known_contact || false;
 
   const hasCriticalFields = Boolean(title || company);
 
@@ -197,6 +216,8 @@ export function buildInlinePersonalizePrompt(contact, sharedBody, tagContext, re
     industry ? `Industry: ${industry}` : null,
     tenure ? `Tenure: ${tenure}` : null,
     personaSummary ? `Persona: ${personaSummary}` : null,
+    relationshipState ? `Relationship: ${clip(relationshipState, 100)}` : null,
+    warmthLevel ? `Warmth: ${warmthLevel}` : null,
   ].filter(Boolean);
 
   const senderLine = [
@@ -228,6 +249,7 @@ RULES:
 3. ${specificityRule}
 4. Do not repeat or paraphrase anything already in the message.
 5. No greeting and no sign-off unless the surrounding text grammatically requires it.
+6. ${toneDirective(warmthLevel, knownContact)}
 
 Return ONLY the replacement text. No quotes around it, no labels, no explanation.`;
 }

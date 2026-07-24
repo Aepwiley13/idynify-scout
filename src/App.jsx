@@ -46,6 +46,8 @@ import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
 import ScoutGame from './pages/Scout/ScoutGame';
+import CadencesList from './pages/Scout/CadencesList';
+import CadenceDetail from './pages/Scout/CadenceDetail';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminICPEditor from './pages/Admin/AdminICPEditor';
@@ -444,6 +446,24 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <ScoutGame />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Cadences */}
+        <Route
+          path="/scout/cadences"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <CadencesList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/scout/cadence/:cadenceId"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <CadenceDetail />
             </ProtectedRoute>
           }
         />

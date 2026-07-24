@@ -21,7 +21,7 @@ import {
   Radar, Crosshair, Eye, Target, Tent, Shield, Users, Building2,
   Zap, Archive, BarChart3, Swords, Mail,
   Palette, Check, ChevronLeft, ChevronRight, Home,
-  Settings as SettingsIcon, Plus,
+  Settings as SettingsIcon, Plus, RefreshCw,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -188,6 +188,7 @@ const CC_ITEMS = [
   { id: 'companies',  label: 'Companies',    Icon: Building2, desc: 'Full accounts roster — all view'  },
   { id: 'missions',   label: 'Missions',     Icon: Zap,       desc: 'Create and manage missions'       },
   { id: 'campaigns',  label: 'Campaigns',    Icon: Mail,      desc: 'Send emails to multiple contacts', route: '/hunter/campaign/new' },
+  { id: 'cadences',   label: 'Cadences',     Icon: RefreshCw, desc: 'Bulk outreach history',            route: '/scout/cadences' },
   { id: 'go_to_war',  label: 'Go To War',    Icon: Swords,    desc: '8-phase bulk mission launcher'    },
   { id: 'weapons',    label: 'Weapons',      Icon: Crosshair, desc: 'Channel selector, message builder' },
   { id: 'arsenal',    label: 'Arsenal',      Icon: Archive,   desc: 'Saved message templates library'  },

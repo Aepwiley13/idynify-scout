@@ -28,7 +28,8 @@ import {
   BookOpen,
   Zap,
   LayoutDashboard,
-  RotateCcw
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import { useThemeCtx } from '../../theme/ThemeContext';
 import { THEMES, ASSETS, BRAND } from '../../theme/tokens';
@@ -150,6 +151,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       path: '/hunter/campaign/new'
     },
     {
+      icon: RefreshCw,
+      label: 'Cadences',
+      sublabel: 'Bulk outreach history',
+      path: '/scout/cadences'
+    },
+    {
       icon: Crosshair,
       label: 'Weapons',
       sublabel: 'Channel selector, message builder',
@@ -220,6 +227,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       path: '/scout',
       state: { activeTab: 'all-leads' },
       isPrimary: true
+    },
+    {
+      icon: RefreshCw,
+      label: 'Cadences',
+      sublabel: 'Bulk outreach history',
+      path: '/scout/cadences'
     },
     {
       icon: Star,

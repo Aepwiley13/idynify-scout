@@ -16,7 +16,7 @@ import { useActiveUser } from '../../context/ImpersonationContext';
 import {
   Radar, Crosshair, Eye, Target, Tent, Shield, Archive,
   Zap, Building2, Users, Plus,
-  Palette, Check, Settings, ChevronLeft, ChevronRight, Home,
+  Palette, Check, Settings, ChevronLeft, ChevronRight, Home, RefreshCw,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
@@ -28,6 +28,7 @@ import AllLeads from './AllLeads';
 import CompanyProfileView from './CompanyProfileView';
 import ScoutPlus from './ScoutPlus';
 import ICPSettings from './ICPSettings';
+import CadencesList from './CadencesList';
 
 // ─── BarryAvatar ─────────────────────────────────────────────────────────────
 function BarryAvatar({ size = 28, style = {} }) {
@@ -171,6 +172,7 @@ const NAV_SECTIONS = [
       { id: 'daily',       label: 'Daily Discoveries', Icon: Zap,      desc: 'Review Queue'        },
       { id: 'scoutplus',   label: 'Scout+',            Icon: Plus,     desc: 'Add contacts'        },
       { id: 'icpsettings', label: 'ICP Settings',      Icon: Settings, desc: 'Targeting criteria'  },
+      { id: 'cadences',   label: 'Cadences',          Icon: RefreshCw, desc: 'Bulk outreach history' },
     ],
   },
   { id: 'hunter',         label: 'HUNTER',          Icon: Crosshair, route: '/hunter',          items: [] },
@@ -206,6 +208,7 @@ function ScoutShellInner({ user }) {
     'icp-settings':    'icpsettings',
     'scout-plus':      'scoutplus',
     'company-search':  'scoutplus',
+    'cadences':        'cadences',
   };
   // Build ITEM_TO_TAB explicitly — deriving it from Object.fromEntries(TAB_TO_ITEM) is
   // unsafe because both 'scout-plus' and 'company-search' map to 'scoutplus', causing
@@ -216,6 +219,7 @@ function ScoutShellInner({ user }) {
     'all':         'all-leads',
     'icpsettings': 'icp-settings',
     'scoutplus':   'scout-plus',
+    'cadences':    'cadences',
   };
 
   // Read tab from URL (?tab=company-search) with fallback to legacy location.state
@@ -281,6 +285,7 @@ function ScoutShellInner({ user }) {
     if (activeItem === 'all')         return <AllLeads mode="scout" />;
     if (activeItem === 'scoutplus')   return <ScoutPlus />;
     if (activeItem === 'icpsettings') return <ICPSettings />;
+    if (activeItem === 'cadences')   return <CadencesList />;
     // Placeholder for any future unbuilt sections
     const item = section?.items.find(i => i.id === activeItem);
     return (

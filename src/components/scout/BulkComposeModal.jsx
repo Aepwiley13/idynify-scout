@@ -31,10 +31,14 @@ function replacePersonalizeTags(template, replacement) {
   return template.replace(/\{\{personalize\}\}/gi, replacement);
 }
 
-export default function BulkComposeModal({ contacts: initialContacts, allContacts = [], onClose }) {
+export default function BulkComposeModal({
+  contacts: initialContacts, allContacts = [], onClose,
+  initialSubject = '', initialBody = '', initialPath = 'write_your_own',
+  initialCc = '', initialPersonalize = true,
+}) {
   const T = useT();
   const [step, setStep] = useState(1);
-  const [activePath, setActivePath] = useState('write_your_own');
+  const [activePath, setActivePath] = useState(initialPath);
 
   // ─── Selected contacts (mutable via in-modal search) ───
   const [selectedContacts, setSelectedContacts] = useState(initialContacts);
@@ -45,16 +49,16 @@ export default function BulkComposeModal({ contacts: initialContacts, allContact
   const searchInputRef = useRef(null);
 
   // ─── Path 1 state (Write your own) ───
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [personalizeWithBarry, setPersonalizeWithBarry] = useState(true);
+  const [subject, setSubject] = useState(initialSubject);
+  const [body, setBody] = useState(initialBody);
+  const [personalizeWithBarry, setPersonalizeWithBarry] = useState(initialPersonalize);
 
   // ─── Path 2 state (Send with attachment) ───
   const [p2Subject, setP2Subject] = useState('');
   const [p2Body, setP2Body] = useState('');
   const [attachment, setAttachment] = useState(null); // { file, base64, filename, size }
   const [attachmentError, setAttachmentError] = useState(null);
-  const [cc, setCc] = useState('');
+  const [cc, setCc] = useState(initialCc);
   const fileInputRef = useRef(null);
   const dropZoneRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);

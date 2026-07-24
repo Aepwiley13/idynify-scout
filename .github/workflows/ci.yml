@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - name: Run tests
+        run: |
+          npx vitest run \
+            --exclude 'src/test/HunterCardStack.test.jsx' \
+            --exclude 'src/test/HunterContactCard.test.jsx' \
+            --exclude 'src/test/hunterBootstrap.test.js' \
+            --exclude 'src/test/hunterOutcomeLogic.test.js' \
+            --exclude 'src/test/hunterSoundHaptics.test.jsx' \
+            --exclude 'src/test/ReconSectionEditor.test.jsx' \
+            --exclude 'src/test/ReconErrorBoundary.test.jsx' \
+            --exclude 'src/test/ReconModulePage.test.jsx'

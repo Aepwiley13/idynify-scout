@@ -995,7 +995,7 @@ function AllLeadsCard({
 }
 
 // ─── AllLeadsRow (Gmail-style) ────────────────────────────────────────────────
-function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onArchive }) {
+function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onArchive, bulkMode = false, isSelected = false, onSelect }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
@@ -1014,13 +1014,32 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onAr
     }
   }
 
+  function handleRowClick(e) {
+    if (bulkMode) { onSelect && onSelect(contact.id); return; }
+    onClick && onClick(e);
+  }
+
   return (
     <div
-      onClick={onClick}
-      style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 15px', borderBottom: `1px solid ${T.border}`, cursor: 'pointer', background: selected ? T.rowSel : 'transparent', borderLeft: `2px solid ${selected ? BRAND.pink : 'transparent'}`, transition: 'all 0.1s' }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = T.rowHov; setHovered(true); }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; setHovered(false); }}
+      onClick={handleRowClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 15px', borderBottom: `1px solid ${T.border}`, cursor: 'pointer', background: isSelected ? T.accentBg : selected ? T.rowSel : 'transparent', borderLeft: `2px solid ${isSelected ? BRAND.pink : selected ? BRAND.pink : 'transparent'}`, transition: 'all 0.1s' }}
+      onMouseEnter={e => { if (!selected && !isSelected) e.currentTarget.style.background = T.rowHov; setHovered(true); }}
+      onMouseLeave={e => { if (!selected && !isSelected) e.currentTarget.style.background = isSelected ? T.accentBg : 'transparent'; setHovered(false); }}
     >
+      {(bulkMode || isSelected) && (
+        <div
+          onClick={e => { e.stopPropagation(); onSelect && onSelect(contact.id); }}
+          style={{
+            width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+            background: isSelected ? BRAND.pink : T.surface,
+            border: `2px solid ${isSelected ? BRAND.pink : T.border2}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          {isSelected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
+        </div>
+      )}
       <Av initials={getInitials(contact.name)} color={color} size={30} src={contact.photo_url} />
       <div style={{ width: 128, flexShrink: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</div>
@@ -2209,6 +2228,9 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                         ? () => navigate('/scout?tab=scout-plus', { state: { initialView: 'company-search', searchCompanyName: c.company_name } })
                         : undefined
                   }
+                  isSelected={selectedIds.has(c.id)}
+                  bulkMode={bulkMode}
+                  onSelect={toggleSelect}
                   onArchive={handleContactArchived}
                 />
               ))}

@@ -4,7 +4,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { checkGmailConnection } from '../../utils/sendActionResolver';
-import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
 
@@ -42,6 +42,25 @@ export default function BulkComposeModal({
 
   // ─── Selected contacts (mutable via in-modal search) ───
   const [selectedContacts, setSelectedContacts] = useState(initialContacts);
+
+  // ─── Self-loaded contacts when allContacts prop is empty ───
+  const [loadedContacts, setLoadedContacts] = useState([]);
+  useEffect(() => {
+    if (allContacts.length > 0) return;
+    (async () => {
+      try {
+        const user = getEffectiveUser();
+        if (!user) return;
+        const snap = await getDocs(
+          query(collection(db, 'users', user.uid, 'contacts'), orderBy('name'), limit(200))
+        );
+        setLoadedContacts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.warn('[BulkComposeModal] Failed to load contacts', err);
+      }
+    })();
+  }, [allContacts.length]);
+  const contactPool = allContacts.length > 0 ? allContacts : loadedContacts;
 
   // ─── In-modal search state ───
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,9 +165,9 @@ export default function BulkComposeModal({
 
   // ─── In-modal search: filter allContacts by query, exclude already selected ───
   const selectedIdSet = new Set(contacts.map(c => c.id));
+  const availableContacts = contactPool.filter(c => !selectedIdSet.has(c.id));
   const searchResults = searchQuery.trim().length >= 2
-    ? allContacts
-        .filter(c => !selectedIdSet.has(c.id))
+    ? availableContacts
         .filter(c => {
           const q = searchQuery.toLowerCase();
           return (
@@ -158,6 +177,9 @@ export default function BulkComposeModal({
           );
         })
         .slice(0, 8)
+    : [];
+  const browseList = contacts.length === 0 && searchQuery.trim().length < 2
+    ? availableContacts.slice(0, 15)
     : [];
 
   function addContact(contact) {
@@ -807,7 +829,7 @@ export default function BulkComposeModal({
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label style={{ ...sectionLabel, marginBottom: 0 }}>Recipients</label>
-                  {contacts.length > 0 && contacts.length < MAX_CONTACTS && allContacts.length > 0 && (
+                  {contacts.length > 0 && contacts.length < MAX_CONTACTS && contactPool.length > 0 && (
                     <button
                       onClick={() => { setSearchOpen(o => !o); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
                       style={{
@@ -835,12 +857,17 @@ export default function BulkComposeModal({
                         style={{ ...inputStyle, paddingLeft: 30, fontSize: 12 }}
                       />
                     </div>
-                    {searchResults.length > 0 && (
+                    {(searchResults.length > 0 || browseList.length > 0) && (
                       <div style={{
                         marginTop: 4, borderRadius: 8, border: `1px solid ${T.border}`,
-                        background: T.cardBg, maxHeight: 160, overflowY: 'auto',
+                        background: T.cardBg, maxHeight: 200, overflowY: 'auto',
                       }}>
-                        {searchResults.map(c => (
+                        {browseList.length > 0 && (
+                          <div style={{ padding: '5px 10px', fontSize: 10, fontWeight: 600, color: T.textFaint, borderBottom: `1px solid ${T.border}` }}>
+                            Select contacts ({availableContacts.length} available)
+                          </div>
+                        )}
+                        {(searchResults.length > 0 ? searchResults : browseList).map(c => (
                           <div
                             key={c.id}
                             onClick={() => addContact(c)}

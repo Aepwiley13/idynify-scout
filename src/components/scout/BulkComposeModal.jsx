@@ -89,6 +89,7 @@ export default function BulkComposeModal({ contacts: initialContacts, allContact
   // ─── Draft state ───
   const [draftId, setDraftId] = useState(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // ─── Load draft on mount ───
   useEffect(() => {
@@ -103,6 +104,7 @@ export default function BulkComposeModal({ contacts: initialContacts, allContact
           const age = Date.now() - (d.updatedAt?.toMillis?.() || 0);
           if (age < 7 * 24 * 60 * 60 * 1000) {
             setDraftId('latest');
+            setDraftRestored(true);
             setActivePath(d.activePath || 'write_your_own');
             if (d.subject) setSubject(d.subject);
             if (d.body) setBody(d.body);
@@ -394,6 +396,14 @@ export default function BulkComposeModal({ contacts: initialContacts, allContact
     }
   }
 
+  function handleAddMoreContacts() {
+    setSendStarted(false);
+    setSendPayload(null);
+    setPreviews(null);
+    setSelectedContacts([]);
+    setStep(1);
+  }
+
   function handleClose() {
     if (step === 3 && sendStarted) {
       if (!window.confirm('Sends in progress — closing will not cancel emails already sent.')) return;
@@ -555,6 +565,18 @@ export default function BulkComposeModal({ contacts: initialContacts, allContact
         {step === 1 && (
           <>
             <div style={bodySection}>
+              {/* ─── Draft resume banner ─── */}
+              {draftRestored && (
+                <div style={{
+                  marginBottom: 14, padding: '10px 14px', borderRadius: 10,
+                  background: `${BRAND.cyan}10`, border: `1px solid ${BRAND.cyan}30`,
+                  fontSize: 12, color: BRAND.cyan, lineHeight: 1.5,
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Draft restored</div>
+                  Your previous contacts were not saved — please re-select recipients.
+                </div>
+              )}
+
               {/* ─── Path Selector ─── */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
                 <div style={pathCardStyle(activePath === 'write_your_own')} onClick={() => setActivePath('write_your_own')}>
@@ -1007,6 +1029,7 @@ export default function BulkComposeModal({ contacts: initialContacts, allContact
             <BulkSendExecutor
               payload={sendPayload}
               T={T}
+              onAddMoreContacts={handleAddMoreContacts}
             />
           </div>
         )}

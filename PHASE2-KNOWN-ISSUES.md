@@ -28,6 +28,12 @@ The `awaiting_reply` transitions are **send-side only** — they fire when a mes
 
 Calendar steps in sequences are currently record-only (`onSent()` called directly, no `executeSendAction`). Routing calendar sequence steps to the real `createCalendarEventViaApi` requires date/time fields that `GeneratedContentReview` does not capture. This is net-new UI work scoped to a later phase, not Phase 0.
 
+## 5. Campaign draft restore does not save selected contacts
+
+When a bulk campaign draft is saved to `users/{uid}/campaignDrafts/latest` on modal close, only compose fields (subject, body, path, CC, personalize toggle) are persisted. The selected contact list is saved as `contactIds` but is not re-resolved on restore because the full contacts array is not available at draft-load time. Users see a "Draft restored — please re-select recipients" banner on resume.
+
+**Implication:** A future improvement could resolve `contactIds` by querying Firestore for the saved IDs at draft load, or by passing the full contacts list into the draft loader. This is a UX convenience gap, not a data loss issue — the compose content (the harder part to recreate) is preserved.
+
 ---
 
-_These four items feed directly into the Phase 2 brief. Do not lose them._
+_These five items feed directly into the Phase 2 brief. Do not lose them._

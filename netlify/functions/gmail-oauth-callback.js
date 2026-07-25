@@ -124,10 +124,13 @@ export const handler = async (event) => {
         email: email,
         connectedAt: new Date().toISOString(),
         status: 'connected',
-        scopes: [
-          'https://www.googleapis.com/auth/gmail.send',
-          'https://www.googleapis.com/auth/userinfo.email'
-        ],
+        scopes: tokens.scope
+          ? tokens.scope.split(' ')
+          : [
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
         updatedAt: new Date().toISOString()
       });
 

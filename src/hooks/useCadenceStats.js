@@ -47,6 +47,8 @@ export default function useCadenceStats() {
     draftCadences: 0,
     totalContactsReached: 0,
     totalSent: 0,
+    totalReplies: 0,
+    replyRate: '0%',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,6 +68,7 @@ export default function useCadenceStats() {
         let draftCadences = 0;
         let totalContactsReached = 0;
         let totalSent = 0;
+        let totalReplies = 0;
 
         snap.forEach((docSnap) => {
           const c = docSnap.data();
@@ -76,7 +79,12 @@ export default function useCadenceStats() {
 
           totalContactsReached += c.contactCount || 0;
           totalSent += c.sentCount || 0;
+          totalReplies += c.repliedCount || 0;
         });
+
+        const replyRate = totalSent > 0
+          ? (totalReplies / totalSent * 100).toFixed(1) + '%'
+          : '0%';
 
         setStats({
           activeCadences,
@@ -84,6 +92,8 @@ export default function useCadenceStats() {
           draftCadences,
           totalContactsReached,
           totalSent,
+          totalReplies,
+          replyRate,
         });
         setLoading(false);
       },

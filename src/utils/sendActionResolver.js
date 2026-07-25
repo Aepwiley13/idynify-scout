@@ -143,7 +143,7 @@ export async function resolveSendMethod(channel, userId, contact) {
 /**
  * OPTION A: Send email via Gmail API
  */
-export async function sendEmailViaGmail({ userId, contact, subject, body, ccRecipients, attachment, cc }) {
+export async function sendEmailViaGmail({ userId, contact, subject, body, ccRecipients, attachment, cc, cadenceId }) {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('Not authenticated');
@@ -165,6 +165,8 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
         contactId: contact.id,
         // Preserve the existing Gmail thread for follow-ups (Sprint 3)
         existingThreadId: contact.gmail_thread_id || null,
+        // Phase 2 open tracking: when present, gmail-send-quick embeds the pixel
+        ...(cadenceId ? { cadenceId } : {}),
         ccEmails: ccEmails.length > 0 ? ccEmails : undefined,
         ...(attachment ? { attachment } : {}),
         ...(cc ? { cc } : {}),
@@ -180,6 +182,7 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
     return {
       result: SEND_RESULT.SENT,
       gmailMessageId: data.gmailMessageId,
+      gmailThreadId: data.gmailThreadId,
       sentAt: data.sentAt,
       message: 'Email sent via Gmail'
     };
@@ -438,6 +441,8 @@ export async function executeSendAction({
   ccRecipients,
   attachment,
   cc,
+  // Cadence open-tracking: forwarded to gmail-send-quick to embed the pixel
+  cadenceId,
   // Calendar-specific params
   startDateTime,
   endDateTime,
@@ -461,7 +466,7 @@ export async function executeSendAction({
     case CHANNELS.EMAIL:
       if (resolution.method === 'real') {
         // Option A: Real Gmail send
-        sendResult = await sendEmailViaGmail({ userId, contact, subject, body, ccRecipients, attachment, cc });
+        sendResult = await sendEmailViaGmail({ userId, contact, subject, body, ccRecipients, attachment, cc, cadenceId });
         activityType = sendResult.result === SEND_RESULT.SENT ? 'email_sent' : 'email_failed';
       } else {
         // Option B: Native mailto

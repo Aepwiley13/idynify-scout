@@ -1008,7 +1008,7 @@ function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
 
 // ─── DailyLeads ──────────────────────────────────────────────────────────────
 // ─── ICP Reclarification Modal ────────────────────────────────────────────────
-function IcpReclarificationModal({ userId, onClose, onSearchComplete }) {
+function IcpReclarificationModal({ userId, onClose, onSearchComplete, reconConfidence }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -2603,6 +2603,7 @@ export default function DailyLeads({ onNavigate }) {
       {showICPChat && (
         <IcpReclarificationModal
           userId={auth.currentUser?.uid}
+          reconConfidence={reconConfidence}
           onClose={() => setShowICPChat(false)}
           onSearchComplete={() => {
             resetBatch();

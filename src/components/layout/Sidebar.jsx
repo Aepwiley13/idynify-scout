@@ -248,12 +248,6 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
       state: { activeTab: 'saved-companies' }
     },
     {
-      icon: Users,
-      label: 'People',
-      path: '/scout',
-      state: { activeTab: 'all-leads' }
-    },
-    {
       icon: UserPlus,
       label: 'Scout+',
       path: '/scout',
@@ -262,8 +256,7 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
     {
       icon: TrendingUp,
       label: 'Total Market',
-      path: '/scout',
-      state: { activeTab: 'total-market' }
+      path: '/scout/total-market'
     },
     {
       icon: Settings,

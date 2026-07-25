@@ -54,6 +54,11 @@ const MainLayout = ({ children, user }) => {
       return 'Contact Profile';
     }
 
+    // Total Market — full addressable-market view
+    if (pathname === '/scout/total-market') {
+      return 'Total Market';
+    }
+
     // Scout main pages with tabs
     if (pathname === '/scout') {
       if (activeTab === 'all-leads' || !activeTab) {

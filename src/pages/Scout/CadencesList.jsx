@@ -1,18 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
-import { RefreshCw, ArrowLeft, Plus, Users, Send, AlertTriangle, Eye } from 'lucide-react';
+import { RefreshCw, Plus, Users, Send, AlertTriangle, Eye } from 'lucide-react';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
 
-function formatDate(ts) {
+function formatDateTime(ts) {
   if (!ts) return '—';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  }) + ' at ' + d.toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
 }
+
+function getCadenceStatus(c) {
+  if (c.completedAt) return 'Completed';
+  if ((c.sentCount || 0) > 0) return 'Active';
+  return 'Draft';
+}
+
+const STATUS_BADGE_COLORS = {
+  Completed: STATUS.green,
+  Active:    '#3b82f6',
+  Draft:     '#94a3b8',
+};
 
 export default function CadencesList() {
   const T = useT();
@@ -35,11 +51,20 @@ export default function CadencesList() {
     return unsub;
   }, [user?.uid]);
 
+  const totals = useMemo(() => {
+    let contacts = 0, sent = 0;
+    for (const c of cadences) {
+      contacts += c.contactCount || 0;
+      sent += c.sentCount || 0;
+    }
+    return { contacts, sent };
+  }, [cadences]);
+
   if (loading) {
     return (
       <div style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
+        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100dvh',
       }}>
         <RefreshCw size={24} color={T.textFaint} style={{ animation: 'spin 1.5s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
@@ -54,46 +79,59 @@ export default function CadencesList() {
     }}>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          marginBottom: 8, flexWrap: 'wrap', gap: 12,
+        }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <RefreshCw size={20} color={BRAND.pink} />
-              <h1 style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: 0 }}>Cadences</h1>
-            </div>
-            <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Bulk outreach history</p>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '0 0 4px' }}>
+              Cadences
+            </h1>
+            <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>
+              Your bulk outreach history
+            </p>
           </div>
           <button
             onClick={() => setShowCompose(true)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 20px', borderRadius: 10,
-              background: BRAND.pink, color: '#fff',
-              border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: 600,
-              transition: 'opacity 0.15s',
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10,
+              background: `linear-gradient(135deg, ${BRAND.pink}, #c41568)`,
+              color: '#fff', border: 'none',
+              cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(232,25,125,0.25)',
             }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            <Plus size={16} />
-            New Cadence
+            <Plus size={15} />
+            + New Cadence
           </button>
         </div>
+
+        {/* Aggregate summary */}
+        {cadences.length > 0 && (
+          <div style={{ fontSize: 12, color: T.textFaint, marginBottom: 20 }}>
+            {cadences.length} cadence{cadences.length !== 1 ? 's' : ''}
+            {' • '}
+            {totals.contacts} contact{totals.contacts !== 1 ? 's' : ''} reached
+            {' • '}
+            {totals.sent} sent
+          </div>
+        )}
 
         {/* Empty state */}
         {cadences.length === 0 && (
           <div style={{
             textAlign: 'center', padding: '80px 32px',
             background: T.cardBg, border: `1px solid ${T.border}`,
-            borderRadius: 16,
+            borderRadius: 16, marginTop: 12,
           }}>
             <div style={{
-              width: 56, height: 56, borderRadius: 16,
-              background: `${BRAND.pink}15`, border: `1px solid ${BRAND.pink}30`,
+              width: 80, height: 80, borderRadius: 20,
+              background: `${BRAND.pink}12`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 16px',
+              margin: '0 auto 20px',
             }}>
-              <RefreshCw size={24} color={BRAND.pink} />
+              <RefreshCw size={48} color={BRAND.pink} style={{ opacity: 0.8 }} />
             </div>
             <div style={{ fontSize: 15, fontWeight: 600, color: T.text, marginBottom: 8 }}>
               No cadences yet
@@ -106,46 +144,74 @@ export default function CadencesList() {
 
         {/* Cadence cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {cadences.map(c => (
-            <div
-              key={c.id}
-              onClick={() => navigate(`/scout/cadence/${c.id}`)}
-              style={{
-                background: T.cardBg, border: `1px solid ${T.border}`,
-                borderRadius: 14, padding: '18px 22px',
-                cursor: 'pointer', transition: 'all 0.12s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = T.border2 || T.border;
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = T.border;
-                e.currentTarget.style.transform = 'none';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: T.text, marginBottom: 4 }}>
+          {cadences.map(c => {
+            const status = getCadenceStatus(c);
+            const badgeColor = STATUS_BADGE_COLORS[status];
+            return (
+              <div
+                key={c.id}
+                onClick={() => navigate(`/scout/cadence/${c.id}`)}
+                style={{
+                  background: T.cardBg,
+                  border: `1px solid ${T.border}`,
+                  borderLeft: `4px solid ${BRAND.pink}`,
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.15s, transform 0.15s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                  e.currentTarget.style.transform = 'none';
+                }}
+              >
+                {/* Top row: name + status */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  gap: 12, marginBottom: 10,
+                }}>
+                  <div style={{
+                    fontSize: 15, fontWeight: 500, color: T.text,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    minWidth: 0, flex: 1,
+                  }}>
                     {c.name || 'Untitled Cadence'}
                   </div>
-                  <div style={{ fontSize: 12, color: T.textMuted }}>
-                    {formatDate(c.completedAt)}
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '3px 10px', borderRadius: 20, flexShrink: 0,
+                    background: `${badgeColor}15`, border: `1px solid ${badgeColor}30`,
+                    fontSize: 11, fontWeight: 600, color: badgeColor,
+                  }}>
+                    {status}
+                  </span>
+                </div>
+
+                {/* Bottom row: date + stats */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  flexWrap: 'wrap', gap: 8,
+                }}>
+                  <div style={{ fontSize: 12, color: T.textFaint }}>
+                    {formatDateTime(c.completedAt || c.createdAt)}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                    <StatPill icon={Users} value={c.contactCount || 0} label="contacts" color={T.textMuted} T={T} />
+                    <StatPill icon={Send} value={c.sentCount || 0} label="sent" color={STATUS.green} T={T} />
+                    {(c.failedCount || 0) > 0 && (
+                      <StatPill icon={AlertTriangle} value={c.failedCount} label="failed" color={STATUS.red} T={T} />
+                    )}
+                    <StatPill icon={Eye} value={c.openedCount || 0} label="opened" color={BRAND.purple} T={T} />
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-                  <StatPill icon={Users} value={c.contactCount || 0} label="contacts" color={T.textMuted} T={T} />
-                  <StatPill icon={Send} value={c.sentCount || 0} label="sent" color={STATUS.green} T={T} />
-                  {(c.failedCount || 0) > 0 && (
-                    <StatPill icon={AlertTriangle} value={c.failedCount} label="failed" color={STATUS.red} T={T} />
-                  )}
-                  {(c.openedCount || 0) > 0 && (
-                    <StatPill icon={Eye} value={c.openedCount} label="opened" color={BRAND.cyan} T={T} />
-                  )}
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -161,9 +227,9 @@ export default function CadencesList() {
 
 function StatPill({ icon: Icon, value, label, color, T }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <Icon size={13} color={color} />
-      <span style={{ fontSize: 13, fontWeight: 600, color, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
       <span style={{ fontSize: 11, color: T.textFaint }}>{label}</span>
     </div>
   );

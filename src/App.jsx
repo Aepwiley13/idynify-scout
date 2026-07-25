@@ -48,6 +48,7 @@ import ContactProfile from './pages/Scout/ContactProfile';
 import ScoutGame from './pages/Scout/ScoutGame';
 import CadencesList from './pages/Scout/CadencesList';
 import CadenceDetail from './pages/Scout/CadenceDetail';
+import TotalMarket from './pages/Scout/TotalMarket';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminICPEditor from './pages/Admin/AdminICPEditor';
@@ -464,6 +465,17 @@ function App() {
           element={
             <ProtectedRoute withLayout={true}>
               <CadenceDetail />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Total Market — full addressable-market view (was orphaned: component
+            existed but had no route). Rendered in the shared shell like Cadences. */}
+        <Route
+          path="/scout/total-market"
+          element={
+            <ProtectedRoute withLayout={true}>
+              <TotalMarket />
             </ProtectedRoute>
           }
         />

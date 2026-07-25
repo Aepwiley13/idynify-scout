@@ -37,3 +37,54 @@ When a bulk campaign draft is saved to `users/{uid}/campaignDrafts/latest` on mo
 ---
 
 _These five items feed directly into the Phase 2 brief. Do not lose them._
+
+---
+
+## Phase 1 vs Phase 2 Feature Scope
+
+### Phase 1 — Build now (real data exists)
+
+Cadences Dashboard:
+- KPI cards: Active cadences, Completed cadences, Draft cadences, Total contacts reached
+- Cadence performance table: name, type, audience, contacts, sent, status, last run, owner
+- Search and filtering: by status, last run, owner
+- Cadence Library: reusable templates (First Touch, Partner Outreach, Referral Ask, Event Follow-up, Customer Check-in)
+- Upcoming cadences section (placeholder, wires when scheduled sends exist)
+
+Cadence Intelligence:
+- Barry reads cadence name and subject to suggest contacts
+- One-line explanation per suggested contact
+- User reviews and adjusts before sending
+
+### Phase 2 — Requires infrastructure not yet built
+
+Data infrastructure needed:
+- Open tracking (email tracking pixel or link redirect through Netlify function)
+- Reply detection (Gmail read scope + re-consent from existing users)
+- Contact-level icp_score written at enrichment time (currently defined in schema but never written)
+- barryContext normalized and persisted to contact doc (currently generated but thrown away)
+- Meetings booked tracking
+- Activity over time aggregation from email_logs
+
+Dashboard sections that unlock with Phase 2 data:
+- Open rate column in cadence table
+- Reply rate column in cadence table
+- Meetings booked column
+- Average reply rate KPI card
+- Meetings booked KPI card
+- Activity over time chart (emails sent, replies, meetings over 7/30/90 days)
+- Barry AI Insights (cadences outperforming, cadences needing attention, replies waiting for follow-up)
+
+Intelligence features:
+- Barry signal-based contact ranking (company fit, role fit, industry fit, engagement history, relationship type)
+- Explainable recommendations with reasons per contact
+- Contacts who engaged with a cadence surfaced for follow-up
+- Smart move-to-Campaign or move-to-Mission suggestion when a contact replies
+
+Platform features:
+- Scheduled cadence sends
+- Upcoming cadences section (live data)
+- Multi-user team view (owner column becomes meaningful)
+- Cadence Library as a shared marketplace
+- Cadence health score (AI-generated)
+- Revenue and opportunities tracking

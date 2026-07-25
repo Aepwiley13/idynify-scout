@@ -34,6 +34,20 @@ vi.mock('../../src/theme/ThemeContext', () => ({
   }),
 }));
 
+// Firestore is mocked so the pre-minted cadence write (on mount) and the
+// completion finalize resolve instantly under fake timers. The send-loop
+// assertions below don't inspect these writes.
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(() => ({})),
+  addDoc: vi.fn(async () => ({ id: 'cad-test' })),
+  doc: vi.fn(() => ({})),
+  getDoc: vi.fn(async () => ({ exists: () => true, data: () => ({ contacts: [] }) })),
+  updateDoc: vi.fn(async () => {}),
+  increment: vi.fn((n) => ({ __inc: n })),
+  serverTimestamp: vi.fn(() => ({ __ts: true })),
+}));
+vi.mock('../../src/firebase/config', () => ({ db: {} }));
+
 import BulkSendExecutor, { SEND_DELAY_MS } from '../components/scout/BulkSendExecutor';
 
 const T = {

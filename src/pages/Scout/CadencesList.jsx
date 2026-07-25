@@ -8,9 +8,9 @@ import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import {
   RefreshCw, Plus, Users, Send, AlertTriangle, Eye,
   Inbox, CheckCircle, FileText, MessageSquare,
-  Search, SlidersHorizontal, ChevronDown, MoreHorizontal,
+  Search, SlidersHorizontal, ChevronDown, ChevronRight, MoreHorizontal,
   TrendingUp, BarChart3, Clock, Folder, Calendar,
-  Copy, Archive,
+  Copy, Archive, MessageCircleReply,
 } from 'lucide-react';
 import KpiCard from '../../components/cadences/KpiCard';
 import useCadenceStats from '../../hooks/useCadenceStats';
@@ -79,6 +79,8 @@ export default function CadencesList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [toast, setToast] = useState(null);
+  const [insightFilter, setInsightFilter] = useState(null);
+  const tableRef = useRef(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -98,6 +100,25 @@ export default function CadencesList() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const barryInsights = useMemo(() => {
+    let repliedCount = 0;
+    let openedNoReplyCount = 0;
+    let failedCount = 0;
+    let firstFailedCadenceId = null;
+    cadences.forEach(c => {
+      const contacts = c.contacts || [];
+      contacts.forEach(ct => {
+        if (ct.replied) repliedCount++;
+        if (ct.status === 'opened' && !ct.replied) openedNoReplyCount++;
+        if (ct.status === 'failed') {
+          failedCount++;
+          if (!firstFailedCadenceId) firstFailedCadenceId = c.id;
+        }
+      });
+    });
+    return { repliedCount, openedNoReplyCount, failedCount, firstFailedCadenceId };
+  }, [cadences]);
+
   const filtered = useMemo(() => {
     let list = cadences;
     if (searchQuery.trim()) {
@@ -110,8 +131,11 @@ export default function CadencesList() {
     if (statusFilter !== 'All') {
       list = list.filter(c => getCadenceStatus(c) === statusFilter);
     }
+    if (insightFilter === 'hasReplies') {
+      list = list.filter(c => (c.contacts || []).some(ct => ct.replied));
+    }
     return list;
-  }, [cadences, searchQuery, statusFilter]);
+  }, [cadences, searchQuery, statusFilter, insightFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const paginated = filtered.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -290,28 +314,56 @@ export default function CadencesList() {
                 background: `${BRAND.purple}12`, border: `1px solid ${BRAND.purple}30`,
               }}>BETA</span>
             </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '12px 0' }}>
-              <img
-                src={ASSETS.barryAvatar}
-                alt="Barry AI"
-                style={{ width: 48, height: 48, borderRadius: '50%', marginBottom: 12, opacity: 0.7 }}
-                onError={e => { e.currentTarget.style.display = 'none'; }}
-              />
-              <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.6, maxWidth: 220 }}>
-                As your cadences collect data, Barry will surface insights and recommend next actions.
+            {barryInsights.repliedCount === 0 && barryInsights.openedNoReplyCount === 0 && barryInsights.failedCount === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '12px 0' }}>
+                <img
+                  src={ASSETS.barryAvatar}
+                  alt="Barry AI"
+                  style={{ width: 48, height: 48, borderRadius: '50%', marginBottom: 12, opacity: 0.7 }}
+                  onError={e => { e.currentTarget.style.display = 'none'; }}
+                />
+                <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.6, maxWidth: 220 }}>
+                  As your cadences collect data, Barry will surface insights and recommend next actions.
+                </div>
               </div>
-            </div>
-            <button
-              disabled
-              style={{
-                display: 'block', width: '100%', textAlign: 'center',
-                padding: '10px 0 2px', background: 'none', border: 'none',
-                color: T.textFaint, fontSize: 12, fontWeight: 600,
-                cursor: 'default', opacity: 0.5,
-              }}
-            >
-              View all insights
-            </button>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {barryInsights.repliedCount > 0 && (
+                  <InsightRow
+                    icon={MessageCircleReply}
+                    color={STATUS.green}
+                    text={`${barryInsights.repliedCount} contact(s) replied to your cadences. Consider moving them to a Campaign to continue the conversation.`}
+                    actionLabel="View replied contacts"
+                    onAction={() => {
+                      setInsightFilter('hasReplies');
+                      setCurrentPage(1);
+                      tableRef.current?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    T={T}
+                  />
+                )}
+                {barryInsights.openedNoReplyCount > 0 && (
+                  <InsightRow
+                    icon={Eye}
+                    color={STATUS.amber}
+                    text={`${barryInsights.openedNoReplyCount} contact(s) opened your email but haven't replied. A follow-up cadence may help.`}
+                    actionLabel="Send follow-up"
+                    onAction={() => setComposeState({ subject: '', body: '' })}
+                    T={T}
+                  />
+                )}
+                {barryInsights.failedCount > 0 && (
+                  <InsightRow
+                    icon={AlertTriangle}
+                    color={STATUS.red}
+                    text={`${barryInsights.failedCount} send(s) failed. Verify email addresses to improve delivery.`}
+                    actionLabel="View failed"
+                    onAction={() => navigate(`/scout/cadence/${barryInsights.firstFailedCadenceId}`)}
+                    T={T}
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Activity Over Time */}
@@ -358,10 +410,33 @@ export default function CadencesList() {
         </div>
 
         {/* ═══ SECTION 4 — Cadence table ═══ */}
-        <div style={{
+        <div ref={tableRef} style={{
           background: T.cardBg, border: `1px solid ${T.border}`,
           borderRadius: 12, overflow: 'hidden', marginBottom: 20,
         }}>
+          {/* Insight filter chip */}
+          {insightFilter && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 20px',
+              background: `${STATUS.green}08`,
+              borderBottom: `1px solid ${T.border}`,
+            }}>
+              <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>
+                Showing: Cadences with replies
+              </span>
+              <button
+                onClick={() => setInsightFilter(null)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 12, color: BRAND.pink, fontWeight: 600,
+                  padding: 0,
+                }}
+              >
+                &times; Clear
+              </button>
+            </div>
+          )}
           {/* Table header */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -718,6 +793,39 @@ function FilterDropdown({ label, value, options, onChange, T }) {
       >
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
+    </div>
+  );
+}
+
+function InsightRow({ icon: Icon, color, text, actionLabel, onAction, T }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '10px 12px', borderRadius: 8,
+      background: `${color}08`, border: `1px solid ${color}15`,
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 8,
+        background: `${color}15`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, marginTop: 1,
+      }}>
+        <Icon size={14} color={color} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: T.text, lineHeight: 1.5 }}>{text}</div>
+        <button
+          onClick={onAction}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 11, fontWeight: 600, color, padding: '4px 0 0',
+          }}
+        >
+          {actionLabel}
+          <ChevronRight size={12} />
+        </button>
+      </div>
     </div>
   );
 }

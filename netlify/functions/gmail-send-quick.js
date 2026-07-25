@@ -7,6 +7,7 @@
  * OPTION A: Real Send - produces verifiable email in Gmail Sent folder.
  */
 
+import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
@@ -80,16 +81,32 @@ function toHtml(text) {
 }
 
 /**
+ * Build the open-tracking pixel <img> tag for a cadence send.
+ * Params are packed into a single base64 `data` query param, matching what
+ * track-open.js decodes: { contactId, cadenceId, userId, messageId }.
+ * Returns the full img tag string. Exported for testing.
+ */
+export function buildTrackingPixel({ baseUrl, userId, contactId, cadenceId, messageId }) {
+  const data = Buffer.from(
+    JSON.stringify({ contactId, cadenceId, userId, messageId })
+  ).toString('base64');
+  const url = `${baseUrl.replace(/\/+$/, '')}/.netlify/functions/track-open?data=${encodeURIComponent(data)}`;
+  return `<img src="${url}" width="1" height="1" border="0" style="display:none;" alt="">`;
+}
+
+/**
  * Build the RFC 2822 message for the Gmail API.
  * Body is converted to HTML for proper paragraph/line-break rendering.
  * With an attachment it produces a multipart/mixed message: an HTML part
  * for the body and an application/pdf part with Content-Disposition: attachment.
  * Exported for testing.
  */
-export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment }) {
+export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment, trackingPixel }) {
   const lines = [`To: ${recipientName} <${toEmail}>`];
   if (ccHeader) lines.push(`Cc: ${ccHeader}`);
-  const htmlBody = toHtml(bodyText);
+  // The body is always sent as text/html, so the tracking pixel (when present)
+  // is appended to the end of the HTML body. Absent → byte-identical output.
+  const htmlBody = toHtml(bodyText) + (trackingPixel || '');
 
   if (!attachment) {
     lines.push(
@@ -158,7 +175,10 @@ export const handler = async (event) => {
     // ccEmails: optional array of { name, email } objects to CC.
     // cc: optional single CC email string (Phase 1.5) — merged with ccEmails.
     // attachment: optional { data: base64, filename, mimeType: 'application/pdf' } (Phase 1.5).
-    const { userId, authToken, toEmail, toName, subject, body, contactId, existingThreadId, ccEmails, cc, attachment } = JSON.parse(event.body);
+    // cadenceId: optional — present for cadence/bulk sends. When both contactId
+    // and cadenceId are supplied, an open-tracking pixel is embedded (Phase 2).
+    // One-off drawer sends omit cadenceId and are not tracked.
+    const { userId, authToken, toEmail, toName, subject, body, contactId, cadenceId, existingThreadId, ccEmails, cc, attachment } = JSON.parse(event.body);
 
     // Validate required fields
     if (!userId || !authToken || !toEmail || !subject || !body) {
@@ -330,6 +350,24 @@ export const handler = async (event) => {
     const signature = await getGmailSignature(gmail);
     const bodyWithSignature = appendSignature(body, signature);
 
+    // Open tracking (Phase 2): embed a pixel only for cadence sends — those
+    // carrying both contactId and cadenceId. Requires the deploy's public base
+    // URL from the environment; if unset we skip tracking rather than emit a
+    // broken relative URL. A fresh trackingId (UUID) is the pixel's messageId.
+    const trackingBaseUrl = process.env.NETLIFY_URL || process.env.DEPLOY_URL || process.env.URL || null;
+    let trackingId = null;
+    let trackingPixel = null;
+    if (contactId && cadenceId && trackingBaseUrl) {
+      trackingId = randomUUID();
+      trackingPixel = buildTrackingPixel({
+        baseUrl: trackingBaseUrl,
+        userId,
+        contactId,
+        cadenceId,
+        messageId: trackingId,
+      });
+    }
+
     // Create email in RFC 2822 format (multipart/mixed when a PDF is attached)
     const recipientName = toName || toEmail;
     const ccHeader = ccList.length > 0
@@ -341,7 +379,8 @@ export const handler = async (event) => {
       subject,
       bodyText: bodyWithSignature,
       ccHeader,
-      attachment: attachmentPart
+      attachment: attachmentPart,
+      trackingPixel,
     });
 
     // Encode email in base64url format (required by Gmail API)
@@ -409,6 +448,8 @@ export const handler = async (event) => {
         status: 'sent',
         sentAt,
         source: 'quick_engage',
+        ...(cadenceId && { cadenceId }),
+        ...(trackingId && { trackingId }),
         ...(ccList.length > 0 && { ccEmails: ccList.map(r => r.email) }),
         ...(attachmentPart && { attachmentFilename: attachmentPart.filename })
       });

@@ -1,0 +1,619 @@
+<title>Sprint 1 Verification Report — Team B</title>
+<style>
+  @font-face {
+    font-family: 'Display';
+    src: local('Georgia'), local('Times New Roman');
+    font-weight: 400 700;
+  }
+
+  :root {
+    --bg: #F5F4F1;
+    --bg-surface: #ECEAE6;
+    --bg-inset: #E3E1DC;
+    --text: #1B1E1A;
+    --text-secondary: #555850;
+    --text-tertiary: #7D7A73;
+    --accent: #3F6338;
+    --accent-light: #E8F0E6;
+    --warning: #8B6914;
+    --warning-bg: #FDF6E3;
+    --warning-border: #E0C97A;
+    --critical: #943425;
+    --critical-bg: #FBF0EE;
+    --critical-border: #DDA49B;
+    --success: #2B7A3D;
+    --success-bg: #EDF7EF;
+    --success-border: #A3D4AD;
+    --info: #2F5E8A;
+    --info-bg: #EBF2F8;
+    --info-border: #A0C4E0;
+    --border: #D5D3CE;
+    --rule: #C9C6BF;
+    --pass: #2B7A3D;
+    --pass-bg: #EDF7EF;
+    --pass-border: #A3D4AD;
+    --flag: #943425;
+    --flag-bg: #FBF0EE;
+    --flag-border: #DDA49B;
+    --note: #8B6914;
+    --note-bg: #FDF6E3;
+    --note-border: #E0C97A;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #161816;
+    --bg-surface: #1E201D;
+    --bg-inset: #262824;
+    --text: #E0DFD9;
+    --text-secondary: #A5A39C;
+    --text-tertiary: #7D7A73;
+    --accent: #6FA964;
+    --accent-light: #1E2E1C;
+    --warning: #D4A426;
+    --warning-bg: #2A2315;
+    --warning-border: #5C4A1A;
+    --critical: #D4605A;
+    --critical-bg: #2A1A18;
+    --critical-border: #5C2822;
+    --success: #5CB86E;
+    --success-bg: #1A2A1D;
+    --success-border: #2E5234;
+    --info: #5A9FD4;
+    --info-bg: #172030;
+    --info-border: #1E3A55;
+    --border: #333530;
+    --rule: #3A3C37;
+    --pass: #5CB86E;
+    --pass-bg: #1A2A1D;
+    --pass-border: #2E5234;
+    --flag: #D4605A;
+    --flag-bg: #2A1A18;
+    --flag-border: #5C2822;
+    --note: #D4A426;
+    --note-bg: #2A2315;
+    --note-border: #5C4A1A;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161816;
+      --bg-surface: #1E201D;
+      --bg-inset: #262824;
+      --text: #E0DFD9;
+      --text-secondary: #A5A39C;
+      --text-tertiary: #7D7A73;
+      --accent: #6FA964;
+      --accent-light: #1E2E1C;
+      --warning: #D4A426;
+      --warning-bg: #2A2315;
+      --warning-border: #5C4A1A;
+      --critical: #D4605A;
+      --critical-bg: #2A1A18;
+      --critical-border: #5C2822;
+      --success: #5CB86E;
+      --success-bg: #1A2A1D;
+      --success-border: #2E5234;
+      --info: #5A9FD4;
+      --info-bg: #172030;
+      --info-border: #1E3A55;
+      --border: #333530;
+      --rule: #3A3C37;
+      --pass: #5CB86E;
+      --pass-bg: #1A2A1D;
+      --pass-border: #2E5234;
+      --flag: #D4605A;
+      --flag-bg: #2A1A18;
+      --flag-border: #5C2822;
+      --note: #D4A426;
+      --note-bg: #2A2315;
+      --note-border: #5C4A1A;
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+  }
+
+  @media (max-width: 600px) {
+    .page { padding: 2rem 1rem 3rem; }
+  }
+
+  /* Header */
+  .report-header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .report-header h1 {
+    font-family: 'Display', Georgia, serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0 0 0.5rem;
+    text-wrap: balance;
+  }
+
+  .report-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    font-size: 0.82rem;
+    color: var(--text-tertiary);
+    letter-spacing: 0.01em;
+  }
+
+  .report-meta span { white-space: nowrap; }
+
+  /* Verdict banner */
+  .verdict-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: 6px;
+    margin-bottom: 2rem;
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .verdict-banner.hold {
+    background: var(--flag-bg);
+    border: 1px solid var(--flag-border);
+    color: var(--flag);
+  }
+
+  .verdict-banner .verdict-icon {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .verdict-banner strong {
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 0.15rem;
+  }
+
+  /* Summary table */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 2.5rem;
+  }
+
+  .summary-cell {
+    background: var(--bg-surface);
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .summary-cell .count {
+    font-family: 'Display', Georgia, serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  .summary-cell .count.pass-count { color: var(--pass); }
+  .summary-cell .count.flag-count { color: var(--flag); }
+  .summary-cell .count.note-count { color: var(--note); }
+
+  .summary-cell .label {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 2.5rem;
+  }
+
+  .section-heading {
+    font-family: 'Display', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* Check items */
+  .check-item {
+    padding: 1rem 1.25rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    border: 1px solid;
+  }
+
+  .check-item.pass {
+    background: var(--pass-bg);
+    border-color: var(--pass-border);
+  }
+
+  .check-item.flag {
+    background: var(--flag-bg);
+    border-color: var(--flag-border);
+  }
+
+  .check-item.note {
+    background: var(--note-bg);
+    border-color: var(--note-border);
+  }
+
+  .check-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .check-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .check-badge.pass {
+    background: var(--pass);
+    color: #fff;
+  }
+
+  .check-badge.flag {
+    background: var(--flag);
+    color: #fff;
+  }
+
+  .check-badge.note {
+    background: var(--note);
+    color: #fff;
+  }
+
+  :root[data-theme="dark"] .check-badge.pass { color: #0d1a0f; }
+  :root[data-theme="dark"] .check-badge.flag { color: #1a0d0c; }
+  :root[data-theme="dark"] .check-badge.note { color: #1a1508; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .check-badge.pass { color: #0d1a0f; }
+    :root:not([data-theme="light"]) .check-badge.flag { color: #1a0d0c; }
+    :root:not([data-theme="light"]) .check-badge.note { color: #1a1508; }
+  }
+
+  .check-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+  }
+
+  .check-title.pass { color: var(--pass); }
+  .check-title.flag { color: var(--flag); }
+  .check-title.note { color: var(--note); }
+
+  .check-body {
+    font-size: 0.87rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .check-body p {
+    margin: 0.4rem 0 0;
+  }
+
+  .check-body code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+    font-size: 0.82em;
+    background: var(--bg-inset);
+    padding: 0.12em 0.35em;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  .check-body ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.25rem;
+  }
+
+  .check-body li {
+    margin-bottom: 0.2rem;
+  }
+
+  .file-ref {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+    font-size: 0.8em;
+    color: var(--text-tertiary);
+    word-break: break-all;
+  }
+
+  /* Discrepancy callout */
+  .discrepancy {
+    background: var(--flag-bg);
+    border: 2px solid var(--flag-border);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin: 1.5rem 0;
+  }
+
+  .discrepancy-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--flag);
+    margin-bottom: 0.5rem;
+  }
+
+  .discrepancy p {
+    font-size: 0.87rem;
+    color: var(--text-secondary);
+    margin: 0.35rem 0 0;
+    line-height: 1.6;
+  }
+
+  .discrepancy p:first-of-type { margin-top: 0; }
+
+  .discrepancy strong { color: var(--text); }
+
+  /* Bottom-line */
+  .bottom-line {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .bottom-line h2 {
+    font-family: 'Display', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+  }
+
+  .bottom-line p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    margin: 0.5rem 0;
+  }
+
+  .bottom-line ol {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+  }
+
+  .bottom-line li {
+    margin-bottom: 0.3rem;
+  }
+</style>
+
+<div class="page">
+
+  <header class="report-header">
+    <h1>Sprint 1 Verification Report</h1>
+    <div class="report-meta">
+      <span>Team B &mdash; Pre-Merge Review</span>
+      <span>Branch: <code>claude/first-run-experience-audit-7bukv5</code></span>
+      <span>Commit: <code>c5155c1</code></span>
+      <span>July 25, 2026</span>
+    </div>
+  </header>
+
+  <!-- Verdict -->
+  <div class="verdict-banner hold">
+    <span class="verdict-icon">&#9632;</span>
+    <div>
+      <strong>Hold &mdash; Do Not Merge Yet</strong>
+      One item needs Aaron&rsquo;s decision before merging. Team A chose a different option than expected for the Total Market fix. The code itself is correct for the option they chose &mdash; but it&rsquo;s not the option Aaron specified.
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-cell">
+      <div class="count pass-count">4</div>
+      <div class="label">Pass</div>
+    </div>
+    <div class="summary-cell">
+      <div class="count flag-count">1</div>
+      <div class="label">Flag</div>
+    </div>
+    <div class="summary-cell">
+      <div class="count note-count">2</div>
+      <div class="label">Notes</div>
+    </div>
+  </div>
+
+  <!-- FIX 1 -->
+  <div class="section">
+    <h2 class="section-heading">FIX 1 &mdash; reconConfidence Bug</h2>
+
+    <div class="check-item pass">
+      <div class="check-header">
+        <span class="check-badge pass">Pass</span>
+        <span class="check-title pass">reconConfidence prop correctly threaded</span>
+      </div>
+      <div class="check-body">
+        <p>The <code>reconConfidence</code> state variable is defined at <span class="file-ref">DailyLeads.jsx:1279</span> and is now correctly passed as a prop to <code>IcpReclarificationModal</code>.</p>
+        <ul>
+          <li><span class="file-ref">DailyLeads.jsx:1011</span> &mdash; Modal function signature updated to accept <code>reconConfidence</code> as a destructured prop</li>
+          <li><span class="file-ref">DailyLeads.jsx:2606</span> &mdash; Parent passes <code>reconConfidence={reconConfidence}</code> when rendering the modal</li>
+          <li><span class="file-ref">DailyLeads.jsx:1089</span> &mdash; Modal uses the prop in the API call body: <code>JSON.stringify({ userId, authToken, companyProfile, reconConfidence })</code></li>
+        </ul>
+        <p>Before this fix, <code>reconConfidence</code> was referenced inside the modal but never passed to it, causing the API call to silently send <code>undefined</code>. Fix is correct and complete.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIX 2 -->
+  <div class="section">
+    <h2 class="section-heading">FIX 2 &mdash; Total Market Navigation</h2>
+
+    <div class="discrepancy">
+      <div class="discrepancy-label">Discrepancy &mdash; Requires Aaron&rsquo;s Decision</div>
+      <p><strong>Aaron&rsquo;s instructions say:</strong> &ldquo;Confirm no route was added for <code>/scout/total-market</code> (they chose Option B).&rdquo;</p>
+      <p><strong>What Team A actually did:</strong> They chose <strong>Option A</strong> &mdash; wire up the orphaned Total Market page rather than remove its nav entry.</p>
+    </div>
+
+    <div class="check-item flag">
+      <div class="check-header">
+        <span class="check-badge flag">Flag</span>
+        <span class="check-title flag">Team A chose Option A, not Option B</span>
+      </div>
+      <div class="check-body">
+        <p>Team A&rsquo;s Sprint 1 Brief presented two options for the orphaned Total Market page:</p>
+        <ul>
+          <li><strong>Option A:</strong> Wire it up &mdash; add a route for <code>/scout/total-market</code> and point the sidebar nav to it</li>
+          <li><strong>Option B:</strong> Remove the dead nav entry</li>
+        </ul>
+        <p>Team A chose Option A. Their implementation is technically correct for that choice:</p>
+        <ul>
+          <li><span class="file-ref">App.jsx</span> &mdash; Added <code>import TotalMarket</code> and a <code>&lt;Route path="/scout/total-market"&gt;</code> block with <code>ProtectedRoute</code></li>
+          <li><span class="file-ref">Sidebar.jsx</span> &mdash; Updated the Total Market nav entry from <code>path: '/scout', state: { activeTab: 'total-market' }</code> to <code>path: '/scout/total-market'</code> (direct route)</li>
+          <li><span class="file-ref">MainLayout.jsx</span> &mdash; Added title mapping for <code>/scout/total-market</code> &rarr; &ldquo;Total Market&rdquo;</li>
+        </ul>
+        <p>The code is clean and the page will render correctly. But Aaron expected Option B. <strong>Aaron needs to decide:</strong> accept Option A as-is, or ask Team A to switch to Option B before merging.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIX 3 -->
+  <div class="section">
+    <h2 class="section-heading">FIX 3 &mdash; Duplicate People Entry</h2>
+
+    <div class="check-item pass">
+      <div class="check-header">
+        <span class="check-badge pass">Pass</span>
+        <span class="check-title pass">Duplicate People entry removed</span>
+      </div>
+      <div class="check-body">
+        <p>The Scout section in <span class="file-ref">Sidebar.jsx</span> previously had two entries labeled &ldquo;People&rdquo;:</p>
+        <ul>
+          <li>One with <code>sublabel: 'My Leads'</code>, navigating to <code>/scout?tab=all-leads</code></li>
+          <li>A second duplicate block with <code>icon: Users, label: 'People', path: '/scout', state: { activeTab: 'all-leads' }</code></li>
+        </ul>
+        <p>Team A removed the duplicate block. Only the &ldquo;My Leads&rdquo; entry remains. Verified on the branch &mdash; the <code>scoutItems</code> array now contains exactly one People entry that navigates correctly to <code>/scout</code> with <code>activeTab: 'all-leads'</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dead Code Cleanup -->
+  <div class="section">
+    <h2 class="section-heading">Dead Code Cleanup</h2>
+
+    <div class="check-item pass">
+      <div class="check-header">
+        <span class="check-badge pass">Pass</span>
+        <span class="check-title pass">SavedCompanies.css deleted</span>
+      </div>
+      <div class="check-body">
+        <p><span class="file-ref">src/pages/Scout/SavedCompanies.css</span> (719 lines) was deleted. Confirmed it was dead code: <code>SavedCompanies.jsx</code> uses inline styles exclusively and never imported this CSS file.</p>
+      </div>
+    </div>
+
+    <div class="check-item note">
+      <div class="check-header">
+        <span class="check-badge note">Note</span>
+        <span class="check-title note">NavigationBar.jsx &mdash; not deleted, but Aaron&rsquo;s reasoning is inaccurate</span>
+      </div>
+      <div class="check-body">
+        <p>Team A correctly did <strong>not</strong> delete <code>NavigationBar.jsx</code>. However, Aaron&rsquo;s stated reason &mdash; &ldquo;referenced in index.html&rdquo; &mdash; is incorrect.</p>
+        <ul>
+          <li>The file lives at <span class="file-ref">src/components/NavigationBar.jsx</span> (not <code>src/components/layout/</code>)</li>
+          <li><code>index.html</code> contains <strong>zero</strong> references to NavigationBar</li>
+          <li><code>App.jsx</code> does <strong>not</strong> import it</li>
+        </ul>
+        <p>The file <em>is</em> dead code, but deleting it wasn&rsquo;t part of Sprint 1 scope, so leaving it is the right call. This is noted for future cleanup awareness only &mdash; no action needed for this merge.</p>
+      </div>
+    </div>
+
+    <div class="check-item note">
+      <div class="check-header">
+        <span class="check-badge note">Note</span>
+        <span class="check-title note">MissionControl.jsx &mdash; not deleted, but Aaron&rsquo;s reasoning is inaccurate</span>
+      </div>
+      <div class="check-body">
+        <p>Team A correctly did <strong>not</strong> delete <code>MissionControl.jsx</code>. However, Aaron&rsquo;s stated reason &mdash; &ldquo;imported by App.jsx&rdquo; &mdash; is incorrect.</p>
+        <ul>
+          <li><code>App.jsx</code> imports <code>MissionControlDashboardV2</code>, <strong>not</strong> <code>MissionControl</code></li>
+          <li><span class="file-ref">src/pages/Scout/MissionControl.jsx</span> (1,191 lines) is orphaned &mdash; no file in the codebase imports it</li>
+        </ul>
+        <p>Like NavigationBar, this is dead code but was out of Sprint 1 scope. Noted for future cleanup only.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Build & Tests -->
+  <div class="section">
+    <h2 class="section-heading">Build &amp; Test Verification</h2>
+
+    <div class="check-item pass">
+      <div class="check-header">
+        <span class="check-badge pass">Pass</span>
+        <span class="check-title pass">Vite build completes successfully</span>
+      </div>
+      <div class="check-body">
+        <p><code>npx vite build</code> completes in ~13s with no errors. Output:</p>
+        <ul>
+          <li>One pre-existing warning: duplicate <code>color</code> key in <span class="file-ref">BarryReconGuide.jsx:155</span> (not introduced by Sprint 1)</li>
+          <li>One pre-existing chunk-size warning for the main bundle (3,375 KB)</li>
+          <li>Clean build artifacts produced in <code>dist/</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="check-item pass">
+      <div class="check-header">
+        <span class="check-badge pass">Pass</span>
+        <span class="check-title pass">Test suite &mdash; no new failures</span>
+      </div>
+      <div class="check-body">
+        <p>Ran <code>npx vitest run</code> on both <code>main</code> and Team A&rsquo;s branch. Identical results:</p>
+        <ul>
+          <li><strong>272 passed</strong>, 10 failed (3 test files)</li>
+          <li>All 10 failures are pre-existing on <code>main</code> &mdash; concentrated in <code>hunterSoundHaptics.test.jsx</code> (5), <code>hunterActionSystem.test.jsx</code> (4), and <code>hunterAdvancedFilters.test.jsx</code> (1)</li>
+          <li>Sprint 1 changes introduced <strong>zero</strong> new test failures</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom line -->
+  <div class="bottom-line">
+    <h2>Bottom Line</h2>
+    <p>Team A&rsquo;s Sprint 1 work is clean and well-executed. The reconConfidence fix, duplicate People removal, SavedCompanies.css deletion, and build all check out. <strong>One item blocks merge:</strong></p>
+    <ol>
+      <li><strong>Total Market (Option A vs. B):</strong> Team A chose Option A (wire up the route) instead of Option B (remove the nav entry) that Aaron expected. The implementation is technically correct for Option A. Aaron needs to decide whether to accept it or request a change.</li>
+    </ol>
+    <p>Two additional notes for Aaron&rsquo;s awareness &mdash; neither blocks merge:</p>
+    <ol>
+      <li><strong>NavigationBar.jsx</strong> is <em>not</em> referenced in <code>index.html</code> &mdash; it&rsquo;s dead code. Correctly left alone for Sprint 1, but the stated reason for keeping it is inaccurate.</li>
+      <li><strong>MissionControl.jsx</strong> is <em>not</em> imported by <code>App.jsx</code> &mdash; it&rsquo;s dead code. Same situation: correctly left alone, but the stated reason is inaccurate.</li>
+    </ol>
+    <p>Once Aaron resolves the Total Market question, the branch is clear to merge.</p>
+  </div>
+
+</div>

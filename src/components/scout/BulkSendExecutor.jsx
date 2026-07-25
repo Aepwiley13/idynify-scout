@@ -20,7 +20,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Send, CheckCircle2, XCircle, Mail, Clock, Loader, RotateCcw, AlertTriangle, UserPlus,
 } from 'lucide-react';
-import { collection, addDoc, doc, updateDoc, getDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { db } from '../../firebase/config';
@@ -161,6 +161,7 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
             contacts: items.map(buildContactEntry),
             sentCount: 0,
             openedCount: 0,
+            nativeHandoffCount: 0,
             failedCount: 0,
             createdAt: serverTimestamp(),
           });
@@ -251,9 +252,10 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
             contacts: mergedContacts,
             sentCount: counts.sent,
             failedCount: counts.failed,
-            // Additive so recipient opens recorded by track-open during the loop
-            // are not overwritten. counts.opened is native mail-app handoff.
-            openedCount: increment(counts.opened),
+            // openedCount is owned exclusively by track-open (recipient pixel
+            // opens) and is intentionally not written here. Native mail-app
+            // handoffs (OPENED result, Gmail not connected) count separately.
+            nativeHandoffCount: counts.opened,
             completedAt: serverTimestamp(),
           });
         } else {
@@ -267,7 +269,9 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
             contactCount: items.length,
             contacts: items.map((p) => ({ ...buildContactEntry(p), ...finalById[p.contact.id] })),
             sentCount: counts.sent,
-            openedCount: counts.opened,
+            // No pre-minted cadenceId → no pixel embedded → no recipient opens.
+            openedCount: 0,
+            nativeHandoffCount: counts.opened,
             failedCount: counts.failed,
             createdAt: serverTimestamp(),
             completedAt: serverTimestamp(),

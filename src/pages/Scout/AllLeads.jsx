@@ -371,6 +371,56 @@ function PersonModal({ contact, company, onClose, onEngage, onOpenProfile, engag
   );
 }
 
+// ─── Warm signal (Phase 2 Workstream C) ──────────────────────────────────────
+// A contact is "warm" when they opened or replied to a cadence email in the
+// last 30 days. last_replied_at (check-replies) is an ISO string; last_opened_at
+// (track-open) is a Firestore Timestamp — normalize both to epoch ms.
+const WARM_SIGNAL_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+const WARM_SIGNAL_CONFIG = {
+  replied: { label: 'Replied recently', color: '#10b981' }, // green
+  opened:  { label: 'Opened recently',  color: '#f59e0b' }, // orange
+};
+
+function toEpochMs(ts) {
+  if (!ts) return null;
+  if (typeof ts.toDate === 'function') return ts.toDate().getTime();          // Firestore Timestamp
+  if (typeof ts === 'object' && typeof ts.seconds === 'number') return ts.seconds * 1000; // raw Timestamp
+  const d = new Date(ts);                                                     // ISO string / number / Date
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+}
+
+// Returns 'replied' | 'opened' | null. Reply outranks open.
+function getWarmSignal(contact) {
+  const now = Date.now();
+  const repliedMs = toEpochMs(contact.last_replied_at);
+  if (repliedMs !== null && now - repliedMs <= WARM_SIGNAL_WINDOW_MS) return 'replied';
+  const openedMs = toEpochMs(contact.last_opened_at);
+  if (openedMs !== null && now - openedMs <= WARM_SIGNAL_WINDOW_MS) return 'opened';
+  return null;
+}
+
+// Small solid pill (white text) so it stays legible over card photos.
+function WarmSignalBadge({ signal }) {
+  const cfg = WARM_SIGNAL_CONFIG[signal];
+  if (!cfg) return null;
+  return (
+    <span
+      title={cfg.label}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        padding: '2px 7px', borderRadius: 20,
+        background: cfg.color, color: '#fff',
+        fontSize: 9, fontWeight: 700, letterSpacing: 0.3, whiteSpace: 'nowrap',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+      }}
+    >
+      <Flame size={9} />
+      {cfg.label}
+    </span>
+  );
+}
+
 // ─── AllLeadsCard ─────────────────────────────────────────────────────────────
 function AllLeadsCard({
   contact, company, onClick, onCompanyClick, onEngage,
@@ -620,12 +670,13 @@ function AllLeadsCard({
             )}
           </div>
         )}
-        {/* Engagement state badge (top-left) */}
-        <div style={{ position: 'absolute', top: 8, left: 8 }}>
+        {/* Engagement state badge (top-left) + warm signal badge stacked below */}
+        <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
           <EngageBadge
             state={engageState}
             hunterStatus={mode === 'hunter' ? contact.hunter_status : undefined}
           />
+          {getWarmSignal(contact) && <WarmSignalBadge signal={getWarmSignal(contact)} />}
         </div>
         {/* Name + title over gradient */}
         <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12 }}>
@@ -989,6 +1040,7 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onAr
           );
         })}
       </div>
+      {getWarmSignal(contact) && <WarmSignalBadge signal={getWarmSignal(contact)} />}
       <StatusBadge status={status} small />
       <div style={{ width: 52, flexShrink: 0, textAlign: 'right' }}>
         {email ? <Mail size={12} color={BRIGADE.blue} /> : <span style={{ fontSize: 10, color: T.textFaint }}>—</span>}
@@ -1154,6 +1206,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   const [warmthFilter, setWarmthFilter] = useState(null); // 'cold' | 'warm' | 'hot'
   const [sourceFilter, setSourceFilter] = useState(null);  // addedFrom value
   const [smartFilter, setSmartFilter] = useState(null);    // 'has_replied' | 'going_cold'
+  const [warmSignalFilter, setWarmSignalFilter] = useState(false); // opened/replied in last 30 days
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false); // data quality filters dropdown
 
   // Bulk selection
@@ -1554,6 +1607,9 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // Warmth filter
   if (warmthFilter) filtered = filtered.filter(c => (c.warmth_level || 'cold') === warmthFilter);
 
+  // Warm signals filter — opened or replied to a cadence in the last 30 days
+  if (warmSignalFilter) filtered = filtered.filter(c => getWarmSignal(c) !== null);
+
   // Source filter
   if (sourceFilter) filtered = filtered.filter(c => (c.addedFrom || 'manual') === sourceFilter);
 
@@ -1644,7 +1700,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   };
 
   // Count active filters for badge
-  const activeFilterCount = [industryFilter, warmthFilter, sourceFilter, smartFilter, dataFilter, tagFilter].filter(Boolean).length;
+  const activeFilterCount = [industryFilter, warmthFilter, sourceFilter, smartFilter, dataFilter, tagFilter, warmSignalFilter].filter(Boolean).length;
 
   if (loading) {
     return (
@@ -1921,6 +1977,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${smartFilter === 'going_cold' ? '#dc262660' : T.border}`, background: smartFilter === 'going_cold' ? '#dc262615' : 'transparent', color: smartFilter === 'going_cold' ? '#dc2626' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
         ><Flame size={9} />Going Cold</button>
 
+        {/* ── Warm signals filter (opened/replied in last 30 days) ── */}
+        <button
+          onClick={() => setWarmSignalFilter(v => !v)}
+          title="Contacts who opened or replied to a cadence in the last 30 days"
+          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${warmSignalFilter ? '#10b98160' : T.border}`, background: warmSignalFilter ? '#10b98115' : 'transparent', color: warmSignalFilter ? '#10b981' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+        ><Flame size={9} />Warm Signals</button>
+
         {/* ── Tag filter picker ── */}
         <div style={{ position: 'relative', flexShrink: 0 }} ref={tagPickerRef}>
           <button
@@ -2002,7 +2065,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         {/* Active filter count badge */}
         {activeFilterCount > 0 && (
           <button
-            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); }}
+            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); setWarmSignalFilter(false); }}
             style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <X size={9} />{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} — Clear

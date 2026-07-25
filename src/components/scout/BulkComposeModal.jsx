@@ -4,7 +4,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { checkGmailConnection } from '../../utils/sendActionResolver';
-import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
 
@@ -52,7 +52,7 @@ export default function BulkComposeModal({
         const user = getEffectiveUser();
         if (!user) return;
         const snap = await getDocs(
-          query(collection(db, 'users', user.uid, 'contacts'), orderBy('name'), limit(200))
+          query(collection(db, 'users', user.uid, 'contacts'), limit(200))
         );
         setLoadedContacts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
@@ -166,7 +166,7 @@ export default function BulkComposeModal({
   // ─── In-modal search: filter allContacts by query, exclude already selected ───
   const selectedIdSet = new Set(contacts.map(c => c.id));
   const availableContacts = contactPool.filter(c => !selectedIdSet.has(c.id));
-  const searchResults = searchQuery.trim().length >= 2
+  const searchResults = searchQuery.trim().length >= 1
     ? availableContacts
         .filter(c => {
           const q = searchQuery.toLowerCase();
@@ -176,9 +176,9 @@ export default function BulkComposeModal({
             (c.company_name || c.company || '').toLowerCase().includes(q)
           );
         })
-        .slice(0, 8)
+        .slice(0, 10)
     : [];
-  const browseList = contacts.length === 0 && searchQuery.trim().length < 2
+  const browseList = searchQuery.trim().length === 0
     ? availableContacts.slice(0, 15)
     : [];
 
@@ -890,7 +890,7 @@ export default function BulkComposeModal({
                         ))}
                       </div>
                     )}
-                    {searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                    {searchQuery.trim().length >= 1 && searchResults.length === 0 && (
                       <div style={{ marginTop: 4, padding: '8px 10px', fontSize: 11, color: T.textFaint, textAlign: 'center' }}>
                         No matching contacts found
                       </div>

@@ -1,0 +1,1133 @@
+<title>Scout Technical Audit — All Sections</title>
+<style>
+  @font-face {
+    font-family: 'Display';
+    src: local('Georgia'), local('Times New Roman');
+    font-weight: 400 700;
+  }
+
+  :root {
+    --bg: #F5F4F1;
+    --bg-surface: #ECEAE6;
+    --bg-inset: #E3E1DC;
+    --text: #1B1E1A;
+    --text-secondary: #555850;
+    --text-tertiary: #7D7A73;
+    --accent: #3F6338;
+    --accent-light: #E8F0E6;
+    --warning: #8B6914;
+    --warning-bg: #FDF6E3;
+    --warning-border: #E0C97A;
+    --critical: #943425;
+    --critical-bg: #FBF0EE;
+    --critical-border: #DDA49B;
+    --success: #2B7A3D;
+    --success-bg: #EDF7EF;
+    --success-border: #A3D4AD;
+    --info: #2F5E8A;
+    --info-bg: #EBF2F8;
+    --info-border: #A0C4E0;
+    --border: #D5D3CE;
+    --rule: #C9C6BF;
+    --nav-bg: rgba(245,244,241,0.92);
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #161816;
+    --bg-surface: #1E201D;
+    --bg-inset: #262824;
+    --text: #E0DFD9;
+    --text-secondary: #A5A39C;
+    --text-tertiary: #7D7A73;
+    --accent: #6FA964;
+    --accent-light: #1E2E1C;
+    --warning: #D4A426;
+    --warning-bg: #2A2315;
+    --warning-border: #5C4A1A;
+    --critical: #D4605A;
+    --critical-bg: #2A1A18;
+    --critical-border: #5C2822;
+    --success: #5CB86E;
+    --success-bg: #1A2A1D;
+    --success-border: #2E5234;
+    --info: #5A9FD4;
+    --info-bg: #172030;
+    --info-border: #1E3A55;
+    --border: #333530;
+    --rule: #3A3C37;
+    --nav-bg: rgba(22,24,22,0.92);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161816;
+      --bg-surface: #1E201D;
+      --bg-inset: #262824;
+      --text: #E0DFD9;
+      --text-secondary: #A5A39C;
+      --text-tertiary: #7D7A73;
+      --accent: #6FA964;
+      --accent-light: #1E2E1C;
+      --warning: #D4A426;
+      --warning-bg: #2A2315;
+      --warning-border: #5C4A1A;
+      --critical: #D4605A;
+      --critical-bg: #2A1A18;
+      --critical-border: #5C2822;
+      --success: #5CB86E;
+      --success-bg: #1A2A1D;
+      --success-border: #2E5234;
+      --info: #5A9FD4;
+      --info-bg: #172030;
+      --info-border: #1E3A55;
+      --border: #333530;
+      --rule: #3A3C37;
+      --nav-bg: rgba(22,24,22,0.92);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page-wrapper {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    max-width: 1180px;
+    margin: 0 auto;
+    gap: 0;
+    min-height: 100vh;
+  }
+
+  /* --- Sticky nav --- */
+  .section-nav {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 32px 16px 32px 8px;
+    border-right: 1px solid var(--border);
+    background: var(--nav-bg);
+    backdrop-filter: blur(8px);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .section-nav::-webkit-scrollbar { width: 4px; }
+  .section-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .nav-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 16px 8px 6px;
+  }
+  .nav-label:first-child { padding-top: 0; }
+
+  .section-nav a {
+    display: block;
+    padding: 5px 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 4px;
+    line-height: 1.35;
+    transition: background 0.15s, color 0.15s;
+  }
+  .section-nav a:hover { background: var(--bg-surface); color: var(--text); }
+  .section-nav a.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+
+  /* --- Main content --- */
+  .main-content {
+    padding: 40px 48px 80px;
+    max-width: 820px;
+  }
+
+  .report-header {
+    margin-bottom: 40px;
+    padding-bottom: 28px;
+    border-bottom: 2px solid var(--rule);
+  }
+
+  .report-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .report-title {
+    font-family: 'Display', Georgia, 'Times New Roman', serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .report-meta {
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+
+  /* --- Sections --- */
+  .audit-section {
+    margin-bottom: 48px;
+    scroll-margin-top: 24px;
+  }
+
+  .section-heading {
+    font-family: 'Display', Georgia, 'Times New Roman', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 20px;
+    line-height: 1.3;
+  }
+
+  .question-block {
+    margin-bottom: 24px;
+  }
+
+  .question-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+  }
+
+  .question-text {
+    font-family: 'Display', Georgia, 'Times New Roman', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.35;
+  }
+
+  .answer {
+    color: var(--text-secondary);
+    font-size: 14.5px;
+    line-height: 1.7;
+  }
+
+  .answer p { margin-bottom: 10px; }
+  .answer p:last-child { margin-bottom: 0; }
+  .answer strong { color: var(--text); font-weight: 600; }
+  .answer code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    background: var(--bg-inset);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+
+  .answer ul, .answer ol {
+    padding-left: 20px;
+    margin-bottom: 10px;
+  }
+  .answer li { margin-bottom: 4px; }
+
+  /* --- Status badges --- */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    vertical-align: middle;
+    text-transform: uppercase;
+  }
+  .badge-ok { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+  .badge-warn { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+  .badge-crit { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical-border); }
+  .badge-info { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-border); }
+  .badge-stub { background: var(--bg-inset); color: var(--text-tertiary); border: 1px solid var(--border); }
+
+  /* --- Callout boxes --- */
+  .callout {
+    padding: 12px 16px;
+    border-radius: 5px;
+    margin: 12px 0;
+    font-size: 14px;
+    line-height: 1.6;
+    border-left: 3px solid;
+  }
+  .callout-flag { background: var(--warning-bg); border-color: var(--warning); color: var(--text); }
+  .callout-bug { background: var(--critical-bg); border-color: var(--critical); color: var(--text); }
+  .callout-ok { background: var(--success-bg); border-color: var(--success); color: var(--text); }
+  .callout-info { background: var(--info-bg); border-color: var(--info); color: var(--text); }
+
+  .callout-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .callout-flag .callout-label { color: var(--warning); }
+  .callout-bug .callout-label { color: var(--critical); }
+  .callout-ok .callout-label { color: var(--success); }
+  .callout-info .callout-label { color: var(--info); }
+
+  /* --- Tables --- */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 12px 0;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--text); font-weight: 500; }
+
+  /* --- Summary strip --- */
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 16px 0 24px;
+  }
+
+  .summary-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .summary-card .sc-value {
+    font-family: 'Display', Georgia, 'Times New Roman', serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .summary-card .sc-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+  }
+
+  /* --- File ref --- */
+  .file-ref {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    background: var(--bg-inset);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* --- Responsive --- */
+  @media (max-width: 768px) {
+    .page-wrapper {
+      grid-template-columns: 1fr;
+    }
+    .section-nav {
+      position: static;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .nav-label { width: 100%; padding: 8px 0 2px; }
+    .section-nav a { font-size: 12px; padding: 4px 8px; }
+    .main-content { padding: 24px 16px 60px; }
+    .report-title { font-size: 22px; }
+    .summary-strip { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<div class="page-wrapper">
+  <nav class="section-nav" id="nav">
+    <div class="nav-label">Overview</div>
+    <a href="#executive">Executive Summary</a>
+    <div class="nav-label">Audit Sections</div>
+    <a href="#s1">1. Navigation</a>
+    <a href="#s2">2. People / My Leads</a>
+    <a href="#s3">3. Daily Discoveries</a>
+    <a href="#s4">4. Saved Companies</a>
+    <a href="#s5">5. Cadences</a>
+    <a href="#s6">6. Other Sections</a>
+    <a href="#s7">7. Barry in Scout</a>
+    <div class="nav-label">Appendix</div>
+    <a href="#readiness">Customer Readiness</a>
+    <a href="#bugs">Bugs Found</a>
+  </nav>
+
+  <main class="main-content">
+    <header class="report-header">
+      <div class="report-eyebrow">Team B &mdash; Technical Audit</div>
+      <h1 class="report-title">Scout: Complete Section-by-Section Technical Audit</h1>
+      <div class="report-meta">Based on current <code>main</code> branch &middot; July 25, 2026 &middot; Audit-only, no code changes</div>
+    </header>
+
+    <!-- Executive Summary -->
+    <section class="audit-section" id="executive">
+      <h2 class="section-heading">Executive Summary</h2>
+
+      <div class="summary-strip">
+        <div class="summary-card">
+          <div class="sc-value">8</div>
+          <div class="sc-label">Core Modules</div>
+        </div>
+        <div class="summary-card">
+          <div class="sc-value">60+</div>
+          <div class="sc-label">Routes Defined</div>
+        </div>
+        <div class="summary-card">
+          <div class="sc-value">2</div>
+          <div class="sc-label">Orphaned Pages</div>
+        </div>
+        <div class="summary-card">
+          <div class="sc-value">15+</div>
+          <div class="sc-label">"Coming Soon" Stubs</div>
+        </div>
+      </div>
+
+      <div class="answer">
+        <p>Scout is a large, fully-built application with eight core modules (Scout, Hunter, Sniper, Basecamp, Command Center, Reinforcements, Fallback, RECON), an AI assistant (Barry) with 67 dedicated files and 24 backend functions, and a deep feature set across every module. The vast majority of the application is production-grade code, not placeholder.</p>
+        <p><strong>Key findings:</strong> Two pages are fully built but orphaned (TotalMarket, legacy MissionControl). The sidebar has a duplicate "People" entry in the Scout pillar. The Cadences system is single-send only with no scheduling or multi-step sequences. There are 15+ features marked "Coming Soon" across Settings, Cadences, and Scout+. One confirmed bug exists in DailyLeads where <code>IcpReclarificationModal</code> references an out-of-scope variable. Barry is deeply integrated but absent from all Sniper sub-sections, most Fallback sections, and several Scout pages where new users would benefit from guidance.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 1 — NAVIGATION -->
+    <section class="audit-section" id="s1">
+      <h2 class="section-heading">Section 1 &mdash; Scout Navigation</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q1</div>
+        <div class="question-text">List every item currently in the Scout sidebar navigation.</div>
+
+        <div class="answer">
+          <p>The desktop sidebar (<code>src/components/layout/Sidebar.jsx</code>) organizes navigation into 8 collapsible "pillars" plus a header link to Mission Control. The complete inventory:</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Pillar</th><th>Label</th><th>Route</th><th>What It Does</th></tr>
+            </thead>
+            <tbody>
+              <tr><td rowspan="8">Command Center</td><td>People</td><td><code>/command-center?tab=people</code></td><td>All contacts grid (AllLeads)</td></tr>
+              <tr><td>Companies</td><td><code>/command-center?tab=companies</code></td><td>Shared companies view</td></tr>
+              <tr><td>Missions</td><td><code>/command-center?tab=missions</code></td><td>Mission management</td></tr>
+              <tr><td>Campaigns</td><td><code>/hunter/campaign/new</code></td><td>Create new campaign</td></tr>
+              <tr><td>Cadences</td><td><code>/scout/cadences</code></td><td>Bulk outreach history</td></tr>
+              <tr><td>Weapons</td><td><code>/command-center?tab=weapons</code></td><td>Outreach tools</td></tr>
+              <tr><td>Arsenal</td><td><code>/command-center?tab=arsenal</code></td><td>Saved weapons/templates</td></tr>
+              <tr><td>Outcomes</td><td><code>/command-center?tab=outcomes</code></td><td>Result tracking</td></tr>
+
+              <tr><td rowspan="10">Scout</td><td>People</td><td><code>/scout?tab=all-leads</code></td><td>Contact pipeline</td></tr>
+              <tr><td>Cadences</td><td><code>/scout/cadences</code></td><td>Bulk outreach history</td></tr>
+              <tr><td>Daily Discoveries</td><td><code>/scout?tab=daily-leads</code></td><td>Swipe-triage lead queue</td></tr>
+              <tr><td>Saved Companies</td><td><code>/scout?tab=saved-companies</code></td><td>Accepted companies list</td></tr>
+              <tr><td>People (duplicate)</td><td><code>/scout?tab=all-leads</code></td><td>Same as above &mdash; duplicate entry</td></tr>
+              <tr><td>Scout+</td><td><code>/scout?tab=scout-plus</code></td><td>Contact import hub</td></tr>
+              <tr><td>Total Market</td><td><code>/scout?tab=total-market</code></td><td>Market overview (orphaned &mdash; see Q2)</td></tr>
+              <tr><td>ICP Settings</td><td><code>/scout?tab=icp-settings</code></td><td>Ideal Customer Profile config</td></tr>
+              <tr><td>Game Mode &ndash; Beta</td><td><code>/scout/game</code></td><td>Gamified engagement</td></tr>
+              <tr><td>Settings</td><td><code>/settings</code></td><td>User preferences</td></tr>
+
+              <tr><td rowspan="7">Hunter</td><td>All People</td><td><code>/hunter?tab=all</code></td><td>All hunter contacts</td></tr>
+              <tr><td>Follow Up Now</td><td><code>/hunter?tab=followup</code></td><td>Overdue contacts</td></tr>
+              <tr><td>Today's Actions</td><td><code>/hunter?tab=today</code></td><td>Today's tasks</td></tr>
+              <tr><td>Replied</td><td><code>/hunter?tab=replied</code></td><td>Reply filter</td></tr>
+              <tr><td>Active</td><td><code>/hunter?tab=active</code></td><td>In-mission contacts</td></tr>
+              <tr><td>New (Unengaged)</td><td><code>/hunter?tab=new</code></td><td>Unengaged contacts</td></tr>
+              <tr><td>Settings</td><td><code>/settings</code></td><td>User preferences</td></tr>
+
+              <tr><td rowspan="7">Sniper</td><td>People</td><td><code>/sniper?tab=people</code></td><td>Pipeline contacts</td></tr>
+              <tr><td>Companies</td><td><code>/sniper?tab=companies</code></td><td>Pipeline companies</td></tr>
+              <tr><td>Pipeline</td><td><code>/sniper?tab=pipeline</code></td><td>Kanban deal stages</td></tr>
+              <tr><td>Targets</td><td><code>/sniper?tab=targets</code></td><td>Target management</td></tr>
+              <tr><td>Touches</td><td><code>/sniper?tab=touches</code></td><td>Touch tracking</td></tr>
+              <tr><td>Playbooks</td><td><code>/sniper?tab=playbooks</code></td><td>Sales playbooks</td></tr>
+              <tr><td>Outcomes</td><td><code>/sniper?tab=outcomes</code></td><td>Outcome tracking</td></tr>
+
+              <tr><td>Basecamp</td><td>Basecamp</td><td><code>/basecamp</code></td><td>Customer management hub</td></tr>
+              <tr><td>Reinforcements</td><td>Reinforcements</td><td><code>/reinforcements</code></td><td>Referral intelligence</td></tr>
+
+              <tr><td rowspan="7">RECON</td><td>Overview</td><td><code>/recon</code></td><td>ICP training overview</td></tr>
+              <tr><td>ICP Intelligence</td><td><code>/recon/icp-intelligence</code></td><td>Module 1</td></tr>
+              <tr><td>Messaging &amp; Voice</td><td><code>/recon/messaging</code></td><td>Module 2</td></tr>
+              <tr><td>Objections &amp; Constraints</td><td><code>/recon/objections</code></td><td>Module 3</td></tr>
+              <tr><td>Competitive Intel</td><td><code>/recon/competitive-intel</code></td><td>Module 4</td></tr>
+              <tr><td>Buying Signals</td><td><code>/recon/buying-signals</code></td><td>Module 5</td></tr>
+              <tr><td>Barry Training</td><td><code>/recon/barry-training</code></td><td>Training status dashboard</td></tr>
+
+              <tr><td rowspan="3">Fallback</td><td>Comeback Engine</td><td><code>/fallback</code></td><td>Archive hub</td></tr>
+              <tr><td>People</td><td><code>/fallback?tab=people</code></td><td>Archived contacts</td></tr>
+              <tr><td>Companies</td><td><code>/fallback?tab=companies</code></td><td>Archived companies</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="answer">
+          <p><strong>Mobile navigation:</strong> Bottom tab bar shows Scout, Hunter, Sniper, Basecamp, and a "More" button. The More sheet surfaces Recon, Game, Reinforcements, Command Center, Missions, Campaigns, Cadences, Fallback, Mission Control, Settings, and Admin (conditional).</p>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q2</div>
+        <div class="question-text">Are there any nav items that are broken, incomplete, or go to placeholder pages?</div>
+        <div class="answer">
+
+          <div class="callout callout-bug">
+            <div class="callout-label">Broken / Orphaned</div>
+            <strong>Total Market</strong> &mdash; The sidebar links to <code>/scout?tab=total-market</code>, but <code>ScoutMain.jsx</code> does not handle this tab value. The <code>TotalMarket.jsx</code> file (394 lines) is fully built but never imported by any component. Users clicking this nav item will see the default Scout tab instead of the Total Market page.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Duplicate Entry</div>
+            <strong>"People" appears twice</strong> in the Scout pillar &mdash; at lines 223-229 and 250-255 of <code>Sidebar.jsx</code>, both pointing to <code>/scout?tab=all-leads</code>.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Stale Link</div>
+            <strong>ModuleNavigationGrid RECON card</strong> on the Mission Control dashboard links to <code>/mission-control-v2/recon</code> (the legacy path) instead of <code>/recon</code> (the current self-contained shell). The legacy path still works via a redirect, but it's an unnecessary hop.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Dead Code</div>
+            <strong>Legacy NavigationBar</strong> (<code>src/components/NavigationBar.jsx</code>) has 4 links to old routes. This component appears unused by the current module-based UI.
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-label">Note</div>
+            <strong>Weapons section</strong> content in the Command Center displays a "Coming Soon" heading (<code>WeaponsSection.jsx:116</code>). The nav item works, but the destination is a stub.
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q3</div>
+        <div class="question-text">Is the navigation order logical for a new user trying to go from zero to first cadence sent?</div>
+        <div class="answer">
+          <p><strong>Partially.</strong> The happy path for a new user would be: Set up ICP &rarr; Discover companies (Daily Discoveries) &rarr; Save companies &rarr; Find contacts (People) &rarr; Send cadence. However:</p>
+          <ul>
+            <li>ICP Settings is buried 8th in the Scout pillar, after items the user can't use yet.</li>
+            <li>Daily Discoveries (the primary lead source) is 3rd &mdash; reasonable, but a new user wouldn't know to start there.</li>
+            <li>The Cadences item appears in both the Command Center pillar and the Scout pillar, which could confuse new users about where "their" cadences live.</li>
+            <li>The duplicate "People" entry in Scout adds noise.</li>
+            <li>There is no onboarding flow that guides the sidebar sequence &mdash; the user must intuit the correct order.</li>
+          </ul>
+          <p>The sidebar is organized by module rather than by user journey. For power users this is fine; for a new user going from zero to first cadence, the implicit steps are not surfaced.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2 — PEOPLE / MY LEADS -->
+    <section class="audit-section" id="s2">
+      <h2 class="section-heading">Section 2 &mdash; People (My Leads)</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q4</div>
+        <div class="question-text">What does the People / My Leads page look like for a brand new user with zero contacts?</div>
+        <div class="answer">
+          <p><strong>Yes, there is an empty state with guidance.</strong> Defined at <code>AllLeads.jsx:1715-1738</code>. For the "people" mode, it shows:</p>
+          <ul>
+            <li>A large <code>Users</code> icon (48px)</li>
+            <li>Heading: <strong>"No Contacts Yet"</strong></li>
+            <li>Body: "Accept companies in Daily Leads to start building your contact pipeline."</li>
+            <li>CTA button: <strong>"View Saved Companies"</strong> &rarr; navigates to <code>/scout?tab=saved-companies</code></li>
+          </ul>
+          <div class="callout callout-flag">
+            <div class="callout-label">Friction</div>
+            The CTA sends users to Saved Companies, but a brand new user has no saved companies either. The more logical CTA would be "Go to Daily Discoveries" or "Set up your ICP" to start the pipeline from scratch. There is no onboarding walkthrough or tutorial.
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q5</div>
+        <div class="question-text">How does a user add their first contact? What are all the available methods?</div>
+        <div class="answer">
+          <p>Five methods exist, three are active:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Method</th><th>Location</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Add Manually</td><td>Scout+ tab</td><td><span class="badge badge-ok">Active</span></td></tr>
+                <tr><td>LinkedIn Link paste</td><td>Scout+ tab + AllLeads toolbar button</td><td><span class="badge badge-ok">Active</span></td></tr>
+                <tr><td>Company Search</td><td>Scout+ tab</td><td><span class="badge badge-ok">Active</span></td></tr>
+                <tr><td>Upload CSV</td><td>Scout+ tab</td><td><span class="badge badge-stub">Coming Soon</span></td></tr>
+                <tr><td>Scan Business Card</td><td>Scout+ tab</td><td><span class="badge badge-stub">Coming Soon</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Additionally, the primary path is indirect: accept companies in Daily Discoveries, which auto-searches for contacts via Apollo. An "Add via LinkedIn" button also appears directly in the AllLeads toolbar.</p>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q6</div>
+        <div class="question-text">What contact data is shown on each card? What is missing that would be useful?</div>
+        <div class="answer">
+          <p><strong>Card view shows</strong> (component <code>AllLeadsCard</code> at <code>AllLeads.jsx:425-994</code>):</p>
+          <ul>
+            <li>Photo or initials avatar</li>
+            <li>Full name, job title</li>
+            <li>Engagement badge (COLD, ACTIVE, REPLIED, CONVERTED)</li>
+            <li>Status badge (NOT CONTACTED, ENGAGED, AWAITING REPLY, etc.)</li>
+            <li>Days since last contact (e.g., "7d")</li>
+            <li>Company name (clickable chip)</li>
+            <li>Signal chip (e.g., "New role &mdash; timing signal")</li>
+            <li>Email (or "No email found" + Enrich button)</li>
+            <li>Last interaction time</li>
+            <li>Tags (up to 3, with +N overflow)</li>
+            <li>Brigade assignment pill</li>
+            <li>Action buttons row</li>
+          </ul>
+          <p><strong>Missing that would be useful:</strong> Phone number (only visible in the Pro-tier modal), LinkedIn headline, ICP match score, company size/industry at a glance, and time zone for outreach timing.</p>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q7</div>
+        <div class="question-text">What actions can a user take on a contact from this list view?</div>
+        <div class="answer">
+          <p><strong>Card view actions:</strong></p>
+          <ul>
+            <li><strong>Primary CTA</strong> &mdash; context-sensitive: "Engage" (cold), "Follow Up" (active), "Follow Up Now" (overdue), "Respond" (replied), "View Account" (converted)</li>
+            <li><strong>LinkedIn</strong> &mdash; opens profile in new tab</li>
+            <li><strong>Add to Mission</strong> (Hunter mode) &mdash; popover listing active missions</li>
+            <li><strong>Move to SNIPER</strong> (Hunter mode) &mdash; adds to SNIPER pipeline</li>
+            <li><strong>Return to Scout</strong> (Hunter mode) &mdash; resets hunter status</li>
+            <li><strong>Archive</strong> &mdash; confirmation popover with reason dropdown</li>
+            <li><strong>Brigade picker</strong> &mdash; inline popover grid for assignment</li>
+            <li><strong>Bulk selection checkbox</strong> (when bulk mode active)</li>
+          </ul>
+          <p><strong>Bulk actions</strong> (when contacts selected): Assign Brigade, Export CSV, Compose Email (max 25), Clear selection.</p>
+          <p><strong>Person modal actions</strong> (click card on desktop): Same CTA, email, phone (Pro only), LinkedIn, Barry context notes, Open Full Profile.</p>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q8</div>
+        <div class="question-text">Is the Start Cadence button visible and working correctly?</div>
+        <div class="answer">
+          <p><strong>Yes, it is visible and functional</strong>, but it's a two-step indirect flow, not a direct "create cadence" button. Located at <code>AllLeads.jsx:2092-2096</code>:</p>
+          <ol>
+            <li>Click "Start Cadence" &rarr; toggles <strong>bulk selection mode</strong> (button label changes to "Selecting (N)")</li>
+            <li>Click contacts to select them (checkboxes appear on cards)</li>
+            <li>A guidance banner appears: "Click contacts to select them, then use the action bar below"</li>
+            <li>A floating bulk action bar appears at the bottom with <strong>"Compose Email"</strong></li>
+            <li>Compose Email opens <code>BulkComposeModal</code> &mdash; which is the actual cadence creation flow</li>
+          </ol>
+          <div class="callout callout-flag">
+            <div class="callout-label">Friction</div>
+            The name "Start Cadence" suggests it will open a cadence builder, but it actually enters a contact-selection mode with no immediate indication that composing email is the next step. The connection between selecting contacts and creating a cadence is not obvious to a new user.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3 — DAILY DISCOVERIES -->
+    <section class="audit-section" id="s3">
+      <h2 class="section-heading">Section 3 &mdash; Daily Discoveries</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q9</div>
+        <div class="question-text">What is Daily Discoveries supposed to do and what does it actually do today?</div>
+        <div class="answer">
+          <p><strong>Intended:</strong> A Tinder-style swipe-triage queue for companies and people, where users review AI-curated leads, swipe right to save or left to reject, with feedback loops that train Barry to find better leads.</p>
+
+          <p><strong>Actual:</strong> <span class="badge badge-ok">Fully Built</span> &mdash; 2,683 lines of production-grade code.</p>
+
+          <ul>
+            <li><strong>Companies Tab:</strong> Loads pending companies from Firestore, scores them against ICP using <code>calculateICPScore()</code>, presents as swipeable cards. Right-swipe accepts and auto-searches for contacts via Apollo.</li>
+            <li><strong>People Tab:</strong> Shows contacts from accepted companies matching target titles as swipeable person cards.</li>
+            <li><strong>Batching:</strong> Every 10 swipes shows a batch-end screen with results and Barry ICP refinement suggestions.</li>
+            <li><strong>Session tracking:</strong> Daily swipe limit (25), session stats, daily streaks, streak milestones.</li>
+            <li><strong>Undo:</strong> Last 5 swipes with Firestore state reversion.</li>
+            <li><strong>Feedback system:</strong> Post-swipe feedback form with reason chips, 1-10 fit score slider, text notes.</li>
+            <li><strong>Multi-ICP support:</strong> Switch between ICP profiles, re-scoring the queue.</li>
+            <li><strong>Barry integration:</strong> Side panel chat for ICP refinement, nudge cards, ICP reclarification modal.</li>
+            <li><strong>Keyboard shortcuts:</strong> Arrow keys, L/J for swipe, U for undo, B for Barry.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q10</div>
+        <div class="question-text">Does it work for a brand new user with no ICP set up?</div>
+        <div class="answer">
+          <p><strong>Yes.</strong> There is an explicit ICP validation gate at <code>DailyLeads.jsx:2002-2046</code>. When no ICP profile exists, the page renders:</p>
+          <ul>
+            <li>Barry avatar</li>
+            <li>Heading: <strong>"Let's set up your ICP first"</strong></li>
+            <li>Explanation text about needing an ICP before curating leads</li>
+            <li>Primary CTA: <strong>"Talk to Barry"</strong> &rarr; navigates to <code>/onboarding/barry</code></li>
+            <li>Secondary CTA: <strong>"Set up manually instead"</strong> &rarr; navigates to <code>/scout?tab=icp-settings</code></li>
+          </ul>
+          <div class="callout callout-flag">
+            <div class="callout-label">Edge Case</div>
+            If a user has a legacy <code>companyProfile/current</code> document with empty arrays (e.g., <code>industries: []</code>), the gate won't catch it &mdash; the profile is truthy but useless. Scoring would produce all-zero scores. The backend <code>daily-leads-refresh.js:170</code> does guard against this by requiring at least one of industries, companySizes, or locations.
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q11</div>
+        <div class="question-text">What file controls this page and what is its current state?</div>
+        <div class="answer">
+          <p><strong>Primary file:</strong> <code>src/pages/Scout/DailyLeads.jsx</code> (2,683 lines)<br>
+          <strong>CSS:</strong> <code>src/pages/Scout/DailyLeads.css</code> (1,341 lines)<br>
+          <strong>Parent shell:</strong> <code>src/pages/Scout/ScoutMain.jsx</code></p>
+          <p><strong>State: </strong><span class="badge badge-ok">Fully Built</span> &mdash; Complete UI with swipe/touch/keyboard input, responsive layouts, animations, Firestore data layer, 4 Netlify functions, Apollo API integration, feedback loops, and session management. Nothing is placeholder.</p>
+
+          <div class="callout callout-bug">
+            <div class="callout-label">Bug</div>
+            <strong><code>IcpReclarificationModal</code> references <code>reconConfidence</code> out of scope</strong> (line 1089). This component is defined as a standalone function (line 1011) outside <code>DailyLeads</code> (which starts at line 1220). The <code>reconConfidence</code> state variable is defined inside <code>DailyLeads</code> at line 1279 and is not passed as a prop. At runtime, <code>reconConfidence</code> will be <code>undefined</code>, meaning the <code>search-companies</code> API call receives <code>reconConfidence: undefined</code>.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4 — SAVED COMPANIES -->
+    <section class="audit-section" id="s4">
+      <h2 class="section-heading">Section 4 &mdash; Saved Companies</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q12</div>
+        <div class="question-text">What is Saved Companies supposed to do and what does it actually do today?</div>
+        <div class="answer">
+          <p><strong>Intended:</strong> Display all accepted companies, allow management (archive/restore, search/filter), view details via modal, find contacts, and navigate to contact discovery.</p>
+          <p><strong>Actual:</strong> <span class="badge badge-ok">Fully Built</span> &mdash; 811 lines, fully functional.</p>
+          <ul>
+            <li><strong>Three view modes:</strong> Cards (responsive grid), List (compact rows), Swipe ("Find Contacts" deck for companies without contacts)</li>
+            <li><strong>Active/Archived tabs</strong> with counts</li>
+            <li><strong>Client-side search</strong> by company name or industry</li>
+            <li><strong>KPI stats header:</strong> Total Companies, Total Contacts, With Contacts, Completion Rate</li>
+            <li><strong>Archive/Restore</strong> with cascade to associated contacts via <code>companyArchiveService.js</code></li>
+            <li><strong>Company detail modal</strong> with Apollo enrichment</li>
+            <li><strong>Navigation to contact flows:</strong> CompanyProfileView or CompanyLeads depending on existing contacts</li>
+            <li><strong>View mode persistence</strong> via localStorage</li>
+            <li><strong>Keyboard/touch support</strong> in swipe mode</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q13</div>
+        <div class="question-text">Does it work for a brand new user? What do they see?</div>
+        <div class="answer">
+          <p><strong>Yes.</strong> At <code>SavedCompanies.jsx:163-177</code>, when both active and archived lists are empty:</p>
+          <ul>
+            <li><code>Building2</code> icon</li>
+            <li>Heading: <strong>"No Matched Companies Yet"</strong></li>
+            <li>Body: "Match with companies in Daily Leads to start building your hunt list."</li>
+            <li>CTA: <strong>"Start Matching Companies"</strong> &rarr; navigates to Daily Leads tab</li>
+          </ul>
+          <div class="callout callout-ok">
+            <div class="callout-label">Good</div>
+            The empty state correctly directs the user to Daily Discoveries, which is the right first step after ICP setup. No crashes or guard condition issues.
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q14</div>
+        <div class="question-text">What file controls this page and what is its current state?</div>
+        <div class="answer">
+          <p><strong>Primary file:</strong> <code>src/pages/Scout/SavedCompanies.jsx</code> (811 lines)<br>
+          <strong>CSS:</strong> <code>src/pages/Scout/SavedCompanies.css</code> (720 lines &mdash; <strong>dead code</strong>, not imported; the JSX uses inline styles exclusively)<br>
+          <strong>State:</strong> <span class="badge badge-ok">Fully Built</span></p>
+          <div class="callout callout-flag">
+            <div class="callout-label">Dead Code</div>
+            <code>SavedCompanies.css</code> (720 lines) defines class-based styles that are not used by the current inline-styled JSX. This is a leftover from an earlier design iteration.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5 — CADENCES -->
+    <section class="audit-section" id="s5">
+      <h2 class="section-heading">Section 5 &mdash; Cadences</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q15</div>
+        <div class="question-text">From a new user perspective, is the Cadences flow complete end to end? List any gaps or friction points.</div>
+        <div class="answer">
+          <p>The cadence system is <strong>functional but limited to single-send operations</strong>. The end-to-end flow works &mdash; a user can create, send, and track a cadence &mdash; but there are significant gaps:</p>
+
+          <p><strong>Three creation paths exist:</strong></p>
+          <ol>
+            <li><strong>From Cadences Dashboard:</strong> Click "+ New Cadence" &rarr; opens BulkComposeModal with zero contacts (must add manually inside modal)</li>
+            <li><strong>From AllLeads:</strong> "Start Cadence" &rarr; bulk select contacts &rarr; "Compose Email" &rarr; BulkComposeModal with pre-loaded contacts</li>
+            <li><strong>From Templates:</strong> Click a template in Cadence Library &rarr; opens compose with pre-filled subject/body, zero contacts</li>
+          </ol>
+
+          <p><strong>Critical gaps:</strong></p>
+
+          <div class="callout callout-bug">
+            <div class="callout-label">No Multi-Step Sequences</div>
+            Cadences are single-send-and-done. No step editors, no multi-day sequences, no follow-up scheduling. The "Upcoming Cadences" section confirms "Scheduled sending coming soon." This is the biggest gap for a sales tool.
+          </div>
+
+          <div class="callout callout-bug">
+            <div class="callout-label">No Delete or Archive</div>
+            There is no way to delete or archive a cadence. The archive button shows a "Coming soon" toast. Old cadences accumulate permanently.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">25-Contact Limit</div>
+            Hardcoded at <code>MAX_CONTACTS = 25</code> in both <code>BulkComposeModal.jsx</code> and <code>AllLeads.jsx</code>. No way to send to more contacts in a single cadence.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">No Send Confirmation</div>
+            Clicking "Send to N contacts" immediately begins sending with no "Are you sure?" confirmation dialog.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Stub Features</div>
+            These are visible in the UI but non-functional: "View all performance" (no-op onClick), Meetings Booked KPI ("Coming soon"), Activity tracking tab, Advanced filters, Scheduled sending, Archive action, CadenceDetail row actions (View contact, Resend), Bulk actions in CadenceDetail, Owner filter, Last Run filter, Export button.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Duplicate Search Bars</div>
+            The dashboard has two search inputs (page header and table header) bound to the same state &mdash; visual redundancy.
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q16</div>
+        <div class="question-text">Is the empty state on the Cadences dashboard clear enough for a new user to know what to do?</div>
+        <div class="answer">
+          <p><strong>It's informational but passive.</strong> When a new user visits with zero cadences:</p>
+          <ul>
+            <li>KPI cards all show <code>0</code>; "Meetings Booked" shows "Coming soon"</li>
+            <li>Performance table: "No cadences yet" in a centered cell</li>
+            <li>Barry Insights: Barry avatar with "As your cadences collect data, Barry will surface insights"</li>
+            <li>Activity section: "Activity tracking coming soon"</li>
+            <li>Cadence table: "No cadences yet. Create your first cadence to get started."</li>
+            <li>Upcoming: "Scheduled sending coming soon"</li>
+            <li><strong>Cadence Library:</strong> 5 hardcoded templates (Prospecting, Partnership, Event Follow-up, Referral, Customer Check-in) &mdash; this is the only interactive element for a new user</li>
+          </ul>
+          <div class="callout callout-flag">
+            <div class="callout-label">Missing Guidance</div>
+            There is no dedicated welcome/onboarding state, no guided first-cadence tutorial, and no step-by-step CTA. The "+ New Cadence" button exists but is small and in the header. The templates section is the most useful entry point but it's at the very bottom of the page. A new user may not scroll far enough to see it.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 6 — OTHER SECTIONS -->
+    <section class="audit-section" id="s6">
+      <h2 class="section-heading">Section 6 &mdash; Other Scout Sections</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q17</div>
+        <div class="question-text">List any other Scout sections and their current state.</div>
+        <div class="answer">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Section</th><th>Route</th><th>Lines</th><th>Status</th><th>Notes</th></tr></thead>
+              <tbody>
+                <tr><td>Scout+</td><td><code>/scout?tab=scout-plus</code></td><td>268</td><td><span class="badge badge-ok">Built</span></td><td>3/5 import methods active; CSV + Business Card "Coming Soon"</td></tr>
+                <tr><td>Total Market</td><td>None (orphaned)</td><td>394</td><td><span class="badge badge-crit">Orphaned</span></td><td>Fully built page, not imported anywhere, unreachable</td></tr>
+                <tr><td>ICP Settings</td><td><code>/scout?tab=icp-settings</code></td><td>1,168</td><td><span class="badge badge-ok">Built</span></td><td>Multi-ICP, scoring weights, Barry integration, deep features</td></tr>
+                <tr><td>Game Mode</td><td><code>/scout/game</code></td><td>529 + 13 sub</td><td><span class="badge badge-ok">Built</span></td><td>Full gamified engagement with sessions, streaks, prefetch, send integration</td></tr>
+                <tr><td>User Settings</td><td><code>/settings</code></td><td>1,705</td><td><span class="badge badge-ok">Built</span></td><td>7 tabs; Gmail/Calendar/MFA working; 5 CRM stubs</td></tr>
+                <tr><td>Command Center</td><td><code>/command-center</code></td><td>728+</td><td><span class="badge badge-ok">Built</span></td><td>Strategy hub: missions, weapons, Go To War</td></tr>
+                <tr><td>Mission Control V2</td><td><code>/mission-control-v2</code></td><td>489</td><td><span class="badge badge-ok">Built</span></td><td>Main dashboard/landing page after login</td></tr>
+                <tr><td>Hunter</td><td><code>/hunter</code></td><td>600+</td><td><span class="badge badge-ok">Built</span></td><td>Missions, campaigns, weapons, blitz mode</td></tr>
+                <tr><td>Blitz Mode</td><td><code>/hunter/blitz</code></td><td>562</td><td><span class="badge badge-ok">Built</span></td><td>Rapid engagement queue with pre-fetch</td></tr>
+                <tr><td>Sniper</td><td><code>/sniper</code></td><td>632</td><td><span class="badge badge-ok">Built</span></td><td>Post-demo pipeline with Kanban board</td></tr>
+                <tr><td>Basecamp</td><td><code>/basecamp</code></td><td>660</td><td><span class="badge badge-ok">Built</span></td><td>Customer management + CSM tools</td></tr>
+                <tr><td>Reinforcements</td><td><code>/reinforcements</code></td><td>627</td><td><span class="badge badge-ok">Built</span></td><td>Referral intelligence, 5 sections</td></tr>
+                <tr><td>RECON</td><td><code>/recon</code></td><td>Multi-file</td><td><span class="badge badge-ok">Built</span></td><td>ICP training platform, 5 modules</td></tr>
+                <tr><td>Fallback</td><td><code>/fallback</code></td><td>616</td><td><span class="badge badge-ok">Built</span></td><td>Archive hub for lost/archived contacts</td></tr>
+                <tr><td>Go To War</td><td>(inside Cmd Center)</td><td>1,780</td><td><span class="badge badge-ok">Built</span></td><td>8-phase bulk mission wizard</td></tr>
+                <tr><td>Checkout</td><td><code>/checkout</code></td><td>251</td><td><span class="badge badge-ok">Built</span></td><td>Stripe; Starter ($20) + Pro ($50)</td></tr>
+                <tr><td>Onboarding</td><td><code>/onboarding</code></td><td>Multi-file</td><td><span class="badge badge-ok">Built</span></td><td>RECON wizard + Barry ICP</td></tr>
+                <tr><td>Admin</td><td><code>/admin</code></td><td>Multi-file</td><td><span class="badge badge-ok">Built</span></td><td>User management, API activity, audit logs</td></tr>
+                <tr><td>Super Admin</td><td><code>/super-admin</code></td><td>Multi-file</td><td><span class="badge badge-ok">Built</span></td><td>Multi-tenant administration</td></tr>
+                <tr><td>Legacy MissionControl</td><td>None (orphaned)</td><td>1,191</td><td><span class="badge badge-crit">Orphaned</span></td><td>Replaced by modular system, not imported</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q18</div>
+        <div class="question-text">Which sections are ready to show to a new paying customer and which are not?</div>
+        <div class="answer">
+          <p><strong>Ready for customers:</strong></p>
+          <ul>
+            <li><strong>Mission Control V2</strong> &mdash; solid dashboard landing</li>
+            <li><strong>Daily Discoveries</strong> &mdash; complete swipe experience (fix the <code>reconConfidence</code> bug)</li>
+            <li><strong>Saved Companies</strong> &mdash; complete with all views</li>
+            <li><strong>People / AllLeads</strong> &mdash; full contact management</li>
+            <li><strong>ICP Settings</strong> &mdash; deeply featured</li>
+            <li><strong>Scout+</strong> &mdash; 3 working import methods</li>
+            <li><strong>RECON</strong> &mdash; complete training platform</li>
+            <li><strong>Hunter</strong> &mdash; full execution module</li>
+            <li><strong>Sniper</strong> &mdash; complete pipeline management</li>
+            <li><strong>Basecamp</strong> &mdash; full customer management</li>
+            <li><strong>Onboarding</strong> &mdash; functional ICP and RECON flows</li>
+            <li><strong>Settings</strong> &mdash; core functions work (Gmail, Calendar, MFA, themes)</li>
+            <li><strong>Game Mode</strong> &mdash; complete but beta-labeled</li>
+            <li><strong>Checkout</strong> &mdash; Stripe integration functional</li>
+          </ul>
+
+          <p><strong>Not ready / risky for customers:</strong></p>
+          <ul>
+            <li><strong>Total Market</strong> &mdash; orphaned, unreachable despite sidebar entry</li>
+            <li><strong>Cadences</strong> &mdash; functional but single-send only; many stub features visible; no delete/archive; would disappoint users expecting multi-step sequences</li>
+            <li><strong>Weapons section</strong> (Command Center) &mdash; shows "Coming Soon"</li>
+            <li><strong>Settings integrations</strong> &mdash; HubSpot, Salesforce, Slack, Zapier, LinkedIn all show "Coming soon"</li>
+            <li><strong>Reinforcements</strong> &mdash; built but lacks Barry integration in most sub-sections</li>
+            <li><strong>Fallback</strong> &mdash; built but no Barry re-engagement guidance</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 7 — BARRY -->
+    <section class="audit-section" id="s7">
+      <h2 class="section-heading">Section 7 &mdash; Barry in Scout</h2>
+
+      <div class="question-block">
+        <div class="question-num">Q19</div>
+        <div class="question-text">Where does Barry currently appear in Scout? List every touchpoint.</div>
+        <div class="answer">
+          <p>Barry is deeply integrated across the application with <strong>67 dedicated files</strong>, <strong>24 Netlify backend functions</strong>, and <strong>23 distinct UI touchpoints</strong>:</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Touchpoint</th><th>Location</th><th>What It Does</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td>Global Floating Button</td><td>Every page (except login/signup/checkout/onboarding)</td><td>48px circle, opens BarryChat drawer</td></tr>
+                <tr><td>2</td><td>BarryChat Drawer</td><td>Global</td><td>Module-aware slide-in chat with session persistence, suggested prompts</td></tr>
+                <tr><td>3</td><td>Sidebar Barry Buttons</td><td>Sniper, Reinforcements, Basecamp, Fallback, RECON, Hunter, Settings</td><td>Module-specific chat entry points</td></tr>
+                <tr><td>4</td><td>Mission Control ChatPanel</td><td>Mission Control dashboard</td><td>Full command interface: orientation briefs, action routing, pipeline actions, mode cycling</td></tr>
+                <tr><td>5</td><td>BarryHUD</td><td>Go To War (Command Center)</td><td>Persistent coaching strip, 8 phases, progress bar</td></tr>
+                <tr><td>6</td><td>ICP Onboarding</td><td><code>/onboarding/barry</code></td><td>Full conversational ICP interview with typing indicator, progress bar</td></tr>
+                <tr><td>7</td><td>RECON Guide Panel</td><td>RECON section editor</td><td>Live panel (60/40 desktop split) with auto-fetch and coaching</td></tr>
+                <tr><td>8</td><td>RECON Coach</td><td>RECON module</td><td>Slide-in coaching drawer for all sections</td></tr>
+                <tr><td>9</td><td>RECON Post-Save Feedback</td><td>RECON</td><td>Quality assessment, gap warnings, mirror text after saves</td></tr>
+                <tr><td>10</td><td>"Train Barry" Button</td><td>Various modules</td><td>Quick-action CTA linking to RECON</td></tr>
+                <tr><td>11</td><td>Contact Intelligence</td><td>Contact Profile page</td><td>BarryContext (preview/full), BarryBriefing (prose), BarryInsightPanel (recommendations)</td></tr>
+                <tr><td>12</td><td>Hunter Warning Cards</td><td>Hunter contact engagement</td><td>Relationship guardrail warnings before message send</td></tr>
+                <tr><td>13</td><td>Hunter Recommendation Cards</td><td>Hunter dashboard</td><td>Proactive strategy recommendations with reasoning display</td></tr>
+                <tr><td>14</td><td>Hunter Insights Card</td><td>Hunter outcomes</td><td>Best/worst strategy analysis from outcome attribution</td></tr>
+                <tr><td>15</td><td>ICP Panel (DailyLeads)</td><td>Daily Discoveries</td><td>Slide-in chat for ICP refinement, nudge cards for pattern detection</td></tr>
+                <tr><td>16</td><td>ICP Panel (ICPSettings)</td><td>ICP Settings</td><td>Chat panel for conversational ICP editing</td></tr>
+                <tr><td>17</td><td>ICP Reclarification Modal</td><td>Daily Discoveries</td><td>Modal after zero-match batches for ICP refinement</td></tr>
+                <tr><td>18</td><td>Session History Panel</td><td>Global</td><td>Drawer showing all past Barry conversations</td></tr>
+                <tr><td>19</td><td>Signup Page</td><td><code>/signup</code></td><td>"[BARRY:ONLINE]" code display, Barry bear image</td></tr>
+                <tr><td>20</td><td>Checkout Success</td><td><code>/checkout/success</code></td><td>"MEET BARRY NOW" CTA button</td></tr>
+                <tr><td>21</td><td>RECON Training Page</td><td><code>/recon/barry-training</code></td><td>7-dimension training status dashboard</td></tr>
+                <tr><td>22</td><td>RECON Overview</td><td><code>/recon</code></td><td>Barry's Knowledge Map, Context Confidence, Writing Style</td></tr>
+                <tr><td>23</td><td>Admin Conversations View</td><td><code>/admin</code></td><td>Admin panel for viewing all user-Barry conversations</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p><strong>Backend infrastructure:</strong> 24 Netlify functions, 3 server-side utility modules (context assembler, guardrails, strategy recommender), 2 client-side services (barryMemoryService with 993 lines of three-tier memory, barryCSM for customer success intelligence), plus a context stack builder and pub/sub context store.</p>
+        </div>
+      </div>
+
+      <div class="question-block">
+        <div class="question-num">Q20</div>
+        <div class="question-text">Where is Barry absent that a new user would benefit from guidance?</div>
+        <div class="answer">
+          <p>17+ pages and sub-sections have zero Barry integration where new users would benefit:</p>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">All 6 Sniper Sub-Sections</div>
+            Pipeline, Targets, Touches, Playbooks, Outcomes, Companies &mdash; none have Barry references. Barry could provide personalized playbook suggestions, pipeline health summaries, and tactical coaching, similar to Hunter's dashboard check-in cards.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">3 of 5 Reinforcements Sub-Sections</div>
+            Dashboard, Record Referral, and Leaderboard have no Barry. Barry could suggest referral talking points, highlight which contacts are likely to refer, and provide motivational nudges.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">2 of 3 Basecamp Sub-Sections</div>
+            People and Companies sections have no Barry, despite <code>barryCSM.js</code> already having full health-read and signal-detection capabilities. These are prime candidates for portfolio summaries, at-risk alerts, and expansion callouts.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">All 3 Fallback Sub-Sections</div>
+            People, Companies, and FallbackModule have no Barry. For contacts that have gone cold, Barry could provide re-engagement strategies, new angles from RECON data, and timing recommendations.
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Scout Pages</div>
+            CompanySearch (0 refs &mdash; no ICP match context on results), CompanyLeads (0 refs &mdash; no prioritization), PeopleMain (0 refs), MissionAssignModal (0 refs &mdash; no strategy suggestions during assignment).
+          </div>
+
+          <div class="callout callout-flag">
+            <div class="callout-label">Homepage</div>
+            Zero Barry presence on the public homepage. A welcome message or live demo could help prospects understand the platform's AI capabilities.
+          </div>
+
+          <div class="callout callout-info">
+            <div class="callout-label">Empty States</div>
+            Most empty states across the app show static text. Only Reinforcements NurtureSection uses Barry in its empty state ("Barry will alert you when someone needs attention"). All other empty states could incorporate Barry coaching to tell new users what to do next.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPENDIX: CUSTOMER READINESS -->
+    <section class="audit-section" id="readiness">
+      <h2 class="section-heading">Appendix A &mdash; Customer Readiness Summary</h2>
+      <div class="answer">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Section</th><th>Verdict</th><th>Blocker</th></tr></thead>
+            <tbody>
+              <tr><td>Mission Control V2</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>RECON / Onboarding</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>Daily Discoveries</td><td><span class="badge badge-ok">Ready</span></td><td>Fix reconConfidence bug</td></tr>
+              <tr><td>Saved Companies</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>People / AllLeads</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>ICP Settings</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>Scout+</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>Hunter</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>Sniper</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>Basecamp</td><td><span class="badge badge-ok">Ready</span></td><td>&mdash;</td></tr>
+              <tr><td>Game Mode</td><td><span class="badge badge-ok">Ready</span></td><td>Beta-labeled</td></tr>
+              <tr><td>Settings</td><td><span class="badge badge-warn">Partial</span></td><td>5 CRM integrations show "Coming soon"</td></tr>
+              <tr><td>Cadences</td><td><span class="badge badge-warn">Partial</span></td><td>Single-send only; 10+ visible stubs; no delete/archive</td></tr>
+              <tr><td>Reinforcements</td><td><span class="badge badge-warn">Partial</span></td><td>Built but lacks Barry in most sub-sections</td></tr>
+              <tr><td>Fallback</td><td><span class="badge badge-warn">Partial</span></td><td>Built but no Barry re-engagement guidance</td></tr>
+              <tr><td>Total Market</td><td><span class="badge badge-crit">Not Ready</span></td><td>Orphaned page; sidebar link goes nowhere</td></tr>
+              <tr><td>Weapons (Cmd Center)</td><td><span class="badge badge-crit">Not Ready</span></td><td>Shows "Coming Soon" heading</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPENDIX: BUGS -->
+    <section class="audit-section" id="bugs">
+      <h2 class="section-heading">Appendix B &mdash; Bugs and Issues Found</h2>
+      <div class="answer">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Severity</th><th>Location</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-crit">Bug</span></td>
+                <td><code>DailyLeads.jsx:1089</code></td>
+                <td><code>IcpReclarificationModal</code> references <code>reconConfidence</code> which is defined inside <code>DailyLeads</code> (line 1279) but the modal is a standalone function outside that scope (line 1011). The variable is <code>undefined</code> at runtime.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-warn">Issue</span></td>
+                <td><code>Sidebar.jsx:223, 250</code></td>
+                <td>Duplicate "People" entry in the Scout pillar. Both link to <code>/scout?tab=all-leads</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-warn">Issue</span></td>
+                <td><code>ScoutMain.jsx</code></td>
+                <td>Total Market tab is referenced in sidebar but not handled in ScoutMain's render logic. TotalMarket.jsx (394 lines) is never imported.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-warn">Issue</span></td>
+                <td><code>ModuleNavigationGrid.jsx</code></td>
+                <td>RECON card links to legacy path <code>/mission-control-v2/recon</code> instead of <code>/recon</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-warn">Issue</span></td>
+                <td><code>CadencesList.jsx:292</code></td>
+                <td>"View all performance" button has a no-op <code>onClick={() => {}}</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-info">Dead Code</span></td>
+                <td><code>SavedCompanies.css</code></td>
+                <td>720-line CSS file not imported by its component (inline styles used instead).</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-info">Dead Code</span></td>
+                <td><code>MissionControl.jsx</code></td>
+                <td>1,191-line legacy page fully built but not imported anywhere.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-info">Dead Code</span></td>
+                <td><code>NavigationBar.jsx</code></td>
+                <td>Legacy top navbar with 4 links, appears unused by current UI.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Minimal scroll-spy for nav highlighting
+  const sections = document.querySelectorAll('.audit-section');
+  const navLinks = document.querySelectorAll('.section-nav a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`.section-nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>

@@ -166,7 +166,10 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
           };
         });
 
-        const name = `Cadence - ${new Date().toLocaleDateString('en-US', {
+        // User-provided cadence name (from BulkComposeModal payload). Fall back
+        // to the auto-generated date string only if it is somehow empty.
+        const providedName = items[0]?.cadenceName?.trim();
+        const name = providedName || `Cadence - ${new Date().toLocaleDateString('en-US', {
           month: 'short', day: 'numeric', year: 'numeric',
         })}`;
 

@@ -40,6 +40,9 @@ export default function BulkComposeModal({
   const [step, setStep] = useState(1);
   const [activePath, setActivePath] = useState(initialPath);
 
+  // ─── Cadence name (shared across both paths, user-provided) ───
+  const [cadenceName, setCadenceName] = useState('');
+
   // ─── Selected contacts (mutable via in-modal search) ───
   const [selectedContacts, setSelectedContacts] = useState(initialContacts);
 
@@ -375,7 +378,7 @@ export default function BulkComposeModal({
           if (hasTag && p.openingLine) {
             finalBody = replacePersonalizeTags(p2Body, p.openingLine);
           }
-          const item = { contact: p.contact, subject: p2Subject, body: finalBody };
+          const item = { contact: p.contact, subject: p2Subject, body: finalBody, cadenceName };
           if (attachment) {
             item.attachment = { data: attachment.base64, filename: attachment.filename, mimeType: 'application/pdf' };
           }
@@ -390,7 +393,7 @@ export default function BulkComposeModal({
           const parts = [greeting];
           if (p.openingLine) parts.push(p.openingLine);
           parts.push(body);
-          return { contact: p.contact, subject, body: parts.join('\n\n') };
+          return { contact: p.contact, subject, body: parts.join('\n\n'), cadenceName };
         });
     }
     setSendPayload(payload);
@@ -458,7 +461,7 @@ export default function BulkComposeModal({
   // ─── Compose validity ───
   const path1Valid = subject.trim() && body.trim();
   const path2Valid = p2Body.trim() && gmailConnected;
-  const composeValid = isPath2 ? path2Valid : path1Valid;
+  const composeValid = cadenceName.trim() && (isPath2 ? path2Valid : path1Valid);
 
   // ─── Styles ───
   const overlay = {
@@ -651,6 +654,15 @@ export default function BulkComposeModal({
                   <div style={{ fontSize: 11, color: T.textFaint }}>Message + PDF + inline personalization</div>
                 </div>
               </div>
+
+              {/* ─── Cadence Name (shared, required, first field) ─── */}
+              <label style={sectionLabel}>Cadence Name</label>
+              <input
+                value={cadenceName}
+                onChange={e => setCadenceName(e.target.value)}
+                placeholder={'e.g. "Bank CEO Introduction", "Partner Outreach", "Event Follow-up"'}
+                style={{ ...inputStyle, marginBottom: 18 }}
+              />
 
               {/* ─── Path 1: Write your own ─── */}
               {activePath === 'write_your_own' && (

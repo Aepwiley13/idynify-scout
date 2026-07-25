@@ -180,6 +180,7 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
     return {
       result: SEND_RESULT.SENT,
       gmailMessageId: data.gmailMessageId,
+      gmailThreadId: data.gmailThreadId,
       sentAt: data.sentAt,
       message: 'Email sent via Gmail'
     };

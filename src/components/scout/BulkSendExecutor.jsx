@@ -64,8 +64,8 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
   const items = payload || [];
   const total = items.length;
 
-  function setContactStatus(contactId, status, reason = null) {
-    setStatuses((prev) => ({ ...prev, [contactId]: { status, reason } }));
+  function setContactStatus(contactId, status, reason = null, meta = null) {
+    setStatuses((prev) => ({ ...prev, [contactId]: { status, reason, ...meta } }));
   }
 
   async function sendOne(item) {
@@ -78,12 +78,16 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
       if (cc) args.cc = cc;
       const res = await executeSendAction(args);
 
+      const sendMeta = {
+        gmailMessageId: res?.gmailMessageId || null,
+        gmailThreadId: res?.gmailThreadId || null,
+      };
       switch (res?.result) {
         case SEND_RESULT.SENT:
-          setContactStatus(contact.id, 'sent');
+          setContactStatus(contact.id, 'sent', null, sendMeta);
           break;
         case SEND_RESULT.OPENED:
-          setContactStatus(contact.id, 'opened');
+          setContactStatus(contact.id, 'opened', null, sendMeta);
           break;
         case SEND_RESULT.UNAVAILABLE:
           setContactStatus(contact.id, 'failed', 'No email address on file');
@@ -163,6 +167,7 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
             status: entry.status || 'pending',
             reason: entry.reason ?? null,
             gmailMessageId: entry.gmailMessageId ?? null,
+            gmailThreadId: entry.gmailThreadId ?? null,
           };
         });
 

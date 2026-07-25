@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { db, auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
@@ -9,7 +9,7 @@ import {
   ArrowLeft, RefreshCw, Send, AlertTriangle, Eye, Users,
   UserPlus, Copy, MoreHorizontal, Pencil, Check,
   Search, SlidersHorizontal, Download, ChevronDown, ChevronUp,
-  Archive, Settings,
+  Archive, Settings, MessageCircleReply, Info,
 } from 'lucide-react';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
 
@@ -66,9 +66,11 @@ const CONTACT_STATUS_COLORS = {
   opened:  STATUS.green,
   failed:  STATUS.red,
   pending: '#94a3b8',
+  replied: '#10b981',
 };
 
-function contactStatusLabel(status) {
+function contactStatusLabel(status, replied) {
+  if (replied) return 'Replied';
   if (status === 'sent') return 'Sent';
   if (status === 'opened') return 'Opened';
   if (status === 'failed') return 'Failed';
@@ -95,20 +97,76 @@ export default function CadenceDetail() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const moreRef = useRef(null);
   const nameInputRef = useRef(null);
+  const [checkingReplies, setCheckingReplies] = useState(false);
+  const [replyCheckResult, setReplyCheckResult] = useState(null);
+  const [needsGmailReconnect, setNeedsGmailReconnect] = useState(false);
+  const replyCheckedRef = useRef(false);
+
+  const fetchCadence = useCallback(async () => {
+    if (!user?.uid || !cadenceId) return;
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid, 'cadences', cadenceId));
+      if (snap.exists()) setCadence({ id: snap.id, ...snap.data() });
+    } catch {
+      // read failure
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.uid, cadenceId]);
+
+  const checkReplies = useCallback(async () => {
+    if (!user?.uid || !cadenceId || checkingReplies) return;
+    setCheckingReplies(true);
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      const authToken = await firebaseUser.getIdToken();
+      const res = await fetch('/.netlify/functions/check-replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, cadenceId }),
+      });
+      const data = await res.json();
+      if (data.code === 'NEEDS_RECONNECT') {
+        setNeedsGmailReconnect(true);
+      } else if (data.repliesFound > 0) {
+        setReplyCheckResult(data);
+        await fetchCadence();
+      }
+    } catch (err) {
+      console.warn('Reply check failed:', err);
+    } finally {
+      setCheckingReplies(false);
+    }
+  }, [user?.uid, cadenceId, checkingReplies, fetchCadence]);
 
   useEffect(() => {
     if (!user?.uid || !cadenceId) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'users', user.uid, 'cadences', cadenceId));
-        if (snap.exists()) setCadence({ id: snap.id, ...snap.data() });
-      } catch {
-        // read failure
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user?.uid, cadenceId]);
+    fetchCadence();
+  }, [user?.uid, cadenceId, fetchCadence]);
+
+  useEffect(() => {
+    if (!cadence || replyCheckedRef.current) return;
+    replyCheckedRef.current = true;
+    checkReplies();
+  }, [cadence, checkReplies]);
+
+  const handleReconnectGmail = useCallback(async () => {
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      const authToken = await firebaseUser.getIdToken();
+      const res = await fetch('/.netlify/functions/gmail-oauth-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken }),
+      });
+      const data = await res.json();
+      if (data.authUrl) window.location.href = data.authUrl;
+    } catch (err) {
+      showToast('Failed to start Gmail reconnection');
+    }
+  }, [user?.uid, showToast]);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -222,9 +280,11 @@ export default function CadenceDetail() {
   const sentCount = cadence.sentCount || 0;
   const failedCount = cadence.failedCount || 0;
   const openedCount = cadence.openedCount || 0;
+  const repliedCount = cadence.repliedCount || 0;
   const sentPct = totalContacts > 0 ? Math.round((sentCount / totalContacts) * 100) : 0;
   const failedPct = totalContacts > 0 ? Math.round((failedCount / totalContacts) * 100) : 0;
   const openedPct = totalContacts > 0 ? Math.round((openedCount / totalContacts) * 100) : 0;
+  const repliedPct = sentCount > 0 ? Math.round((repliedCount / sentCount) * 100) : 0;
   const progressPct = totalContacts > 0
     ? Math.round(((sentCount + failedCount) / totalContacts) * 100) : 0;
   const progressText = progressPct >= 100
@@ -256,6 +316,30 @@ export default function CadenceDetail() {
           <ArrowLeft size={16} />
           Back to Cadences
         </button>
+
+        {/* Gmail re-consent banner */}
+        {needsGmailReconnect && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '12px 16px', borderRadius: 10, marginBottom: 16,
+            background: `${STATUS.amber}12`, border: `1px solid ${STATUS.amber}30`,
+          }}>
+            <Info size={16} color={STATUS.amber} style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, fontSize: 13, color: T.text }}>
+              <strong>New feature available: Reply detection.</strong> Reconnect Gmail to enable it.
+            </div>
+            <button
+              onClick={handleReconnectGmail}
+              style={{
+                padding: '6px 14px', borderRadius: 8, flexShrink: 0,
+                background: STATUS.amber, color: '#fff', border: 'none',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Reconnect Gmail
+            </button>
+          </div>
+        )}
 
         {/* ═══ ZONE 1 — Header ═══ */}
         <div style={{
@@ -397,7 +481,7 @@ export default function CadenceDetail() {
 
         {/* ═══ ZONE 2 — Stats row ═══ */}
         <style>{`
-          .cd-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+          .cd-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
           .cd-content { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
           @media (max-width: 768px) {
             .cd-stats { grid-template-columns: repeat(2, 1fr); }
@@ -425,6 +509,11 @@ export default function CadenceDetail() {
             icon={Eye} label="Opened" value={openedCount}
             pct={`${openedPct}%`}
             color={BRAND.purple} bgTint={BRAND.purple} T={T}
+          />
+          <StatCard
+            icon={MessageCircleReply} label="Replied" value={repliedCount}
+            pct={`${repliedPct}%`}
+            color={STATUS.green} bgTint={STATUS.green} T={T}
           />
           <div className="cd-progress" style={{
             padding: '16px 20px',
@@ -533,8 +622,25 @@ export default function CadenceDetail() {
             padding: '14px 20px', borderBottom: `1px solid ${T.border}`,
             flexWrap: 'wrap', gap: 10,
           }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
-              Contacts ({filteredContacts.length})
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
+                Contacts ({filteredContacts.length})
+              </span>
+              <button
+                onClick={checkReplies}
+                disabled={checkingReplies}
+                title="Check for replies"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 28, height: 28, borderRadius: 6,
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  cursor: checkingReplies ? 'default' : 'pointer',
+                  color: T.textMuted, padding: 0,
+                  opacity: checkingReplies ? 0.6 : 1,
+                }}
+              >
+                <RefreshCw size={13} style={checkingReplies ? { animation: 'spin 1s linear infinite' } : {}} />
+              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Search */}
@@ -601,6 +707,7 @@ export default function CadenceDetail() {
                   <ThCell T={T}>Contact</ThCell>
                   <ThCell T={T}>Email</ThCell>
                   <ThCell T={T}>Status</ThCell>
+                  <ThCell T={T}>Replied</ThCell>
                   <ThCell T={T}>Sent</ThCell>
                   <ThCell T={T}>Reason</ThCell>
                   <th style={{ padding: '10px 20px 10px 10px', width: 40 }} />
@@ -609,7 +716,7 @@ export default function CadenceDetail() {
               <tbody>
                 {paginatedContacts.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{
+                    <td colSpan={8} style={{
                       padding: '48px 20px', textAlign: 'center',
                       color: T.textFaint, fontSize: 13,
                     }}>
@@ -677,7 +784,21 @@ export default function CadenceDetail() {
                         {ct.email || '—'}
                       </td>
                       <td style={{ padding: '10px 14px' }}>
-                        <ContactBadge status={ct.status} />
+                        <ContactBadge status={ct.replied ? 'replied' : ct.status} />
+                      </td>
+                      <td style={{ padding: '10px 14px' }}>
+                        {ct.replied ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center',
+                            padding: '3px 10px', borderRadius: 20,
+                            background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}30`,
+                            fontSize: 12, fontWeight: 600, color: STATUS.green,
+                          }}>
+                            Replied
+                          </span>
+                        ) : (
+                          <span style={{ color: T.textFaint, fontSize: 12 }}>—</span>
+                        )}
                       </td>
                       <td style={{ padding: '10px 14px', color: T.textMuted, fontSize: 12 }}>
                         {ct.sentAt ? formatShortTime(ct.sentAt) :
@@ -862,7 +983,9 @@ function DetailRow({ label, value, T }) {
 }
 
 function ContactBadge({ status }) {
-  const color = CONTACT_STATUS_COLORS[status] || CONTACT_STATUS_COLORS.pending;
+  const effectiveStatus = status === 'replied' ? 'replied' : status;
+  const color = CONTACT_STATUS_COLORS[effectiveStatus] || CONTACT_STATUS_COLORS.pending;
+  const label = effectiveStatus === 'replied' ? 'Replied' : contactStatusLabel(status);
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
@@ -870,7 +993,7 @@ function ContactBadge({ status }) {
       background: `${color}15`, border: `1px solid ${color}30`,
       fontSize: 12, fontWeight: 600, color,
     }}>
-      {contactStatusLabel(status)}
+      {label}
     </span>
   );
 }

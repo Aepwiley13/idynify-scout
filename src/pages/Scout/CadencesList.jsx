@@ -210,7 +210,7 @@ export default function CadencesList() {
           <KpiCard icon={CheckCircle} label="Completed Cadences" value={kpi.completedCadences} color={STATUS.green} />
           <KpiCard icon={FileText} label="Drafts" value={kpi.draftCadences} color="#94a3b8" />
           <KpiCard icon={Users} label="Total Contacts Reached" value={kpi.totalContactsReached} color="#3b82f6" />
-          <KpiCard icon={MessageSquare} label="Reply Rate (Avg)" value="Coming soon" color={STATUS.amber} />
+          <KpiCard icon={MessageSquare} label="Reply Rate (Avg)" value={kpi.replyRate} color={STATUS.amber} />
           <KpiCard icon={Calendar} label="Meetings Booked" value="Coming soon" color={BRAND.pink} />
         </div>
 
@@ -247,8 +247,12 @@ export default function CadencesList() {
                       </td>
                       <td style={{ padding: '8px 8px', color: T.textMuted, textAlign: 'right' }}>{c.contactCount || 0}</td>
                       <td style={{ padding: '8px 8px', color: T.textMuted, textAlign: 'right' }}>{c.sentCount || 0}</td>
-                      <td style={{ padding: '8px 8px', color: T.textFaint, textAlign: 'right' }}>—</td>
-                      <td style={{ padding: '8px 8px', color: T.textFaint, textAlign: 'right' }}>—</td>
+                      <td style={{ padding: '8px 8px', color: T.textFaint, textAlign: 'right' }}>
+                        {(c.openedCount && c.sentCount) ? `${Math.round((c.openedCount / c.sentCount) * 100)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '8px 8px', color: c.repliedCount ? STATUS.green : T.textFaint, textAlign: 'right', fontWeight: c.repliedCount ? 600 : 400 }}>
+                        {(c.repliedCount && c.sentCount) ? `${Math.round((c.repliedCount / c.sentCount) * 100)}%` : '—'}
+                      </td>
                       <td style={{ padding: '8px 8px', color: T.textFaint, textAlign: 'right' }}>—</td>
                     </tr>
                   ))}
@@ -498,8 +502,12 @@ export default function CadencesList() {
                           }} />
                         </div>
                       </td>
-                      <td style={{ padding: '12px 10px', color: T.textFaint, textAlign: 'center' }}>—</td>
-                      <td style={{ padding: '12px 10px', color: T.textFaint, textAlign: 'center' }}>—</td>
+                      <td style={{ padding: '12px 10px', color: T.textFaint, textAlign: 'center' }}>
+                        {(c.openedCount && sentCount) ? `${Math.round((c.openedCount / sentCount) * 100)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '12px 10px', textAlign: 'center', color: c.repliedCount ? STATUS.green : T.textFaint, fontWeight: c.repliedCount ? 600 : 400 }}>
+                        {(c.repliedCount && sentCount) ? `${Math.round((c.repliedCount / sentCount) * 100)}%` : '—'}
+                      </td>
                       <td style={{ padding: '12px 10px', color: T.textFaint, textAlign: 'center' }}>—</td>
                       {/* Status badge */}
                       <td style={{ padding: '12px 10px' }}>

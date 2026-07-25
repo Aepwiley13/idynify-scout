@@ -49,7 +49,7 @@ function formatShortTime(ts) {
     + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-function getCadenceStatus(cadence) {
+export function getCadenceStatus(cadence) {
   if (cadence.completedAt) return 'Completed';
   if ((cadence.sentCount || 0) > 0) return 'Active';
   return 'Draft';

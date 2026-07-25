@@ -102,6 +102,11 @@ export default function CadenceDetail() {
   const [needsGmailReconnect, setNeedsGmailReconnect] = useState(false);
   const replyCheckedRef = useRef(false);
 
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
   const fetchCadence = useCallback(async () => {
     if (!user?.uid || !cadenceId) return;
     try {
@@ -148,7 +153,7 @@ export default function CadenceDetail() {
   useEffect(() => {
     if (!cadence || replyCheckedRef.current) return;
     replyCheckedRef.current = true;
-    checkReplies();
+    checkReplies().catch(() => {});
   }, [cadence, checkReplies]);
 
   const handleReconnectGmail = useCallback(async () => {
@@ -176,11 +181,6 @@ export default function CadenceDetail() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [moreOpen]);
-
-  const showToast = useCallback((msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  }, []);
 
   const handleNameSave = useCallback(async () => {
     if (!editName.trim() || editName.trim() === cadence?.name) {

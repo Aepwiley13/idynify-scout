@@ -176,6 +176,7 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
         await addDoc(collection(db, 'users', userId, 'cadences'), {
           userId,
           name,
+          status: 'completed',
           subject: items[0].subject || '',
           body: items[0].body || '',
           contactCount: items.length,

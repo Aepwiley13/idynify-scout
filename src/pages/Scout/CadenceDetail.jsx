@@ -282,7 +282,14 @@ export default function CadenceDetail() {
                 </div>
               ) : (
                 <>
-                  <h1 style={{ fontSize: 24, fontWeight: 700, color: T.text, margin: 0 }}>
+                  <h1
+                    title={cadence.name || 'Untitled Cadence'}
+                    style={{
+                      fontSize: 24, fontWeight: 700, color: T.text, margin: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      maxWidth: 'calc(100% - 40px)',
+                    }}
+                  >
                     {cadence.name || 'Untitled Cadence'}
                   </h1>
                   <button
@@ -499,7 +506,7 @@ export default function CadenceDetail() {
           }}>
             <DetailRow label="Created" value={formatDateTime(cadence.createdAt || cadence.completedAt)} T={T} />
             <DetailRow label="Last updated" value={formatDateTime(cadence.completedAt || cadence.createdAt)} T={T} />
-            <DetailRow label="Created by" value={user?.displayName || user?.email?.split('@')[0] || '—'} T={T} />
+            <DetailRow label="Created by" value={user?.displayName || user?.email || '—'} T={T} />
             <DetailRow label="Cadence type" value="Outreach" T={T} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0' }}>
               <span style={{ fontSize: 13, color: T.textMuted }}>Status</span>

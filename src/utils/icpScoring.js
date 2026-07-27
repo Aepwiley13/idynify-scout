@@ -353,32 +353,33 @@ export function generateMatchReasons(company, icpProfile) {
   const reasons = [];
 
   // Confirmed matches first, in weight order (industry is the strongest signal).
+  // Each reason reads as a specific insight, not a generic label.
   if (dims.industry.active && dims.industry.match === 100) {
-    reasons.push(`Matches your target industry (${titleCase(dims.industry.matchedCriterion || dims.industry.value)})`);
+    reasons.push(`Matches your target industry: ${titleCase(dims.industry.matchedCriterion || dims.industry.value)}`);
   }
   if (dims.employeeSize.active && dims.employeeSize.match === 100) {
-    reasons.push(`Company size ${dims.employeeSize.value} in your target range`);
+    reasons.push(`Company size aligns with your ICP: ${dims.employeeSize.value} employees`);
   }
   if (dims.location.active && dims.location.match === 100 && !dims.location.nationwide) {
-    reasons.push(`In your target location (${dims.location.value})`);
+    reasons.push(`Located in your target region: ${dims.location.value}`);
   }
   if (dims.revenue.active && dims.revenue.match === 100) {
-    reasons.push(`Revenue ${dims.revenue.value} in your target range`);
+    reasons.push(`Revenue aligns with your ICP: ${dims.revenue.value}`);
   }
   if (reasons.length > 0) return reasons;
 
   // No confirmed matches — surface the strongest partial signals honestly.
   if (dims.industry.active && dims.industry.match === 50 && dims.industry.value) {
-    reasons.push(`Related to your target industry (${titleCase(dims.industry.value)})`);
+    reasons.push(`Related to your target industry: ${titleCase(dims.industry.value)}`);
   }
   if (dims.employeeSize.active && dims.employeeSize.match === 50 && dims.employeeSize.value) {
-    reasons.push(`Company size ${dims.employeeSize.value} near your target range`);
+    reasons.push(`Company size near your ICP range: ${dims.employeeSize.value} employees`);
   }
   if (reasons.length > 0) return reasons;
 
   // A clear industry miss is the most useful "why not".
   if (dims.industry.active && dims.industry.match === 0 && dims.industry.value) {
-    return [`Outside your target industries (${titleCase(dims.industry.value)})`];
+    return [`Outside your target industries: ${titleCase(dims.industry.value)}`];
   }
 
   return ['Limited company data available to assess ICP fit'];

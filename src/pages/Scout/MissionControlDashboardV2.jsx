@@ -9,7 +9,7 @@ import {
   updateDoc, setDoc, addDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
-import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
@@ -54,7 +54,7 @@ function KpiCard({ icon: Icon, label, value, color, subtitle, T }) {
 
 // ─── Fit Score Badge ─────────────────────────────────────────────────────────
 function FitBadge({ score }) {
-  const color = score >= 90 ? STATUS.green : score >= 70 ? STATUS.amber : '#888';
+  const color = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -80,7 +80,7 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
   const location = company.location || company.city || '';
   const website = company.website || company.url || '';
   const score = company.fit_score || 0;
-  const reasons = company.matchReasons || company.match_reasons || [];
+  const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
   const matchReason = company.matchReason || company.match_reason || '';
   const contact = company.recommendedContact || company.recommended_contact || null;
 
@@ -176,7 +176,7 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
             Why {name} is a great match
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(reasons.length > 0 ? reasons : matchReason ? [matchReason] : ['Matches your ICP criteria']).map((r, i) => (
+            {(reasons.length > 0 ? reasons : matchReason ? [matchReason] : ['Matches your ICP profile']).map((r, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 fontSize: 13, color: T.text,
@@ -299,7 +299,7 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
 
 // ─── Barry Panel ─────────────────────────────────────────────────────────────
 function BarryPanel({ companies, T, navigate }) {
-  const highFit = companies.filter(c => (c.fit_score || 0) >= 90).length;
+  const highFit = companies.filter(c => (c.fit_score || 0) >= 75).length;
   const topIndustry = (() => {
     const counts = {};
     companies.forEach(c => {
@@ -310,7 +310,7 @@ function BarryPanel({ companies, T, navigate }) {
   })();
 
   const take = companies.length > 0
-    ? `These are the best companies for you right now. ${highFit} have a fit score above 90%.${topIndustry ? ` I'm seeing a strong pattern in ${topIndustry}.` : ''} Want me to adjust anything or find more in a different industry?`
+    ? `These are the best companies for you right now. ${highFit} have a fit score above 75%.${topIndustry ? ` I'm seeing a strong pattern in ${topIndustry}.` : ''} Want me to adjust anything or find more in a different industry?`
     : 'No matches yet. Complete your ICP in RECON and I\'ll start finding companies for you.';
 
   return (
@@ -474,12 +474,16 @@ export default function MissionControlDashboardV2() {
         ? allCompanies.filter(c => !c.icpId || c.icpId === activeICPId)
         : allCompanies;
 
-      // Score and sort
+      // Score and sort. Reasons come from the SAME shared scorer that produces
+      // the score, so the "why it's a match" text is specific per company.
       const scored = filtered.map(c => ({
         ...c,
         fit_score: activeProfile
           ? calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS)
           : (c.fit_score || c.icpScore || 0),
+        fit_reasons: activeProfile
+          ? generateMatchReasons(c, activeProfile)
+          : (c.fit_reasons || c.matchReasons || c.match_reasons || []),
       }));
       scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
 
@@ -530,7 +534,7 @@ export default function MissionControlDashboardV2() {
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
   const totalMatches = companies.length;
-  const highFit = companies.filter(c => (c.fit_score || 0) >= 90).length;
+  const highFit = companies.filter(c => (c.fit_score || 0) >= 75).length;
   const repliedThisWeek = cadenceReplies;
 
   // ── Approve ────────────────────────────────────────────────────────────────
@@ -632,7 +636,7 @@ export default function MissionControlDashboardV2() {
           {/* KPI Row */}
           <div style={{ display: 'flex', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
             <KpiCard icon={Target} label="Total Matches" value={totalMatches} color={BRAND.pink} T={T} />
-            <KpiCard icon={Star} label="High Fit (90%+)" value={highFit} color={STATUS.green} T={T} />
+            <KpiCard icon={Star} label="Good Fit (75%+)" value={highFit} color={STATUS.green} T={T} />
             <KpiCard icon={Mail} label="Replied This Week" value={repliedThisWeek} color={BRAND.cyan} subtitle="From cadences" T={T} />
             <KpiCard icon={Calendar} label="Meetings Booked" value="—" color={T.textFaint} subtitle="Coming soon" T={T} />
           </div>
@@ -717,7 +721,12 @@ export default function MissionControlDashboardV2() {
                 const name = company.name || company.company_name || 'Unknown';
                 const industry = company.industry || '';
                 const size = company.employee_count || company.employeeCount || '';
-                const reason = company.matchReason || company.match_reason || (industry ? `${industry} company matching your ICP` : '—');
+                // "Why it's a match" — first 2-3 specific reasons from the shared
+                // scorer, never a generic template.
+                const reasonList = company.fit_reasons || company.matchReasons || company.match_reasons || [];
+                const reason = reasonList.length > 0
+                  ? reasonList.slice(0, 3).join(' • ')
+                  : 'Matches your ICP profile';
                 const contact = company.recommendedContact;
 
                 return (

@@ -136,9 +136,9 @@ describe('generateMatchReason — specific per company', () => {
       headquarters_location: 'Austin, TX',
     };
     const reason = generateMatchReason(company, FULL_ICP);
-    expect(reason).toContain('your target industry (Credit Unions)'); // uses ICP casing
-    expect(reason).toContain('Company size 101-200');
-    expect(reason).toContain('location (TX)');
+    expect(reason).toContain('Matches your target industry: Credit Unions'); // uses ICP casing
+    expect(reason).toContain('Company size aligns with your ICP: 101-200');
+    expect(reason).toContain('Located in your target region: TX');
     expect(reason).not.toMatch(/company matching your ICP/i); // not the generic string
   });
 
@@ -172,8 +172,8 @@ describe('generateMatchReasons — array for the Mission Control table', () => {
     );
     expect(Array.isArray(reasons)).toBe(true);
     expect(reasons[0]).toContain('Credit Unions'); // industry is the strongest signal, first
-    expect(reasons.some((r) => /company size 101-200/i.test(r))).toBe(true);
-    expect(reasons.some((r) => /location \(TX\)/i.test(r))).toBe(true);
+    expect(reasons.some((r) => /company size aligns with your ICP: 101-200/i.test(r))).toBe(true);
+    expect(reasons.some((r) => /located in your target region: TX/i.test(r))).toBe(true);
   });
 
   it('returns a single "outside your industries" reason for a weak match', () => {

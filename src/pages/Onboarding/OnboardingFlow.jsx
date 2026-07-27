@@ -6,7 +6,7 @@ import { useT } from '../../theme/ThemeContext';
 import { useMissionControlTheme } from '../../theme/useMissionControlTheme';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import { getActiveUserId } from '../../context/ImpersonationContext';
-import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import GmailConnectButton from '../../components/hunter/GmailConnectButton';
 import { ArrowRight, Check, Globe, Loader, SkipForward, MessageCircle } from 'lucide-react';
@@ -246,8 +246,11 @@ function ProspectCard({ company, T }) {
   const industry = company.industry || '';
   const size = company.employee_count || company.employeeCount || '';
   const score = company.fit_score || 0;
-  const reason = company.matchReason || company.match_reason ||
-    (industry ? `${industry} company matching your ICP` : 'Matches your ideal customer profile');
+  // Specific reasons from the shared scorer; never a generic industry template.
+  const reasonList = company.fit_reasons || company.matchReasons || company.match_reasons || [];
+  const reason = reasonList.length > 0
+    ? reasonList.slice(0, 2).join(' • ')
+    : (company.matchReason || company.match_reason || 'Matches your ideal customer profile');
 
   return (
     <div style={{
@@ -501,6 +504,9 @@ export default function OnboardingFlow() {
             fit_score: icpProfile
               ? calculateICPScore(c, icpProfile, icpProfile.scoringWeights || DEFAULT_WEIGHTS)
               : (c.fit_score || c.icpScore || 50),
+            fit_reasons: icpProfile
+              ? generateMatchReasons(c, icpProfile)
+              : (c.fit_reasons || []),
           }));
         }
         scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));

@@ -44,6 +44,11 @@
 [functions."barryBulkPersonalize"]
   timeout = 26
 
+# analyze-website fetches an external site (10s cap) then calls Barry to extract
+# a business profile — give it headroom beyond the default function timeout.
+[functions."analyze-website"]
+  timeout = 26
+
 [dev]
   framework = "#custom"
   command = "npm run dev"

@@ -9,6 +9,10 @@ import { useActiveUserId, useImpersonation } from '../context/ImpersonationConte
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
 import { generateDashboardRecommendations, dismissRecommendation } from '../utils/recommendationEngine';
 import { scoreCompany } from '../utils/icpScoring';
+
+// "Good Fit" KPI threshold — companies scoring at/above this count toward the
+// Good Fit tile and render green. 75 is honest given current (often sparse) data.
+const GOOD_FIT_THRESHOLD = 75;
 import BarryChatPanel from '../components/dashboard/BarryChatPanel';
 import QuickLaunchStrip from '../components/dashboard/QuickLaunchStrip';
 import MissionCardDeck from '../components/dashboard/MissionCardDeck';
@@ -114,7 +118,7 @@ export default function MissionControlDashboardV2() {
 
         setMatchStats({
           total: scored.length,
-          highFit: scored.filter((c) => c.fit_score >= 90).length
+          highFit: scored.filter((c) => c.fit_score >= GOOD_FIT_THRESHOLD).length
         });
         setTopMatches(scored.slice(0, 6));
       } else {
@@ -379,7 +383,7 @@ export default function MissionControlDashboardV2() {
                 </div>
                 <div>
                   <div className="text-green-400 text-lg md:text-2xl font-bold leading-none">{matchStats.highFit}</div>
-                  <div className="text-gray-400 text-[10px] md:text-xs mt-1 uppercase tracking-wide">High Fit (90%+)</div>
+                  <div className="text-gray-400 text-[10px] md:text-xs mt-1 uppercase tracking-wide">Good Fit (75%+)</div>
                 </div>
               </div>
             </div>
@@ -387,9 +391,10 @@ export default function MissionControlDashboardV2() {
             <ul className="divide-y divide-white/5">
               {topMatches.map((company) => {
                 const score = company.fit_score ?? 0;
-                const scoreColor = score >= 90 ? '#22c55e' : score >= 70 ? '#06b6d4' : score >= 50 ? '#f59e0b' : '#6b7280';
-                // Mission Control renders the first 1-2 reasons as the display text.
-                const why = (company.fit_reasons || []).slice(0, 2).join(' · ');
+                const scoreColor = score >= GOOD_FIT_THRESHOLD ? '#22c55e' : score >= 50 ? '#f59e0b' : '#6b7280';
+                // "Why it's a match" comes straight from the shared scorer's
+                // reasons array — top 2-3 specific reasons, never a generic template.
+                const why = (company.fit_reasons || []).slice(0, 3).join(' • ') || 'Matches your ICP profile';
                 return (
                   <li
                     key={company.id}
@@ -404,7 +409,7 @@ export default function MissionControlDashboardV2() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-white text-sm font-semibold truncate">{company.name || 'Unknown Company'}</div>
-                      <div className="text-gray-400 text-xs truncate mt-0.5">{why || 'Matched your ICP'}</div>
+                      <div className="text-gray-400 text-xs truncate mt-0.5">{why}</div>
                     </div>
                     {company.industry && (
                       <span className="hidden sm:inline text-[11px] text-cyan-300/80 font-mono flex-shrink-0">{company.industry}</span>

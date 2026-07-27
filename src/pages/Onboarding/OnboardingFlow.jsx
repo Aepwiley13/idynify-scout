@@ -327,11 +327,11 @@ export default function OnboardingFlow() {
     if (onboarding.loading || hasCheckedOnboardingRef.current) return;
     hasCheckedOnboardingRef.current = true;
 
-    if (onboarding.completed) {
+    if (onboarding.isComplete) {
       navigate('/mission-control-v2', { replace: true });
       return;
     }
-    if (onboarding.started) {
+    if (onboarding.flags.started) {
       setStep(onboarding.currentStep);
     }
   }, [onboarding.loading]);
@@ -455,7 +455,6 @@ export default function OnboardingFlow() {
   };
 
   const handleGmailSuccess = async () => {
-    await onboarding.markStep('gmailConnected');
     setStep(5);
   };
 

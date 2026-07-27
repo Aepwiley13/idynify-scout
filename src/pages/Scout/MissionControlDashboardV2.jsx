@@ -549,7 +549,7 @@ export default function MissionControlDashboardV2() {
   };
 
   // ── Resume Banner ──────────────────────────────────────────────────────────
-  const showResumeBanner = !onboarding.loading && onboarding.started && !onboarding.completed;
+  const showResumeBanner = !onboarding.loading && onboarding.flags.started && !onboarding.isComplete;
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {

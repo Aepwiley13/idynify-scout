@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateICPScore,
   generateMatchReason,
+  generateMatchReasons,
   scoreCompany,
   getScoreBreakdown,
   extractStateFromLocation,
@@ -116,7 +117,7 @@ describe('generateMatchReason — specific per company', () => {
     };
     const reason = generateMatchReason(company, FULL_ICP);
     expect(reason).toContain('your target industry (Credit Unions)'); // uses ICP casing
-    expect(reason).toContain('company size (101-200)');
+    expect(reason).toContain('Company size 101-200');
     expect(reason).toContain('location (TX)');
     expect(reason).not.toMatch(/company matching your ICP/i); // not the generic string
   });
@@ -135,7 +136,7 @@ describe('generateMatchReason — specific per company', () => {
 
   it('describes a partial fit when only a related industry matches', () => {
     const reason = generateMatchReason({ industry: 'Banking & Credit Unions' }, FULL_ICP);
-    expect(reason).toMatch(/partial ICP fit/i);
+    expect(reason).toMatch(/related to your target industry/i);
   });
 
   it('falls back gracefully with no ICP', () => {
@@ -143,15 +144,52 @@ describe('generateMatchReason — specific per company', () => {
   });
 });
 
+describe('generateMatchReasons — array for the Mission Control table', () => {
+  it('returns an array of specific reasons, strongest first', () => {
+    const reasons = generateMatchReasons(
+      { industry: 'credit unions', employee_count: 150, headquarters_location: 'Austin, TX' },
+      FULL_ICP
+    );
+    expect(Array.isArray(reasons)).toBe(true);
+    expect(reasons[0]).toContain('Credit Unions'); // industry is the strongest signal, first
+    expect(reasons.some((r) => /company size 101-200/i.test(r))).toBe(true);
+    expect(reasons.some((r) => /location \(TX\)/i.test(r))).toBe(true);
+  });
+
+  it('returns a single "outside your industries" reason for a weak match', () => {
+    const reasons = generateMatchReasons({ industry: 'Fast Food' }, FULL_ICP);
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]).toMatch(/outside your target industries/i);
+  });
+
+  it('first 1-2 reasons form the Mission Control display text', () => {
+    const reasons = generateMatchReasons(
+      { industry: 'Credit Unions', employee_count: 150, headquarters_location: 'Austin, TX', revenue_range: '$5M-$10M' },
+      FULL_ICP
+    );
+    const display = reasons.slice(0, 2).join(' · ');
+    expect(display).toContain('Credit Unions');
+    expect(display.split(' · ')).toHaveLength(2);
+  });
+});
+
 describe('scoreCompany', () => {
-  it('returns score, reason, and breakdown together', () => {
+  it('returns score, reasons array, reason string, and breakdown together', () => {
     const result = scoreCompany(
       { industry: 'Credit Unions', employee_count: 150, state: 'TX', revenue_range: '$5M-$10M' },
       FULL_ICP
     );
     expect(result.score).toBeGreaterThanOrEqual(90);
+    expect(Array.isArray(result.reasons)).toBe(true);
+    expect(result.reasons[0]).toContain('Credit Unions');
     expect(result.reason).toContain('Credit Unions');
     expect(result.breakdown.totalScore).toBe(result.score);
+  });
+
+  it('differentiates high-fit from out-of-ICP companies', () => {
+    const good = scoreCompany({ industry: 'Credit Unions', employee_count: 150, state: 'TX', revenue_range: '$5M-$10M' }, FULL_ICP);
+    const bad = scoreCompany({ industry: 'Fast Food' }, FULL_ICP);
+    expect(good.score).toBeGreaterThan(bad.score + 40); // clearly separated
   });
 });
 

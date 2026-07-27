@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { calculateICPScore, generateMatchReason } from '../../utils/icpScoring';
+import { calculateICPScore, generateMatchReason, generateMatchReasons } from '../../utils/icpScoring';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
@@ -265,13 +265,15 @@ export default function ICPSettings() {
       for (const companyDoc of companiesSnapshot.docs) {
         const company = companyDoc.data();
         const newScore = calculateICPScore(company, icpProfile, weights);
-        const fitReason = generateMatchReason(company, icpProfile);
+        const fitReasons = generateMatchReasons(company, icpProfile);
 
-        // Update company with new fit_score + specific per-company match reason
+        // Update company with new fit_score + specific per-company match reasons
+        // (array for the Mission Control table, sentence for legacy string reads)
         updates.push(
           updateDoc(doc(db, 'users', userId, 'companies', companyDoc.id), {
             fit_score: newScore,
-            fit_reason: fitReason,
+            fit_reasons: fitReasons,
+            fit_reason: generateMatchReason(company, icpProfile),
             lastScoreUpdate: new Date().toISOString()
           })
         );

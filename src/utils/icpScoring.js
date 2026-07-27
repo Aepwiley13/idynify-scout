@@ -337,63 +337,77 @@ export function calculateICPScore(company, icpProfile, weights = DEFAULT_WEIGHTS
 }
 
 /**
- * Build a specific, per-company "why it's a match" reason from the ICP criteria
- * the company actually matches — e.g. "Matches your target industry (Credit
- * Unions) and company size (101-200)."
+ * Build an ARRAY of specific, per-company "why it's a match" reasons from the
+ * ICP criteria the company actually matches — most significant first. A UI can
+ * render the first 1-2 as summary text. Examples:
+ *   ["Matches your target industry (Credit Unions)", "Company size 101-200 in range"]
+ *   ["Outside your target industries (Fast Food)"]
+ * @param {Object} company
+ * @param {Object} icpProfile
+ * @returns {string[]}
+ */
+export function generateMatchReasons(company, icpProfile) {
+  if (!company || !icpProfile) return ['No ICP configured to assess fit'];
+
+  const dims = evaluateDimensions(company, icpProfile);
+  const reasons = [];
+
+  // Confirmed matches first, in weight order (industry is the strongest signal).
+  if (dims.industry.active && dims.industry.match === 100) {
+    reasons.push(`Matches your target industry (${titleCase(dims.industry.matchedCriterion || dims.industry.value)})`);
+  }
+  if (dims.employeeSize.active && dims.employeeSize.match === 100) {
+    reasons.push(`Company size ${dims.employeeSize.value} in your target range`);
+  }
+  if (dims.location.active && dims.location.match === 100 && !dims.location.nationwide) {
+    reasons.push(`In your target location (${dims.location.value})`);
+  }
+  if (dims.revenue.active && dims.revenue.match === 100) {
+    reasons.push(`Revenue ${dims.revenue.value} in your target range`);
+  }
+  if (reasons.length > 0) return reasons;
+
+  // No confirmed matches — surface the strongest partial signals honestly.
+  if (dims.industry.active && dims.industry.match === 50 && dims.industry.value) {
+    reasons.push(`Related to your target industry (${titleCase(dims.industry.value)})`);
+  }
+  if (dims.employeeSize.active && dims.employeeSize.match === 50 && dims.employeeSize.value) {
+    reasons.push(`Company size ${dims.employeeSize.value} near your target range`);
+  }
+  if (reasons.length > 0) return reasons;
+
+  // A clear industry miss is the most useful "why not".
+  if (dims.industry.active && dims.industry.match === 0 && dims.industry.value) {
+    return [`Outside your target industries (${titleCase(dims.industry.value)})`];
+  }
+
+  return ['Limited company data available to assess ICP fit'];
+}
+
+/**
+ * Single-sentence version of the match reasons, for callers that want a string
+ * (e.g. a persisted fit_reason). Joins the reason array naturally.
  * @param {Object} company
  * @param {Object} icpProfile
  * @returns {string}
  */
 export function generateMatchReason(company, icpProfile) {
-  if (!company || !icpProfile) return 'No ICP configured to assess fit.';
-
-  const dims = evaluateDimensions(company, icpProfile);
-
-  const strong = [];
-  if (dims.industry.active && dims.industry.match === 100) {
-    strong.push(`your target industry (${titleCase(dims.industry.matchedCriterion || dims.industry.value)})`);
-  }
-  if (dims.employeeSize.active && dims.employeeSize.match === 100) {
-    strong.push(`company size (${dims.employeeSize.value})`);
-  }
-  if (dims.location.active && dims.location.match === 100 && !dims.location.nationwide) {
-    strong.push(`location (${dims.location.value})`);
-  }
-  if (dims.revenue.active && dims.revenue.match === 100) {
-    strong.push(`revenue range (${dims.revenue.value})`);
-  }
-  if (strong.length > 0) {
-    return `Matches ${joinWithAnd(strong)}.`;
-  }
-
-  // No confirmed matches — describe the strongest partial signal honestly.
-  const partial = [];
-  if (dims.industry.active && dims.industry.match === 50 && dims.industry.value) {
-    partial.push(`a related industry (${titleCase(dims.industry.value)})`);
-  }
-  if (dims.employeeSize.active && dims.employeeSize.match === 50 && dims.employeeSize.value) {
-    partial.push(`a near-fit company size (${dims.employeeSize.value})`);
-  }
-  if (partial.length > 0) {
-    return `Partial ICP fit: ${joinWithAnd(partial)}.`;
-  }
-
-  // A clear industry miss is the most useful "why not".
-  if (dims.industry.active && dims.industry.match === 0 && dims.industry.value) {
-    return `Outside your target industries (${titleCase(dims.industry.value)}) — weak ICP fit.`;
-  }
-
-  return 'Limited company data available to assess ICP fit.';
+  const reasons = generateMatchReasons(company, icpProfile);
+  if (reasons.length === 0) return 'Limited company data available to assess ICP fit.';
+  return `${reasons.join('. ')}.`;
 }
 
 /**
- * Convenience: score a company and its reason in one call.
- * @returns {{ score: number, reason: string, breakdown: Object }}
+ * Score a company and its match reasons in one call — the shared entry point
+ * for Mission Control and Daily Discoveries.
+ * @returns {{ score: number, reasons: string[], reason: string, breakdown: Object }}
  */
 export function scoreCompany(company, icpProfile, weights = DEFAULT_WEIGHTS) {
+  const reasons = generateMatchReasons(company, icpProfile);
   return {
     score: calculateICPScore(company, icpProfile, weights),
-    reason: generateMatchReason(company, icpProfile),
+    reasons,
+    reason: reasons.join('. '),
     breakdown: getScoreBreakdown(company, icpProfile, weights)
   };
 }
@@ -462,12 +476,6 @@ export function getScoreBreakdown(company, icpProfile, weights = DEFAULT_WEIGHTS
 }
 
 // ─── Small formatting helpers ───────────────────────────────────────────────
-
-function joinWithAnd(items) {
-  if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-}
 
 function titleCase(str) {
   if (typeof str !== 'string') return str;

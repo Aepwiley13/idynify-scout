@@ -16,7 +16,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
-import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore } from '../../utils/icpScoring';
+import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons } from '../../utils/icpScoring';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 
@@ -1398,10 +1398,11 @@ export default function DailyLeads({ onNavigate }) {
         ? allPendingData.filter(c => !c.icpId || c.icpId === activeId)
         : allPendingData;
 
-      // Score companies against active ICP
+      // Score companies against active ICP (reasons from the same shared fn)
       const scoredData = companiesData.map(c => ({
         ...c,
         fit_score: calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS),
+        fit_reasons: generateMatchReasons(c, activeProfile),
       }));
       scoredData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
 
@@ -1532,6 +1533,7 @@ export default function DailyLeads({ onNavigate }) {
     const rescored = filtered.map(c => ({
       ...c,
       fit_score: calculateICPScore(c, selectedICP, selectedICP.scoringWeights || DEFAULT_WEIGHTS),
+      fit_reasons: generateMatchReasons(c, selectedICP),
     }));
     rescored.sort((a, b) => b.fit_score - a.fit_score);
     setCompanies(rescored);

@@ -1,6 +1,20 @@
 /**
  * ICP Scoring Utility
- * Calculates weighted fit scores for companies based on ICP criteria
+ * Calculates weighted fit scores for companies based on the user's active ICP.
+ *
+ * Scoring model (fixes the "every company is 0 or 50" bug):
+ *   - Reads the field names companies actually carry, with fallbacks, and
+ *     accepts employee size as either a numeric count or a range string.
+ *   - Each dimension resolves to 100 (match), 50 (partial / unknown data), or
+ *     0 (definite miss).
+ *   - The weighted average is normalized over the dimensions the ICP actually
+ *     configures, so an unconfigured dimension never drags every company down
+ *     to a uniform default. A company matching every configured criterion
+ *     scores ~100; a partial match lands in the 60-80 band; a weak match falls
+ *     below 50.
+ *
+ * Per-dimension `match` values are intentionally kept in {0, 50, 100} so the
+ * existing score-breakdown tooltips (MissionControl, DailyLeads) keep working.
  */
 
 /**
@@ -12,6 +26,10 @@ export const DEFAULT_WEIGHTS = {
   employeeSize: 15,
   revenue: 10
 };
+
+// Neutral score for a configured dimension we simply have no company data for.
+// Not a miss (0) and not a confirmed match (100) — genuine uncertainty.
+const UNKNOWN = 50;
 
 /**
  * Company size ranges for matching
@@ -29,170 +47,374 @@ const REVENUE_RANGES = [
   "$20M-$50M", "$50M-$100M", "$100M-$200M", "$200M-$500M", "$500M-$1B", "$1B+"
 ];
 
-/**
- * Calculate industry match percentage
- * @param {string} companyIndustry - Company's industry
- * @param {string[]} icpIndustries - ICP selected industries
- * @returns {number} 0 or 100
- */
-function calculateIndustryMatch(companyIndustry, icpIndustries) {
-  if (!companyIndustry || !icpIndustries || icpIndustries.length === 0) {
-    return 0;
+// ─── Field resolution helpers ───────────────────────────────────────────────
+// Company docs are written by several paths (Apollo discovery, enrichment,
+// LinkedIn import) with inconsistent field names. Resolve each dimension from
+// whatever is present rather than assuming one canonical name.
+
+/** Company's industry, across the known field names. */
+function resolveIndustry(company) {
+  const v = company.industry || company.primary_industry || company.company_industry;
+  return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
+/** Company's state/location, across the known field names. */
+function resolveState(company) {
+  const raw =
+    company.state ||
+    company.location ||
+    company.headquarters_location ||
+    company.hq_location ||
+    null;
+  return extractStateFromLocation(raw);
+}
+
+/** Company's employee count as a number, from a numeric field or a range string. */
+function resolveEmployeeCount(company) {
+  const numeric =
+    company.employee_count ??
+    company.estimated_num_employees ??
+    company.employeeCount ??
+    company.num_employees;
+  if (typeof numeric === 'number' && numeric > 0) return numeric;
+  if (typeof numeric === 'string' && /^\d+$/.test(numeric.trim())) {
+    return parseInt(numeric.trim(), 10);
   }
 
-  // Case-insensitive exact match = 100%, else 0
-  const normalized = companyIndustry.toLowerCase().trim();
-  return icpIndustries.some(i => i.toLowerCase().trim() === normalized) ? 100 : 0;
+  // Fall back to a range string ("101-200 employees", "51-100", "10,001+").
+  const rangeStr = company.company_size || company.employee_range || company.size;
+  const parsed = parseSizeRange(rangeStr);
+  if (!parsed) return null;
+  return parsed.max === Infinity ? parsed.min : Math.round((parsed.min + parsed.max) / 2);
+}
+
+/** Company's revenue value, across the known field names. */
+function resolveRevenue(company) {
+  const v = company.revenue_range || company.revenue || company.annual_revenue;
+  return v != null && v !== '' ? v : null;
 }
 
 /**
- * Calculate location match percentage
- * @param {string} companyLocation - Company's location/state
- * @param {string[]} icpLocations - ICP selected locations
- * @param {boolean} isNationwide - ICP nationwide setting
- * @returns {number} 0 or 100
+ * Parse a size range label into { min, max } (max = Infinity for "N+").
+ * Tolerates commas and a trailing " employees".
  */
-function calculateLocationMatch(companyLocation, icpLocations, isNationwide) {
-  // If nationwide, all companies match
-  if (isNationwide) {
-    return 100;
+function parseSizeRange(rangeStr) {
+  if (rangeStr == null) return null;
+  const cleaned = String(rangeStr).replace(/employees/i, '').replace(/,/g, '').trim();
+  if (!cleaned) return null;
+
+  if (cleaned.includes('+')) {
+    const min = parseInt(cleaned, 10);
+    return Number.isNaN(min) ? null : { min, max: Infinity };
   }
 
-  if (!companyLocation || !icpLocations || icpLocations.length === 0) {
-    return 0;
-  }
+  const [minStr, maxStr] = cleaned.split('-');
+  const min = parseInt(minStr, 10);
+  if (Number.isNaN(min)) return null;
+  const max = maxStr != null ? parseInt(maxStr, 10) : min;
+  return { min, max: Number.isNaN(max) ? min : max };
+}
 
-  // Check if company location is in selected states
-  return icpLocations.includes(companyLocation) ? 100 : 0;
+/** Which COMPANY_SIZE_RANGES bucket a raw employee count falls into (-1 if none). */
+function bucketIndexForCount(count) {
+  return COMPANY_SIZE_RANGES.findIndex((range) => {
+    const parsed = parseSizeRange(range);
+    return parsed && count >= parsed.min && count <= parsed.max;
+  });
 }
 
 /**
- * Get index of a size/revenue range
- * @param {string} value - Size or revenue range string
- * @param {string[]} ranges - Array of ranges to search
- * @returns {number} Index or -1 if not found
+ * Extract a state/region token from a location string.
+ * "Austin, TX" → "TX"; "TX, USA" → "TX"; "California" → "California".
  */
-function getRangeIndex(value, ranges) {
-  return ranges.findIndex(range => range === value);
-}
-
-/**
- * Calculate employee size match percentage
- * @param {string} companySize - Company's employee size range
- * @param {string[]} icpSizes - ICP selected size ranges
- * @returns {number} 0, 50, or 100
- */
-function calculateEmployeeSizeMatch(companySize, icpSizes) {
-  if (!companySize || !icpSizes || icpSizes.length === 0) {
-    return 0;
+export function extractStateFromLocation(location) {
+  if (!location) return null;
+  if (typeof location === 'object') {
+    return location.state || location.region || location.city || null;
   }
+  if (typeof location !== 'string' || !location.trim()) return null;
 
-  // Exact match = 100%
-  if (icpSizes.includes(companySize)) {
-    return 100;
-  }
-
-  // Adjacent range = 50%
-  const companyIndex = getRangeIndex(companySize, COMPANY_SIZE_RANGES);
-  if (companyIndex === -1) return 0;
-
-  for (const icpSize of icpSizes) {
-    const icpIndex = getRangeIndex(icpSize, COMPANY_SIZE_RANGES);
-    if (icpIndex === -1) continue;
-
-    // Check if adjacent (difference of 1)
-    if (Math.abs(companyIndex - icpIndex) === 1) {
-      return 50;
+  const parts = location.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    if (/^(usa|united states|us)$/i.test(parts[parts.length - 1])) {
+      return parts[parts.length - 2];
     }
+    return parts[1];
   }
-
-  return 0;
+  return parts[0] || null;
 }
 
-/**
- * Calculate revenue match percentage
- * @param {string} companyRevenue - Company's revenue range
- * @param {string[]} icpRevenues - ICP selected revenue ranges
- * @returns {number} 0, 50, or 100
- */
-function calculateRevenueMatch(companyRevenue, icpRevenues) {
-  if (!companyRevenue || !icpRevenues || icpRevenues.length === 0) {
-    return 0;
+/** Parse a dollar figure ("$5M", "$1.2B", "5000000") into a number, or null. */
+function parseRevenueToNumber(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return null;
+  const m = value.replace(/[$,\s]/g, '').match(/([\d.]+)\s*([kmb])?/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (Number.isNaN(n)) return null;
+  const unit = (m[2] || '').toLowerCase();
+  const mult = unit === 'b' ? 1e9 : unit === 'm' ? 1e6 : unit === 'k' ? 1e3 : 1;
+  return n * mult;
+}
+
+// ─── Per-dimension evaluation ───────────────────────────────────────────────
+// Each returns { active, match, value, matchedCriterion }:
+//   active  = the ICP configures this dimension (participates in the score)
+//   match   = 100 | 50 | 0  (50 = partial or unknown data)
+//   value   = the company's value, for display in reasons
+//   matchedCriterion = the ICP label that matched, for nicely-cased reasons
+
+function evalIndustry(company, icp) {
+  const icpIndustries = icp.industries || [];
+  if (icpIndustries.length === 0) return { active: false, match: 0 };
+
+  const industry = resolveIndustry(company);
+  if (!industry) return { active: true, match: UNKNOWN, unknown: true };
+
+  const norm = industry.toLowerCase().trim();
+
+  // Exact (case-insensitive) match.
+  const exact = icpIndustries.find((i) => i.toLowerCase().trim() === norm);
+  if (exact) return { active: true, match: 100, value: industry, matchedCriterion: exact };
+
+  // Partial: token overlap in either direction ("Credit Unions" vs "Banking & Credit Unions").
+  const related = icpIndustries.find((i) => {
+    const other = i.toLowerCase().trim();
+    return other.includes(norm) || norm.includes(other) || shareSignificantToken(norm, other);
+  });
+  if (related) return { active: true, match: 50, value: industry, matchedCriterion: related };
+
+  return { active: true, match: 0, value: industry };
+}
+
+function evalLocation(company, icp) {
+  const configured = icp.isNationwide || (icp.locations || []).length > 0;
+  if (!configured) return { active: false, match: 0 };
+
+  if (icp.isNationwide) return { active: true, match: 100, value: 'Nationwide', nationwide: true };
+
+  const state = resolveState(company);
+  if (!state) return { active: true, match: UNKNOWN, unknown: true };
+
+  const norm = String(state).toLowerCase().trim();
+  const hit = (icp.locations || []).some((l) => String(l).toLowerCase().trim() === norm);
+  return hit
+    ? { active: true, match: 100, value: state }
+    : { active: true, match: 0, value: state };
+}
+
+function evalEmployeeSize(company, icp) {
+  const icpSizes = icp.companySizes || [];
+  if (icpSizes.length === 0) return { active: false, match: 0 };
+
+  const count = resolveEmployeeCount(company);
+  if (count == null) return { active: true, match: UNKNOWN, unknown: true };
+
+  const companyBucket = bucketIndexForCount(count);
+  const icpBuckets = icpSizes
+    .map((s) => COMPANY_SIZE_RANGES.findIndex((r) => r === s))
+    .filter((i) => i !== -1);
+
+  const label = companyBucket !== -1 ? COMPANY_SIZE_RANGES[companyBucket] : String(count);
+
+  if (companyBucket === -1 || icpBuckets.length === 0) {
+    return { active: true, match: UNKNOWN, unknown: true, value: label };
   }
-
-  // Exact match = 100%
-  if (icpRevenues.includes(companyRevenue)) {
-    return 100;
+  if (icpBuckets.includes(companyBucket)) {
+    return { active: true, match: 100, value: label };
   }
+  // Adjacent bucket = partial.
+  if (icpBuckets.some((i) => Math.abs(i - companyBucket) === 1)) {
+    return { active: true, match: 50, value: label };
+  }
+  return { active: true, match: 0, value: label };
+}
 
-  // Adjacent range = 50%
-  const companyIndex = getRangeIndex(companyRevenue, REVENUE_RANGES);
-  if (companyIndex === -1) return 0;
+function evalRevenue(company, icp) {
+  const icpRevenues = icp.revenueRanges || [];
+  if (icpRevenues.length === 0 || icp.skipRevenue) return { active: false, match: 0 };
 
-  for (const icpRevenue of icpRevenues) {
-    const icpIndex = getRangeIndex(icpRevenue, REVENUE_RANGES);
-    if (icpIndex === -1) continue;
+  const revenue = resolveRevenue(company);
+  if (!revenue) return { active: true, match: UNKNOWN, unknown: true };
 
-    // Check if adjacent (difference of 1)
-    if (Math.abs(companyIndex - icpIndex) === 1) {
-      return 50;
+  // Exact label match against configured ranges.
+  if (icpRevenues.includes(revenue)) return { active: true, match: 100, value: revenue };
+
+  // Adjacent labeled range (by REVENUE_RANGES index).
+  const companyIndex = REVENUE_RANGES.findIndex((r) => r === revenue);
+  if (companyIndex !== -1) {
+    const icpIndexes = icpRevenues.map((r) => REVENUE_RANGES.indexOf(r)).filter((i) => i !== -1);
+    if (icpIndexes.includes(companyIndex)) return { active: true, match: 100, value: revenue };
+    if (icpIndexes.some((i) => Math.abs(i - companyIndex) === 1)) {
+      return { active: true, match: 50, value: revenue };
     }
+    return { active: true, match: 0, value: revenue };
   }
 
-  return 0;
+  // Company revenue is a raw figure ("$5M") — test numeric containment in any range.
+  const amount = parseRevenueToNumber(revenue);
+  if (amount != null) {
+    for (const label of icpRevenues) {
+      const bounds = revenueLabelBounds(label);
+      if (bounds && amount >= bounds.min && amount <= bounds.max) {
+        return { active: true, match: 100, value: revenue };
+      }
+    }
+    return { active: true, match: 0, value: revenue };
+  }
+
+  return { active: true, match: UNKNOWN, unknown: true, value: revenue };
+}
+
+/** Numeric bounds for a REVENUE_RANGES label, or null. */
+function revenueLabelBounds(label) {
+  if (!label) return null;
+  if (/less than/i.test(label)) {
+    const max = parseRevenueToNumber(label.replace(/less than/i, ''));
+    return max != null ? { min: 0, max } : null;
+  }
+  if (label.includes('+')) {
+    const min = parseRevenueToNumber(label);
+    return min != null ? { min, max: Infinity } : null;
+  }
+  const [minStr, maxStr] = label.split('-');
+  const min = parseRevenueToNumber(minStr);
+  const max = parseRevenueToNumber(maxStr);
+  if (min == null || max == null) return null;
+  return { min, max };
+}
+
+/** Do two industry strings share a meaningful (4+ char, non-stopword) token? */
+function shareSignificantToken(a, b) {
+  const stop = new Set(['and', 'the', 'for', 'services', 'solutions', 'company', 'group']);
+  const tokensA = a.split(/[^a-z0-9]+/i).filter((t) => t.length >= 4 && !stop.has(t));
+  const tokensB = new Set(b.split(/[^a-z0-9]+/i).filter((t) => t.length >= 4 && !stop.has(t)));
+  return tokensA.some((t) => tokensB.has(t));
 }
 
 /**
- * Calculate overall ICP fit score for a company
+ * Evaluate all four dimensions for a company against an ICP.
+ * @returns {{ industry, location, employeeSize, revenue }} per-dimension results
+ */
+function evaluateDimensions(company, icpProfile) {
+  return {
+    industry: evalIndustry(company, icpProfile),
+    location: evalLocation(company, icpProfile),
+    employeeSize: evalEmployeeSize(company, icpProfile),
+    revenue: evalRevenue(company, icpProfile)
+  };
+}
+
+// ─── Public scoring API ─────────────────────────────────────────────────────
+
+/**
+ * Calculate overall ICP fit score for a company.
+ * Normalized over the dimensions the ICP actually configures.
  * @param {Object} company - Company data
- * @param {Object} icpProfile - ICP profile with criteria
+ * @param {Object} icpProfile - Active ICP profile
  * @param {Object} weights - Scoring weights (default: DEFAULT_WEIGHTS)
  * @returns {number} Fit score 0-100
  */
 export function calculateICPScore(company, icpProfile, weights = DEFAULT_WEIGHTS) {
-  if (!company || !icpProfile) {
-    return 0;
+  if (!company || !icpProfile) return 0;
+
+  const dims = evaluateDimensions(company, icpProfile);
+
+  let weightedSum = 0;
+  let activeWeight = 0;
+  for (const key of ['industry', 'location', 'employeeSize', 'revenue']) {
+    const dim = dims[key];
+    if (!dim.active) continue;
+    weightedSum += dim.match * (weights[key] || 0);
+    activeWeight += weights[key] || 0;
   }
 
-  // Calculate individual match percentages
-  const industryMatch = calculateIndustryMatch(
-    company.industry,
-    icpProfile.industries || []
-  );
+  // No configured criteria → nothing to score against; return a neutral 50
+  // rather than a misleading 0 so the UI shows "moderate, unscored".
+  if (activeWeight === 0) return UNKNOWN;
 
-  const locationMatch = calculateLocationMatch(
-    company.location || company.state,
-    icpProfile.locations || [],
-    icpProfile.isNationwide || false
-  );
+  return Math.round(weightedSum / activeWeight);
+}
 
-  const employeeSizeMatch = calculateEmployeeSizeMatch(
-    company.employee_count || company.company_size,
-    icpProfile.companySizes || []
-  );
+/**
+ * Build an ARRAY of specific, per-company "why it's a match" reasons from the
+ * ICP criteria the company actually matches — most significant first. A UI can
+ * render the first 1-2 as summary text. Examples:
+ *   ["Matches your target industry (Credit Unions)", "Company size 101-200 in range"]
+ *   ["Outside your target industries (Fast Food)"]
+ * @param {Object} company
+ * @param {Object} icpProfile
+ * @returns {string[]}
+ */
+export function generateMatchReasons(company, icpProfile) {
+  if (!company || !icpProfile) return ['No ICP configured to assess fit'];
 
-  const revenueMatch = calculateRevenueMatch(
-    company.revenue,
-    icpProfile.revenueRanges || []
-  );
+  const dims = evaluateDimensions(company, icpProfile);
+  const reasons = [];
 
-  // Calculate weighted score
-  const weightedScore = (
-    (industryMatch * (weights.industry / 100)) +
-    (locationMatch * (weights.location / 100)) +
-    (employeeSizeMatch * (weights.employeeSize / 100)) +
-    (revenueMatch * (weights.revenue / 100))
-  );
+  // Confirmed matches first, in weight order (industry is the strongest signal).
+  if (dims.industry.active && dims.industry.match === 100) {
+    reasons.push(`Matches your target industry (${titleCase(dims.industry.matchedCriterion || dims.industry.value)})`);
+  }
+  if (dims.employeeSize.active && dims.employeeSize.match === 100) {
+    reasons.push(`Company size ${dims.employeeSize.value} in your target range`);
+  }
+  if (dims.location.active && dims.location.match === 100 && !dims.location.nationwide) {
+    reasons.push(`In your target location (${dims.location.value})`);
+  }
+  if (dims.revenue.active && dims.revenue.match === 100) {
+    reasons.push(`Revenue ${dims.revenue.value} in your target range`);
+  }
+  if (reasons.length > 0) return reasons;
 
-  return Math.round(weightedScore);
+  // No confirmed matches — surface the strongest partial signals honestly.
+  if (dims.industry.active && dims.industry.match === 50 && dims.industry.value) {
+    reasons.push(`Related to your target industry (${titleCase(dims.industry.value)})`);
+  }
+  if (dims.employeeSize.active && dims.employeeSize.match === 50 && dims.employeeSize.value) {
+    reasons.push(`Company size ${dims.employeeSize.value} near your target range`);
+  }
+  if (reasons.length > 0) return reasons;
+
+  // A clear industry miss is the most useful "why not".
+  if (dims.industry.active && dims.industry.match === 0 && dims.industry.value) {
+    return [`Outside your target industries (${titleCase(dims.industry.value)})`];
+  }
+
+  return ['Limited company data available to assess ICP fit'];
+}
+
+/**
+ * Single-sentence version of the match reasons, for callers that want a string
+ * (e.g. a persisted fit_reason). Joins the reason array naturally.
+ * @param {Object} company
+ * @param {Object} icpProfile
+ * @returns {string}
+ */
+export function generateMatchReason(company, icpProfile) {
+  const reasons = generateMatchReasons(company, icpProfile);
+  if (reasons.length === 0) return 'Limited company data available to assess ICP fit.';
+  return `${reasons.join('. ')}.`;
+}
+
+/**
+ * Score a company and its match reasons in one call — the shared entry point
+ * for Mission Control and Daily Discoveries.
+ * @returns {{ score: number, reasons: string[], reason: string, breakdown: Object }}
+ */
+export function scoreCompany(company, icpProfile, weights = DEFAULT_WEIGHTS) {
+  const reasons = generateMatchReasons(company, icpProfile);
+  return {
+    score: calculateICPScore(company, icpProfile, weights),
+    reasons,
+    reason: reasons.join('. '),
+    breakdown: getScoreBreakdown(company, icpProfile, weights)
+  };
 }
 
 /**
  * Generic numeric range match — used for any post-fetch numeric ICP filter.
  * Returns 100 (pass) or 0 (fail). Unknown values (null/undefined) always pass through.
- * @param {number|null} value - The company's value for this field
- * @param {{ min: number|null, max: number|null }|null} range - The configured range
- * @returns {number} 100 = pass, 0 = fail
  */
 export function calculateNumericRangeMatch(value, range) {
   if (!range || (range.min === null && range.max === null)) return 100; // not configured
@@ -204,20 +426,13 @@ export function calculateNumericRangeMatch(value, range) {
 
 /**
  * Gate function: returns true only if the company passes all active post-fetch range filters.
- * This runs BEFORE scoring. Companies that fail never enter the queue.
- * 90% of users have no foundedAgeRange set — this returns true immediately for them.
- * @param {Object} company - Company data (must have founded_year)
- * @param {Object} icpProfile - ICP profile
- * @returns {boolean}
  */
 export function passesAllFilters(company, icpProfile) {
   if (!icpProfile) return true;
 
-  // Founded age filter
   if (icpProfile.foundedAgeRange) {
     const currentYear = new Date().getFullYear();
     const { minAge, maxAge } = icpProfile.foundedAgeRange;
-    // Convert age to year range: older company = smaller year
     const minYear = maxAge !== null && maxAge !== undefined ? currentYear - maxAge : null;
     const maxYear = minAge !== null && minAge !== undefined ? currentYear - minAge : null;
     if (calculateNumericRangeMatch(company.founded_year, { min: minYear, max: maxYear }) === 0) {
@@ -225,15 +440,11 @@ export function passesAllFilters(company, icpProfile) {
     }
   }
 
-  // Future numeric range filters added here — one block each
-
   return true;
 }
 
 /**
  * Validate that weights total 100%
- * @param {Object} weights - Weights object
- * @returns {boolean} True if valid
  */
 export function validateWeights(weights) {
   const total = weights.industry + weights.location + weights.employeeSize + weights.revenue;
@@ -241,46 +452,32 @@ export function validateWeights(weights) {
 }
 
 /**
- * Get breakdown of score components (for debugging/display)
- * @param {Object} company - Company data
- * @param {Object} icpProfile - ICP profile
- * @param {Object} weights - Scoring weights
- * @returns {Object} Score breakdown
+ * Get breakdown of score components (for debugging/display).
+ * Per-dimension `match` stays in {0, 50, 100} for the tooltip consumers.
  */
 export function getScoreBreakdown(company, icpProfile, weights = DEFAULT_WEIGHTS) {
-  const industryMatch = calculateIndustryMatch(company.industry, icpProfile.industries || []);
-  const locationMatch = calculateLocationMatch(
-    company.location || company.state,
-    icpProfile.locations || [],
-    icpProfile.isNationwide || false
-  );
-  const employeeSizeMatch = calculateEmployeeSizeMatch(
-    company.employee_count || company.company_size,
-    icpProfile.companySizes || []
-  );
-  const revenueMatch = calculateRevenueMatch(company.revenue, icpProfile.revenueRanges || []);
+  const dims = (company && icpProfile)
+    ? evaluateDimensions(company, icpProfile)
+    : { industry: { match: 0 }, location: { match: 0 }, employeeSize: { match: 0 }, revenue: { match: 0 } };
+
+  const row = (key) => ({
+    match: dims[key].match,
+    weight: weights[key],
+    contribution: Math.round(dims[key].match * (weights[key] / 100))
+  });
 
   return {
-    industry: {
-      match: industryMatch,
-      weight: weights.industry,
-      contribution: Math.round(industryMatch * (weights.industry / 100))
-    },
-    location: {
-      match: locationMatch,
-      weight: weights.location,
-      contribution: Math.round(locationMatch * (weights.location / 100))
-    },
-    employeeSize: {
-      match: employeeSizeMatch,
-      weight: weights.employeeSize,
-      contribution: Math.round(employeeSizeMatch * (weights.employeeSize / 100))
-    },
-    revenue: {
-      match: revenueMatch,
-      weight: weights.revenue,
-      contribution: Math.round(revenueMatch * (weights.revenue / 100))
-    },
+    industry: row('industry'),
+    location: row('location'),
+    employeeSize: row('employeeSize'),
+    revenue: row('revenue'),
     totalScore: calculateICPScore(company, icpProfile, weights)
   };
+}
+
+// ─── Small formatting helpers ───────────────────────────────────────────────
+
+function titleCase(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
 }

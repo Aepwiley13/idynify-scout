@@ -8,6 +8,7 @@ import { isUserAdmin } from '../utils/adminAuth';
 import { useActiveUserId, useImpersonation } from '../context/ImpersonationContext';
 import { initializeDashboard, getDashboardState } from '../utils/dashboardUtils';
 import { generateDashboardRecommendations, dismissRecommendation } from '../utils/recommendationEngine';
+import { scoreCompany } from '../utils/icpScoring';
 import BarryChatPanel from '../components/dashboard/BarryChatPanel';
 import QuickLaunchStrip from '../components/dashboard/QuickLaunchStrip';
 import MissionCardDeck from '../components/dashboard/MissionCardDeck';
@@ -37,6 +38,8 @@ export default function MissionControlDashboardV2() {
   const [recommendations, setRecommendations] = useState([]);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
+  const [topMatches, setTopMatches] = useState([]);
+  const [matchStats, setMatchStats] = useState({ total: 0, highFit: 0 });
 
   useEffect(() => {
     loadDashboardStats();
@@ -94,6 +97,30 @@ export default function MissionControlDashboardV2() {
       const icpDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
       const hasICP = icpDoc.exists() && (icpDoc.data().industries?.length > 0 || icpDoc.data().managedByBarry);
       setHasCompletedICP(hasICP);
+
+      // Score companies against the active ICP using the SAME shared scorer as
+      // Daily Discoveries, so Mission Control and Scout agree on fit + reasons.
+      if (hasICP) {
+        const icpProfile = icpDoc.data();
+        const allCompaniesSnapshot = await getDocs(collection(db, 'users', userId, 'companies'));
+        const scored = allCompaniesSnapshot.docs
+          .map((d) => {
+            const company = { id: d.id, ...d.data() };
+            const { score, reasons } = scoreCompany(company, icpProfile);
+            return { ...company, fit_score: score, fit_reasons: reasons };
+          })
+          .filter((c) => c.status !== 'rejected' && c.status !== 'archived')
+          .sort((a, b) => b.fit_score - a.fit_score);
+
+        setMatchStats({
+          total: scored.length,
+          highFit: scored.filter((c) => c.fit_score >= 90).length
+        });
+        setTopMatches(scored.slice(0, 6));
+      } else {
+        setMatchStats({ total: 0, highFit: 0 });
+        setTopMatches([]);
+      }
 
       // Check if user has seen the welcome popup
       const userDoc = await getDoc(doc(db, 'users', userId));
@@ -336,6 +363,58 @@ export default function MissionControlDashboardV2() {
           onScoutClick={handleScoutClick}
           onNavigate={(route) => navigate(route)}
         />
+
+        {/* TOP ICP MATCHES — scored with the shared icpScoring engine */}
+        {topMatches.length > 0 && (
+          <section className="mt-8 rounded-2xl border border-cyan-500/20 bg-black/30 backdrop-blur-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cyan-500/15">
+              <div>
+                <h2 className="text-white font-mono text-sm md:text-base font-semibold tracking-wider">TOP RECOMMENDED COMPANIES</h2>
+                <p className="text-gray-400 text-xs mt-0.5">Ranked by how well they match your ICP</p>
+              </div>
+              <div className="flex items-center gap-4 md:gap-6 text-right">
+                <div>
+                  <div className="text-cyan-300 text-lg md:text-2xl font-bold leading-none">{matchStats.total}</div>
+                  <div className="text-gray-400 text-[10px] md:text-xs mt-1 uppercase tracking-wide">Total Matches</div>
+                </div>
+                <div>
+                  <div className="text-green-400 text-lg md:text-2xl font-bold leading-none">{matchStats.highFit}</div>
+                  <div className="text-gray-400 text-[10px] md:text-xs mt-1 uppercase tracking-wide">High Fit (90%+)</div>
+                </div>
+              </div>
+            </div>
+
+            <ul className="divide-y divide-white/5">
+              {topMatches.map((company) => {
+                const score = company.fit_score ?? 0;
+                const scoreColor = score >= 90 ? '#22c55e' : score >= 70 ? '#06b6d4' : score >= 50 ? '#f59e0b' : '#6b7280';
+                // Mission Control renders the first 1-2 reasons as the display text.
+                const why = (company.fit_reasons || []).slice(0, 2).join(' · ');
+                return (
+                  <li
+                    key={company.id}
+                    onClick={() => navigate(`/scout/company/${company.id}`)}
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-cyan-500/5 cursor-pointer transition-colors"
+                  >
+                    <div
+                      className="flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center font-bold text-sm"
+                      style={{ background: `${scoreColor}1a`, border: `1px solid ${scoreColor}55`, color: scoreColor }}
+                    >
+                      {score}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white text-sm font-semibold truncate">{company.name || 'Unknown Company'}</div>
+                      <div className="text-gray-400 text-xs truncate mt-0.5">{why || 'Matched your ICP'}</div>
+                    </div>
+                    {company.industry && (
+                      <span className="hidden sm:inline text-[11px] text-cyan-300/80 font-mono flex-shrink-0">{company.industry}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {/* QUICK LAUNCH STRIP — temporarily hidden */}
         {/* <QuickLaunchStrip

@@ -322,10 +322,14 @@ function BarryPanel({ companies, T, navigate }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <div style={{
           width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
-          border: `2px solid ${T.accent}`,
+          background: `linear-gradient(135deg,${BRAND.pink},${T.cyan || BRAND.cyan})`,
+          border: `2px solid ${(T.cyan || BRAND.cyan)}50`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          boxShadow: `0 0 20px ${(T.cyan || BRAND.cyan)}50`,
         }}>
           <img src={ASSETS.barryAvatar} alt="Barry" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-               onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '🐻'; }} />
+               onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }} />
         </div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>Barry is with you</div>
@@ -444,20 +448,37 @@ export default function MissionControlDashboardV2() {
       const userId = activeUserId || auth.currentUser?.uid;
       if (!userId) return;
 
-      // Load ICP profile for scoring
+      // Load ICP profiles from icpProfiles subcollection (matches DailyLeads pattern)
+      const icpProfilesSnap = await getDocs(collection(db, 'users', userId, 'icpProfiles'));
+      let icps = icpProfilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+      // Fallback to legacy companyProfile/current
       const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-      const icpProfile = profileDoc.exists() ? profileDoc.data() : null;
+      let activeProfile = profileDoc.exists() ? profileDoc.data() : null;
+      let activeICPId = null;
+
+      if (icps.length > 0) {
+        const firstICP = icps.find(i => i.isActive && i.status === 'active') || icps[0];
+        activeICPId = firstICP.id;
+        activeProfile = firstICP;
+      }
 
       // Load companies (accepted + pending)
       const companiesRef = collection(db, 'users', userId, 'companies');
       const snapshot = await getDocs(companiesRef);
       const allCompanies = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      // Filter by active ICP (legacy companies with no icpId show for all)
+      const filtered = activeICPId
+        ? allCompanies.filter(c => !c.icpId || c.icpId === activeICPId)
+        : allCompanies;
+
       // Score and sort
-      const scored = allCompanies.map(c => ({
+      const scored = filtered.map(c => ({
         ...c,
-        fit_score: icpProfile
-          ? calculateICPScore(c, icpProfile, icpProfile.scoringWeights || DEFAULT_WEIGHTS)
+        fit_score: activeProfile
+          ? calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS)
           : (c.fit_score || c.icpScore || 0),
       }));
       scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));

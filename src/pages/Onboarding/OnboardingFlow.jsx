@@ -28,23 +28,23 @@ function ProgressDots({ step, total = 6, T }) {
   );
 }
 
-// ─── Barry Avatar ────────────────────────────────────────────────────────────
+// ─── Barry Avatar (matches BarryChat.jsx pattern) ───────────────────────────
 function BarryAvatar({ size = 96, T }) {
+  const color = T.cyan || BRAND.cyan;
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      overflow: 'hidden', flexShrink: 0,
-      border: `3px solid ${T.accent}`,
-      boxShadow: `0 0 24px ${T.accent}30`,
+      background: `linear-gradient(135deg,${BRAND.pink},${color})`,
+      border: `2px solid ${color}50`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0, overflow: 'hidden',
+      boxShadow: `0 0 ${size * 0.5}px ${color}50`,
     }}>
       <img
         src={ASSETS.barryAvatar}
         alt="Barry"
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        onError={(e) => {
-          e.target.style.display = 'none';
-          e.target.parentElement.innerHTML = '<span style="font-size:48px;display:flex;align-items:center;justify-content:center;height:100%">🐻</span>';
-        }}
+        onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }}
       />
     </div>
   );
@@ -321,16 +321,20 @@ export default function OnboardingFlow() {
   const [firstName, setFirstName] = useState('');
   const [stillWorking, setStillWorking] = useState(false);
 
+  const hasCheckedOnboardingRef = useRef(false);
+
   useEffect(() => {
-    if (!onboarding.loading && onboarding.completed) {
+    if (onboarding.loading || hasCheckedOnboardingRef.current) return;
+    hasCheckedOnboardingRef.current = true;
+
+    if (onboarding.completed) {
       navigate('/mission-control-v2', { replace: true });
       return;
     }
-    // Resume at last completed step for returning users
-    if (!onboarding.loading && onboarding.started) {
+    if (onboarding.started) {
       setStep(onboarding.currentStep);
     }
-  }, [onboarding.loading, onboarding.completed, onboarding.started]);
+  }, [onboarding.loading]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -455,13 +459,14 @@ export default function OnboardingFlow() {
     setStep(5);
   };
 
-  // ── Step 5: Build List ──────────────────────────────────────────────────────
+  // ── Step 5: Build List (with <24h freshness check) ──────────────────────────
   useEffect(() => {
     if (step !== 5) return;
     setBuildingList(true);
     setStillWorking(false);
 
     const stillWorkingTimer = setTimeout(() => setStillWorking(true), 10000);
+    const DAY_MS = 24 * 60 * 60 * 1000;
 
     const loadCompanies = async () => {
       const userId = getActiveUserId();
@@ -476,15 +481,32 @@ export default function OnboardingFlow() {
         const snapshot = await getDocs(companiesRef);
         const allCompanies = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Score them
-        const scored = allCompanies.map(c => ({
-          ...c,
-          fit_score: icpProfile ? calculateICPScore(c, icpProfile, icpProfile.scoringWeights || DEFAULT_WEIGHTS) : (c.fit_score || c.icpScore || 50),
-        }));
+        // Check freshness — if any company was discovered/created <24h ago, use existing scores
+        const now = Date.now();
+        const hasFreshData = allCompanies.length > 0 && allCompanies.some(c => {
+          const ts = c.discoveredAt || c.createdAt || c.addedAt;
+          if (!ts) return false;
+          const ms = ts.toDate ? ts.toDate().getTime() : new Date(ts).getTime();
+          return (now - ms) < DAY_MS;
+        });
+
+        let scored;
+        if (hasFreshData) {
+          scored = allCompanies.map(c => ({
+            ...c,
+            fit_score: c.fit_score || c.icpScore || 50,
+          }));
+        } else {
+          scored = allCompanies.map(c => ({
+            ...c,
+            fit_score: icpProfile
+              ? calculateICPScore(c, icpProfile, icpProfile.scoringWeights || DEFAULT_WEIGHTS)
+              : (c.fit_score || c.icpScore || 50),
+          }));
+        }
         scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
 
-        const total = scored.length;
-        setMatchCount(total > 0 ? total : 0);
+        setMatchCount(scored.length);
         setTopCompanies(scored.slice(0, 5));
 
         await onboarding.markStep('completed');

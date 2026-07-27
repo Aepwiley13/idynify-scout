@@ -1,4 +1,4 @@
-import { ASSETS } from '../../theme/tokens';
+import { ASSETS, BRAND } from '../../theme/tokens';
 import { useT } from '../../theme/ThemeContext';
 
 export default function OnboardingStep({ step, totalSteps = 6, children }) {
@@ -36,14 +36,18 @@ export default function OnboardingStep({ step, totalSteps = 6, children }) {
         ))}
       </div>
 
-      {/* Barry avatar */}
+      {/* Barry avatar (matches BarryChat.jsx pattern) */}
       <div style={{
         width: 80,
         height: 80,
         borderRadius: '50%',
         overflow: 'hidden',
-        border: `3px solid ${T.accent}`,
-        boxShadow: `0 0 20px ${T.accent}30`,
+        background: `linear-gradient(135deg,${BRAND.pink},${T.cyan || BRAND.cyan})`,
+        border: `2px solid ${(T.cyan || BRAND.cyan)}50`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: `0 0 40px ${(T.cyan || BRAND.cyan)}50`,
         marginBottom: 24,
         flexShrink: 0,
       }}>
@@ -51,7 +55,7 @@ export default function OnboardingStep({ step, totalSteps = 6, children }) {
           src={ASSETS.barryAvatar}
           alt="Barry"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<span style="font-size:40px;display:flex;align-items:center;justify-content:center;height:100%">🐻</span>'; }}
+          onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }}
         />
       </div>
 

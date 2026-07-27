@@ -15,8 +15,8 @@ import GettingStarted from './pages/GettingStarted';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
-import MissionControlDashboardV2 from './pages/MissionControlDashboardV2';
-// MissionControlDashboard (legacy) archived as MissionControlDashboard.archived.jsx
+import MissionControlDashboardV2 from './pages/Scout/MissionControlDashboardV2';
+// Legacy dashboard preserved at ./pages/MissionControlDashboardV2.jsx
 import RECONModulePage from './pages/RECONModulePage';
 import RECONSectionPage from './pages/RECONSectionPage';
 
@@ -104,6 +104,7 @@ import MissionDetail from './pages/Hunter/MissionDetail';
 // Barry Onboarding
 import BarryOnboarding from './pages/Onboarding/BarryOnboarding';
 import ReconOnboardingWizard from './pages/Onboarding/ReconOnboardingWizard';
+import OnboardingFlow from './pages/Onboarding/OnboardingFlow';
 
 // User Settings
 import UserSettings from './pages/UserSettings';
@@ -257,8 +258,8 @@ function App() {
       return <Navigate to="/checkout" />;
     }
 
-    // Return users skip the wizard; new users go through onboarding
-    if (userData?.onboardingComplete) {
+    // Return users skip onboarding; new users go through Barry onboarding flow
+    if (userData?.onboardingComplete || userData?.onboarding?.completed) {
       return <Navigate to="/mission-control-v2" />;
     }
     return <Navigate to="/onboarding" />;
@@ -300,8 +301,12 @@ function App() {
         <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
-        {/* RECON-first onboarding wizard — post-payment entry point */}
-        <Route path="/onboarding" element={<ProtectedRoute><ReconOnboardingWizard /></ProtectedRoute>} />
+        {/* Barry onboarding flow — 6-step first-run experience */}
+        <Route path="/onboarding" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
+        {/* Resume link for partially completed onboarding */}
+        <Route path="/onboarding/flow" element={<ProtectedRoute><OnboardingFlow /></ProtectedRoute>} />
+        {/* RECON onboarding wizard — deep ICP setup */}
+        <Route path="/onboarding/recon" element={<ProtectedRoute><ReconOnboardingWizard /></ProtectedRoute>} />
         {/* Barry ICP Onboarding - legacy, kept for deep links */}
         <Route path="/onboarding/barry" element={<ProtectedRoute><BarryOnboarding /></ProtectedRoute>} />
 

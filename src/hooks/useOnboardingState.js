@@ -66,9 +66,14 @@ function toMillis(value) {
   return Number.isNaN(ms) ? null : ms;
 }
 
-/** True when a started-but-incomplete user is past the staleness cutoff. */
+/**
+ * True when an account is older than the cutoff and onboarding is not marked
+ * complete. Deliberately does NOT require `started` (FLAG 5): existing users
+ * predate the onboarding flow entirely — they have no onboarding field at all —
+ * and must be sent straight to Mission Control rather than into onboarding.
+ */
 export function isStaleOnboarding(onboarding, createdAt, now = Date.now()) {
-  if (!onboarding?.started || onboarding?.completed) return false;
+  if (onboarding?.completed) return false;
   const createdMs = toMillis(createdAt);
   if (createdMs == null) return false;
   const ageDays = (now - createdMs) / (1000 * 60 * 60 * 24);
@@ -90,8 +95,9 @@ export function deriveOnboardingState(onboarding = {}, gmailConnected = false, c
   const smartQuestionsAnswered = Boolean(ob.smartQuestionsAnswered);
   const explicitlyComplete = Boolean(ob.completed);
 
-  // Returning-user safety valve: a user who started > 7 days ago and never
-  // finished is treated as complete so they aren't stuck on the flow.
+  // Returning-user safety valve: an account older than 7 days without a
+  // completion is treated as complete — protects existing users who predate the
+  // onboarding flow (no onboarding field) and anyone who never finished it.
   const staleComplete = isStaleOnboarding(ob, createdAt);
   const isComplete = explicitlyComplete || staleComplete;
 

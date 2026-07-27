@@ -2,7 +2,7 @@
  * analyze-website (Mission Control 2.0 Sprint 2, Workstream A1) — Unit Tests
  *
  * Covers the pure extraction/mapping helpers plus the handler's failure and
- * success paths with node-fetch, the Anthropic SDK, and Firestore mocked.
+ * success paths with the built-in fetch, the Anthropic SDK, and Firestore mocked.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -11,8 +11,6 @@ const mockFetch = vi.hoisted(() => vi.fn());
 const mockDashboardGet = vi.hoisted(() => vi.fn());
 const mockDashboardUpdate = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockUserSet = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
-
-vi.mock('node-fetch', () => ({ default: mockFetch }));
 
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class MockAnthropic {
@@ -59,7 +57,9 @@ import {
   normalizeExtraction,
   mapDataToReconSections,
   recomputeReconModule,
+  buildWebsiteAnalysis,
   RECON_FIELD_MAP,
+  WEBSITE_ANALYSIS_FIELDS,
   EXTRACTION_FIELDS,
 } from '../../netlify/functions/analyze-website.js';
 
@@ -111,6 +111,7 @@ function invoke(body) {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.ANTHROPIC_API_KEY = 'test-key';
+  vi.stubGlobal('fetch', mockFetch); // handler uses the built-in global fetch
   mockCreate.mockImplementation(() => anthropicJsonResponse(FULL_PROFILE));
   mockDashboardGet.mockResolvedValue(makeDashboardSnap(makeReconSections()));
 });
@@ -199,7 +200,7 @@ describe('normalizeExtraction', () => {
 // ─── mapDataToReconSections ───────────────────────────────────────────────────
 
 describe('mapDataToReconSections', () => {
-  it('maps each extracted field to its configured section + key', () => {
+  it('maps only the Section 1 identity fields onto their existing keys', () => {
     const extracted = normalizeExtraction(FULL_PROFILE);
     const { sections, writtenFields } = mapDataToReconSections(makeReconSections(), extracted);
 
@@ -209,16 +210,22 @@ describe('mapDataToReconSections', () => {
     expect(s1.data.mainProduct).toBe('A CI/CD platform');
     expect(s1.data.currentCustomers).toBe('Engineering teams');
 
-    const s3 = sections.find((s) => s.sectionId === 3);
-    expect(s3.data.targetIndustry).toBe('Software');
-    expect(s3.data.targetCompanySize).toBe('Mid-market');
-    expect(s3.data.icpSummary).toContain('software companies');
-
-    const s9 = sections.find((s) => s.sectionId === 9);
-    expect(s9.data.valueProposition).toBe('Ship faster with confidence');
-
-    // Every mapped field should be recorded as written.
+    // Only the four Section 1 mappings are written — nothing is invented in
+    // structured sections (FLAG 1).
     expect(writtenFields.length).toBe(Object.keys(RECON_FIELD_MAP).length);
+    expect(writtenFields.every((w) => w.sectionId === 1)).toBe(true);
+  });
+
+  it('never writes new keys into structured sections 3 or 9', () => {
+    const extracted = normalizeExtraction(FULL_PROFILE);
+    const { sections } = mapDataToReconSections(makeReconSections(), extracted);
+    const s3 = sections.find((s) => s.sectionId === 3);
+    const s9 = sections.find((s) => s.sectionId === 9);
+    // Untouched — still their original not_started/null shape.
+    expect(s3.data).toBeNull();
+    expect(s3.status).toBe('not_started');
+    expect(s9.data).toBeNull();
+    expect(s9.status).toBe('not_started');
   });
 
   it('marks Section 1 completed when all its fields are populated', () => {
@@ -229,13 +236,12 @@ describe('mapDataToReconSections', () => {
     expect(s1.completedAt).toBeTruthy();
   });
 
-  it('leaves structured sections in_progress, never falsely completed', () => {
-    const extracted = normalizeExtraction(FULL_PROFILE);
-    const { sections } = mapDataToReconSections(makeReconSections(), extracted);
-    const s3 = sections.find((s) => s.sectionId === 3);
-    const s9 = sections.find((s) => s.sectionId === 9);
-    expect(s3.status).toBe('in_progress');
-    expect(s9.status).toBe('in_progress');
+  it('leaves Section 1 in_progress when only some fields are filled', () => {
+    const partial = normalizeExtraction({ companyName: 'Acme', description: 'We build things.', confidence: 40 });
+    const { sections } = mapDataToReconSections(makeReconSections(), partial);
+    const s1 = sections.find((s) => s.sectionId === 1);
+    expect(s1.status).toBe('in_progress');
+    expect(s1.completedAt).toBeUndefined();
   });
 
   it('does not overwrite fields the user already filled in', () => {
@@ -250,18 +256,6 @@ describe('mapDataToReconSections', () => {
     expect(writtenFields.find((w) => w.field === 'companyName')).toBeUndefined();
   });
 
-  it('does not clobber existing non-empty array values', () => {
-    const sections = makeReconSections({
-      3: { status: 'in_progress', data: { companySize: ['smb'], targetIndustry: 'Fintech' } },
-    });
-    const extracted = normalizeExtraction(FULL_PROFILE);
-    const { sections: out } = mapDataToReconSections(sections, extracted);
-    const s3 = out.find((s) => s.sectionId === 3);
-    expect(s3.data.companySize).toEqual(['smb']);
-    expect(s3.data.targetIndustry).toBe('Fintech'); // user value preserved
-    expect(s3.data.targetCompanySize).toBe('Mid-market'); // still filled
-  });
-
   it('does not mutate the input sections array', () => {
     const input = makeReconSections();
     const snapshot = JSON.stringify(input);
@@ -273,6 +267,29 @@ describe('mapDataToReconSections', () => {
     const partial = normalizeExtraction({ companyName: 'Acme', confidence: 40 });
     const { writtenFields } = mapDataToReconSections(makeReconSections(), partial);
     expect(writtenFields).toEqual([{ field: 'companyName', sectionId: 1, key: 'companyName' }]);
+  });
+});
+
+// ─── buildWebsiteAnalysis ─────────────────────────────────────────────────────
+
+describe('buildWebsiteAnalysis', () => {
+  it('collects the unmatched fields plus confidence + analyzedAt', () => {
+    const analysis = buildWebsiteAnalysis(normalizeExtraction(FULL_PROFILE), '2026-07-27T00:00:00.000Z');
+    expect(analysis.targetIndustry).toBe('Software');
+    expect(analysis.targetCompanySize).toBe('Mid-market');
+    expect(analysis.valueProposition).toBe('Ship faster with confidence');
+    expect(analysis.icpSummary).toContain('software companies');
+    expect(analysis.confidence).toBe(88);
+    expect(analysis.analyzedAt).toBe('2026-07-27T00:00:00.000Z');
+    // Never leaks Section 1 identity fields into the analysis blob.
+    expect('companyName' in analysis).toBe(false);
+  });
+
+  it('omits empty fields but always records confidence', () => {
+    const analysis = buildWebsiteAnalysis(normalizeExtraction({ companyName: 'Acme', confidence: 10 }));
+    for (const f of WEBSITE_ANALYSIS_FIELDS) expect(f in analysis).toBe(false);
+    expect(analysis.confidence).toBe(10);
+    expect(analysis.analyzedAt).toBeTruthy();
   });
 });
 
@@ -332,6 +349,15 @@ describe('handler', () => {
     expect(body.data.confidence).toBe(88);
     expect(mockDashboardUpdate).toHaveBeenCalledTimes(1);
     expect(mockUserSet).toHaveBeenCalledTimes(1); // websiteAnalyzed flag
+
+    // Section 1 identity fields land on the recon module; unmatched fields land
+    // in the clearly labeled websiteAnalysis sub-object (FLAG 1).
+    const updateArg = mockDashboardUpdate.mock.calls[0][0];
+    const recon = updateArg.modules.find((m) => m.id === 'recon');
+    expect(recon.sections.find((s) => s.sectionId === 1).data.companyName).toBe('Acme Corp');
+    expect(recon.websiteAnalysis.targetIndustry).toBe('Software');
+    expect(recon.websiteAnalysis.valueProposition).toBe('Ship faster with confidence');
+    expect(recon.websiteAnalysis.confidence).toBe(88);
   });
 
   it('returns a friendly message when the site blocks us (403)', async () => {

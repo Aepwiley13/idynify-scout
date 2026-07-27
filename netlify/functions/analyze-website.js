@@ -7,7 +7,7 @@
  *
  * Flow:
  *   1. Verify auth (shared verifyAuthToken util — supports admin impersonation).
- *   2. Fetch the URL with node-fetch (10s timeout, realistic User-Agent).
+ *   2. Fetch the URL with the built-in fetch (10s timeout, realistic User-Agent).
  *   3. Strip scripts/styles/tags → keep first 8000 chars of visible text.
  *   4. Ask Barry (claude-sonnet-4-6) for a structured JSON business profile.
  *   5. Merge the extracted fields into the user's RECON sections
@@ -24,7 +24,6 @@
  *   Body: { url, userId, authToken }
  */
 
-import fetch from 'node-fetch';
 import Anthropic from '@anthropic-ai/sdk';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { createMessageWithRetry } from './utils/anthropicRetry.js';
@@ -57,29 +56,34 @@ export const EXTRACTION_FIELDS = [
 ];
 
 /**
- * Maps each extracted field to the closest RECON section + field key.
- *   Section 1 (Business Foundation) — free-text company identity fields.
- *   Section 3 (Target Market)       — free-text targeting descriptors that
- *                                     complement the structured firmographic
- *                                     selects the user fills in manually.
- *   Section 9 (Messaging)           — the value proposition, in the user's words.
+ * Maps extracted fields onto EXISTING RECON Section 1 (Business Foundation)
+ * fields only — an exact match to fields the editor already recognizes, so no
+ * new keys are ever invented inside a section's data (FLAG 1 decision).
+ *
+ * Fields with no clean existing home (target firmographics, value prop, ICP
+ * summary) are NOT forced into structured sections; they go to the clearly
+ * labeled recon.websiteAnalysis sub-object instead — see WEBSITE_ANALYSIS_FIELDS.
  */
 export const RECON_FIELD_MAP = {
-  companyName:       { sectionId: 1, key: 'companyName' },
-  description:       { sectionId: 1, key: 'whatYouDo' },
-  whatTheySell:      { sectionId: 1, key: 'mainProduct' },
-  whoTheyServeTo:    { sectionId: 1, key: 'currentCustomers' },
-  targetIndustry:    { sectionId: 3, key: 'targetIndustry' },
-  targetCompanySize: { sectionId: 3, key: 'targetCompanySize' },
-  icpSummary:        { sectionId: 3, key: 'icpSummary' },
-  valueProposition:  { sectionId: 9, key: 'valueProposition' },
+  companyName:    { sectionId: 1, key: 'companyName' },
+  description:    { sectionId: 1, key: 'whatYouDo' },
+  whatTheySell:   { sectionId: 1, key: 'mainProduct' },
+  whoTheyServeTo: { sectionId: 1, key: 'currentCustomers' },
 };
+
+// Extracted fields that have no clean existing RECON field. Stored under
+// modules[recon].websiteAnalysis.{field} so they're clearly labeled as Barry's
+// analysis and never pollute the structured section editors (FLAG 1 decision).
+export const WEBSITE_ANALYSIS_FIELDS = [
+  'targetIndustry',
+  'targetCompanySize',
+  'valueProposition',
+  'icpSummary',
+];
 
 // Sections auto-marked "completed" once every listed key is populated. Only
 // Section 1 qualifies: its fields are exactly the free-text identity fields the
 // editor recognizes, so a full set is a genuine, user-visible completion.
-// Sections 3 & 9 only receive supplementary free-text and are left for the user
-// to finish with their structured inputs (never falsely marked complete).
 const AUTO_COMPLETE_SECTIONS = {
   1: ['companyName', 'whatYouDo', 'mainProduct', 'currentCustomers'],
 };
@@ -342,10 +346,27 @@ export function recomputeReconModule(reconModule) {
   return reconModule;
 }
 
+/**
+ * Build the recon.websiteAnalysis sub-object from the extracted fields that
+ * have no clean existing RECON home. Only non-empty fields are included, plus
+ * confidence + analyzedAt for traceability. Pure — exported for testing.
+ */
+export function buildWebsiteAnalysis(extracted, nowIso = new Date().toISOString()) {
+  const analysis = {};
+  for (const field of WEBSITE_ANALYSIS_FIELDS) {
+    if (hasValue(extracted?.[field])) analysis[field] = extracted[field].trim();
+  }
+  analysis.confidence = normalizeConfidence(extracted?.confidence);
+  analysis.analyzedAt = nowIso;
+  return analysis;
+}
+
 // ─── Firestore write ────────────────────────────────────────────────────────
 
 /**
- * Merge the extracted profile into dashboards/{userId} RECON sections.
+ * Merge the extracted profile into dashboards/{userId}: Section 1 identity
+ * fields into their existing keys, and everything without a clean home into the
+ * clearly labeled modules[recon].websiteAnalysis sub-object.
  * No-op-safe: if the dashboard or RECON module is missing, returns [] written.
  *
  * @returns {Promise<{ writtenFields: Array, touchedSectionIds: number[] }>}
@@ -375,13 +396,23 @@ async function writeToRecon(userId, extracted) {
     nowIso
   );
 
-  if (writtenFields.length === 0) {
-    // Everything was already filled by the user — nothing to persist.
+  const analysis = buildWebsiteAnalysis(extracted, nowIso);
+  const hasAnalysisFields = WEBSITE_ANALYSIS_FIELDS.some((f) => hasValue(extracted?.[f]));
+
+  if (writtenFields.length === 0 && !hasAnalysisFields) {
+    // User already filled the identity fields and Barry found nothing else —
+    // nothing meaningful to persist.
     return { writtenFields: [], touchedSectionIds: [] };
   }
 
+  const existingModule = modules[reconIndex];
   const nextModules = [...modules];
-  nextModules[reconIndex] = { ...nextModules[reconIndex], sections };
+  nextModules[reconIndex] = {
+    ...existingModule,
+    sections,
+    // Merge so re-running refreshes fields without wiping earlier findings.
+    websiteAnalysis: { ...(existingModule.websiteAnalysis || {}), ...analysis },
+  };
   recomputeReconModule(nextModules[reconIndex]);
 
   await dashboardRef.update({

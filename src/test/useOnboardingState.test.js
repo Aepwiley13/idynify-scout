@@ -40,24 +40,26 @@ describe('deriveGmailConnected', () => {
 
 describe('isStaleOnboarding', () => {
   const now = Date.now();
-  it('is true for a started, incomplete user older than 7 days', () => {
+  it('is true for an incomplete account older than 7 days', () => {
     expect(isStaleOnboarding({ started: true }, new Date(now - 8 * DAY_MS), now)).toBe(true);
   });
-  it('is false within the 7-day window', () => {
-    expect(isStaleOnboarding({ started: true }, new Date(now - 3 * DAY_MS), now)).toBe(false);
+  it('is true for an EXISTING user with no onboarding field (FLAG 5)', () => {
+    // Predates the onboarding flow entirely — must be protected, not onboarded.
+    expect(isStaleOnboarding({}, new Date(now - 30 * DAY_MS), now)).toBe(true);
+    expect(isStaleOnboarding(undefined, new Date(now - 30 * DAY_MS), now)).toBe(true);
   });
-  it('is false if never started', () => {
-    expect(isStaleOnboarding({}, new Date(now - 30 * DAY_MS), now)).toBe(false);
+  it('is false within the 7-day window', () => {
+    expect(isStaleOnboarding({}, new Date(now - 3 * DAY_MS), now)).toBe(false);
   });
   it('is false if already completed', () => {
-    expect(isStaleOnboarding({ started: true, completed: true }, new Date(now - 30 * DAY_MS), now)).toBe(false);
+    expect(isStaleOnboarding({ completed: true }, new Date(now - 30 * DAY_MS), now)).toBe(false);
   });
   it('handles Firestore Timestamp-like objects', () => {
     const ts = { toMillis: () => now - 10 * DAY_MS };
-    expect(isStaleOnboarding({ started: true }, ts, now)).toBe(true);
+    expect(isStaleOnboarding({}, ts, now)).toBe(true);
   });
   it('is false when createdAt is missing', () => {
-    expect(isStaleOnboarding({ started: true }, null, now)).toBe(false);
+    expect(isStaleOnboarding({}, null, now)).toBe(false);
   });
 });
 
@@ -131,6 +133,20 @@ describe('deriveOnboardingState flags', () => {
     expect(s.isComplete).toBe(true);
     expect(s.currentStep).toBe(6);
     expect(s.flags.completed).toBe(true);
+  });
+
+  it('sends an existing user with no onboarding field to Mission Control (FLAG 5)', () => {
+    const oldCreatedAt = new Date(Date.now() - 60 * DAY_MS);
+    const s = deriveOnboardingState(undefined, false, oldCreatedAt);
+    expect(s.isComplete).toBe(true);
+    expect(s.isNewUser).toBe(false);
+    expect(s.currentStep).toBe(6);
+  });
+
+  it('still onboards a genuinely new user (recent createdAt)', () => {
+    const s = deriveOnboardingState(undefined, false, new Date());
+    expect(s.isComplete).toBe(false);
+    expect(s.currentStep).toBe(1);
   });
 
   it('surfaces the skipped flag', () => {

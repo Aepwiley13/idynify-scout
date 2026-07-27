@@ -91,6 +91,26 @@ describe('calculateICPScore — field-name resolution', () => {
   });
 });
 
+describe('calculateICPScore — graceful with missing fields (DECISION 2)', () => {
+  it('scores an industry-only company (no size/location/revenue) at the Good Fit threshold', () => {
+    // Current data is often industry-only; such a company should still count as
+    // a Good Fit (>= 75) rather than being penalized to a broken-looking score.
+    const score = calculateICPScore({ industry: 'Credit Unions' }, FULL_ICP);
+    expect(score).toBeGreaterThanOrEqual(75);
+  });
+
+  it('does not throw and returns a finite score for a company with no usable fields', () => {
+    const score = calculateICPScore({ name: 'Mystery Co' }, FULL_ICP);
+    expect(Number.isFinite(score)).toBe(true);
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('keeps an out-of-industry company below the Good Fit threshold even with missing data', () => {
+    expect(calculateICPScore({ industry: 'Fast Food' }, FULL_ICP)).toBeLessThan(75);
+  });
+});
+
 describe('calculateICPScore — edge cases', () => {
   it('returns 0 when company or ICP is missing', () => {
     expect(calculateICPScore(null, FULL_ICP)).toBe(0);

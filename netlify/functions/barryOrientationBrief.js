@@ -83,6 +83,26 @@ export const handler = async (event) => {
       highFit: normalizeCount(context?.highFit),
       totalReplies: normalizeCount(context?.totalReplies),
     };
+
+    // Sanitize the client-supplied top-priority action at the boundary too:
+    // coerce to trimmed, length-capped strings so raw client text never flows
+    // unbounded into the prompt. Absent/blank fields resolve to null.
+    const normalizeText = (value, maxLen) => {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      return trimmed.slice(0, maxLen);
+    };
+
+    const tp = context?.topPriority;
+    const topPriority = tp
+      ? {
+          title: normalizeText(tp.title, 200),
+          reason: normalizeText(tp.reason, 200),
+          urgency: normalizeText(tp.urgency, 20),
+        }
+      : null;
+    const hasTopPriority = !!(topPriority && topPriority.title);
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
     await verifyAuthToken(authToken, userId);
@@ -146,6 +166,7 @@ export const handler = async (event) => {
     const orientationPrompt = `You are Barry, Idynify's AI sales intelligence assistant. Generate a 2-3 sentence orientation message for a user opening Mission Control.
 
 CURRENT PLATFORM STATE:
+- Highest priority action: ${hasTopPriority ? topPriority.title : 'none'}${hasTopPriority && topPriority.reason ? ` (${topPriority.reason})` : ''}
 - Total companies matching ICP: ${dashboardContext.totalMatches ?? 'unknown'}
 - High confidence matches (75%+ fit): ${dashboardContext.highFit ?? 'unknown'}
 - Total replies received: ${dashboardContext.totalReplies ?? 'unknown'}
@@ -156,11 +177,12 @@ CURRENT PLATFORM STATE:
 RULES:
 - Be specific to the numbers. Name stale contacts if available.
 - Open with the strongest AVAILABLE signal, in this priority order:
-  1. Replies — if "Total replies received" > 0, someone responded and deserves attention now.
-  2. High-fit matches — else if "High confidence matches" > 0, strong opportunities are ready to review.
-  3. Total matches — else if "Total companies matching ICP" > 0, the pipeline is building.
-  4. Otherwise, lead with the existing RECON, mission, and lead context.
-  5. Generic welcome only when no meaningful signal exists at all.
+  1. Highest priority action — if "Highest priority action" is not "none", open with it. Reference it by name and work its reason into the first sentence. It outranks every other signal below.
+  2. Replies — else if "Total replies received" > 0, someone responded and deserves attention now.
+  3. High-fit matches — else if "High confidence matches" > 0, strong opportunities are ready to review.
+  4. Total matches — else if "Total companies matching ICP" > 0, the pipeline is building.
+  5. Otherwise, lead with the existing RECON, mission, and lead context.
+  6. Generic welcome only when no meaningful signal exists at all.
 - Do not describe any dashboard total as "new", "today", "this week", or "overnight". These are all-time account totals unless a time-bounded value is explicitly provided.
 - If RECON is below 80%, mention the gap and its effect in one short clause.
 - No "Welcome back!" or generic greetings. Lead with the most actionable signal.

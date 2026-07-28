@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { STATUS } from '../../theme/tokens';
-import { AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 
 const URGENCY_COLOR = { high: STATUS.red, medium: STATUS.amber, low: STATUS.green };
 const DEFAULT_VISIBLE = 3;
@@ -63,7 +63,7 @@ function PriorityCard({ item, T }) {
   );
 }
 
-export default function TodaysPriorities({ recommendations, loading, T }) {
+export default function TodaysPriorities({ recommendations, loading, error, onRetry, T }) {
   const [expanded, setExpanded] = useState(false);
 
   if (loading) {
@@ -79,6 +79,37 @@ export default function TodaysPriorities({ recommendations, loading, T }) {
     );
   }
 
+  if (error) {
+    return (
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 32px 24px' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 14 }}>
+          Today's Priorities
+        </div>
+        <div style={{
+          padding: '24px 20px', borderRadius: 12, background: T.cardBg,
+          border: `1px solid ${T.border}`, textAlign: 'center',
+        }}>
+          <AlertCircle size={20} color={STATUS.red} style={{ marginBottom: 8 }} />
+          <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 12 }}>
+            We couldn't load today's priorities.
+          </div>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
+                background: T.surface, color: T.text, border: `1px solid ${T.border}`,
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!recommendations.length) {
     return (
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 32px 24px' }}>
@@ -89,9 +120,12 @@ export default function TodaysPriorities({ recommendations, loading, T }) {
           padding: '24px 20px', borderRadius: 12, background: T.cardBg,
           border: `1px solid ${T.border}`, textAlign: 'center',
         }}>
-          <AlertCircle size={20} color={T.textFaint} style={{ marginBottom: 8 }} />
-          <div style={{ fontSize: 13, color: T.textMuted }}>
-            You're all caught up for now.
+          <CheckCircle2 size={20} color={STATUS.green} style={{ marginBottom: 8 }} />
+          <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 4 }}>
+            You're caught up for now
+          </div>
+          <div style={{ fontSize: 12, color: T.textMuted }}>
+            Barry will surface new priorities as activity develops.
           </div>
         </div>
       </div>

@@ -677,7 +677,7 @@ export default function MissionControlDashboardV2() {
   const [subscriptionTier, setSubscriptionTier] = useState(null);
   const [acceptedCompanies, setAcceptedCompanies] = useState(0);
   const [cadencesSent, setCadencesSent] = useState(0);
-  const { recommendations, loading: recsLoading } = useRecommendations(activeUserId);
+  const { recommendations, loading: recsLoading, error: recsError, retry: recsRetry } = useRecommendations(activeUserId);
 
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
@@ -916,7 +916,7 @@ export default function MissionControlDashboardV2() {
             totalMatches,
             highFit,
             totalReplies: cadenceReplies,
-            topPriority: recommendations[0] ? {
+            topPriority: (!recsError && recommendations[0]) ? {
               title: recommendations[0].title,
               reason: recommendations[0].reason,
               urgency: recommendations[0].urgency,
@@ -928,7 +928,7 @@ export default function MissionControlDashboardV2() {
       </div>
 
       {/* Today's Priorities */}
-      <TodaysPriorities recommendations={recommendations} loading={recsLoading} T={T} />
+      <TodaysPriorities recommendations={recommendations} loading={recsLoading} error={recsError} onRetry={recsRetry} T={T} />
 
       {/* Main Layout */}
       <div className="mc2-layout" style={{

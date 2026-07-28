@@ -86,6 +86,7 @@ export function useRecommendations(userId) {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -108,9 +109,11 @@ export function useRecommendations(userId) {
       });
 
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, retryCount]);
 
-  return { recommendations, loading, error };
+  const retry = () => setRetryCount(c => c + 1);
+
+  return { recommendations, loading, error, retry };
 }
 
 export default useRecommendations;

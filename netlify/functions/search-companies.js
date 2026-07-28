@@ -596,9 +596,9 @@ export const handler = async (event) => {
   } catch (error) {
     console.error('💥 Error in search-companies:', error);
 
-    // Log failed API usage (extract userId from body if available)
+    // Log failed API usage and mark Barry as ERROR
     try {
-      const { userId } = JSON.parse(event.body);
+      const { userId, authToken } = JSON.parse(event.body);
       if (userId) {
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'searchCompanies', 'error', {
@@ -606,6 +606,7 @@ export const handler = async (event) => {
           errorCode: error.message,
           metadata: {}
         });
+
       }
     } catch (logError) {
       console.error('Failed to log API error:', logError);

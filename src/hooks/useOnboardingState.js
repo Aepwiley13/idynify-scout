@@ -132,6 +132,11 @@ export function useOnboardingState() {
   const [onboarding, setOnboarding] = useState(undefined);
   const [createdAt, setCreatedAt] = useState(null);
   const [gmailData, setGmailData] = useState(undefined);
+  const [barryState, setBarryState] = useState(null);
+  const [companiesFoundCount, setCompaniesFoundCount] = useState(0);
+  const [onboardingSource, setOnboardingSource] = useState(null);
+  const [hasSeenMCWelcome, setHasSeenMCWelcome] = useState(null);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   const user = getEffectiveUser();
   const uid = user?.uid || null;
@@ -145,6 +150,11 @@ export function useOnboardingState() {
         const data = snap.exists() ? snap.data() : {};
         setOnboarding(data.onboarding || {});
         setCreatedAt(data.createdAt || null);
+        setBarryState(data.barryState ?? null);
+        setCompaniesFoundCount(data.companiesFoundCount ?? 0);
+        setOnboardingSource(data.onboardingSource ?? null);
+        setHasSeenMCWelcome(data.hasSeenMCWelcome ?? null);
+        setOnboardingComplete(Boolean(data.onboardingComplete));
       },
       (err) => {
         console.warn('[useOnboardingState] user doc listen failed:', err.message);
@@ -208,6 +218,11 @@ export function useOnboardingState() {
     ...derived,
     markStep,
     loading,
+    barryState,
+    companiesFoundCount,
+    onboardingSource,
+    hasSeenMCWelcome,
+    onboardingComplete,
   };
 }
 

@@ -11,13 +11,14 @@ import {
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
 import useOnboardingState from '../../hooks/useOnboardingState';
+import AnimatedCounter from '../../components/AnimatedCounter';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
 import {
   Search, Filter, ChevronLeft, ChevronRight, ExternalLink,
   Linkedin, Users, Target, TrendingUp, Calendar, X,
   Loader, ArrowRight, Star, Mail, UserPlus, RefreshCw,
-  BarChart3, Building2, Check,
+  BarChart3, Building2, Check, AlertCircle,
 } from 'lucide-react';
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
@@ -402,6 +403,357 @@ function BarryPanel({ companies, T, navigate }) {
   );
 }
 
+// ─── Barry Narration Messages ───────────────────────────────────────────────
+const BARRY_NARRATIONS = [
+  'Finding companies similar to your best customers...',
+  'Filtering out poor matches...',
+  'Ranking your top opportunities...',
+  'Preparing your workspace...',
+];
+
+// ─── First-Run View ─────────────────────────────────────────────────────────
+function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate }) {
+  const [ctaDisabled, setCtaDisabled] = useState(false);
+  const [ctaError, setCtaError] = useState(null);
+  const [narrationIndex, setNarrationIndex] = useState(0);
+
+  const isSearching = barryState === 'SEARCHING' || barryState === null;
+  const isReady = barryState === 'READY';
+  const isError = barryState === 'ERROR';
+
+  useEffect(() => {
+    if (!isSearching) return;
+    const timer = setInterval(() => {
+      setNarrationIndex(prev => (prev + 1) % BARRY_NARRATIONS.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [isSearching]);
+
+  const handleSeenMC = async () => {
+    setCtaDisabled(true);
+    setCtaError(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not signed in');
+      await setDoc(doc(db, 'users', user.uid), { hasSeenMCWelcome: true }, { merge: true });
+      navigate('/scout', { state: { activeTab: 'daily-leads' } });
+    } catch {
+      setCtaDisabled(false);
+      setCtaError('Something went wrong. Try again.');
+    }
+  };
+
+  const handleRetry = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      await setDoc(doc(db, 'users', user.uid), {
+        barryState: 'SEARCHING',
+        companiesFoundCount: 0,
+      }, { merge: true });
+      const authToken = await user.getIdToken();
+      const profileDoc = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
+      const companyProfile = profileDoc.exists() ? profileDoc.data() : {};
+      fetch('/.netlify/functions/search-companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile }),
+      }).catch(() => {});
+    } catch { /* best effort */ }
+  };
+
+  const topThree = companies.slice(0, 3);
+  const counterTarget = companiesFoundCount > 0 ? companiesFoundCount : companies.length;
+
+  const progressItems = [
+    { label: 'Business Understood', done: true },
+    { label: 'Ideal Customer Profile Created', done: true },
+    {
+      label: isSearching ? 'Finding and ranking companies...'
+        : isReady ? 'Prospect list ready'
+        : 'Search failed',
+      done: isReady,
+      active: isSearching,
+      error: isError,
+    },
+    { label: 'Available after you review your first matches', done: false, greyed: true },
+  ];
+
+  return (
+    <div style={{
+      maxWidth: 1200, margin: '0 auto', padding: '48px 32px',
+      display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 48,
+      minHeight: 'calc(100vh - 120px)', alignContent: 'start',
+    }}>
+      {/* Left Column — Barry */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {/* Barry Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%', overflow: 'hidden',
+            background: `linear-gradient(135deg,${BRAND.pink},${T.cyan || BRAND.cyan})`,
+            border: `2px solid ${(T.cyan || BRAND.cyan)}50`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: `0 0 24px ${(T.cyan || BRAND.cyan)}40`,
+          }}>
+            <img src={ASSETS.barryAvatar} alt="Barry" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                 onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: T.text }}>Barry</div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '2px 10px', borderRadius: 20,
+              background: `${STATUS.green}18`, fontSize: 11, fontWeight: 600,
+              color: STATUS.green,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS.green }} />
+              AI SDR &bull; Online
+            </div>
+          </div>
+        </div>
+
+        {/* Heading */}
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: T.text, margin: 0, lineHeight: 1.3 }}>
+          {isSearching && 'Barry is building your sales engine'}
+          {isReady && 'Barry found your first matches'}
+          {isError && 'Barry ran into a problem'}
+        </h1>
+
+        {/* Progress List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {progressItems.map((item, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              opacity: item.greyed ? 0.4 : 1,
+            }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: item.done ? `${STATUS.green}18`
+                  : item.error ? `${STATUS.red || '#ef4444'}18`
+                  : item.active ? `${T.accent}18`
+                  : `${T.textFaint}12`,
+                border: `1.5px solid ${
+                  item.done ? `${STATUS.green}40`
+                  : item.error ? `${STATUS.red || '#ef4444'}40`
+                  : item.active ? `${T.accent}40`
+                  : `${T.textFaint}25`
+                }`,
+              }}>
+                {item.done && <Check size={13} color={STATUS.green} />}
+                {item.active && <Loader size={13} color={T.accent} className="animate-spin" />}
+                {item.error && <X size={13} color={STATUS.red || '#ef4444'} />}
+              </div>
+              <span style={{
+                fontSize: 14, fontWeight: item.done || item.active ? 600 : 400,
+                color: item.greyed ? T.textFaint : item.error ? (STATUS.red || '#ef4444') : T.text,
+              }}>
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Narration (searching only) */}
+        {isSearching && (
+          <p style={{
+            fontSize: 13, color: T.textMuted, fontStyle: 'italic', margin: 0,
+            padding: '12px 16px', background: T.surface, borderRadius: 10,
+            borderLeft: `3px solid ${T.accent}`,
+            transition: 'opacity 0.3s',
+          }}>
+            "{BARRY_NARRATIONS[narrationIndex]}"
+          </p>
+        )}
+      </div>
+
+      {/* Right Column — Matches */}
+      <div style={{
+        background: T.cardBg, border: `1px solid ${T.border}`,
+        borderRadius: 16, padding: 24, height: 'fit-content',
+      }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: T.textMuted, margin: '0 0 20px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Here's a preview of what's coming
+        </h3>
+
+        {/* SEARCHING — no companies yet */}
+        {isSearching && topThree.length === 0 && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 16, padding: '40px 0',
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%',
+              background: `${T.accent}12`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'pulse 2s ease-in-out infinite',
+            }}>
+              <Search size={24} color={T.accent} />
+            </div>
+            <p style={{ fontSize: 14, color: T.textMuted, textAlign: 'center', margin: 0 }}>
+              Barry is building your sales engine...
+            </p>
+          </div>
+        )}
+
+        {/* SEARCHING — some companies found already */}
+        {isSearching && topThree.length > 0 && (
+          <>
+            <div style={{
+              textAlign: 'center', marginBottom: 20,
+              fontSize: 13, color: T.textMuted,
+            }}>
+              <span style={{ fontSize: 32, fontWeight: 800, color: T.accent }}>
+                {companies.length}
+              </span>{' '}
+              found so far...
+            </div>
+            {topThree.map((company, i) => (
+              <FirstRunCompanyCard key={company.id || i} company={company} T={T} />
+            ))}
+          </>
+        )}
+
+        {/* READY */}
+        {isReady && (
+          <>
+            <div style={{
+              textAlign: 'center', marginBottom: 20,
+            }}>
+              <div style={{ fontSize: 13, color: T.textMuted, marginBottom: 4 }}>Barry found</div>
+              <div style={{ fontSize: 48, fontWeight: 800, color: T.accent, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                <AnimatedCounter target={counterTarget} duration={2500} />
+              </div>
+              <div style={{ fontSize: 14, color: T.text, marginTop: 6, fontWeight: 600 }}>
+                companies that match your ICP
+              </div>
+            </div>
+            {topThree.map((company, i) => (
+              <FirstRunCompanyCard key={company.id || i} company={company} T={T} />
+            ))}
+          </>
+        )}
+
+        {/* ERROR */}
+        {isError && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 16, padding: '32px 0',
+          }}>
+            <AlertCircle size={32} color={STATUS.red || '#ef4444'} />
+            <p style={{ fontSize: 14, color: T.text, textAlign: 'center', margin: 0 }}>
+              Barry ran into a problem building your first list.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={handleRetry}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.accent, color: '#fff', border: 'none',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate('/onboarding/barry')}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  color: T.text, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Review ICP with Barry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CTA */}
+        {companies.length > 0 && !isError && (
+          <div style={{ marginTop: 20 }}>
+            <button
+              onClick={handleSeenMC}
+              disabled={ctaDisabled}
+              style={{
+                width: '100%', padding: '14px 20px', borderRadius: 12,
+                background: ctaDisabled
+                  ? T.textFaint
+                  : `linear-gradient(135deg, ${BRAND.pink}, ${BRAND.purple})`,
+                color: '#fff', border: 'none', fontSize: 14, fontWeight: 700,
+                cursor: ctaDisabled ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: ctaDisabled ? 0.6 : 1,
+              }}
+            >
+              See all matches <ArrowRight size={16} />
+            </button>
+            {ctaError && (
+              <p style={{ fontSize: 12, color: STATUS.red || '#ef4444', textAlign: 'center', marginTop: 8 }}>
+                {ctaError}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.05); }
+        }
+        @media (max-width: 900px) {
+          div[style*="gridTemplateColumns: 3fr 2fr"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function FirstRunCompanyCard({ company, T }) {
+  const name = company.name || company.company_name || 'Unknown';
+  const industry = company.industry || '';
+  const score = Math.round(company.fit_score || 0);
+  const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
+  const topReason = reasons[0] || 'Matches your ICP profile';
+  const color = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
+
+  return (
+    <div style={{
+      padding: '14px 16px', borderRadius: 12,
+      background: T.surface, border: `1px solid ${T.border}`,
+      marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: 10,
+        background: `${T.accent}12`, border: `1px solid ${T.accent}25`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14, fontWeight: 700, color: T.accent, flexShrink: 0,
+      }}>
+        {name.charAt(0)}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{name}</div>
+        <div style={{ fontSize: 11, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {industry ? `${industry} — ` : ''}{topReason}
+        </div>
+      </div>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        padding: '4px 10px', borderRadius: 16, minWidth: 36,
+        background: `${color}18`, border: `1px solid ${color}40`,
+        fontSize: 12, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums',
+      }}>
+        {score}
+      </span>
+    </div>
+  );
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
@@ -413,6 +765,13 @@ export default function MissionControlDashboardV2() {
   const activeUserId = useActiveUserId();
   const { isReadOnly } = useImpersonation();
   const onboarding = useOnboardingState();
+  const {
+    onboardingComplete: obComplete,
+    onboardingSource,
+    hasSeenMCWelcome,
+    barryState,
+    companiesFoundCount,
+  } = onboarding;
   const [cadenceReplies, setCadenceReplies] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -552,8 +911,11 @@ export default function MissionControlDashboardV2() {
     }
   };
 
-  // ── Resume Banner ──────────────────────────────────────────────────────────
-  const showResumeBanner = !onboarding.loading && onboarding.flags.started && !onboarding.isComplete;
+  // ── First-Run Gate ─────────────────────────────────────────────────────────
+  const isFirstRun =
+    obComplete === true &&
+    onboardingSource === 'barry_onboarding' &&
+    hasSeenMCWelcome === false;
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
@@ -570,32 +932,29 @@ export default function MissionControlDashboardV2() {
     );
   }
 
+  // ── First-Run View ────────────────────────────────────────────────────────
+  if (isFirstRun) {
+    return (
+      <div style={{ minHeight: '100vh', background: T.appBg, paddingBottom: 80 }}>
+        <FirstRunView
+          barryState={barryState}
+          companiesFoundCount={companiesFoundCount}
+          companies={companies}
+          T={T}
+          navigate={navigate}
+        />
+        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+        <style>{`
+          .animate-spin { animation: spin 1s linear infinite; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: T.appBg, paddingBottom: 80 }}>
-      {/* Resume Onboarding Banner */}
-      {showResumeBanner && (
-        <div style={{
-          padding: '12px 24px',
-          background: `linear-gradient(135deg, ${BRAND.pink}18, ${BRAND.purple}18)`,
-          borderBottom: `1px solid ${BRAND.pink}30`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-        }}>
-          <span style={{ fontSize: 13, color: T.text }}>
-            You haven't finished setting up. Barry can help you get more out of Scout.
-          </span>
-          <button
-            onClick={() => navigate('/onboarding/flow')}
-            style={{
-              padding: '6px 16px', borderRadius: 8, border: 'none',
-              background: BRAND.pink, color: '#fff', fontSize: 12,
-              fontWeight: 700, cursor: 'pointer',
-            }}
-          >
-            Resume setup
-          </button>
-        </div>
-      )}
-
       {/* Header */}
       <header style={{
         padding: '24px 32px 20px',

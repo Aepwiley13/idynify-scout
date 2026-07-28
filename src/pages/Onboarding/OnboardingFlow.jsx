@@ -10,6 +10,7 @@ import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../
 import useOnboardingState from '../../hooks/useOnboardingState';
 import GmailConnectButton from '../../components/hunter/GmailConnectButton';
 import { ArrowRight, Check, Globe, Loader, SkipForward, MessageCircle } from 'lucide-react';
+import AnimatedCounter from '../../components/AnimatedCounter';
 
 // ─── Progress Bar ────────────────────────────────────────────────────────────
 function ProgressDots({ step, total = 6, T }) {
@@ -278,28 +279,6 @@ function ProspectCard({ company, T }) {
       <FitBadge score={Math.round(score)} T={T} />
     </div>
   );
-}
-
-// ─── Animated Counter ────────────────────────────────────────────────────────
-function AnimatedCounter({ target, duration = 2000 }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (target <= 0) return;
-    const start = performance.now();
-    const animate = (now) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.round(eased * target));
-      if (progress < 1) ref.current = requestAnimationFrame(animate);
-    };
-    ref.current = requestAnimationFrame(animate);
-    return () => { if (ref.current) cancelAnimationFrame(ref.current); };
-  }, [target, duration]);
-
-  return <span>{count}</span>;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

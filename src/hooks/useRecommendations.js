@@ -14,7 +14,7 @@
  * Field provenance (see PR notes):
  *   id, type        → passed through from the engine unchanged
  *   actionLabel     → REMAPPED from the engine's nested `action.label`
- *   title           → DERIVED: `${actionLabel} — ${entityName}`
+ *   title           → DERIVED by formatRecommendationTitle (src/utils/recommendationCopy.js)
  *   reason          → DERIVED: reasoning.observed (falls back to whyItMatters)
  *   urgency         → DERIVED from priorityWeight (0/1→high, 2→medium, 3→low)
  *   route           → DERIVED from entity id using real app routes

@@ -35,12 +35,12 @@ export default function HunterReadinessBanner({
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 4 }}>
-            Ready for Hunter
+            Barry's Recommendation
           </div>
           <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.5 }}>
-            You've found {acceptedCompanies} companies
-            {totalReplies >= 1 ? ` and ${totalReplies} ${totalReplies === 1 ? 'reply is' : 'replies are'} coming in` : ' and started sending cadences'}.
-            Hunter can manage follow-up so conversations don't slip through.
+            {totalReplies >= 1
+              ? `You've found ${acceptedCompanies} ${acceptedCompanies === 1 ? 'company' : 'companies'} and ${totalReplies} ${totalReplies === 1 ? 'reply is' : 'replies are'} coming in. Hunter can manage follow-up so conversations don't slip through.`
+              : `You've found ${acceptedCompanies} ${acceptedCompanies === 1 ? 'company' : 'companies'} and outreach is underway. Hunter can help organize conversations as they begin.`}
           </div>
         </div>
         <button

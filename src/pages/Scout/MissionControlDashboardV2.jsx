@@ -928,7 +928,7 @@ export default function MissionControlDashboardV2() {
       </div>
 
       {/* Today's Priorities */}
-      <TodaysPriorities recommendations={recommendations} loading={recsLoading} error={recsError} onRetry={recsRetry} T={T} />
+      <TodaysPriorities recommendations={recommendations} loading={recsLoading} error={recsError} onRetry={recsRetry} totalReplies={cadenceReplies} highFit={highFit} T={T} />
 
       {/* Main Layout */}
       <div className="mc2-layout" style={{

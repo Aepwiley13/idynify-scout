@@ -472,6 +472,29 @@ export const handler = async (event) => {
     if (pendingCount >= TARGET_QUEUE_SIZE) {
       console.log(`✅ Queue is full (${pendingCount}/${TARGET_QUEUE_SIZE}). No new companies needed.`);
 
+      // Companies already exist and are available → READY (never leave Barry
+      // stuck at SEARCHING on this early return). Count reflects the available
+      // queue, not new inserts.
+      {
+        const userDocUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}?updateMask.fieldPaths=barryState&updateMask.fieldPaths=companiesFoundCount`;
+        const stateResponse = await fetch(userDocUrl, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            fields: {
+              barryState: { stringValue: 'READY' },
+              companiesFoundCount: { integerValue: String(pendingCount) }
+            }
+          })
+        });
+        if (!stateResponse.ok) {
+          console.error('❌ Failed to set barryState=READY (queue full):', await stateResponse.text());
+        }
+      }
+
       return {
         statusCode: 200,
         headers: {
@@ -506,6 +529,29 @@ export const handler = async (event) => {
 
     // Save companies to Firestore
     await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile, icpId);
+
+    // Barry state contract: companies are saved and available → READY.
+    // Same REST pattern as the company writes (authToken Bearer + updateMask
+    // merge so only these two fields are touched on the user doc).
+    {
+      const userDocUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}?updateMask.fieldPaths=barryState&updateMask.fieldPaths=companiesFoundCount`;
+      const stateResponse = await fetch(userDocUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          fields: {
+            barryState: { stringValue: 'READY' },
+            companiesFoundCount: { integerValue: String(toAdd.length) }
+          }
+        })
+      });
+      if (!stateResponse.ok) {
+        console.error('❌ Failed to set barryState=READY:', await stateResponse.text());
+      }
+    }
 
     const responseTime = Date.now() - startTime;
     const generationTime = responseTime / 1000;
@@ -563,6 +609,31 @@ export const handler = async (event) => {
       }
     } catch (logError) {
       console.error('Failed to log API error:', logError);
+    }
+
+    // Barry state contract: search failed → ERROR. Best-effort merge using the
+    // same REST pattern; never let this mask the original failure.
+    try {
+      const { userId, authToken } = JSON.parse(event.body);
+      const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+      if (userId && authToken && projectId) {
+        const userDocUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}?updateMask.fieldPaths=barryState`;
+        const stateResponse = await fetch(userDocUrl, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            fields: { barryState: { stringValue: 'ERROR' } }
+          })
+        });
+        if (!stateResponse.ok) {
+          console.error('❌ Failed to set barryState=ERROR:', await stateResponse.text());
+        }
+      }
+    } catch (stateError) {
+      console.error('Failed to set barryState=ERROR:', stateError);
     }
 
     const generationTime = (Date.now() - startTime) / 1000;

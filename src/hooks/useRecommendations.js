@@ -14,7 +14,7 @@
  * Field provenance (see PR notes):
  *   id, type        → passed through from the engine unchanged
  *   actionLabel     → REMAPPED from the engine's nested `action.label`
- *   title           → DERIVED: `${actionLabel} — ${entityName}`
+ *   title           → DERIVED by formatRecommendationTitle (src/utils/recommendationCopy.js)
  *   reason          → DERIVED: reasoning.observed (falls back to whyItMatters)
  *   urgency         → DERIVED from priorityWeight (0/1→high, 2→medium, 3→low)
  *   route           → DERIVED from entity id using real app routes
@@ -26,6 +26,7 @@
 
 import { useState, useEffect } from 'react';
 import { generateDashboardRecommendations } from '../utils/recommendationEngine';
+import { formatRecommendationTitle } from '../utils/recommendationCopy';
 
 // priorityWeight → urgency. Weights come from PRIORITY_WEIGHTS in the engine:
 //   0 = critical_contact, 1 = approaching_deadline, 2 = stalled_high_value, 3 = general_gap
@@ -62,17 +63,12 @@ function routeFromEntity(entity) {
 export function normalizeRecommendation(rec) {
   const entity = resolveEntity(rec);
   const actionLabel = rec.action?.label || 'View';
-  const entityName = entity.name || null;
   const reason = rec.reasoning?.observed || rec.reasoning?.whyItMatters || '';
-
-  const title = entityName
-    ? `${actionLabel} — ${entityName}`
-    : (reason || actionLabel);
 
   return {
     id: rec.id ?? (entity.id ? `${rec.type}_${entity.id}` : rec.type),
     type: rec.type ?? null,
-    title,
+    title: formatRecommendationTitle(rec),
     reason,
     urgency: urgencyFromWeight(rec.priorityWeight),
     actionLabel,

@@ -63,7 +63,21 @@ function PriorityCard({ item, T }) {
   );
 }
 
-export default function TodaysPriorities({ recommendations, loading, error, onRetry, T }) {
+function buildMorningSummary(priorityCount, replyCount, matchCount) {
+  const parts = [];
+  parts.push(`${priorityCount} ${priorityCount === 1 ? 'priority' : 'priorities'}`);
+  if (replyCount > 0) {
+    parts.push(`${replyCount} ${replyCount === 1 ? 'reply' : 'replies'} waiting`);
+  }
+  if (matchCount > 0) {
+    parts.push(`${matchCount} strong ${matchCount === 1 ? 'match' : 'matches'} ready`);
+  }
+  if (parts.length === 1) return `Today you have ${parts[0]}.`;
+  if (parts.length === 2) return `Today you have ${parts[0]} and ${parts[1]}.`;
+  return `Today you have ${parts[0]}, ${parts[1]}, and ${parts[2]}.`;
+}
+
+export default function TodaysPriorities({ recommendations, loading, error, onRetry, totalReplies, highFit, T }) {
   const [expanded, setExpanded] = useState(false);
 
   if (loading) {
@@ -154,6 +168,9 @@ export default function TodaysPriorities({ recommendations, loading, error, onRe
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         )}
+      </div>
+      <div style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.5, marginBottom: 14 }}>
+        {buildMorningSummary(recommendations.length, totalReplies || 0, highFit || 0)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
         {visible.map(item => <PriorityCard key={item.id} item={item} T={T} />)}

@@ -12,12 +12,13 @@ import { useActiveUserId, useImpersonation } from '../../context/ImpersonationCo
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
+import BarryChatPanel from '../../components/dashboard/BarryChatPanel';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
 import {
   Search, Filter, ChevronLeft, ChevronRight, ExternalLink,
-  Linkedin, Users, Target, TrendingUp, Calendar, X,
-  Loader, ArrowRight, Star, Mail, UserPlus, RefreshCw,
+  Linkedin, Users, Target, Calendar, X,
+  Loader, ArrowRight, Star, Mail, UserPlus,
   BarChart3, Building2, Check, AlertCircle,
 } from 'lucide-react';
 
@@ -294,111 +295,6 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
           to { transform: translateX(0); }
         }
       `}</style>
-    </div>
-  );
-}
-
-// ─── Barry Panel ─────────────────────────────────────────────────────────────
-function BarryPanel({ companies, T, navigate }) {
-  const highFit = companies.filter(c => (c.fit_score || 0) >= 75).length;
-  const topIndustry = (() => {
-    const counts = {};
-    companies.forEach(c => {
-      const ind = c.industry || 'Unknown';
-      counts[ind] = (counts[ind] || 0) + 1;
-    });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-  })();
-
-  const take = companies.length > 0
-    ? `These are the best companies for you right now. ${highFit} have a fit score above 75%.${topIndustry ? ` I'm seeing a strong pattern in ${topIndustry}.` : ''} Want me to adjust anything or find more in a different industry?`
-    : 'No matches yet. Complete your ICP in RECON and I\'ll start finding companies for you.';
-
-  return (
-    <div style={{
-      background: T.cardBg, border: `1px solid ${T.border}`,
-      borderRadius: 16, padding: 20, height: 'fit-content',
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: '50%', overflow: 'hidden',
-          background: `linear-gradient(135deg,${BRAND.pink},${T.cyan || BRAND.cyan})`,
-          border: `2px solid ${(T.cyan || BRAND.cyan)}50`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: `0 0 20px ${(T.cyan || BRAND.cyan)}50`,
-        }}>
-          <img src={ASSETS.barryAvatar} alt="Barry" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-               onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }} />
-        </div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>Barry is with you</div>
-          <div style={{ fontSize: 11, color: T.textFaint }}>AI SDR</div>
-        </div>
-      </div>
-
-      {/* Barry's Take */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 6 }}>Barry's Take</div>
-        <p style={{ fontSize: 13, color: T.text, lineHeight: 1.55, margin: 0 }}>{take}</p>
-      </div>
-
-      {/* Quick Actions */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.textMuted, marginBottom: 8 }}>Quick Actions</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {[
-            { label: 'Build a Cadence', icon: Mail, path: '/scout/cadences' },
-            { label: 'View My Outreach', icon: TrendingUp, path: '/hunter' },
-            { label: 'Import More Contacts', icon: UserPlus, path: '/scout?tab=company-search' },
-            { label: 'Schedule a Meeting', icon: Calendar, path: null },
-          ].map(({ label, icon: Icon, path }) => (
-            <button
-              key={label}
-              onClick={() => path && navigate(path)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 12px', borderRadius: 8,
-                background: T.surface, border: `1px solid ${T.border}`,
-                color: T.text, fontSize: 12, fontWeight: 500,
-                cursor: path ? 'pointer' : 'default',
-                opacity: path ? 1 : 0.5,
-                textAlign: 'left', width: '100%',
-              }}
-            >
-              <Icon size={14} color={T.textMuted} />
-              {label}
-              {!path && <span style={{ marginLeft: 'auto', fontSize: 10, color: T.textFaint }}>Soon</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Find More */}
-      <button
-        onClick={() => navigate('/scout?tab=daily-leads')}
-        style={{
-          width: '100%', padding: '12px 16px', borderRadius: 10,
-          background: `linear-gradient(135deg, ${BRAND.pink}, ${BRAND.purple})`,
-          color: '#fff', border: 'none', fontSize: 13, fontWeight: 700,
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}
-      >
-        <RefreshCw size={14} /> Find More Companies
-      </button>
-
-      {/* Quote */}
-      <div style={{
-        marginTop: 16, padding: '12px 16px',
-        background: T.surface, borderRadius: 10,
-        borderLeft: `3px solid ${T.accent}`,
-      }}>
-        <p style={{ fontSize: 12, color: T.textMuted, fontStyle: 'italic', margin: 0, lineHeight: 1.5 }}>
-          "You focus on relationships. I'll handle the prospecting. Let's get you more customers."
-        </p>
-        <p style={{ fontSize: 11, color: T.textFaint, margin: '4px 0 0', textAlign: 'right' }}>— Barry</p>
-      </div>
     </div>
   );
 }
@@ -773,6 +669,7 @@ export default function MissionControlDashboardV2() {
     companiesFoundCount,
   } = onboarding;
   const [cadenceReplies, setCadenceReplies] = useState(0);
+  const [kpisLoaded, setKpisLoaded] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
@@ -786,8 +683,8 @@ export default function MissionControlDashboardV2() {
 
   useEffect(() => {
     if (activeUserId) {
-      loadCompanies();
-      loadCadenceReplies();
+      Promise.allSettled([loadCompanies(), loadCadenceReplies()])
+        .then(() => setKpisLoaded(true));
     }
   }, [activeUserId]);
 
@@ -985,10 +882,19 @@ export default function MissionControlDashboardV2() {
         </div>
       </header>
 
+      {/* Barry Chat Panel — full width above the grid */}
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 32px 24px' }}>
+        <BarryChatPanel
+          userId={activeUserId || auth.currentUser?.uid}
+          kpiContext={{ totalMatches, highFit, totalReplies: cadenceReplies }}
+          kpiContextReady={kpisLoaded}
+          T={T}
+        />
+      </div>
+
       {/* Main Layout */}
       <div className="mc2-layout" style={{
         maxWidth: 1400, margin: '0 auto', padding: '24px 32px',
-        display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24,
       }}>
         {/* Left Column: KPIs + Table */}
         <div style={{ minWidth: 0 }}>
@@ -996,7 +902,7 @@ export default function MissionControlDashboardV2() {
           <div style={{ display: 'flex', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
             <KpiCard icon={Target} label="Total Matches" value={totalMatches} color={BRAND.pink} T={T} />
             <KpiCard icon={Star} label="Good Fit (75%+)" value={highFit} color={STATUS.green} T={T} />
-            <KpiCard icon={Mail} label="Replied This Week" value={repliedThisWeek} color={BRAND.cyan} subtitle="From cadences" T={T} />
+            <KpiCard icon={Mail} label="Total Replies" value={repliedThisWeek} color={BRAND.cyan} subtitle="All time" T={T} />
             <KpiCard icon={Calendar} label="Meetings Booked" value="—" color={T.textFaint} subtitle="Coming soon" T={T} />
           </div>
 
@@ -1221,8 +1127,6 @@ export default function MissionControlDashboardV2() {
           </div>
         </div>
 
-        {/* Right Column: Barry Panel */}
-        <BarryPanel companies={companies} T={T} navigate={navigate} />
       </div>
 
       {/* Company Detail Panel */}
@@ -1256,7 +1160,6 @@ export default function MissionControlDashboardV2() {
           to { transform: translateX(0); }
         }
         @media (max-width: 900px) {
-          .mc2-layout { grid-template-columns: 1fr !important; }
           .mc2-table-header, .mc2-table-row {
             grid-template-columns: 1fr !important;
           }

@@ -19,7 +19,7 @@ describe('formatRecommendationTitle', () => {
   it('next_step_overdue with contact name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'next_step_overdue', contactName: 'David Butterfield',
-    }))).toBe('Follow up with David Butterfield');
+    }))).toBe('Complete the next step with David Butterfield');
   });
 
   it('next_step_overdue without contact name', () => {
@@ -45,20 +45,20 @@ describe('formatRecommendationTitle', () => {
   it('stalled_mission_inactive with mission name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'stalled_mission_inactive', missionName: 'Acme Corp',
-    }))).toBe('Review stalled mission with Acme Corp');
+    }))).toBe('Resume mission with Acme Corp');
   });
 
   it('stalled_mission_inactive without mission name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'stalled_mission_inactive',
-    }))).toBe('Review stalled mission');
+    }))).toBe('Resume stalled mission');
   });
 
   // ── stalled_outcome_not_recorded ──
   it('stalled_outcome_not_recorded with contact name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'stalled_outcome_not_recorded', contactName: 'Jordan Lee',
-    }))).toBe('Record outcome for Jordan Lee');
+    }))).toBe('Record the outcome with Jordan Lee');
   });
 
   // ── high_value_no_mission ──
@@ -92,42 +92,42 @@ describe('formatRecommendationTitle', () => {
   it('momentum_channel_switch with contact name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'momentum_channel_switch', contactName: 'Alex Morgan',
-    }))).toBe('Try a new channel with Alex Morgan');
+    }))).toBe('Try another channel with Alex Morgan');
   });
 
   // ── momentum_accelerate ──
   it('momentum_accelerate with contact name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'momentum_accelerate', contactName: 'Angela Phillips',
-    }))).toBe('Follow up with Angela Phillips');
+    }))).toBe('Accelerate outreach with Angela Phillips');
   });
 
   // ── momentum_compress ──
   it('momentum_compress with contact name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'momentum_compress', contactName: 'Chris Park',
-    }))).toBe('Compress sequence for Chris Park');
+    }))).toBe('Close the loop with Chris Park');
   });
 
   // ── strategic_gap_no_engagement ──
   it('strategic_gap_no_engagement with campaign name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'strategic_gap_no_engagement', campaignName: 'Q3 Outreach',
-    }))).toBe('Re-engage contacts in Q3 Outreach');
+    }))).toBe('Begin outreach with Q3 Outreach');
   });
 
   // ── strategic_gap_never_contacted ──
   it('strategic_gap_never_contacted with campaign name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'strategic_gap_never_contacted', campaignName: 'Enterprise Push',
-    }))).toBe('Activate contacts in Enterprise Push');
+    }))).toBe('Start a conversation with Enterprise Push');
   });
 
   // ── strategic_gap_no_outcome ──
   it('strategic_gap_no_outcome with campaign name', () => {
     expect(formatRecommendationTitle(makeRec({
       type: 'strategic_gap_no_outcome', campaignName: 'Summer Campaign',
-    }))).toBe('Record outcomes for Summer Campaign');
+    }))).toBe('Record an outcome for Summer Campaign');
   });
 
   // ── Unknown / future type fallback ──

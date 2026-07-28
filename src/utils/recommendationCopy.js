@@ -13,16 +13,16 @@ export function formatRecommendationTitle(rec) {
 
   switch (type) {
     case 'next_step_overdue':
-      return contactName ? `Follow up with ${contactName}` : 'Complete overdue step';
+      return contactName ? `Complete the next step with ${contactName}` : 'Complete overdue step';
 
     case 'stalled_awaiting_reply':
       return contactName ? `Follow up with ${contactName}` : 'Follow up on stalled conversation';
 
     case 'stalled_mission_inactive':
-      return missionName ? `Review stalled mission with ${missionName}` : 'Review stalled mission';
+      return missionName ? `Resume mission with ${missionName}` : 'Resume stalled mission';
 
     case 'stalled_outcome_not_recorded':
-      return contactName ? `Record outcome for ${contactName}` : 'Record missing outcome';
+      return contactName ? `Record the outcome with ${contactName}` : 'Record missing outcome';
 
     case 'high_value_no_mission':
       return contactName ? `Start a mission with ${contactName}` : 'Start mission for key contact';
@@ -34,22 +34,22 @@ export function formatRecommendationTitle(rec) {
       return contactName ? `Re-engage ${contactName}` : 'Re-engage dormant contact';
 
     case 'momentum_channel_switch':
-      return contactName ? `Try a new channel with ${contactName}` : 'Switch communication channel';
+      return contactName ? `Try another channel with ${contactName}` : 'Switch communication channel';
 
     case 'momentum_accelerate':
-      return contactName ? `Follow up with ${contactName}` : 'Accelerate mission momentum';
+      return contactName ? `Accelerate outreach with ${contactName}` : 'Accelerate mission momentum';
 
     case 'momentum_compress':
-      return contactName ? `Compress sequence for ${contactName}` : 'Compress mission sequence';
+      return contactName ? `Close the loop with ${contactName}` : 'Close the loop';
 
     case 'strategic_gap_no_engagement':
-      return campaignName ? `Re-engage contacts in ${campaignName}` : 'Re-engage campaign contacts';
+      return campaignName ? `Begin outreach with ${campaignName}` : 'Begin campaign outreach';
 
     case 'strategic_gap_never_contacted':
-      return campaignName ? `Activate contacts in ${campaignName}` : 'Activate uncontacted members';
+      return campaignName ? `Start a conversation with ${campaignName}` : 'Start campaign conversations';
 
     case 'strategic_gap_no_outcome':
-      return campaignName ? `Record outcomes for ${campaignName}` : 'Record campaign outcomes';
+      return campaignName ? `Record an outcome for ${campaignName}` : 'Record campaign outcomes';
 
     default: {
       const actionLabel = rec.action?.label || 'View';

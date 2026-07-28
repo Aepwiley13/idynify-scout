@@ -922,7 +922,7 @@ export default function MissionControlDashboardV2() {
               urgency: recommendations[0].urgency,
             } : null,
           }}
-          kpiContextReady={kpisLoaded}
+          kpiContextReady={kpisLoaded && !recsLoading}
           T={T}
         />
       </div>

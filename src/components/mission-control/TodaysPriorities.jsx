@@ -47,16 +47,18 @@ function PriorityCard({ item, T }) {
       }}>
         {item.reason}
       </div>
-      <button
-        onClick={() => navigate(item.route)}
-        style={{
-          fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
-          background: `${T.accent}18`, color: T.accent, border: `1px solid ${T.accent}35`,
-          cursor: 'pointer',
-        }}
-      >
-        {item.actionLabel}
-      </button>
+      {item.route && (
+        <button
+          onClick={() => navigate(item.route)}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
+            background: `${T.accent}18`, color: T.accent, border: `1px solid ${T.accent}35`,
+            cursor: 'pointer',
+          }}
+        >
+          {item.actionLabel}
+        </button>
+      )}
     </div>
   );
 }

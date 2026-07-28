@@ -13,6 +13,10 @@ import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
 import BarryChatPanel from '../../components/dashboard/BarryChatPanel';
+import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
+import RecentOutreachActivity from '../../components/mission-control/RecentOutreachActivity';
+import HunterReadinessBanner from '../../components/mission-control/HunterReadinessBanner';
+import useRecommendations from '../../hooks/useRecommendations';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
 import {
@@ -670,6 +674,10 @@ export default function MissionControlDashboardV2() {
   } = onboarding;
   const [cadenceReplies, setCadenceReplies] = useState(0);
   const [kpisLoaded, setKpisLoaded] = useState(false);
+  const [subscriptionTier, setSubscriptionTier] = useState(null);
+  const [acceptedCompanies, setAcceptedCompanies] = useState(0);
+  const [cadencesSent, setCadencesSent] = useState(0);
+  const { recommendations, loading: recsLoading, error: recsError, retry: recsRetry } = useRecommendations(activeUserId);
 
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
@@ -685,8 +693,26 @@ export default function MissionControlDashboardV2() {
     if (activeUserId) {
       Promise.allSettled([loadCompanies(), loadCadenceReplies()])
         .then(() => setKpisLoaded(true));
+      loadHunterReadinessData();
     }
   }, [activeUserId]);
+
+  const loadHunterReadinessData = async () => {
+    try {
+      const userId = activeUserId || auth.currentUser?.uid;
+      if (!userId) return;
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) setSubscriptionTier(userDoc.data().subscriptionTier || 'starter');
+      const companiesSnap = await getDocs(
+        query(collection(db, 'users', userId, 'companies'), where('status', '==', 'accepted'))
+      );
+      setAcceptedCompanies(companiesSnap.size);
+      const cadencesSnap = await getDocs(collection(db, 'users', userId, 'cadences'));
+      let sent = 0;
+      cadencesSnap.forEach(d => { sent += d.data().sentCount || 0; });
+      setCadencesSent(sent);
+    } catch { /* best effort */ }
+  };
 
   const loadCadenceReplies = async () => {
     try {
@@ -886,11 +912,23 @@ export default function MissionControlDashboardV2() {
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 32px 24px' }}>
         <BarryChatPanel
           userId={activeUserId || auth.currentUser?.uid}
-          kpiContext={{ totalMatches, highFit, totalReplies: cadenceReplies }}
-          kpiContextReady={kpisLoaded}
+          kpiContext={{
+            totalMatches,
+            highFit,
+            totalReplies: cadenceReplies,
+            topPriority: (!recsError && recommendations[0]) ? {
+              title: recommendations[0].title,
+              reason: recommendations[0].reason,
+              urgency: recommendations[0].urgency,
+            } : null,
+          }}
+          kpiContextReady={kpisLoaded && !recsLoading}
           T={T}
         />
       </div>
+
+      {/* Today's Priorities */}
+      <TodaysPriorities recommendations={recommendations} loading={recsLoading} error={recsError} onRetry={recsRetry} T={T} />
 
       {/* Main Layout */}
       <div className="mc2-layout" style={{
@@ -1128,6 +1166,18 @@ export default function MissionControlDashboardV2() {
         </div>
 
       </div>
+
+      {/* Recent Outreach Activity */}
+      <RecentOutreachActivity userId={activeUserId || auth.currentUser?.uid} T={T} />
+
+      {/* Hunter Readiness Banner */}
+      <HunterReadinessBanner
+        acceptedCompanies={acceptedCompanies}
+        totalReplies={cadenceReplies}
+        cadencesSent={cadencesSent}
+        subscriptionTier={subscriptionTier}
+        T={T}
+      />
 
       {/* Company Detail Panel */}
       {selectedCompany && (

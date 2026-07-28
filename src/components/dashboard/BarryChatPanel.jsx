@@ -27,6 +27,30 @@ import { buildContextStack } from '../../utils/barryContextStack';
 import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { BRAND, STATUS } from '../../theme/tokens';
+
+const DEFAULT_TOKENS = {
+  appBg:     '#000000',
+  cardBg:    '#110e1e',
+  cardBg2:   '#0b0818',
+  surface:   '#ffffff08',
+  surface2:  '#ffffff0d',
+  border:    '#ffffff0d',
+  border2:   '#ffffff18',
+  text:      '#f0eaff',
+  textMuted: '#9080b0',
+  textFaint: '#4a3870',
+  textGhost: '#2a1a50',
+  input:     '#ffffff08',
+  accent:    BRAND.pink,
+  accentBg:  `${BRAND.pink}15`,
+  accentBdr: `${BRAND.pink}35`,
+  cyan:      BRAND.cyan,
+  cyanBg:    `${BRAND.cyan}12`,
+  cyanBdr:   `${BRAND.cyan}35`,
+  isDark:    true,
+  statBg:    '#ffffff06',
+};
 
 // ── Conversation persistence helpers ───────────────────────────────────────────
 
@@ -166,19 +190,19 @@ function isActionIntent(message) {
 const MODE_CONFIG = {
   PRIORITIZE: {
     label: 'PRIORITIZE',
-    pillClass: 'bg-red-500/20 text-red-400 border-red-500/30',
-    dotClass: 'bg-red-500'
+    pillStyle: { background: `${STATUS.red}33`, color: STATUS.red, border: `1px solid ${STATUS.red}4d` },
+    dotColor: STATUS.red,
   },
   SUGGEST: {
     label: 'SUGGEST',
-    pillClass: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-    dotClass: 'bg-teal-500'
+    pillStyle: { background: `${BRAND.cyan}33`, color: BRAND.cyan, border: `1px solid ${BRAND.cyan}4d` },
+    dotColor: BRAND.cyan,
   },
   GROWTH: {
     label: 'GROWTH',
-    pillClass: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    dotClass: 'bg-purple-500'
-  }
+    pillStyle: { background: `${BRAND.purple}33`, color: BRAND.purple, border: `1px solid ${BRAND.purple}4d` },
+    dotColor: BRAND.purple,
+  },
 };
 
 const MODES = ['SUGGEST', 'PRIORITIZE', 'GROWTH'];
@@ -216,33 +240,34 @@ function PipelineMoveRow({ move, onExecute }) {
   };
 
   return (
-    <div className="flex items-start gap-2 px-3 py-2 bg-gray-800/40 border border-gray-700/40 rounded-xl">
+    <div className="flex items-start gap-2 px-3 py-2 rounded-xl" style={{ background: `${BRAND.navy}66`, border: `1px solid ${BRAND.navy}66` }}>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-100 truncate">{move.contact_name}</div>
-        <div className="text-xs text-gray-400 mt-0.5">
-          <span className="text-gray-500">{stageLabels[move.current_stage] || move.current_stage}</span>
-          <span className="mx-1 text-gray-600">→</span>
-          <span className="text-cyan-400">{stageLabels[move.recommended_stage] || move.recommended_stage}</span>
-          {move.reason && <span className="ml-2 text-gray-500">· {move.reason}</span>}
+        <div className="text-sm font-medium truncate" style={{ color: '#f0eaff' }}>{move.contact_name}</div>
+        <div className="text-xs mt-0.5" style={{ color: '#9080b0' }}>
+          <span style={{ color: '#4a3870' }}>{stageLabels[move.current_stage] || move.current_stage}</span>
+          <span className="mx-1" style={{ color: '#4a3870' }}>→</span>
+          <span style={{ color: BRAND.cyan }}>{stageLabels[move.recommended_stage] || move.recommended_stage}</span>
+          {move.reason && <span className="ml-2" style={{ color: '#4a3870' }}>· {move.reason}</span>}
         </div>
       </div>
       <div className="flex-shrink-0">
         {status === 'idle' && (
           <button
             onClick={handleMove}
-            className="px-2.5 py-1 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 rounded-lg text-xs font-mono transition-all"
+            className="px-2.5 py-1 rounded-lg text-xs font-mono transition-all"
+            style={{ background: `${BRAND.cyan}26`, border: `1px solid ${BRAND.cyan}4d`, color: BRAND.cyan }}
           >
             Move →
           </button>
         )}
         {status === 'loading' && (
-          <span className="text-xs text-gray-500 font-mono">Moving...</span>
+          <span className="text-xs font-mono" style={{ color: '#4a3870' }}>Moving...</span>
         )}
         {status === 'done' && (
-          <span className="text-xs text-emerald-400 font-mono">✓ Done</span>
+          <span className="text-xs font-mono" style={{ color: STATUS.green }}>✓ Done</span>
         )}
         {status === 'error' && (
-          <span className="text-xs text-red-400 font-mono">✗ Failed</span>
+          <span className="text-xs font-mono" style={{ color: STATUS.red }}>✗ Failed</span>
         )}
       </div>
     </div>
@@ -251,7 +276,7 @@ function PipelineMoveRow({ move, onExecute }) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function BarryChatPanel({ userId }) {
+export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextReady = false, T = DEFAULT_TOKENS }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('SUGGEST');
@@ -283,7 +308,7 @@ export default function BarryChatPanel({ userId }) {
     }
   }, [inputValue]);
 
-  // ── On mount: build context stack + load opening brief ────────────────────
+  // ── On mount: build context stack + restore conversation ──────────────────
 
   useEffect(() => {
     const hasVisited = sessionStorage.getItem('barry_mission_visited');
@@ -295,6 +320,16 @@ export default function BarryChatPanel({ userId }) {
 
     initPanel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Gate orientation brief on KPI readiness ──────────────────────────────
+
+  const hasRequestedOrientation = useRef(false);
+
+  useEffect(() => {
+    if (!userId || !kpiContextReady || hasRequestedOrientation.current) return;
+    hasRequestedOrientation.current = true;
+    loadOrientationBrief();
+  }, [userId, kpiContextReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-save conversation to Firestore whenever messages change ───────────
 
@@ -339,17 +374,19 @@ export default function BarryChatPanel({ userId }) {
     // Unblock the UI immediately — user can start typing while brief loads
     setLoading(false);
 
-    // Build context stack + load brief in the background (non-blocking)
-    let stack = null;
+    // Build context stack in the background (non-blocking)
     try {
-      stack = await buildContextStack(user.uid);
+      const stack = await buildContextStack(user.uid);
       setContextStack(stack);
     } catch (err) {
       console.warn('[BarryChatPanel] Context stack build failed (non-fatal):', err.message);
     }
+  }
 
-    // Load the opening brief without blocking the chat input
-    loadOpeningBrief(user, stack);
+  async function loadOrientationBrief() {
+    const user = getEffectiveUser();
+    if (!user) return;
+    loadOpeningBrief(user, contextStack);
   }
 
   // ── Opening brief (orientation) ───────────────────────────────────────────
@@ -386,7 +423,7 @@ export default function BarryChatPanel({ userId }) {
       const res = await fetch('/.netlify/functions/barryOrientationBrief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, authToken }),
+        body: JSON.stringify({ userId, authToken, context: kpiContext }),
       });
 
       const data = await res.json();
@@ -1104,10 +1141,12 @@ export default function BarryChatPanel({ userId }) {
 
       {/* ── Panel Header (always visible) ── */}
       <div
-        className="flex items-center justify-between px-5 py-4 bg-black/50 backdrop-blur-xl border border-cyan-500/20 cursor-pointer select-none"
+        className="flex items-center justify-between px-5 py-4 backdrop-blur-xl cursor-pointer select-none"
         style={{
+          background: `${T.appBg}80`,
+          border: `1px solid ${T.cyanBdr}`,
           borderRadius: isCollapsed ? '1rem' : '1rem 1rem 0 0',
-          boxShadow: '0 0 20px rgba(6, 182, 212, 0.1)'
+          boxShadow: `0 0 20px ${T.cyanBg}`,
         }}
         onClick={() => setIsCollapsed(prev => !prev)}
       >
@@ -1117,7 +1156,7 @@ export default function BarryChatPanel({ userId }) {
             {briefLoading && !brief ? (
               <>
                 <span className="text-4xl opacity-60 animate-pulse">🐻</span>
-                <div className="absolute inset-0 rounded-full border-2 border-cyan-400/40 animate-ping" />
+                <div className="absolute inset-0 rounded-full animate-ping" style={{ border: `2px solid ${T.cyanBdr}` }} />
               </>
             ) : (
               <span className="text-4xl">🐻</span>
@@ -1126,33 +1165,34 @@ export default function BarryChatPanel({ userId }) {
 
           <div>
             <div className="flex items-center flex-wrap gap-2">
-              <span className="text-white font-semibold text-sm font-mono">Barry</span>
+              <span className="font-semibold text-sm font-mono" style={{ color: T.text }}>Barry</span>
 
               {/* Mode badge — clickable to cycle modes */}
               <button
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-mono cursor-pointer transition-opacity hover:opacity-80 ${modeConfig.pillClass}`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono cursor-pointer transition-opacity hover:opacity-80"
+                style={modeConfig.pillStyle}
                 onClick={handleModeClick}
                 title="Click to change Barry's mode"
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${modeConfig.dotClass}`} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: modeConfig.dotColor }} />
                 {modeConfig.label}
               </button>
             </div>
 
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs text-cyan-400 font-mono">Online</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: STATUS.green }} />
+              <span className="text-xs font-mono" style={{ color: T.cyan }}>Online</span>
 
               {/* Collapsed: show last message preview */}
               {isCollapsed && lastMessage && lastMessage.content && (
-                <span className="text-xs text-gray-400 truncate max-w-xs ml-1">
+                <span className="text-xs truncate max-w-xs ml-1" style={{ color: T.textMuted }}>
                   {lastMessage.content.length > 50
                     ? lastMessage.content.slice(0, 50) + '...'
                     : lastMessage.content}
                 </span>
               )}
               {isCollapsed && briefLoading && !brief && (
-                <span className="text-xs text-gray-500 font-mono animate-pulse ml-1">Loading...</span>
+                <span className="text-xs font-mono animate-pulse ml-1" style={{ color: T.textFaint }}>Loading...</span>
               )}
             </div>
           </div>
@@ -1160,7 +1200,8 @@ export default function BarryChatPanel({ userId }) {
 
         {/* Right: collapse toggle */}
         <button
-          className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all text-lg font-mono flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-lg transition-all text-lg font-mono flex-shrink-0"
+          style={{ color: T.textMuted }}
           onClick={(e) => { e.stopPropagation(); setIsCollapsed(prev => !prev); }}
           aria-label={isCollapsed ? 'Expand Barry panel' : 'Collapse Barry panel'}
         >
@@ -1171,20 +1212,27 @@ export default function BarryChatPanel({ userId }) {
       {/* ── Panel Body (collapsible) ── */}
       {!isCollapsed && (
         <div
-          className="bg-black/40 backdrop-blur-xl border-x border-b border-cyan-500/20 overflow-hidden"
-          style={{ borderRadius: '0 0 1rem 1rem', boxShadow: '0 10px 30px rgba(0,0,0,0.4)' }}
+          className="backdrop-blur-xl overflow-hidden"
+          style={{
+            background: `${T.appBg}66`,
+            borderLeft: `1px solid ${T.cyanBdr}`,
+            borderRight: `1px solid ${T.cyanBdr}`,
+            borderBottom: `1px solid ${T.cyanBdr}`,
+            borderRadius: '0 0 1rem 1rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+          }}
         >
 
           {/* Opening Brief */}
           <div className="px-5 pt-5 pb-4">
             {briefLoading && !brief ? (
               <div className="space-y-2" aria-busy="true" aria-label="Barry is thinking">
-                <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-3/4" />
-                <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-full" />
-                <div className="h-4 bg-gray-700/50 rounded-full animate-pulse w-2/3" />
+                <div className="h-4 rounded-full animate-pulse w-3/4" style={{ background: T.surface2 }} />
+                <div className="h-4 rounded-full animate-pulse w-full" style={{ background: T.surface2 }} />
+                <div className="h-4 rounded-full animate-pulse w-2/3" style={{ background: T.surface2 }} />
               </div>
             ) : (
-              <div className="text-gray-200 text-sm leading-relaxed">
+              <div className="text-sm leading-relaxed" style={{ color: T.text }}>
                 <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
                   {brief || 'Your pipeline is ready. Tell me what you want to work on.'}
                 </ReactMarkdown>
@@ -1198,7 +1246,8 @@ export default function BarryChatPanel({ userId }) {
               {suggestedPrompts.map((prompt, i) => (
                 <button
                   key={i}
-                  className="px-3 py-1.5 text-xs font-mono bg-black/40 hover:bg-cyan-500/10 border border-gray-700/60 hover:border-cyan-500/30 text-gray-400 hover:text-cyan-300 rounded-lg transition-all"
+                  className="px-3 py-1.5 text-xs font-mono rounded-lg transition-all"
+                  style={{ background: `${T.appBg}66`, border: `1px solid ${T.border2}`, color: T.textMuted }}
                   onClick={() => handlePromptClick(prompt)}
                 >
                   {prompt}
@@ -1210,7 +1259,7 @@ export default function BarryChatPanel({ userId }) {
           {/* Conversation Thread */}
           {(hasConversation || sending) && (
             <>
-              <div className="mx-5 border-t border-cyan-500/10" />
+              <div className="mx-5" style={{ borderTop: `1px solid ${T.cyanBg}` }} />
               <div
                 ref={threadRef}
                 className="px-5 py-4 overflow-y-auto flex flex-col gap-3"
@@ -1224,12 +1273,9 @@ export default function BarryChatPanel({ userId }) {
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                        <div className="text-sm px-3 py-2 leading-relaxed bg-emerald-500/10 text-emerald-200 border border-emerald-500/25 rounded-2xl rounded-tl-sm">
+                        <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: `${STATUS.green}1a`, color: `${STATUS.green}cc`, border: `1px solid ${STATUS.green}40` }}>
                           ✓ Mission created for <strong>{msg.contactName}</strong>. Draft is ready in Active Missions.{' '}
-                          <a
-                            href="/hunter"
-                            className="underline underline-offset-2 text-emerald-300 hover:text-emerald-100 transition-colors"
-                          >
+                          <a href="/hunter" className="underline underline-offset-2 transition-colors" style={{ color: STATUS.green }}>
                             View in Hunter →
                           </a>
                         </div>
@@ -1242,9 +1288,9 @@ export default function BarryChatPanel({ userId }) {
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                        <div className="text-sm px-3 py-3 leading-relaxed bg-cyan-500/10 text-cyan-200 border border-cyan-500/30 rounded-2xl rounded-tl-sm max-w-[88%]">
+                        <div className="text-sm px-3 py-3 leading-relaxed rounded-2xl rounded-tl-sm max-w-[88%]" style={{ background: T.cyanBg, color: T.cyan, border: `1px solid ${T.cyanBdr}` }}>
                           {msg.responseText && (
-                            <div className="mb-3 text-gray-200">{msg.responseText}</div>
+                            <div className="mb-3" style={{ color: T.text }}>{msg.responseText}</div>
                           )}
                           <div className="flex gap-2 flex-wrap">
                             <button
@@ -1253,7 +1299,8 @@ export default function BarryChatPanel({ userId }) {
                                 setPendingPipelineAction(null);
                                 await executePipelineAction(saved);
                               }}
-                              className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-mono transition-all"
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+                              style={{ background: `${T.cyan}33`, border: `1px solid ${T.cyan}66`, color: T.cyan }}
                             >
                               {msg.confirmLabel || 'Confirm →'}
                             </button>
@@ -1267,7 +1314,8 @@ export default function BarryChatPanel({ userId }) {
                                   angles: []
                                 }]);
                               }}
-                              className="px-3 py-1.5 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/40 text-gray-400 rounded-lg text-xs font-mono transition-all"
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+                              style={{ background: T.surface2, border: `1px solid ${T.border2}`, color: T.textMuted }}
                             >
                               Not yet
                             </button>
@@ -1279,20 +1327,17 @@ export default function BarryChatPanel({ userId }) {
 
                   // ── Pipeline action result bubble ──
                   if (msg.role === 'pipeline_result') {
+                    const resultColor = msg.success ? STATUS.green : STATUS.red;
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                        <div className={`text-sm px-3 py-2 leading-relaxed border rounded-2xl rounded-tl-sm ${
-                          msg.success
-                            ? 'bg-emerald-500/10 text-emerald-200 border-emerald-500/25'
-                            : 'bg-red-500/10 text-red-300 border-red-500/25'
-                        }`}>
+                        <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: `${resultColor}1a`, color: `${resultColor}cc`, border: `1px solid ${resultColor}40` }}>
                           {msg.success ? '✓ ' : '✗ '}{msg.text}
                           {msg.success && msg.action_type === 'engage_contact' && (
-                            <>{' '}<a href="/hunter" className="underline text-emerald-300 hover:text-emerald-100 transition-colors">Open Hunter →</a></>
+                            <>{' '}<a href="/hunter" className="underline transition-colors" style={{ color: STATUS.green }}>Open Hunter →</a></>
                           )}
                           {msg.success && msg.action_type === 'move_stage' && msg.text?.includes('Sniper') && (
-                            <>{' '}<a href="/sniper" className="underline text-emerald-300 hover:text-emerald-100 transition-colors">Open Sniper →</a></>
+                            <>{' '}<a href="/sniper" className="underline transition-colors" style={{ color: STATUS.green }}>Open Sniper →</a></>
                           )}
                         </div>
                       </div>
@@ -1306,7 +1351,7 @@ export default function BarryChatPanel({ userId }) {
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
                         <div className="flex flex-col gap-2 max-w-[92%]">
                           {msg.responseText && (
-                            <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                            <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: T.cardBg, color: T.text, border: `1px solid ${T.border}` }}>
                               {msg.responseText}
                             </div>
                           )}
@@ -1327,18 +1372,20 @@ export default function BarryChatPanel({ userId }) {
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                        <div className="text-sm px-3 py-3 leading-relaxed bg-cyan-500/10 text-cyan-200 border border-cyan-500/30 rounded-2xl rounded-tl-sm max-w-[88%]">
+                        <div className="text-sm px-3 py-3 leading-relaxed rounded-2xl rounded-tl-sm max-w-[88%]" style={{ background: T.cyanBg, color: T.cyan, border: `1px solid ${T.cyanBdr}` }}>
                           <div className="mb-3">📧 {msg.summary}</div>
                           <div className="flex gap-2">
                             <button
                               onClick={async () => { const saved = pendingAction; setPendingAction(null); await executeConfirmedAction(saved); }}
-                              className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-mono transition-all"
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+                              style={{ background: `${T.cyan}33`, border: `1px solid ${T.cyan}66`, color: T.cyan }}
                             >
                               Yes, send →
                             </button>
                             <button
                               onClick={() => { setPendingAction(null); setMessages(prev => [...prev, { role: 'assistant', content: 'Got it — cancelled.', has_message_angles: false, angles: [] }]); }}
-                              className="px-3 py-1.5 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/40 text-gray-400 rounded-lg text-xs font-mono transition-all"
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+                              style={{ background: T.surface2, border: `1px solid ${T.border2}`, color: T.textMuted }}
                             >
                               Cancel
                             </button>
@@ -1350,14 +1397,11 @@ export default function BarryChatPanel({ userId }) {
 
                   // ── Action result bubble ──
                   if (msg.role === 'action_result') {
+                    const resultColor = msg.success ? STATUS.green : STATUS.red;
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                        <div className={`text-sm px-3 py-2 leading-relaxed border rounded-2xl rounded-tl-sm ${
-                          msg.success
-                            ? 'bg-emerald-500/10 text-emerald-200 border-emerald-500/25'
-                            : 'bg-red-500/10 text-red-300 border-red-500/25'
-                        }`}>
+                        <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: `${resultColor}1a`, color: `${resultColor}cc`, border: `1px solid ${resultColor}40` }}>
                           {msg.success ? '✓ ' : '✗ '}{msg.text}
                         </div>
                       </div>
@@ -1370,14 +1414,14 @@ export default function BarryChatPanel({ userId }) {
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
                         <div className="flex flex-col gap-1.5 max-w-[88%]">
-                          <div className="text-xs text-gray-500 font-mono px-1">Recent inbox</div>
+                          <div className="text-xs font-mono px-1" style={{ color: T.textFaint }}>Recent inbox</div>
                           {msg.threads.length === 0 ? (
-                            <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-400 border border-gray-700/50 rounded-2xl rounded-tl-sm">Inbox is empty.</div>
+                            <div className="text-sm px-3 py-2 rounded-2xl rounded-tl-sm" style={{ background: T.cardBg, color: T.textMuted, border: `1px solid ${T.border}` }}>Inbox is empty.</div>
                           ) : msg.threads.map((thread, ti) => (
-                            <div key={ti} className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-xl">
-                              <div className="font-medium text-gray-100 truncate">{thread.subject || '(no subject)'}</div>
-                              <div className="text-xs text-gray-400 mt-0.5 truncate">{thread.from}</div>
-                              {thread.snippet && <div className="text-xs text-gray-500 mt-1 line-clamp-1">{thread.snippet}</div>}
+                            <div key={ti} className="text-sm px-3 py-2 rounded-xl" style={{ background: T.cardBg, color: T.text, border: `1px solid ${T.border}` }}>
+                              <div className="font-medium truncate" style={{ color: T.text }}>{thread.subject || '(no subject)'}</div>
+                              <div className="text-xs mt-0.5 truncate" style={{ color: T.textMuted }}>{thread.from}</div>
+                              {thread.snippet && <div className="text-xs mt-1 line-clamp-1" style={{ color: T.textFaint }}>{thread.snippet}</div>}
                             </div>
                           ))}
                         </div>
@@ -1391,17 +1435,17 @@ export default function BarryChatPanel({ userId }) {
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
                         <div className="flex flex-col gap-1.5 max-w-[88%]">
-                          <div className="text-xs text-gray-500 font-mono px-1">Upcoming calendar</div>
+                          <div className="text-xs font-mono px-1" style={{ color: T.textFaint }}>Upcoming calendar</div>
                           {msg.events.length === 0 ? (
-                            <div className="text-sm px-3 py-2 bg-gray-800/60 text-gray-400 border border-gray-700/50 rounded-2xl rounded-tl-sm">Nothing scheduled.</div>
+                            <div className="text-sm px-3 py-2 rounded-2xl rounded-tl-sm" style={{ background: T.cardBg, color: T.textMuted, border: `1px solid ${T.border}` }}>Nothing scheduled.</div>
                           ) : msg.events.slice(0, 5).map((event, ei) => (
-                            <div key={ei} className="text-sm px-3 py-2 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-xl">
-                              <div className="font-medium text-gray-100">{event.title}</div>
-                              <div className="text-xs text-gray-400 mt-0.5">
+                            <div key={ei} className="text-sm px-3 py-2 rounded-xl" style={{ background: T.cardBg, color: T.text, border: `1px solid ${T.border}` }}>
+                              <div className="font-medium" style={{ color: T.text }}>{event.title}</div>
+                              <div className="text-xs mt-0.5" style={{ color: T.textMuted }}>
                                 {event.start ? new Date(event.start).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Time TBD'}
                               </div>
                               {event.attendees?.length > 0 && (
-                                <div className="text-xs text-gray-500 mt-0.5">With: {event.attendees.join(', ')}</div>
+                                <div className="text-xs mt-0.5" style={{ color: T.textFaint }}>With: {event.attendees.join(', ')}</div>
                               )}
                             </div>
                           ))}
@@ -1415,9 +1459,9 @@ export default function BarryChatPanel({ userId }) {
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                        <div className="text-sm px-3 py-2 leading-relaxed bg-amber-500/10 text-amber-200 border border-amber-500/25 rounded-2xl rounded-tl-sm">
+                        <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: `${STATUS.amber}1a`, color: `${STATUS.amber}cc`, border: `1px solid ${STATUS.amber}40` }}>
                           {msg.text}{' '}
-                          <a href="/basecamp?tab=integrations" className="underline text-amber-300 hover:text-amber-100 transition-colors">
+                          <a href="/basecamp?tab=integrations" className="underline transition-colors" style={{ color: STATUS.amber }}>
                             Connect {msg.service} →
                           </a>
                         </div>
@@ -1428,7 +1472,7 @@ export default function BarryChatPanel({ userId }) {
                   if (msg.role === 'user') {
                     return (
                       <div key={i} className="flex gap-2 flex-row-reverse">
-                        <div className="text-sm px-3 py-2 max-w-[82%] leading-relaxed bg-cyan-500/20 text-cyan-100 border border-cyan-500/30 rounded-2xl rounded-tr-sm">
+                        <div className="text-sm px-3 py-2 max-w-[82%] leading-relaxed rounded-2xl rounded-tr-sm" style={{ background: `${T.cyan}33`, color: T.text, border: `1px solid ${T.cyanBdr}` }}>
                           {msg.content}
                         </div>
                       </div>
@@ -1442,7 +1486,7 @@ export default function BarryChatPanel({ userId }) {
                       <div className="flex flex-col gap-2 max-w-[88%]">
                         {/* Text portion — always shown if present */}
                         {msg.content && (
-                          <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                          <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: T.cardBg, color: T.text, border: `1px solid ${T.border}` }}>
                             <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
                               {msg.content}
                             </ReactMarkdown>
@@ -1477,11 +1521,11 @@ export default function BarryChatPanel({ userId }) {
                 {sending && (
                   <div className="flex gap-2" aria-label="Barry is typing">
                     <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
-                    <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                    <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
                       <div className="flex gap-1 items-center">
-                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '120ms' }} />
-                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '240ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: T.textMuted, animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: T.textMuted, animationDelay: '120ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: T.textMuted, animationDelay: '240ms' }} />
                       </div>
                     </div>
                   </div>
@@ -1491,7 +1535,7 @@ export default function BarryChatPanel({ userId }) {
           )}
 
           {/* Input Area */}
-          <div className="px-5 py-4 border-t border-cyan-500/10">
+          <div className="px-5 py-4" style={{ borderTop: `1px solid ${T.cyanBg}` }}>
             <div className="flex gap-2">
               <textarea
                 ref={inputRef}
@@ -1506,14 +1550,15 @@ export default function BarryChatPanel({ userId }) {
                 placeholder="Tell me what you want to work on..."
                 disabled={sending || loading}
                 aria-label="Message Barry"
-                style={{ resize: 'none', overflowY: 'auto' }}
-                className="flex-1 min-w-0 bg-black/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50 font-mono leading-relaxed"
+                style={{ resize: 'none', overflowY: 'auto', background: `${T.appBg}80`, border: `1px solid ${T.border2}`, color: T.text }}
+                className="flex-1 min-w-0 rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors disabled:opacity-50 font-mono leading-relaxed"
               />
               <button
                 onClick={() => sendMessage(inputValue)}
                 disabled={sending || loading || !inputValue.trim()}
                 aria-label="Send message"
-                className="flex-shrink-0 px-4 py-2.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 rounded-xl text-sm font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-mono transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: `${T.cyan}33`, border: `1px solid ${T.cyanBdr}`, color: T.cyan }}
               >
                 Send →
               </button>

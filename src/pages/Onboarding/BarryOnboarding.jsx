@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import ICPConfirmationCard from '../../components/onboarding/ICPConfirmationCard';
@@ -348,6 +348,23 @@ export default function BarryOnboarding() {
         { merge: true }
       );
 
+      // Mark onboarding complete on the user doc and set Barry's initial
+      // execution state so Mission Control can read where Barry is. The
+      // search-companies function flips barryState to READY (or ERROR) once
+      // the background search below resolves.
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          onboardingComplete: true,
+          onboardingCompletedAt: serverTimestamp(),
+          onboardingSource: 'barry_onboarding',
+          barryState: 'SEARCHING',
+          companiesFoundCount: 0,
+          hasSeenMCWelcome: false
+        },
+        { merge: true }
+      );
+
       // Trigger immediate lead search in the background
       const authToken = await user.getIdToken();
       fetch('/.netlify/functions/search-companies', {
@@ -385,9 +402,10 @@ export default function BarryOnboarding() {
       ];
       setConversationHistory(finalHistory);
 
-      // Navigate to Scout Daily Leads after a brief delay
+      // Navigate to Mission Control after a brief delay — users watch Barry
+      // work (barryState) from there.
       setTimeout(() => {
-        navigate('/scout', { state: { activeTab: 'daily-leads' } });
+        navigate('/mission-control-v2');
       }, 2500);
 
     } catch (error) {

@@ -64,8 +64,25 @@ export const handler = async (event) => {
     const body = JSON.parse(event.body);
     userId = body.userId;
     const authToken = body.authToken;
+    const context = body.context;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
+
+    // ── Normalize client-supplied KPI context at the boundary ──────────────────
+    // These are contextual display values for an orientation message, not
+    // authoritative analytics. Never insert raw client values into the prompt.
+    // Callers that omit `context` resolve every field to null → 'unknown'.
+    const normalizeCount = (value) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) return null;
+      return Math.floor(parsed);
+    };
+
+    const dashboardContext = {
+      totalMatches: normalizeCount(context?.totalMatches),
+      highFit: normalizeCount(context?.highFit),
+      totalReplies: normalizeCount(context?.totalReplies),
+    };
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
     await verifyAuthToken(authToken, userId);
@@ -129,12 +146,22 @@ export const handler = async (event) => {
     const orientationPrompt = `You are Barry, Idynify's AI sales intelligence assistant. Generate a 2-3 sentence orientation message for a user opening Mission Control.
 
 CURRENT PLATFORM STATE:
+- Total companies matching ICP: ${dashboardContext.totalMatches ?? 'unknown'}
+- High confidence matches (75%+ fit): ${dashboardContext.highFit ?? 'unknown'}
+- Total replies received: ${dashboardContext.totalReplies ?? 'unknown'}
 - ${reconLine}
 - ${missionsLine}
 - ${leadsLine}
 
 RULES:
 - Be specific to the numbers. Name stale contacts if available.
+- Open with the strongest AVAILABLE signal, in this priority order:
+  1. Replies — if "Total replies received" > 0, someone responded and deserves attention now.
+  2. High-fit matches — else if "High confidence matches" > 0, strong opportunities are ready to review.
+  3. Total matches — else if "Total companies matching ICP" > 0, the pipeline is building.
+  4. Otherwise, lead with the existing RECON, mission, and lead context.
+  5. Generic welcome only when no meaningful signal exists at all.
+- Do not describe any dashboard total as "new", "today", "this week", or "overnight". These are all-time account totals unless a time-bounded value is explicitly provided.
 - If RECON is below 80%, mention the gap and its effect in one short clause.
 - No "Welcome back!" or generic greetings. Lead with the most actionable signal.
 - Confident and direct. Field commander reading the board.

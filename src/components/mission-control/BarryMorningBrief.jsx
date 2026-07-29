@@ -1,10 +1,10 @@
 import ReactMarkdown from 'react-markdown';
 import { BRAND, ASSETS } from '../../theme/tokens';
-import { Loader, AlertCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, MessageSquare } from 'lucide-react';
 
 function SkeletonBrief({ T }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="mc-skeleton-pulse" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ width: '90%', height: 12, borderRadius: 6, background: T.surface2 }} />
       <div style={{ width: '70%', height: 12, borderRadius: 6, background: T.surface2 }} />
       <div style={{ width: '50%', height: 10, borderRadius: 6, background: T.surface2, marginTop: 4 }} />
@@ -64,7 +64,10 @@ export default function BarryMorningBrief({ orientation, openBarry, T }) {
           </div>
         </div>
         {isLoading && (
-          <Loader size={14} color={T.textMuted} className="animate-spin" style={{ flexShrink: 0 }} />
+          <div className="mc-skeleton-pulse" style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: T.textMuted, flexShrink: 0,
+          }} />
         )}
       </div>
 

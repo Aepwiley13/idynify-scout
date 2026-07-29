@@ -14,6 +14,7 @@ import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
 import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
 import RecentOutreachActivity from '../../components/mission-control/RecentOutreachActivity';
+import HunterReadinessBanner from '../../components/mission-control/HunterReadinessBanner';
 import MissionControlRightRail from '../../components/mission-control/MissionControlRightRail';
 import useRecommendations from '../../hooks/useRecommendations';
 import '../../components/mission-control/MissionControlLayout.css';
@@ -1144,13 +1145,18 @@ export default function MissionControlDashboardV2({ orientation, openBarry, setB
           openBarry={openBarry}
           recommendations={recommendations}
           recsLoading={recsLoading}
-          acceptedCompanies={acceptedCompanies}
-          cadenceReplies={cadenceReplies}
-          cadencesSent={cadencesSent}
-          subscriptionTier={subscriptionTier}
           T={T}
         />
       </div>
+
+      {/* Hunter Readiness Banner — full-width below the grid */}
+      <HunterReadinessBanner
+        acceptedCompanies={acceptedCompanies}
+        totalReplies={cadenceReplies}
+        cadencesSent={cadencesSent}
+        subscriptionTier={subscriptionTier}
+        T={T}
+      />
 
       {/* Company Detail Panel */}
       {selectedCompany && (

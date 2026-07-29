@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import BarryMorningBrief from './BarryMorningBrief';
-import HunterReadinessBanner from './HunterReadinessBanner';
 import { STATUS } from '../../theme/tokens';
 
 const URGENCY_COLOR = { high: STATUS.red, medium: STATUS.amber, low: STATUS.green };
@@ -93,10 +92,6 @@ export default function MissionControlRightRail({
   openBarry,
   recommendations,
   recsLoading,
-  acceptedCompanies,
-  cadenceReplies,
-  cadencesSent,
-  subscriptionTier,
   T,
 }) {
   return (
@@ -113,17 +108,6 @@ export default function MissionControlRightRail({
           Quick Actions
         </div>
         <QuickActions recommendations={recommendations} loading={recsLoading} T={T} />
-      </div>
-
-      {/* Section 3: Hunter Recommendation */}
-      <div className="mc-rail-hunter-wrapper" style={{ marginTop: 16 }}>
-        <HunterReadinessBanner
-          acceptedCompanies={acceptedCompanies}
-          totalReplies={cadenceReplies}
-          cadencesSent={cadencesSent}
-          subscriptionTier={subscriptionTier}
-          T={T}
-        />
       </div>
     </aside>
   );

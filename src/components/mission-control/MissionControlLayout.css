@@ -19,17 +19,14 @@
   min-width: 0;
 }
 
-/* Reset HunterReadinessBanner outer wrapper when inside the rail */
-.mc-rail-hunter-wrapper > div {
-  max-width: none;
-  margin: 0;
-  padding: 0;
+/* Pulse skeleton animation for loading states */
+@keyframes mc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-/* Remove inner padding override — the banner handles its own spacing,
-   but the outer wrapper's 32px horizontal padding is redundant in the rail. */
-.mc-rail-hunter-wrapper > div > div {
-  border-radius: 14px;
+.mc-skeleton-pulse {
+  animation: mc-pulse 1.5s ease-in-out infinite;
 }
 
 /* ─── Tablet: stack rail below main ──────────────────────────────────────── */
@@ -40,7 +37,7 @@
   }
 
   .mc-right-rail {
-    order: -1;
+    order: 2;
   }
 }
 

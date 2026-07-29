@@ -57,12 +57,11 @@ function getSidebarModule(pathname) {
   return 'default';
 }
 
-const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
+const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {}, onToggleBarry, barryOpen = false, barryButtonRef }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { themeId, setThemeId } = useThemeCtx();
   const isLightTheme = !THEMES[themeId]?.isDark;
   const [themePanelOpen, setThemePanelOpen] = useState(false);
-  const [barryOpen, setBarryOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     people: true,
     recon: true,
@@ -536,10 +535,12 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
 
       {/* Barry Nav Button */}
       <button
+        ref={barryButtonRef}
         className={`settings-toggle ${isCollapsed ? 'collapsed' : ''} ${barryOpen ? 'active' : ''}`}
-        onClick={() => setBarryOpen(o => !o)}
+        onClick={() => { if (onToggleBarry) onToggleBarry(); }}
         title={isCollapsed ? 'Barry AI' : ''}
         aria-label="Open Barry chat"
+        aria-expanded={barryOpen}
         style={{ borderColor: barryOpen ? barryCfg.color : undefined, position: 'relative' }}
       >
         <div style={{ position: 'relative', flexShrink: 0, width: 16, height: 16 }}>
@@ -559,11 +560,15 @@ const Sidebar = ({ mobileMenuOpen = false, onCloseMobileMenu = () => {} }) => {
         {!isCollapsed && <span className="settings-toggle-label">Barry</span>}
       </button>
 
-      {barryOpen && (
+      {/* Non-shell fallback: only when the layout does not own Barry
+          (no onToggleBarry prop) do we render the inline drawer as before.
+          Under MainLayout the shell-mounted BarryChatPanel replaces this,
+          so this branch is inert in the current app. */}
+      {!onToggleBarry && barryOpen && (
         <BarryChat
           module={barryModule}
           context={barryCtx}
-          onClose={() => setBarryOpen(false)}
+          onClose={() => {}}
         />
       )}
 

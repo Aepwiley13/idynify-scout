@@ -12,13 +12,10 @@ import { useActiveUserId, useImpersonation } from '../../context/ImpersonationCo
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
-import BarryChatPanel from '../../components/dashboard/BarryChatPanel';
 import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
 import RecentOutreachActivity from '../../components/mission-control/RecentOutreachActivity';
 import HunterReadinessBanner from '../../components/mission-control/HunterReadinessBanner';
 import useRecommendations from '../../hooks/useRecommendations';
-import BottomNav from '../../components/layout/BottomNav';
-import MoreSheet from '../../components/layout/MoreSheet';
 import {
   Search, Filter, ChevronLeft, ChevronRight, ExternalLink,
   Linkedin, Users, Target, Calendar, X,
@@ -658,7 +655,11 @@ function FirstRunCompanyCard({ company, T }) {
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 
-export default function MissionControlDashboardV2() {
+// `orientation` and `openBarry` are injected by MainLayout via cloneElement and
+// are consumed in Phase B (BarryMorningBrief / composition). They are received
+// here now so the shell contract is complete.
+// eslint-disable-next-line no-unused-vars
+export default function MissionControlDashboardV2({ orientation, openBarry, setBarryPageContext }) {
   useMissionControlTheme();
   const T = useT();
   const navigate = useNavigate();
@@ -686,7 +687,6 @@ export default function MissionControlDashboardV2() {
   const [scoreFilter, setScoreFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [selectedCompany, setSelectedCompany] = useState(null);
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const PER_PAGE = 10;
 
   useEffect(() => {
@@ -819,6 +819,32 @@ export default function MissionControlDashboardV2() {
   const highFit = companies.filter(c => (c.fit_score || 0) >= 75).length;
   const repliedThisWeek = cadenceReplies;
 
+  // Report KPI readiness up to the shell so the globally-mounted Barry panel can
+  // gate its orientation request. The shell owns BarryChatPanel now; this page
+  // only supplies the context it used to pass as props.
+  useEffect(() => {
+    setBarryPageContext?.({
+      kpiContext: {
+        totalMatches,
+        highFit,
+        totalReplies: cadenceReplies,
+        topPriority: (!recsError && recommendations[0]) ? {
+          title: recommendations[0].title,
+          reason: recommendations[0].reason,
+          urgency: recommendations[0].urgency,
+        } : null,
+      },
+      kpiContextReady: kpisLoaded && !recsLoading,
+    });
+  }, [setBarryPageContext, totalMatches, highFit, cadenceReplies,
+      recsError, recommendations, kpisLoaded, recsLoading]);
+
+  // Clear shell KPI context on unmount so it doesn't leak to other pages that
+  // mount inside the same shell.
+  useEffect(() => {
+    return () => setBarryPageContext?.({ kpiContext: {}, kpiContextReady: false });
+  }, [setBarryPageContext]);
+
   // ── Approve ────────────────────────────────────────────────────────────────
   const handleApprove = async (company) => {
     if (isReadOnly) return;
@@ -858,7 +884,7 @@ export default function MissionControlDashboardV2() {
   // ── First-Run View ────────────────────────────────────────────────────────
   if (isFirstRun) {
     return (
-      <div style={{ minHeight: '100vh', background: T.appBg, paddingBottom: 80 }}>
+      <div style={{ background: T.appBg }}>
         <FirstRunView
           barryState={barryState}
           companiesFoundCount={companiesFoundCount}
@@ -866,8 +892,6 @@ export default function MissionControlDashboardV2() {
           T={T}
           navigate={navigate}
         />
-        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
-        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
         <style>{`
           .animate-spin { animation: spin 1s linear infinite; }
           @keyframes spin { to { transform: rotate(360deg); } }
@@ -877,56 +901,7 @@ export default function MissionControlDashboardV2() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: T.appBg, paddingBottom: 80 }}>
-      {/* Header */}
-      <header style={{
-        padding: '24px 32px 20px',
-        borderBottom: `1px solid ${T.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: `${T.accent}15`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <BarChart3 size={20} color={T.accent} />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, margin: 0 }}>Mission Control</h1>
-            <p style={{ fontSize: 12, color: T.textMuted, margin: 0 }}>Your top recommended companies</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={() => navigate('/scout')} style={{
-            padding: '8px 16px', borderRadius: 8,
-            background: T.surface, border: `1px solid ${T.border}`,
-            color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-          }}>
-            New Search +
-          </button>
-        </div>
-      </header>
-
-      {/* Barry Chat Panel — full width above the grid */}
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 32px 24px' }}>
-        <BarryChatPanel
-          userId={activeUserId || auth.currentUser?.uid}
-          kpiContext={{
-            totalMatches,
-            highFit,
-            totalReplies: cadenceReplies,
-            topPriority: (!recsError && recommendations[0]) ? {
-              title: recommendations[0].title,
-              reason: recommendations[0].reason,
-              urgency: recommendations[0].urgency,
-            } : null,
-          }}
-          kpiContextReady={kpisLoaded && !recsLoading}
-          T={T}
-        />
-      </div>
-
+    <div style={{ background: T.appBg }}>
       {/* Today's Priorities */}
       <TodaysPriorities recommendations={recommendations} loading={recsLoading} error={recsError} onRetry={recsRetry} totalReplies={cadenceReplies} highFit={highFit} T={T} />
 
@@ -1197,10 +1172,6 @@ export default function MissionControlDashboardV2() {
           />
         </>
       )}
-
-      {/* Mobile Bottom Nav */}
-      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
-      <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
 
       <style>{`
         .animate-spin { animation: spin 1s linear infinite; }

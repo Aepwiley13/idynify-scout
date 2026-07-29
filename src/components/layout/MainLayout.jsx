@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
+import BarryChatPanel from '../dashboard/BarryChatPanel';
 import { User, Menu, Settings, LogOut, History } from 'lucide-react';
 import { auth } from '../../firebase/config';
+import { useActiveUserId } from '../../context/ImpersonationContext';
 import './MainLayout.css';
 
 const MainLayout = ({ children, user }) => {
@@ -14,6 +16,77 @@ const MainLayout = ({ children, user }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const activeUserId = useActiveUserId();
+
+  // ── Global Barry shell state ──────────────────────────────────────────────
+  // BarryChatPanel is mounted once here and stays mounted; the sidebar button
+  // toggles `barryOpen`. Orientation flows up from the panel; page KPI context
+  // flows up from the routed page. Both flow back down to the routed page.
+  const [barryOpen, setBarryOpen] = useState(false);
+  const [orientation, setOrientation] = useState({
+    status: 'loading',
+    brief: null,
+    suggestedPrompts: [],
+    mode: null,
+    error: null,
+  });
+  const [barryPageContext, setBarryPageContext] = useState({
+    kpiContext: {},
+    kpiContextReady: false,
+  });
+
+  // Blocker 2 — route-aware readiness. Only Mission Control reports KPI context
+  // upward, so gate on the real signal there and treat every other MainLayout
+  // route as ready immediately: Barry initializes with empty context rather than
+  // hanging on the loading skeleton. Deterministic — no timer, no MC race.
+  const isMissionControl = location.pathname === '/mission-control-v2';
+  const effectiveKpiContextReady = isMissionControl
+    ? barryPageContext.kpiContextReady
+    : true;
+
+  const barryButtonRef = useRef(null);   // desktop Sidebar Barry trigger
+  const moreButtonRef = useRef(null);    // mobile BottomNav "More" trigger
+  const barryHostRef = useRef(null);
+  const returnFocusRef = useRef(null);   // element to refocus when Barry closes
+
+  // One shared close handler for every close path (host X button, Escape,
+  // Sidebar toggle) so focus restoration is consistent regardless of how Barry
+  // was closed. returnFocusRef is set to whichever control opened Barry.
+  const closeBarry = useCallback(() => {
+    setBarryOpen(false);
+    returnFocusRef.current?.focus();
+  }, []);
+
+  // Focus trap: while open, move focus into the panel and cycle Tab/Shift+Tab
+  // within it. Hand-rolled — no dependency.
+  useEffect(() => {
+    if (!barryOpen) return;
+    const host = barryHostRef.current;
+    if (!host) return;
+
+    const selector = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const getFocusable = () =>
+      Array.from(host.querySelectorAll(selector)).filter((el) => el.offsetParent !== null);
+
+    (getFocusable()[0] || host).focus();
+
+    const onKeyDown = (e) => {
+      if (e.key !== 'Tab') return;
+      const items = getFocusable();
+      if (items.length === 0) { e.preventDefault(); return; }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    host.addEventListener('keydown', onKeyDown);
+    return () => host.removeEventListener('keydown', onKeyDown);
+  }, [barryOpen]);
 
   const handleLogout = async () => {
     try {
@@ -100,6 +173,16 @@ const MainLayout = ({ children, user }) => {
       <Sidebar
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={() => setMobileMenuOpen(false)}
+        onToggleBarry={() => {
+          if (barryOpen) {
+            closeBarry();
+          } else {
+            returnFocusRef.current = barryButtonRef.current;
+            setBarryOpen(true);
+          }
+        }}
+        barryOpen={barryOpen}
+        barryButtonRef={barryButtonRef}
       />
 
       {/* Mobile Menu Backdrop */}
@@ -164,18 +247,72 @@ const MainLayout = ({ children, user }) => {
 
         {/* Page Content */}
         <main className="page-content">
-          {children}
+          {React.isValidElement(children)
+            ? React.cloneElement(children, {
+                orientation,
+                // Content-initiated open (Phase B BarryMorningBrief) records its
+                // own return-focus target then; Phase A triggers are the Sidebar
+                // button and the mobile "More" button, wired below.
+                openBarry: () => setBarryOpen(true),
+                setBarryPageContext,
+              })
+            : children}
         </main>
       </div>
 
       {/* Bottom Navigation — mobile only (rendered outside main-content so it's always fixed) */}
-      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
 
-      {/* More Sheet — slide-up overlay for secondary navigation on mobile */}
-      <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+      {/* More Sheet — slide-up overlay for secondary navigation on mobile.
+          Barry's mobile entry point lives here; opening records the BottomNav
+          "More" button as the focus-return target since the sheet (and its
+          Barry row) unmounts on open. */}
+      <MoreSheet
+        isOpen={moreSheetOpen}
+        onClose={() => setMoreSheetOpen(false)}
+        onOpenBarry={() => {
+          returnFocusRef.current = moreButtonRef.current;
+          setBarryOpen(true);
+        }}
+      />
 
       {/* Barry session history panel */}
       <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+
+      {/* Global Barry panel host — always mounted; visibility toggled via inert
+          + aria-hidden so BarryChatPanel keeps its orientation and conversation
+          state across open/close cycles.
+
+          NOTE: Barry persistence is currently limited to the lifetime of this
+          MainLayout instance. True cross-module persistence requires converting
+          module routes to children of one shared parent layout route. Deferred
+          to a future routing phase. */}
+      <div
+        ref={barryHostRef}
+        className="barry-panel-host"
+        role="dialog"
+        aria-modal={barryOpen ? 'true' : undefined}
+        aria-label="Barry AI Assistant"
+        aria-hidden={!barryOpen}
+        inert={!barryOpen ? '' : undefined}
+        tabIndex={-1}
+        onKeyDown={(e) => { if (e.key === 'Escape') closeBarry(); }}
+      >
+        <button
+          type="button"
+          className="barry-host-close"
+          onClick={closeBarry}
+          aria-label="Close Barry"
+        >
+          ✕
+        </button>
+        <BarryChatPanel
+          userId={activeUserId || auth.currentUser?.uid}
+          kpiContext={barryPageContext.kpiContext}
+          kpiContextReady={effectiveKpiContextReady}
+          onOrientationChange={setOrientation}
+        />
+      </div>
     </div>
   );
 };

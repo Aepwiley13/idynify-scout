@@ -421,3 +421,72 @@
 .more-sheet-title { color: var(--text-primary); }
 .more-sheet-close { background: var(--surface); color: var(--text-secondary); }
 .more-sheet-item { background: var(--bg-card); border-color: var(--border); color: var(--text-primary); }
+
+/* barry-panel-host: intentionally always mounted.
+   Visibility toggled via inert + aria-hidden to preserve
+   BarryChatPanel orientation state across open/close cycles.
+   cloneElement used here intentionally as the smallest solution
+   for a single shell consumer. Revisit with context if additional
+   modules consume shell-owned Barry state. */
+.barry-panel-host {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1000;
+  width: min(480px, 100%);
+  height: 100vh;
+  overflow-y: auto;
+  background: #0a0713;
+  border-left: 1px solid rgba(0, 196, 212, 0.25);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.55);
+  /* Extra top padding reserves a zone for the host close button so it does not
+     collide with BarryChatPanel's own header/collapse control. */
+  padding: 60px 16px 20px;
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+
+/* Closed state — inert is present only while the panel is closed. */
+.barry-panel-host[inert] {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Host close button — pinned top-right, above Barry content, ≥44px touch
+   target on mobile. Not rendered while the host is closed. */
+.barry-host-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid rgba(0, 196, 212, 0.35);
+  border-radius: 10px;
+  background: rgba(10, 7, 19, 0.9);
+  color: #f0eaff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.barry-host-close:hover {
+  border-color: rgba(0, 196, 212, 0.6);
+}
+
+.barry-panel-host[inert] .barry-host-close {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .barry-panel-host {
+    width: 100%;
+    padding: 56px 12px 16px;
+  }
+}

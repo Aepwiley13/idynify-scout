@@ -19,7 +19,7 @@ import { auth } from '../../firebase/config';
 import { useThemeCtx } from '../../theme/ThemeContext';
 import { THEMES } from '../../theme/tokens';
 
-export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
+export default function MoreSheet({ isOpen, onClose, isAdmin = false, onOpenBarry }) {
   const navigate = useNavigate();
   const { themeId, setThemeId } = useThemeCtx();
   const isLightTheme = !THEMES[themeId]?.isDark;
@@ -41,6 +41,14 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false }) {
         </div>
 
         <div className="more-sheet-grid">
+          {/* Barry — mobile entry point to the globally-mounted shell panel */}
+          <button
+            className="more-sheet-item"
+            onClick={() => { onOpenBarry?.(); onClose(); }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 22, lineHeight: 1 }}>🐻</span>
+            <span>Barry</span>
+          </button>
           {/* Modules not in primary bottom nav */}
           <button className="more-sheet-item" onClick={() => go('/recon')}>
             <Brain size={22} />

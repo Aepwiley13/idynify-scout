@@ -45,7 +45,7 @@ const NAV_ITEMS = [
   },
 ];
 
-export default function BottomNav({ onOpenMore }) {
+export default function BottomNav({ onOpenMore, moreButtonRef }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -78,6 +78,7 @@ export default function BottomNav({ onOpenMore }) {
         return (
           <button
             key={item.id}
+            ref={item.id === 'more' ? moreButtonRef : null}
             className={`bottom-nav-item ${active ? 'active' : ''}`}
             onClick={() => handleTap(item)}
             aria-label={item.label}

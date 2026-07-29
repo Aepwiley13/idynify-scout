@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
@@ -44,9 +44,18 @@ const MainLayout = ({ children, user }) => {
     ? barryPageContext.kpiContextReady
     : true;
 
-  const barryButtonRef = useRef(null);
+  const barryButtonRef = useRef(null);   // desktop Sidebar Barry trigger
+  const moreButtonRef = useRef(null);    // mobile BottomNav "More" trigger
   const barryHostRef = useRef(null);
-  const prevBarryOpen = useRef(false);
+  const returnFocusRef = useRef(null);   // element to refocus when Barry closes
+
+  // One shared close handler for every close path (host X button, Escape,
+  // Sidebar toggle) so focus restoration is consistent regardless of how Barry
+  // was closed. returnFocusRef is set to whichever control opened Barry.
+  const closeBarry = useCallback(() => {
+    setBarryOpen(false);
+    returnFocusRef.current?.focus();
+  }, []);
 
   // Focus trap: while open, move focus into the panel and cycle Tab/Shift+Tab
   // within it. Hand-rolled — no dependency.
@@ -77,14 +86,6 @@ const MainLayout = ({ children, user }) => {
     };
     host.addEventListener('keydown', onKeyDown);
     return () => host.removeEventListener('keydown', onKeyDown);
-  }, [barryOpen]);
-
-  // Return focus to the Sidebar Barry button when the panel closes.
-  useEffect(() => {
-    if (prevBarryOpen.current && !barryOpen) {
-      barryButtonRef.current?.focus();
-    }
-    prevBarryOpen.current = barryOpen;
   }, [barryOpen]);
 
   const handleLogout = async () => {
@@ -172,7 +173,14 @@ const MainLayout = ({ children, user }) => {
       <Sidebar
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={() => setMobileMenuOpen(false)}
-        onToggleBarry={() => setBarryOpen((o) => !o)}
+        onToggleBarry={() => {
+          if (barryOpen) {
+            closeBarry();
+          } else {
+            returnFocusRef.current = barryButtonRef.current;
+            setBarryOpen(true);
+          }
+        }}
         barryOpen={barryOpen}
         barryButtonRef={barryButtonRef}
       />
@@ -242,6 +250,9 @@ const MainLayout = ({ children, user }) => {
           {React.isValidElement(children)
             ? React.cloneElement(children, {
                 orientation,
+                // Content-initiated open (Phase B BarryMorningBrief) records its
+                // own return-focus target then; Phase A triggers are the Sidebar
+                // button and the mobile "More" button, wired below.
                 openBarry: () => setBarryOpen(true),
                 setBarryPageContext,
               })
@@ -250,10 +261,20 @@ const MainLayout = ({ children, user }) => {
       </div>
 
       {/* Bottom Navigation — mobile only (rendered outside main-content so it's always fixed) */}
-      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
+      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
 
-      {/* More Sheet — slide-up overlay for secondary navigation on mobile */}
-      <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+      {/* More Sheet — slide-up overlay for secondary navigation on mobile.
+          Barry's mobile entry point lives here; opening records the BottomNav
+          "More" button as the focus-return target since the sheet (and its
+          Barry row) unmounts on open. */}
+      <MoreSheet
+        isOpen={moreSheetOpen}
+        onClose={() => setMoreSheetOpen(false)}
+        onOpenBarry={() => {
+          returnFocusRef.current = moreButtonRef.current;
+          setBarryOpen(true);
+        }}
+      />
 
       {/* Barry session history panel */}
       <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
@@ -275,8 +296,16 @@ const MainLayout = ({ children, user }) => {
         aria-hidden={!barryOpen}
         inert={!barryOpen ? '' : undefined}
         tabIndex={-1}
-        onKeyDown={(e) => { if (e.key === 'Escape') setBarryOpen(false); }}
+        onKeyDown={(e) => { if (e.key === 'Escape') closeBarry(); }}
       >
+        <button
+          type="button"
+          className="barry-host-close"
+          onClick={closeBarry}
+          aria-label="Close Barry"
+        >
+          ✕
+        </button>
         <BarryChatPanel
           userId={activeUserId || auth.currentUser?.uid}
           kpiContext={barryPageContext.kpiContext}

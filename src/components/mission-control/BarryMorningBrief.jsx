@@ -13,12 +13,14 @@ function SkeletonBrief({ T }) {
 }
 
 export default function BarryMorningBrief({ orientation, openBarry, T }) {
-  const safe = orientation ?? {
-    status: 'loading',
-    brief: null,
-    suggestedPrompts: [],
-    mode: null,
-    error: null,
+  const safe = {
+    status: orientation?.status ?? 'loading',
+    brief: orientation?.brief ?? '',
+    suggestedPrompts: Array.isArray(orientation?.suggestedPrompts)
+      ? orientation.suggestedPrompts
+      : [],
+    mode: orientation?.mode ?? null,
+    error: orientation?.error ?? null,
   };
 
   const isLoading = safe.status === 'loading';

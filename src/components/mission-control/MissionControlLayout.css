@@ -1,0 +1,50 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MissionControlLayout.css — Phase B two-column grid
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mc-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.mc-main-column {
+  min-width: 0;
+}
+
+.mc-right-rail {
+  min-width: 0;
+}
+
+/* Pulse skeleton animation for loading states */
+@keyframes mc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.mc-skeleton-pulse {
+  animation: mc-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── Tablet: stack rail below main ──────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .mc-content-grid {
+    grid-template-columns: 1fr;
+    padding: 20px 24px;
+  }
+
+  .mc-right-rail {
+    order: 2;
+  }
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mc-content-grid {
+    padding: 16px;
+    gap: 16px;
+  }
+}

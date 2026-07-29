@@ -366,7 +366,7 @@ function App() {
         <Route
           path="/mission-control-v2"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute withLayout={true}>
               <MissionControlDashboardV2 />
             </ProtectedRoute>
           }

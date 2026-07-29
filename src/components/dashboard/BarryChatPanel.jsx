@@ -276,7 +276,7 @@ function PipelineMoveRow({ move, onExecute }) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextReady = false, T = DEFAULT_TOKENS }) {
+export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextReady = false, T = DEFAULT_TOKENS, onOrientationChange = null }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('SUGGEST');
@@ -396,6 +396,7 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
 
   async function loadOpeningBrief(user, _stack) {
     setBriefLoading(true);
+    onOrientationChange?.({ status: 'loading' });
     try {
       // Check sessionStorage cache — skip API call if still warm
       if (orientationCacheKey) {
@@ -407,6 +408,12 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
               setBrief(parsed.brief);
               setSuggestedPrompts(parsed.suggestedPrompts);
               if (parsed.mode) setMode(parsed.mode);
+              onOrientationChange?.({
+                status: 'ready',
+                brief: parsed.brief,
+                suggestedPrompts: parsed.suggestedPrompts,
+                mode: parsed.mode,
+              });
               setBriefLoading(false);
               return;
             }
@@ -417,7 +424,9 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
       let authToken;
       try { authToken = await user.getIdToken(); } catch (tokenErr) {
         console.warn('[BarryChatPanel] getIdToken failed (loadOpeningBrief):', tokenErr.message);
-        setFallbackBrief(); setBriefLoading(false); return;
+        setFallbackBrief();
+        onOrientationChange?.({ status: 'error', error: tokenErr, brief: null, suggestedPrompts: [] });
+        setBriefLoading(false); return;
       }
 
       const res = await fetch('/.netlify/functions/barryOrientationBrief', {
@@ -437,6 +446,8 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
         setSuggestedPrompts(prompts);
         if (mode) setMode(mode);
 
+        onOrientationChange?.({ status: 'ready', brief, suggestedPrompts: prompts, mode });
+
         // Cache the result
         if (orientationCacheKey) {
           try {
@@ -450,10 +461,12 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
         }
       } else {
         setFallbackBrief();
+        onOrientationChange?.({ status: 'error', error: 'orientation_failed', brief: null, suggestedPrompts: [] });
       }
     } catch (err) {
       console.error('[BarryChatPanel] Opening brief failed:', err);
       setFallbackBrief();
+      onOrientationChange?.({ status: 'error', error: err, brief: null, suggestedPrompts: [] });
     } finally {
       setBriefLoading(false);
     }

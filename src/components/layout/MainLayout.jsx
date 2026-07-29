@@ -34,6 +34,8 @@ const MainLayout = ({ children, user }) => {
     kpiContext: {},
     kpiContextReady: false,
   });
+  // Blocker 2 fallback readiness — see the effect below.
+  const [barryFallbackReady, setBarryFallbackReady] = useState(false);
 
   const barryButtonRef = useRef(null);
   const barryHostRef = useRef(null);
@@ -77,6 +79,20 @@ const MainLayout = ({ children, user }) => {
     }
     prevBarryOpen.current = barryOpen;
   }, [barryOpen]);
+
+  // Blocker 2 — non-MC readiness fallback.
+  // Only Mission Control reports KPI context upward, so on every other route that
+  // renders MainLayout `kpiContextReady` would stay false forever and Barry would
+  // hang on its loading skeleton. If no page reports readiness within a short
+  // grace window, let Barry initialize with whatever (possibly empty) context is
+  // present. Mission Control's real signal always wins when it arrives first —
+  // this timer is cleared the moment kpiContextReady becomes true, so the MC path
+  // still requests orientation with full KPI context.
+  useEffect(() => {
+    if (barryPageContext.kpiContextReady) return;
+    const t = setTimeout(() => setBarryFallbackReady(true), 4000);
+    return () => clearTimeout(t);
+  }, [barryPageContext.kpiContextReady]);
 
   const handleLogout = async () => {
     try {
@@ -251,7 +267,12 @@ const MainLayout = ({ children, user }) => {
 
       {/* Global Barry panel host — always mounted; visibility toggled via inert
           + aria-hidden so BarryChatPanel keeps its orientation and conversation
-          state across open/close cycles. */}
+          state across open/close cycles.
+
+          NOTE: Barry persistence is currently limited to the lifetime of this
+          MainLayout instance. True cross-module persistence requires converting
+          module routes to children of one shared parent layout route. Deferred
+          to a future routing phase. */}
       <div
         ref={barryHostRef}
         className="barry-panel-host"
@@ -266,7 +287,7 @@ const MainLayout = ({ children, user }) => {
         <BarryChatPanel
           userId={activeUserId || auth.currentUser?.uid}
           kpiContext={barryPageContext.kpiContext}
-          kpiContextReady={barryPageContext.kpiContextReady}
+          kpiContextReady={barryPageContext.kpiContextReady || barryFallbackReady}
           onOrientationChange={setOrientation}
         />
       </div>

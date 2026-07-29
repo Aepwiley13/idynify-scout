@@ -1,0 +1,53 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MissionControlLayout.css — Phase B two-column grid
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mc-content-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.mc-main-column {
+  min-width: 0;
+}
+
+.mc-right-rail {
+  min-width: 0;
+}
+
+/* Reset HunterReadinessBanner outer wrapper when inside the rail */
+.mc-rail-hunter-wrapper > div {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Remove inner padding override — the banner handles its own spacing,
+   but the outer wrapper's 32px horizontal padding is redundant in the rail. */
+.mc-rail-hunter-wrapper > div > div {
+  border-radius: 14px;
+}
+
+/* ─── Tablet: stack rail below main ──────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .mc-content-grid {
+    grid-template-columns: 1fr;
+    padding: 20px 24px;
+  }
+
+  .mc-right-rail {
+    order: -1;
+  }
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mc-content-grid {
+    padding: 16px;
+    gap: 16px;
+  }
+}

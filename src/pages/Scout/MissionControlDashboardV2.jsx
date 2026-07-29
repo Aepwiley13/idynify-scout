@@ -14,8 +14,9 @@ import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
 import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
 import RecentOutreachActivity from '../../components/mission-control/RecentOutreachActivity';
-import HunterReadinessBanner from '../../components/mission-control/HunterReadinessBanner';
+import MissionControlRightRail from '../../components/mission-control/MissionControlRightRail';
 import useRecommendations from '../../hooks/useRecommendations';
+import '../../components/mission-control/MissionControlLayout.css';
 import {
   Search, Filter, ChevronLeft, ChevronRight, ExternalLink,
   Linkedin, Users, Target, Calendar, X,
@@ -655,10 +656,6 @@ function FirstRunCompanyCard({ company, T }) {
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 
-// `orientation` and `openBarry` are injected by MainLayout via cloneElement and
-// are consumed in Phase B (BarryMorningBrief / composition). They are received
-// here now so the shell contract is complete.
-// eslint-disable-next-line no-unused-vars
 export default function MissionControlDashboardV2({ orientation, openBarry, setBarryPageContext }) {
   useMissionControlTheme();
   const T = useT();
@@ -905,12 +902,10 @@ export default function MissionControlDashboardV2({ orientation, openBarry, setB
       {/* Today's Priorities */}
       <TodaysPriorities recommendations={recommendations} loading={recsLoading} error={recsError} onRetry={recsRetry} totalReplies={cadenceReplies} highFit={highFit} T={T} />
 
-      {/* Main Layout */}
-      <div className="mc2-layout" style={{
-        maxWidth: 1400, margin: '0 auto', padding: '24px 32px',
-      }}>
-        {/* Left Column: KPIs + Table */}
-        <div style={{ minWidth: 0 }}>
+      {/* Two-Column Grid */}
+      <div className="mc-content-grid">
+        {/* ── Main Column ── */}
+        <div className="mc-main-column">
           {/* KPI Row */}
           <div style={{ display: 'flex', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
             <KpiCard icon={Target} label="Total Matches" value={totalMatches} color={BRAND.pink} T={T} />
@@ -1138,21 +1133,24 @@ export default function MissionControlDashboardV2({ orientation, openBarry, setB
               </div>
             )}
           </div>
+
+          {/* Recent Outreach Activity */}
+          <RecentOutreachActivity userId={activeUserId || auth.currentUser?.uid} T={T} />
         </div>
 
+        {/* ── Right Rail ── */}
+        <MissionControlRightRail
+          orientation={orientation}
+          openBarry={openBarry}
+          recommendations={recommendations}
+          recsLoading={recsLoading}
+          acceptedCompanies={acceptedCompanies}
+          cadenceReplies={cadenceReplies}
+          cadencesSent={cadencesSent}
+          subscriptionTier={subscriptionTier}
+          T={T}
+        />
       </div>
-
-      {/* Recent Outreach Activity */}
-      <RecentOutreachActivity userId={activeUserId || auth.currentUser?.uid} T={T} />
-
-      {/* Hunter Readiness Banner */}
-      <HunterReadinessBanner
-        acceptedCompanies={acceptedCompanies}
-        totalReplies={cadenceReplies}
-        cadencesSent={cadencesSent}
-        subscriptionTier={subscriptionTier}
-        T={T}
-      />
 
       {/* Company Detail Panel */}
       {selectedCompany && (

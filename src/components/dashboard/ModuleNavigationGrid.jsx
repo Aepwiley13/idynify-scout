@@ -4,7 +4,7 @@ import { CommandCenterIcon, ReconIcon, ScoutIcon, HunterIcon, SniperIcon, Homeba
  * ModuleNavigationGrid — 7-card module launcher in two rows + footer card.
  *
  * Row 1: Scout, Hunter, Sniper
- * Row 2: Homebase, Command Center, Recon
+ * Row 2: Basecamp, Command Center, Recon
  * Row 3: Reinforcements (full width)
  *
  * Props:
@@ -85,10 +85,13 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
       onClick: () => onNavigate('/sniper'),
     },
 
-    // ── Row 2: Homebase, Command Center, Recon ──
+    // ── Row 2: Basecamp, Command Center, Recon ──
     {
-      id: 'homebase',
-      label: 'HOMEBASE',
+      // Locked vocabulary: this module is Basecamp everywhere. It was
+      // labelled HOMEBASE only here — on the first screen a new user sees —
+      // while every rail, the sidebar and the route all said Basecamp.
+      id: 'basecamp',
+      label: 'BASECAMP',
       description: 'Your mission command & settings',
       stat: 'Configure your base of operations',
       badge: null,
@@ -99,7 +102,7 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
       shadowClass: 'shadow-green-500/40',
       bgGradient: 'from-green-500/10 to-emerald-600/5',
       icon: <HomebaseIcon />,
-      btnLabel: 'Enter Homebase →',
+      btnLabel: 'Enter Basecamp →',
       onClick: () => onNavigate('/basecamp'),
     },
     {
@@ -140,7 +143,7 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
       bgGradient: 'from-purple-500/10 to-pink-600/5',
       icon: <ReconIcon />,
       btnLabel: 'Train AI →',
-      onClick: () => onNavigate('/mission-control-v2/recon'),
+      onClick: () => onNavigate('/recon'),
     },
   ];
 

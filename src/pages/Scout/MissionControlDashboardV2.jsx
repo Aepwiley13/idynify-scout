@@ -19,6 +19,7 @@ import HunterReadinessBanner from '../../components/mission-control/HunterReadin
 import MissionControlRightRail from '../../components/mission-control/MissionControlRightRail';
 import MobileCompanyCard from '../../components/mission-control/MobileCompanyCard';
 import useRecommendations from '../../hooks/useRecommendations';
+import { useShell } from '../../context/ShellContext';
 import '../../components/mission-control/MissionControlLayout.css';
 import {
   Search, Filter, ChevronLeft, ChevronRight, ExternalLink,
@@ -662,7 +663,15 @@ function FirstRunCompanyCard({ company, T }) {
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 
-export default function MissionControlDashboardV2({ orientation, openBarry, setBarryPageContext }) {
+/**
+ * Shell state used to arrive as props injected by MainLayout via
+ * React.cloneElement. That only ever reached a direct child, and stopped
+ * working entirely once routes became <Outlet/> children of the layout route.
+ * It comes from context now — same three values, no prop plumbing, and
+ * reachable from any depth.
+ */
+export default function MissionControlDashboardV2() {
+  const { orientation, openBarry, setBarryPageContext } = useShell();
   useMissionControlTheme();
   const T = useT();
   const navigate = useNavigate();

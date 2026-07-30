@@ -11,8 +11,12 @@
  *     for the duration of this sprint and removed only after the remaining
  *     modules migrate.
  *
- * Layer 2 (Scout only):   SHELL_MIGRATION.scoutInShell = false
- *   → ScoutMain renders its original self-contained icon-rail shell.
+ * NOTE ON SCOUT: the Phase 0 assessment sketched a Scout-only rollback flag.
+ * It is not implemented, and deliberately so — Scout's icon rail was removed
+ * rather than kept behind a branch, because retaining a second Scout chrome
+ * is exactly the duplication this sprint exists to end. With `enabled: false`
+ * Scout still renders inside MainLayout, just remounting per route as it did
+ * before. Reverting Scout to its own rail is a git revert, not a flag.
  *
  * Env override lets ops flip the flag without a code deploy:
  *   VITE_SHELL_MIGRATION=off
@@ -25,15 +29,6 @@ export const SHELL_MIGRATION = {
   /** Master switch for the Sprint 1 vertical slice. */
   enabled: !disabledByEnv,
 
-  /** Scout renders as content inside the shell rather than its own shell. */
-  scoutInShell: !disabledByEnv,
-
-  /**
-   * Contact Profile opens as a contextual panel over the Scout list.
-   * When false, /scout/contact/:id renders as a full content route only.
-   * The full content route always remains available for direct links.
-   */
-  contactPanel: !disabledByEnv,
 };
 
 /**

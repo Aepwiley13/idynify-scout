@@ -45,6 +45,7 @@ import AllLeads from './pages/Scout/AllLeads';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
+import ContactProfilePanel from './pages/Scout/ContactProfilePanel';
 import ScoutGame from './pages/Scout/ScoutGame';
 import CadencesList from './pages/Scout/CadencesList';
 import CadenceDetail from './pages/Scout/CadenceDetail';
@@ -432,8 +433,13 @@ function App() {
         {SHELL_MIGRATION.enabled ? (
           <Route element={<ShellRoute loading={loading} user={user} userData={userData} />}>
             <Route path="/mission-control-v2" element={<MissionControlDashboardV2 />} />
-            <Route path="/scout" element={<ScoutMain />} />
-            <Route path="/scout/contact/:contactId" element={<ContactProfile />} />
+            {/* Contact Profile is a CHILD of Scout, not a sibling. That is
+                what keeps Scout mounted while a contact is open, so closing
+                the panel restores the list, its filters and its scroll
+                position instead of rebuilding them. */}
+            <Route path="/scout" element={<ScoutMain />}>
+              <Route path="contact/:contactId" element={<ContactProfilePanel />} />
+            </Route>
             <Route path="/scout/company/:companyId" element={<CompanyDetail />} />
             <Route path="/scout/company/:companyId/leads" element={<CompanyLeads />} />
             <Route path="/scout/total-market" element={<TotalMarket />} />
@@ -447,7 +453,11 @@ function App() {
               path="/mission-control-v2"
               element={<ProtectedRoute withLayout={true}><MissionControlDashboardV2 /></ProtectedRoute>}
             />
-            <Route path="/scout" element={<ProtectedRoute><ScoutMain /></ProtectedRoute>} />
+            {/* Degraded mode: the shell is still present, just not persistent
+                (it remounts per route, as it did before the migration).
+                Scout renders inside it — Scout no longer carries its own
+                rail, so it must not be rendered bare. */}
+            <Route path="/scout" element={<ProtectedRoute withLayout={true}><ScoutMain /></ProtectedRoute>} />
             <Route
               path="/scout/contact/:contactId"
               element={<ProtectedRoute withLayout={true}><ContactProfile /></ProtectedRoute>}

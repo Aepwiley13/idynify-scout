@@ -106,9 +106,16 @@ Four layers, cheapest first:
 | Layer | Mechanism | Blast radius | Time to revert |
 |---|---|---|---|
 | **1. Per-route** | Move a route out of `<Route element={<ShellRoute/>}>` back to `<ProtectedRoute withLayout>`. Both wrappers are retained this sprint. | One route | ~1 minute |
-| **2. Scout only** | `ScoutMain` keeps its self-contained rendering path behind `SHELL_MIGRATION.scoutInShell`. Flip false → the old rail returns. | Scout | ~1 minute |
-| **3. Whole slice** | `src/constants/shellMigration.js` exports one flag consumed by `App.jsx`. False → every in-scope route reverts to pre-migration wrapping. | Vertical slice | ~1 minute, no deploy if flag is env-driven |
-| **4. Git** | Migration is one branch, phase-by-phase commits. `git revert` of the merge commit. | Everything | one deploy cycle |
+| **2. Whole slice** | `src/constants/shellMigration.js` exports one flag consumed by `App.jsx`. False → every in-scope route reverts to pre-migration wrapping. | Vertical slice | ~1 minute, no deploy if flag is env-driven |
+| **3. Git** | Migration is one branch, phase-by-phase commits. `git revert` of the merge commit. | Everything | one deploy cycle |
+
+> **Corrected after implementation.** This table originally proposed a
+> Scout-only rollback flag that kept `ScoutMain`'s icon rail behind a branch.
+> It was not built, deliberately: retaining a second Scout chrome preserves
+> exactly the duplication this sprint exists to end. With the slice flag off,
+> Scout renders inside `MainLayout` rather than bare — degraded to "shell
+> present but remounting per route", which is where the product already was.
+> Reverting Scout specifically is a `git revert`, not a flag.
 
 **Barry data rollback:** the unified thread writes to `barryConversations/missionControl` — the key `BarryChatPanel` already uses. Legacy `drawer_${module}` documents are **read-migrated, never deleted**: on first load the shell reads the module thread if the unified thread is empty. Rolling back leaves both intact. No destructive migration in Sprint 1.
 

@@ -143,7 +143,7 @@ const Sidebar = ({
       <div className="sidebar-utility">
         <button
           type="button"
-          className={`settings-toggle ${isCollapsed ? 'collapsed' : ''} ${location.pathname === '/settings' ? 'active' : ''}`}
+          className={`settings-toggle settings-accent ${isCollapsed ? 'collapsed' : ''} ${location.pathname === '/settings' ? 'active' : ''}`}
           onClick={() => go('/settings')}
           title={isCollapsed ? 'Settings' : ''}
           aria-label="Settings"

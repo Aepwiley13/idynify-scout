@@ -30,7 +30,9 @@
 }
 
 /* ─── Tablet: stack rail below main ──────────────────────────────────────── */
-@media (max-width: 1024px) {
+/* 1280px accounts for the 260px fixed sidebar — below this, the main column
+   is too narrow for the data table alongside the 320px rail. */
+@media (max-width: 1280px) {
   .mc-content-grid {
     grid-template-columns: 1fr;
     padding: 20px 24px;

@@ -50,3 +50,36 @@
     gap: 16px;
   }
 }
+
+/* ─── Company list: desktop table ⇄ mobile cards ─────────────────────────────
+   Presentation toggle only. Both views render from the same paginated
+   `pageCompanies` array in MissionControlDashboardV2 — same filtering,
+   sorting, scoring, and pagination. 768px is Mission Control's established
+   mobile breakpoint (see the block above); no new breakpoint introduced. */
+.mc2-table-desktop { display: block; }
+.mc2-cards-mobile  { display: none; }
+
+@media (max-width: 768px) {
+  .mc2-table-desktop { display: none; }
+  .mc2-cards-mobile  { display: block; }
+}
+
+/* Card sizing/spacing only — colors/backgrounds stay inline via T.* tokens. */
+.mc2-mobile-card {
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mc2-mobile-card-action {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}

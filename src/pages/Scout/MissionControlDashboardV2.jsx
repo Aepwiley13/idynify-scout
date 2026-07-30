@@ -10,12 +10,14 @@ import {
 } from 'firebase/firestore';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
+import { getFitTier } from '../../utils/companyDisplay';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
 import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
 import RecentOutreachActivity from '../../components/mission-control/RecentOutreachActivity';
 import HunterReadinessBanner from '../../components/mission-control/HunterReadinessBanner';
 import MissionControlRightRail from '../../components/mission-control/MissionControlRightRail';
+import MobileCompanyCard from '../../components/mission-control/MobileCompanyCard';
 import useRecommendations from '../../hooks/useRecommendations';
 import '../../components/mission-control/MissionControlLayout.css';
 import {
@@ -59,7 +61,10 @@ function KpiCard({ icon: Icon, label, value, color, subtitle, T }) {
 
 // ─── Fit Score Badge ─────────────────────────────────────────────────────────
 function FitBadge({ score }) {
-  const color = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
+  // Threshold/color logic lives in the shared getFitTier util so the desktop
+  // table and the mobile card can never diverge. Output is byte-identical to
+  // the previous inline logic (green ≥75, amber ≥50, grey below).
+  const { color } = getFitTier(score);
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -961,6 +966,8 @@ export default function MissionControlDashboardV2({ orientation, openBarry, setB
             </select>
           </div>
 
+          {/* Desktop: table (unchanged JSX, wrapped for the responsive toggle) */}
+          <div className="mc2-table-desktop">
           {/* Company Table */}
           <div style={{
             background: T.cardBg, border: `1px solid ${T.border}`,
@@ -1134,6 +1141,71 @@ export default function MissionControlDashboardV2({ orientation, openBarry, setB
               </div>
             )}
           </div>
+          </div>{/* end .mc2-table-desktop */}
+
+          {/* Mobile: cards — same pageCompanies array, same setSelectedCompany handler */}
+          <div className="mc2-cards-mobile">
+            {pageCompanies.length === 0 ? (
+              <div style={{
+                background: T.cardBg, border: `1px solid ${T.border}`,
+                borderRadius: 14, padding: 40, textAlign: 'center',
+                color: T.textMuted, fontSize: 14,
+              }}>
+                {searchTerm || industryFilter || scoreFilter !== 'all'
+                  ? 'No companies match your filters.'
+                  : 'No companies yet. Head to Scout to start finding prospects.'}
+              </div>
+            ) : (
+              pageCompanies.map(company => (
+                <MobileCompanyCard
+                  key={company.id || company.name}
+                  company={company}
+                  onSelect={setSelectedCompany}
+                  T={T}
+                />
+              ))
+            )}
+
+            {/* Pagination — same page/totalPages/setPage as the desktop table */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
+                marginTop: 4,
+              }}>
+                <button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8,
+                    background: T.surface, border: `1px solid ${T.border}`,
+                    color: page === 0 ? T.textFaint : T.text,
+                    cursor: page === 0 ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 12, fontWeight: 600,
+                  }}
+                >
+                  <ChevronLeft size={14} /> Prev
+                </button>
+                <span style={{ fontSize: 12, color: T.textMuted }}>
+                  Page {page + 1} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8,
+                    background: T.surface, border: `1px solid ${T.border}`,
+                    color: page >= totalPages - 1 ? T.textFaint : T.text,
+                    cursor: page >= totalPages - 1 ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 12, fontWeight: 600,
+                  }}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Recent Outreach Activity */}
           <RecentOutreachActivity userId={activeUserId || auth.currentUser?.uid} T={T} />
@@ -1183,11 +1255,6 @@ export default function MissionControlDashboardV2({ orientation, openBarry, setB
         @keyframes slideInRight {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
-        }
-        @media (max-width: 900px) {
-          .mc2-table-header, .mc2-table-row {
-            grid-template-columns: 1fr !important;
-          }
         }
       `}</style>
     </div>

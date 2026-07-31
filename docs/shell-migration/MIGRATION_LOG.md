@@ -23,11 +23,18 @@ before that question had any chance to hold one up.
 | **Fallback** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Recon** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Command Center** | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Settings** | ✓ | ✓ | n/a | ✓ | ✓ |
 
-**9 of 9. The desktop shell is complete.** Every module in the product renders
-into one shell that is mounted once. No module ships application chrome of its
-own any more — there is one sidebar, one wordmark, one active-state treatment,
-one sub-nav component and one Barry.
+**10 of 10. The desktop shell is complete.** Every screen in the product
+renders into one shell that is mounted once. Nothing ships application chrome
+of its own any more — there is one sidebar, one wordmark, one active-state
+treatment, one sub-nav component and one Barry.
+
+Settings came last and is documented separately in `TOPBAR_AND_MOBILE.md`,
+because it arrived with the top bar and mobile work rather than as one of the
+seven module migrations. Its active-highlight cell is n/a: Settings is not in
+the sidebar — it is reached from the top bar's account menu and the mobile
+drawer.
 
 ---
 
@@ -258,11 +265,14 @@ setup hub, a duplicate of several modules, or two destinations wearing one name
 is worth deciding now. Nothing about it was changed during the migration
 specifically so this decision is made on the merits.
 
-**2. Mobile.** Every module still carries its own mobile branch and its own top
-bar, and each is in `MODULES_WITH_OWN_MOBILE_NAV` so the shell does not add a
-second bottom nav on top. That is a holding position, not a design. Mobile is
-now the only place in the product where the eight-shells problem still exists,
-and it should be reconciled in one pass rather than per module.
+**2. Mobile.** *(Partly addressed — see `TOPBAR_AND_MOBILE.md`.)* The
+hamburger drawer, the More sheet and the mobile top bar have since been done.
+What remains is that every module still carries its own mobile branch and its
+own top bar, each listed in `MODULES_WITH_OWN_MOBILE_NAV` so the shell does not
+stack a second bottom nav on top. Those in-module tab strips are confirmed
+correct for mobile; what is not reconciled is that some of those top bars carry
+their own theme picker and settings button, now duplicating the drawer. One
+pass, not eight.
 
 **3. Barry's navigation contract in production.** The contract is published and
 tested, and `barryMissionChat.js` renders it into the system prompt. What has

@@ -54,7 +54,20 @@ vi.mock('../pages/Hunter/sections/ArsenalSection', () => stub('cc-arsenal'));
 vi.mock('../pages/Hunter/sections/OutcomesSection', () => stub('cc-outcomes'));
 vi.mock('../pages/Scout/GoToWar', () => stub('cc-gotowar'));
 vi.mock('../components/notifications/NotificationCenter', () => stub('notifications'));
+vi.mock('../components/serviceProfiles/ServiceProfileSetup', () => stub('service-setup'));
+vi.mock('../utils/mfa', () => ({
+  isMfaEnrolled: async () => false,
+  getEnrolledFactors: async () => [],
+  startTotpEnrollment: () => {}, completeTotpEnrollment: () => {}, unenrollFactor: () => {},
+}));
 vi.mock('../hooks/useSubscription', () => ({ useSubscription: () => ({ isProTier: true, loading: false }) }));
+// Settings' preference hook calls doc(db, …) inside an effect. With a stubbed
+// db that throws synchronously, before the promise its .catch is attached to
+// exists — so the rejection escapes and takes the render down. Mocked here
+// like every other Firestore-touching dependency in this file.
+vi.mock('../hooks/useUserPreference', () => ({
+  useUserPreference: (_key, initial) => [initial, () => {}],
+}));
 
 const { default: HunterMain } = await import('../pages/Hunter/HunterMain');
 const { default: SniperMain } = await import('../pages/Sniper/SniperMain');
@@ -63,6 +76,7 @@ const { default: ReinforcementsMain } = await import('../pages/Reinforcements/Re
 const { default: FallbackMain } = await import('../pages/Fallback/FallbackMain');
 const { default: ReconMain } = await import('../pages/Recon/ReconMain');
 const { default: PeopleMain } = await import('../pages/Scout/PeopleMain');
+const { default: UserSettings } = await import('../pages/UserSettings');
 
 /**
  * One row per migrated module. `otherModules` are labels the module's own rail
@@ -165,6 +179,23 @@ const MIGRATED = [
     descriptions: ['8-phase bulk mission launcher', 'Saved message templates library'],
     activeTab: { query: '?tab=arsenal', expect: 'Arsenal' },
   },
+  {
+    name: 'Settings',
+    Component: UserSettings,
+    path: '/settings',
+    title: 'SETTINGS',
+    tagline: 'Account, security, billing and appearance',
+    storageKey: 'settings_subnav_collapsed',
+    sections: [
+      'Account', 'Security', 'Billing', 'Integrations',
+      'Your Services', 'Hunter', 'Appearance',
+    ],
+    descriptions: ['Password and two-factor', 'Themes and mission sounds'],
+    // Settings holds its section in local state rather than the URL — it
+    // always did, and that is out of scope here — so this row asserts the
+    // default rather than a deep link.
+    activeTab: { query: '', expect: 'Account' },
+  },
 ];
 
 /** Labels the deleted icon rails used to show for OTHER modules. */
@@ -232,7 +263,16 @@ describe.each(MIGRATED)('$name — migrated into the shell', (mod) => {
 
   it('renders no settings, home or user-footer controls', () => {
     const { container } = renderModule(mod);
-    expect(within(container).queryByText('aaron@idynify.com')).toBeNull();
+
+    // Scoped to the sub-nav panel, which is where every module's deleted user
+    // footer printed the signed-in email. Not container-wide: Settings' own
+    // Account section legitimately displays the email as content, and a
+    // container-wide query cannot tell "chrome we removed" from "the field the
+    // screen exists to show".
+    const panel = screen.getByRole('complementary', { name: new RegExp(`${mod.title} sections`, 'i') });
+    expect(within(panel).queryByText('aaron@idynify.com')).toBeNull();
+    expect(within(panel).queryByText(/@idynify\.com$/)).toBeNull();
+
     expect(within(container).queryByTitle('Mission Control')).toBeNull();
   });
 

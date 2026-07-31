@@ -141,9 +141,27 @@ export const GROUP_ORDER = [
   NAV_GROUPS.INTELLIGENCE,
 ];
 
+/**
+ * Settings. A destination, not a module — it has no place in SIDEBAR_ORDER
+ * because it is reached from the top bar's user menu and the mobile drawer.
+ *
+ * It is in ALL_DESTINATIONS all the same, so resolveModule('/settings') gives
+ * the shell a real answer. Without it /settings fell through to the
+ * Mission Control fallback and the breadcrumb read "Mission Control" while the
+ * user was plainly in Settings.
+ */
+export const SETTINGS = {
+  id: 'settings',
+  label: 'Settings',
+  railLabel: 'SETTINGS',
+  path: '/settings',
+  barryModule: 'default',
+  description: 'Account, security, billing and appearance',
+};
+
 /** Utility links below the divider. Not modules; never grouped with them. */
 export const UTILITY_LINKS = [
-  { id: 'settings', label: 'Settings', path: '/settings' },
+  SETTINGS,
   { id: 'help', label: 'Help / Support', path: null, action: 'support' },
 ];
 
@@ -166,10 +184,16 @@ export const COMMAND_CENTER = {
 };
 
 /**
- * Destinations that belong to no NAV_GROUP. Named for the grouping, not for
- * visibility: everything here is in the sidebar.
+ * Destinations that belong to no NAV_GROUP.
+ *
+ * Named for the grouping, not for visibility — these are not "lesser"
+ * destinations. Command Center is a first-class sidebar item; Settings is
+ * reached from the top bar's user menu and the mobile drawer. What they share
+ * is that the locked IA puts neither in PIPELINE, RELATIONSHIPS or
+ * INTELLIGENCE. SIDEBAR_ORDER, below, is what decides who draws in the
+ * sidebar.
  */
-export const UNGROUPED_DESTINATIONS = [COMMAND_CENTER];
+export const UNGROUPED_DESTINATIONS = [COMMAND_CENTER, SETTINGS];
 
 const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNGROUPED_DESTINATIONS];
 

@@ -264,3 +264,26 @@
   .scout-contact-panel { width: 100%; border-left: none; }
 }
 
+
+/* ── Module shell ──
+   The row a migrated module renders into: sub-nav panel, then workspace.
+   Lives here because ModuleSubNav requires a `position: relative` parent for
+   its expand affordance — providing the parent class alongside the component
+   makes that guarantee automatic rather than something each module has to
+   remember. */
+.module-shell {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.module-workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

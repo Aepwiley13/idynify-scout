@@ -23,19 +23,6 @@
    inside Scout.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* Two-layer navigation.
-   Layer 1 — the icon rail — belongs to the shell. Layer 2 is this row: the
-   module's expandable sub-nav panel, then the workspace. Hence `row`, not
-   `column`: the panel sits beside the content, not above it. */
-.scout-module {
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  position: relative;
-}
-
 /* ── Mobile — preserved pre-migration layout (Phase 0 constraint C3) ── */
 .scout-mobile {
   display: flex;

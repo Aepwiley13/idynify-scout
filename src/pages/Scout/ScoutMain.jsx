@@ -264,7 +264,7 @@ function ScoutShellInner() {
   // tagline in the header, a `‹` collapse control, items as name + short
   // description, collapse state remembered per module.
   return (
-    <div className="scout-module">
+    <div className="module-shell">
       <ModuleSubNav
         title="SCOUT"
         tagline="Find and qualify prospects"

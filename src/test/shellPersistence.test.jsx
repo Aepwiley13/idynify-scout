@@ -57,6 +57,10 @@ function MissionControlProbe() {
   return <div data-testid="page">mission-control</div>;
 }
 
+function HunterProbe() {
+  return <div data-testid="page">hunter</div>;
+}
+
 function ScoutProbe() {
   return (
     <div>
@@ -93,6 +97,7 @@ function renderShell(initialPath = '/mission-control-v2', ContactPanel = Contact
             <Route path="/scout" element={<ScoutProbe />}>
               <Route path="contact/:contactId" element={<ContactPanel />} />
             </Route>
+            <Route path="/hunter" element={<HunterProbe />} />
           </Route>
         </Routes>
       </ShellProvider>
@@ -124,13 +129,31 @@ describe('shell persistence across the Phase 8 journey', () => {
     // Contact Profile → back to Scout
     await act(async () => { navigateTo('/scout?tab=all-leads'); });
 
-    // Scout → Mission Control
+    // Scout → Hunter. This is the crossing "Move to Hunter" lands on, and the
+    // one that used to swap the entire application chrome — Scout's rail out,
+    // Hunter's rail in, Barry destroyed and rebuilt in between.
+    await act(async () => { navigateTo('/hunter'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('hunter');
+
+    // Hunter → Mission Control
     await act(async () => { navigateTo('/mission-control-v2'); });
     expect(screen.getByTestId('page')).toHaveTextContent('mission-control');
 
-    // Four transitions, still one shell. Pre-migration this would be 5.
+    // Five transitions, still one shell. Pre-migration this would be 6.
     expect(shellMountCount).toBe(1);
     expect(screen.getByTestId('shell-chrome')).toBeInTheDocument();
+  });
+
+  it('crosses Scout → Hunter without remounting the shell', async () => {
+    renderShell('/scout?tab=all-leads');
+    expect(shellMountCount).toBe(1);
+
+    await act(async () => { navigateTo('/hunter'); });
+
+    expect(screen.getByTestId('page')).toHaveTextContent('hunter');
+    expect(shellMountCount).toBe(1);
+    expect(latestContext.current_module).toBe('hunter');
+    expect(latestContext.source_route).toBe('/scout?tab=all-leads');
   });
 
   it('keeps Scout mounted while a contact panel is open', async () => {

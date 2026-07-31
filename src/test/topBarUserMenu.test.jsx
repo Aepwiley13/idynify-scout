@@ -13,7 +13,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../theme/ThemeContext';
 import UserMenu from '../components/layout/UserMenu';
 import { displayNameFor, initialsFor } from '../utils/userIdentity';
-import { supportMailto } from '../constants/support';
+import { supportMailto, SUPPORT_EMAIL, PLANNED_SUPPORT_EMAIL } from '../constants/support';
 
 vi.mock('../firebase/config', () => ({
   auth: { currentUser: null, onAuthStateChanged: () => () => {} },
@@ -35,6 +35,19 @@ const AARON = { email: 'aaron@idynify.com', firstName: 'Aaron', lastName: 'Wiley
 beforeEach(() => { localStorage.clear(); });
 
 describe('display identity', () => {
+  it('treats displayName as canonical — it beats every other source', () => {
+    // What Settings → Account writes. A name the user chose outranks one
+    // assembled from onboarding fragments or derived from an address.
+    expect(displayNameFor({
+      displayName: 'Ren',
+      firstName: 'Aaron', lastName: 'Wiley',
+      name: 'Legacy Name',
+      email: 'aaron@idynify.com',
+    })).toBe('Ren');
+
+    expect(initialsFor({ displayName: 'Aaron Wiley', email: 'x@y.com' })).toBe('AW');
+  });
+
   it('prefers a real first and last name', () => {
     expect(displayNameFor(AARON)).toBe('Aaron Wiley');
     expect(initialsFor(AARON)).toBe('AW');
@@ -44,6 +57,13 @@ describe('display identity', () => {
     expect(displayNameFor({ name: 'Aaron Wiley' })).toBe('Aaron Wiley');
     expect(displayNameFor({ displayName: 'Aaron Wiley' })).toBe('Aaron Wiley');
     expect(displayNameFor({ firstName: 'Aaron' })).toBe('Aaron');
+  });
+
+  it('ignores a blank displayName rather than showing an empty name', () => {
+    // Clearing the field in Settings writes '', which must fall through to the
+    // next source — not render a nameless account menu.
+    expect(displayNameFor({ displayName: '   ', firstName: 'Aaron' })).toBe('Aaron');
+    expect(displayNameFor({ displayName: '', email: 'aaron@idynify.com' })).toBe('Aaron');
   });
 
   it('derives a name from the email rather than showing the address', () => {
@@ -155,9 +175,34 @@ describe('UserMenu', () => {
 });
 
 describe('support link', () => {
-  it('points at the support address with a subject line', () => {
+  it('points at the configured address with a subject line', () => {
     // Was a Crisp-if-loaded fork falling back to support@idynify.com, an
     // address nothing answers — so the fallback silently went nowhere.
-    expect(supportMailto()).toBe('mailto:aaron@idynify.com?subject=Idynify%20Support%20Request');
+    expect(supportMailto()).toBe(`mailto:${SUPPORT_EMAIL}?subject=Idynify%20Support%20Request`);
+  });
+
+  it('ships a monitored address, not the planned one', () => {
+    // support@idynify.com is the target and is NOT live. Pointing help at an
+    // unmonitored inbox is the exact failure the old fallback had, so the
+    // default stays on the monitored address until Aaron confirms otherwise.
+    // Flipping DEFAULT_SUPPORT_EMAIL (or setting VITE_SUPPORT_EMAIL) is the
+    // whole change — this test is the reminder that it has not happened yet.
+    expect(PLANNED_SUPPORT_EMAIL).toBe('support@idynify.com');
+    expect(SUPPORT_EMAIL).toBe('aaron@idynify.com');
+  });
+
+  it('is named in exactly one place', async () => {
+    // "Not duplicated across components." CheckoutCancelPage had its own
+    // hard-coded support@idynify.com in prose, pointing a cancelled checkout
+    // at an inbox nobody reads.
+    const files = import.meta.glob('../{components,pages}/**/*.{js,jsx}', {
+      query: '?raw', import: 'default', eager: true,
+    });
+
+    const offenders = Object.entries(files)
+      .filter(([, src]) => /['"`][\w.+-]+@idynify\.com/.test(src))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
   });
 });

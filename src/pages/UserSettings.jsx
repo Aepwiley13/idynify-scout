@@ -52,6 +52,8 @@ import { BRAND, THEMES, ASSETS } from '../theme/tokens';
 import BottomNav from '../components/layout/BottomNav';
 import MoreSheet from '../components/layout/MoreSheet';
 import ModuleSubNav from '../components/layout/ModuleSubNav';
+import { displayNameFor } from '../utils/userIdentity';
+import { useShell } from '../context/ShellContext';
 import ServiceProfileSetup from '../components/serviceProfiles/ServiceProfileSetup';
 import './UserSettings.css';
 
@@ -355,6 +357,7 @@ function AppearancePanel() {
 export default function UserSettings() {
   const T = useT();
   const navigate = useNavigate();
+  const { updateDisplayName } = useShell();
 
   const mql = window.matchMedia('(max-width: 768px)');
   const [isMobile, setIsMobile] = useState(() => mql.matches);
@@ -373,6 +376,12 @@ export default function UserSettings() {
   const [pwResetSent, setPwResetSent]     = useState(false);
   const [pwResetLoading, setPwResetLoading] = useState(false);
   const [pwResetError, setPwResetError]   = useState(null);
+
+  /* ── display name ── */
+  const [displayName, setDisplayName]           = useState('');
+  const [displayNameInput, setDisplayNameInput] = useState('');
+  const [displayNameSaving, setDisplayNameSaving] = useState(false);
+  const [displayNameSaved, setDisplayNameSaved]   = useState(false);
 
   /* ── booking link ── */
   const [bookingLink, setBookingLink]         = useState('');
@@ -422,7 +431,7 @@ export default function UserSettings() {
     loadGmailStatus();
     loadCalendarStatus();
     loadBilling();
-    loadBookingLink();
+    loadProfile();
     refreshMfaStatus();
     // Auto-switch to integrations tab if redirected from Calendar OAuth
     const params = new URLSearchParams(window.location.search);
@@ -476,16 +485,44 @@ export default function UserSettings() {
     setServiceProfiles(prev => prev.filter(p => p.id !== profileId));
   }
 
-  async function loadBookingLink() {
+  /**
+   * Display name and booking link come out of the same user document, so they
+   * share one read rather than fetching it twice.
+   */
+  async function loadProfile() {
     if (!user) return;
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
-      if (snap.exists()) {
-        const link = snap.data().bookingLink || '';
-        setBookingLink(link);
-        setBookingLinkInput(link);
-      }
+      if (!snap.exists()) return;
+      const data = snap.data();
+
+      const link = data.bookingLink || '';
+      setBookingLink(link);
+      setBookingLinkInput(link);
+
+      const name = data.displayName || '';
+      setDisplayName(name);
+      setDisplayNameInput(name);
     } catch { /* non-blocking */ }
+  }
+
+  async function handleSaveDisplayName() {
+    if (displayNameSaving) return;
+    const next = displayNameInput.trim();
+    setDisplayNameSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { displayName: next });
+      setDisplayName(next);
+      // Tell the shell, so the top bar and drawer update now rather than on
+      // the next reload. App reads users/{uid} once, when auth resolves.
+      updateDisplayName(next);
+      setDisplayNameSaved(true);
+      setTimeout(() => setDisplayNameSaved(false), 2500);
+    } catch (err) {
+      console.error('[UserSettings] Failed to save display name:', err);
+    } finally {
+      setDisplayNameSaving(false);
+    }
   }
 
   async function handleSaveBookingLink() {
@@ -732,9 +769,62 @@ export default function UserSettings() {
           <div className="us-section-stack">
             <section className="us-section">
               <h2 className="us-section-title">Profile</h2>
+
+              {/* Display name. THE canonical name field — the top bar, the
+                  mobile drawer and anywhere else that greets the user read
+                  users/{uid}.displayName first.
+
+                  Until this existed there was nowhere in the product to set a
+                  name, which is why every surface printed the raw email
+                  address. Leaving it blank is fine and supported: the name
+                  falls back to one derived from the email, which is what
+                  everyone sees today. */}
               <div className="us-card">
                 <div className="us-card-icon" style={{ background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
                   <User className="w-4 h-4" />
+                </div>
+                <div className="us-card-body" style={{ flex: 1 }}>
+                  <label className="us-card-label" htmlFor="us-display-name">Display name</label>
+                  <span className="us-card-value us-card-value--muted">
+                    How you appear across Idynify. Leave blank to use{' '}
+                    {displayNameFor({ email: user?.email }) || 'a name from your email'}.
+                  </span>
+                  <input
+                    id="us-display-name"
+                    type="text"
+                    maxLength={60}
+                    placeholder={displayNameFor({ email: user?.email }) || 'Your name'}
+                    value={displayNameInput}
+                    onChange={e => setDisplayNameInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveDisplayName(); }}
+                    style={{
+                      marginTop: '0.5rem',
+                      width: '100%',
+                      padding: '0.45rem 0.7rem',
+                      fontSize: '0.82rem',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(139,92,246,0.3)',
+                      background: 'rgba(139,92,246,0.05)',
+                      color: 'inherit',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+                <button
+                  className={`us-action-btn ${displayNameSaved ? 'us-action-btn--done' : 'us-action-btn--primary'}`}
+                  onClick={handleSaveDisplayName}
+                  aria-label="Save display name"
+                  disabled={displayNameSaving || displayNameInput.trim() === displayName}
+                  style={{ alignSelf: 'flex-end', flexShrink: 0 }}
+                >
+                  {displayNameSaving ? <Loader className="w-3.5 h-3.5 animate-spin" /> : displayNameSaved ? <CheckCircle className="w-3.5 h-3.5" /> : null}
+                  {displayNameSaved ? 'Saved' : 'Save'}
+                </button>
+              </div>
+
+              <div className="us-card">
+                <div className="us-card-icon" style={{ background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                  <Mail className="w-4 h-4" />
                 </div>
                 <div className="us-card-body">
                   <span className="us-card-label">Email address</span>
@@ -775,6 +865,7 @@ export default function UserSettings() {
                 <button
                   className={`us-action-btn ${bookingLinkSaved ? 'us-action-btn--done' : 'us-action-btn--primary'}`}
                   onClick={handleSaveBookingLink}
+                  aria-label="Save booking link"
                   disabled={bookingLinkSaving || bookingLinkInput === bookingLink}
                   style={{ alignSelf: 'flex-end', flexShrink: 0 }}
                 >

@@ -23,18 +23,45 @@ export function useUserPreference(key, defaultValue) {
     const user = auth.currentUser;
     if (!user) return;
 
-    getDoc(doc(db, 'users', user.uid))
-      .then(snap => {
+    // doc() validates its arguments and throws SYNCHRONOUSLY when `db` is not
+    // a real Firestore instance — before there is a promise for .catch to
+    // attach to. So the .catch below never saw it: the throw escaped the
+    // effect, React unwound the tree, and any screen using a preference went
+    // blank. It took Settings down whole.
+    //
+    // A misconfigured `db` is a configuration failure, not a missing
+    // preference, so it is logged as an error and named as such rather than
+    // folded into the "could not load" warning below. The hook still returns
+    // defaultValue and the screen still renders — a preference is not worth a
+    // blank page.
+    const load = async () => {
+      let ref;
+      try {
+        ref = doc(db, 'users', user.uid);
+      } catch (err) {
+        console.error(
+          `[useUserPreference] Firestore is not configured — cannot read '${key}'.`,
+          err
+        );
+        return;
+      }
+
+      try {
+        const snap = await getDoc(ref);
         if (snap.exists()) {
           const prefs = snap.data().preferences || {};
           if (key in prefs) setValue(prefs[key]);
         }
-      })
-      .catch(err => {
+      } catch (err) {
         // Non-fatal — falls back to defaultValue
         console.warn(`[useUserPreference] Could not load '${key}':`, err.message);
-      })
-      .finally(() => setLoaded(true));
+      }
+    };
+
+    // Both outcomes finish loading. Deferred to the promise rather than called
+    // in the effect body so a configuration failure does not setState during
+    // the effect and cascade a render.
+    load().finally(() => setLoaded(true));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist to Firestore + update local state optimistically

@@ -14,6 +14,8 @@
 | 5 | Hamburger drawer gains Settings, Help and the account | `Sidebar.jsx` |
 | 6 | More sheet: modules only, theme as a toggle | `MoreSheet.jsx` |
 | 7 | Mobile top bar down to four controls | `MainLayout.css` |
+| 8 | **Display name field** in Settings → Account | `UserSettings.jsx` |
+| 9 | **`useUserPreference` crash path fixed** | `useUserPreference.js` |
 
 **8 of 8 on the shell checklist.** Settings was the last screen in the product
 still swapping the shell out for the old 60px rail.
@@ -43,21 +45,36 @@ menu.
 
 ### Where the name comes from
 
-The brief asks for "first name + last name — NOT the email address". **The
-product has never stored a name for the account holder.** `users/{uid}` carries
-`firstName` only when onboarding happened to fill it, and Firebase Auth's
-`displayName` is unset for email/password signups, which is how everyone here
-signs up. That absence is why every surface so far printed the raw email.
+**Settings → Account now has a Display name field.** `users/{uid}.displayName`
+is the canonical source; one input, one Save button. Everything else is
+fallback, in descending order of how much it is really a name the user chose:
 
-`utils/userIdentity.js` resolves through what actually exists, in order —
-`firstName`/`lastName`, then `name`/`displayName` — and derives a name from the
-email as a last resort rather than falling back to showing the address:
-`aaron@idynify.com` → **Aaron**, `aaron.wiley@…` → **Aaron Wiley**.
+1. `displayName` — set by the user, in Settings → Account
+2. `firstName` + `lastName` — sometimes filled by onboarding
+3. `name` — legacy, written by older code paths
+4. derived from the email — a convenience, not a claim about identity
 
-That is a display convenience, not a claim about identity. If a real name field
-lands later it wins automatically, because it is checked first. **Worth
-deciding: should the Account section of Settings ask for a name?** Right now
-there is nowhere in the product to set one.
+The last resort derives rather than falling back to showing the address:
+`aaron@idynify.com` → **Aaron**, `aaron.wiley@…` → **Aaron Wiley**. Leaving the
+field blank is a supported state, not an error — it is what every existing user
+is in today, and the field says so.
+
+Firebase Auth's own `displayName` is deliberately **not** consulted. It is
+unset for email/password signups, which is how everyone here signs up, and
+reading it would put a second writable name in play with no way to reconcile
+the two.
+
+**One thing the field needed that was not obvious.** `App` reads `users/{uid}`
+once, when auth resolves, and never again — so saving a name would not reach
+the top bar until a reload. You would type your name, press Save, see "Saved",
+and watch the corner keep calling you something else. `ShellContext` now
+exposes `shellUser`, and Settings publishes the saved name to it. Display
+concern only; Firestore stays the source of truth and the override never
+writes.
+
+Both Save buttons in the Account section also gained distinct accessible names
+("Save display name", "Save booking link"). Two buttons labelled just "Save" on
+one screen is ambiguous to a screen reader — and, as it happens, to a test.
 
 ---
 
@@ -68,8 +85,9 @@ loaded, and otherwise `mailto:support@idynify.com` — an address nothing
 answers. So the fallback path silently went nowhere, which is what the brief
 noticed.
 
-One destination now, in `constants/support.js`, shared by the top bar and the
-mobile drawer:
+One destination now, in `constants/support.js`. **Nothing else in the codebase
+names a support address** — every surface calls `supportMailto()`, and there is
+a test that fails if a second one appears.
 
 ```
 mailto:aaron@idynify.com?subject=Idynify%20Support%20Request
@@ -77,6 +95,19 @@ mailto:aaron@idynify.com?subject=Idynify%20Support%20Request
 
 An `<a href>` rather than a button — a real link the browser and OS both
 understand, so it opens the mail client without depending on JS.
+
+**The target is `support@idynify.com`, and it is not the default yet.** That
+inbox is not live, and pointing help at an unmonitored address is worse than
+pointing it at a monitored personal one — it is precisely the failure the old
+Crisp fallback had. When Aaron confirms, flip `DEFAULT_SUPPORT_EMAIL` in
+`constants/support.js`, or set `VITE_SUPPORT_EMAIL` to roll it out per
+environment first. A test asserts the shipped value is still the monitored one,
+so this cannot be forgotten quietly.
+
+**One real duplicate was found and removed.** `CheckoutCancelPage` hard-coded
+"Need help? Contact support@idynify.com" in prose — so a cancelled checkout,
+the moment a customer is most likely to need a human, was pointing at an inbox
+nobody reads. It now renders `SUPPORT_EMAIL` as a live mailto link.
 
 ---
 
@@ -90,7 +121,11 @@ compact rail took its place. Same recipe as the seven module migrations.
 
 Route moved into the `ShellRoute` group, mirrored in the rollback branch.
 
-### One decision worth flagging
+### The sub-nav — confirmed, keeping it
+
+*Approved as built.* Contextual navigation inside a destination does not
+compete with global navigation. Recorded here because the brief said otherwise
+and the reasoning is worth keeping:
 
 The brief says Settings **"does not need a sub-nav panel — it is a single
 destination"**. It is a single destination, and it has always had a 190px
@@ -105,8 +140,7 @@ drift the shared component exists to prevent.
 
 The sections gained short descriptions ("Password and two-factor", "Themes and
 mission sounds"), because every other module's panel has them and Settings
-would otherwise read differently. **If you want the panel gone, say so and it
-is a small change** — but the seven sections need somewhere to go first.
+would otherwise read differently.
 
 Settings is **not** in the sidebar. It is reached from the account menu and the
 mobile drawer, which is the brief's own alternative ("or a settings icon if
@@ -208,11 +242,19 @@ still exactly those five.
 
 ## Verification
 
-**540 tests, 535 passing.** Three new suites and one repair:
+**552 tests, 547 passing.** Four new suites and one repair:
 
-- `topBarUserMenu.test.jsx` (12) — identity resolution including the
-  email-derived fallback, the dropdown's contents, keyboard behaviour, and that
-  the top bar shows a name and not an address.
+- `topBarUserMenu.test.jsx` (16) — identity resolution (displayName wins over
+  everything; a blank one falls through rather than rendering a nameless menu),
+  the dropdown's contents, keyboard behaviour, and that the top bar shows a
+  name and not an address. Also asserts the shipped support address is the
+  monitored one, and **greps the whole component and page tree for a second
+  hard-coded `@idynify.com` address** — "not duplicated across components" as a
+  test rather than a promise.
+- `settingsDisplayName.test.jsx` (8) — the field is in Account, says what blank
+  means, trims, writes `users/{uid}.displayName`, loads back, keeps Save
+  disabled until something changed, and **reaches the top bar without a
+  reload**.
 - `mobileNavigation.test.jsx` (13) — the drawer lists every module in sidebar
   order, reaches Settings/Help/Log out, and closes on tap; the More sheet holds
   modules only; the bottom nav is unchanged.
@@ -246,17 +288,22 @@ Build passes. Lint at or below baseline on every file touched.
 
 ---
 
+## Fixed since first review
+
+**`useUserPreference` no longer has a crash path.** It calls `doc(db, …)`
+inside an effect, and `doc()` throws **synchronously** — before the promise its
+`.catch` is attached to exists — so the rejection escaped, React unwound the
+tree, and any screen using a preference went blank. It took Settings down
+whole. Now the `doc()` call is guarded on its own: a misconfigured Firestore is
+a **configuration** failure, so it is logged as an error and named as such
+rather than folded into the "could not load" warning, and the hook still
+returns its default so a preference is never worth a blank page. The error is
+logged, not swallowed. Loading is finished via the promise rather than in the
+effect body, so the fix does not itself cascade a render.
+
+---
+
 ## Carried forward
-
-**No name field.** See §1. The name is derived from the email for everyone
-until someone can set one.
-
-**A latent bug in `useUserPreference`.** It calls `doc(db, …)` inside an
-effect, and `doc()` throws **synchronously** — before the promise its `.catch`
-is attached to exists — so a rejection escapes and takes the render down. It
-only fires when `db` is misconfigured, which in production means the app is
-already broken, so this was mocked in tests rather than fixed here. Worth a
-one-line `try` in whichever sprint owns that hook.
 
 **Logo assets** are still absent — the wordmark, mark and Barry avatar all
 render fallbacks. Unchanged from the previous PRs, still not shippable
@@ -266,3 +313,23 @@ branding.
 horizontal tab strip, which the brief confirms is correct for mobile. What is
 not reconciled is that some of those top bars carry their own theme picker and
 settings button, now duplicating the drawer. Worth one pass, not eight.
+
+**`support@idynify.com` is not live.** One line in `constants/support.js` when
+it is. Tracked by a test so it cannot go quiet.
+
+---
+
+## The shell is closed
+
+The navigation is done. Hunter migrates on the same pattern, and after that the
+global shell stops changing unless real users in real sessions show real
+confusion — not instinct, not another audit. Evidence.
+
+Every part of this that matters long-term is the contract, not the chrome.
+`navigationContext` — `current_module`, `current_entity_id`,
+`current_pipeline_stage`, `source_route`, `navigation_history` — already
+publishes on every navigation and already renders into Barry's system prompt.
+The navigation's job from here is to keep that contract accurate so Barry never
+loses the user. Hunter's migration is the first link that matters: it is where
+Barry learns that a prospect crossed from discovery into active engagement, who
+made that call, and what the context was.

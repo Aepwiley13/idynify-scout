@@ -55,7 +55,7 @@ import './MainLayout.css';
  * reconciles the two.
  */
 const MODULES_WITH_OWN_MOBILE_NAV = [
-  '/scout', '/hunter', '/sniper', '/basecamp', '/reinforcements',
+  '/scout', '/hunter', '/sniper', '/basecamp', '/reinforcements', '/fallback',
 ];
 
 function ownsItsMobileNav(pathname) {

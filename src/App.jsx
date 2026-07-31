@@ -460,6 +460,7 @@ function App() {
             <Route path="/sniper" element={<SniperMain />} />
             <Route path="/basecamp" element={<BasecampMain />} />
             <Route path="/reinforcements" element={<ReinforcementsMain />} />
+            <Route path="/fallback" element={<FallbackMain />} />
           </Route>
         ) : (
           <>
@@ -520,6 +521,7 @@ function App() {
             <Route path="/sniper" element={<ProtectedRoute withLayout={true}><SniperMain /></ProtectedRoute>} />
             <Route path="/basecamp" element={<ProtectedRoute withLayout={true}><BasecampMain /></ProtectedRoute>} />
             <Route path="/reinforcements" element={<ProtectedRoute withLayout={true}><ReinforcementsMain /></ProtectedRoute>} />
+            <Route path="/fallback" element={<ProtectedRoute withLayout={true}><FallbackMain /></ProtectedRoute>} />
           </>
         )}
 
@@ -594,15 +596,6 @@ function App() {
         <Route path="/scout/contact-search" element={<Navigate to="/scout?tab=company-search" replace />} />
 
 
-        {/* Fallback Module — archive hub for lost/archived people & companies (no MainLayout) */}
-        <Route
-          path="/fallback"
-          element={
-            <ProtectedRoute>
-              <FallbackMain />
-            </ProtectedRoute>
-          }
-        />
 
 
         {/* Blitz Mode — rapid engagement queue (no MainLayout) */}

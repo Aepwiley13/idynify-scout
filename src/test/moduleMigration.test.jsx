@@ -46,12 +46,16 @@ vi.mock('../pages/Reinforcements/sections/OpportunitiesSection', () => stub('rf-
 vi.mock('../pages/Reinforcements/sections/LeaderboardSection', () => stub('rf-leaderboard'));
 vi.mock('../pages/Reinforcements/sections/RecordReferralSection', () => stub('rf-record'));
 vi.mock('../pages/Reinforcements/sections/NurtureSection', () => stub('rf-nurture'));
+vi.mock('../pages/Fallback/sections/PeopleSection', () => stub('fb-people'));
+vi.mock('../pages/Fallback/sections/CompaniesSection', () => stub('fb-companies'));
+vi.mock('../pages/Fallback/sections/FallbackModule', () => stub('fb-comeback'));
 vi.mock('../hooks/useSubscription', () => ({ useSubscription: () => ({ isProTier: true, loading: false }) }));
 
 const { default: HunterMain } = await import('../pages/Hunter/HunterMain');
 const { default: SniperMain } = await import('../pages/Sniper/SniperMain');
 const { default: BasecampMain } = await import('../pages/Basecamp/BasecampMain');
 const { default: ReinforcementsMain } = await import('../pages/Reinforcements/ReinforcementsMain');
+const { default: FallbackMain } = await import('../pages/Fallback/FallbackMain');
 
 /**
  * One row per migrated module. `otherModules` are labels the module's own rail
@@ -107,6 +111,17 @@ const MIGRATED = [
     sections: ['Dashboard', 'Opportunities', 'Leaderboard', 'Record', 'Nurture'],
     descriptions: ['Network overview', 'Top referral sources'],
     activeTab: { query: '?tab=nurture', expect: 'Nurture' },
+  },
+  {
+    name: 'Fallback',
+    Component: FallbackMain,
+    path: '/fallback',
+    title: 'FALLBACK',
+    tagline: 'Re-engage archived and closed-lost',
+    storageKey: 'fallback_subnav_collapsed',
+    sections: ['Comeback', 'People', 'Companies'],
+    descriptions: ['Re-engagement engine', 'Archived & lost people'],
+    activeTab: { query: '?tab=companies', expect: 'Companies' },
   },
 ];
 

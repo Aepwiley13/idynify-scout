@@ -15,11 +15,11 @@ Order: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Comm
 | **Sniper** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Basecamp** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Reinforcements** | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Fallback | migrate | migrate | migrate | restyle | migrate |
+| **Fallback** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Command Center | migrate | migrate | migrate | restyle | migrate |
 | Recon | migrate | migrate | migrate | restyle | migrate |
 
-**6 of 9.** The whole pipeline — Scout, Hunter, Sniper — plus Basecamp and Reinforcements. Three left: Fallback, Command Center, Recon.
+**7 of 9.** Two left: Command Center and Recon.
 
 ---
 
@@ -112,20 +112,33 @@ sidebar 220px | active: Reinforcements | sub-nav 190px
 sections: Dashboard · Opportunities · Leaderboard · Record · Nurture
 ```
 
+## 5 — Fallback
+
+`FallbackMain.jsx`: **626 → 296 lines.**
+
+Sections unchanged: Comeback, People, Companies.
+
+Route moved: `/fallback`.
+
+```
+sidebar 220px | active: Fallback | sub-nav 190px
+sections: Comeback · People · Companies
+```
+
 ---
 
 ## Verification
 
-`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Reinforcements → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 9 times.
+`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Reinforcements → Fallback → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 10 times.
 
 Two crossings get their own tests:
 
 - **Scout → Hunter.** The one "Move to Hunter" lands on, and the one the original audit called the worst moment in the product — Scout's rail out, Hunter's rail in, Barry destroyed and rebuilt in between. It now changes nothing but the content.
 - **Scout → Hunter → Sniper.** The whole pipeline on one shell, with `current_module` and `source_route` tracking correctly at each step.
 
-`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 32 tests across Hunter, Sniper, Basecamp and Reinforcements, growing by 8 per migration.
+`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 40 tests across Hunter, Sniper, Basecamp, Reinforcements and Fallback, growing by 8 per migration.
 
-Suite **473 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
+Suite **481 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
 
 ---
 
@@ -141,4 +154,16 @@ Suite **473 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 ## Next
 
-**Fallback.** Same recipe; its sections are Comeback, People and Companies.
+**Command Center**, then **Recon**.
+
+Command Center is the one that needs a decision before it starts, not just a
+migration. It holds six unrelated concerns behind one route — people,
+companies, missions, weapons, arsenal, outcomes — and an earlier brief said it
+"is not a top-level module" on the grounds that it already appears in Hunter's
+sub-nav. It does not; Hunter's sub-nav is Blitz Mode, All People, Companies,
+Follow Up Now, Today's Actions, Replied, Active, New. It is currently reachable
+only from the sidebar and Mission Control's module grid.
+
+Migrating it as-is is straightforward. Deciding whether it should stay one
+destination is an information-architecture question, and worth answering
+first.

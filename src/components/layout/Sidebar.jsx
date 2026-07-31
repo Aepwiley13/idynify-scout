@@ -1,156 +1,122 @@
 /**
- * Sidebar — the global icon rail.
+ * Sidebar — Layer 1 of the three-layer navigation.
  *
- * ~64px. Fixed. It never changes shape, width or structure, on any route.
- * The rail is infrastructure: it tells you where you are and gets out of the
- * way so the content area can do the work.
+ *   [Layer 1]        [Layer 2]            [Layer 3]
+ *   Wide sidebar  →  Module sub-nav   →   Content
+ *   220px, fixed     190px, collapsible   fills the rest
  *
- * Renders the LOCKED information architecture from constants/navigationModel.js:
+ * Always visible on every authenticated desktop route. Never collapses, never
+ * changes width, no icon-only state, no hover-to-expand.
  *
- *   [Idynify mark]
- *   ──────────────
- *   Mission Control          (stands alone)
- *   ──────────────
- *   Scout · Hunter · Sniper                  PIPELINE
- *   ──────────────
- *   Basecamp · Reinforcements · Fallback     RELATIONSHIPS
- *   ──────────────
- *   Recon                                    INTELLIGENCE
- *   ──────────────
- *   Settings · Help / Support
- *   ──────────────
- *   Barry · Account
+ * Structure:
+ *   IDYNIFY wordmark  → Mission Control
+ *   Module list       → full text labels, active item as a filled violet pill
+ *   Barry card        → pinned to the bottom, opens the Barry overlay
  *
- * Decisions worth not re-litigating:
+ * Things this sidebar deliberately does NOT have, per the final brief:
+ *   · group headers (PIPELINE / RELATIONSHIPS / INTELLIGENCE)
+ *   · descriptive subtitles under module names
+ *   · a theme toggle — Settings already owns a Themes section
+ *   · Barry as a plain nav item — he lives in the card at the bottom only
+ *   · a collapse control
  *
- *  - Groups are communicated by DIVIDERS, not permanent text headers. The
- *    headers cost vertical space the rail cannot spare. Screen readers still
- *    get the grouping: each group is a <ul> with an accessible name, which is
- *    the non-visual equivalent of the header that was removed.
- *  - Labels appear on the ACTIVE item only. Everything else is icon plus a
- *    hover/focus tooltip carrying the full locked label.
- *  - No collapse control. A rail that can change width is a rail that can
- *    surprise you; the whole point is that it is always the same.
- *  - Barry sits at the bottom with the account, below a divider, because he
- *    is a persistent overlay and not a destination. Navigation controls,
- *    Barry recommends.
+ * Order comes from SIDEBAR_ORDER in constants/navigationModel.js, which is the
+ * single source of truth for what exists and what it is called.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Home, Radar, Crosshair, Target, Tent, Shield, Archive, Eye,
-  Settings, LifeBuoy, Check,
+  Home, Radar, Crosshair, Target, Tent, Shield, Archive, Eye, Users,
+  ChevronRight,
 } from 'lucide-react';
 import {
   MISSION_CONTROL,
-  GROUP_ORDER,
-  modulesInGroup,
+  sidebarDestinations,
   resolveModule,
 } from '../../constants/navigationModel';
-import { useThemeCtx } from '../../theme/ThemeContext';
-import { THEMES, ASSETS } from '../../theme/tokens';
+import { ASSETS } from '../../theme/tokens';
 import { useShell } from '../../context/ShellContext';
-import { auth } from '../../firebase/config';
-import { useActiveUser } from '../../context/ImpersonationContext';
 import './Sidebar.css';
 
 /** Icons live in the view layer; navigationModel stays presentation-free. */
 const MODULE_ICONS = {
+  'mission-control': Home,
   scout: Radar,
   hunter: Crosshair,
   sniper: Target,
   basecamp: Tent,
-  reinforcements: Shield,
-  fallback: Archive,
   recon: Eye,
+  reinforcements: Users,
+  fallback: Archive,
+  'command-center': Users,
 };
 
 /**
- * Place a tooltip against its button, in viewport coordinates.
+ * The IDYNIFY wordmark.
  *
- * The tooltip is `position: fixed` rather than absolutely positioned inside
- * the button, because the nav scrolls when the module list outgrows a short
- * viewport — and a scroll container clips on BOTH axes. CSS cannot express
- * "scroll vertically, overflow horizontally": `overflow-y: auto` forces
- * `overflow-x` to compute to `auto` as well, so an absolutely positioned
- * tooltip is cut off at the rail's edge with only its arrow escaping.
- *
- * Fixed positioning takes it out of the clip entirely. The cost is these few
- * lines of measurement, which is the same trade Linear and Slack make by
- * portalling their rail tooltips.
+ * Renders the brand asset when it loads, and a styled text wordmark when it
+ * does not. The fallback is not decoration: /assets/Idynify_logo1.png is not
+ * in this repository (nor are the barry avatar or short mark), so without it
+ * the top of the sidebar is blank in any environment where the assets are not
+ * deployed — which is every environment this code has been run in so far.
  */
-function positionTooltip(button) {
-  const tip = button?.querySelector('.rail-tooltip');
-  if (!tip) return;
-  const r = button.getBoundingClientRect();
-  tip.style.top = `${r.top + r.height / 2}px`;
-  tip.style.left = `${r.right + 10}px`;
-}
-
-/**
- * One rail button. Icon always; label only when active; tooltip always.
- *
- * The tooltip carries the full locked label even when the visible rail label
- * is an abbreviation, so "MC" is never the only name a user is offered.
- */
-function RailButton({
-  icon,
-  label,
-  railLabel,
-  active = false,
-  onClick,
-  className = '',
-  children,
-}) {
-  // Lifted to a local rather than destructured as `icon: Icon`: this repo has
-  // no eslint-plugin-react, so JSX references do not count as usage and the
-  // config compensates with varsIgnorePattern '^[A-Z_]' — which covers
-  // variables but not destructured parameters.
-  const Icon = icon;
-  const ref = useRef(null);
-
-  return (
-    <button
-      ref={ref}
-      type="button"
-      className={`rail-btn ${active ? 'active' : ''} ${className}`}
-      onClick={onClick}
-      onMouseEnter={() => positionTooltip(ref.current)}
-      onFocus={() => positionTooltip(ref.current)}
-      aria-label={label}
-      aria-current={active ? 'page' : undefined}
-    >
-      {children ?? <Icon size={18} strokeWidth={active ? 2.25 : 1.9} aria-hidden="true" />}
-      {active && <span className="rail-btn-label">{railLabel || label}</span>}
-      <span className="rail-tooltip" role="presentation">{label}</span>
-    </button>
-  );
-}
-
-function RailDivider() {
-  return <div className="rail-divider" role="presentation" />;
-}
-
-/**
- * Barry's avatar, with a glyph fallback.
- *
- * The old rails hid the <img> on error, which left an empty button whenever
- * the asset failed to load — and Barry is the one control in the rail with no
- * icon to fall back to. A bear keeps the trigger visible and recognisable.
- */
-function BarryIcon() {
+function Wordmark() {
   const [failed, setFailed] = useState(false);
 
-  if (failed) return <span className="rail-barry-fallback" aria-hidden="true">🐻</span>;
+  if (failed) {
+    return (
+      <span className="sidebar-wordmark-text" aria-hidden="true">
+        IDYNIFY
+      </span>
+    );
+  }
 
   return (
     <img
-      className="rail-barry-avatar"
-      src={ASSETS.barryAvatar}
+      className="sidebar-wordmark-img"
+      src={ASSETS.logoFull}
       alt=""
       onError={() => setFailed(true)}
     />
+  );
+}
+
+/**
+ * Barry's card. Barry is a persistent overlay, never a destination — the card
+ * opens him, it does not navigate anywhere.
+ */
+function BarryCard({ onOpen, barryOpen, buttonRef }) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  return (
+    <button
+      type="button"
+      ref={buttonRef}
+      className={`barry-card ${barryOpen ? 'open' : ''}`}
+      onClick={onOpen}
+      aria-label="Open Barry"
+      aria-expanded={barryOpen}
+    >
+      <span className="barry-card-avatar">
+        {avatarFailed ? (
+          <span className="barry-card-avatar-fallback" aria-hidden="true">🐻</span>
+        ) : (
+          <img src={ASSETS.barryAvatar} alt="" onError={() => setAvatarFailed(true)} />
+        )}
+      </span>
+
+      <span className="barry-card-body">
+        <span className="barry-card-name">Barry</span>
+        <span className="barry-card-role">AI SDR</span>
+        <span className="barry-card-status">
+          <span className="barry-card-dot" aria-hidden="true" />
+          Online
+        </span>
+      </span>
+
+      <ChevronRight size={16} className="barry-card-chevron" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -164,180 +130,56 @@ const Sidebar = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { openBarry } = useShell();
-  const { themeId, setThemeId } = useThemeCtx();
-  const activeUser = useActiveUser();
 
-  const [accountOpen, setAccountOpen] = useState(false);
-  const accountRef = useRef(null);
-
-  // Active module resolves by longest path prefix, so /scout/contact/abc keeps
-  // Scout lit. Nested routes previously lost the highlight entirely.
+  // Longest-prefix resolution keeps Scout lit on /scout/contact/:id — the
+  // active module must stay obvious on nested routes, not just module hubs.
   const activeModule = resolveModule(location.pathname);
-
-  const email = activeUser?.email || auth.currentUser?.email || '';
-  const initials = (email.slice(0, 2) || 'ID').toUpperCase();
-
-  useEffect(() => {
-    if (!accountOpen) return undefined;
-    const onDocClick = (e) => {
-      if (!accountRef.current?.contains(e.target)) setAccountOpen(false);
-    };
-    const onKey = (e) => { if (e.key === 'Escape') setAccountOpen(false); };
-    document.addEventListener('mousedown', onDocClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [accountOpen]);
 
   const go = (path) => {
     navigate(path);
     onCloseMobileMenu();
   };
 
-  const openSupport = () => {
-    // Crisp is already mounted for authenticated users. Reuse it rather than
-    // standing up a second support surface.
-    if (window.$crisp) window.$crisp.push(['do', 'chat:open']);
-    else window.open('mailto:support@idynify.com', '_blank');
-    onCloseMobileMenu();
-  };
-
-  const renderGroup = (group) => (
-    <ul className="rail-group" key={group} aria-label={group.toLowerCase()}>
-      {modulesInGroup(group).map(mod => (
-        <li key={mod.id}>
-          <RailButton
-            icon={MODULE_ICONS[mod.id] || Radar}
-            label={mod.label}
-            railLabel={mod.railLabel}
-            active={activeModule.id === mod.id}
-            onClick={() => go(mod.path)}
-          />
-        </li>
-      ))}
-    </ul>
-  );
-
   return (
-    <div className={`sidebar rail ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-      {/* Brand mark. Intentionally not a control: Mission Control is its own
-          labelled item directly below, and two controls doing the same thing
-          is the duplication this navigation work exists to remove. */}
-      <div className="rail-brand" aria-hidden="true">
-        <img
-          src={ASSETS.logoMark}
-          alt=""
-          onError={e => { e.target.style.display = 'none'; }}
-        />
-      </div>
+    <div className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+      <button
+        type="button"
+        className="sidebar-wordmark"
+        onClick={() => go(MISSION_CONTROL.path)}
+        aria-label={`Idynify — go to ${MISSION_CONTROL.label}`}
+      >
+        <Wordmark />
+      </button>
 
-      <RailDivider />
-
-      <nav className="rail-nav" aria-label="Global navigation">
-        {/* Mission Control stands alone, outside the groups. */}
-        <ul className="rail-group">
-          <li>
-            <RailButton
-              icon={Home}
-              label={MISSION_CONTROL.label}
-              railLabel={MISSION_CONTROL.railLabel}
-              active={activeModule.id === MISSION_CONTROL.id}
-              onClick={() => go(MISSION_CONTROL.path)}
-            />
-          </li>
-        </ul>
-
-        {GROUP_ORDER.map((group, i) => (
-          <div key={group} className="rail-group-wrap">
-            <RailDivider />
-            {renderGroup(group, i)}
-          </div>
-        ))}
-      </nav>
-
-      {/* Utility */}
-      <RailDivider />
-      <ul className="rail-group">
-        <li>
-          <RailButton
-            icon={Settings}
-            label="Settings"
-            railLabel="SET"
-            active={location.pathname === '/settings'}
-            onClick={() => go('/settings')}
-            className="rail-btn-settings"
-          />
-        </li>
-        <li>
-          <RailButton icon={LifeBuoy} label="Help / Support" onClick={openSupport} />
-        </li>
-      </ul>
-
-      {/* Barry + account */}
-      <RailDivider />
-      <ul className="rail-group rail-group-end">
-        <li>
-          <button
-            type="button"
-            ref={barryButtonRef}
-            className={`rail-btn rail-btn-barry ${barryOpen ? 'active' : ''}`}
-            onClick={() => (onToggleBarry ? onToggleBarry() : openBarry())}
-            aria-label="Barry"
-            aria-expanded={barryOpen}
-          >
-            <BarryIcon />
-            <span className="rail-tooltip" role="presentation">Barry</span>
-          </button>
-        </li>
-
-        <li className="rail-account" ref={accountRef}>
-          <button
-            type="button"
-            className={`rail-btn rail-btn-account ${accountOpen ? 'active' : ''}`}
-            onClick={() => setAccountOpen(o => !o)}
-            aria-label="Account and appearance"
-            aria-expanded={accountOpen}
-            aria-haspopup="menu"
-          >
-            <span className="rail-avatar">{initials}</span>
-            <span className="rail-tooltip" role="presentation">{email || 'Account'}</span>
-          </button>
-
-          {accountOpen && (
-            <div className="rail-account-menu" role="menu">
-              <div className="rail-account-identity">
-                <span className="rail-avatar lg">{initials}</span>
-                <div className="rail-account-meta">
-                  <span className="rail-account-email">{email || 'Signed in'}</span>
-                  <span className="rail-account-theme">{THEMES[themeId]?.label || 'Theme'}</span>
-                </div>
-              </div>
-
-              {/* Theme switching lived in the old text sidebar. The rail has no
-                  room for a theme row, and the capability should not vanish
-                  with the redesign — it belongs with identity, which is also
-                  where the Hunter rail surfaced the active theme name. */}
-              <div className="rail-account-section">Appearance</div>
-              {Object.values(THEMES).map(theme => (
+      <nav className="sidebar-nav" aria-label="Global navigation">
+        <ul className="sidebar-modules">
+          {sidebarDestinations().map(dest => {
+            const Icon = MODULE_ICONS[dest.id] || Radar;
+            const active = activeModule.id === dest.id;
+            return (
+              <li key={dest.id}>
                 <button
                   type="button"
-                  key={theme.id}
-                  role="menuitemradio"
-                  aria-checked={themeId === theme.id}
-                  className={`rail-account-theme-option ${themeId === theme.id ? 'selected' : ''}`}
-                  onClick={() => { setThemeId(theme.id); setAccountOpen(false); }}
+                  className={`sidebar-module ${active ? 'active' : ''}`}
+                  onClick={() => go(dest.path)}
+                  aria-current={active ? 'page' : undefined}
                 >
-                  <span className="rail-theme-swatch" style={{ background: theme.swatchBg }} />
-                  <span>{theme.label}</span>
-                  {themeId === theme.id && <Check size={13} aria-hidden="true" />}
+                  <Icon size={17} strokeWidth={active ? 2.2 : 1.9} aria-hidden="true" />
+                  <span className="sidebar-module-label">{dest.label}</span>
                 </button>
-              ))}
-            </div>
-          )}
-        </li>
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      <div className="sidebar-footer">
+        <BarryCard
+          buttonRef={barryButtonRef}
+          barryOpen={barryOpen}
+          onOpen={() => (onToggleBarry ? onToggleBarry() : openBarry())}
+        />
+      </div>
     </div>
   );
 };

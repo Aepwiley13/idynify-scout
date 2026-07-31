@@ -29,7 +29,7 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { User, Menu, Settings, LogOut, History, Search, ChevronRight } from 'lucide-react';
+import { User, Menu, Settings, LogOut, History, Search, ChevronRight, LifeBuoy } from 'lucide-react';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
@@ -232,6 +232,23 @@ function ShellChrome({ children, user }) {
               title="Session history"
             >
               <History size={18} />
+            </button>
+
+            {/* Help / Support moved here from the sidebar: the final brief's
+                sidebar is wordmark + modules + Barry card only, and dropping
+                the control outright would have removed the only in-product
+                route to support. Reuses the Crisp widget already mounted for
+                authenticated users rather than adding a second surface. */}
+            <button
+              className="topbar-icon-btn"
+              onClick={() => {
+                if (window.$crisp) window.$crisp.push(['do', 'chat:open']);
+                else window.open('mailto:support@idynify.com', '_blank');
+              }}
+              aria-label="Help and support"
+              title="Help / Support"
+            >
+              <LifeBuoy size={18} />
             </button>
 
             <button

@@ -155,16 +155,54 @@ export const UTILITY_LINKS = [
 ];
 
 /**
- * Command Center is a real destination that the locked IA does not list as a
- * module. It keeps its route and its shell; it is reachable from Mission
- * Control. Recorded here so route→module resolution stays exhaustive and
- * Barry gets the right persona there.
+ * Command Center. The locked IA does not place it in a group, but the final
+ * navigation brief puts it in the sidebar as its own item, last in the list.
  */
-export const UNLISTED_DESTINATIONS = [
-  { id: 'command-center', label: 'Command Center', path: '/command-center', barryModule: 'command-center' },
-];
+export const COMMAND_CENTER = {
+  id: 'command-center',
+  label: 'Command Center',
+  railLabel: 'COMMAND CENTER',
+  path: '/command-center',
+  barryModule: 'command-center',
+  description: 'People, companies, missions and messaging',
+  inScope: false,
+};
+
+export const UNLISTED_DESTINATIONS = [COMMAND_CENTER];
 
 const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNLISTED_DESTINATIONS];
+
+/**
+ * SIDEBAR ORDER — the exact top-to-bottom order of the wide sidebar.
+ *
+ * Deliberately a flat list, not derived from GROUP_ORDER. The final brief
+ * specifies this order explicitly and states that the Pipeline /
+ * Relationships / Intelligence grouping is an architectural decision, not a
+ * visual one in this sidebar style — so no group headers render, and Recon
+ * sits between Basecamp and Reinforcements rather than after Fallback.
+ *
+ * GROUP_ORDER and modulesInGroup() are kept: the grouping still describes the
+ * product's architecture and is used elsewhere. It just is not what the
+ * sidebar draws.
+ */
+export const SIDEBAR_ORDER = [
+  'mission-control',
+  'scout',
+  'hunter',
+  'sniper',
+  'basecamp',
+  'recon',
+  'reinforcements',
+  'fallback',
+  'command-center',
+];
+
+/** The sidebar's destinations, in the exact order above. */
+export function sidebarDestinations() {
+  return SIDEBAR_ORDER
+    .map(id => ALL_DESTINATIONS.find(d => d.id === id))
+    .filter(Boolean);
+}
 
 /**
  * Resolve a pathname to its owning module.

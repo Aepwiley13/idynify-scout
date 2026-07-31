@@ -57,6 +57,8 @@ Migrating a module is now:
 
 Keep each module's existing sections and descriptions exactly as they are — only the visual formatting comes from the component, which is what the brief asks for. Collapse state, persistence, the `‹` control and the expand affordance are all handled.
 
+Two things were added to the component during the migrations, both because a module would otherwise have lost content it displayed: an optional per-item `badge` (Command Center's active-missions count, the only one in the product), and descriptions that wrap to two lines instead of truncating on one.
+
 This matters because "restyle to match Scout" is the same instruction that produced nine diverging copies of the module rail before the shell migration. A shared component makes matching automatic instead of aspirational.
 
 ---
@@ -81,6 +83,6 @@ Suite **439 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 **Logo assets.** `/assets/Idynify_logo1.png`, `Short_Logo_Idynify.png` and `barry_AI.jpg` are still absent, so all three fall back: CSS wordmark, gradient `ID` mark, bear glyph. Agreed this is not shippable — the fallbacks exist so the sidebar is never blank, not as the brand. Waiting on the files.
 
-**Module migration.** Unchanged from the previous PR: only Mission Control and Scout render inside the shell. The other seven keep their own icon rails, so the wide sidebar, wordmark, toggle and Barry card do not appear on them. Hunter next.
+**Module migration.** *(Closed — see `MIGRATION_LOG.md`.)* At the time of writing only Mission Control and Scout rendered inside the shell, and the other seven kept their own icon rails, so the wide sidebar, wordmark, toggle and Barry card did not appear on them. All seven have since been migrated in the order set out below. Every module in the product now renders into one shell, mounted once.
 
 Per the brief, each migration PR includes a screen recording of the module's journey before and after. **I cannot produce those here** — every authenticated route redirects to `/login` and signing in needs real credentials plus reachable Firebase Auth, neither available in this environment. Someone with product access needs to record them, or the requirement needs to change to something reproducible in CI.

@@ -423,9 +423,9 @@ function App() {
             only what is inside <Outlet/> — the sidebar, top bar and Barry are
             never unmounted.
 
-            Out-of-scope modules (Hunter, Sniper, Basecamp, Reinforcements,
-            Fallback, Recon) keep their existing self-contained shells below,
-            untouched and fully functional. The migration is route by route.
+            Every module is now in this group. Hunter, Sniper, Basecamp,
+            Reinforcements, Fallback, Recon and Command Center each shipped
+            their own application chrome before; none of them do now.
 
             Rollback: SHELL_MIGRATION.enabled = false restores the previous
             per-route <ProtectedRoute withLayout> wrapping in the else branch.
@@ -458,6 +458,24 @@ function App() {
 
             {/* Sniper — migrated into the shell. */}
             <Route path="/sniper" element={<SniperMain />} />
+            <Route path="/basecamp" element={<BasecampMain />} />
+            <Route path="/reinforcements" element={<ReinforcementsMain />} />
+            <Route path="/fallback" element={<FallbackMain />} />
+
+            {/* Recon — the one module that always used real nested routes, so
+                its children move across unchanged. */}
+            <Route path="/recon" element={<ReconMain />}>
+              <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
+              <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
+              <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
+              <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
+              <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
+              <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
+            </Route>
+
+            {/* Command Center — the last module in. /people still redirects
+                here; that redirect stays outside the group, being a redirect. */}
+            <Route path="/command-center" element={<PeopleMain />} />
           </Route>
         ) : (
           <>
@@ -516,6 +534,18 @@ function App() {
               element={<ProtectedRoute withLayout={true}><CampaignDetail /></ProtectedRoute>}
             />
             <Route path="/sniper" element={<ProtectedRoute withLayout={true}><SniperMain /></ProtectedRoute>} />
+            <Route path="/basecamp" element={<ProtectedRoute withLayout={true}><BasecampMain /></ProtectedRoute>} />
+            <Route path="/reinforcements" element={<ProtectedRoute withLayout={true}><ReinforcementsMain /></ProtectedRoute>} />
+            <Route path="/fallback" element={<ProtectedRoute withLayout={true}><FallbackMain /></ProtectedRoute>} />
+            <Route path="/recon" element={<ProtectedRoute withLayout={true}><ReconMain /></ProtectedRoute>}>
+              <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
+              <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
+              <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
+              <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
+              <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
+              <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
+            </Route>
+            <Route path="/command-center" element={<ProtectedRoute withLayout={true}><PeopleMain /></ProtectedRoute>} />
           </>
         )}
 
@@ -536,35 +566,9 @@ function App() {
           }
         />
 
-        {/* RECON Platform — self-contained shell (no MainLayout) */}
-        <Route
-          path="/recon"
-          element={
-            <ProtectedRoute>
-              <ReconMain />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
-          <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
-          <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
-          <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
-          <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
-          <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
-        </Route>
 
-        {/* Command Center — strategy & setup hub, self-contained shell (no MainLayout) */}
-        {/* Primary URL: /command-center — /people remains for backward compatibility */}
-        <Route
-          path="/command-center"
-          element={
-            <ProtectedRoute>
-              <PeopleMain />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Redirect old /hunter/* setup routes → /command-center with matching tab */}
+        {/* Redirect old /hunter/* setup routes → /command-center with matching tab.
+            /command-center itself now lives in the shell group above. */}
         <Route path="/hunter/missions"  element={<Navigate to="/command-center?tab=missions"  replace />} />
         <Route path="/hunter/weapons"   element={<Navigate to="/command-center?tab=weapons"   replace />} />
         <Route path="/hunter/arsenal"   element={<Navigate to="/command-center?tab=arsenal"   replace />} />
@@ -589,35 +593,8 @@ function App() {
         <Route path="/scout/daily-leads" element={<Navigate to="/scout?tab=daily-leads" replace />} />
         <Route path="/scout/contact-search" element={<Navigate to="/scout?tab=company-search" replace />} />
 
-        {/* Basecamp Module — self-contained two-column shell (no MainLayout) */}
-        <Route
-          path="/basecamp"
-          element={
-            <ProtectedRoute>
-              <BasecampMain />
-            </ProtectedRoute>
-          }
-        />
 
-        {/* Fallback Module — archive hub for lost/archived people & companies (no MainLayout) */}
-        <Route
-          path="/fallback"
-          element={
-            <ProtectedRoute>
-              <FallbackMain />
-            </ProtectedRoute>
-          }
-        />
 
-        {/* Reinforcements Module — referral intelligence hub (no MainLayout) */}
-        <Route
-          path="/reinforcements"
-          element={
-            <ProtectedRoute>
-              <ReinforcementsMain />
-            </ProtectedRoute>
-          }
-        />
 
         {/* Blitz Mode — rapid engagement queue (no MainLayout) */}
         <Route

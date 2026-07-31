@@ -65,6 +65,26 @@ function SniperProbe() {
   return <div data-testid="page">sniper</div>;
 }
 
+function BasecampProbe() {
+  return <div data-testid="page">basecamp</div>;
+}
+
+function ReinforcementsProbe() {
+  return <div data-testid="page">reinforcements</div>;
+}
+
+function FallbackProbe() {
+  return <div data-testid="page">fallback</div>;
+}
+
+function ReconProbe() {
+  return <div data-testid="page">recon</div>;
+}
+
+function CommandCenterProbe() {
+  return <div data-testid="page">command-center</div>;
+}
+
 function ScoutProbe() {
   return (
     <div>
@@ -103,6 +123,11 @@ function renderShell(initialPath = '/mission-control-v2', ContactPanel = Contact
             </Route>
             <Route path="/hunter" element={<HunterProbe />} />
             <Route path="/sniper" element={<SniperProbe />} />
+            <Route path="/basecamp" element={<BasecampProbe />} />
+            <Route path="/reinforcements" element={<ReinforcementsProbe />} />
+            <Route path="/fallback" element={<FallbackProbe />} />
+            <Route path="/recon" element={<ReconProbe />} />
+            <Route path="/command-center" element={<CommandCenterProbe />} />
           </Route>
         </Routes>
       </ShellProvider>
@@ -144,11 +169,33 @@ describe('shell persistence across the Phase 8 journey', () => {
     await act(async () => { navigateTo('/sniper'); });
     expect(screen.getByTestId('page')).toHaveTextContent('sniper');
 
-    // Sniper → Mission Control
+    // Sniper → Basecamp. Won deal handed to customer success, same shell.
+    await act(async () => { navigateTo('/basecamp'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('basecamp');
+
+    // Basecamp → Reinforcements. Asking a customer for an intro, same shell.
+    await act(async () => { navigateTo('/reinforcements'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('reinforcements');
+
+    // Reinforcements → Fallback. Recovering a lost deal, same shell.
+    await act(async () => { navigateTo('/fallback'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('fallback');
+
+    // Fallback → Recon. Checking what Barry knows about the segment.
+    await act(async () => { navigateTo('/recon'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('recon');
+
+    // Recon → Command Center. The last module in, and the last crossing that
+    // used to swap the whole application chrome.
+    await act(async () => { navigateTo('/command-center'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('command-center');
+
+    // Command Center → Mission Control
     await act(async () => { navigateTo('/mission-control-v2'); });
     expect(screen.getByTestId('page')).toHaveTextContent('mission-control');
 
-    // Six transitions, still one shell. Pre-migration this would be 7.
+    // Eleven transitions across every module in the product, still one shell.
+    // Pre-migration this journey mounted the shell 12 times.
     expect(shellMountCount).toBe(1);
     expect(screen.getByTestId('shell-chrome')).toBeInTheDocument();
   });

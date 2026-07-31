@@ -31,6 +31,7 @@ import { useNavigate, useSearchParams, Outlet, useParams } from 'react-router-do
 import {
   Users, Building2, Zap, Plus, Settings, RefreshCw, TrendingUp, Gamepad2,
   Radar, Crosshair, Target, Tent, Shield, Eye, Archive,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
@@ -121,6 +122,17 @@ function ScoutShellInner() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [drillCompanyId, setDrillCompanyId] = useState(null);
+
+  // Collapse state persists per module, same key and same semantics the other
+  // modules already use — so collapsing Scout's panel does not collapse
+  // Hunter's, and each remembers what the user chose.
+  const [subNavOpen, setSubNavOpen] = useState(
+    () => localStorage.getItem('scout_subnav_collapsed') !== 'true'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('scout_subnav_collapsed', subNavOpen ? 'false' : 'true');
+  }, [subNavOpen]);
 
   // Active view follows the URL when the URL says anything, and holds its
   // last value when it does not.
@@ -255,33 +267,72 @@ function ScoutShellInner() {
     );
   }
 
-  // ── Desktop — content only. The shell owns everything around this. ───────
+  // ── Desktop ──────────────────────────────────────────────────────────────
+  // Layer 1 (the icon rail) is the shell's. Layer 2 — this expandable sub-nav
+  // panel — is Scout's, and matches the panel Hunter, Sniper, Basecamp,
+  // Reinforcements, Recon and Fallback already ship: 190px, module name and
+  // tagline in the header, a `‹` collapse control, items as name + short
+  // description, collapse state remembered per module.
   return (
     <div className="scout-module">
-      {/* Module navigation: changes the working view INSIDE Scout.
-          The user can see the active module (sidebar + breadcrumb, owned by
-          the shell) and the active Scout view (here) at the same time. */}
-      <nav className="scout-views" aria-label="Scout views">
-        {SCOUT_VIEWS.map(view => {
-          const active = !view.route && activeView === view.id;
-          return (
+      <aside
+        className={`module-subnav ${subNavOpen ? '' : 'collapsed'}`}
+        aria-label="Scout sections"
+      >
+        <div className="module-subnav-inner">
+          <div className="module-subnav-header">
+            <div className="module-subnav-heading">
+              <div className="module-subnav-title">SCOUT</div>
+              <div className="module-subnav-tagline">Find and qualify prospects</div>
+            </div>
             <button
-              key={view.id}
               type="button"
-              className={`scout-view-tab ${active ? 'active' : ''}`}
-              onClick={() => switchView(view.id)}
-              title={view.desc}
-              aria-current={active ? 'true' : undefined}
+              className="module-subnav-toggle"
+              onClick={() => setSubNavOpen(false)}
+              aria-label="Collapse Scout sections"
+              title="Collapse"
             >
-              <view.Icon size={15} aria-hidden="true" />
-              <span>{view.label}</span>
+              <ChevronLeft size={12} aria-hidden="true" />
             </button>
-          );
-        })}
-      </nav>
+          </div>
+
+          <div className="module-subnav-items">
+            {SCOUT_VIEWS.map(view => {
+              const active = !view.route && activeView === view.id;
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  className={`module-subnav-item ${active ? 'active' : ''}`}
+                  onClick={() => switchView(view.id)}
+                  aria-current={active ? 'true' : undefined}
+                >
+                  <view.Icon size={13} aria-hidden="true" />
+                  <span className="module-subnav-item-text">
+                    <span className="module-subnav-item-label">{view.label}</span>
+                    <span className="module-subnav-item-desc">{view.desc}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+
+      {!subNavOpen && (
+        <button
+          type="button"
+          className="module-subnav-expand"
+          onClick={() => setSubNavOpen(true)}
+          aria-label="Expand Scout sections"
+          title="Expand"
+        >
+          <ChevronRight size={12} aria-hidden="true" />
+        </button>
+      )}
 
       <div className={`scout-workspace ${contactPanelOpen ? 'with-panel' : ''}`}>
-        <div className="scout-list" aria-hidden={contactPanelOpen ? undefined : undefined}>
+        <div className="scout-list">
           {renderView()}
         </div>
 

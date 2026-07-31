@@ -162,15 +162,25 @@ function Av({ initials, color = BASECAMP_GREEN, size = 24 }) {
 }
 
 // ─── Module rail config ───────────────────────────────────────────────────────
+// Locked order, Mission Control first: it is the platform's anchor and must be
+// the first item in the rail on every screen. This module still renders its own
+// rail because it has not been migrated into the global shell yet; when it is,
+// this array goes away and the shell's rail takes over.
+//
+// Command Center sits last rather than first. The direction correction says it
+// is not a top-level module, but it is NOT currently reachable from any other
+// module's sub-nav, so removing it outright would strand /command-center.
+// Demoted to the end and flagged rather than deleted.
 const MODULE_RAIL = [
-  { id: 'people',         label: 'COMMAND CENTER', Icon: Users,     route: '/command-center' },
-  { id: 'scout',          label: 'SCOUT',          Icon: Radar,     route: '/scout'          },
-  { id: 'hunter',         label: 'HUNTER',         Icon: Crosshair, route: '/hunter'         },
-  { id: 'sniper',         label: 'SNIPER',         Icon: Target,    route: '/sniper'         },
-  { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: null              }, // active module
-  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements' },
-  { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'          },
-  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'       },
+  { id: 'mission-control', label: 'MC',               Icon: Home,      route: '/mission-control-v2'   },
+  { id: 'scout',           label: 'SCOUT',            Icon: Radar,     route: '/scout'                },
+  { id: 'hunter',          label: 'HUNTER',           Icon: Crosshair, route: '/hunter'               },
+  { id: 'sniper',          label: 'SNIPER',           Icon: Target,    route: '/sniper'               },
+  { id: 'basecamp',        label: 'BASECAMP',         Icon: Tent,      route: null                    }, // active module
+  { id: 'reinforcements',  label: 'REINFORCEMENTS',   Icon: Shield,    route: '/reinforcements'       },
+  { id: 'fallback',        label: 'FALLBACK',         Icon: Archive,   route: '/fallback'             },
+  { id: 'recon',           label: 'RECON',            Icon: Eye,       route: '/recon'                },
+  { id: 'people',          label: 'COMMAND CENTER',   Icon: Users,     route: '/command-center'       },
 ];
 
 // ─── BASECAMP sub-nav items ─────────────────────────────────────────────────

@@ -455,6 +455,9 @@ function App() {
             <Route path="/hunter/mission/:missionId" element={<MissionDetail />} />
             <Route path="/hunter/campaign/new" element={<CreateCampaign />} />
             <Route path="/hunter/campaign/:campaignId" element={<CampaignDetail />} />
+
+            {/* Sniper — migrated into the shell. */}
+            <Route path="/sniper" element={<SniperMain />} />
           </Route>
         ) : (
           <>
@@ -512,6 +515,7 @@ function App() {
               path="/hunter/campaign/:campaignId"
               element={<ProtectedRoute withLayout={true}><CampaignDetail /></ProtectedRoute>}
             />
+            <Route path="/sniper" element={<ProtectedRoute withLayout={true}><SniperMain /></ProtectedRoute>} />
           </>
         )}
 
@@ -625,15 +629,6 @@ function App() {
           }
         />
 
-        {/* Sniper Module — self-contained two-column shell (no MainLayout) */}
-        <Route
-          path="/sniper"
-          element={
-            <ProtectedRoute>
-              <SniperMain />
-            </ProtectedRoute>
-          }
-        />
 
         {/* User Settings — self-contained shell (no MainLayout) */}
         <Route

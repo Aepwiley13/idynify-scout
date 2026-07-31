@@ -114,6 +114,7 @@ function ShellChrome({ children, user }) {
   const {
     barryOpen, openBarry, closeBarry, toggleBarry,
     setOrientation,
+    sidebarMode,
     barryPageContext,
     navigationContext,
     quickEngage,
@@ -178,7 +179,7 @@ function ShellChrome({ children, user }) {
   const fullBleed = module.id !== MISSION_CONTROL.id;
 
   return (
-    <div className={`main-layout ${fullBleed ? 'shell-fixed-height' : ''}`}>
+    <div className={`main-layout ${fullBleed ? 'shell-fixed-height' : ''} sidebar-${sidebarMode}`}>
       <Sidebar
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={() => setMobileMenuOpen(false)}

@@ -6,13 +6,16 @@
 }
 
 /* Main Content Area
-   Offset by the wide sidebar's fixed width. The sidebar never changes width,
-   so there is no transition and no collapsed variant to account for — the
-   content area's geometry is constant on every route. Layer 2 (the module
-   sub-nav) is what collapses, and it lives inside the content boundary. */
+   Offset by the sidebar's width, which the user can toggle between wide and
+   compact. The mode lives in ShellContext and lands here as a class on
+   .main-layout, so the offset and the sidebar can never disagree.
+   Layer 2 (the module sub-nav) collapses independently, inside this boundary. */
+.main-layout.sidebar-wide .main-content { margin-left: 220px; }
+.main-layout.sidebar-compact .main-content { margin-left: 64px; }
+
 .main-content {
   flex: 1;
-  margin-left: 220px;
+  transition: margin-left 0.18s ease;
   display: flex;
   flex-direction: column;
   min-height: 100vh;

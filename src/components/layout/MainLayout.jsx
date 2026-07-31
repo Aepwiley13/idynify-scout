@@ -56,6 +56,7 @@ import './MainLayout.css';
  */
 const MODULES_WITH_OWN_MOBILE_NAV = [
   '/scout', '/hunter', '/sniper', '/basecamp', '/reinforcements', '/fallback',
+  '/recon',
 ];
 
 function ownsItsMobileNav(pathname) {

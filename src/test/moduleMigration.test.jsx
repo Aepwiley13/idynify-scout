@@ -56,6 +56,7 @@ const { default: SniperMain } = await import('../pages/Sniper/SniperMain');
 const { default: BasecampMain } = await import('../pages/Basecamp/BasecampMain');
 const { default: ReinforcementsMain } = await import('../pages/Reinforcements/ReinforcementsMain');
 const { default: FallbackMain } = await import('../pages/Fallback/FallbackMain');
+const { default: ReconMain } = await import('../pages/Recon/ReconMain');
 
 /**
  * One row per migrated module. `otherModules` are labels the module's own rail
@@ -123,6 +124,23 @@ const MIGRATED = [
     descriptions: ['Re-engagement engine', 'Archived & lost people'],
     activeTab: { query: '?tab=companies', expect: 'Companies' },
   },
+  {
+    name: 'Recon',
+    Component: ReconMain,
+    path: '/recon',
+    title: 'RECON',
+    tagline: 'ICP, messaging and market intelligence',
+    storageKey: 'recon_subnav_collapsed',
+    sections: [
+      'Overview', 'Alignment Brief', 'User Profile', 'ICP Intelligence',
+      'Messaging & Voice', 'Objections', 'Competitive Intel',
+      'Buying Signals', 'Barry Training',
+    ],
+    descriptions: ['Training dashboard', 'What Barry knows'],
+    // Recon's sections are ROUTES, not tabs — the active item is derived from
+    // the pathname, so this row exercises a different resolution path.
+    activeTab: { query: '', path: '/recon/messaging', expect: 'Messaging & Voice' },
+  },
 ];
 
 /** Labels the deleted icon rails used to show for OTHER modules. */
@@ -130,7 +148,13 @@ const OTHER_MODULE_RAIL_LABELS = [
   'SCOUT', 'HUNTER', 'SNIPER', 'BASECAMP', 'REINFORCEMENTS', 'FALLBACK', 'RECON',
 ];
 
-function renderModule({ Component, path }, query = '') {
+function renderModule(mod, query = '', at = null) {
+  // Assigned rather than destructured in the signature: the repo's ESLint
+  // config has no react plugin, so a JSX-only reference to a destructured
+  // PARAM does not count as usage and no-unused-vars fires on it.
+  const Component = mod.Component;
+  const path = mod.path;
+
   window.matchMedia = (q) => ({
     matches: false, media: q, onchange: null,
     addEventListener: () => {}, removeEventListener: () => {},
@@ -138,11 +162,15 @@ function renderModule({ Component, path }, query = '') {
   });
 
   return render(
-    <MemoryRouter initialEntries={[path + query]}>
+    <MemoryRouter initialEntries={[at || path + query]}>
       <ThemeProvider>
         <ShellProvider user={{ id: 'u1' }} userData={{}}>
           <Routes>
-            <Route path={path} element={<Component />} />
+            {/* Wildcard child so route-driven modules (Recon) resolve their
+                nested paths; tab-driven modules ignore it. */}
+            <Route path={path} element={<Component />}>
+              <Route path="*" element={null} />
+            </Route>
           </Routes>
         </ShellProvider>
       </ThemeProvider>
@@ -166,8 +194,15 @@ describe.each(MIGRATED)('$name — migrated into the shell', (mod) => {
   it('mounts no Barry of its own', () => {
     // Each of these used to mount BarryChat on its own drawer_<module> thread.
     // Barry is the shell's now: one instance, one thread.
+    //
+    // Checked structurally, not by text: Recon legitimately has sections named
+    // "Barry Training" and "What Barry knows", and a /barry/i text query would
+    // fail on those while still missing an actual mounted Barry.
     const { container } = renderModule(mod);
-    expect(within(container).queryByText(/barry/i)).toBeNull();
+    expect(container.querySelector('img[alt="Barry"]')).toBeNull();
+    expect(container.querySelector('[class*="barry-card"]')).toBeNull();
+    expect(container.querySelector('[class*="barry-chat"]')).toBeNull();
+    expect(container.querySelector('[class*="rail-btn-barry"]')).toBeNull();
   });
 
   it('renders no settings, home or user-footer controls', () => {
@@ -204,7 +239,7 @@ describe.each(MIGRATED)('$name — migrated into the shell', (mod) => {
   });
 
   it('marks the active section from the URL', () => {
-    renderModule(mod, mod.activeTab.query);
+    renderModule(mod, mod.activeTab.query, mod.activeTab.path);
     const panel = screen.getByRole('complementary', { name: new RegExp(`${mod.title} sections`, 'i') });
 
     const active = within(panel).getAllByRole('button')

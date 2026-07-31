@@ -16,10 +16,10 @@ Order: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Comm
 | **Basecamp** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Reinforcements** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Fallback** | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Recon** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Command Center | migrate | migrate | migrate | restyle | migrate |
-| Recon | migrate | migrate | migrate | restyle | migrate |
 
-**7 of 9.** Two left: Command Center and Recon.
+**8 of 9.** One left: Command Center.
 
 ---
 
@@ -125,6 +125,37 @@ sidebar 220px | active: Fallback | sub-nav 190px
 sections: Comeback · People · Companies
 ```
 
+## 6 — Recon
+
+`ReconMain.jsx`: **609 → 290 lines.**
+
+Nine sections unchanged: Overview, Alignment Brief, User Profile, ICP
+Intelligence, Messaging & Voice, Objections, Competitive Intel, Buying Signals,
+Barry Training.
+
+Routes moved: `/recon` and its six children.
+
+**Recon is the one module that already used real nested routes** rather than a
+`?tab=` param — which is why it was the only module with correct Back-button
+behaviour before any of this started. That is preserved rather than converted:
+its sub-nav items navigate, they do not switch a local tab, and its children
+still render through `<Outlet/>`. The active item is derived from the pathname,
+so the panel and the address bar cannot disagree.
+
+That makes it the only row in `moduleMigration.test.jsx` whose active-section
+assertion exercises path resolution instead of a query param, which is worth
+having: the shared panel now has both resolution strategies under test.
+
+Step 4 of the recipe (drop `{ replace: true }`) does not apply — there were no
+tab writes to fix.
+
+```
+sidebar 220px | active: Recon | sub-nav 190px
+sections: Overview · Alignment Brief · User Profile · ICP Intelligence ·
+          Messaging & Voice · Objections · Competitive Intel ·
+          Buying Signals · Barry Training
+```
+
 ---
 
 ## Verification
@@ -136,9 +167,9 @@ Two crossings get their own tests:
 - **Scout → Hunter.** The one "Move to Hunter" lands on, and the one the original audit called the worst moment in the product — Scout's rail out, Hunter's rail in, Barry destroyed and rebuilt in between. It now changes nothing but the content.
 - **Scout → Hunter → Sniper.** The whole pipeline on one shell, with `current_module` and `source_route` tracking correctly at each step.
 
-`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 40 tests across Hunter, Sniper, Basecamp, Reinforcements and Fallback, growing by 8 per migration.
+`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 48 tests across Hunter, Sniper, Basecamp, Reinforcements, Fallback and Recon, growing by 8 per migration.
 
-Suite **481 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
+Suite **489 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router and `HunterContactCard` date-fns failures, confirmed identical on `HEAD` without these changes. Build passes, lint clean on every file touched.
 
 ---
 
@@ -154,16 +185,15 @@ Suite **481 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 ## Next
 
-**Command Center**, then **Recon**.
+**Command Center** — the last one, migrated as-is.
 
-Command Center is the one that needs a decision before it starts, not just a
-migration. It holds six unrelated concerns behind one route — people,
-companies, missions, weapons, arsenal, outcomes — and an earlier brief said it
-"is not a top-level module" on the grounds that it already appears in Hunter's
-sub-nav. It does not; Hunter's sub-nav is Blitz Mode, All People, Companies,
-Follow Up Now, Today's Actions, Replied, Active, New. It is currently reachable
-only from the sidebar and Mission Control's module grid.
+Whether its sections belong together behind one route is a real
+information-architecture question, and it is explicitly **not** being answered
+here: the shell gets finished and made consistent everywhere first, and the
+product decision happens against a consistent shell rather than mid-migration.
 
-Migrating it as-is is straightforward. Deciding whether it should stay one
-destination is an information-architecture question, and worth answering
-first.
+One correction stands, and is now confirmed: an earlier brief said Command
+Center "is not a top-level module" because it already appears in Hunter's
+sub-nav. It does not — Hunter's sub-nav is Blitz Mode, All People, Companies,
+Follow Up Now, Today's Actions, Replied, Active, New. Command Center is a
+first-class sidebar item and stays exactly where it is.

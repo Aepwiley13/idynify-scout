@@ -461,6 +461,17 @@ function App() {
             <Route path="/basecamp" element={<BasecampMain />} />
             <Route path="/reinforcements" element={<ReinforcementsMain />} />
             <Route path="/fallback" element={<FallbackMain />} />
+
+            {/* Recon — the one module that always used real nested routes, so
+                its children move across unchanged. */}
+            <Route path="/recon" element={<ReconMain />}>
+              <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
+              <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
+              <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
+              <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
+              <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
+              <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
+            </Route>
           </Route>
         ) : (
           <>
@@ -522,6 +533,14 @@ function App() {
             <Route path="/basecamp" element={<ProtectedRoute withLayout={true}><BasecampMain /></ProtectedRoute>} />
             <Route path="/reinforcements" element={<ProtectedRoute withLayout={true}><ReinforcementsMain /></ProtectedRoute>} />
             <Route path="/fallback" element={<ProtectedRoute withLayout={true}><FallbackMain /></ProtectedRoute>} />
+            <Route path="/recon" element={<ProtectedRoute withLayout={true}><ReconMain /></ProtectedRoute>}>
+              <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
+              <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
+              <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
+              <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
+              <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
+              <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
+            </Route>
           </>
         )}
 
@@ -542,22 +561,6 @@ function App() {
           }
         />
 
-        {/* RECON Platform — self-contained shell (no MainLayout) */}
-        <Route
-          path="/recon"
-          element={
-            <ProtectedRoute>
-              <ReconMain />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<ReconErrorBoundary><ReconOverview /></ReconErrorBoundary>} />
-          <Route path="user-profile" element={<ReconErrorBoundary><ReconSection0 /></ReconErrorBoundary>} />
-          <Route path="barry-training" element={<ReconErrorBoundary><BarryTraining /></ReconErrorBoundary>} />
-          <Route path="alignment-brief" element={<ReconErrorBoundary><AlignmentBrief /></ReconErrorBoundary>} />
-          <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
-          <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
-        </Route>
 
         {/* Command Center — strategy & setup hub, self-contained shell (no MainLayout) */}
         {/* Primary URL: /command-center — /people remains for backward compatibility */}

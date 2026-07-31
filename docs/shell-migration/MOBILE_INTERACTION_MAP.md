@@ -334,6 +334,31 @@ map, updated on navigation. Deliberately **not** done in this sprint: it changes
 what a navigation control does, and this artifact exists to be reviewed before
 anything else moves.
 
+> **APPROVED SEMANTICS — restoration is session-scoped. Build to this.**
+>
+> Restoration applies **only while the current authenticated app session
+> remains active.** A force-close and fresh PWA launch uses the configured
+> `start_url` (today `/scout?tab=daily-leads`) and restores nothing.
+>
+> It must **never** reopen:
+> - a contact leaf
+> - a compose route
+> - a modal
+> - Quick Engage state
+> - bulk-selection state
+>
+> Only a module's **section** is eligible — the `?tab=` or Recon path, nothing
+> below it. In implementation terms: store per module, in memory on
+> `ShellContext` (not `localStorage`, which survives a force-close and would
+> violate the fresh-launch rule), and record a path only when it resolves to a
+> bottom-bar item for that module. That last condition is what excludes every
+> item on the never-reopen list without having to enumerate them — a contact
+> leaf, a compose route and a modal are none of them a bottom-bar destination.
+>
+> **Today's behaviour already satisfies every "must never" above**, because
+> nothing is restored at all. The rules are recorded here so the fix cannot
+> quietly introduce what it is forbidden to.
+
 **3 — No in-app Back, and iOS standalone may not provide one.**
 See Journey 5. The top bar should stay four controls; the fix is not a global
 back button. Leaf screens that can be reached without a bar item pointing back
@@ -396,14 +421,140 @@ and the drift guard in `moduleMigration.test.jsx` picks it up automatically.
    that change how navigation behaves.
 2. **Finding 4 should be fixed before merge.** It is small, it is mine, and it
    makes the bar say something untrue.
-3. **Real-device verification.** Everything above is Chromium at 390×844 with a
-   stubbed viewport. Three things behave differently on hardware and none can be
-   checked here:
-   - **safe-area insets** — the bottom bar, the drawer footer, the module More
-     sheet and the announcement stack all use `env(safe-area-inset-bottom)`; a
-     notched iPhone is the only way to confirm they compose correctly
-   - **the iOS keyboard** — it does not resize the viewport in standalone mode,
-     so a fixed bottom bar can end up above or behind it
-   - **iOS standalone Back** — Finding 3 rests on this; it needs a real
-     home-screen install to confirm
+3. **Real-device verification** — see the checklist below. Everything in this
+   document is Chromium at 390×844 with a stubbed viewport.
 4. Then merge, and lock the shell.
+
+---
+
+## Real-device checklist
+
+Run on an installed iPhone home-screen app (`display: standalone`). Three
+things behave differently on hardware and none of them can be checked in
+Chromium.
+
+**1 — Safe-area insets.**
+The bottom bar, the drawer footer, the module More sheet and the announcement
+stack all use `env(safe-area-inset-bottom)`. A notched iPhone is the only way to
+confirm they compose rather than double up. Check: nothing sits under the home
+indicator; the drawer's Barry card clears the bar; an announcement clears both.
+
+**2 — Fresh launch starts clean.**
+Force-close and reopen the installed PWA → confirm it opens Scout Daily and does
+not restore the previous contact leaf or transient workflow.
+
+**3 — The iOS keyboard.**
+It does not resize the viewport in standalone mode, so a fixed bottom bar can
+end up above or behind it. Check: tap into search and into a note field, and
+confirm the bar does not float mid-screen over the content.
+
+**4 — iOS standalone Back.**
+Finding 3 rests entirely on this. Open a contact from Scout → People, then try
+to get back without using a bottom-bar item. If there is no way back, Finding 3
+is confirmed and the leaf needs its own `←`.
+
+**5 — The feel test.** Use it normally for a few minutes: move between Scout
+sections, open and close a contact, launch Hunter, type into search, scroll a
+long list, close the app, relaunch. It should read as:
+
+> The hamburger changes the workspace.
+> The bottom bar changes the view.
+> Back exits detail work.
+> A fresh launch starts clean.
+
+
+---
+
+## Deploy preview — what Aaron needs to run the checklist
+
+**PR:** [#497](https://github.com/Aepwiley13/idynify-scout/pull/497)
+**Commit under test:** the head of PR #497 — read it from the PR rather than
+from here, so it cannot go stale if another commit lands.
+**Preview URL:** `https://deploy-preview-497--idynify.netlify.app`
+
+Netlify builds a deploy preview per PR at
+`deploy-preview-<PR>--<site>.netlify.app`. The site is `idynify` — the same one
+the PR's own "Header rules / Redirect rules / Pages changed" checks report
+against, and those checks link to the exact deploy.
+
+> **I could not load this URL to confirm it.** This environment's network policy
+> denies outbound HTTPS to `netlify.app` (the proxy answers 403 to CONNECT), so
+> everything in this section is read from configuration, not from a fetched
+> page. **The Netlify check on the PR is authoritative** — open its deploy link
+> and use the URL it reports.
+
+### Deep links work
+
+`netlify.toml` has the SPA fallback:
+
+```toml
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+```
+
+So `/hunter`, `/recon/messaging` and `start_url` all resolve on a hard load.
+Without this the PWA would fail on launch, since `start_url` is not `/`.
+
+### Authentication — expected to work, and here is why
+
+Sign-in is **email/password only**: `signInWithEmailAndPassword` in `Login.jsx`,
+`createUserWithEmailAndPassword` in `Signup.jsx`. No Google, no popup, no
+redirect.
+
+That matters because Firebase's **authorized-domains** list gates OAuth
+popup/redirect flows — it does not gate email/password. So a preview origin
+does not need to be added to it. There is also **no App Check** anywhere in the
+codebase, which would otherwise reject an unregistered domain.
+
+*Stated from code, not from a completed sign-in* — I have no credentials and
+cannot log in. If sign-in fails on the preview, the cause is almost certainly
+neither of the above; check the browser console for the Firebase error code
+before assuming it is a domain problem.
+
+### ⚠️ The preview writes to the SAME Firestore as production
+
+`src/firebase/config.js` hard-codes `projectId: "idynify-scout-dev"` with no
+environment override. Every build — preview, production, local — uses that one
+project.
+
+**Hardware QA on this preview mutates real data.** Specifically:
+
+- **Move to Hunter** genuinely moves the contact. The announcement's Undo
+  restores the previous stage, so use it.
+- **Start Cadence** can send real email. Do not complete a cadence during QA
+  unless you intend the send.
+- Contacts added via Scout+ are real contacts.
+
+Journeys 1–5 can all be walked without an irreversible write, provided cadences
+are not completed. Worth deciding separately whether preview builds should point
+at a distinct Firebase project — that is a bigger question than this PR.
+
+### Standalone PWA install — supported
+
+`public/manifest.json` declares `"display": "standalone"`, `start_url:
+/scout?tab=daily-leads`, portrait, with 192 and 512 icons. Netlify serves the
+preview over HTTPS, which is the remaining install requirement. Add to Home
+Screen from Safari on the preview URL and it installs as its own app.
+
+**A preview install is a separate app from a production install** — different
+origin, separate storage, separate service worker. It will not disturb an
+existing production install, and both can coexist on the home screen.
+
+### The service worker matters for checklist item 2
+
+`public/sw.js` is registered on every load. It is **network-first for
+navigation** and **cache-first for `/assets/`** (safe, since those filenames are
+content-hashed), and it calls `skipWaiting()` + `clients.claim()` so a new
+version takes over immediately rather than waiting for every tab to close.
+
+Two consequences for QA:
+
+1. **A stale build should not survive a relaunch.** If the preview ever looks
+   like an older commit, force-close and relaunch once — that is the SW handing
+   over, not a bug in the navigation.
+2. **Offline navigation falls back to `caches.match('/')`.** If the device drops
+   connection mid-test, a relaunch may land on `/` rather than `start_url`.
+   That is the service worker, not the fresh-launch rule — retest item 2 with a
+   connection.

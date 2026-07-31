@@ -34,8 +34,6 @@ import {
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
-import BottomNav from '../../components/layout/BottomNav';
-import MoreSheet from '../../components/layout/MoreSheet';
 import ModuleSubNav from '../../components/layout/ModuleSubNav';
 
 const RECON_INDIGO = '#6366f1';
@@ -150,7 +148,6 @@ function ReconShellInner() {
     return () => mql.removeEventListener('change', handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   // Active item derived from the pathname, reversed so the longest match wins
   // and /recon/messaging does not resolve to the /recon overview.
@@ -165,106 +162,21 @@ function ReconShellInner() {
   };
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
+  // ── Mobile ───────────────────────────────────────────────────────────────
+  // Content only. Recon used to render its own mobile top bar and a
+  // horizontal strip of its own sections beneath it — module navigation in the
+  // one place a phone user's thumb cannot reach, while the bottom bar listed
+  // MODULES, duplicating the hamburger.
+  //
+  // The shell owns all three surfaces now: hamburger for modules, bottom bar
+  // for these sections, top bar for where you are.
   if (isMobile) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column',
-        height: '100dvh', width: '100%',
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-        color: T.text, overflow: 'hidden', position: 'relative',
-      }}>
-        <style>{`
-          * { box-sizing: border-box; }
-          button, input { font-family: Inter, system-ui, sans-serif; }
-          ::-webkit-scrollbar { width: 3px; height: 3px; }
-          ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
-          @keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
-          @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-          input::placeholder { color: ${T.textFaint}; }
-        `}</style>
-
-        {/* Mobile top bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
-          background: T.railBg, flexShrink: 0, zIndex: 2,
-        }}>
-          <div
-            onClick={() => navigate('/mission-control-v2')}
-            title="Mission Control"
-            style={{
-              width: 28, height: 28, borderRadius: 7,
-              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
-              boxShadow: `0 2px 10px ${BRAND.pink}40`,
-            }}
-          >
-            <img src={ASSETS.logoMark} alt="Mission Control"
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
-            />
-          </div>
-          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text }}>
-            {RECON_ITEMS.find(i => i.id === activeItem)?.label || 'Recon'}
-          </div>
-          <div
-            onClick={() => navigate('/settings')}
-            title="Settings"
-            style={{
-              width: 34, height: 34, borderRadius: 9,
-              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : T.accentBg,
-              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : T.accentBdr}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-            }}
-          >
-            <Settings size={16} color={SETTINGS_ORANGE} />
-          </div>
-          <ThemePicker />
-        </div>
-
-        {/* Mobile horizontal tab nav */}
-        <div style={{
-          display: 'flex', overflowX: 'auto', flexShrink: 0,
-          background: T.navBg, borderBottom: `1px solid ${T.border}`,
-          padding: '0 6px',
-        }}>
-          {RECON_ITEMS.map(it => {
-            const active = activeItem === it.id;
-            return (
-              <div
-                key={it.id}
-                onClick={() => navigate(it.path)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? RECON_INDIGO : 'transparent'}`,
-                  color: active ? RECON_INDIGO : T.textMuted,
-                  fontSize: 12, fontWeight: active ? 600 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  transition: 'all 0.12s',
-                }}
-              >
-                <it.Icon size={12} />
-                {it.label}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Mobile main content — paddingBottom leaves room for BottomNav */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
-          <Outlet />
-        </div>
-
-        {/* Cross-module bottom nav */}
-        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
-        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+      <div className="module-mobile">
+        <Outlet />
       </div>
     );
   }
-
 
   // ── Desktop — content only. The shell owns everything around this. ───────
   return (

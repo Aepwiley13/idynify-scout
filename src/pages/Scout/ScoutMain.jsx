@@ -30,11 +30,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams, Outlet, useParams } from 'react-router-dom';
 import {
   Users, Building2, Zap, Plus, Settings, RefreshCw, TrendingUp, Gamepad2,
-  Radar, Crosshair, Target, Tent, Shield, Eye, Archive,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { BRAND, ASSETS } from '../../theme/tokens';
-import { MODULES, MISSION_CONTROL } from '../../constants/navigationModel';
 import DailyLeads from './DailyLeads';
 import SavedCompanies from './SavedCompanies';
 import AllLeads from './AllLeads';
@@ -99,13 +96,6 @@ const VIEW_TO_TAB = {
  * shows it as active, so nothing disagrees.
  */
 const DEFAULT_VIEW = 'daily';
-
-// Mobile-only module list. Sourced from navigationModel so it cannot drift
-// from the sidebar the way the eight hand-maintained MODULE_RAIL copies did.
-const MOBILE_MODULE_ICONS = {
-  scout: Radar, hunter: Crosshair, sniper: Target,
-  basecamp: Tent, reinforcements: Shield, recon: Eye, fallback: Archive,
-};
 
 function ScoutShellInner() {
   const T = useT();
@@ -184,75 +174,20 @@ function ScoutShellInner() {
     return null;
   };
 
-  // ── Mobile — preserved from the pre-migration layout (constraint C3) ─────
+  // ── Mobile ───────────────────────────────────────────────────────────────
+  // Content only. Scout used to render its own top bar (logo, a horizontal
+  // strip of every OTHER module, a settings button) and its own bottom nav —
+  // so global navigation appeared twice on the same screen and Scout's own
+  // sections appeared nowhere thumb-reachable.
+  //
+  // The shell owns all three surfaces now: hamburger for modules, bottom bar
+  // for Scout's sections, top bar for where you are. Scout renders what Scout
+  // is about.
   if (isMobile) {
-    const MOBILE_BOTTOM_NAV = [
-      { id: 'daily',     label: 'Daily',  Icon: Zap },
-      { id: 'saved',     label: 'Saved',  Icon: Building2 },
-      { id: 'all',       label: 'People', Icon: Users },
-      { id: 'scoutplus', label: 'Scout+', Icon: Plus },
-      { id: 'icpsettings', label: 'ICP',  Icon: Settings },
-    ];
-
     return (
       <div className="scout-mobile" style={{ background: T.appBg, color: T.text }}>
-        <div className="scout-mobile-topbar" style={{ background: T.railBg, borderColor: T.border }}>
-          <button
-            type="button"
-            className="scout-mobile-home"
-            onClick={() => navigate(MISSION_CONTROL.path)}
-            aria-label={MISSION_CONTROL.label}
-          >
-            <img src={ASSETS.logoMark} alt="" onError={e => { e.target.style.display = 'none'; }} />
-          </button>
-          <div className="scout-mobile-modules">
-            {MODULES.map(mod => {
-              const Icon = MOBILE_MODULE_ICONS[mod.id] || Radar;
-              const active = mod.id === 'scout';
-              return (
-                <button
-                  key={mod.id}
-                  type="button"
-                  onClick={() => navigate(mod.path)}
-                  className={`scout-mobile-module ${active ? 'active' : ''}`}
-                  title={mod.label}
-                >
-                  <Icon size={16} />
-                  <span>{mod.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            className="scout-mobile-home"
-            onClick={() => navigate('/settings')}
-            aria-label="Settings"
-          >
-            <Settings size={15} />
-          </button>
-        </div>
-
         <div className="scout-mobile-content">{renderView()}</div>
         {contactPanelOpen && <Outlet context={outletContext} />}
-
-        <div className="scout-mobile-bottomnav" style={{ background: T.railBg, borderColor: T.border }}>
-          {MOBILE_BOTTOM_NAV.map(it => {
-            const active = activeView === it.id;
-            return (
-              <button
-                key={it.id}
-                type="button"
-                onClick={() => switchView(it.id)}
-                className={`scout-mobile-tab ${active ? 'active' : ''}`}
-                style={{ color: active ? BRAND.pink : T.textFaint }}
-              >
-                <it.Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-                <span>{it.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
     );
   }

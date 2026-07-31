@@ -34,6 +34,7 @@ import Sidebar from './Sidebar';
 import UserMenu from './UserMenu';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
+import ModuleMoreSheet from './ModuleMoreSheet';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
 import BarryChatPanel from '../dashboard/BarryChatPanel';
 import NotificationCenter from '../notifications/NotificationCenter';
@@ -44,28 +45,17 @@ import { useActiveUserId } from '../../context/ImpersonationContext';
 import { ShellProvider, useShell } from '../../context/ShellContext';
 import { resolveModule, MISSION_CONTROL } from '../../constants/navigationModel';
 import { supportMailto } from '../../constants/support';
+import { bottomNavFor } from '../../constants/mobileNavigation';
 import { useT } from '../../theme/ThemeContext';
 import './MainLayout.css';
 
-/**
- * Modules that still render their own mobile bottom navigation.
+/* MODULES_WITH_OWN_MOBILE_NAV is gone.
  *
- * Constraint C3 from the Phase 0 assessment: bringing Scout into the shell
- * would give mobile Scout two bottom navs — the shell's and its own. Mobile
- * is out of scope this sprint, so the shell yields on those routes rather
- * than stacking. Desktop is unaffected. Removed when the mobile sprint
- * reconciles the two.
- */
-const MODULES_WITH_OWN_MOBILE_NAV = [
-  '/scout', '/hunter', '/sniper', '/basecamp', '/reinforcements', '/fallback',
-  '/recon', '/command-center', '/settings',
-];
-
-function ownsItsMobileNav(pathname) {
-  return MODULES_WITH_OWN_MOBILE_NAV.some(
-    p => pathname === p || pathname.startsWith(p + '?')
-  );
-}
+ * It listed the modules that shipped their own mobile bottom nav, so the shell
+ * would yield rather than stack a second one on top — a holding position from
+ * Phase 0 constraint C3, kept while mobile was out of scope. Mobile is in scope
+ * now: no module renders navigation of its own, the shell's bottom bar shows
+ * the current module's SECTIONS, and there is nothing left to yield to. */
 
 /**
  * Breadcrumb: Mission Control ▸ Scout ▸ <entity>
@@ -131,6 +121,7 @@ function ShellChrome({ children, user }) {
   const barryHostRef = useRef(null);
 
   const module = resolveModule(location.pathname);
+  const moduleHasOwnMore = Boolean(bottomNavFor(module.id)?.overflow?.length);
 
   // Route-aware Barry readiness. Only Mission Control reports KPI context
   // upward, so gate on the real signal there and treat every other route as
@@ -270,17 +261,26 @@ function ShellChrome({ children, user }) {
         </main>
       </div>
 
-      {/* Mobile bottom nav — suppressed on modules that still ship their own
-          (Phase 0 constraint C3). */}
-      {!ownsItsMobileNav(location.pathname) && (
-        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
-      )}
+      {/* Mobile bottom nav — the module's sections, always. */}
+      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
 
-      <MoreSheet
-        isOpen={moreSheetOpen}
-        onClose={() => setMoreSheetOpen(false)}
-        onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
-      />
+      {/* Two More surfaces, never both.
+          Inside a module with overflow sections, More belongs to the module.
+          On Mission Control, Settings or anything unmatched, the bar lists
+          modules and More is the global sheet. Which one opens follows from
+          which bar is showing, so the trigger and its sheet always agree. */}
+      {moduleHasOwnMore ? (
+        <ModuleMoreSheet
+          isOpen={moreSheetOpen}
+          onClose={() => setMoreSheetOpen(false)}
+        />
+      ) : (
+        <MoreSheet
+          isOpen={moreSheetOpen}
+          onClose={() => setMoreSheetOpen(false)}
+          onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
+        />
+      )}
 
       <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
 

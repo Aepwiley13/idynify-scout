@@ -26,8 +26,8 @@
  * module.
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import {
@@ -49,8 +49,6 @@ import {
 } from '../utils/mfa';
 import { useT, useThemeCtx } from '../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../theme/tokens';
-import BottomNav from '../components/layout/BottomNav';
-import MoreSheet from '../components/layout/MoreSheet';
 import ModuleSubNav from '../components/layout/ModuleSubNav';
 import { displayNameFor } from '../utils/userIdentity';
 import { useShell } from '../context/ShellContext';
@@ -356,7 +354,6 @@ function AppearancePanel() {
 /* ─── Main component ─────────────────────────────────────────────────────── */
 export default function UserSettings() {
   const T = useT();
-  const navigate = useNavigate();
   const { updateDisplayName } = useShell();
 
   const mql = window.matchMedia('(max-width: 768px)');
@@ -367,9 +364,23 @@ export default function UserSettings() {
     return () => mql.removeEventListener('change', handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState('account');
+  /**
+   * The active section comes from the URL, like every other module's.
+   *
+   * It used to be local state, which was fine while the only way to change it
+   * was the sub-nav panel sitting right there. Mobile's bottom bar navigates,
+   * so the section has to be addressable — and making it addressable also
+   * means a Settings link can now point at a section, refresh keeps you where
+   * you were, and Back steps through sections instead of leaving Settings.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = TABS.some(t => t.id === tabParam) ? tabParam : 'account';
+
+  const setActiveTab = useCallback((id) => {
+    setSearchParams(id === 'account' ? {} : { tab: id });
+  }, [setSearchParams]);
 
   /* ── account ── */
   const user = auth.currentUser;
@@ -433,9 +444,9 @@ export default function UserSettings() {
     loadBilling();
     loadProfile();
     refreshMfaStatus();
-    // Auto-switch to integrations tab if redirected from Calendar OAuth
+    // Auto-switch to integrations if redirected back from Calendar OAuth.
     const params = new URLSearchParams(window.location.search);
-    if (params.get('calendar_connected') === 'true') {
+    if (params.get('calendar_connected') === 'true' && !params.get('tab')) {
       setActiveTab('integrations');
     }
   }, []);
@@ -1388,97 +1399,15 @@ export default function UserSettings() {
     );
   }
 
-  /* ─── Mobile layout ──────────────────────────────────────────────────── */
+  /* ─── Mobile ────────────────────────────────────────────────────────────
+     Content only, like every module. Settings used to render its own top bar
+     (logo, back arrow, theme picker) and a horizontal strip of its seven
+     sections — the last such strip in the product. The shell's bottom bar
+     carries the sections now. */
   if (isMobile) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column',
-        height: '100dvh', width: '100%',
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-        color: T.text, overflow: 'hidden',
-      }}>
-        <style>{`
-          * { box-sizing: border-box; }
-          button, input { font-family: Inter, system-ui, sans-serif; }
-          ::-webkit-scrollbar { width: 3px; height: 3px; }
-          ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
-          @keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
-          @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-          input::placeholder { color: ${T.textFaint}; }
-        `}</style>
-
-        {/* Mobile top bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '9px 14px', borderBottom: `1px solid ${T.border}`,
-          background: T.railBg, flexShrink: 0, zIndex: 2,
-        }}>
-          <div
-            onClick={() => navigate('/mission-control-v2')}
-            title="Mission Control"
-            style={{
-              width: 28, height: 28, borderRadius: 7,
-              background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
-              boxShadow: `0 2px 10px ${BRAND.pink}40`,
-            }}
-          >
-            <img src={ASSETS.logoMark} alt="Mission Control"
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
-            />
-          </div>
-          <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: SETTINGS_ORANGE }}>Settings</div>
-          <button
-            onClick={() => navigate(-1)}
-            style={{
-              width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border2}`,
-              background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            <ArrowLeft size={14} color={T.textMuted} />
-          </button>
-          <ThemePicker />
-        </div>
-
-        {/* Mobile horizontal tab nav */}
-        <div style={{
-          display: 'flex', overflowX: 'auto', flexShrink: 0,
-          background: T.navBg, borderBottom: `1px solid ${T.border}`,
-          padding: '0 6px',
-        }}>
-          {TABS.map(({ id, label, icon: Icon }) => {
-            const active = activeTab === id;
-            return (
-              <div
-                key={id}
-                onClick={() => setActiveTab(id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '9px 12px', flexShrink: 0,
-                  borderBottom: `2px solid ${active ? SETTINGS_ORANGE : 'transparent'}`,
-                  color: active ? SETTINGS_ORANGE : T.textMuted,
-                  fontSize: 12, fontWeight: active ? 600 : 400,
-                  cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.12s',
-                }}
-              >
-                <Icon size={12} />
-                {label}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Mobile main content — paddingBottom leaves room for BottomNav */}
-        <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
-          {renderPanel()}
-        </div>
-
-        {/* Cross-module bottom nav */}
-        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
-        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+      <div className="module-mobile">
+        {renderPanel()}
         {showServiceSetup && (
           <ServiceProfileSetup
             onComplete={() => { setShowServiceSetup(false); loadServiceProfiles(); }}

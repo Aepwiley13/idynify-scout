@@ -1,6 +1,16 @@
 # Top Bar + Settings + Mobile Navigation
 **Team A | Idynify | Enterprise-ready top bar, Settings into the shell, mobile drawer**
 
+> **The mobile sections of this document are superseded by
+> [`MOBILE_CONSTITUTION.md`](./MOBILE_CONSTITUTION.md).**
+>
+> Two instructions here were wrong and are reversed there: that the bottom bar
+> should keep listing modules, and that each module's horizontal section strip
+> was correct for mobile. Together they preserved the duplication rather than
+> fixing it. The drawer, the top bar and the More sheet cleanup below stand;
+> the bottom bar now carries the current module's sections and the strips are
+> gone.
+
 ---
 
 ## Summary

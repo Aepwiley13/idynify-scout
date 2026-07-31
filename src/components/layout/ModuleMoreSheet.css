@@ -1,0 +1,128 @@
+/* ModuleMoreSheet — overflow sections for the current module.
+ *
+ * Deliberately unlike the global hamburger drawer: this comes up from the
+ * BOTTOM (where its trigger is), is only as tall as its contents, is titled
+ * with the module name, and is tinted with the module colour. The drawer is
+ * full-height, from the left, neutral, and titled IDYNIFY. Two surfaces, two
+ * jobs, told apart before you read a word. */
+
+.module-more-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .module-more-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(3px);
+    animation: moduleMoreFade 0.18s ease;
+  }
+
+  .module-more-sheet {
+    position: absolute;
+    /* Sits ON the bottom nav rather than above it: the bar is the trigger, and
+       a gap showing the bar underneath invites tapping through it. */
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: moduleMoreUp 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .module-more-handle {
+    width: 40px;
+    height: 4px;
+    margin: 10px auto 0;
+    border-radius: 2px;
+    background: var(--border);
+  }
+
+  .module-more-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .module-more-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .module-more-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* A list, not a tile grid. Section names are long enough that tiles either
+     truncate or wrap into a ragged grid. */
+  .module-more-list {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 16px;
+  }
+
+  .module-more-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    /* 48px of height: this is a thumb target at the bottom of a phone. */
+    min-height: 48px;
+    padding: 12px 10px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .module-more-item:active {
+    background: var(--bg-secondary);
+  }
+
+  .theme-dark .module-more-sheet {
+    background: #0f0f14;
+  }
+
+  .theme-dark .module-more-item:active {
+    background: #1e1e2e;
+  }
+}
+
+@keyframes moduleMoreFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes moduleMoreUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-more-backdrop,
+  .module-more-sheet { animation: none; }
+}

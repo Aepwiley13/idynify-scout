@@ -15,6 +15,8 @@ import { ShellProvider } from '../context/ShellContext';
 import Sidebar from '../components/layout/Sidebar';
 import MoreSheet from '../components/layout/MoreSheet';
 import BottomNav from '../components/layout/BottomNav';
+import ModuleMoreSheet from '../components/layout/ModuleMoreSheet';
+import { MODULE_COLORS } from '../constants/mobileNavigation';
 import { SIDEBAR_ORDER, sidebarDestinations } from '../constants/navigationModel';
 
 vi.mock('../firebase/config', () => ({
@@ -24,7 +26,21 @@ vi.mock('../firebase/config', () => ({
 
 const AARON = { email: 'aaron@idynify.com', firstName: 'Aaron', lastName: 'Wiley' };
 
+/**
+ * jsdom has no matchMedia, and the sidebar now BUILDS one arrangement or the
+ * other rather than hiding one with CSS — so a mobile test that does not say
+ * it is mobile silently renders the desktop nav and asserts nothing it means to.
+ */
+function setViewport(mobile) {
+  window.matchMedia = (q) => ({
+    matches: mobile, media: q, onchange: null,
+    addEventListener: () => {}, removeEventListener: () => {},
+    addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+  });
+}
+
 function renderDrawer({ onClose = vi.fn(), onLogout = vi.fn() } = {}) {
+  setViewport(true);
   const utils = render(
     <MemoryRouter initialEntries={['/hunter']}>
       <ThemeProvider>
@@ -51,16 +67,40 @@ function renderMoreSheet(onClose = vi.fn()) {
 beforeEach(() => { localStorage.clear(); });
 
 describe('hamburger drawer', () => {
-  it('lists every module, in the desktop sidebar order', () => {
-    // Same component as the desktop sidebar, so the order cannot drift: this
-    // asserts that is still true rather than re-listing the modules.
+  it('lists every module, grouped by what the platform actually is', () => {
+    // Desktop draws a flat list — the final nav brief calls the grouping an
+    // architectural decision, not a visual one in that sidebar style. The
+    // drawer is the ONLY place modules are listed on mobile, so it is where
+    // the shape has to be legible.
     renderDrawer();
 
     const nav = screen.getByRole('navigation', { name: /global navigation/i });
     const labels = within(nav).getAllByRole('button').map(b => b.textContent);
 
-    expect(labels).toEqual(sidebarDestinations().map(d => d.label));
+    expect(labels).toEqual([
+      'Mission Control',
+      'Scout', 'Hunter', 'Sniper',
+      'Basecamp', 'Reinforcements', 'Fallback',
+      'Recon',
+      'Command Center',
+    ]);
+
+    // Same destinations as desktop, different arrangement — nothing dropped.
+    expect([...labels].sort()).toEqual(sidebarDestinations().map(d => d.label).sort());
     expect(labels).toHaveLength(SIDEBAR_ORDER.length);
+  });
+
+  it('labels the groups, and makes none of them tappable', () => {
+    // A group describes the platform. It is not a destination, and a heading
+    // that looks tappable but is not is worse than no heading.
+    renderDrawer();
+    const nav = screen.getByRole('navigation', { name: /global navigation/i });
+
+    for (const group of ['PIPELINE', 'RELATIONSHIPS', 'INTELLIGENCE']) {
+      const el = within(nav).getByText(group);
+      expect(el.tagName).not.toBe('BUTTON');
+      expect(el.closest('button')).toBeNull();
+    }
   });
 
   it('marks the module the user is actually in', () => {
@@ -168,16 +208,137 @@ describe('More sheet', () => {
   });
 });
 
-describe('bottom nav — unchanged', () => {
-  it('is still Scout · Hunter · Sniper · Basecamp · More', () => {
-    render(
-      <MemoryRouter initialEntries={['/scout']}>
-        <BottomNav onOpenMore={vi.fn()} />
+describe('bottom bar — module sections, not modules', () => {
+  function renderBar(at) {
+    return render(
+      <MemoryRouter initialEntries={[at]}>
+        <ThemeProvider>
+          <BottomNav onOpenMore={vi.fn()} />
+        </ThemeProvider>
       </MemoryRouter>
     );
+  }
 
-    const nav = screen.getByRole('navigation', { name: /main navigation/i });
-    expect(within(nav).getAllByRole('button').map(b => b.textContent))
-      .toEqual(['Scout', 'Hunter', 'Sniper', 'Basecamp', 'More']);
+  const labels = () =>
+    within(screen.getByRole('navigation')).getAllByRole('button').map(b => b.textContent);
+
+  it('shows the current module\'s sections', () => {
+    // The whole correction in one assertion. This bar used to read
+    // Scout · Hunter · Sniper · Basecamp · More on every screen in the
+    // product — the hamburger's job, done twice.
+    renderBar('/hunter?tab=all');
+    expect(labels()).toEqual(['Blitz', 'All People', 'Companies', 'Follow Up', 'More']);
+  });
+
+  it('changes with the module', () => {
+    renderBar('/scout?tab=daily-leads');
+    expect(labels()).toEqual(['Daily', 'Saved', 'People', 'Scout+', 'More']);
+  });
+
+  it('shows no More cell for a module whose sections all fit', () => {
+    // Basecamp has exactly four. A More that opens an empty sheet is worse
+    // than no More.
+    renderBar('/basecamp?tab=people');
+    expect(labels()).toEqual(['People', 'Companies', 'Engage', 'CSM']);
+  });
+
+  it('never lists another module', () => {
+    renderBar('/sniper?tab=people');
+    for (const other of ['Scout', 'Hunter', 'Basecamp', 'Recon', 'Fallback']) {
+      expect(labels()).not.toContain(other);
+    }
+  });
+
+  it('falls back to the module list where there are no sections to show', () => {
+    // Mission Control is a single scrolling dashboard with nothing to switch
+    // between — see the note in constants/mobileNavigation.
+    renderBar('/mission-control-v2');
+    expect(labels()).toEqual(['Scout', 'Hunter', 'Sniper', 'Basecamp', 'More']);
+  });
+
+  it('marks the section from the URL', () => {
+    renderBar('/hunter?tab=companies');
+    const current = within(screen.getByRole('navigation'))
+      .getAllByRole('button').filter(b => b.getAttribute('aria-current') === 'page');
+
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveTextContent('Companies');
+  });
+
+  it('marks the default section on a bare module URL', () => {
+    // /hunter with no ?tab= renders Hunter's default view. An unlit bar reads
+    // as "you are nowhere".
+    renderBar('/hunter');
+    const current = within(screen.getByRole('navigation'))
+      .getAllByRole('button').filter(b => b.getAttribute('aria-current') === 'page');
+
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveTextContent('All People');
+  });
+
+  it('resolves path-based sections too, longest match winning', () => {
+    // Recon navigates by real path. /recon/messaging must not also light
+    // Overview, whose path is a prefix of every Recon route.
+    renderBar('/recon/messaging');
+    const current = within(screen.getByRole('navigation'))
+      .getAllByRole('button').filter(b => b.getAttribute('aria-current') === 'page');
+
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveTextContent('Messaging');
+  });
+
+  it('tints the active section with the module colour', () => {
+    renderBar('/hunter?tab=all');
+    const active = within(screen.getByRole('navigation'))
+      .getAllByRole('button').find(b => b.getAttribute('aria-current') === 'page');
+
+    expect(active).toHaveStyle({ color: MODULE_COLORS.hunter });
+  });
+
+  it('names itself for the module, so the bar is not "Main navigation" everywhere', () => {
+    renderBar('/sniper?tab=people');
+    expect(screen.getByRole('navigation', { name: /sniper sections/i })).toBeInTheDocument();
+  });
+});
+
+describe('the two More surfaces stay distinct', () => {
+  function renderModuleMore(at) {
+    return render(
+      <MemoryRouter initialEntries={[at]}>
+        <ThemeProvider>
+          <ModuleMoreSheet isOpen onClose={vi.fn()} />
+        </ThemeProvider>
+      </MemoryRouter>
+    );
+  }
+
+  it('shows only the current module\'s overflow sections', () => {
+    renderModuleMore('/hunter?tab=all');
+    const sheet = screen.getByRole('dialog');
+
+    expect(within(sheet).getAllByRole('button').map(b => b.textContent))
+      .toEqual(['', "Today's Actions", 'Replied', 'Active', 'New (Unengaged)']);
+  });
+
+  it('contains no module names at all', () => {
+    // Acceptance criterion 7. If a module name appears here the user has two
+    // ways to change workspace and no way to tell them apart.
+    renderModuleMore('/scout?tab=daily-leads');
+    const sheet = screen.getByRole('dialog');
+
+    for (const module of ['Hunter', 'Sniper', 'Basecamp', 'Recon', 'Reinforcements',
+                          'Fallback', 'Command Center', 'Mission Control']) {
+      expect(within(sheet).queryByText(module)).toBeNull();
+    }
+  });
+
+  it('is titled with the module, where the global sheet says "All Modules"', () => {
+    renderModuleMore('/recon');
+    expect(within(screen.getByRole('dialog')).getByText('Recon')).toBeInTheDocument();
+  });
+
+  it('does not open for a module with nothing to overflow', () => {
+    const { container } = renderModuleMore('/basecamp?tab=people');
+    expect(container).toBeEmptyDOMElement();
   });
 });

@@ -44,12 +44,14 @@ import {
 import {
   MISSION_CONTROL,
   sidebarDestinations,
+  mobileDrawerSections,
   resolveModule,
 } from '../../constants/navigationModel';
 import { supportMailto } from '../../constants/support';
 import { displayNameFor, initialsFor } from '../../utils/userIdentity';
 import { ASSETS } from '../../theme/tokens';
 import { useShell } from '../../context/ShellContext';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import './Sidebar.css';
 
 /** Icons live in the view layer; navigationModel stays presentation-free. */
@@ -136,6 +138,32 @@ function BarryControl({ compact, onOpen, barryOpen, buttonRef }) {
   );
 }
 
+/**
+ * One module row. Shared by the desktop list and the mobile grouped drawer so
+ * the two cannot drift apart.
+ */
+function ModuleLink({ dest, compact, active, onGo }) {
+  const Icon = MODULE_ICONS[dest.id] || Radar;
+  return (
+    <button
+      type="button"
+      className={`sidebar-module ${active ? 'active' : ''}`}
+      onClick={() => onGo(dest.path)}
+      aria-current={active ? 'page' : undefined}
+      aria-label={dest.label}
+      title={compact ? dest.label : undefined}
+    >
+      <Icon size={17} strokeWidth={active ? 2.2 : 1.9} aria-hidden="true" />
+      <span className="sidebar-module-label" aria-hidden={compact ? 'true' : undefined}>
+        {/* Compact shows the short rail label; the accessible name stays the
+            full locked label either way, so "MC" is never the only name on
+            offer. */}
+        {compact ? (dest.railLabel || dest.label) : dest.label}
+      </span>
+    </button>
+  );
+}
+
 const Sidebar = ({
   mobileMenuOpen = false,
   onCloseMobileMenu = () => {},
@@ -148,6 +176,7 @@ const Sidebar = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { openBarry, sidebarMode, toggleSidebar } = useShell();
+  const isMobile = useIsMobile();
 
   const compact = sidebarMode === 'compact';
 
@@ -198,34 +227,59 @@ const Sidebar = ({
         <X size={18} aria-hidden="true" />
       </button>
 
-      <nav className="sidebar-nav" aria-label="Global navigation">
+      {/* DESKTOP — the flat, locked order. Unchanged. */}
+      {!isMobile && (
+      <nav className="sidebar-nav sidebar-nav-flat" aria-label="Global navigation">
         <ul className="sidebar-modules">
-          {sidebarDestinations().map(dest => {
-            const Icon = MODULE_ICONS[dest.id] || Radar;
-            const active = activeModule.id === dest.id;
-            return (
-              <li key={dest.id}>
-                <button
-                  type="button"
-                  className={`sidebar-module ${active ? 'active' : ''}`}
-                  onClick={() => go(dest.path)}
-                  aria-current={active ? 'page' : undefined}
-                  aria-label={dest.label}
-                  title={compact ? dest.label : undefined}
-                >
-                  <Icon size={17} strokeWidth={active ? 2.2 : 1.9} aria-hidden="true" />
-                  <span className="sidebar-module-label" aria-hidden={compact ? 'true' : undefined}>
-                    {/* Compact shows the short rail label; the accessible name
-                        stays the full locked label either way, so "MC" is
-                        never the only name on offer. */}
-                    {compact ? (dest.railLabel || dest.label) : dest.label}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
+          {sidebarDestinations().map(dest => (
+            <li key={dest.id}>
+              <ModuleLink
+                dest={dest}
+                compact={compact}
+                active={activeModule.id === dest.id}
+                onGo={go}
+              />
+            </li>
+          ))}
         </ul>
       </nav>
+      )}
+
+      {/* MOBILE — the same destinations, grouped.
+          Two arrangements rather than one, because the orders genuinely
+          differ: desktop puts Recon between Basecamp and Reinforcements, while
+          grouped puts it under INTELLIGENCE after Fallback. One list cannot be
+          both. They share ModuleLink, so a change to how a module renders
+          cannot land on one surface and miss the other.
+
+          Only one is BUILT, not merely hidden: two landmarks both labelled
+          "Global navigation" is one stylesheet failure away from rendering
+          both, and it makes every query against the sidebar ambiguous. */}
+      {isMobile && (
+      <nav className="sidebar-nav sidebar-nav-grouped" aria-label="Global navigation">
+        {mobileDrawerSections().map((section, i) => (
+          <div className="sidebar-group" key={section.label || `ungrouped-${i}`}>
+            {/* Not a button and not tappable: a group is a description of the
+                platform, not a destination. */}
+            {section.label && (
+              <div className="sidebar-group-label" aria-hidden="true">{section.label}</div>
+            )}
+            <ul className="sidebar-modules" aria-label={section.label || undefined}>
+              {section.destinations.map(dest => (
+                <li key={dest.id}>
+                  <ModuleLink
+                    dest={dest}
+                    compact={false}
+                    active={activeModule.id === dest.id}
+                    onGo={go}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+      )}
 
       {/* ── Mobile drawer tail ──
           Settings, Help and the account, all mobile-only.

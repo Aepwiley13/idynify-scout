@@ -49,15 +49,25 @@
     background: var(--bg-secondary);
   }
 
+  /* The active colour is set inline, per module, by BottomNav — one value in
+     one place rather than nine colour classes. Weight is the part that does
+     not vary, so it stays here. */
   .bottom-nav-item.active {
-    color: #ec4899; /* Brand pink */
+    font-weight: 600;
   }
 
   .bottom-nav-label {
     font-size: 10px;
     font-weight: 500;
     letter-spacing: 0.01em;
-    line-height: 1;
+    line-height: 1.15;
+    /* Section labels are longer than module names were ("Opportunities",
+       "All People"). Two lines rather than an ellipsis: a bar reading
+       "Opportu…" beside "Leaderb…" tells you nothing. */
+    max-width: 100%;
+    padding: 0 2px;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -77,7 +87,5 @@
     background: #1e1e2e;
   }
 
-  .theme-dark .bottom-nav-item.active {
-    color: #ec4899;
-  }
+  /* Active colour comes from the module, inline, in both themes. */
 }

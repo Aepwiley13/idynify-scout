@@ -265,14 +265,12 @@ setup hub, a duplicate of several modules, or two destinations wearing one name
 is worth deciding now. Nothing about it was changed during the migration
 specifically so this decision is made on the merits.
 
-**2. Mobile.** *(Partly addressed — see `TOPBAR_AND_MOBILE.md`.)* The
-hamburger drawer, the More sheet and the mobile top bar have since been done.
-What remains is that every module still carries its own mobile branch and its
-own top bar, each listed in `MODULES_WITH_OWN_MOBILE_NAV` so the shell does not
-stack a second bottom nav on top. Those in-module tab strips are confirmed
-correct for mobile; what is not reconciled is that some of those top bars carry
-their own theme picker and settings button, now duplicating the drawer. One
-pass, not eight.
+**2. Mobile.** *(Done — see `MOBILE_CONSTITUTION.md`.)* Every module's mobile
+branch is content only. No module renders navigation of its own, the bottom bar
+carries the current module's sections, the hamburger is the only place modules
+are listed, and `MODULES_WITH_OWN_MOBILE_NAV` is gone. The earlier note here
+said the in-module tab strips were "confirmed correct for mobile" — that came
+from a brief which was subsequently corrected, and the strips are gone.
 
 **3. Barry's navigation contract in production.** The contract is published and
 tested, and `barryMissionChat.js` renders it into the system prompt. What has

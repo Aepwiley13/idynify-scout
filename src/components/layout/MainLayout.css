@@ -671,4 +671,35 @@
   .shell-breadcrumb-item:not(:last-child) { display: none; }
   .shell-breadcrumb-current { font-size: 1rem; max-width: 18ch; }
   .topbar-icon-btn { width: 32px; height: 32px; }
+
+  /* Full-bleed module content still has to clear the bottom bar.
+     `.page-content` reserves that room, but `.page-content-full` zeroes all
+     padding at ≤1024px and wins on specificity, so the room was being given
+     back. It did not show before because every module drew its own bottom nav
+     with its own padding; now that the shell owns the bar, the last row of
+     every list would sit underneath it. */
+  .page-content.page-content-full {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ── Module content on mobile ──
+   Every module's mobile branch renders into this. It exists to do one thing:
+   fill the space between the shell's top bar and its bottom bar, and let the
+   module scroll inside it. Modules used to size themselves to 100dvh and draw
+   their own bars at both ends, which is why content could end up underneath
+   the shell's bar rather than above it. */
+.module-mobile {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+@media (min-width: 769px) {
+  /* Desktop never renders this branch; the rule is here so a stray usage
+     cannot silently become a full-height block on a wide screen. */
+  .module-mobile { display: none; }
 }

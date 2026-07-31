@@ -230,6 +230,43 @@ export function sidebarDestinations() {
 }
 
 /**
+ * The same destinations, grouped, for the MOBILE hamburger drawer.
+ *
+ * Desktop deliberately draws a flat list — the final nav brief says the
+ * Pipeline / Relationships / Intelligence split is an architectural decision,
+ * not a visual one in that sidebar style. The mobile drawer is a different
+ * surface with a different job: it is the only place modules are listed at all,
+ * so it is where the shape of the platform has to be legible.
+ *
+ * Returns sections, each `{ label, destinations }`. `label: null` means an
+ * ungrouped run that renders without a heading — Mission Control at the top,
+ * and Command Center at the bottom, both of which sit outside the three groups.
+ * Same objects, same order within groups; only the presentation differs.
+ */
+export function mobileDrawerSections() {
+  const byId = id => ALL_DESTINATIONS.find(d => d.id === id);
+  const inGroup = group =>
+    SIDEBAR_ORDER.map(byId).filter(d => d && d.group === group);
+
+  const grouped = new Set(
+    GROUP_ORDER.flatMap(g => inGroup(g)).map(d => d.id)
+  );
+
+  // Anything in the sidebar that belongs to no group and is not Mission
+  // Control. Derived rather than hard-coded, so a new ungrouped destination
+  // appears here instead of silently vanishing from mobile.
+  const ungrouped = SIDEBAR_ORDER
+    .map(byId)
+    .filter(d => d && d.id !== MISSION_CONTROL.id && !grouped.has(d.id));
+
+  return [
+    { label: null, destinations: [MISSION_CONTROL] },
+    ...GROUP_ORDER.map(g => ({ label: g, destinations: inGroup(g) })),
+    ...(ungrouped.length ? [{ label: null, destinations: ungrouped }] : []),
+  ].filter(s => s.destinations.length > 0);
+}
+
+/**
  * Resolve a pathname to its owning module.
  *
  * Longest-prefix wins so /scout/contact/x resolves to scout, not to a

@@ -20,6 +20,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '../theme/ThemeContext';
 import { ShellProvider } from '../context/ShellContext';
+import { MODULE_BOTTOM_NAV } from '../constants/mobileNavigation';
 
 vi.mock('../firebase/config', () => ({
   auth: { currentUser: { uid: 'u1', email: 'aaron@idynify.com' }, onAuthStateChanged: () => () => {} },
@@ -85,6 +86,7 @@ const { default: UserSettings } = await import('../pages/UserSettings');
 const MIGRATED = [
   {
     name: 'Hunter',
+    moduleId: 'hunter',
     Component: HunterMain,
     path: '/hunter',
     title: 'HUNTER',
@@ -99,6 +101,7 @@ const MIGRATED = [
   },
   {
     name: 'Sniper',
+    moduleId: 'sniper',
     Component: SniperMain,
     path: '/sniper',
     title: 'SNIPER',
@@ -113,6 +116,7 @@ const MIGRATED = [
   },
   {
     name: 'Basecamp',
+    moduleId: 'basecamp',
     Component: BasecampMain,
     path: '/basecamp',
     title: 'BASECAMP',
@@ -124,6 +128,7 @@ const MIGRATED = [
   },
   {
     name: 'Reinforcements',
+    moduleId: 'reinforcements',
     Component: ReinforcementsMain,
     path: '/reinforcements',
     title: 'REINFORCEMENTS',
@@ -135,6 +140,7 @@ const MIGRATED = [
   },
   {
     name: 'Fallback',
+    moduleId: 'fallback',
     Component: FallbackMain,
     path: '/fallback',
     title: 'FALLBACK',
@@ -146,6 +152,7 @@ const MIGRATED = [
   },
   {
     name: 'Recon',
+    moduleId: 'recon',
     Component: ReconMain,
     path: '/recon',
     title: 'RECON',
@@ -163,6 +170,7 @@ const MIGRATED = [
   },
   {
     name: 'Command Center',
+    moduleId: 'command-center',
     Component: PeopleMain,
     path: '/command-center',
     title: 'COMMAND CENTER',
@@ -181,6 +189,7 @@ const MIGRATED = [
   },
   {
     name: 'Settings',
+    moduleId: 'settings',
     Component: UserSettings,
     path: '/settings',
     title: 'SETTINGS',
@@ -300,6 +309,44 @@ describe.each(MIGRATED)('$name — migrated into the shell', (mod) => {
     }
     for (const desc of mod.descriptions) {
       expect(within(panel).getByText(desc)).toBeInTheDocument();
+    }
+  });
+
+  it('the mobile bottom bar names sections this module actually has', () => {
+    // constants/mobileNavigation.js is a SECOND copy of each module's section
+    // list — the shell must not import nine module files to draw the bottom
+    // bar. A second copy is exactly how nine diverging module rails happened,
+    // so every label there is checked against the labels the module really
+    // renders. Rename a section in one place and this fails.
+    //
+    // The bar abbreviates on purpose — a 360px cell fits "Follow Up", not
+    // "Follow Up Now" — so items that shorten a name declare the real one in
+    // `section`. That lets this compare EXACTLY rather than guessing at
+    // prefixes, which would let a rename hide behind an abbreviation.
+    const config = MODULE_BOTTOM_NAV[mod.moduleId];
+    if (!config) return;
+
+    renderModule(mod);
+    const panel = screen.getByRole('complementary', { name: new RegExp(`${mod.title} sections`, 'i') });
+    const real = within(panel).getAllByRole('button')
+      .map(b => b.querySelector('.module-subnav-item-label')?.textContent)
+      .filter(Boolean);
+
+    for (const item of [...config.primary, ...config.overflow]) {
+      const name = item.section || item.label;
+      expect(real, `${mod.name}: "${name}" is not one of its sections`).toContain(name);
+    }
+  });
+
+  it('the mobile bottom bar reaches every section, between the bar and its More sheet', () => {
+    // The strip under the top bar is gone, so if a section is in neither the
+    // bar nor the More sheet it is unreachable on a phone.
+    const config = MODULE_BOTTOM_NAV[mod.moduleId];
+    if (!config) return;
+
+    const reachable = [...config.primary, ...config.overflow].map(i => i.section || i.label);
+    for (const section of mod.sections) {
+      expect(reachable, `${mod.name} section "${section}" is unreachable on mobile`).toContain(section);
     }
   });
 

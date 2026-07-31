@@ -40,8 +40,6 @@ import {
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
-import BottomNav from '../../components/layout/BottomNav';
-import MoreSheet from '../../components/layout/MoreSheet';
 import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import AllLeads from './AllLeads';
 import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
@@ -221,7 +219,6 @@ function PeopleShellInner({ user }) {
     return () => mql.removeEventListener('change', handler);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   /**
    * The active section is DERIVED from the URL rather than mirrored into state
@@ -344,111 +341,18 @@ function PeopleShellInner({ user }) {
   };
 
   // ── Mobile — preserved from the pre-migration layout (constraint C3) ────────
+  // ── Mobile ───────────────────────────────────────────────────────────────
+  // Content only. Command Center used to render its own mobile top bar and a
+  // horizontal strip of its own sections beneath it — module navigation in the
+  // one place a phone user's thumb cannot reach, while the bottom bar listed
+  // MODULES, duplicating the hamburger.
+  //
+  // The shell owns all three surfaces now: hamburger for modules, bottom bar
+  // for these sections, top bar for where you are.
   if (isMobile) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column',
-        height: '100dvh', width: '100%',
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-        color: T.text, overflow: 'hidden', position: 'relative',
-      }}>
-        <style>{`
-          * { box-sizing: border-box; }
-          button, input { font-family: Inter, system-ui, sans-serif; }
-          ::-webkit-scrollbar { width: 3px; height: 3px; }
-          ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
-          @keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
-          @keyframes fadeUp  { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-          input::placeholder { color: ${T.textFaint}; }
-        `}</style>
-
-        {/* Mobile top bar */}
-        <div style={{
-          flexShrink: 0, zIndex: 2,
-          background: T.railBg, borderBottom: `1px solid ${T.border}`,
-        }}>
-          {/* Row 1: logo + title + theme + settings */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px' }}>
-            <div
-              onClick={() => navigate('/mission-control-v2')}
-              title="Mission Control"
-              style={{
-                width: 28, height: 28, borderRadius: 7,
-                background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
-                boxShadow: `0 2px 10px ${BRAND.pink}40`,
-              }}
-            >
-              <img src={ASSETS.logoMark} alt="Mission Control"
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
-              />
-            </div>
-            <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: 0.3 }}>
-              Command Center
-            </div>
-            <NotificationCenter userId={user?.uid} T={T} />
-            <ThemePicker dropUp={false} />
-            <div
-              onClick={() => navigate('/settings')}
-              title="Settings"
-              style={{
-                width: 34, height: 34, borderRadius: 9,
-                background: T.accentBg, border: `1px solid ${T.accentBdr}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-              }}
-            >
-              <SettingsIcon size={16} color={SETTINGS_ORANGE} />
-            </div>
-          </div>
-
-          {/* Row 2: section tabs */}
-          <div style={{ display: 'flex', overflowX: 'auto', gap: 0, padding: '0 14px 8px' }}>
-            {CC_ITEMS.map(item => {
-              const active = activeSection === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => switchSection(item.id)}
-                  style={{
-                    flexShrink: 0, padding: '7px 12px', border: 'none', borderRadius: 8,
-                    background: active ? `${CC_CYAN}18` : 'transparent',
-                    color: active ? CC_CYAN : T.textFaint,
-                    fontSize: 12, fontWeight: active ? 700 : 500,
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    borderBottom: active ? `2px solid ${CC_CYAN}` : '2px solid transparent',
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                    display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
-                  }}
-                >
-                  <item.Icon size={12} />
-                  {item.label}
-                  {item.id === 'missions' && activeMissionsCount > 0 && (
-                    <span style={{
-                      minWidth: 14, height: 14, borderRadius: 7,
-                      background: CC_CYAN, color: '#000',
-                      fontSize: 8, fontWeight: 700, padding: '0 3px',
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {activeMissionsCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Mobile main content — paddingBottom leaves room for BottomNav */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1, paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}>
-          {renderMain()}
-        </div>
-
-        {/* Cross-module bottom nav */}
-        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} />
-        <MoreSheet isOpen={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} />
+      <div className="module-mobile">
+        {renderMain()}
       </div>
     );
   }

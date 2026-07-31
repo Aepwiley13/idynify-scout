@@ -13,13 +13,13 @@ Order: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Comm
 | Scout | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Hunter** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Sniper** | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Basecamp | migrate | migrate | migrate | restyle | migrate |
+| **Basecamp** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Reinforcements | migrate | migrate | migrate | restyle | migrate |
 | Fallback | migrate | migrate | migrate | restyle | migrate |
 | Command Center | migrate | migrate | migrate | restyle | migrate |
 | Recon | migrate | migrate | migrate | restyle | migrate |
 
-**4 of 9.** The whole pipeline — Scout, Hunter, Sniper — is now one shell.
+**5 of 9.** The whole pipeline — Scout, Hunter, Sniper — plus Basecamp.
 
 ---
 
@@ -68,20 +68,51 @@ sidebar 220px | active: Sniper | sub-nav 190px
 sections: People · Companies · Pipeline · Targets · Touches · Playbooks · Outcomes
 ```
 
+## 3 — Basecamp
+
+`BasecampMain.jsx`: **670 → 352 lines.**
+
+Sections unchanged: People, Companies, Engage, CSM.
+
+Route moved: `/basecamp`.
+
+**The Barry persona split is resolved.** This module has always declared
+`basecamp` (the CSM persona, teal) while the old route maps sent `/basecamp`
+to `homebase` (the GUIDE persona, red) — so Barry greeted a customer-success
+screen with *"what do you need to set up or configure today?"*, and the
+persona the module intended was unreachable through navigation. Basecamp no
+longer mounts its own `BarryChat` at all, so the wrong persona cannot be
+applied; the shell resolves it from `navigationModel`, which is locked to
+`basecamp`. `MODULE_CONFIG.homebase` is now referenced only by the orphaned
+`BarryTrigger` and can go with it in the cleanup sprint.
+
+The CSM dashboard needs a user id. It now comes from `useActiveUserId()`
+rather than the deleted per-shell resolver, so an admin viewing a tenant still
+sees that tenant's portfolio.
+
+```
+sidebar 220px | active: Basecamp | sub-nav 190px
+sections: People · Companies · Engage · CSM
+```
+
+Also fixed while here: sub-nav taglines wrap to two lines instead of
+truncating. Scout's fits on one; "Customer success and retention" did not, and
+a module's stated purpose is not worth losing to an ellipsis.
+
 ---
 
 ## Verification
 
-`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 7 times.
+`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 8 times.
 
 Two crossings get their own tests:
 
 - **Scout → Hunter.** The one "Move to Hunter" lands on, and the one the original audit called the worst moment in the product — Scout's rail out, Hunter's rail in, Barry destroyed and rebuilt in between. It now changes nothing but the content.
 - **Scout → Hunter → Sniper.** The whole pipeline on one shell, with `current_module` and `source_route` tracking correctly at each step.
 
-`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 16 tests across Hunter and Sniper today, growing by 8 per migration.
+`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 24 tests across Hunter, Sniper and Basecamp, growing by 8 per migration.
 
-Suite **457 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
+Suite **465 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
 
 ---
 
@@ -97,4 +128,4 @@ Suite **457 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 ## Next
 
-**Basecamp.** Same recipe. Resolve the `homebase`/`basecamp` Barry persona split as part of it — the module declares `basecamp` (CSM) while the old route maps sent `/basecamp` to `homebase` (GUIDE), so the intended persona was unreachable.
+**Reinforcements.** Same recipe; its sections are Dashboard, Opportunities, Leaderboard, Record and Nurture.

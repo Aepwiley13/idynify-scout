@@ -37,9 +37,15 @@ vi.mock('../pages/Sniper/sections/TouchesSection', () => stub('touches'));
 vi.mock('../pages/Sniper/sections/PlaybooksSection', () => stub('playbooks'));
 vi.mock('../pages/Sniper/sections/OutcomesSection', () => stub('outcomes'));
 vi.mock('../pages/Sniper/sections/SniperCompaniesSection', () => stub('sniper-companies'));
+vi.mock('../pages/Basecamp/sections/PeopleSection', () => stub('bc-people'));
+vi.mock('../pages/Basecamp/sections/CompaniesSection', () => stub('bc-companies'));
+vi.mock('../pages/Basecamp/sections/EngagementCenter', () => stub('bc-engage'));
+vi.mock('../components/csm/CSMDashboard', () => stub('csm'));
+vi.mock('../hooks/useSubscription', () => ({ useSubscription: () => ({ isProTier: true, loading: false }) }));
 
 const { default: HunterMain } = await import('../pages/Hunter/HunterMain');
 const { default: SniperMain } = await import('../pages/Sniper/SniperMain');
+const { default: BasecampMain } = await import('../pages/Basecamp/BasecampMain');
 
 /**
  * One row per migrated module. `otherModules` are labels the module's own rail
@@ -74,10 +80,23 @@ const MIGRATED = [
     descriptions: ['Conversion board', 'Win/loss analytics'],
     activeTab: { query: '?tab=playbooks', expect: 'Playbooks' },
   },
+  {
+    name: 'Basecamp',
+    Component: BasecampMain,
+    path: '/basecamp',
+    title: 'BASECAMP',
+    tagline: 'Customer success and retention',
+    storageKey: 'basecamp_subnav_collapsed',
+    sections: ['People', 'Companies', 'Engage', 'CSM'],
+    descriptions: ['Your contacts', 'Customer success'],
+    activeTab: { query: '?tab=engage', expect: 'Engage' },
+  },
 ];
 
 /** Labels the deleted icon rails used to show for OTHER modules. */
-const OTHER_MODULE_RAIL_LABELS = ['SCOUT', 'BASECAMP', 'REINFORCEMENTS', 'FALLBACK', 'RECON'];
+const OTHER_MODULE_RAIL_LABELS = [
+  'SCOUT', 'HUNTER', 'SNIPER', 'BASECAMP', 'REINFORCEMENTS', 'FALLBACK', 'RECON',
+];
 
 function renderModule({ Component, path }, query = '') {
   window.matchMedia = (q) => ({
@@ -104,7 +123,10 @@ beforeEach(() => { localStorage.clear(); });
 describe.each(MIGRATED)('$name — migrated into the shell', (mod) => {
   it('renders no module rail of its own', () => {
     const { container } = renderModule(mod);
-    for (const label of OTHER_MODULE_RAIL_LABELS) {
+    // Skip the module's own title: it legitimately appears in the sub-nav
+    // panel header. Everything else in this list was a rail entry, and the
+    // rail is what had to go.
+    for (const label of OTHER_MODULE_RAIL_LABELS.filter(l => l !== mod.title)) {
       expect(within(container).queryByText(label)).toBeNull();
     }
   });

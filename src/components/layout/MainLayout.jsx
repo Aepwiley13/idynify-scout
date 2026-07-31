@@ -54,7 +54,7 @@ import './MainLayout.css';
  * than stacking. Desktop is unaffected. Removed when the mobile sprint
  * reconciles the two.
  */
-const MODULES_WITH_OWN_MOBILE_NAV = ['/scout', '/hunter', '/sniper'];
+const MODULES_WITH_OWN_MOBILE_NAV = ['/scout', '/hunter', '/sniper', '/basecamp'];
 
 function ownsItsMobileNav(pathname) {
   return MODULES_WITH_OWN_MOBILE_NAV.some(

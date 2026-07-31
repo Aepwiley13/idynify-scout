@@ -458,6 +458,7 @@ function App() {
 
             {/* Sniper — migrated into the shell. */}
             <Route path="/sniper" element={<SniperMain />} />
+            <Route path="/basecamp" element={<BasecampMain />} />
           </Route>
         ) : (
           <>
@@ -516,6 +517,7 @@ function App() {
               element={<ProtectedRoute withLayout={true}><CampaignDetail /></ProtectedRoute>}
             />
             <Route path="/sniper" element={<ProtectedRoute withLayout={true}><SniperMain /></ProtectedRoute>} />
+            <Route path="/basecamp" element={<ProtectedRoute withLayout={true}><BasecampMain /></ProtectedRoute>} />
           </>
         )}
 
@@ -589,15 +591,6 @@ function App() {
         <Route path="/scout/daily-leads" element={<Navigate to="/scout?tab=daily-leads" replace />} />
         <Route path="/scout/contact-search" element={<Navigate to="/scout?tab=company-search" replace />} />
 
-        {/* Basecamp Module — self-contained two-column shell (no MainLayout) */}
-        <Route
-          path="/basecamp"
-          element={
-            <ProtectedRoute>
-              <BasecampMain />
-            </ProtectedRoute>
-          }
-        />
 
         {/* Fallback Module — archive hub for lost/archived people & companies (no MainLayout) */}
         <Route

@@ -42,6 +42,11 @@ export const NAV_GROUPS = {
 export const MISSION_CONTROL = {
   id: 'mission-control',
   label: 'Mission Control',
+  // railLabel is a DISPLAY ABBREVIATION for the 60px icon rail, never an
+  // alternative name. `label` remains the locked vocabulary and is what the
+  // tooltip, breadcrumb and every piece of copy must use. This exists only
+  // because "Mission Control" does not fit under a 20px icon.
+  railLabel: 'MC',
   path: '/mission-control-v2',
   barryModule: 'default',
   inScope: true,
@@ -58,6 +63,7 @@ export const MODULES = [
   // ── PIPELINE ──────────────────────────────────────────────────────────────
   {
     id: 'scout',
+    railLabel: 'SCOUT',
     label: 'Scout',
     path: '/scout',
     group: NAV_GROUPS.PIPELINE,
@@ -67,6 +73,7 @@ export const MODULES = [
   },
   {
     id: 'hunter',
+    railLabel: 'HUNTER',
     label: 'Hunter',
     path: '/hunter',
     group: NAV_GROUPS.PIPELINE,
@@ -76,6 +83,7 @@ export const MODULES = [
   },
   {
     id: 'sniper',
+    railLabel: 'SNIPER',
     label: 'Sniper',
     path: '/sniper',
     group: NAV_GROUPS.PIPELINE,
@@ -87,6 +95,7 @@ export const MODULES = [
   // ── RELATIONSHIPS ─────────────────────────────────────────────────────────
   {
     id: 'basecamp',
+    railLabel: 'BASECAMP',
     label: 'Basecamp',
     path: '/basecamp',
     group: NAV_GROUPS.RELATIONSHIPS,
@@ -100,6 +109,7 @@ export const MODULES = [
   },
   {
     id: 'reinforcements',
+    railLabel: 'REINFORCEMENTS',
     label: 'Reinforcements',
     path: '/reinforcements',
     group: NAV_GROUPS.RELATIONSHIPS,
@@ -109,6 +119,7 @@ export const MODULES = [
   },
   {
     id: 'fallback',
+    railLabel: 'FALLBACK',
     label: 'Fallback',
     path: '/fallback',
     group: NAV_GROUPS.RELATIONSHIPS,
@@ -120,6 +131,7 @@ export const MODULES = [
   // ── INTELLIGENCE ──────────────────────────────────────────────────────────
   {
     id: 'recon',
+    railLabel: 'RECON',
     label: 'Recon',
     path: '/recon',
     group: NAV_GROUPS.INTELLIGENCE,

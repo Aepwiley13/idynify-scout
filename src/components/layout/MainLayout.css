@@ -6,12 +6,13 @@
 }
 
 /* Main Content Area
-   Offset by the icon rail's fixed width. The rail never changes width, so
-   there is no transition and no collapsed variant to account for — the
-   content area's geometry is constant on every route. */
+   Offset by the wide sidebar's fixed width. The sidebar never changes width,
+   so there is no transition and no collapsed variant to account for — the
+   content area's geometry is constant on every route. Layer 2 (the module
+   sub-nav) is what collapses, and it lives inside the content boundary. */
 .main-content {
   flex: 1;
-  margin-left: 64px;
+  margin-left: 220px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;

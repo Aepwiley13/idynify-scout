@@ -1,379 +1,269 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   GLOBAL ICON RAIL
+   LAYER 1 — THE WIDE SIDEBAR
 
-   ~64px, fixed, identical on every authenticated route. It never changes
-   shape, width or structure — that invariance is the feature. The rail is
-   infrastructure; the content area is the product.
-
-   Grouping is carried by dividers rather than text headers, so Pipeline /
-   Relationships / Intelligence read as groups without spending vertical
-   space on labels. Screen readers get the same grouping from the accessible
-   name on each <ul>.
-
-   This file replaces the 260px text sidebar wholesale. Its pillar rules,
-   collapse states and nav-item styles are gone — no element emits those
-   class names any more.
+   220px, fixed, always visible on every authenticated desktop route. It never
+   collapses to icons, never hover-expands, never changes width. Layer 2 (the
+   module sub-nav) is what collapses when the user wants content width.
    ══════════════════════════════════════════════════════════════════════════ */
 
-.sidebar.rail {
+.sidebar {
   position: fixed;
   left: 0;
   top: 0;
   height: 100vh;
-  width: 64px;
+  width: 220px;
   flex-shrink: 0;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 10px 0 8px;
   background: var(--bg-card);
   border-right: 1px solid var(--border);
-  overflow: visible; /* tooltips escape the rail */
+  overflow: hidden;
 }
 
-/* ── Brand ── */
-.rail-brand {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  overflow: hidden;
-  flex-shrink: 0;
+/* ── Wordmark ── */
+.sidebar-wordmark {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #e0218a, #00c4d4);
-}
-
-.rail-brand img {
   width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* ── Dividers carry the grouping ── */
-.rail-divider {
-  width: 28px;
-  height: 1px;
-  margin: 8px 0;
-  background: var(--border);
+  padding: 18px 18px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-/* ── Nav ──
-   Scrolls if the module list ever outgrows the viewport; the rail itself
-   still never changes width. */
-.rail-nav {
+.sidebar-wordmark-img {
+  max-width: 100%;
+  max-height: 34px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+/* Text fallback. Mirrors the brand wordmark: bold italic magenta with a cyan
+   outline stroke and an underline bar. Used whenever the asset is absent. */
+.sidebar-wordmark-text {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 5px;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #e8197d;
+  -webkit-text-stroke: 0.6px #00c4cc;
+  paint-order: stroke fill;
+}
+
+.sidebar-wordmark-text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #e8197d, #00c4cc);
+}
+
+/* ── Module list ── */
+.sidebar-nav {
   flex: 1;
   min-height: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   overflow-y: auto;
-  overflow-x: visible;
-  scrollbar-width: none;
+  padding: 4px 10px 10px;
+  scrollbar-width: thin;
 }
 
-.rail-nav::-webkit-scrollbar { width: 0; }
-
-.rail-group-wrap {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.rail-group {
+.sidebar-modules {
   list-style: none;
   margin: 0;
   padding: 0;
-  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
 }
 
-.rail-group-end {
-  gap: 4px;
-}
-
-/* ── Rail buttons ──
-   Fixed 48×44 so the rail's rhythm does not shift when the active item gains
-   its label. The label is absolutely positioned for exactly that reason: an
-   active item must never be taller than an inactive one. */
-.rail-btn {
-  position: relative;
-  width: 48px;
-  height: 44px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.rail-btn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.rail-btn:focus-visible {
-  outline: 2px solid var(--accent, #f97316);
-  outline-offset: 1px;
-}
-
-.rail-btn.active {
-  background: var(--bg-secondary);
-  border-color: var(--accent, #f97316);
-  color: var(--accent, #f97316);
-}
-
-/* Active label. Absolutely positioned so it never changes the button's
-   height, and clamped so REINFORCEMENTS cannot widen the rail. */
-.rail-btn-label {
-  position: absolute;
-  bottom: 3px;
-  left: 0;
-  right: 0;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  text-align: center;
-  color: inherit;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 2px;
-}
-
-/* Nudge the icon up when a label is present so the pair stays optically
-   centred without the button resizing. */
-.rail-btn.active > svg,
-.rail-btn.active > .rail-barry-avatar,
-.rail-btn.active > .rail-barry-fallback {
-  transform: translateY(-3px);
-}
-
-.rail-btn-settings.active {
-  border-color: #faaa20;
-  color: #d97706;
-}
-
-/* ── Tooltip ──
-   Every item carries the full locked label, including items whose visible
-   rail label is an abbreviation — "MC" is never the only name on offer. */
-.rail-tooltip {
-  /* Fixed, not absolute — see positionTooltip() in Sidebar.jsx. The nav is a
-     scroll container, and a scroll container clips on both axes, so an
-     absolutely positioned tooltip is cut off at the rail's edge. `top` and
-     `left` are set from the button's rect on hover/focus. */
-  position: fixed;
-  transform: translateY(-50%) translateX(-4px);
-  z-index: 300;
-  padding: 5px 9px;
-  border-radius: 6px;
-  background: var(--text-primary);
-  color: var(--bg-card);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
-}
-
-.rail-tooltip::after {
-  content: '';
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 4px solid transparent;
-  border-right-color: var(--text-primary);
-}
-
-.rail-btn:hover .rail-tooltip,
-.rail-btn:focus-visible .rail-tooltip {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(-50%) translateX(0);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rail-tooltip { transition: none; }
-}
-
-/* ── Barry ── */
-.rail-barry-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.rail-barry-fallback {
-  font-size: 19px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.rail-btn-barry.active {
-  border-color: #00c4d4;
-  background: rgba(0, 196, 212, 0.12);
-}
-
-/* ── Account ── */
-.rail-account {
-  position: relative;
-}
-
-.rail-avatar {
+.sidebar-module {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--bg-secondary);
-  border: 1.5px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-}
-
-.rail-avatar.lg {
-  width: 34px;
-  height: 34px;
-  font-size: 0.75rem;
-}
-
-.rail-account-menu {
-  position: absolute;
-  bottom: 0;
-  left: calc(100% + 10px);
-  z-index: 400;
-  width: 232px;
-  padding: 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
-}
-
-.rail-account-identity {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding-bottom: 10px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.rail-account-meta {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.rail-account-email {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rail-account-theme {
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-}
-
-.rail-account-section {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  opacity: 0.7;
-  padding: 2px 4px 6px;
-}
-
-.rail-account-theme-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 11px;
   width: 100%;
-  padding: 6px 7px;
+  padding: 9px 12px;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border: none;
+  border-radius: 9px;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-family: inherit;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-.rail-account-theme-option:hover {
+.sidebar-module:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
-.rail-account-theme-option.selected {
-  border-color: var(--accent, #f97316);
-  color: var(--text-primary);
-  font-weight: 600;
+.sidebar-module:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: -2px;
 }
 
-.rail-account-theme-option > span:nth-child(2) {
+/* Active module — a filled violet pill with white text. The single strongest
+   signal in the sidebar, and it holds on nested routes too. */
+.sidebar-module.active {
+  background: #7c3aed;
+  color: #ffffff;
+  font-weight: 650;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.32);
+}
+
+.sidebar-module.active:hover {
+  background: #6d28d9;
+  color: #ffffff;
+}
+
+.sidebar-module > svg { flex-shrink: 0; }
+
+.sidebar-module-label {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rail-theme-swatch {
-  width: 22px;
-  height: 14px;
-  border-radius: 3px;
+/* ── Footer: Barry card ── */
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.barry-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.barry-card:hover {
+  border-color: #7c3aed;
+}
+
+.barry-card.open {
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.barry-card:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: 1px;
+}
+
+.barry-card-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.barry-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.barry-card-avatar-fallback {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.barry-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.barry-card-name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.barry-card-role {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.barry-card-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.barry-card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
   flex-shrink: 0;
 }
 
+.barry-card-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
 /* ── Mobile ──
-   The rail slides in as a drawer. Same rail, same width, same structure —
+   The sidebar slides in as a drawer. Same sidebar, same width, same contents —
    it does not become a different navigation on a smaller screen. */
 @media (max-width: 768px) {
-  .sidebar.rail {
+  .sidebar {
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0);
     z-index: 200;
+    width: 260px;
   }
 
-  .sidebar.rail.mobile-open {
+  .sidebar.mobile-open {
     transform: translateX(0);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
   }
+}
 
-  /* Tooltips are meaningless without a pointer. */
-  .rail-tooltip { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
 }

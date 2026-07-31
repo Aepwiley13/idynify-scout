@@ -18,6 +18,7 @@ import {
   resolveModule,
   resolveModuleLabel,
   resolveBarryModule,
+  sidebarDestinations,
 } from '../constants/navigationModel';
 
 describe('navigationModel — locked hierarchy', () => {
@@ -52,6 +53,37 @@ describe('navigationModel — locked hierarchy', () => {
     // module HOMEBASE on the first screen a new user ever sees.
     const serialised = JSON.stringify(MODULES).toLowerCase();
     expect(serialised).not.toContain('homebase');
+  });
+});
+
+describe('SIDEBAR_ORDER — what the wide sidebar draws', () => {
+  it('is the exact order from the final brief, including Command Center', () => {
+    expect(sidebarDestinations().map(d => d.label)).toEqual([
+      'Mission Control',
+      'Scout', 'Hunter', 'Sniper',
+      'Basecamp', 'Recon', 'Reinforcements', 'Fallback',
+      'Command Center',
+    ]);
+  });
+
+  it('is deliberately NOT the group order', () => {
+    // The brief puts Recon between Basecamp and Reinforcements and states the
+    // grouping is architectural, not visual. GROUP_ORDER still describes the
+    // architecture; it just is not what the sidebar draws.
+    const grouped = GROUP_ORDER.flatMap(g => modulesInGroup(g).map(m => m.label));
+    const drawn = sidebarDestinations()
+      .map(d => d.label)
+      .filter(l => l !== 'Mission Control' && l !== 'Command Center');
+
+    expect(drawn).not.toEqual(grouped);
+    expect([...drawn].sort()).toEqual([...grouped].sort());
+  });
+
+  it('names every entry it draws', () => {
+    for (const dest of sidebarDestinations()) {
+      expect(dest.label).toBeTruthy();
+      expect(dest.path).toBeTruthy();
+    }
   });
 });
 

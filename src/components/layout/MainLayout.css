@@ -5,19 +5,16 @@
   background: var(--bg-secondary);
 }
 
-/* Main Content Area */
+/* Main Content Area
+   Offset by the icon rail's fixed width. The rail never changes width, so
+   there is no transition and no collapsed variant to account for — the
+   content area's geometry is constant on every route. */
 .main-content {
   flex: 1;
-  margin-left: 260px;
+  margin-left: 64px;
   display: flex;
   flex-direction: column;
-  transition: margin-left 0.3s ease;
   min-height: 100vh;
-}
-
-/* When sidebar is collapsed */
-.sidebar.collapsed ~ .main-content {
-  margin-left: 64px;
 }
 
 /* Top Bar */
@@ -142,10 +139,6 @@
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .main-content {
-    margin-left: 64px;
-  }
-
   .top-bar {
     padding: 1rem 1.5rem;
   }

@@ -218,8 +218,32 @@ export const MODULE_BOTTOM_NAV = {
  * fallback." So Mission Control and anything unmatched fall through to
  * `GLOBAL_BOTTOM_NAV` below, and the module bar takes over inside a module.
  *
- * Flagged rather than invented. If those four sections should exist, that is a
- * Mission Control brief.
+ * Flagged rather than invented.
+ *
+ * ── FUTURE UX — Mission Control's bottom bar ────────────────────────────────
+ *
+ * DECIDED, NOT YET BUILDABLE. When the Mission Control content sprint happens,
+ * this is what the bar becomes — do not re-derive it:
+ *
+ *     Priorities · Today · Pipeline · Activity · Barry
+ *
+ * Five cells, not four-plus-More: there is no overflow, so nothing is hidden
+ * and the fifth slot is free. Barry is a cell here rather than a floating
+ * button because on Mission Control he is a destination — the screen exists to
+ * decide what deserves attention, and he is how you ask.
+ *
+ * Each needs a real section behind it before it can ship. Today
+ * `MissionControlDashboardV2` is one scrolling dashboard: a module grid and a
+ * "Top Recommended Companies" list. Nothing routes, nothing switches. Adding
+ * bar cells that scroll to anchors would be navigation pretending sections
+ * exist, and the bar would lie about where you are the moment the user
+ * scrolled.
+ *
+ * When the sections are real, add a `'mission-control'` entry to
+ * MODULE_BOTTOM_NAV above and the fallback below stops applying to it — no
+ * other change is needed. `moduleMigration.test.jsx` will then hold the entry
+ * to the same drift guard as every other module.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 export const GLOBAL_BOTTOM_NAV = [
   { id: 'scout',    label: 'Scout',    Icon: Target,     to: '/scout?tab=all-leads' },

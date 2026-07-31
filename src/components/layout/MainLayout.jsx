@@ -117,6 +117,7 @@ function ShellChrome({ children, user }) {
   const [historyOpen, setHistoryOpen] = React.useState(false);
 
   const {
+    shellUser,
     barryOpen, openBarry, closeBarry, toggleBarry,
     setOrientation,
     sidebarMode,
@@ -191,7 +192,7 @@ function ShellChrome({ children, user }) {
         onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
         barryOpen={barryOpen}
         barryButtonRef={barryButtonRef}
-        user={user}
+        user={shellUser ?? user}
         onLogout={handleLogout}
       />
 
@@ -258,7 +259,7 @@ function ShellChrome({ children, user }) {
             {/* Settings and Log out are inside this menu now, and the email
                 with them. The top bar was showing the raw address on every
                 screen next to a bordered Log out button. */}
-            {user && <UserMenu user={user} onLogout={handleLogout} />}
+            {user && <UserMenu user={shellUser ?? user} onLogout={handleLogout} />}
           </div>
         </header>
 

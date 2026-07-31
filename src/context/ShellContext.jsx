@@ -54,6 +54,8 @@ export function useShell() {
 /** No-op shell for routes that are not yet inside the migration. */
 const FALLBACK_SHELL = {
   inShell: false,
+  shellUser: null,
+  updateDisplayName: () => {},
   barryOpen: false,
   openBarry: () => {},
   closeBarry: () => {},
@@ -94,6 +96,13 @@ function readSidebarMode() {
 
 export function ShellProvider({ children, user, userData }) {
   const location = useLocation();
+
+  // Display-name override, applied after Settings saves one. See shellUser
+  // below for why this exists.
+  const [displayNameOverride, setDisplayNameOverride] = useState(null);
+  const updateDisplayName = useCallback((name) => {
+    setDisplayNameOverride(name?.trim() || '');
+  }, []);
 
   // ── Barry shell state ───────────────────────────────────────────────────
   const [barryOpen, setBarryOpen] = useState(false);
@@ -299,8 +308,27 @@ export function ShellProvider({ children, user, userData }) {
     sourceRoute, nav.history,
   ]);
 
+  /**
+   * The signed-in user, as the chrome should render them right now.
+   *
+   * `user` comes from App, which reads users/{uid} once when auth resolves and
+   * does not read it again. So saving a display name in Settings would not
+   * reach the top bar until a reload — you would type your name, press Save,
+   * see "Saved", and watch the corner keep calling you something else.
+   *
+   * Settings calls updateDisplayName() after a successful write and the
+   * override applies until the next auth-driven read supersedes it. It is a
+   * display concern only; Firestore is still the source of truth, and this
+   * never writes.
+   */
+  const shellUser = useMemo(() => (
+    displayNameOverride == null ? user : { ...user, displayName: displayNameOverride }
+  ), [user, displayNameOverride]);
+
   const value = useMemo(() => ({
     inShell: true,
+    shellUser,
+    updateDisplayName,
     barryOpen,
     openBarry,
     closeBarry,
@@ -322,6 +350,7 @@ export function ShellProvider({ children, user, userData }) {
     sidebarMode,
     toggleSidebar,
   }), [
+    shellUser, updateDisplayName,
     barryOpen, openBarry, closeBarry, toggleBarry,
     orientation, barryPageContext,
     navigationContext, setEntityContext, clearEntityContext,

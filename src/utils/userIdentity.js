@@ -1,20 +1,24 @@
 /**
  * Who the signed-in user is, for display.
  *
- * The top bar and the mobile drawer both need a display name and an initials
- * avatar, and the product has never stored a first/last name for the account
- * holder — `users/{uid}` carries `firstName` only when onboarding happened to
- * fill it, and Firebase Auth's `displayName` is unset for email/password
- * signups, which is how everyone here signs up. Every surface that wanted a
- * name has so far printed the raw email instead.
+ * `displayName` on `users/{uid}` is THE CANONICAL FIELD. Settings → Account
+ * writes it; everything else here is fallback, in descending order of how much
+ * it is really a name the user chose:
  *
- * So this resolves through what actually exists, in order, and derives a name
- * from the email as a last resort rather than falling back to showing the
- * address. `aaron@idynify.com` → "Aaron"; `aaron.wiley@…` → "Aaron Wiley".
+ *   1. displayName          — set by the user, in Settings → Account
+ *   2. firstName + lastName — sometimes filled by onboarding
+ *   3. name                 — legacy, written by older code paths
+ *   4. derived from email   — a convenience, not a claim about identity
  *
- * The derived name is a display convenience, not a claim about identity: if a
- * real name field lands later it wins automatically, because it is checked
- * first.
+ * The last resort derives rather than falling back to showing the address:
+ * `aaron@idynify.com` → "Aaron", `aaron.wiley@…` → "Aaron Wiley". Before this
+ * sprint the whole product printed the raw email, because there was nowhere to
+ * set a name; now there is, and the moment a user saves one it wins, because
+ * it is checked first.
+ *
+ * Firebase Auth's own `displayName` is deliberately NOT consulted: it is unset
+ * for email/password signups, which is how everyone here signs up, and reading
+ * it would put a second writable name in play with no way to reconcile the two.
  */
 
 /** Capitalise a lowercase email fragment: "wiley" → "Wiley". */
@@ -51,12 +55,16 @@ function nameFromEmail(email) {
 export function displayNameFor(user) {
   if (!user) return '';
 
+  // Canonical. Whatever the user typed in Settings → Account wins outright.
+  const chosen = (user.displayName || '').trim();
+  if (chosen) return chosen;
+
   const first = (user.firstName || '').trim();
   const last = (user.lastName || '').trim();
   if (first || last) return [first, last].filter(Boolean).join(' ');
 
-  const single = (user.name || user.displayName || '').trim();
-  if (single) return single;
+  const legacy = (user.name || '').trim();
+  if (legacy) return legacy;
 
   return nameFromEmail(user.email);
 }

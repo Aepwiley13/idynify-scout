@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { SUPPORT_EMAIL, supportMailto } from '../constants/support';
 
 export default function CheckoutCancelPage() {
   const navigate = useNavigate();
@@ -66,9 +67,15 @@ export default function CheckoutCancelPage() {
             </button>
           </div>
 
-          {/* Support */}
+          {/* Support — the address comes from constants/support so there is
+              one place to change it. This page hard-coded support@idynify.com,
+              an inbox that is not live yet, so a cancelled checkout was being
+              pointed at nobody. */}
           <p className="text-gray-500 text-sm mt-8 font-mono">
-            Need help? Contact support@idynify.com
+            Need help? Contact{' '}
+            <a href={supportMailto()} className="text-cyan-400 hover:text-cyan-300 underline">
+              {SUPPORT_EMAIL}
+            </a>
           </p>
         </div>
       </div>

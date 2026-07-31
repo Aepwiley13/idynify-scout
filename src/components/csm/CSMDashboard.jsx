@@ -221,7 +221,20 @@ export default function CSMDashboard({ userId }) {
   const healthMap = useMemo(() => {
     const map = new Map();
     contacts.forEach(c => {
-      map.set(c.id, computeHealthScore(c));
+      // Guarded per contact. This runs over live customer records, and a
+      // single malformed one — an unparseable date, a milestone field that is
+      // an object where an array is expected — used to throw out of the memo,
+      // out of render, and take the whole application down with it. One bad
+      // record now costs one card's score, not the screen.
+      try {
+        map.set(c.id, computeHealthScore(c));
+      } catch (err) {
+        console.error('[CSMDashboard] health score failed for contact', c.id, err);
+        map.set(c.id, {
+          score: 0, bucket: 'neutral', label: 'Unknown',
+          color: '#9ca3af', signals: {}, failed: true,
+        });
+      }
     });
     return map;
   }, [contacts]);

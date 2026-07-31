@@ -35,6 +35,7 @@ import UserMenu from './UserMenu';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
 import ModuleMoreSheet from './ModuleMoreSheet';
+import ModuleErrorBoundary from './ModuleErrorBoundary';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
 import BarryChatPanel from '../dashboard/BarryChatPanel';
 import NotificationCenter from '../notifications/NotificationCenter';
@@ -256,8 +257,16 @@ function ShellChrome({ children, user }) {
 
         {/* The content boundary. Routes swap here; nothing above or beside
             this element re-mounts. */}
+        {/* Module content, inside a boundary.
+            A module that throws used to unmount the whole tree — on a dark
+            theme, a black screen with no message and no navigation. The
+            boundary sits INSIDE the shell, so a broken section leaves the
+            hamburger, the bottom bar and Barry working and the user can go
+            somewhere else. Keyed by pathname so it clears on navigation. */}
         <main className={`page-content ${fullBleed ? 'page-content-full' : ''}`}>
-          {children ?? <Outlet />}
+          <ModuleErrorBoundary resetKey={location.pathname} moduleLabel={module.label}>
+            {children ?? <Outlet />}
+          </ModuleErrorBoundary>
         </main>
       </div>
 

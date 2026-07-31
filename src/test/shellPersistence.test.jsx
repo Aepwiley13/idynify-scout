@@ -85,6 +85,10 @@ function CommandCenterProbe() {
   return <div data-testid="page">command-center</div>;
 }
 
+function SettingsProbe() {
+  return <div data-testid="page">settings</div>;
+}
+
 function ScoutProbe() {
   return (
     <div>
@@ -128,6 +132,7 @@ function renderShell(initialPath = '/mission-control-v2', ContactPanel = Contact
             <Route path="/fallback" element={<FallbackProbe />} />
             <Route path="/recon" element={<ReconProbe />} />
             <Route path="/command-center" element={<CommandCenterProbe />} />
+            <Route path="/settings" element={<SettingsProbe />} />
           </Route>
         </Routes>
       </ShellProvider>
@@ -190,12 +195,18 @@ describe('shell persistence across the Phase 8 journey', () => {
     await act(async () => { navigateTo('/command-center'); });
     expect(screen.getByTestId('page')).toHaveTextContent('command-center');
 
-    // Command Center → Mission Control
+    // Command Center → Settings. Opening Settings used to be the sharpest
+    // swap left in the product: the wide sidebar vanished and the old 60px
+    // rail took its place.
+    await act(async () => { navigateTo('/settings'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('settings');
+
+    // Settings → Mission Control
     await act(async () => { navigateTo('/mission-control-v2'); });
     expect(screen.getByTestId('page')).toHaveTextContent('mission-control');
 
-    // Eleven transitions across every module in the product, still one shell.
-    // Pre-migration this journey mounted the shell 12 times.
+    // Twelve transitions across every screen in the product, still one shell.
+    // Pre-migration this journey mounted the shell 13 times.
     expect(shellMountCount).toBe(1);
     expect(screen.getByTestId('shell-chrome')).toBeInTheDocument();
   });

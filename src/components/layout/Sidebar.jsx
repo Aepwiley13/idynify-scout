@@ -21,8 +21,15 @@
  * Things this sidebar deliberately does NOT have:
  *   · group headers (PIPELINE / RELATIONSHIPS / INTELLIGENCE)
  *   · descriptive subtitles under module names
- *   · a theme toggle — Settings already owns a Themes section
+ *   · a theme toggle — Settings owns Appearance, and the top bar's user menu
+ *     owns the one-click light/dark switch
  *   · Barry as a plain nav item — he is the card / icon at the bottom only
+ *
+ * ON MOBILE this same component is the hamburger drawer, and it grows a tail:
+ * a close control, Settings, Help, and the account block with Log out. Those
+ * are display:none above 768px, where they live in the top bar's user menu
+ * instead. The drawer has no top bar, so without them mobile would be the one
+ * surface with no route to Settings, support or logging out.
  *
  * Order comes from SIDEBAR_ORDER in constants/navigationModel.js, the single
  * source of truth for what exists and what it is called.
@@ -32,13 +39,15 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Radar, Crosshair, Target, Tent, Shield, Archive, Eye, Users,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, Settings, LifeBuoy, LogOut, X,
 } from 'lucide-react';
 import {
   MISSION_CONTROL,
   sidebarDestinations,
   resolveModule,
 } from '../../constants/navigationModel';
+import { supportMailto } from '../../constants/support';
+import { displayNameFor, initialsFor } from '../../utils/userIdentity';
 import { ASSETS } from '../../theme/tokens';
 import { useShell } from '../../context/ShellContext';
 import './Sidebar.css';
@@ -133,6 +142,8 @@ const Sidebar = ({
   onToggleBarry,
   barryOpen = false,
   barryButtonRef,
+  user,
+  onLogout,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -174,6 +185,19 @@ const Sidebar = ({
           : <ChevronLeft size={12} aria-hidden="true" />}
       </button>
 
+      {/* Mobile only. On desktop this sidebar is always open, so a close
+          control would have nothing to close. On mobile it is a drawer, and a
+          drawer whose only exit is a tap on the 100px of page still showing
+          beside it is a drawer people get stuck in. */}
+      <button
+        type="button"
+        className="sidebar-mobile-close"
+        onClick={onCloseMobileMenu}
+        aria-label="Close navigation menu"
+      >
+        <X size={18} aria-hidden="true" />
+      </button>
+
       <nav className="sidebar-nav" aria-label="Global navigation">
         <ul className="sidebar-modules">
           {sidebarDestinations().map(dest => {
@@ -202,6 +226,55 @@ const Sidebar = ({
           })}
         </ul>
       </nav>
+
+      {/* ── Mobile drawer tail ──
+          Settings, Help and the account, all mobile-only.
+
+          On desktop these live in the top bar's user menu, which the drawer
+          does not render — so without this block the mobile drawer would be
+          the one surface in the product from which Settings, Help and Log out
+          are all unreachable. The desktop sidebar is unchanged: every element
+          here is display:none above 768px. */}
+      <div className="sidebar-mobile-tail">
+        <div className="sidebar-mobile-sep" />
+
+        <button
+          type="button"
+          className="sidebar-mobile-link"
+          onClick={() => go('/settings')}
+        >
+          <Settings size={17} aria-hidden="true" />
+          <span>Settings</span>
+        </button>
+
+        <a
+          className="sidebar-mobile-link"
+          href={supportMailto()}
+          onClick={onCloseMobileMenu}
+        >
+          <LifeBuoy size={17} aria-hidden="true" />
+          <span>Help</span>
+        </a>
+
+        <div className="sidebar-mobile-sep" />
+
+        <div className="sidebar-mobile-user">
+          <span className="sidebar-mobile-avatar" aria-hidden="true">{initialsFor(user)}</span>
+          <span className="sidebar-mobile-identity">
+            <span className="sidebar-mobile-name">{displayNameFor(user) || user?.email}</span>
+            <span className="sidebar-mobile-email">{user?.email}</span>
+          </span>
+        </div>
+
+        <button
+          type="button"
+          className="sidebar-mobile-link danger"
+          onClick={() => { onCloseMobileMenu(); onLogout?.(); }}
+        >
+          <LogOut size={17} aria-hidden="true" />
+          <span>Log out</span>
+        </button>
+      </div>
 
       <div className="sidebar-footer">
         <BarryControl

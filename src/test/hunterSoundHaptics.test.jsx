@@ -29,7 +29,9 @@
 
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { ThemeProvider } from '../theme/ThemeContext';
 
 // Static imports for pure-logic utilities (functions read window/navigator at call time)
 import { isAudioAvailable, preloadAudio } from '../utils/hunterAudioContext';
@@ -46,6 +48,17 @@ vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
   getDoc: vi.fn().mockResolvedValue({ exists: () => false, data: () => ({}) }),
   updateDoc: vi.fn().mockResolvedValue(undefined)
+}));
+
+// MFA reads the real Firebase user object off auth.currentUser, which the
+// stub above is not. Stubbed here so the Security section's status check does
+// not take the whole render down before the Hunter section is reachable.
+vi.mock('../utils/mfa', () => ({
+  isMfaEnrolled: vi.fn().mockResolvedValue(false),
+  getEnrolledFactors: vi.fn().mockResolvedValue([]),
+  startTotpEnrollment: vi.fn(),
+  completeTotpEnrollment: vi.fn(),
+  unenrollFactor: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -171,31 +184,65 @@ describe('hunterHaptics — vibration spec', () => {
 });
 
 // ── UserSettings toggle ───────────────────────────────────────────────────
+//
+// These five never actually ran. They rendered <UserSettings /> bare, which
+// threw before reaching a single assertion — first on useLocation() outside a
+// Router, then on window.matchMedia, which jsdom does not implement and the
+// file never stubbed. Five green-looking specs that only ever asserted that
+// the component crashes.
+//
+// Now rendered the way the component is actually used: inside a Router and a
+// ThemeProvider, at desktop width, on the Hunter section — which is where the
+// Mission sounds toggle lives.
 
 describe('UserSettings — Mission sounds toggle', () => {
+  function renderSettings(SettingsComponent) {
+    // Assigned rather than taken as a param: this repo's ESLint config has no
+    // react plugin, so a JSX-only reference to a PARAM does not count as usage.
+    const Component = SettingsComponent;
+
+    window.matchMedia = (q) => ({
+      matches: false, media: q, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    });
+
+    const utils = render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <ThemeProvider>
+          <Component />
+        </ThemeProvider>
+      </MemoryRouter>
+    );
+
+    // The toggle is in the Hunter section, not the default Account one.
+    const panel = screen.getByRole('complementary', { name: /settings sections/i });
+    fireEvent.click(within(panel).getByText('Hunter'));
+    return utils;
+  }
 
   it('renders the Mission sounds label (exact spec wording)', async () => {
-    const UserSettings = (await import('../pages/UserSettings')).default;
-    render(<UserSettings />);
+    const Component = (await import('../pages/UserSettings')).default;
+    renderSettings(Component);
     expect(screen.getByText('Mission sounds')).toBeInTheDocument();
   });
 
   it('renders a toggle switch with role="switch"', async () => {
-    const UserSettings = (await import('../pages/UserSettings?v=2')).default;
-    render(<UserSettings />);
+    const Component = (await import('../pages/UserSettings?v=2')).default;
+    renderSettings(Component);
     expect(screen.getByRole('switch', { name: /mission sounds/i })).toBeInTheDocument();
   });
 
   it('toggle is ON by default', async () => {
-    const UserSettings = (await import('../pages/UserSettings?v=3')).default;
-    render(<UserSettings />);
+    const Component = (await import('../pages/UserSettings?v=3')).default;
+    renderSettings(Component);
     const toggle = screen.getByRole('switch', { name: /mission sounds/i });
     expect(toggle.getAttribute('aria-checked')).toBe('true');
   });
 
   it('clicking toggle changes aria-checked state', async () => {
-    const UserSettings = (await import('../pages/UserSettings?v=4')).default;
-    render(<UserSettings />);
+    const Component = (await import('../pages/UserSettings?v=4')).default;
+    renderSettings(Component);
     const toggle = screen.getByRole('switch', { name: /mission sounds/i });
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     fireEvent.click(toggle);
@@ -203,8 +250,8 @@ describe('UserSettings — Mission sounds toggle', () => {
   });
 
   it('does NOT use the label "Sound effects" — spec requires "Mission sounds"', async () => {
-    const UserSettings = (await import('../pages/UserSettings?v=5')).default;
-    render(<UserSettings />);
+    const Component = (await import('../pages/UserSettings?v=5')).default;
+    renderSettings(Component);
     expect(screen.queryByText('Sound effects')).not.toBeInTheDocument();
     expect(screen.getByText('Mission sounds')).toBeInTheDocument();
   });

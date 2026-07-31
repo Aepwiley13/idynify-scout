@@ -29,8 +29,9 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { User, Menu, Settings, LogOut, History, Search, ChevronRight, LifeBuoy } from 'lucide-react';
+import { Menu, History, Search, ChevronRight, LifeBuoy } from 'lucide-react';
 import Sidebar from './Sidebar';
+import UserMenu from './UserMenu';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
@@ -42,6 +43,7 @@ import { auth } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 import { ShellProvider, useShell } from '../../context/ShellContext';
 import { resolveModule, MISSION_CONTROL } from '../../constants/navigationModel';
+import { supportMailto } from '../../constants/support';
 import { useT } from '../../theme/ThemeContext';
 import './MainLayout.css';
 
@@ -56,7 +58,7 @@ import './MainLayout.css';
  */
 const MODULES_WITH_OWN_MOBILE_NAV = [
   '/scout', '/hunter', '/sniper', '/basecamp', '/reinforcements', '/fallback',
-  '/recon', '/command-center',
+  '/recon', '/command-center', '/settings',
 ];
 
 function ownsItsMobileNav(pathname) {
@@ -189,6 +191,8 @@ function ShellChrome({ children, user }) {
         onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
         barryOpen={barryOpen}
         barryButtonRef={barryButtonRef}
+        user={user}
+        onLogout={handleLogout}
       />
 
       {mobileMenuOpen && (
@@ -230,7 +234,7 @@ function ShellChrome({ children, user }) {
             {activeUserId && <NotificationCenter userId={activeUserId} T={T} />}
 
             <button
-              className="topbar-icon-btn"
+              className="topbar-icon-btn topbar-desktop-only"
               onClick={() => setHistoryOpen(true)}
               aria-label="Barry session history"
               title="Session history"
@@ -238,44 +242,23 @@ function ShellChrome({ children, user }) {
               <History size={18} />
             </button>
 
-            {/* Help / Support moved here from the sidebar: the final brief's
-                sidebar is wordmark + modules + Barry card only, and dropping
-                the control outright would have removed the only in-product
-                route to support. Reuses the Crisp widget already mounted for
-                authenticated users rather than adding a second surface. */}
-            <button
-              className="topbar-icon-btn"
-              onClick={() => {
-                if (window.$crisp) window.$crisp.push(['do', 'chat:open']);
-                else window.open('mailto:support@idynify.com', '_blank');
-              }}
+            {/* Help / Support. Was a Crisp-if-loaded / mailto-if-not fork
+                pointing at support@idynify.com, an address nothing answers —
+                so the fallback path silently went nowhere. One destination
+                now, shared with the mobile drawer. */}
+            <a
+              className="topbar-icon-btn topbar-desktop-only"
+              href={supportMailto()}
               aria-label="Help and support"
               title="Help / Support"
             >
-              <LifeBuoy size={18} />
-            </button>
+              <LifeBuoy size={18} aria-hidden="true" />
+            </a>
 
-            <button
-              className={`topbar-icon-btn ${location.pathname === '/settings' ? 'active' : ''}`}
-              onClick={() => navigate('/settings')}
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings size={18} />
-            </button>
-
-            {user && (
-              <>
-                <div className="user-info">
-                  <User size={16} />
-                  <span>{user.email}</span>
-                </div>
-                <button className="logout-button" onClick={handleLogout} title="Log out">
-                  <LogOut size={18} />
-                  <span>Log out</span>
-                </button>
-              </>
-            )}
+            {/* Settings and Log out are inside this menu now, and the email
+                with them. The top bar was showing the raw address on every
+                screen next to a bordered Log out button. */}
+            {user && <UserMenu user={user} onLogout={handleLogout} />}
           </div>
         </header>
 

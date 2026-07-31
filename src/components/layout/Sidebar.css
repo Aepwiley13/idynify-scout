@@ -322,6 +322,14 @@
   color: var(--text-secondary);
 }
 
+/* ── Mobile drawer tail ──
+   Settings, Help and the account block. Hidden entirely on desktop, where
+   these live in the top bar's user menu; shown in the drawer, which does not
+   render a top bar. Declared display:none here and switched on in the mobile
+   block below, so the desktop sidebar is untouched by all of it. */
+.sidebar-mobile-tail,
+.sidebar-mobile-close { display: none; }
+
 /* ── Mobile ──
    The sidebar slides in as a drawer, always in wide mode: a 64px rail is not
    a useful drawer, and the toggle is a desktop density control. */
@@ -335,7 +343,7 @@
 
   .sidebar,
   .sidebar.compact,
-  .sidebar.wide { width: 260px; align-items: stretch; }
+  .sidebar.wide { width: 264px; align-items: stretch; }
 
   .sidebar.mobile-open {
     transform: translateX(0);
@@ -343,6 +351,103 @@
   }
 
   .sidebar-toggle { display: none; }
+
+  .sidebar-mobile-close {
+    display: flex;
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    z-index: 1;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  /* The module list is the part that scrolls. The tail stays pinned so Log
+     out does not require scrolling past nine modules to reach. */
+  .sidebar-mobile-tail {
+    display: block;
+    flex-shrink: 0;
+    padding: 0 10px;
+  }
+
+  .sidebar-mobile-sep {
+    height: 1px;
+    margin: 8px 2px;
+    background: var(--border);
+  }
+
+  .sidebar-mobile-link {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .sidebar-mobile-link:active { background: var(--bg-secondary); }
+
+  .sidebar-mobile-link.danger { color: #b4443f; }
+
+  .sidebar-mobile-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .sidebar-mobile-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .sidebar-mobile-identity {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .sidebar-mobile-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sidebar-mobile-email {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

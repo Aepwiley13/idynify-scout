@@ -1,17 +1,33 @@
 /**
- * UserSettings — Self-contained settings shell.
+ * UserSettings — Settings module content.
  *
- * Architecture matches RECON / HUNTER:
- *  ┌─────────────────────────────────────────────────────────┐
- *  │  Icon Rail (60px)  │  Sub-Nav (190px)  │  Main Content  │
- *  └─────────────────────────────────────────────────────────┘
+ * MIGRATED INTO THE GLOBAL SHELL. This was the last screen in the product
+ * still carrying its own application chrome: a 60px icon rail listing every
+ * module, a hand-built 190px sub-nav, a theme picker, a user footer and its
+ * own BarryChat instance. Opening Settings from anywhere replaced the whole
+ * shell — the wide sidebar vanished and the old compact rail took its place,
+ * which is exactly the swap the shell migration existed to end.
  *
- * Accent color: Orange (#faaa20) — Settings identity.
- * Route: /settings — no withLayout={true} needed.
+ * Settings now owns only what is Settings':
+ *
+ *   Global navigation  → MainLayout        (moves the user across Idynify)
+ *   Module navigation  → ModuleSubNav      (changes the working view here)
+ *
+ * A NOTE ON THE SUB-NAV. The brief says Settings "does not need a sub-nav
+ * panel — it is a single destination". It is a single destination, and it has
+ * always had a 190px sub-nav panel with seven sections in it: Account,
+ * Security, Billing, Integrations, Your Services, Hunter, Appearance. The
+ * brief also says the existing sections stay exactly as they are, so the panel
+ * stays and renders through the shared component like every other module's.
+ * Deleting it would have removed seven sections; hand-keeping it would have
+ * left the one panel in the product that does not match the others.
+ *
+ * Mobile keeps its original self-contained layout, the same as every migrated
+ * module.
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import {
@@ -20,8 +36,7 @@ import {
   Loader, LogOut, Lock, Smartphone, BarChart3, Calendar,
   Key, Zap, ExternalLink, Layers, Briefcase, Plus, Star as StarIcon,
   RefreshCw, Star, MessageSquare, Share2,
-  Radar, Crosshair, Eye, Target, Tent, Archive,
-  Palette, Check, ChevronLeft, ChevronRight, Home, Settings as SettingsIcon, Clock,
+  Palette, Check, Clock,
 } from 'lucide-react';
 import { db, auth } from '../firebase/config';
 import { useMissionSounds } from '../hooks/useMissionSounds';
@@ -36,17 +51,13 @@ import { useT, useThemeCtx } from '../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../theme/tokens';
 import BottomNav from '../components/layout/BottomNav';
 import MoreSheet from '../components/layout/MoreSheet';
-import BarryChat, { MODULE_CONFIG } from '../components/barry/BarryChat';
-import { useBarryContext } from '../context/barryContextStore';
+import ModuleSubNav from '../components/layout/ModuleSubNav';
 import ServiceProfileSetup from '../components/serviceProfiles/ServiceProfileSetup';
 import './UserSettings.css';
 
 /* ─── accent ─────────────────────────────────────────────────────────────── */
 const SETTINGS_ORANGE  = '#faaa20';
 const SETTINGS_ORANGE2 = '#f59e0b';
-
-const BARRY_MODULE = 'default';
-const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
 
 /* ─── constants ─────────────────────────────────────────────────────────── */
 const TABS = [
@@ -57,6 +68,24 @@ const TABS = [
   { id: 'services',     label: 'Your Services',  icon: Briefcase },
   { id: 'hunter',       label: 'Hunter',         icon: Settings2 },
   { id: 'appearance',   label: 'Appearance',     icon: Palette   },
+];
+
+/**
+ * The same seven sections, in the shape ModuleSubNav takes.
+ *
+ * The old panel showed labels only — every other module's panel shows a short
+ * description under each one, so the sections gained them here rather than
+ * Settings being the one panel that reads differently. TABS itself is
+ * unchanged, because the mobile tab strip renders from it.
+ */
+const SETTINGS_SECTIONS = [
+  { id: 'account',      label: 'Account',      Icon: User,       desc: 'Profile and booking link' },
+  { id: 'security',     label: 'Security',     Icon: Shield,     desc: 'Password and two-factor' },
+  { id: 'billing',      label: 'Billing',      Icon: CreditCard, desc: 'Plan and credits' },
+  { id: 'integrations', label: 'Integrations', Icon: Plug,       desc: 'Gmail, calendar and CRM' },
+  { id: 'services',     label: 'Your Services', Icon: Briefcase, desc: 'What you sell' },
+  { id: 'hunter',       label: 'Hunter',       Icon: Settings2,  desc: 'Outreach defaults' },
+  { id: 'appearance',   label: 'Appearance',   Icon: Palette,    desc: 'Themes and mission sounds' },
 ];
 
 const PLAN_LABELS  = { starter: 'Starter', pro: 'Pro' };
@@ -78,51 +107,10 @@ const HUNTER_STUBS = [
   { label: 'Auto-archive',     desc: 'Automatically archive contacts after final step'     },
 ];
 
-/* ─── Particles ──────────────────────────────────────────────────────────── */
-const PARTICLE_STARS = Array.from({ length: 55 }, () => ({
-  x: Math.random() * 100, y: Math.random() * 100,
-  size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
-  dur: Math.random() * 4 + 3, delay: Math.random() * 5,
-}));
-
-function Particles() {
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-      {PARTICLE_STARS.map((s, i) => (
-        <div key={i} style={{
-          position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
-          width: s.size, height: s.size, borderRadius: '50%', background: '#fff',
-          opacity: s.op,
-          animation: `twinkle ${s.dur}s ease-in-out infinite`,
-          animationDelay: `${s.delay}s`,
-        }} />
-      ))}
-    </div>
-  );
-}
-
-/* ─── BarryAvatar ────────────────────────────────────────────────────────── */
-function BarryAvatar({ size = 28, style = {} }) {
-  const glow = `0 0 ${size * 0.5}px ${BRAND.cyan}50`;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-      border: `2px solid ${BRAND.cyan}50`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.46, flexShrink: 0, boxShadow: glow, overflow: 'hidden', ...style,
-    }}>
-      <img
-        src={ASSETS.barryAvatar}
-        alt="Barry AI"
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }}
-      />
-    </div>
-  );
-}
-
-/* ─── ThemePicker ────────────────────────────────────────────────────────── */
+/* ─── ThemePicker ─────────────────────────────────────────────────────────
+   Mobile only. The desktop copy went with the rest of the rail — on desktop
+   the theme lives in the top bar's user menu (one click, light ⇄ dark) and in
+   the Appearance section below (the full set). */
 function ThemePicker() {
   const T = useT();
   const { themeId, setThemeId } = useThemeCtx();
@@ -363,38 +351,10 @@ function AppearancePanel() {
   );
 }
 
-/* ─── Avatar ─────────────────────────────────────────────────────────────── */
-function Av({ initials, size = 24 }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: `${SETTINGS_ORANGE}20`, border: `1.5px solid ${SETTINGS_ORANGE}50`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.3, fontWeight: 700, color: SETTINGS_ORANGE, flexShrink: 0,
-    }}>
-      {initials}
-    </div>
-  );
-}
-
-/* ─── Module rail ────────────────────────────────────────────────────────── */
-const MODULE_RAIL = [
-  { id: 'people',         label: 'COMMAND CENTER', Icon: Users,     route: '/command-center' },
-  { id: 'scout',          label: 'SCOUT',          Icon: Radar,     route: '/scout'          },
-  { id: 'hunter',         label: 'HUNTER',         Icon: Crosshair, route: '/hunter'         },
-  { id: 'sniper',         label: 'SNIPER',         Icon: Target,    route: '/sniper'         },
-  { id: 'basecamp',       label: 'BASECAMP',       Icon: Tent,      route: '/basecamp'       },
-  { id: 'reinforcements', label: 'REINFORCEMENTS', Icon: Shield,    route: '/reinforcements' },
-  { id: 'recon',          label: 'RECON',          Icon: Eye,       route: '/recon'          },
-  { id: 'fallback',       label: 'FALLBACK',       Icon: Archive,   route: '/fallback'       },
-];
-
 /* ─── Main component ─────────────────────────────────────────────────────── */
 export default function UserSettings() {
   const T = useT();
-  const { themeId } = useThemeCtx();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const mql = window.matchMedia('(max-width: 768px)');
   const [isMobile, setIsMobile] = useState(() => mql.matches);
@@ -407,15 +367,9 @@ export default function UserSettings() {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState('account');
-  const [barryOpen, setBarryOpen] = useState(false);
-  const barryCtx = useBarryContext();
-  const [subNavOpen, setSubNavOpen] = useState(
-    () => localStorage.getItem('settings_subnav_collapsed') !== 'true'
-  );
 
   /* ── account ── */
   const user = auth.currentUser;
-  const userInitials = (user?.email || 'SE').slice(0, 2).toUpperCase();
   const [pwResetSent, setPwResetSent]     = useState(false);
   const [pwResetLoading, setPwResetLoading] = useState(false);
   const [pwResetError, setPwResetError]   = useState(null);
@@ -1444,251 +1398,21 @@ export default function UserSettings() {
     );
   }
 
-  /* ─── Desktop layout ─────────────────────────────────────────────────── */
+  /* ─── Desktop ──────────────────────────────────────────────────────────
+     Layer 1 (the sidebar) is the shell's. Layer 2 — this panel — is
+     Settings', and is the same component every module renders. */
   return (
-    <div style={{
-      display: 'flex', height: '100vh', width: '100%',
-      background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-      color: T.text, overflow: 'hidden', position: 'relative',
-      transition: 'background 0.25s, color 0.25s',
-    }}>
-      <style>{`
-        * { box-sizing: border-box; }
-        button, input { font-family: Inter, system-ui, sans-serif; }
-        ::-webkit-scrollbar { width: 3px; height: 3px; }
-        ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
-        @keyframes twinkle  { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
-        @keyframes slideIn  { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes slideUp  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes fadeUp   { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-        input::placeholder  { color: ${T.textFaint}; }
-      `}</style>
+    <div className="module-shell">
+      <ModuleSubNav
+        title="SETTINGS"
+        tagline="Account, security, billing and appearance"
+        items={SETTINGS_SECTIONS}
+        activeId={activeTab}
+        onSelect={setActiveTab}
+        storageKey="settings_subnav_collapsed"
+      />
 
-      {T.particles && <Particles />}
-
-      {/* ── ICON RAIL ── */}
-      <div style={{
-        width: 60, flexShrink: 0, background: T.railBg,
-        borderRight: `1px solid ${T.border}`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        paddingTop: 13, paddingBottom: 13, gap: 3,
-        position: 'relative', zIndex: 2, transition: 'background 0.25s',
-      }}>
-        {/* Logo mark → Mission Control */}
-        <div
-          onClick={() => navigate('/mission-control-v2')}
-          title="Mission Control"
-          style={{
-            width: 34, height: 34, borderRadius: 9,
-            background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 17, marginBottom: 16,
-            boxShadow: `0 4px 18px ${BRAND.pink}50`, flexShrink: 0, overflow: 'hidden',
-            cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = `0 6px 22px ${BRAND.pink}70`; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = `0 4px 18px ${BRAND.pink}50`; }}
-        >
-          <img src={ASSETS.logoMark} alt="Mission Control"
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
-          />
-        </div>
-
-        {/* Module icons */}
-        {MODULE_RAIL.map(mod => (
-          <div
-            key={mod.id}
-            onClick={() => { if (!mod.locked && mod.route) navigate(mod.route); }}
-            title={mod.label}
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: mod.locked ? 'not-allowed' : 'pointer',
-              background: 'transparent',
-              border: '1px solid transparent',
-              gap: 1, transition: 'all 0.15s', marginBottom: 2,
-              opacity: mod.locked ? 0.32 : 1,
-            }}
-            onMouseEnter={e => { if (!mod.locked) e.currentTarget.style.background = T.surface; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <mod.Icon size={14} color={T.textFaint} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, color: T.textFaint, marginTop: 1 }}>
-              {mod.label}
-            </span>
-          </div>
-        ))}
-
-        {/* Bottom: MC + Settings (active) + Theme + Barry */}
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center' }}>
-          <div
-            onClick={() => navigate('/mission-control-v2')}
-            title="Mission Control"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
-              background: 'transparent', border: '1px solid transparent',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${SETTINGS_ORANGE}40`; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
-          >
-            <Home size={14} color={T.textFaint} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: T.textFaint }}>MC</span>
-          </div>
-          {/* Settings — active */}
-          <div
-            title="SETTINGS"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'default', gap: 1,
-              background: 'rgba(250,170,32,0.15)',
-              border: `1px solid ${SETTINGS_ORANGE}`,
-              boxShadow: `0 0 12px rgba(250,170,32,0.4)`,
-            }}
-          >
-            <SettingsIcon size={14} color={SETTINGS_ORANGE} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: SETTINGS_ORANGE }}>SET</span>
-          </div>
-          <ThemePicker />
-          <div
-            onClick={() => setBarryOpen(o => !o)}
-            title="Barry AI"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
-              background: barryOpen ? `${BARRY_CHAKRA}20` : 'transparent',
-              border: `1px solid ${barryOpen ? BARRY_CHAKRA : 'transparent'}`,
-              boxShadow: barryOpen ? `0 0 12px ${BARRY_CHAKRA}40` : 'none',
-            }}
-            onMouseEnter={e => { if (!barryOpen) e.currentTarget.style.background = T.surface; }}
-            onMouseLeave={e => { if (!barryOpen) e.currentTarget.style.background = 'transparent'; }}
-          >
-            <BarryAvatar size={22} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: barryOpen ? BARRY_CHAKRA : T.textFaint }}>
-              BARRY
-            </span>
-          </div>
-          {barryOpen && (
-            <BarryChat module={BARRY_MODULE} context={barryCtx} onClose={() => setBarryOpen(false)} />
-          )}
-        </div>
-      </div>
-
-      {/* ── SUB-NAV (collapsible) ── */}
-      <div style={{
-        width: subNavOpen ? 190 : 0, flexShrink: 0, background: T.navBg,
-        borderRight: subNavOpen ? `1px solid ${T.border}` : 'none',
-        display: 'flex', flexDirection: 'column',
-        position: 'relative', zIndex: 2,
-        transition: 'width 0.2s ease, background 0.25s',
-        overflow: 'hidden',
-      }}>
-        <div style={{ width: 190, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          {/* Sub-nav header */}
-          <div style={{
-            padding: '13px 13px 9px',
-            borderBottom: `1px solid ${T.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            flexShrink: 0,
-          }}>
-            <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: SETTINGS_ORANGE, fontWeight: 700, marginBottom: 1 }}>
-                SETTINGS
-              </div>
-              <div style={{ fontSize: 9, color: T.textFaint }}>{TABS.length} sections</div>
-            </div>
-            <div
-              onClick={() => { setSubNavOpen(false); localStorage.setItem('settings_subnav_collapsed', 'true'); }}
-              title="Collapse sidebar"
-              style={{
-                width: 22, height: 22, borderRadius: 6,
-                background: T.surface, border: `1px solid ${T.border2}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              <ChevronLeft size={12} color={T.textFaint} />
-            </div>
-          </div>
-
-          {/* Tab items */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
-            {TABS.map(({ id, label, icon: Icon }) => {
-              const active = activeTab === id;
-              return (
-                <div
-                  key={id}
-                  onClick={() => setActiveTab(id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
-                    borderRadius: 8, cursor: 'pointer', marginBottom: 1,
-                    background: active ? `${SETTINGS_ORANGE}12` : 'transparent',
-                    borderLeft: `2px solid ${active ? SETTINGS_ORANGE : 'transparent'}`,
-                    transition: 'all 0.12s',
-                  }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <Icon size={13} color={active ? SETTINGS_ORANGE : T.textFaint} style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? SETTINGS_ORANGE : T.textMuted,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {label}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* User footer */}
-          <div style={{
-            padding: '9px 11px', borderTop: `1px solid ${T.border}`,
-            display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
-          }}>
-            <Av initials={userInitials} size={24} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.email || 'user@idynify.com'}
-              </div>
-              <div style={{ fontSize: 8, color: T.textFaint }}>
-                {THEMES[themeId]?.label || 'Mission Control'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sub-nav expand button */}
-      {!subNavOpen && (
-        <div
-          onClick={() => { setSubNavOpen(true); localStorage.setItem('settings_subnav_collapsed', 'false'); }}
-          title="Expand sidebar"
-          style={{
-            position: 'absolute', left: 60, top: 13, zIndex: 3,
-            width: 22, height: 22, borderRadius: '0 6px 6px 0',
-            background: T.navBg, border: `1px solid ${T.border}`, borderLeft: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          <ChevronRight size={12} color={T.textFaint} />
-        </div>
-      )}
-
-      {/* ── MAIN CONTENT ── */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', position: 'relative', zIndex: 1,
-        transition: 'background 0.25s',
-      }}>
+      <div className="module-workspace">
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {renderPanel()}
         </div>

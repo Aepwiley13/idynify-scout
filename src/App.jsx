@@ -476,6 +476,11 @@ function App() {
             {/* Command Center — the last module in. /people still redirects
                 here; that redirect stays outside the group, being a redirect. */}
             <Route path="/command-center" element={<PeopleMain />} />
+
+            {/* Settings. Not a module and not in the sidebar — reached from
+                the top bar's user menu — but it is a full screen, and it was
+                the last one still swapping the shell out for the old rail. */}
+            <Route path="/settings" element={<UserSettings />} />
           </Route>
         ) : (
           <>
@@ -546,6 +551,7 @@ function App() {
               <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
             </Route>
             <Route path="/command-center" element={<ProtectedRoute withLayout={true}><PeopleMain /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute withLayout={true}><UserSettings /></ProtectedRoute>} />
           </>
         )}
 
@@ -606,16 +612,6 @@ function App() {
           }
         />
 
-
-        {/* User Settings — self-contained shell (no MainLayout) */}
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <UserSettings />
-            </ProtectedRoute>
-          }
-        />
 
         {/* Diagnostic Tools */}
         <Route

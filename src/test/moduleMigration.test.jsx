@@ -6,10 +6,9 @@
  * "back to Mission Control" button, user footer and Barry instance. Entering
  * one replaced the whole application chrome and leaving it replaced it again.
  *
- * Table-driven on purpose. The remaining migrations — Basecamp,
- * Reinforcements, Fallback, Command Center, Recon — each add one row here and
- * inherit the whole checklist, so no module can be migrated and quietly skip
- * a step.
+ * Table-driven on purpose: each migration adds one row here and inherits the
+ * whole checklist, so no module could be migrated and quietly skip a step.
+ * All seven are now in the table.
  *
  * Module views are mocked: this tests the navigation layer, and the real ones
  * open Firestore connections.
@@ -49,6 +48,12 @@ vi.mock('../pages/Reinforcements/sections/NurtureSection', () => stub('rf-nurtur
 vi.mock('../pages/Fallback/sections/PeopleSection', () => stub('fb-people'));
 vi.mock('../pages/Fallback/sections/CompaniesSection', () => stub('fb-companies'));
 vi.mock('../pages/Fallback/sections/FallbackModule', () => stub('fb-comeback'));
+vi.mock('../pages/Hunter/sections/MissionsSection', () => stub('cc-missions'));
+vi.mock('../pages/Hunter/sections/WeaponsSection', () => stub('cc-weapons'));
+vi.mock('../pages/Hunter/sections/ArsenalSection', () => stub('cc-arsenal'));
+vi.mock('../pages/Hunter/sections/OutcomesSection', () => stub('cc-outcomes'));
+vi.mock('../pages/Scout/GoToWar', () => stub('cc-gotowar'));
+vi.mock('../components/notifications/NotificationCenter', () => stub('notifications'));
 vi.mock('../hooks/useSubscription', () => ({ useSubscription: () => ({ isProTier: true, loading: false }) }));
 
 const { default: HunterMain } = await import('../pages/Hunter/HunterMain');
@@ -57,6 +62,7 @@ const { default: BasecampMain } = await import('../pages/Basecamp/BasecampMain')
 const { default: ReinforcementsMain } = await import('../pages/Reinforcements/ReinforcementsMain');
 const { default: FallbackMain } = await import('../pages/Fallback/FallbackMain');
 const { default: ReconMain } = await import('../pages/Recon/ReconMain');
+const { default: PeopleMain } = await import('../pages/Scout/PeopleMain');
 
 /**
  * One row per migrated module. `otherModules` are labels the module's own rail
@@ -141,11 +147,30 @@ const MIGRATED = [
     // the pathname, so this row exercises a different resolution path.
     activeTab: { query: '', path: '/recon/messaging', expect: 'Messaging & Voice' },
   },
+  {
+    name: 'Command Center',
+    Component: PeopleMain,
+    path: '/command-center',
+    title: 'COMMAND CENTER',
+    tagline: 'People, companies, missions and messaging',
+    storageKey: 'cc_subnav_collapsed',
+    // Migrated AS-IS. All nine sections, in the order the module had them.
+    // Whether they belong together is a product question for after the shell
+    // is consistent; this row's job is to prove the migration changed none of
+    // them.
+    sections: [
+      'People', 'Companies', 'Missions', 'Campaigns', 'Cadences',
+      'Go To War', 'Weapons', 'Arsenal', 'Outcomes',
+    ],
+    descriptions: ['8-phase bulk mission launcher', 'Saved message templates library'],
+    activeTab: { query: '?tab=arsenal', expect: 'Arsenal' },
+  },
 ];
 
 /** Labels the deleted icon rails used to show for OTHER modules. */
 const OTHER_MODULE_RAIL_LABELS = [
   'SCOUT', 'HUNTER', 'SNIPER', 'BASECAMP', 'REINFORCEMENTS', 'FALLBACK', 'RECON',
+  'COMMAND CENTER',
 ];
 
 function renderModule(mod, query = '', at = null) {

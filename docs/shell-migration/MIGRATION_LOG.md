@@ -1,7 +1,12 @@
 # Module Migration Log
 **Team A | Idynify | Moving the remaining modules into the global shell**
 
-Order: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Command Center → Recon.**
+Order shipped: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Recon → Command Center.**
+
+Recon and Command Center are swapped relative to the brief's order. Command
+Center went last on purpose: it is the only one with an open product question
+attached, and doing it last meant every mechanical migration was finished
+before that question had any chance to hold one up.
 
 ---
 
@@ -17,9 +22,12 @@ Order: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Comm
 | **Reinforcements** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Fallback** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Recon** | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Command Center | migrate | migrate | migrate | restyle | migrate |
+| **Command Center** | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-**8 of 9.** One left: Command Center.
+**9 of 9. The desktop shell is complete.** Every module in the product renders
+into one shell that is mounted once. No module ships application chrome of its
+own any more — there is one sidebar, one wordmark, one active-state treatment,
+one sub-nav component and one Barry.
 
 ---
 
@@ -156,20 +164,73 @@ sections: Overview · Alignment Brief · User Profile · ICP Intelligence ·
           Buying Signals · Barry Training
 ```
 
+## 7 — Command Center
+
+`PeopleMain.jsx`: **792 → 500 lines.** The smallest drop of the seven, and not
+because less came out — the icon rail, hand-built sub-nav, theme picker,
+settings button, home button, user footer and Barry instance all went. What
+stayed is a mobile branch this module carries in full, plus the missions and
+campaigns data loading the sections depend on.
+
+Nine sections unchanged: People, Companies, Missions, Campaigns, Cadences, Go
+To War, Weapons, Arsenal, Outcomes.
+
+Route moved: `/command-center`. The `/people` and `/hunter/*` redirects stay
+where they are, being redirects.
+
+**Migrated as-is.** Whether these nine belong together behind one route is a
+real information-architecture question. It is deliberately not answered here:
+the shell gets finished and made consistent first, and the product decision
+gets made against a consistent shell rather than in the middle of a migration.
+
+Two things changed that were not on the recipe:
+
+- **The active section is derived from the URL** rather than mirrored into
+  state by an effect. The old version held it in state and had an effect push
+  the URL into it, so for one render after every navigation the panel showed
+  the previous section while the address bar showed the new one.
+- **`ModuleSubNav` gained optional per-item badges.** Command Center is the
+  only module that shows a count (active missions), and it is existing content
+  — the shared panel had to be able to carry it or migrating the module would
+  have meant dropping something it displayed.
+
+```
+sidebar 220px | active: Command Center | sub-nav 190px
+sections: People · Companies · Missions ③ · Campaigns · Cadences ·
+          Go To War · Weapons · Arsenal · Outcomes
+```
+
+### Two fixes this migration forced
+
+**Section descriptions were truncating.** `.module-subnav-item-desc` was
+`white-space: nowrap` with an ellipsis, inherited from Scout's panel where
+every description is short enough to fit. Command Center's are the longest in
+the product and its pre-migration panel wrapped them, so the shared panel would
+have clipped content the module used to show — "Channel selector, message …",
+which loses the half that distinguishes the section. Descriptions now wrap to
+two lines, the same treatment the header tagline already had. Verified across
+every module: nothing clips.
+
+**`inScope` is gone from `navigationModel.js`.** It marked the Sprint 1
+vertical slice — which modules were in the shell versus still shipping their
+own. Every module is in the shell now, so the flag had no referent and no
+readers, while still saying `false` for seven modules that had been migrated.
+Deleted rather than left saying something untrue.
+
 ---
 
 ## Verification
 
-`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Reinforcements → Fallback → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 10 times.
+`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Reinforcements → Fallback → Recon → Command Center → Mission Control** — every module in the product — and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 12 times.
 
 Two crossings get their own tests:
 
 - **Scout → Hunter.** The one "Move to Hunter" lands on, and the one the original audit called the worst moment in the product — Scout's rail out, Hunter's rail in, Barry destroyed and rebuilt in between. It now changes nothing but the content.
 - **Scout → Hunter → Sniper.** The whole pipeline on one shell, with `current_module` and `source_route` tracking correctly at each step.
 
-`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 48 tests across Hunter, Sniper, Basecamp, Reinforcements, Fallback and Recon, growing by 8 per migration.
+`moduleMigration.test.jsx` runs its eight-assertion checklist against **all seven** migrated modules — 56 tests. Each migration added one row and inherited the whole checklist, which is why none of them could quietly skip a step.
 
-Suite **489 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router and `HunterContactCard` date-fns failures, confirmed identical on `HEAD` without these changes. Build passes, lint clean on every file touched.
+Suite **497 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router, `ReconSectionEditor` and `HunterContactCard` failures, confirmed identical on `HEAD` without these changes. Build passes; lint at baseline on every file touched.
 
 ---
 
@@ -177,7 +238,7 @@ Suite **489 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 **Mobile is unreconciled.** Each migrated module keeps its mobile branch verbatim and joins `MODULES_WITH_OWN_MOBILE_NAV`, so mobile still shows the module's own top bar alongside the shell's. Doing it per module would leave them inconsistent mid-flight; the mobile sprint reconciles all of them at once.
 
-**No screen recordings.** The brief asks each migration PR to include one. Not possible here: authenticated routes redirect to `/login`, and signing in needs real credentials plus reachable Firebase Auth. Screenshots are the real components rendered in Chromium via a temporary harness, deleted before commit — they verify structure, not a live journey. This applies to all seven migrations, so it is worth deciding whether someone with product access records them or the requirement becomes something reproducible in CI.
+**No screen recordings.** The brief asks each migration PR to include one. Not possible here: authenticated routes redirect to `/login`, and signing in needs real credentials plus reachable Firebase Auth. Screenshots are the real components rendered in Chromium via a temporary harness, deleted before commit — they verify structure, not a live journey. This applied to all seven migrations, so it is worth deciding whether someone with product access records them or the requirement becomes something reproducible in CI.
 
 **Logo assets** are still absent, so the wordmark, mark and Barry avatar all render their fallbacks.
 
@@ -185,15 +246,32 @@ Suite **489 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 ## Next
 
-**Command Center** — the last one, migrated as-is.
+The desktop shell is done. Three things are now decidable that were not before,
+because they are product questions that needed a consistent shell to be asked
+against:
 
-Whether its sections belong together behind one route is a real
-information-architecture question, and it is explicitly **not** being answered
-here: the shell gets finished and made consistent everywhere first, and the
-product decision happens against a consistent shell rather than mid-migration.
+**1. Command Center's contents.** Nine sections behind one route: People,
+Companies, Missions, Campaigns, Cadences, Go To War, Weapons, Arsenal,
+Outcomes. Some overlap other modules — People and Companies also exist in
+Hunter, Basecamp, Sniper and Fallback; Cadences is Scout's. Whether this is a
+setup hub, a duplicate of several modules, or two destinations wearing one name
+is worth deciding now. Nothing about it was changed during the migration
+specifically so this decision is made on the merits.
 
-One correction stands, and is now confirmed: an earlier brief said Command
-Center "is not a top-level module" because it already appears in Hunter's
-sub-nav. It does not — Hunter's sub-nav is Blitz Mode, All People, Companies,
-Follow Up Now, Today's Actions, Replied, Active, New. Command Center is a
-first-class sidebar item and stays exactly where it is.
+**2. Mobile.** Every module still carries its own mobile branch and its own top
+bar, and each is in `MODULES_WITH_OWN_MOBILE_NAV` so the shell does not add a
+second bottom nav on top. That is a holding position, not a design. Mobile is
+now the only place in the product where the eight-shells problem still exists,
+and it should be reconciled in one pass rather than per module.
+
+**3. Barry's navigation contract in production.** The contract is published and
+tested, and `barryMissionChat.js` renders it into the system prompt. What has
+not happened is watching real conversations to see whether "the user is looking
+at Sarah Chen, in Scout, having arrived from Mission Control" actually changes
+Barry's answers for the better.
+
+One correction stands, and is confirmed: an earlier brief said Command Center
+"is not a top-level module" because it already appears in Hunter's sub-nav. It
+does not — Hunter's sub-nav is Blitz Mode, All People, Companies, Follow Up
+Now, Today's Actions, Replied, Active, New. Command Center is a first-class
+sidebar item and stays exactly where it is.

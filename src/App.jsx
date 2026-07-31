@@ -423,9 +423,9 @@ function App() {
             only what is inside <Outlet/> — the sidebar, top bar and Barry are
             never unmounted.
 
-            Out-of-scope modules (Hunter, Sniper, Basecamp, Reinforcements,
-            Fallback, Recon) keep their existing self-contained shells below,
-            untouched and fully functional. The migration is route by route.
+            Every module is now in this group. Hunter, Sniper, Basecamp,
+            Reinforcements, Fallback, Recon and Command Center each shipped
+            their own application chrome before; none of them do now.
 
             Rollback: SHELL_MIGRATION.enabled = false restores the previous
             per-route <ProtectedRoute withLayout> wrapping in the else branch.
@@ -472,6 +472,10 @@ function App() {
               <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
               <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
             </Route>
+
+            {/* Command Center — the last module in. /people still redirects
+                here; that redirect stays outside the group, being a redirect. */}
+            <Route path="/command-center" element={<PeopleMain />} />
           </Route>
         ) : (
           <>
@@ -541,6 +545,7 @@ function App() {
               <Route path="section/:sectionId" element={<ReconErrorBoundary><ReconSectionEditor /></ReconErrorBoundary>} />
               <Route path=":moduleId" element={<ReconErrorBoundary><ReconModulePage /></ReconErrorBoundary>} />
             </Route>
+            <Route path="/command-center" element={<ProtectedRoute withLayout={true}><PeopleMain /></ProtectedRoute>} />
           </>
         )}
 
@@ -562,18 +567,8 @@ function App() {
         />
 
 
-        {/* Command Center — strategy & setup hub, self-contained shell (no MainLayout) */}
-        {/* Primary URL: /command-center — /people remains for backward compatibility */}
-        <Route
-          path="/command-center"
-          element={
-            <ProtectedRoute>
-              <PeopleMain />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Redirect old /hunter/* setup routes → /command-center with matching tab */}
+        {/* Redirect old /hunter/* setup routes → /command-center with matching tab.
+            /command-center itself now lives in the shell group above. */}
         <Route path="/hunter/missions"  element={<Navigate to="/command-center?tab=missions"  replace />} />
         <Route path="/hunter/weapons"   element={<Navigate to="/command-center?tab=weapons"   replace />} />
         <Route path="/hunter/arsenal"   element={<Navigate to="/command-center?tab=arsenal"   replace />} />

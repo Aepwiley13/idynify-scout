@@ -49,15 +49,15 @@ export const MISSION_CONTROL = {
   railLabel: 'MC',
   path: '/mission-control-v2',
   barryModule: 'default',
-  inScope: true,
 };
 
 /**
  * Modules in locked order within their groups.
  *
- * `inScope` marks the Sprint 1 vertical slice. Out-of-scope modules appear
- * in the sidebar and retain their current routes and self-contained shells,
- * exactly as the brief requires — they are real destinations, not fakes.
+ * These carried an `inScope` flag marking the Sprint 1 vertical slice, which
+ * distinguished the modules living in the global shell from the ones still
+ * shipping their own. Every module is in the shell now, so the distinction has
+ * no referent and the flag is gone rather than left saying something untrue.
  */
 export const MODULES = [
   // ── PIPELINE ──────────────────────────────────────────────────────────────
@@ -69,7 +69,6 @@ export const MODULES = [
     group: NAV_GROUPS.PIPELINE,
     barryModule: 'scout',
     description: 'Find and qualify prospects',
-    inScope: true,
   },
   {
     id: 'hunter',
@@ -79,7 +78,6 @@ export const MODULES = [
     group: NAV_GROUPS.PIPELINE,
     barryModule: 'hunter',
     description: 'Engage and follow up',
-    inScope: false,
   },
   {
     id: 'sniper',
@@ -89,7 +87,6 @@ export const MODULES = [
     group: NAV_GROUPS.PIPELINE,
     barryModule: 'sniper',
     description: 'Close deals',
-    inScope: false,
   },
 
   // ── RELATIONSHIPS ─────────────────────────────────────────────────────────
@@ -105,7 +102,6 @@ export const MODULES = [
     // module's own declaration.
     barryModule: 'basecamp',
     description: 'Customer success and retention',
-    inScope: false,
   },
   {
     id: 'reinforcements',
@@ -115,7 +111,6 @@ export const MODULES = [
     group: NAV_GROUPS.RELATIONSHIPS,
     barryModule: 'reinforcements',
     description: 'Referral and warm-intro network',
-    inScope: false,
   },
   {
     id: 'fallback',
@@ -125,7 +120,6 @@ export const MODULES = [
     group: NAV_GROUPS.RELATIONSHIPS,
     barryModule: 'fallback',
     description: 'Re-engage archived and closed-lost',
-    inScope: false,
   },
 
   // ── INTELLIGENCE ──────────────────────────────────────────────────────────
@@ -137,7 +131,6 @@ export const MODULES = [
     group: NAV_GROUPS.INTELLIGENCE,
     barryModule: 'recon',
     description: 'ICP, messaging and market intelligence',
-    inScope: false,
   },
 ];
 
@@ -155,8 +148,13 @@ export const UTILITY_LINKS = [
 ];
 
 /**
- * Command Center. The locked IA does not place it in a group, but the final
- * navigation brief puts it in the sidebar as its own item, last in the list.
+ * Command Center. A first-class sidebar item, last in the list.
+ *
+ * It sits outside PIPELINE / RELATIONSHIPS / INTELLIGENCE because the locked
+ * IA does not place it in any of them — not because it is a lesser
+ * destination. An earlier direction correction said Command Center "is not a
+ * top-level module" on the grounds that it already appeared in Hunter's
+ * sub-nav; it does not, and that has been confirmed as an error in the brief.
  */
 export const COMMAND_CENTER = {
   id: 'command-center',
@@ -165,12 +163,15 @@ export const COMMAND_CENTER = {
   path: '/command-center',
   barryModule: 'command-center',
   description: 'People, companies, missions and messaging',
-  inScope: false,
 };
 
-export const UNLISTED_DESTINATIONS = [COMMAND_CENTER];
+/**
+ * Destinations that belong to no NAV_GROUP. Named for the grouping, not for
+ * visibility: everything here is in the sidebar.
+ */
+export const UNGROUPED_DESTINATIONS = [COMMAND_CENTER];
 
-const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNLISTED_DESTINATIONS];
+const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNGROUPED_DESTINATIONS];
 
 /**
  * SIDEBAR ORDER — the exact top-to-bottom order of the wide sidebar.

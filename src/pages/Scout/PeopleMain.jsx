@@ -1,16 +1,32 @@
 /**
- * PeopleMain.jsx — Two-column nav shell for the Command Center module.
+ * PeopleMain — Command Center module content.
  *
- * Architecture:
- *  ┌─────────────────────────────────────────────────────────┐
- *  │  Icon Rail (60px)  │  Sub-Nav (190px)  │  Main Content  │
- *  └─────────────────────────────────────────────────────────┘
+ * MIGRATED INTO THE GLOBAL SHELL, and the last module to go. This file used to
+ * be a self-contained application shell — its own 60px icon rail listing every
+ * module, its own hand-built 190px sub-nav, a theme picker, a settings button,
+ * a "back to Mission Control" button, a user footer and its own Barry instance.
+ * Its own header said so: "This component is self-contained — it does NOT use
+ * MainLayout."
  *
- * This component is self-contained — it does NOT use MainLayout.
- * The App.jsx /people route must NOT use withLayout={true}.
+ * Command Center now owns only what is Command Center's:
  *
- * Command Center = strategy and setup hub.
- * Sections: Missions, People, Companies, Weapons, Arsenal, Outcomes
+ *   Global navigation  → MainLayout        (moves the user across Idynify)
+ *   Module navigation  → ModuleSubNav      (changes the working view here)
+ *
+ * MIGRATED AS-IS. Every section it contained it still contains, in the same
+ * order, with the same descriptions and the same behaviour. Whether these nine
+ * sections belong together behind one route is a real information-architecture
+ * question — and deliberately not answered here. The shell gets finished and
+ * made consistent first; the product decision is made against a consistent
+ * shell rather than in the middle of a migration.
+ *
+ * Command Center is a first-class sidebar item. An earlier direction correction
+ * said it was not a top-level module on the grounds that it already appeared in
+ * Hunter's sub-nav — it does not, and that has been confirmed as an error in
+ * the brief. It stays where it is.
+ *
+ * Mobile (max-width: 768px) keeps its original self-contained layout. Mobile is
+ * out of scope; see constraint C3 in the Phase 0 assessment.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -18,18 +34,16 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import {
-  Radar, Crosshair, Eye, Target, Tent, Shield, Users, Building2,
-  Zap, Archive, BarChart3, Swords, Mail,
-  Palette, Check, ChevronLeft, ChevronRight, Home,
-  Settings as SettingsIcon, Plus, RefreshCw,
+  Users, Building2, Zap, Archive, BarChart3, Swords, Mail,
+  Crosshair, Palette, Check, Plus, RefreshCw,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import BottomNav from '../../components/layout/BottomNav';
 import MoreSheet from '../../components/layout/MoreSheet';
+import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import AllLeads from './AllLeads';
-import BarryChat, { MODULE_CONFIG } from '../../components/barry/BarryChat';
-import { useBarryContext } from '../../context/barryContextStore';
 import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
 import MissionsSection from '../Hunter/sections/MissionsSection';
 import WeaponsSection from '../Hunter/sections/WeaponsSection';
@@ -41,57 +55,12 @@ import NotificationCenter from '../../components/notifications/NotificationCente
 // Command Center accent color
 const CC_CYAN = BRAND.cyan;
 
-// Orange token for settings accent
+// Orange token for settings accent (mobile top bar)
 const SETTINGS_ORANGE = '#faaa20';
 
-const BARRY_MODULE = 'command-center';
-const BARRY_CHAKRA = MODULE_CONFIG[BARRY_MODULE]?.color ?? '#00c4d4';
-
-// ─── Particles ────────────────────────────────────────────────────────────────
-const PARTICLE_STARS = Array.from({ length: 55 }, () => ({
-  x: Math.random() * 100, y: Math.random() * 100,
-  size: Math.random() * 1.8 + 0.4, op: Math.random() * 0.4 + 0.08,
-  dur: Math.random() * 4 + 3, delay: Math.random() * 5,
-}));
-
-function Particles() {
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-      {PARTICLE_STARS.map((s, i) => (
-        <div key={i} style={{
-          position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
-          width: s.size, height: s.size, borderRadius: '50%', background: '#fff',
-          opacity: s.op,
-          animation: `twinkle ${s.dur}s ease-in-out infinite`,
-          animationDelay: `${s.delay}s`,
-        }} />
-      ))}
-    </div>
-  );
-}
-
-// ─── BarryAvatar ──────────────────────────────────────────────────────────────
-function BarryAvatar({ size = 28, style = {} }) {
-  const glow = `0 0 ${size * 0.5}px ${BRAND.cyan}50`;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-      border: `2px solid ${BRAND.cyan}50`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.46, flexShrink: 0, boxShadow: glow, overflow: 'hidden', ...style,
-    }}>
-      <img
-        src={ASSETS.barryAvatar}
-        alt="Barry AI"
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '🐻'; }}
-      />
-    </div>
-  );
-}
-
 // ─── ThemePicker ──────────────────────────────────────────────────────────────
+// Mobile only. The desktop copy went with the rest of the module's chrome —
+// appearance is a shell-level setting, not a per-module one.
 function ThemePicker({ dropUp = true }) {
   const T = useT();
   const { themeId, setThemeId } = useThemeCtx();
@@ -156,43 +125,14 @@ function ThemePicker({ dropUp = true }) {
   );
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
-function Av({ initials, color = CC_CYAN, size = 24 }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: `${color}20`, border: `1.5px solid ${color}50`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.3, fontWeight: 700, color, flexShrink: 0,
-    }}>
-      {initials}
-    </div>
-  );
-}
-
-// ─── Module rail config ───────────────────────────────────────────────────────
-// Locked order, Mission Control first: it is the platform's anchor and must be
-// the first item in the rail on every screen. This module still renders its own
-// rail because it has not been migrated into the global shell yet; when it is,
-// this array goes away and the shell's rail takes over.
-//
-// Command Center sits last rather than first. The direction correction says it
-// is not a top-level module, but it is NOT currently reachable from any other
-// module's sub-nav, so removing it outright would strand /command-center.
-// Demoted to the end and flagged rather than deleted.
-const MODULE_RAIL = [
-  { id: 'mission-control', label: 'MC',               Icon: Home,      route: '/mission-control-v2'   },
-  { id: 'scout',           label: 'SCOUT',            Icon: Radar,     route: '/scout'                },
-  { id: 'hunter',          label: 'HUNTER',           Icon: Crosshair, route: '/hunter'               },
-  { id: 'sniper',          label: 'SNIPER',           Icon: Target,    route: '/sniper'               },
-  { id: 'basecamp',        label: 'BASECAMP',         Icon: Tent,      route: '/basecamp'             },
-  { id: 'reinforcements',  label: 'REINFORCEMENTS',   Icon: Shield,    route: '/reinforcements'       },
-  { id: 'fallback',        label: 'FALLBACK',         Icon: Archive,   route: '/fallback'             },
-  { id: 'recon',           label: 'RECON',            Icon: Eye,       route: '/recon'                },
-  { id: 'people',          label: 'COMMAND CENTER',   Icon: Users,     route: null                    }, // active module
-];
-
-// ─── Command Center sub-nav items ─────────────────────────────────────────────
+/**
+ * Command Center's sections — unchanged.
+ *
+ * `route` entries navigate to a sibling route inside the same shell rather than
+ * switching a panel, the same way Scout's Total Market and Game Mode do. Before
+ * the migration that navigation replaced the entire application chrome; now it
+ * swaps only the content.
+ */
 const CC_ITEMS = [
   { id: 'people',     label: 'People',       Icon: Users,     desc: 'Full contacts roster — all view'  },
   { id: 'companies',  label: 'Companies',    Icon: Building2, desc: 'Full accounts roster — all view'  },
@@ -206,6 +146,8 @@ const CC_ITEMS = [
 ];
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────
+// Only the panel sections appear here. Campaigns and Cadences are routes, so
+// they leave Command Center rather than selecting inside it.
 const TAB_MAP = {
   missions:   'missions',
   people:     'people',
@@ -215,6 +157,9 @@ const TAB_MAP = {
   arsenal:    'arsenal',
   outcomes:   'outcomes',
 };
+
+/** What bare /command-center means. One answer, in one place. */
+const DEFAULT_SECTION = 'people';
 
 // ─── Empty Missions CTA ───────────────────────────────────────────────────────
 function EmptyMissionsCTA({ navigate, T }) {
@@ -264,7 +209,6 @@ function EmptyMissionsCTA({ navigate, T }) {
 // ─── PeopleShellInner ─────────────────────────────────────────────────────────
 function PeopleShellInner({ user }) {
   const T = useT();
-  const { themeId } = useThemeCtx();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -278,28 +222,34 @@ function PeopleShellInner({ user }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
-  const [subNavOpen, setSubNavOpen] = useState(() => localStorage.getItem('cc_subnav_collapsed') !== 'true');
-  const [barryOpen, setBarryOpen] = useState(false);
-  const barryCtx = useBarryContext();
 
-  // Resolve active section from URL param or legacy localStorage
+  /**
+   * The active section is DERIVED from the URL rather than mirrored into state
+   * by an effect.
+   *
+   * The previous version held it in state and had an effect push the URL into
+   * it, which meant that for one render after any navigation the panel showed
+   * the old section while the address bar showed the new one. Deriving it makes
+   * the two incapable of disagreeing. `location.state.activeTab` is still read:
+   * older call sites navigate here that way.
+   */
   const tabParam = searchParams.get('tab') || location.state?.activeTab || null;
-  const initialSection = (tabParam && TAB_MAP[tabParam]) || 'people';
-  const [activeSection, setActiveSection] = useState(initialSection);
-
-  // Sync section when URL params change
-  useEffect(() => {
-    const tab = searchParams.get('tab') || location.state?.activeTab;
-    if (tab && TAB_MAP[tab]) setActiveSection(TAB_MAP[tab]);
-    else if (!tab) setActiveSection('people');
-  }, [searchParams, location.state?.activeTab]);
+  const activeSection = (tabParam && TAB_MAP[tabParam]) || DEFAULT_SECTION;
 
   const switchSection = (sectionId) => {
-    setActiveSection(sectionId);
-    setSearchParams({ tab: sectionId }, { replace: true });
+    const item = CC_ITEMS.find(i => i.id === sectionId);
+    if (item?.route) {
+      navigate(item.route);
+      return;
+    }
+    // No { replace: true }. Section changes are navigation and belong in
+    // history: previously every move inside Command Center was written with
+    // replace, so browser Back skipped the whole module and left it entirely.
+    setSearchParams({ tab: sectionId });
   };
 
-  // Missions and campaigns data (needed for MissionsSection, OutcomesSection, and empty state)
+  // Missions and campaigns data (needed for MissionsSection, OutcomesSection,
+  // the missions count badge and the empty state).
   const [missions, setMissions] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [missionsLoading, setMissionsLoading] = useState(true);
@@ -333,7 +283,13 @@ function PeopleShellInner({ user }) {
   const activeMissionsCount = missions.filter(m => m.status === 'autopilot' || m.status === 'draft').length;
   const hasActiveMissions = activeMissionsCount > 0;
 
-  const userInitials = (user?.email || 'CC').slice(0, 2).toUpperCase();
+  // The missions count rides along on the item rather than being drawn by the
+  // panel, so the panel stays generic and the count stays Command Center's.
+  const subNavItems = CC_ITEMS.map(it =>
+    it.id === 'missions' && activeMissionsCount > 0
+      ? { ...it, badge: activeMissionsCount }
+      : it
+  );
 
   const renderMain = () => {
     switch (activeSection) {
@@ -387,7 +343,7 @@ function PeopleShellInner({ user }) {
     }
   };
 
-  // ── Mobile layout ──────────────────────────────────────────────────────────
+  // ── Mobile — preserved from the pre-migration layout (constraint C3) ────────
   if (isMobile) {
     return (
       <div style={{
@@ -455,7 +411,7 @@ function PeopleShellInner({ user }) {
               return (
                 <button
                   key={item.id}
-                  onClick={() => item.route ? navigate(item.route) : switchSection(item.id)}
+                  onClick={() => switchSection(item.id)}
                   style={{
                     flexShrink: 0, padding: '7px 12px', border: 'none', borderRadius: 8,
                     background: active ? `${CC_CYAN}18` : 'transparent',
@@ -497,284 +453,36 @@ function PeopleShellInner({ user }) {
     );
   }
 
-  // ── Desktop layout ──────────────────────────────────────────────────────────
+  // ── Desktop ────────────────────────────────────────────────────────────────
+  // Layer 1 (the sidebar) is the shell's. Layer 2 — this panel — is Command
+  // Center's, and is now the same component every other module renders rather
+  // than the ninth hand-built copy of nearly the same thing.
   return (
-    <div style={{
-      display: 'flex', height: '100vh', width: '100%',
-      background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-      color: T.text, overflow: 'hidden', position: 'relative',
-      transition: 'background 0.25s, color 0.25s',
-    }}>
-      <style>{`
-        * { box-sizing: border-box; }
-        button, input { font-family: Inter, system-ui, sans-serif; }
-        ::-webkit-scrollbar { width: 3px; height: 3px; }
-        ::-webkit-scrollbar-thumb { background: ${T.isDark ? '#333' : '#ccc'}; border-radius: 3px; }
-        @keyframes twinkle  { 0%,100%{opacity:0.2} 50%{opacity:0.05} }
-        @keyframes slideIn  { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes slideUp  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes fadeUp   { from{opacity:0;transform:translateY(6px)}  to{opacity:1;transform:translateY(0)} }
-        input::placeholder  { color: ${T.textFaint}; }
-      `}</style>
+    <div className="module-shell">
+      <ModuleSubNav
+        title="COMMAND CENTER"
+        tagline="People, companies, missions and messaging"
+        items={subNavItems}
+        activeId={activeSection}
+        onSelect={switchSection}
+        storageKey="cc_subnav_collapsed"
+      />
 
-      {T.particles && <Particles />}
-
-      {/* ── ICON RAIL ── */}
-      <div style={{
-        width: 60, flexShrink: 0, background: T.railBg,
-        borderRight: `1px solid ${T.border}`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        paddingTop: 13, paddingBottom: 13, gap: 3,
-        position: 'relative', zIndex: 2, transition: 'background 0.25s',
-      }}>
-        {/* Logo mark → Mission Control button */}
-        <div
-          onClick={() => navigate('/mission-control-v2')}
-          title="Mission Control"
-          style={{
-            width: 34, height: 34, borderRadius: 9,
-            background: `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 17, marginBottom: 16,
-            boxShadow: `0 4px 18px ${BRAND.pink}50`, flexShrink: 0, overflow: 'hidden',
-            cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = `0 6px 22px ${BRAND.pink}70`; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = `0 4px 18px ${BRAND.pink}50`; }}
-        >
-          <img
-            src={ASSETS.logoMark}
-            alt="Mission Control"
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onError={e => { e.target.style.display = 'none'; e.target.parentNode.textContent = '✦'; }}
-          />
-        </div>
-
-        {/* Module icons */}
-        {MODULE_RAIL.map(mod => {
-          const active = mod.id === 'people';
-          return (
-            <div
-              key={mod.id}
-              onClick={() => { if (mod.route) navigate(mod.route); }}
-              title={mod.label}
-              style={{
-                width: 52, height: 46, borderRadius: 10,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                cursor: mod.route ? 'pointer' : 'default',
-                background: active ? T.accentBg : 'transparent',
-                border: `1px solid ${active ? T.accentBdr : 'transparent'}`,
-                gap: 1, transition: 'all 0.15s', marginBottom: 2,
-              }}
-              onMouseEnter={e => { if (!active && mod.route) e.currentTarget.style.background = T.surface; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <mod.Icon size={14} color={active ? CC_CYAN : T.textFaint} />
-              <span style={{ fontSize: 7, letterSpacing: 0, color: active ? CC_CYAN : T.textFaint, marginTop: 2, textAlign: 'center', width: '100%', lineHeight: 1.3 }}>
-                {mod.label}
-              </span>
-            </div>
-          );
-        })}
-
-        {/* Bottom: MC + Settings + Theme + Barry */}
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center' }}>
-          {/* Mission Control rail icon */}
-          <div
-            onClick={() => navigate('/mission-control-v2')}
-            title="Mission Control"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
-              background: 'transparent', border: '1px solid transparent',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid ${CC_CYAN}40`; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; }}
-          >
-            <Home size={14} color={T.textFaint} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: T.textFaint }}>MC</span>
-          </div>
-          {/* Settings rail icon */}
-          <div
-            onClick={() => navigate('/settings')}
-            title="SETTINGS"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
-              background: location.pathname === '/settings' ? 'rgba(250,170,32,0.15)' : 'transparent',
-              border: `1px solid ${location.pathname === '/settings' ? SETTINGS_ORANGE : 'transparent'}`,
-              boxShadow: location.pathname === '/settings' ? `0 0 12px rgba(250,170,32,0.4)` : 'none',
-            }}
-            onMouseEnter={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = T.surface; e.currentTarget.style.border = `1px solid rgba(250,170,32,0.3)`; } }}
-            onMouseLeave={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.border = '1px solid transparent'; } }}
-          >
-            <SettingsIcon size={14} color={location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: location.pathname === '/settings' ? SETTINGS_ORANGE : T.textFaint }}>
-              SET
-            </span>
-          </div>
-          <ThemePicker />
-          <div
-            onClick={() => setBarryOpen(o => !o)}
-            title="Barry AI"
-            style={{
-              width: 40, height: 40, borderRadius: 10,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', gap: 1, transition: 'all 0.15s',
-              background: barryOpen ? `${BARRY_CHAKRA}20` : 'transparent',
-              border: `1px solid ${barryOpen ? BARRY_CHAKRA : 'transparent'}`,
-              boxShadow: barryOpen ? `0 0 12px ${BARRY_CHAKRA}40` : 'none',
-            }}
-            onMouseEnter={e => { if (!barryOpen) e.currentTarget.style.background = T.surface; }}
-            onMouseLeave={e => { if (!barryOpen) e.currentTarget.style.background = 'transparent'; }}
-          >
-            <BarryAvatar size={22} />
-            <span style={{ fontSize: 7, letterSpacing: 0.5, marginTop: 1, color: barryOpen ? BARRY_CHAKRA : T.textFaint }}>
-              BARRY
-            </span>
-          </div>
-          {barryOpen && (
-            <BarryChat module={BARRY_MODULE} context={barryCtx} onClose={() => setBarryOpen(false)} />
-          )}
-        </div>
-      </div>
-
-      {/* ── SUB-NAV (collapsible) ── */}
-      <div style={{
-        width: subNavOpen ? 190 : 0, flexShrink: 0, background: T.navBg,
-        borderRight: subNavOpen ? `1px solid ${T.border}` : 'none',
-        display: 'flex', flexDirection: 'column',
-        position: 'relative', zIndex: 2,
-        transition: 'width 0.2s ease, background 0.25s',
-        overflow: 'hidden',
-      }}>
-        <div style={{ width: 190, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          {/* Sub-nav header */}
-          <div style={{
-            padding: '13px 13px 9px',
-            borderBottom: `1px solid ${T.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            flexShrink: 0,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div>
-                <div style={{ fontSize: 9, letterSpacing: 2, color: CC_CYAN, fontWeight: 700, marginBottom: 1 }}>
-                  COMMAND CENTER
-                </div>
-                <div style={{ fontSize: 9, color: T.textFaint }}>{CC_ITEMS.length} sections</div>
-              </div>
-              <NotificationCenter userId={user?.uid} T={T} />
-            </div>
-            <div
-              onClick={() => { setSubNavOpen(false); localStorage.setItem('cc_subnav_collapsed', 'true'); }}
-              title="Collapse sidebar"
-              style={{
-                width: 22, height: 22, borderRadius: 6,
-                background: T.surface, border: `1px solid ${T.border2}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              <ChevronLeft size={12} color={T.textFaint} />
-            </div>
-          </div>
-
-          {/* Sub-nav items */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 7px' }}>
-            {CC_ITEMS.map(it => {
-              const active = activeSection === it.id;
-              return (
-                <div
-                  key={it.id}
-                  onClick={() => it.route ? navigate(it.route) : switchSection(it.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px',
-                    borderRadius: 8, marginBottom: 1, cursor: 'pointer',
-                    background: active ? T.accentBg : 'transparent',
-                    borderLeft: `2px solid ${active ? CC_CYAN : 'transparent'}`,
-                    transition: 'all 0.12s', position: 'relative',
-                  }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = T.surface; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <it.Icon size={13} color={active ? CC_CYAN : T.textFaint} style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 12, fontWeight: active ? 600 : 400,
-                      color: active ? CC_CYAN : T.textMuted,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {it.label}
-                    </div>
-                    <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{it.desc}</div>
-                  </div>
-                  {/* Badge for missions count */}
-                  {it.id === 'missions' && activeMissionsCount > 0 && (
-                    <span style={{
-                      minWidth: 16, height: 16, borderRadius: 8,
-                      background: CC_CYAN, color: '#000',
-                      fontSize: 9, fontWeight: 700, padding: '0 4px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}>
-                      {activeMissionsCount}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* User footer */}
-          <div style={{
-            padding: '9px 11px', borderTop: `1px solid ${T.border}`,
-            display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0,
-          }}>
-            <Av initials={userInitials} color={CC_CYAN} size={24} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.email || 'user@idynify.com'}
-              </div>
-              <div style={{ fontSize: 8, color: T.textFaint }}>
-                {THEMES[themeId]?.label || 'Mission Control'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sub-nav expand button (shown when collapsed) */}
-      {!subNavOpen && (
-        <div
-          onClick={() => { setSubNavOpen(true); localStorage.setItem('cc_subnav_collapsed', 'false'); }}
-          title="Expand sidebar"
-          style={{
-            position: 'absolute', left: 60, top: 13, zIndex: 3,
-            width: 22, height: 22, borderRadius: '0 6px 6px 0',
-            background: T.navBg, border: `1px solid ${T.border}`, borderLeft: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          <ChevronRight size={12} color={T.textFaint} />
-        </div>
-      )}
-
-      {/* ── MAIN CONTENT ── */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', position: 'relative', zIndex: 1,
-        transition: 'background 0.25s',
-      }}>
+      <div className="module-workspace">
         {renderMain()}
       </div>
     </div>
   );
 }
 
-// ─── PeopleMain (public export) ───────────────────────────────────────────────
+/**
+ * Command Center still resolves the signed-in user, where the other migrated
+ * modules dropped it. The difference is what it is for: elsewhere the
+ * resolution existed only to print an email in a sidebar footer, and the footer
+ * is the shell's now. Here it is impersonation-aware DATA resolution — the
+ * missions and campaigns queries below are scoped by uid, so an admin viewing
+ * another account has to see that account's missions, not their own.
+ */
 export default function PeopleMain() {
   const activeUser = useActiveUser();
   const [user, setUser] = useState(activeUser || auth.currentUser);

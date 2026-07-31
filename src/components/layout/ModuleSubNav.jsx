@@ -99,6 +99,13 @@ export default function ModuleSubNav({
                       <span className="module-subnav-item-desc">{item.desc}</span>
                     )}
                   </span>
+                  {/* Optional count. Only Command Center uses one today (active
+                      missions), and it is existing content — the panel has to
+                      be able to carry it, or migrating the module would mean
+                      dropping something it showed. */}
+                  {item.badge ? (
+                    <span className="module-subnav-item-badge">{item.badge}</span>
+                  ) : null}
                 </button>
               );
             })}

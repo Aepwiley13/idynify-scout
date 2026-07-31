@@ -139,14 +139,41 @@
 
 .module-subnav-item.active .module-subnav-item-label { font-weight: 600; }
 
+/* Wraps to two lines rather than truncating on one.
+ *
+ * These are short explanations of what a section is — clipping them mid-word
+ * ("Channel selector, message …") costs the reader the part that distinguishes
+ * one section from another, which is the only reason the description is there.
+ * Command Center forced the issue: its descriptions are the longest in the
+ * product and its pre-migration panel wrapped them, so ellipsising here would
+ * have made the migration lose content. Same treatment as the header tagline.
+ */
 .module-subnav-item-desc {
   font-size: 9px;
   margin-top: 1px;
+  line-height: 1.35;
   color: var(--text-secondary);
   opacity: 0.8;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* Optional per-item count. Sized off the label, not the description, so a
+   two-digit badge cannot push the row taller than its neighbours. */
+.module-subnav-item-badge {
+  flex-shrink: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent, #f97316);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 }
 
 /* Expand affordance, shown only while the panel is collapsed. Pinned to the

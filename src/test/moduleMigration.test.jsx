@@ -41,11 +41,17 @@ vi.mock('../pages/Basecamp/sections/PeopleSection', () => stub('bc-people'));
 vi.mock('../pages/Basecamp/sections/CompaniesSection', () => stub('bc-companies'));
 vi.mock('../pages/Basecamp/sections/EngagementCenter', () => stub('bc-engage'));
 vi.mock('../components/csm/CSMDashboard', () => stub('csm'));
+vi.mock('../pages/Reinforcements/sections/DashboardSection', () => stub('rf-dashboard'));
+vi.mock('../pages/Reinforcements/sections/OpportunitiesSection', () => stub('rf-opps'));
+vi.mock('../pages/Reinforcements/sections/LeaderboardSection', () => stub('rf-leaderboard'));
+vi.mock('../pages/Reinforcements/sections/RecordReferralSection', () => stub('rf-record'));
+vi.mock('../pages/Reinforcements/sections/NurtureSection', () => stub('rf-nurture'));
 vi.mock('../hooks/useSubscription', () => ({ useSubscription: () => ({ isProTier: true, loading: false }) }));
 
 const { default: HunterMain } = await import('../pages/Hunter/HunterMain');
 const { default: SniperMain } = await import('../pages/Sniper/SniperMain');
 const { default: BasecampMain } = await import('../pages/Basecamp/BasecampMain');
+const { default: ReinforcementsMain } = await import('../pages/Reinforcements/ReinforcementsMain');
 
 /**
  * One row per migrated module. `otherModules` are labels the module's own rail
@@ -90,6 +96,17 @@ const MIGRATED = [
     sections: ['People', 'Companies', 'Engage', 'CSM'],
     descriptions: ['Your contacts', 'Customer success'],
     activeTab: { query: '?tab=engage', expect: 'Engage' },
+  },
+  {
+    name: 'Reinforcements',
+    Component: ReinforcementsMain,
+    path: '/reinforcements',
+    title: 'REINFORCEMENTS',
+    tagline: 'Referral and warm-intro network',
+    storageKey: 'reinforcements_subnav_collapsed',
+    sections: ['Dashboard', 'Opportunities', 'Leaderboard', 'Record', 'Nurture'],
+    descriptions: ['Network overview', 'Top referral sources'],
+    activeTab: { query: '?tab=nurture', expect: 'Nurture' },
   },
 ];
 

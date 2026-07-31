@@ -459,6 +459,7 @@ function App() {
             {/* Sniper — migrated into the shell. */}
             <Route path="/sniper" element={<SniperMain />} />
             <Route path="/basecamp" element={<BasecampMain />} />
+            <Route path="/reinforcements" element={<ReinforcementsMain />} />
           </Route>
         ) : (
           <>
@@ -518,6 +519,7 @@ function App() {
             />
             <Route path="/sniper" element={<ProtectedRoute withLayout={true}><SniperMain /></ProtectedRoute>} />
             <Route path="/basecamp" element={<ProtectedRoute withLayout={true}><BasecampMain /></ProtectedRoute>} />
+            <Route path="/reinforcements" element={<ProtectedRoute withLayout={true}><ReinforcementsMain /></ProtectedRoute>} />
           </>
         )}
 
@@ -602,15 +604,6 @@ function App() {
           }
         />
 
-        {/* Reinforcements Module — referral intelligence hub (no MainLayout) */}
-        <Route
-          path="/reinforcements"
-          element={
-            <ProtectedRoute>
-              <ReinforcementsMain />
-            </ProtectedRoute>
-          }
-        />
 
         {/* Blitz Mode — rapid engagement queue (no MainLayout) */}
         <Route

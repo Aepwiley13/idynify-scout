@@ -14,12 +14,12 @@ Order: **Hunter → Sniper → Basecamp → Reinforcements → Fallback → Comm
 | **Hunter** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Sniper** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Basecamp** | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Reinforcements | migrate | migrate | migrate | restyle | migrate |
+| **Reinforcements** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Fallback | migrate | migrate | migrate | restyle | migrate |
 | Command Center | migrate | migrate | migrate | restyle | migrate |
 | Recon | migrate | migrate | migrate | restyle | migrate |
 
-**5 of 9.** The whole pipeline — Scout, Hunter, Sniper — plus Basecamp.
+**6 of 9.** The whole pipeline — Scout, Hunter, Sniper — plus Basecamp and Reinforcements. Three left: Fallback, Command Center, Recon.
 
 ---
 
@@ -99,20 +99,33 @@ Also fixed while here: sub-nav taglines wrap to two lines instead of
 truncating. Scout's fits on one; "Customer success and retention" did not, and
 a module's stated purpose is not worth losing to an ellipsis.
 
+## 4 — Reinforcements
+
+`ReinforcementsMain.jsx`: **637 → 303 lines.**
+
+Sections unchanged: Dashboard, Opportunities, Leaderboard, Record, Nurture.
+
+Route moved: `/reinforcements`.
+
+```
+sidebar 220px | active: Reinforcements | sub-nav 190px
+sections: Dashboard · Opportunities · Leaderboard · Record · Nurture
+```
+
 ---
 
 ## Verification
 
-`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 8 times.
+`shellPersistence.test.jsx` walks **Mission Control → Scout → Contact → Scout → Hunter → Sniper → Basecamp → Reinforcements → Mission Control** and asserts a shell mount count of exactly **1**. Pre-migration that journey mounted the shell 9 times.
 
 Two crossings get their own tests:
 
 - **Scout → Hunter.** The one "Move to Hunter" lands on, and the one the original audit called the worst moment in the product — Scout's rail out, Hunter's rail in, Barry destroyed and rebuilt in between. It now changes nothing but the content.
 - **Scout → Hunter → Sniper.** The whole pipeline on one shell, with `current_module` and `source_route` tracking correctly at each step.
 
-`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 24 tests across Hunter, Sniper and Basecamp, growing by 8 per migration.
+`moduleMigration.test.jsx` runs its eight-assertion checklist against every migrated module — 32 tests across Hunter, Sniper, Basecamp and Reinforcements, growing by 8 per migration.
 
-Suite **465 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
+Suite **473 passed / 10 failed** — the 10 are the unchanged pre-existing `UserSettings` Router failures. Build passes, lint clean on every file touched.
 
 ---
 
@@ -128,4 +141,4 @@ Suite **465 passed / 10 failed** — the 10 are the unchanged pre-existing `User
 
 ## Next
 
-**Reinforcements.** Same recipe; its sections are Dashboard, Opportunities, Leaderboard, Record and Nurture.
+**Fallback.** Same recipe; its sections are Comeback, People and Companies.

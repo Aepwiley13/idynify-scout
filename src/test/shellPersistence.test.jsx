@@ -69,6 +69,10 @@ function BasecampProbe() {
   return <div data-testid="page">basecamp</div>;
 }
 
+function ReinforcementsProbe() {
+  return <div data-testid="page">reinforcements</div>;
+}
+
 function ScoutProbe() {
   return (
     <div>
@@ -108,6 +112,7 @@ function renderShell(initialPath = '/mission-control-v2', ContactPanel = Contact
             <Route path="/hunter" element={<HunterProbe />} />
             <Route path="/sniper" element={<SniperProbe />} />
             <Route path="/basecamp" element={<BasecampProbe />} />
+            <Route path="/reinforcements" element={<ReinforcementsProbe />} />
           </Route>
         </Routes>
       </ShellProvider>
@@ -153,11 +158,15 @@ describe('shell persistence across the Phase 8 journey', () => {
     await act(async () => { navigateTo('/basecamp'); });
     expect(screen.getByTestId('page')).toHaveTextContent('basecamp');
 
-    // Basecamp → Mission Control
+    // Basecamp → Reinforcements. Asking a customer for an intro, same shell.
+    await act(async () => { navigateTo('/reinforcements'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('reinforcements');
+
+    // Reinforcements → Mission Control
     await act(async () => { navigateTo('/mission-control-v2'); });
     expect(screen.getByTestId('page')).toHaveTextContent('mission-control');
 
-    // Seven transitions, still one shell. Pre-migration this would be 8.
+    // Eight transitions, still one shell. Pre-migration this would be 9.
     expect(shellMountCount).toBe(1);
     expect(screen.getByTestId('shell-chrome')).toBeInTheDocument();
   });

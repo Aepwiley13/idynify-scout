@@ -1,72 +1,148 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+/**
+ * MainLayout — the one global application shell.
+ *
+ * Sprint 1 shell migration. Before this change MainLayout was applied per
+ * route via <ProtectedRoute withLayout>, which meant React rebuilt the whole
+ * element tree on every navigation and the shell — sidebar, top bar and Barry
+ * alike — unmounted and remounted on each transition. Eight modules avoided it
+ * entirely by shipping their own chrome.
+ *
+ * Now MainLayout mounts once, beneath the router, and routes render into
+ * <Outlet/>. The sidebar does not unmount. Barry does not unmount. The top bar
+ * does not swap.
+ *
+ * MainLayout OWNS
+ *   global sidebar · top bar · breadcrumb · global search mount ·
+ *   notifications · account + logout · settings access · Barry container and
+ *   visibility · Quick Engage host · stage-transition announcements ·
+ *   the main content boundary
+ *
+ * MainLayout DOES NOT OWN
+ *   module filters · module tables · contact actions · pipeline controls ·
+ *   module business logic · module data fetching · module empty states
+ *
+ * Two render modes, both supported during the incremental migration:
+ *   <MainLayout user={u} />            → renders <Outlet/>  (layout route)
+ *   <MainLayout user={u}>{child}</…>   → renders child      (legacy wrapper,
+ *                                        retained for rollback layer 1)
+ */
+
+import React, { useEffect, useRef, useCallback } from 'react';
+import { useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { User, Menu, Settings, LogOut, History, Search, ChevronRight } from 'lucide-react';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
 import BarryChatPanel from '../dashboard/BarryChatPanel';
-import { User, Menu, Settings, LogOut, History } from 'lucide-react';
+import NotificationCenter from '../notifications/NotificationCenter';
+import QuickEngageDrawer from '../engage/QuickEngageDrawer';
+import ShellAnnouncements from './ShellAnnouncements';
 import { auth } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
+import { ShellProvider, useShell } from '../../context/ShellContext';
+import { resolveModule, MISSION_CONTROL } from '../../constants/navigationModel';
+import { useT } from '../../theme/ThemeContext';
 import './MainLayout.css';
 
-const MainLayout = ({ children, user }) => {
+/**
+ * Modules that still render their own mobile bottom navigation.
+ *
+ * Constraint C3 from the Phase 0 assessment: bringing Scout into the shell
+ * would give mobile Scout two bottom navs — the shell's and its own. Mobile
+ * is out of scope this sprint, so the shell yields on those routes rather
+ * than stacking. Desktop is unaffected. Removed when the mobile sprint
+ * reconciles the two.
+ */
+const MODULES_WITH_OWN_MOBILE_NAV = ['/scout'];
+
+function ownsItsMobileNav(pathname) {
+  return MODULES_WITH_OWN_MOBILE_NAV.some(
+    p => pathname === p || pathname.startsWith(p + '?')
+  );
+}
+
+/**
+ * Breadcrumb: Mission Control ▸ Scout ▸ <entity>
+ *
+ * Answers "where am I" and "how did I get here" in one line. The entity
+ * segment is supplied by the module through useShellEntity(), so a contact
+ * panel names the person without the shell knowing anything about contacts.
+ */
+function Breadcrumb({ module, entityLabel, onNavigate }) {
+  const crumbs = [];
+
+  if (module.id !== MISSION_CONTROL.id) {
+    crumbs.push({ label: MISSION_CONTROL.label, path: MISSION_CONTROL.path });
+  }
+  crumbs.push({ label: module.label, path: module.path });
+  if (entityLabel) crumbs.push({ label: entityLabel, path: null });
+
+  return (
+    <nav className="shell-breadcrumb" aria-label="Breadcrumb">
+      {crumbs.map((crumb, i) => {
+        const isLast = i === crumbs.length - 1;
+        return (
+          <span className="shell-breadcrumb-item" key={`${crumb.label}-${i}`}>
+            {i > 0 && <ChevronRight size={13} className="shell-breadcrumb-sep" aria-hidden="true" />}
+            {isLast || !crumb.path ? (
+              <span className="shell-breadcrumb-current" aria-current="page">{crumb.label}</span>
+            ) : (
+              <button type="button" className="shell-breadcrumb-link" onClick={() => onNavigate(crumb.path)}>
+                {crumb.label}
+              </button>
+            )}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ─── ShellChrome — consumes the shell it is rendered inside ──────────────────
+
+function ShellChrome({ children, user }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const T = useT();
   const activeUserId = useActiveUserId();
 
-  // ── Global Barry shell state ──────────────────────────────────────────────
-  // BarryChatPanel is mounted once here and stays mounted; the sidebar button
-  // toggles `barryOpen`. Orientation flows up from the panel; page KPI context
-  // flows up from the routed page. Both flow back down to the routed page.
-  const [barryOpen, setBarryOpen] = useState(false);
-  const [orientation, setOrientation] = useState({
-    status: 'loading',
-    brief: null,
-    suggestedPrompts: [],
-    mode: null,
-    error: null,
-  });
-  const [barryPageContext, setBarryPageContext] = useState({
-    kpiContext: {},
-    kpiContextReady: false,
-  });
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = React.useState(false);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
 
-  // Blocker 2 — route-aware readiness. Only Mission Control reports KPI context
-  // upward, so gate on the real signal there and treat every other MainLayout
-  // route as ready immediately: Barry initializes with empty context rather than
-  // hanging on the loading skeleton. Deterministic — no timer, no MC race.
-  const isMissionControl = location.pathname === '/mission-control-v2';
+  const {
+    barryOpen, openBarry, closeBarry, toggleBarry,
+    setOrientation,
+    barryPageContext,
+    navigationContext,
+    quickEngage,
+  } = useShell();
+
+  const barryButtonRef = useRef(null);
+  const moreButtonRef = useRef(null);
+  const barryHostRef = useRef(null);
+
+  const module = resolveModule(location.pathname);
+
+  // Route-aware Barry readiness. Only Mission Control reports KPI context
+  // upward, so gate on the real signal there and treat every other route as
+  // ready immediately — Barry initialises with empty context rather than
+  // hanging on a skeleton. Deterministic; no timer.
+  const isMissionControl = location.pathname === MISSION_CONTROL.path;
   const effectiveKpiContextReady = isMissionControl
     ? barryPageContext.kpiContextReady
     : true;
 
-  const barryButtonRef = useRef(null);   // desktop Sidebar Barry trigger
-  const moreButtonRef = useRef(null);    // mobile BottomNav "More" trigger
-  const barryHostRef = useRef(null);
-  const returnFocusRef = useRef(null);   // element to refocus when Barry closes
-
-  // One shared close handler for every close path (host X button, Escape,
-  // Sidebar toggle) so focus restoration is consistent regardless of how Barry
-  // was closed. returnFocusRef is set to whichever control opened Barry.
-  const closeBarry = useCallback(() => {
-    setBarryOpen(false);
-    returnFocusRef.current?.focus();
-  }, []);
-
-  // Focus trap: while open, move focus into the panel and cycle Tab/Shift+Tab
-  // within it. Hand-rolled — no dependency.
+  // Focus trap while Barry is open. Hand-rolled — no dependency.
   useEffect(() => {
-    if (!barryOpen) return;
+    if (!barryOpen) return undefined;
     const host = barryHostRef.current;
-    if (!host) return;
+    if (!host) return undefined;
 
     const selector = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const getFocusable = () =>
-      Array.from(host.querySelectorAll(selector)).filter((el) => el.offsetParent !== null);
+      Array.from(host.querySelectorAll(selector)).filter(el => el.offsetParent !== null);
 
     (getFocusable()[0] || host).focus();
 
@@ -88,113 +164,34 @@ const MainLayout = ({ children, user }) => {
     return () => host.removeEventListener('keydown', onKeyDown);
   }, [barryOpen]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await auth.signOut();
       navigate('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
+  }, [navigate]);
 
-  // Get page title based on current route
-  const getPageTitle = () => {
-    const pathname = location.pathname;
-    // Read tab from URL search params (new) with fallback to location.state (legacy)
-    const urlTab = new URLSearchParams(location.search).get('tab');
-    const activeTab = urlTab || location.state?.activeTab;
-
-    if (pathname === '/mission-control-v2') {
-      return 'Mission Control';
-    }
-
-    if (pathname === '/onboarding/barry') {
-      return 'ICP Setup — Barry';
-    }
-
-    // Company Profile page - focused view
-    if (pathname.match(/^\/scout\/company\/[^/]+$/)) {
-      return 'Company Profile';
-    }
-
-    // Company People page
-    if (pathname.match(/^\/scout\/company\/[^/]+\/leads$/)) {
-      return 'Company People';
-    }
-
-    // Contact Profile page
-    if (pathname.match(/^\/scout\/contact\/[^/]+$/)) {
-      return 'Contact Profile';
-    }
-
-    // Total Market — full addressable-market view
-    if (pathname === '/scout/total-market') {
-      return 'Total Market';
-    }
-
-    // Scout main pages with tabs
-    if (pathname === '/scout') {
-      if (activeTab === 'all-leads' || !activeTab) {
-        return 'People';
-      }
-      if (activeTab === 'company-search') return 'Company Search';
-      if (activeTab === 'saved-companies') return 'Saved Companies';
-      if (activeTab === 'all-leads') return 'People';
-      if (activeTab === 'total-market') return 'Total Market';
-      if (activeTab === 'icp-settings') return 'ICP Settings';
-      if (activeTab === 'scout-plus') return 'Scout+';
-    }
-
-    if (pathname === '/hunter') return 'Hunter';
-    if (pathname.startsWith('/hunter/create-mission')) return 'Create Mission';
-    if (pathname.match(/^\/hunter\/mission\//)) return 'Mission Detail';
-
-    // RECON pages — new top-level pillar
-    if (pathname === '/recon') return 'RECON';
-    if (pathname === '/recon/icp-intelligence') return 'ICP Intelligence';
-    if (pathname === '/recon/messaging') return 'Messaging & Voice';
-    if (pathname === '/recon/objections') return 'Objections & Constraints';
-    if (pathname === '/recon/competitive-intel') return 'Competitive Intel';
-    if (pathname === '/recon/buying-signals') return 'Buying Signals';
-    if (pathname === '/recon/barry-training') return 'Barry Training';
-    if (pathname.match(/^\/recon\/section\//)) return 'RECON Section';
-
-    // Legacy RECON path
-    if (pathname.startsWith('/mission-control-v2/recon')) return 'RECON';
-    if (pathname === '/people') return 'All People';
-    if (pathname === '/settings') return 'Settings';
-    if (pathname === '/admin') return 'Admin';
-
-    return 'Idynify Scout';
-  };
+  // Content is full-bleed for module hubs that manage their own padding;
+  // padded for document-style screens. Scout renders its own view chrome.
+  const fullBleed = module.id !== MISSION_CONTROL.id;
 
   return (
-    <div className="main-layout">
+    <div className={`main-layout ${fullBleed ? 'shell-fixed-height' : ''}`}>
       <Sidebar
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={() => setMobileMenuOpen(false)}
-        onToggleBarry={() => {
-          if (barryOpen) {
-            closeBarry();
-          } else {
-            returnFocusRef.current = barryButtonRef.current;
-            setBarryOpen(true);
-          }
-        }}
+        onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
         barryOpen={barryOpen}
         barryButtonRef={barryButtonRef}
       />
 
-      {/* Mobile Menu Backdrop */}
       {mobileMenuOpen && (
-        <div
-          className="mobile-menu-backdrop"
-          onClick={() => setMobileMenuOpen(false)}
-        />
+        <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
       )}
 
       <div className="main-content">
-        {/* Top Bar */}
         <header className="top-bar">
           <div className="top-bar-left">
             <button
@@ -204,95 +201,101 @@ const MainLayout = ({ children, user }) => {
             >
               <Menu size={24} />
             </button>
-            <h1 className="page-title">{getPageTitle()}</h1>
+            <Breadcrumb
+              module={module}
+              entityLabel={navigationContext?.entity_label}
+              onNavigate={navigate}
+            />
           </div>
 
           <div className="top-bar-right">
-            {/* Barry session history */}
+            {/* Global search — mount point reserved, feature not built.
+                Phase 0 constraint C2: the brief lists a global search entry
+                point among shell responsibilities, but no global search
+                exists in the product. A disabled, labelled affordance is
+                honest; a non-functional input would not be. */}
             <button
-              className="topbar-settings-btn"
+              className="topbar-icon-btn"
+              disabled
+              aria-label="Global search — coming soon"
+              title="Global search — coming soon"
+            >
+              <Search size={18} />
+            </button>
+
+            {activeUserId && <NotificationCenter userId={activeUserId} T={T} />}
+
+            <button
+              className="topbar-icon-btn"
               onClick={() => setHistoryOpen(true)}
               aria-label="Barry session history"
-              title="Session History"
+              title="Session history"
             >
-              <History size={20} />
+              <History size={18} />
             </button>
-            {/* Settings shortcut — visible on mobile portrait at top of screen */}
+
             <button
-              className={`topbar-settings-btn ${location.pathname === '/settings' ? 'active' : ''}`}
+              className={`topbar-icon-btn ${location.pathname === '/settings' ? 'active' : ''}`}
               onClick={() => navigate('/settings')}
               aria-label="Settings"
               title="Settings"
             >
-              <Settings size={20} />
+              <Settings size={18} />
             </button>
+
             {user && (
               <>
                 <div className="user-info">
                   <User size={16} />
                   <span>{user.email}</span>
                 </div>
-                <button
-                  className="logout-button"
-                  onClick={handleLogout}
-                  title="Logout"
-                >
+                <button className="logout-button" onClick={handleLogout} title="Log out">
                   <LogOut size={18} />
-                  <span>Logout</span>
+                  <span>Log out</span>
                 </button>
               </>
             )}
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="page-content">
-          {React.isValidElement(children)
-            ? React.cloneElement(children, {
-                orientation,
-                // Content-initiated open (Phase B BarryMorningBrief) records its
-                // own return-focus target then; Phase A triggers are the Sidebar
-                // button and the mobile "More" button, wired below.
-                openBarry: () => setBarryOpen(true),
-                setBarryPageContext,
-              })
-            : children}
+        {/* The content boundary. Routes swap here; nothing above or beside
+            this element re-mounts. */}
+        <main className={`page-content ${fullBleed ? 'page-content-full' : ''}`}>
+          {children ?? <Outlet />}
         </main>
       </div>
 
-      {/* Bottom Navigation — mobile only (rendered outside main-content so it's always fixed) */}
-      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
+      {/* Mobile bottom nav — suppressed on modules that still ship their own
+          (Phase 0 constraint C3). */}
+      {!ownsItsMobileNav(location.pathname) && (
+        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
+      )}
 
-      {/* More Sheet — slide-up overlay for secondary navigation on mobile.
-          Barry's mobile entry point lives here; opening records the BottomNav
-          "More" button as the focus-return target since the sheet (and its
-          Barry row) unmounts on open. */}
       <MoreSheet
         isOpen={moreSheetOpen}
         onClose={() => setMoreSheetOpen(false)}
-        onOpenBarry={() => {
-          returnFocusRef.current = moreButtonRef.current;
-          setBarryOpen(true);
-        }}
+        onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
       />
 
-      {/* Barry session history panel */}
       <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
 
-      {/* Global Barry panel host — always mounted; visibility toggled via inert
-          + aria-hidden so BarryChatPanel keeps its orientation and conversation
-          state across open/close cycles.
+      {/* Stage-transition announcements. Only explicit announce() calls
+          surface here — routine navigation never produces one. */}
+      <ShellAnnouncements />
 
-          NOTE: Barry persistence is currently limited to the lifetime of this
-          MainLayout instance. True cross-module persistence requires converting
-          module routes to children of one shared parent layout route. Deferred
-          to a future routing phase. */}
+      {/* Quick Engage — shell-hosted so it overlays whatever is underneath
+          without unmounting it. Closing restores exact prior context. */}
+      {quickEngage && <QuickEngageDrawer />}
+
+      {/* Barry — always mounted, visibility toggled via inert + aria-hidden so
+          conversation and orientation state survive open/close AND navigation.
+          This is the whole point of the shell: one Barry, one thread. */}
       <div
         ref={barryHostRef}
         className="barry-panel-host"
         role="dialog"
         aria-modal={barryOpen ? 'true' : undefined}
-        aria-label="Barry AI Assistant"
+        aria-label="Barry"
         aria-hidden={!barryOpen}
         inert={!barryOpen ? '' : undefined}
         tabIndex={-1}
@@ -311,10 +314,19 @@ const MainLayout = ({ children, user }) => {
           kpiContext={barryPageContext.kpiContext}
           kpiContextReady={effectiveKpiContextReady}
           onOrientationChange={setOrientation}
+          navigationContext={navigationContext}
         />
       </div>
     </div>
   );
-};
+}
+
+// ─── MainLayout — provides the shell, then renders its chrome ────────────────
+
+const MainLayout = ({ children, user, userData }) => (
+  <ShellProvider user={user} userData={userData}>
+    <ShellChrome user={user}>{children}</ShellChrome>
+  </ShellProvider>
+);
 
 export default MainLayout;

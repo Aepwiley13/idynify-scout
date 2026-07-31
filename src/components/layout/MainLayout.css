@@ -133,38 +133,6 @@
   color: var(--text-primary);
 }
 
-/* Settings shortcut button in TopBar */
-.topbar-settings-btn {
-  display: none; /* hidden on desktop — sidebar handles settings */
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 0.5rem;
-  background: transparent;
-  border: 1.5px solid #faaa20;
-  color: #d97706;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.topbar-settings-btn:hover {
-  background: rgba(250,170,32,0.10);
-  color: #d97706;
-  box-shadow: 0 0 10px rgba(250, 170, 32, 0.4), 0 0 20px rgba(250, 170, 32, 0.15);
-}
-
-.topbar-settings-btn.active {
-  background: rgba(250,170,32,0.10);
-  color: #d97706;
-  box-shadow: 0 0 10px rgba(250, 170, 32, 0.5), 0 0 20px rgba(250, 170, 32, 0.2);
-}
-
-.topbar-settings-btn .lucide {
-  filter: drop-shadow(0 0 3px rgba(250, 170, 32, 0.6));
-}
-
 /* Page Content */
 .page-content {
   flex: 1;
@@ -219,13 +187,6 @@
 
   .page-content {
     padding: 2.5rem 3rem;
-  }
-}
-
-@media (max-width: 1024px) {
-  /* Show settings shortcut on tablet + mobile (sidebar is collapsed, no pillar items) */
-  .topbar-settings-btn {
-    display: flex;
   }
 }
 
@@ -489,4 +450,138 @@
     width: 100%;
     padding: 56px 12px 16px;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SHELL MIGRATION — Sprint 1 additions
+
+   The shell is now persistent: it mounts once and routes swap inside
+   .page-content. Nothing below re-mounts on navigation.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Breadcrumb ──
+   Replaces the single page title. Answers "where am I" and "how did I get
+   here" in one line, and gives a real way back up the hierarchy — the old
+   title was static text and the only "back" was a hardcoded button inside
+   the page. */
+.shell-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.shell-breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.shell-breadcrumb-sep {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.shell-breadcrumb-link {
+  padding: 0.125rem 0.25rem;
+  background: none;
+  border: none;
+  border-radius: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.shell-breadcrumb-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.shell-breadcrumb-current {
+  padding: 0.125rem 0.25rem;
+  color: var(--text-primary);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42ch;
+}
+
+/* ── Top bar icon buttons ──
+   One shape for search / notifications / history / settings, so the top bar
+   reads as one row of controls rather than a pile of one-offs. */
+.topbar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.topbar-icon-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.topbar-icon-btn.active {
+  background: var(--bg-secondary);
+  border-color: var(--accent, #f97316);
+  color: var(--text-primary);
+}
+
+.topbar-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Full-bleed content ──
+   Module hubs manage their own padding and scrolling. Document-style screens
+   (Mission Control) keep the padded boundary. */
+.main-layout.shell-fixed-height .main-content {
+  height: 100vh;
+  min-height: 0;
+}
+
+.page-content.page-content-full {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (min-width: 1280px) {
+  .page-content.page-content-full { padding: 0; }
+}
+
+@media (min-width: 1536px) {
+  .page-content.page-content-full { padding: 0; }
+}
+
+@media (max-width: 1024px) {
+  .page-content.page-content-full { padding: 0; }
+  .shell-breadcrumb-current { max-width: 24ch; }
+}
+
+@media (max-width: 768px) {
+  /* On mobile the breadcrumb collapses to the current location only —
+     the trail is not worth the wrap. */
+  .shell-breadcrumb-item:not(:last-child) { display: none; }
+  .shell-breadcrumb-current { font-size: 1rem; max-width: 18ch; }
+  .topbar-icon-btn { width: 32px; height: 32px; }
 }

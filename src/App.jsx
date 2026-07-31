@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
@@ -45,6 +45,7 @@ import AllLeads from './pages/Scout/AllLeads';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
+import ContactProfilePanel from './pages/Scout/ContactProfilePanel';
 import ScoutGame from './pages/Scout/ScoutGame';
 import CadencesList from './pages/Scout/CadencesList';
 import CadenceDetail from './pages/Scout/CadenceDetail';
@@ -79,6 +80,7 @@ import LeadList from './components/LeadList';
 import CompanyQuestionnaire from './components/scout/CompanyQuestionnaire';
 import ImpersonationBanner from './components/ImpersonationBanner';
 import MainLayout from './components/layout/MainLayout';
+import { SHELL_MIGRATION } from './constants/shellMigration';
 
 // Hunter Pages
 import HunterMain from './pages/Hunter/HunterMain';
@@ -112,6 +114,52 @@ import UserSettings from './pages/UserSettings';
 // Theme
 import WithTheForce from './components/WithTheForce';
 
+
+/**
+ * ShellRoute — the global application shell as a layout route.
+ *
+ * This is the whole point of the Sprint 1 migration. Guard and presentation
+ * are separated: the guard decides whether the user may be here, the shell
+ * decides what surrounds them, and <Outlet/> renders the route. Because the
+ * shell sits ABOVE the route in the element tree, React keeps it mounted
+ * across navigation — sidebar, top bar and Barry survive transitions that
+ * previously destroyed them.
+ *
+ * DECLARED AT MODULE SCOPE ON PURPOSE. React identifies components by type.
+ * A component defined inside App's render body is a NEW type on every App
+ * render, so React unmounts and remounts its entire subtree — which for this
+ * component means destroying the shell and Barry's conversation. App
+ * re-renders at least every 30s from the impersonation poll, so an in-render
+ * declaration would have quietly reintroduced the exact defect this sprint
+ * exists to fix. The surrounding ProtectedRoute helpers are still declared
+ * in-render; that is pre-existing and out of scope, but this one cannot be.
+ *
+ * Authorization semantics are identical to ProtectedRoute: same auth check,
+ * same payment gate, same redirects. Only presentation moved.
+ */
+function ShellRoute({ loading, user, userData, requirePayment = true }) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <p className="text-cyan-400 text-xl font-mono">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (requirePayment && !userData?.hasCompletedPayment) {
+    return <Navigate to="/checkout" />;
+  }
+
+  return (
+    <MainLayout user={user} userData={userData}>
+      <Outlet />
+    </MainLayout>
+  );
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -230,13 +278,16 @@ function App() {
       return <Navigate to="/checkout" />;
     }
 
-    // Wrap with MainLayout if requested
+    // Wrap with MainLayout if requested.
+    // Legacy path — retained for rollback layer 1 (see PHASE0_MIGRATION_SAFETY).
+    // Migrated routes go through ShellRoute below instead.
     if (withLayout) {
-      return <MainLayout user={user}>{children}</MainLayout>;
+      return <MainLayout user={user} userData={userData}>{children}</MainLayout>;
     }
 
     return children;
   };
+
 
   // Smart redirect after login - NEW FLOW
   const SmartRedirect = () => {
@@ -362,15 +413,82 @@ function App() {
           }
         />
 
-        {/* Protected Routes - Mission Control Dashboard V2 (MODULAR SYSTEM) */}
-        <Route
-          path="/mission-control-v2"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <MissionControlDashboardV2 />
-            </ProtectedRoute>
-          }
-        />
+        {/* ══════════════════════════════════════════════════════════════════
+            GLOBAL SHELL — Sprint 1 vertical slice
+
+            Mission Control → Scout → Contact Profile → Quick Engage → back.
+
+            These routes are children of ONE layout route, so the shell mounts
+            once and stays mounted. Navigating between any two of them swaps
+            only what is inside <Outlet/> — the sidebar, top bar and Barry are
+            never unmounted.
+
+            Out-of-scope modules (Hunter, Sniper, Basecamp, Reinforcements,
+            Fallback, Recon) keep their existing self-contained shells below,
+            untouched and fully functional. The migration is route by route.
+
+            Rollback: SHELL_MIGRATION.enabled = false restores the previous
+            per-route <ProtectedRoute withLayout> wrapping in the else branch.
+            ══════════════════════════════════════════════════════════════════ */}
+        {SHELL_MIGRATION.enabled ? (
+          <Route element={<ShellRoute loading={loading} user={user} userData={userData} />}>
+            <Route path="/mission-control-v2" element={<MissionControlDashboardV2 />} />
+            {/* Contact Profile is a CHILD of Scout, not a sibling. That is
+                what keeps Scout mounted while a contact is open, so closing
+                the panel restores the list, its filters and its scroll
+                position instead of rebuilding them. */}
+            <Route path="/scout" element={<ScoutMain />}>
+              <Route path="contact/:contactId" element={<ContactProfilePanel />} />
+            </Route>
+            <Route path="/scout/company/:companyId" element={<CompanyDetail />} />
+            <Route path="/scout/company/:companyId/leads" element={<CompanyLeads />} />
+            <Route path="/scout/total-market" element={<TotalMarket />} />
+            <Route path="/scout/cadences" element={<CadencesList />} />
+            <Route path="/scout/cadence/:cadenceId" element={<CadenceDetail />} />
+            <Route path="/scout/game" element={<ScoutGame />} />
+          </Route>
+        ) : (
+          <>
+            <Route
+              path="/mission-control-v2"
+              element={<ProtectedRoute withLayout={true}><MissionControlDashboardV2 /></ProtectedRoute>}
+            />
+            {/* Degraded mode: the shell is still present, just not persistent
+                (it remounts per route, as it did before the migration).
+                Scout renders inside it — Scout no longer carries its own
+                rail, so it must not be rendered bare. */}
+            <Route path="/scout" element={<ProtectedRoute withLayout={true}><ScoutMain /></ProtectedRoute>} />
+            <Route
+              path="/scout/contact/:contactId"
+              element={<ProtectedRoute withLayout={true}><ContactProfile /></ProtectedRoute>}
+            />
+            <Route
+              path="/scout/company/:companyId"
+              element={<ProtectedRoute withLayout={true}><CompanyDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="/scout/company/:companyId/leads"
+              element={<ProtectedRoute withLayout={true}><CompanyLeads /></ProtectedRoute>}
+            />
+            <Route
+              path="/scout/total-market"
+              element={<ProtectedRoute withLayout={true}><TotalMarket /></ProtectedRoute>}
+            />
+            <Route
+              path="/scout/cadences"
+              element={<ProtectedRoute withLayout={true}><CadencesList /></ProtectedRoute>}
+            />
+            <Route
+              path="/scout/cadence/:cadenceId"
+              element={<ProtectedRoute withLayout={true}><CadenceDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="/scout/game"
+              element={<ProtectedRoute withLayout={true}><ScoutGame /></ProtectedRoute>}
+            />
+          </>
+        )}
+
         <Route
           path="/mission-control-v2/recon"
           element={
@@ -430,100 +548,16 @@ function App() {
           element={<Navigate to="/command-center" replace />}
         />
 
-        {/* Scout Module — self-contained two-column shell (no MainLayout) */}
-        <Route
-          path="/scout"
-          element={
-            <ProtectedRoute>
-              <ScoutMain />
-            </ProtectedRoute>
-          }
-        />
+        {/* Scout legacy URL redirects.
+            The Scout routes themselves now live in the global shell group
+            above. These are pure redirects and stay here.
 
-        {/* Scout+ is merged into /scout - redirect legacy URL */}
-        <Route
-          path="/scout-plus"
-          element={<Navigate to="/scout?tab=scout-plus" replace />}
-        />
-
-        {/* Scout Game Mode */}
-        <Route
-          path="/scout/game"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <ScoutGame />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Cadences */}
-        <Route
-          path="/scout/cadences"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CadencesList />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/scout/cadence/:cadenceId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CadenceDetail />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Total Market — full addressable-market view (was orphaned: component
-            existed but had no route). Rendered in the shared shell like Cadences. */}
-        <Route
-          path="/scout/total-market"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <TotalMarket />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Redirect /scout/daily-leads → /scout with correct tab state */}
-        <Route
-          path="/scout/daily-leads"
-          element={<Navigate to="/scout" state={{ activeTab: 'daily-leads' }} replace />}
-        />
-
-        {/* Redirect removed Contact Search URL to Company Search */}
-        <Route
-          path="/scout/contact-search"
-          element={<Navigate to="/scout" state={{ activeTab: 'company-search' }} replace />}
-        />
-
-        {/* Scout Sub-Routes */}
-        <Route
-          path="/scout/company/:companyId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CompanyDetail />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/scout/company/:companyId/leads"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CompanyLeads />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/scout/contact/:contactId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <ContactProfile />
-            </ProtectedRoute>
-          }
-        />
+            All three now carry ?tab= rather than location.state: the tab must
+            survive refresh and be deep-linkable, and state-based navigation
+            left the URL bare, which is what made bare /scout ambiguous. */}
+        <Route path="/scout-plus" element={<Navigate to="/scout?tab=scout-plus" replace />} />
+        <Route path="/scout/daily-leads" element={<Navigate to="/scout?tab=daily-leads" replace />} />
+        <Route path="/scout/contact-search" element={<Navigate to="/scout?tab=company-search" replace />} />
 
         {/* Basecamp Module — self-contained two-column shell (no MainLayout) */}
         <Route

@@ -344,7 +344,53 @@ Use these as implicit ICP signals when refining targeting. Reference them if the
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null, capabilityBlock = null) {
+/**
+ * Render the shell's navigation context contract into a prompt block.
+ *
+ * This is what makes Barry contextual rather than merely persistent. He keeps
+ * ONE conversation thread across the whole app; this block is how his
+ * expertise follows the user from Mission Control to Scout to a contact to a
+ * send action without the thread resetting at each boundary.
+ *
+ * Deliberately terse. It is orientation, not instruction — Barry is told
+ * where the user is, not what to say about it.
+ */
+function buildNavigationContextBlock(navigationContext) {
+  if (!navigationContext) return '';
+
+  const {
+    current_module, current_route,
+    current_entity_type, current_entity_id, current_pipeline_stage,
+    current_action, source_route, navigation_history,
+  } = navigationContext;
+
+  const lines = [];
+  if (current_module) lines.push(`Module: ${current_module}`);
+  if (current_route) lines.push(`Route: ${current_route}`);
+  if (current_entity_type && current_entity_id) {
+    lines.push(`Open record: ${current_entity_type} ${current_entity_id}${current_pipeline_stage ? ` (pipeline stage: ${current_pipeline_stage})` : ''}`);
+  }
+  if (current_action) lines.push(`In progress: ${current_action}`);
+  if (source_route) lines.push(`Arrived from: ${source_route}`);
+  if (Array.isArray(navigation_history) && navigation_history.length > 1) {
+    lines.push(`Recent path: ${navigation_history.slice(-5).join(' → ')}`);
+  }
+
+  if (lines.length === 0) return '';
+
+  return `
+WHERE THE USER IS RIGHT NOW
+${lines.map(l => `- ${l}`).join('\n')}
+
+Use this to make your answer specific to the screen they are on. If they say
+"this contact" or "here", resolve it against the open record above. Do not
+announce their location back to them or narrate their navigation — they can
+see where they are. Only mention a pipeline stage change if it is genuinely
+material to what they asked.
+`;
+}
+
+function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null, capabilityBlock = null, navigationContext = null) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
   const recon = contextStack?.recon || {};
@@ -469,6 +515,7 @@ ${/* Two-speed context: opening brief uses only reconContext (server-compiled fu
    Additive by design — structured fields give Barry named references; compiled string gives full section text.
    After Cluster C's extractSection() fix, both paths are now correctly populated. */ ''}
 
+${buildNavigationContextBlock(navigationContext)}
 ━━━ ICP PROFILE & CAPABILITY STATE ━━━
 ${icpBlock}
 Reference this when discussing prospecting or targeting. Use the formal filter fields when saved; use RECON intelligence as the targeting baseline when formal fields are absent but RECON is complete.
@@ -748,6 +795,8 @@ export const handler = async (event) => {
     const moduleContext = body.moduleContext && Object.keys(body.moduleContext).length > 0
       ? body.moduleContext
       : null;
+    // Phase 7 navigation context contract, sent by the global shell.
+    const navigationContext = body.navigationContext || null;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -798,7 +847,7 @@ export const handler = async (event) => {
             contacts: (contextStack.contacts || []).slice(0, 50)
           }
         : { contacts: [], missions: [], recon: {} };
-      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext, module, swipeFeedback, capabilityBlock);
+      let systemPrompt = buildMissionControlSystemPrompt(currentMode, effectiveContext, reconContext, module, swipeFeedback, capabilityBlock, navigationContext);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}`;
       }
@@ -1080,7 +1129,7 @@ Return valid JSON only:
       }
 
       const swipeFeedbackConv = await loadSwipeFeedback(userId).catch(() => null);
-      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module, swipeFeedbackConv, capabilityBlock);
+      let systemPrompt = buildMissionControlSystemPrompt(effectiveMode, effectiveContextStack, reconContext, module, swipeFeedbackConv, capabilityBlock, navigationContext);
       if (moduleContext) {
         systemPrompt += `\n\n━━━ CURRENT PAGE CONTEXT (module: ${module}) ━━━\n${JSON.stringify(moduleContext, null, 2)}\nUse this as live context for the user's current view — prioritise it over generic contact lists above.`;
       }

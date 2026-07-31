@@ -276,7 +276,18 @@ function PipelineMoveRow({ move, onExecute }) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextReady = false, T = DEFAULT_TOKENS, onOrientationChange = null }) {
+export default function BarryChatPanel({
+  userId,
+  kpiContext = {},
+  kpiContextReady = false,
+  T = DEFAULT_TOKENS,
+  onOrientationChange = null,
+  // Phase 7 navigation context contract, supplied by the shell. Tells Barry
+  // where the user is, what they have open and what they are doing, so his
+  // expertise follows them across modules WITHOUT starting a new thread.
+  // Shape: src/context/ShellContext.jsx → navigationContext.
+  navigationContext = null,
+}) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('SUGGEST');
@@ -432,7 +443,7 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
       const res = await fetch('/.netlify/functions/barryOrientationBrief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, authToken, context: kpiContext }),
+        body: JSON.stringify({ userId, authToken, context: kpiContext, navigationContext }),
       });
 
       const data = await res.json();
@@ -880,7 +891,10 @@ export default function BarryChatPanel({ userId, kpiContext = {}, kpiContextRead
           message: userMessage,
           conversationHistory,
           barryMode: mode,
-          contextStack
+          contextStack,
+          // Where the user is standing when they ask. Sent with every message
+          // so Barry's answer tracks the screen, not just the conversation.
+          navigationContext
         })
       });
 

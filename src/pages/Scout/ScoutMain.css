@@ -14,3 +14,257 @@
   background: var(--bg-card);
   min-height: 100%;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SHELL MIGRATION — Scout as module content
+
+   Scout no longer renders global chrome. The shell owns the sidebar, top bar,
+   Barry and account controls; everything below changes the working view
+   inside Scout.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.scout-module {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Module navigation — horizontal, at the top of the content boundary, so the
+   shell's sidebar (which module am I in) and this strip (which view am I in)
+   are both readable without competing for the same screen edge. */
+.scout-views {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.625rem 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+}
+
+.scout-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: -1px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.scout-view-tab:hover { color: var(--text-primary); }
+
+.scout-view-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent, #f97316);
+  font-weight: 650;
+}
+
+.scout-view-tab:focus-visible {
+  outline: 2px solid var(--accent, #f97316);
+  outline-offset: -2px;
+  border-radius: 0.25rem;
+}
+
+/* Workspace — the list, plus an optional contact panel beside it */
+.scout-workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scout-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* Split view at comfortable desktop widths: the list stays visible and in
+   place, so closing the panel is a genuine return, not a re-navigation. */
+.scout-contact-panel {
+  width: min(560px, 46%);
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-card);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: scout-panel-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scout-panel-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scout-contact-panel { animation: none; }
+}
+
+.scout-contact-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.scout-contact-panel-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.scout-contact-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3125rem 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.4375rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scout-contact-panel-btn:hover { color: var(--text-primary); }
+.scout-contact-panel-btn.primary {
+  background: var(--accent, #f97316);
+  border-color: var(--accent, #f97316);
+  color: #fff;
+}
+
+.scout-contact-panel-body { flex: 1; min-height: 0; }
+
+/* Narrow desktop: below ~1100px a side-by-side split leaves neither column
+   usable, so the panel takes the full workspace and the list is hidden rather
+   than crushed. The list is still MOUNTED — closing the panel restores its
+   scroll position and filters with nothing rebuilt. */
+@media (max-width: 1100px) {
+  .scout-workspace.with-panel .scout-list { display: none; }
+  .scout-contact-panel { width: 100%; border-left: none; }
+}
+
+/* ── Mobile — preserved pre-migration layout (Phase 0 constraint C3) ── */
+.scout-mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.scout-mobile-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid;
+  flex-shrink: 0;
+}
+
+.scout-mobile-home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.scout-mobile-home img { width: 100%; height: 100%; object-fit: contain; }
+
+.scout-mobile-modules {
+  flex: 1;
+  display: flex;
+  gap: 0.1875rem;
+  overflow-x: auto;
+}
+
+.scout-mobile-module {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1875rem;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem 0.625rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.5625rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scout-mobile-module.active {
+  border-color: var(--accent, #f97316);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.scout-mobile-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.scout-mobile-bottomnav {
+  display: flex;
+  flex-shrink: 0;
+  border-top: 1px solid;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.scout-mobile-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1875rem;
+  min-height: 56px;
+  padding: 0.625rem 0.25rem;
+  background: transparent;
+  border: none;
+  font-size: 0.625rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scout-mobile-tab.active { font-weight: 600; }

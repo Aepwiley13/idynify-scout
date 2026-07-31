@@ -1,0 +1,293 @@
+/* Quick Engage — contextual drawer over the current screen.
+   Right-hand side, narrower than the Barry panel, and below it in the stack:
+   Barry can be consulted while composing without either one hiding the other. */
+
+.quick-engage-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  animation: qe-fade 0.18s ease;
+}
+
+.quick-engage-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 810;
+  width: min(440px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.4);
+  animation: qe-slide 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes qe-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes qe-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-engage-backdrop,
+  .quick-engage-drawer { animation: none; }
+}
+
+/* ── Header ── */
+.quick-engage-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.125rem 1.125rem 0.875rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.quick-engage-heading { flex: 1; min-width: 0; }
+
+.quick-engage-eyebrow {
+  margin: 0 0 0.1875rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+.quick-engage-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-engage-subtitle {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-engage-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.quick-engage-close:hover { color: var(--text-primary); }
+
+/* ── Channels ── */
+.quick-engage-channels {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.75rem 1.125rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.quick-engage-channel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.quick-engage-channel:hover:not(:disabled) { background: var(--bg-secondary); }
+
+.quick-engage-channel.selected {
+  background: var(--bg-secondary);
+  border-color: var(--accent, #f97316);
+  color: var(--text-primary);
+}
+
+.quick-engage-channel:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Body ── */
+.quick-engage-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.quick-engage-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4375rem;
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.quick-engage-notice.warn {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #b45309;
+}
+
+.quick-engage-notice svg { flex-shrink: 0; margin-top: 1px; }
+
+.quick-engage-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+}
+
+.quick-engage-field.grow { flex: 1; }
+
+.quick-engage-field > span {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.quick-engage-field input,
+.quick-engage-field textarea {
+  width: 100%;
+  padding: 0.5625rem 0.6875rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.quick-engage-field input:focus,
+.quick-engage-field textarea:focus {
+  outline: 2px solid var(--accent, #f97316);
+  outline-offset: -1px;
+}
+
+.quick-engage-field input:disabled,
+.quick-engage-field textarea:disabled { opacity: 0.6; }
+
+.quick-engage-fullview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.quick-engage-fullview:hover { color: var(--text-primary); }
+
+/* ── Footer ── */
+.quick-engage-footer {
+  flex-shrink: 0;
+  padding: 0.875rem 1.125rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.quick-engage-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4375rem;
+  margin: 0 0 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.quick-engage-status svg { flex-shrink: 0; margin-top: 1px; }
+.quick-engage-status.ok { color: #16a34a; }
+.quick-engage-status.failed { color: #dc2626; }
+
+.quick-engage-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.quick-engage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  max-width: 100%;
+}
+
+.quick-engage-btn.ghost:hover { color: var(--text-primary); }
+
+.quick-engage-btn.primary {
+  background: var(--accent, #f97316);
+  border-color: var(--accent, #f97316);
+  color: #fff;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.quick-engage-btn.primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* The contact's name on the button keeps the target unambiguous, but must not
+   push the button past the drawer at long names. */
+.quick-engage-btn-target {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spin { animation: qe-spin 0.9s linear infinite; }
+@keyframes qe-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+@media (max-width: 640px) {
+  .quick-engage-drawer { width: 100vw; }
+  .quick-engage-btn-target { display: none; }
+}

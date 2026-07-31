@@ -44,6 +44,8 @@ import { BRAND } from '../../theme/tokens';
 import { archivePerson } from '../../services/peopleService';
 import './ContactProfile.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { useShell } from '../../context/ShellContext';
+import { MODULES } from '../../constants/navigationModel';
 
 // Stage peek card — shown in Action column when user previews a non-active stage.
 // Defined at module scope to avoid React remount on every render.
@@ -96,6 +98,10 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
   const navigate = useNavigate();
   const location = useLocation();
   const T = useT();
+  // Safe outside the shell too — useShell() returns a no-op object for routes
+  // that have not been migrated yet, so the embedded panel usages in AllLeads,
+  // CompanyProfileView and MissionControl keep working unchanged.
+  const shell = useShell();
   const isPanelMode = !!onClose;
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -581,6 +587,49 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
     setEnrichmentSummary(null);
   }
 
+  /**
+   * A contact changed pipeline stage.
+   *
+   * This is the moment the navigation audit called the worst in the product:
+   * the old handler did exactly one thing — set local state — so the user
+   * performed the highest-value action available to them and the application
+   * said nothing. Same URL, same header, and a back button still pointing at
+   * the stage they had just left.
+   *
+   * Now the shell states what happened, offers the destination, and offers a
+   * way back. Barry is told too: the contract's current_pipeline_stage updates
+   * because the entity's stage changed, so his next answer is about a contact
+   * in the new stage without the thread restarting.
+   */
+  function handleStageMoved({ stageTo }) {
+    const stageFrom = contact?.stage || 'scout';
+    setContact(prev => ({ ...prev, stage: stageTo, stage_source: 'manual_override' }));
+
+    const destination = MODULES.find(m => m.id === stageTo);
+    const who = contact?.name
+      || [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim()
+      || 'Contact';
+
+    shell.announce({
+      message: `${who} moved to ${destination?.label || stageTo}.`,
+      detail: destination?.description || null,
+      actionLabel: destination ? `Open ${destination.label}` : null,
+      actionPath: destination?.path || null,
+      // Undo restores the previous stage rather than assuming Scout: this
+      // handler fires for every stage transition, not just Scout → Hunter.
+      undo: async () => {
+        const user = getEffectiveUser();
+        if (!user) return;
+        await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
+          stage: stageFrom,
+          stage_source: 'manual_override',
+          stage_entered_at: new Date().toISOString(),
+        });
+        setContact(prev => ({ ...prev, stage: stageFrom }));
+      },
+    });
+  }
+
   async function handleArchiveContact() {
     try {
       setArchiving(true);
@@ -831,9 +880,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
                 ) : (
                   <StageEngagementPanel
                     contact={contact}
-                    onMoved={({ stageTo }) =>
-                      setContact(prev => ({ ...prev, stage: stageTo, stage_source: 'manual_override' }))
-                    }
+                    onMoved={handleStageMoved}
                   />
                 )}
                 <BarryInsightPanel

@@ -61,6 +61,10 @@ function HunterProbe() {
   return <div data-testid="page">hunter</div>;
 }
 
+function SniperProbe() {
+  return <div data-testid="page">sniper</div>;
+}
+
 function ScoutProbe() {
   return (
     <div>
@@ -98,6 +102,7 @@ function renderShell(initialPath = '/mission-control-v2', ContactPanel = Contact
               <Route path="contact/:contactId" element={<ContactPanel />} />
             </Route>
             <Route path="/hunter" element={<HunterProbe />} />
+            <Route path="/sniper" element={<SniperProbe />} />
           </Route>
         </Routes>
       </ShellProvider>
@@ -135,13 +140,31 @@ describe('shell persistence across the Phase 8 journey', () => {
     await act(async () => { navigateTo('/hunter'); });
     expect(screen.getByTestId('page')).toHaveTextContent('hunter');
 
-    // Hunter → Mission Control
+    // Hunter → Sniper. The rest of the pipeline, same shell.
+    await act(async () => { navigateTo('/sniper'); });
+    expect(screen.getByTestId('page')).toHaveTextContent('sniper');
+
+    // Sniper → Mission Control
     await act(async () => { navigateTo('/mission-control-v2'); });
     expect(screen.getByTestId('page')).toHaveTextContent('mission-control');
 
-    // Five transitions, still one shell. Pre-migration this would be 6.
+    // Six transitions, still one shell. Pre-migration this would be 7.
     expect(shellMountCount).toBe(1);
     expect(screen.getByTestId('shell-chrome')).toBeInTheDocument();
+  });
+
+  it('walks the whole pipeline — Scout → Hunter → Sniper — on one shell', async () => {
+    renderShell('/scout?tab=all-leads');
+    expect(shellMountCount).toBe(1);
+
+    await act(async () => { navigateTo('/hunter'); });
+    expect(latestContext.current_module).toBe('hunter');
+
+    await act(async () => { navigateTo('/sniper'); });
+    expect(latestContext.current_module).toBe('sniper');
+    expect(latestContext.source_route).toBe('/hunter');
+
+    expect(shellMountCount).toBe(1);
   });
 
   it('crosses Scout → Hunter without remounting the shell', async () => {

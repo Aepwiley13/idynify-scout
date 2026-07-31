@@ -31,7 +31,6 @@ import { useNavigate, useSearchParams, Outlet, useParams } from 'react-router-do
 import {
   Users, Building2, Zap, Plus, Settings, RefreshCw, TrendingUp, Gamepad2,
   Radar, Crosshair, Target, Tent, Shield, Eye, Archive,
-  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
@@ -43,6 +42,7 @@ import CompanyProfileView from './CompanyProfileView';
 import ScoutPlus from './ScoutPlus';
 import ICPSettings from './ICPSettings';
 import CadencesList from './CadencesList';
+import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import './ScoutMain.css';
 
 /**
@@ -123,16 +123,6 @@ function ScoutShellInner() {
 
   const [drillCompanyId, setDrillCompanyId] = useState(null);
 
-  // Collapse state persists per module, same key and same semantics the other
-  // modules already use — so collapsing Scout's panel does not collapse
-  // Hunter's, and each remembers what the user chose.
-  const [subNavOpen, setSubNavOpen] = useState(
-    () => localStorage.getItem('scout_subnav_collapsed') !== 'true'
-  );
-
-  useEffect(() => {
-    localStorage.setItem('scout_subnav_collapsed', subNavOpen ? 'false' : 'true');
-  }, [subNavOpen]);
 
   // Active view follows the URL when the URL says anything, and holds its
   // last value when it does not.
@@ -275,61 +265,14 @@ function ScoutShellInner() {
   // description, collapse state remembered per module.
   return (
     <div className="scout-module">
-      <aside
-        className={`module-subnav ${subNavOpen ? '' : 'collapsed'}`}
-        aria-label="Scout sections"
-      >
-        <div className="module-subnav-inner">
-          <div className="module-subnav-header">
-            <div className="module-subnav-heading">
-              <div className="module-subnav-title">SCOUT</div>
-              <div className="module-subnav-tagline">Find and qualify prospects</div>
-            </div>
-            <button
-              type="button"
-              className="module-subnav-toggle"
-              onClick={() => setSubNavOpen(false)}
-              aria-label="Collapse Scout sections"
-              title="Collapse"
-            >
-              <ChevronLeft size={12} aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className="module-subnav-items">
-            {SCOUT_VIEWS.map(view => {
-              const active = !view.route && activeView === view.id;
-              return (
-                <button
-                  key={view.id}
-                  type="button"
-                  className={`module-subnav-item ${active ? 'active' : ''}`}
-                  onClick={() => switchView(view.id)}
-                  aria-current={active ? 'true' : undefined}
-                >
-                  <view.Icon size={13} aria-hidden="true" />
-                  <span className="module-subnav-item-text">
-                    <span className="module-subnav-item-label">{view.label}</span>
-                    <span className="module-subnav-item-desc">{view.desc}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </aside>
-
-      {!subNavOpen && (
-        <button
-          type="button"
-          className="module-subnav-expand"
-          onClick={() => setSubNavOpen(true)}
-          aria-label="Expand Scout sections"
-          title="Expand"
-        >
-          <ChevronRight size={12} aria-hidden="true" />
-        </button>
-      )}
+      <ModuleSubNav
+        title="SCOUT"
+        tagline="Find and qualify prospects"
+        items={SCOUT_VIEWS}
+        activeId={activeView}
+        onSelect={switchView}
+        storageKey="scout_subnav_collapsed"
+      />
 
       <div className={`scout-workspace ${contactPanelOpen ? 'with-panel' : ''}`}>
         <div className="scout-list">

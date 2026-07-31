@@ -1,17 +1,17 @@
 /**
- * Layer 1 — the wide sidebar, rendered for real.
+ * Layer 1 — the sidebar, rendered for real.
  *
- * Asserts the final navigation brief: 220px, always visible, never collapses,
- * full text module names, active module as a filled violet pill, Barry as a
- * card at the bottom rather than a nav item, and the exact module order —
- * including Command Center, which was missing.
+ * Wide by default: 220px, full text module names, active module as a filled
+ * violet pill, Barry as a card at the bottom, and the exact module order
+ * including Command Center. Compact mode is 64px with icon + short label.
  *
  * The "what the sidebar does NOT have" list is tested as hard as the positive
  * spec, because every one of those items has been in this component at some
- * point during the navigation sprints.
+ * point across these navigation sprints — group headers, subtitles and the
+ * theme toggle each shipped once and were each removed by a later brief.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -23,6 +23,8 @@ vi.mock('../firebase/config', () => ({
   auth: { currentUser: { email: 'aaron@idynify.com' }, onAuthStateChanged: () => () => {} },
   db: {},
 }));
+
+beforeEach(() => { localStorage.clear(); });
 
 function renderSidebar(path = '/mission-control-v2', props = {}) {
   return render(
@@ -135,8 +137,14 @@ describe('wide sidebar — Barry card', () => {
 
     const card = screen.getByRole('button', { name: /open barry/i });
     expect(within(card).getByText('Barry')).toBeInTheDocument();
-    expect(within(card).getByText('AI SDR')).toBeInTheDocument();
-    expect(within(card).getByText('Online')).toBeInTheDocument();
+  });
+
+  it('shows only the name and the chevron — no role label, no status', () => {
+    renderSidebar('/scout');
+    const card = screen.getByRole('button', { name: /open barry/i });
+
+    expect(within(card).queryByText('AI SDR')).toBeNull();
+    expect(within(card).queryByText('Online')).toBeNull();
   });
 
   it('opens the Barry overlay rather than navigating', async () => {
@@ -173,15 +181,72 @@ describe('wide sidebar — what it must NOT have', () => {
     }
   });
 
-  it('has no collapse or expand control', () => {
-    renderSidebar();
-    expect(screen.queryByRole('button', { name: /collapse sidebar/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /expand sidebar/i })).toBeNull();
-  });
-
   it('has no theme toggle — Settings owns Themes', () => {
     renderSidebar();
     expect(screen.queryByRole('button', { name: /theme/i })).toBeNull();
     expect(screen.queryByText(/appearance/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('sidebar toggle — wide ↔ compact', () => {
+  it('defaults to wide', () => {
+    const { container } = renderSidebar();
+    expect(container.querySelector('.sidebar.wide')).not.toBeNull();
+    expect(container.querySelector('.sidebar.compact')).toBeNull();
+  });
+
+  it('collapses to compact and expands back', async () => {
+    const user = userEvent.setup();
+    const { container } = renderSidebar();
+
+    await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+    expect(container.querySelector('.sidebar.compact')).not.toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /expand sidebar/i }));
+    expect(container.querySelector('.sidebar.wide')).not.toBeNull();
+  });
+
+  it('shows short labels in compact but keeps the full accessible name', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/scout');
+
+    await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+
+    // Visible label shortens...
+    expect(screen.getByText('MC')).toBeInTheDocument();
+    // ...while the name screen readers and tests use does not, so "MC" is
+    // never the only name on offer.
+    expect(screen.getByRole('button', { name: 'Mission Control' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Command Center' })).toBeInTheDocument();
+  });
+
+  it('keeps the active module marked in compact', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/scout');
+
+    await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+    expect(screen.getByRole('button', { name: 'Scout' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('drops Barry to an icon in compact', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/scout');
+
+    await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+
+    const card = screen.getByRole('button', { name: /open barry/i });
+    expect(card).toBeInTheDocument();
+    expect(within(card).queryByText('Barry')).toBeNull();
+  });
+
+  it('remembers the mode across a remount', async () => {
+    const user = userEvent.setup();
+    const first = renderSidebar();
+
+    await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+    first.unmount();
+
+    const second = renderSidebar();
+    expect(second.container.querySelector('.sidebar.compact')).not.toBeNull();
   });
 });

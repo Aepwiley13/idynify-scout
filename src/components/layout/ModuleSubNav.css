@@ -1,0 +1,266 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   LAYER 2 — MODULE SUB-NAV PANEL
+
+   Lifted out of ScoutMain.css unchanged. Scout's panel is the approved
+   reference style, so rather than asking each migrating module to match it by
+   eye, they render the same component and inherit these rules.
+
+   The parent must be `position: relative` — the expand affordance is pinned
+   to the content edge while the panel is collapsed.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.module-subnav {
+  width: 190px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.module-subnav.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+/* Fixed inner width so the contents do not reflow while the panel animates. */
+.module-subnav-inner {
+  width: 190px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.module-subnav-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 13px 9px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.module-subnav-heading { min-width: 0; }
+
+.module-subnav-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--accent, #f97316);
+  margin-bottom: 1px;
+}
+
+.module-subnav-tagline {
+  font-size: 9px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-subnav-toggle {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.module-subnav-toggle:hover { color: var(--text-primary); }
+
+.module-subnav-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 7px;
+}
+
+.module-subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  margin-bottom: 1px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.module-subnav-item:hover { background: var(--bg-secondary); }
+
+.module-subnav-item.active {
+  background: var(--bg-secondary);
+  border-left-color: var(--accent, #f97316);
+  color: var(--accent, #f97316);
+}
+
+.module-subnav-item:focus-visible {
+  outline: 2px solid var(--accent, #f97316);
+  outline-offset: -2px;
+}
+
+.module-subnav-item > svg { flex-shrink: 0; }
+
+.module-subnav-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.module-subnav-item-label {
+  font-size: 12px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-subnav-item.active .module-subnav-item-label { font-weight: 600; }
+
+.module-subnav-item-desc {
+  font-size: 9px;
+  margin-top: 1px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Expand affordance, shown only while the panel is collapsed. Pinned to the
+   content edge exactly as the existing modules do it. */
+.module-subnav-expand {
+  position: absolute;
+  left: 0;
+  top: 13px;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.module-subnav-expand:hover { color: var(--text-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .module-subnav { transition: none; }
+}
+
+/* Workspace — the list, plus an optional contact panel beside it */
+.scout-workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scout-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* Split view at comfortable desktop widths: the list stays visible and in
+   place, so closing the panel is a genuine return, not a re-navigation. */
+.scout-contact-panel {
+  width: min(560px, 46%);
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-card);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: scout-panel-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scout-panel-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scout-contact-panel { animation: none; }
+}
+
+.scout-contact-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.scout-contact-panel-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.scout-contact-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3125rem 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.4375rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scout-contact-panel-btn:hover { color: var(--text-primary); }
+.scout-contact-panel-btn.primary {
+  background: var(--accent, #f97316);
+  border-color: var(--accent, #f97316);
+  color: #fff;
+}
+
+.scout-contact-panel-body { flex: 1; min-height: 0; }
+
+/* Narrow desktop: below ~1100px a side-by-side split leaves neither column
+   usable, so the panel takes the full workspace and the list is hidden rather
+   than crushed. The list is still MOUNTED — closing the panel restores its
+   scroll position and filters with nothing rebuilt. */
+@media (max-width: 1100px) {
+  .scout-workspace.with-panel .scout-list { display: none; }
+  .scout-contact-panel { width: 100%; border-left: none; }
+}
+

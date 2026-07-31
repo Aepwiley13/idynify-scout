@@ -2,33 +2,37 @@
  * Sidebar — Layer 1 of the three-layer navigation.
  *
  *   [Layer 1]        [Layer 2]            [Layer 3]
- *   Wide sidebar  →  Module sub-nav   →   Content
- *   220px, fixed     190px, collapsible   fills the rest
+ *   Sidebar       →  Module sub-nav   →   Content
+ *   220px / 64px     190px, collapsible   fills the rest
  *
- * Always visible on every authenticated desktop route. Never collapses, never
- * changes width, no icon-only state, no hover-to-expand.
+ * Two modes, toggled by the chevron on the sidebar's right edge and
+ * remembered across navigation and reload:
  *
- * Structure:
- *   IDYNIFY wordmark  → Mission Control
- *   Module list       → full text labels, active item as a filled violet pill
- *   Barry card        → pinned to the bottom, opens the Barry overlay
+ *   wide (default)  220px · IDYNIFY wordmark · full module names · Barry card
+ *   compact          64px · ID mark · icon + short label · Barry icon
  *
- * Things this sidebar deliberately does NOT have, per the final brief:
+ * The mode lives in ShellContext rather than here, because the content area is
+ * offset by a margin that has to match the sidebar's width — one owner means
+ * the two can never disagree.
+ *
+ * The toggle is independent of Layer 2: collapsing the sidebar does not touch
+ * the module sub-nav panel, and vice versa.
+ *
+ * Things this sidebar deliberately does NOT have:
  *   · group headers (PIPELINE / RELATIONSHIPS / INTELLIGENCE)
  *   · descriptive subtitles under module names
  *   · a theme toggle — Settings already owns a Themes section
- *   · Barry as a plain nav item — he lives in the card at the bottom only
- *   · a collapse control
+ *   · Barry as a plain nav item — he is the card / icon at the bottom only
  *
- * Order comes from SIDEBAR_ORDER in constants/navigationModel.js, which is the
- * single source of truth for what exists and what it is called.
+ * Order comes from SIDEBAR_ORDER in constants/navigationModel.js, the single
+ * source of truth for what exists and what it is called.
  */
 
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Radar, Crosshair, Target, Tent, Shield, Archive, Eye, Users,
-  ChevronRight,
+  ChevronRight, ChevronLeft,
 } from 'lucide-react';
 import {
   MISSION_CONTROL,
@@ -53,26 +57,33 @@ const MODULE_ICONS = {
 };
 
 /**
- * The IDYNIFY wordmark.
+ * Brand mark — full wordmark in wide mode, square mark in compact.
  *
- * Renders the brand asset when it loads, and a styled text wordmark when it
- * does not. The fallback is not decoration: /assets/Idynify_logo1.png is not
- * in this repository (nor are the barry avatar or short mark), so without it
- * the top of the sidebar is blank in any environment where the assets are not
- * deployed — which is every environment this code has been run in so far.
+ * Both fall back rather than rendering nothing. /assets/Idynify_logo1.png,
+ * Short_Logo_Idynify.png and barry_AI.jpg are not in this repository, so
+ * without fallbacks the top of the sidebar is blank in any environment where
+ * the assets are not deployed. Flagged for Aaron — a CSS wordmark is a
+ * safety net, not the shipping brand asset.
  */
-function Wordmark() {
+function BrandMark({ compact }) {
   const [failed, setFailed] = useState(false);
 
-  if (failed) {
-    return (
-      <span className="sidebar-wordmark-text" aria-hidden="true">
-        IDYNIFY
-      </span>
+  if (compact) {
+    return failed ? (
+      <span className="sidebar-mark-fallback" aria-hidden="true">ID</span>
+    ) : (
+      <img
+        className="sidebar-mark-img"
+        src={ASSETS.logoMark}
+        alt=""
+        onError={() => setFailed(true)}
+      />
     );
   }
 
-  return (
+  return failed ? (
+    <span className="sidebar-wordmark-text" aria-hidden="true">IDYNIFY</span>
+  ) : (
     <img
       className="sidebar-wordmark-img"
       src={ASSETS.logoFull}
@@ -83,39 +94,35 @@ function Wordmark() {
 }
 
 /**
- * Barry's card. Barry is a persistent overlay, never a destination — the card
- * opens him, it does not navigate anywhere.
+ * Barry. A card in wide mode, an icon in compact. Never a nav item — he is a
+ * persistent overlay, so this opens him rather than navigating anywhere.
  */
-function BarryCard({ onOpen, barryOpen, buttonRef }) {
+function BarryControl({ compact, onOpen, barryOpen, buttonRef }) {
   const [avatarFailed, setAvatarFailed] = useState(false);
+
+  const avatar = avatarFailed ? (
+    <span className="barry-avatar-fallback" aria-hidden="true">🐻</span>
+  ) : (
+    <img src={ASSETS.barryAvatar} alt="" onError={() => setAvatarFailed(true)} />
+  );
 
   return (
     <button
       type="button"
       ref={buttonRef}
-      className={`barry-card ${barryOpen ? 'open' : ''}`}
+      className={`barry-card ${compact ? 'compact' : ''} ${barryOpen ? 'open' : ''}`}
       onClick={onOpen}
       aria-label="Open Barry"
       aria-expanded={barryOpen}
+      title={compact ? 'Barry' : undefined}
     >
-      <span className="barry-card-avatar">
-        {avatarFailed ? (
-          <span className="barry-card-avatar-fallback" aria-hidden="true">🐻</span>
-        ) : (
-          <img src={ASSETS.barryAvatar} alt="" onError={() => setAvatarFailed(true)} />
-        )}
-      </span>
-
-      <span className="barry-card-body">
-        <span className="barry-card-name">Barry</span>
-        <span className="barry-card-role">AI SDR</span>
-        <span className="barry-card-status">
-          <span className="barry-card-dot" aria-hidden="true" />
-          Online
-        </span>
-      </span>
-
-      <ChevronRight size={16} className="barry-card-chevron" aria-hidden="true" />
+      <span className="barry-card-avatar">{avatar}</span>
+      {!compact && (
+        <>
+          <span className="barry-card-name">Barry</span>
+          <ChevronRight size={16} className="barry-card-chevron" aria-hidden="true" />
+        </>
+      )}
     </button>
   );
 }
@@ -129,7 +136,9 @@ const Sidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { openBarry } = useShell();
+  const { openBarry, sidebarMode, toggleSidebar } = useShell();
+
+  const compact = sidebarMode === 'compact';
 
   // Longest-prefix resolution keeps Scout lit on /scout/contact/:id — the
   // active module must stay obvious on nested routes, not just module hubs.
@@ -141,14 +150,28 @@ const Sidebar = ({
   };
 
   return (
-    <div className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+    <div className={`sidebar ${compact ? 'compact' : 'wide'} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
       <button
         type="button"
-        className="sidebar-wordmark"
+        className="sidebar-brand"
         onClick={() => go(MISSION_CONTROL.path)}
         aria-label={`Idynify — go to ${MISSION_CONTROL.label}`}
       >
-        <Wordmark />
+        <BrandMark compact={compact} />
+      </button>
+
+      {/* Right-edge toggle, near the top. Independent of the sub-nav panel. */}
+      <button
+        type="button"
+        className="sidebar-toggle"
+        onClick={toggleSidebar}
+        aria-label={compact ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!compact}
+        title={compact ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {compact
+          ? <ChevronRight size={12} aria-hidden="true" />
+          : <ChevronLeft size={12} aria-hidden="true" />}
       </button>
 
       <nav className="sidebar-nav" aria-label="Global navigation">
@@ -163,9 +186,16 @@ const Sidebar = ({
                   className={`sidebar-module ${active ? 'active' : ''}`}
                   onClick={() => go(dest.path)}
                   aria-current={active ? 'page' : undefined}
+                  aria-label={dest.label}
+                  title={compact ? dest.label : undefined}
                 >
                   <Icon size={17} strokeWidth={active ? 2.2 : 1.9} aria-hidden="true" />
-                  <span className="sidebar-module-label">{dest.label}</span>
+                  <span className="sidebar-module-label" aria-hidden={compact ? 'true' : undefined}>
+                    {/* Compact shows the short rail label; the accessible name
+                        stays the full locked label either way, so "MC" is
+                        never the only name on offer. */}
+                    {compact ? (dest.railLabel || dest.label) : dest.label}
+                  </span>
                 </button>
               </li>
             );
@@ -174,7 +204,8 @@ const Sidebar = ({
       </nav>
 
       <div className="sidebar-footer">
-        <BarryCard
+        <BarryControl
+          compact={compact}
           buttonRef={barryButtonRef}
           barryOpen={barryOpen}
           onOpen={() => (onToggleBarry ? onToggleBarry() : openBarry())}

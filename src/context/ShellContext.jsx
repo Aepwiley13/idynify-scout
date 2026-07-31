@@ -70,7 +70,27 @@ const FALLBACK_SHELL = {
   quickEngage: null,
   openQuickEngage: () => {},
   closeQuickEngage: () => {},
+  sidebarMode: 'wide',
+  toggleSidebar: () => {},
 };
+
+/**
+ * Sidebar mode is shell state, not sidebar state.
+ *
+ * The sidebar is position:fixed, so the content area is offset by margin —
+ * which means MainLayout has to know the width too. Keeping the mode in one
+ * place stops the sidebar and the content boundary from ever disagreeing
+ * about how wide the sidebar currently is.
+ */
+const SIDEBAR_MODE_KEY = 'idynify_sidebar_mode';
+
+function readSidebarMode() {
+  try {
+    return localStorage.getItem(SIDEBAR_MODE_KEY) === 'compact' ? 'compact' : 'wide';
+  } catch {
+    return 'wide'; // private mode / storage disabled — wide is the default
+  }
+}
 
 export function ShellProvider({ children, user, userData }) {
   const location = useLocation();
@@ -98,6 +118,18 @@ export function ShellProvider({ children, user, userData }) {
 
   // Quick Engage drawer — shell-owned, see openQuickEngage below.
   const [quickEngage, setQuickEngage] = useState(null);
+
+  // Wide (220px) or compact (64px). Persisted, so it survives navigation and
+  // reload — a layout preference the user set should not reset on them.
+  const [sidebarMode, setSidebarMode] = useState(readSidebarMode);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarMode(prev => {
+      const next = prev === 'wide' ? 'compact' : 'wide';
+      try { localStorage.setItem(SIDEBAR_MODE_KEY, next); } catch { /* storage disabled */ }
+      return next;
+    });
+  }, []);
 
   // ── Route bookkeeping ───────────────────────────────────────────────────
   // Done DURING RENDER, not in an effect. This is React's documented
@@ -287,12 +319,15 @@ export function ShellProvider({ children, user, userData }) {
     quickEngage,
     openQuickEngage,
     closeQuickEngage,
+    sidebarMode,
+    toggleSidebar,
   }), [
     barryOpen, openBarry, closeBarry, toggleBarry,
     orientation, barryPageContext,
     navigationContext, setEntityContext, clearEntityContext,
     announce, announcements, dismissAnnouncement,
     quickEngage, openQuickEngage, closeQuickEngage,
+    sidebarMode, toggleSidebar,
   ]);
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;

@@ -446,6 +446,15 @@ function App() {
             <Route path="/scout/cadences" element={<CadencesList />} />
             <Route path="/scout/cadence/:cadenceId" element={<CadenceDetail />} />
             <Route path="/scout/game" element={<ScoutGame />} />
+
+            {/* Hunter — migrated into the shell. /hunter/blitz stays outside
+                it on purpose: a timed focus mode with its own header and its
+                own way back, where chrome would defeat the point. */}
+            <Route path="/hunter" element={<HunterMain />} />
+            <Route path="/hunter/create-mission" element={<CreateMission />} />
+            <Route path="/hunter/mission/:missionId" element={<MissionDetail />} />
+            <Route path="/hunter/campaign/new" element={<CreateCampaign />} />
+            <Route path="/hunter/campaign/:campaignId" element={<CampaignDetail />} />
           </Route>
         ) : (
           <>
@@ -485,6 +494,23 @@ function App() {
             <Route
               path="/scout/game"
               element={<ProtectedRoute withLayout={true}><ScoutGame /></ProtectedRoute>}
+            />
+            <Route path="/hunter" element={<ProtectedRoute withLayout={true}><HunterMain /></ProtectedRoute>} />
+            <Route
+              path="/hunter/create-mission"
+              element={<ProtectedRoute withLayout={true}><CreateMission /></ProtectedRoute>}
+            />
+            <Route
+              path="/hunter/mission/:missionId"
+              element={<ProtectedRoute withLayout={true}><MissionDetail /></ProtectedRoute>}
+            />
+            <Route
+              path="/hunter/campaign/new"
+              element={<ProtectedRoute withLayout={true}><CreateCampaign /></ProtectedRoute>}
+            />
+            <Route
+              path="/hunter/campaign/:campaignId"
+              element={<ProtectedRoute withLayout={true}><CampaignDetail /></ProtectedRoute>}
             />
           </>
         )}
@@ -589,16 +615,6 @@ function App() {
           }
         />
 
-        {/* Hunter Module — self-contained two-column shell (no MainLayout) */}
-        <Route
-          path="/hunter"
-          element={
-            <ProtectedRoute>
-              <HunterMain />
-            </ProtectedRoute>
-          }
-        />
-
         {/* Blitz Mode — rapid engagement queue (no MainLayout) */}
         <Route
           path="/hunter/blitz"
@@ -615,38 +631,6 @@ function App() {
           element={
             <ProtectedRoute>
               <SniperMain />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/hunter/create-mission"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CreateMission />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/hunter/mission/:missionId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <MissionDetail />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/hunter/campaign/new"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CreateCampaign />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/hunter/campaign/:campaignId"
-          element={
-            <ProtectedRoute withLayout={true}>
-              <CampaignDetail />
             </ProtectedRoute>
           }
         />

@@ -38,6 +38,9 @@
 [functions."process-scheduled-engagements"]
   timeout = 900
 
+[functions."process-barry-inbox-queue"]
+  timeout = 300
+
 [functions."adminGetUsers"]
   timeout = 26
 

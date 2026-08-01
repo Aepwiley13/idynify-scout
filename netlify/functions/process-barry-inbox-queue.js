@@ -125,7 +125,7 @@ export const handler = async (event) => {
           .collection('contacts').doc(contactId)
           .collection('relationship_context').doc(idynifyUserId);
 
-        await contextRef.update({
+        await contextRef.set({
           openQuestions: analysis.questionsAsked,
           openCommitments: analysis.commitmentsMade,
           objections: analysis.objections,
@@ -138,7 +138,7 @@ export const handler = async (event) => {
           lastAnalyzedAt: FieldValue.serverTimestamp(),
           lastUpdatedAt: FieldValue.serverTimestamp(),
           contextVersion: '2.0.0',
-        });
+        }, { merge: true });
 
         // ── Step 5: Run draft composer ────────────────────────────────
         const draft = await composeDraftReply(db, { analysis, messageRecordId, contactId, idynifyUserId });

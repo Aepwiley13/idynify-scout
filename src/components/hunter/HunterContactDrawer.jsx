@@ -26,6 +26,8 @@ import { generateContactRecommendations, dismissRecommendation } from '../../uti
 import BarryRecommendationCard from './BarryRecommendationCard';
 import BarryWarningCard from './BarryWarningCard';
 import BarryInsightsCard from './BarryInsightsCard';
+import BarryReplyCard from './BarryReplyCard';
+import { fetchPendingDraftForContact } from '../../hooks/usePendingReplies';
 import SequencePanel from './SequencePanel';
 import LearningToast from '../LearningToast';
 import { EmailDraftCard } from '../shared/EmailDraftCard';
@@ -122,6 +124,54 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   const [replyThread, setReplyThread] = useState(null);   // [{ id, from, to, subject, body, date, isInbound }]
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState(null);
+
+  // Sprint 3: Barry inbox reply — draft waiting on the user for this contact
+  const [pendingDraft, setPendingDraft] = useState(null);  // { draft, analysis }
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftError, setDraftError] = useState(null);
+  const [draftReloadToken, setDraftReloadToken] = useState(0);  // bumped by Retry
+
+  // Sprint 3: resolve the pending Barry draft for the open contact only.
+  // Deliberately not usePendingReplies() — that sweeps every contact, and the
+  // drawer only needs this one (two reads instead of two per contact).
+  useEffect(() => {
+    setDraftError(null);
+
+    // The drawer stays mounted while closed (the isOpen guard is a render-time
+    // return), so gate on isOpen or every contact card costs a Firestore read.
+    if (!isOpen || !contact?.id || contact.conversationState !== 'user_action_required') {
+      setPendingDraft(null);
+      return;
+    }
+
+    const user = getEffectiveUser();
+    if (!user) {
+      setPendingDraft(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDraftLoading(true);
+
+    fetchPendingDraftForContact(user.uid, contact.id)
+      .then((result) => {
+        if (cancelled) return;
+        setPendingDraft(result);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // The reply card is non-critical — surface the failure on the card and
+        // leave the rest of the drawer working.
+        console.error('[HunterContactDrawer] pending draft load failed:', err);
+        setPendingDraft(null);
+        setDraftError(err.message || 'Could not load Barry\'s reply.');
+      })
+      .finally(() => {
+        if (!cancelled) setDraftLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [isOpen, contact?.id, contact?.conversationState, draftReloadToken]);
 
   useEffect(() => {
     if (isOpen) {
@@ -887,6 +937,51 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
           {/* === MAIN VIEW: Barry's Question + Chat Input === */}
           {activeView === 'main' && (
             <div className="drawer-main-view">
+              {/* Sprint 3: Barry's inbox reply — the first thing the user sees
+                  when a prospect has replied and Barry has a draft waiting. */}
+              {draftLoading && (
+                <div className="brc-skeleton" aria-label="Loading Barry's reply">
+                  <div className="brc-skeleton-line" />
+                  <div className="brc-skeleton-line" />
+                  <div className="brc-skeleton-line" />
+                </div>
+              )}
+
+              {!draftLoading && draftError && (
+                <div className="brc-error" role="alert">
+                  <AlertCircle className="brc-error-icon" />
+                  <span>{draftError}</span>
+                  <button
+                    type="button"
+                    className="brc-btn brc-btn--ghost"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => setDraftReloadToken(t => t + 1)}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!draftLoading && !draftError && pendingDraft && (
+                <BarryReplyCard
+                  contact={contact}
+                  draft={pendingDraft.draft}
+                  analysis={pendingDraft.analysis}
+                  userId={getEffectiveUser()?.uid}
+                  onSent={() => {
+                    setPendingDraft(null);
+                    // onContactUpdate consumers do setContact(updated) — it
+                    // takes the contact object, not an id.
+                    onContactUpdate?.({ ...contact, conversationState: 'waiting_on_contact' });
+                  }}
+                  onSnooze={() => setPendingDraft(null)}
+                  onDismiss={() => {
+                    setPendingDraft(null);
+                    onContactUpdate?.({ ...contact, conversationState: 'active_conversation' });
+                  }}
+                />
+              )}
+
               {/* Step 7: Barry's Pre-Engagement Recommendation */}
               {drawerRecommendations.length > 0 && (
                 <div className="drawer-barry-recommendation">

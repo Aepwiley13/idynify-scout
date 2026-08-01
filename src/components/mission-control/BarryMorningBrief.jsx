@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import { BRAND, ASSETS } from '../../theme/tokens';
-import { AlertCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, MessageSquare, Mail } from 'lucide-react';
 
 function SkeletonBrief({ T }) {
   return (
@@ -21,6 +21,11 @@ export default function BarryMorningBrief({ orientation, openBarry, T }) {
       : [],
     mode: orientation?.mode ?? null,
     error: orientation?.error ?? null,
+    // Sprint 3: replies Barry has read and drafted an answer for.
+    pendingRepliesCount: Number(orientation?.pendingRepliesCount) || 0,
+    pendingRepliesPreview: Array.isArray(orientation?.pendingRepliesPreview)
+      ? orientation.pendingRepliesPreview
+      : [],
   };
 
   const isLoading = safe.status === 'loading';
@@ -92,6 +97,32 @@ export default function BarryMorningBrief({ orientation, openBarry, T }) {
           style={{ fontSize: 13, color: T.textMuted, lineHeight: 1.6 }}
         >
           <ReactMarkdown>{safe.brief}</ReactMarkdown>
+        </div>
+      )}
+
+      {/* Sprint 3: replies waiting. Compact by design — this is a brief, not an
+          inbox. The card in the Hunter drawer is where the work happens. */}
+      {isReady && safe.pendingRepliesCount > 0 && (
+        <div style={{
+          marginTop: 12,
+          padding: '8px 12px',
+          borderRadius: 8,
+          background: `${BRAND.pink}12`,
+          border: `1px solid ${BRAND.pink}30`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <Mail size={14} color={BRAND.pink} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: T.text, lineHeight: 1.4 }}>
+            <strong>
+              {safe.pendingRepliesCount}&nbsp;
+              {safe.pendingRepliesCount === 1 ? 'reply' : 'replies'}
+            </strong>
+            {' waiting for you'}
+            {safe.pendingRepliesPreview[0]?.name &&
+              ` — ${safe.pendingRepliesPreview[0].name} replied`}
+          </span>
         </div>
       )}
 

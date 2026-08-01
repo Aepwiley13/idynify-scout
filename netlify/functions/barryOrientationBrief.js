@@ -109,7 +109,7 @@ export const handler = async (event) => {
 
     const userRef = db.collection('users').doc(userId);
 
-    const [dashboardDoc, missionsSnap, companiesSnap] = await Promise.all([
+    const [dashboardDoc, missionsSnap, companiesSnap, pendingRepliesSnap] = await Promise.all([
       db.collection('dashboards').doc(userId).get(),
       userRef.collection('missions')
         .where('status', '==', 'active')
@@ -121,6 +121,17 @@ export const handler = async (event) => {
         .orderBy('swipedAt', 'desc')
         .limit(20)
         .get(),
+      // Sprint 3: contacts where Barry has read a reply and drafted an answer.
+      // A failed read must not take the whole brief down — an empty result just
+      // means the replies line is omitted.
+      userRef.collection('contacts')
+        .where('conversationState', '==', 'user_action_required')
+        .limit(10)
+        .get()
+        .catch((err) => {
+          console.warn('[barryOrientationBrief] pending replies query failed:', err.message);
+          return { docs: [] };
+        }),
     ]);
 
     const dashboardData = dashboardDoc.exists ? dashboardDoc.data() : null;
@@ -163,6 +174,23 @@ export const handler = async (event) => {
       ? `${recentLeads} new Daily Leads match${recentLeads !== 1 ? 'es' : ''} in the last 7 days`
       : 'No recent Daily Leads matches';
 
+    // ── Sprint 3: replies waiting on the user ──────────────────────────────
+    const pendingReplies = pendingRepliesSnap.docs.map(d => {
+      const c = d.data();
+      return {
+        name: c.name || c.first_name || 'Unknown',
+        company: c.company_name || c.current_company_name || '',
+        lastInboundSubject: c.lastInboundSubject || '',
+      };
+    });
+
+    const repliesLine = pendingReplies.length > 0
+      ? `Replies needing your attention: ${pendingReplies.length}\n` +
+        pendingReplies.slice(0, 3).map(r =>
+          `  • ${r.name}${r.company ? ' at ' + r.company : ''}${r.lastInboundSubject ? `: "${r.lastInboundSubject}"` : ''}`
+        ).join('\n')
+      : 'No replies waiting on you';
+
     const orientationPrompt = `You are Barry, Idynify's AI sales intelligence assistant. Generate a 2-3 sentence orientation message for a user opening Mission Control.
 
 CURRENT PLATFORM STATE:
@@ -173,16 +201,18 @@ CURRENT PLATFORM STATE:
 - ${reconLine}
 - ${missionsLine}
 - ${leadsLine}
+- ${repliesLine}
 
 RULES:
 - Be specific to the numbers. Name stale contacts if available.
 - Open with the strongest AVAILABLE signal, in this priority order:
   1. Highest priority action — if "Highest priority action" is not "none", open with it. Reference it by name and work its reason into the first sentence. It outranks every other signal below.
-  2. Replies — else if "Total replies received" > 0, someone responded and deserves attention now.
-  3. High-fit matches — else if "High confidence matches" > 0, strong opportunities are ready to review.
-  4. Total matches — else if "Total companies matching ICP" > 0, the pipeline is building.
-  5. Otherwise, lead with the existing RECON, mission, and lead context.
-  6. Generic welcome only when no meaningful signal exists at all.
+  2. Replies needing attention — else if that count is above 0, a real person is waiting on an answer Barry has already drafted. Name them. This outranks every pipeline metric below.
+  3. Replies — else if "Total replies received" > 0, someone responded and deserves attention now.
+  4. High-fit matches — else if "High confidence matches" > 0, strong opportunities are ready to review.
+  5. Total matches — else if "Total companies matching ICP" > 0, the pipeline is building.
+  6. Otherwise, lead with the existing RECON, mission, and lead context.
+  7. Generic welcome only when no meaningful signal exists at all.
 - Do not describe any dashboard total as "new", "today", "this week", or "overnight". These are all-time account totals unless a time-bounded value is explicitly provided.
 - If RECON is below 80%, mention the gap and its effect in one short clause.
 - No "Welcome back!" or generic greetings. Lead with the most actionable signal.
@@ -224,6 +254,17 @@ Return valid JSON only:
       clearTimeout(timeout);
     }
 
+    // A reply someone is waiting on beats any pipeline metric — make sure the
+    // prompt is offered it even when the AI call fails and the fallback runs.
+    if (!brief && pendingReplies.length > 0) {
+      const first = pendingReplies[0];
+      brief =
+        `${pendingReplies.length} repl${pendingReplies.length === 1 ? 'y is' : 'ies are'} waiting on you` +
+        `${first.name !== 'Unknown' ? ` — ${first.name}${first.company ? ` at ${first.company}` : ''} replied` : ''}` +
+        ` and Barry has a draft ready. Start there.`;
+      suggestedPrompts = ['Review pending replies', 'Who should I focus on today?', 'What needs attention?'];
+    }
+
     if (!brief) {
       brief = missions.length > 0
         ? `${missions.length} active mission${missions.length !== 1 ? 's' : ''} in flight${staleMissions.length > 0 ? ` — ${staleMissions.length} need${staleMissions.length === 1 ? 's' : ''} a touchpoint` : ''}.${reconScore < 60 ? ` RECON at ${reconScore}% is limiting Barry's context — completing key sections will improve everything.` : ''} Tell me where you want to focus.`
@@ -231,11 +272,21 @@ Return valid JSON only:
       suggestedPrompts = ['Who should I focus on today?', 'Show me my pipeline status', 'What needs attention?'];
     }
 
+    // Sprint 3: let Barry walk the user through the replies from the chat panel.
+    if (pendingReplies.length > 0 && !suggestedPrompts.includes('Review pending replies')) {
+      suggestedPrompts = ['Review pending replies', ...suggestedPrompts].slice(0, 3);
+    }
+
     const mode = missions.length === 0 ? 'GROWTH' : staleMissions.length > 0 ? 'PRIORITIZE' : 'SUGGEST';
 
     await logApiUsage(userId, 'barryOrientationBrief', 'success', {
       responseTime: Date.now() - startTime,
-      metadata: { reconScore, missionCount: missions.length, recentLeads },
+      metadata: {
+        reconScore,
+        missionCount: missions.length,
+        recentLeads,
+        pendingReplies: pendingReplies.length,
+      },
     });
 
     return {
@@ -247,6 +298,8 @@ Return valid JSON only:
         response_text: brief,
         suggestedPrompts,
         mode,
+        pendingRepliesCount: pendingReplies.length,
+        pendingRepliesPreview: pendingReplies.slice(0, 3),
       }),
     };
 

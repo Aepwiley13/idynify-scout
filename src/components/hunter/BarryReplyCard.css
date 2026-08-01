@@ -1,0 +1,352 @@
+/* BARRY REPLY CARD — Sprint 3: Inbox reply approval
+   Visual language follows BarryInsightsCard / BarryRecommendationCard: a soft
+   tinted panel with a coloured left identity, sitting at the top of the drawer.
+   Barry pink is reserved for the primary send action. */
+
+.barry-reply-card {
+  background: linear-gradient(180deg, #fdf2f8 0%, #ffffff 60%);
+  border: 1px solid #f9a8d4;
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(232, 25, 125, 0.08);
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+
+.brc-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.brc-bear {
+  font-size: 16px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.brc-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.brc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9d174d;
+  line-height: 1.35;
+}
+
+.brc-subtitle {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* ── Zones ──────────────────────────────────────────────── */
+
+.brc-zone {
+  padding: 10px 0;
+  border-top: 1px solid #fce7f3;
+}
+
+.brc-zone--summary {
+  border-top: none;
+  padding-top: 0;
+}
+
+.brc-summary {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+.brc-summary--muted {
+  color: #6b7280;
+  font-style: italic;
+  margin-bottom: 0;
+}
+
+/* ── Badges ─────────────────────────────────────────────── */
+
+.brc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.brc-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.brc-badge--blue  { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.brc-badge--green { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.brc-badge--amber { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.brc-badge--gray  { background: #f9fafb; color: #4b5563; border-color: #e5e7eb; }
+
+/* ── Zone 2: extracted signals ──────────────────────────── */
+
+.brc-zone--signals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.brc-signal-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.brc-signal-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brc-signal-item {
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.45;
+}
+
+/* ── Zone 3: the draft ──────────────────────────────────── */
+
+.brc-draft-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9d174d;
+  margin-bottom: 6px;
+}
+
+.brc-draft-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.brc-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1f2937;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.brc-textarea:focus {
+  outline: none;
+  border-color: #f472b6;
+  box-shadow: 0 0 0 3px rgba(232, 25, 125, 0.1);
+}
+
+.brc-textarea:disabled {
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.brc-draft-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.brc-count {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.brc-count--warn {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.brc-recipient {
+  font-size: 10px;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Errors ─────────────────────────────────────────────── */
+
+.brc-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  font-size: 12px;
+  color: #b91c1c;
+  line-height: 1.4;
+}
+
+.brc-error-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Zone 4: actions ────────────────────────────────────── */
+
+.brc-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.brc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.brc-btn-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.brc-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.brc-btn--ghost {
+  background: #ffffff;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.brc-btn--ghost:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.brc-btn--danger {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.brc-btn--danger:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+/* Send is the only primary action on the card. */
+.brc-btn--primary {
+  margin-left: auto;
+  background: #e8197d;
+  color: #ffffff;
+  border: 1px solid #e8197d;
+  padding: 8px 16px;
+}
+
+.brc-btn--primary:hover:not(:disabled) {
+  background: #d1176f;
+  border-color: #d1176f;
+}
+
+.brc-spin {
+  animation: brc-spin 0.9s linear infinite;
+}
+
+@keyframes brc-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brc-spin { animation: none; }
+}
+
+/* ── Loading shimmer (used while the drawer resolves the draft) ── */
+
+.brc-skeleton {
+  background: #fdf2f8;
+  border: 1px solid #fce7f3;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.brc-skeleton-line {
+  height: 10px;
+  border-radius: 5px;
+  background: #fce7f3;
+  animation: brc-pulse 1.4s ease-in-out infinite;
+}
+
+.brc-skeleton-line:nth-child(1) { width: 55%; }
+.brc-skeleton-line:nth-child(2) { width: 90%; }
+.brc-skeleton-line:nth-child(3) { width: 75%; }
+
+@keyframes brc-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brc-skeleton-line { animation: none; }
+}
+
+/* ── Narrow drawers / mobile ────────────────────────────── */
+
+@media (max-width: 480px) {
+  .brc-actions {
+    flex-wrap: wrap;
+  }
+
+  .brc-btn--primary {
+    margin-left: 0;
+    width: 100%;
+    order: -1;
+  }
+}

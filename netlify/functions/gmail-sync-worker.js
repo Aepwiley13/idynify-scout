@@ -100,8 +100,10 @@ function nextSyncAtIso() {
  * Find every user with a connected Gmail integration.
  *
  * Uses a collection-group query over `integrations` and filters to the `gmail`
- * document in JS — Firestore indexes single fields for collection groups
- * automatically, so this needs no composite index.
+ * document in JS. Firestore's automatic single-field indexing only covers
+ * COLLECTION scope, so the COLLECTION_GROUP index for `integrations.status` is
+ * declared explicitly in firestore.indexes.json — without it this query fails
+ * with FAILED_PRECONDITION on the first run.
  *
  * Least-recently-synced accounts go first so a large tenant list still gets
  * fair coverage across runs. Accounts that have never synced sort first.
@@ -111,11 +113,23 @@ function nextSyncAtIso() {
  * @returns {Promise<Array<{ userId: string, docRef: object, data: object }>>}
  */
 export async function findConnectedGmailUsers(db, limit = MAX_USERS_PER_RUN) {
-  const snap = await db
-    .collectionGroup('integrations')
-    .where('status', '==', 'connected')
-    .limit(limit * 4)
-    .get();
+  let snap;
+  try {
+    snap = await db
+      .collectionGroup('integrations')
+      .where('status', '==', 'connected')
+      .limit(limit * 4)
+      .get();
+  } catch (err) {
+    if (err.code === 9 || /FAILED_PRECONDITION|requires an index/i.test(err.message || '')) {
+      throw new Error(
+        'The collection-group index for integrations.status is missing. Deploy it with ' +
+        '`firebase deploy --only firestore:indexes` — see the fieldOverrides entry in ' +
+        `firestore.indexes.json. Original error: ${err.message}`
+      );
+    }
+    throw err;
+  }
 
   const users = [];
   for (const doc of snap.docs) {

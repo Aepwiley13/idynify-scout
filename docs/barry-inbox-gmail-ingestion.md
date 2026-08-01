@@ -43,11 +43,50 @@ field is modified or removed.
 No Firestore rules change is required: these fields live on a document the
 backend already writes with admin credentials, and no client reads them yet.
 
-No new composite index is required either. The worker finds connected accounts
-with a collection-group query on a single field
-(`collectionGroup('integrations').where('status', '==', 'connected')`), which
-Firestore's automatic single-field indexing already covers, and filters to the
-`gmail` document in memory.
+## Firestore index change
+
+The worker finds connected accounts with a collection-group query on a single
+field:
+
+```js
+db.collectionGroup('integrations').where('status', '==', 'connected')
+```
+
+**This requires an index that must be declared explicitly.** Firestore's
+automatic single-field indexing creates indexes at `COLLECTION` scope only —
+collection-group scoped single-field indexes are never created automatically.
+Without the declaration the query fails with `FAILED_PRECONDITION` on the very
+first run, and the worker would find zero accounts forever.
+
+`firestore.indexes.json` therefore gains a `fieldOverrides` entry:
+
+```json
+{
+  "collectionGroup": "integrations",
+  "fieldPath": "status",
+  "indexes": [
+    { "order": "ASCENDING",  "queryScope": "COLLECTION" },
+    { "order": "DESCENDING", "queryScope": "COLLECTION" },
+    { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+    { "order": "ASCENDING",  "queryScope": "COLLECTION_GROUP" }
+  ]
+}
+```
+
+A `fieldOverride` **replaces** the automatic index configuration for that field
+rather than adding to it, so the three `COLLECTION`-scope entries are listed
+alongside the new `COLLECTION_GROUP` one. Dropping them would silently remove
+indexing that exists today.
+
+Deploy it before or alongside the function:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+`findConnectedGmailUsers()` detects the missing-index error specifically and
+rethrows it with that command in the message, so a mis-sequenced deploy is
+obvious in the logs rather than looking like "no users connected".
 
 ## How the worker runs
 

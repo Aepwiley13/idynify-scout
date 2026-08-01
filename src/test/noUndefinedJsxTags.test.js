@@ -86,5 +86,8 @@ describe('every capitalised JSX tag resolves to something we imported', () => {
     // the next person gets the file and the line instead of a stack trace
     // inside React.
     expect(offenders, `Unbound JSX tags:\n${offenders.join('\n')}`).toEqual([]);
-  });
+  // This walks and Babel-parses every source file under src/, so its runtime
+  // grows with the repo. It sat just under vitest's 5s default and tipped over
+  // once Sprint 1 added test files; the explicit budget stops that recurring.
+  }, 30_000);
 });

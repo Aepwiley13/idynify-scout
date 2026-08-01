@@ -54,6 +54,7 @@ import {
   SYNC_STATE_FIELDS,
   SYNC_STATUS,
 } from '../../netlify/functions/gmail-sync-worker.js';
+import indexConfig from '../../firestore.indexes.json';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fixtures
@@ -216,6 +217,63 @@ describe('findConnectedGmailUsers', () => {
     const docs = Array.from({ length: 10 }, (_, i) => doc('gmail', `u${i}`, { status: 'connected' }));
     const users = await findConnectedGmailUsers(makeSnap(docs), 4);
     expect(users).toHaveLength(4);
+  });
+
+  it('explains how to fix a missing collection-group index', async () => {
+    const db = {
+      collectionGroup: () => ({
+        where: () => ({
+          limit: () => ({
+            get: async () => {
+              throw Object.assign(
+                new Error('FAILED_PRECONDITION: The query requires an index.'),
+                { code: 9 }
+              );
+            },
+          }),
+        }),
+      }),
+    };
+    await expect(findConnectedGmailUsers(db)).rejects.toThrow(
+      /firebase deploy --only firestore:indexes/
+    );
+  });
+
+  it('rethrows unrelated Firestore errors untouched', async () => {
+    const db = {
+      collectionGroup: () => ({
+        where: () => ({
+          limit: () => ({ get: async () => { throw new Error('DEADLINE_EXCEEDED'); } }),
+        }),
+      }),
+    };
+    await expect(findConnectedGmailUsers(db)).rejects.toThrow('DEADLINE_EXCEEDED');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('firestore.indexes.json', () => {
+  it('declares the collection-group index the worker query depends on', () => {
+    const override = (indexConfig.fieldOverrides || []).find(
+      (f) => f.collectionGroup === 'integrations' && f.fieldPath === 'status'
+    );
+    expect(override, 'integrations.status fieldOverride is missing').toBeDefined();
+    expect(override.indexes).toContainEqual({
+      order: 'ASCENDING',
+      queryScope: 'COLLECTION_GROUP',
+    });
+  });
+
+  it('keeps the automatic COLLECTION-scope indexes the override would otherwise drop', () => {
+    const override = indexConfig.fieldOverrides.find(
+      (f) => f.collectionGroup === 'integrations' && f.fieldPath === 'status'
+    );
+    expect(override.indexes).toContainEqual({ order: 'ASCENDING', queryScope: 'COLLECTION' });
+    expect(override.indexes).toContainEqual({ order: 'DESCENDING', queryScope: 'COLLECTION' });
+    expect(override.indexes).toContainEqual({
+      arrayConfig: 'CONTAINS',
+      queryScope: 'COLLECTION',
+    });
   });
 });
 

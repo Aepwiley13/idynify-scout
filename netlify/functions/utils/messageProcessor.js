@@ -184,10 +184,10 @@ export async function processNormalizedMessage(db, message) {
         : null;
 
       const transition = resolveInboundTransition(currentState, message);
-      conversationState = transition.newState;
 
-      // Only update state if it's not an automated message that should be no-op
-      if (message.category !== 'automated' || !currentState) {
+      if (message.category !== 'automated') {
+        conversationState = transition.newState;
+
         const contactUpdate = {
           conversationState,
           lastInboundAt: message.receivedAt,
@@ -200,6 +200,9 @@ export async function processNormalizedMessage(db, message) {
           .collection('users').doc(message.idynifyUserId)
           .collection('contacts').doc(contactId)
           .update(contactUpdate);
+      } else {
+        // Automated messages preserve the contact's existing state
+        conversationState = currentState;
       }
 
       // ── Step 6: Update relationship context ────────────────────────────

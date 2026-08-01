@@ -262,9 +262,19 @@ function ShellChrome({ children, user }) {
             theme, a black screen with no message and no navigation. The
             boundary sits INSIDE the shell, so a broken section leaves the
             hamburger, the bottom bar and Barry working and the user can go
-            somewhere else. Keyed by pathname so it clears on navigation. */}
+            somewhere else.
+
+            Keyed by pathname AND search. Most modules switch sections with
+            ?tab=, so keying on pathname alone meant a section that threw kept
+            showing its error after the user picked a different tab — the
+            module looked permanently broken when only one section was. This
+            is the shell's LAST RESORT; modules put a closer boundary around
+            their own section content so their sub-nav survives. */}
         <main className={`page-content ${fullBleed ? 'page-content-full' : ''}`}>
-          <ModuleErrorBoundary resetKey={location.pathname} moduleLabel={module.label}>
+          <ModuleErrorBoundary
+            resetKey={location.pathname + location.search}
+            moduleLabel={module.label}
+          >
             {children ?? <Outlet />}
           </ModuleErrorBoundary>
         </main>

@@ -28,12 +28,13 @@ import { useState, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Users, Building2, Zap, HeartPulse,
-  Palette, Check,
+  Palette, Check, Lock,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import ModuleSubNav from '../../components/layout/ModuleSubNav';
+import ModuleErrorBoundary from '../../components/layout/ModuleErrorBoundary';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 import { useSubscription } from '../../hooks/useSubscription';
 
@@ -134,6 +135,10 @@ const BASECAMP_ITEMS = [
 
 const SETTINGS_ORANGE = '#faaa20';
 
+/** Human name for a section, so a failure says "CSM" and not "Basecamp". */
+const sectionLabel = (id) =>
+  BASECAMP_ITEMS.find(i => i.id === id)?.label || 'This section';
+
 const TAB_MAP = {
   people:    'people',
   companies: 'companies',
@@ -213,12 +218,26 @@ function BasecampShellInner() {
     setSearchParams({ tab: tabId });
   };
 
+  /**
+   * Section content, inside its own boundary.
+   *
+   * The shell has a boundary too, but that one is the last resort: it replaces
+   * everything the module rendered, INCLUDING Basecamp's sub-nav panel and its
+   * mobile bottom bar entries. So a single broken section took the module's own
+   * navigation with it and there was no way to switch to a working tab.
+   *
+   * This boundary sits inside the module and around the section only, so
+   * People / Companies / Engage stay reachable when CSM fails. Keyed by tab so
+   * moving to a working section clears it.
+   */
   const renderMain = () => (
     <div style={{ flex: 1, overflow: 'auto' }}>
-      {activeTab === 'people'    && <PeopleSection />}
-      {activeTab === 'companies' && <CompaniesSection />}
-      {activeTab === 'engage'    && <EngagementCenter />}
-      {activeTab === 'csm'       && (isProTier ? <CSMDashboard userId={activeUserId} /> : <CSMTeaser T={T} />)}
+      <ModuleErrorBoundary resetKey={activeTab} moduleLabel={sectionLabel(activeTab)}>
+        {activeTab === 'people'    && <PeopleSection />}
+        {activeTab === 'companies' && <CompaniesSection />}
+        {activeTab === 'engage'    && <EngagementCenter />}
+        {activeTab === 'csm'       && (isProTier ? <CSMDashboard userId={activeUserId} /> : <CSMTeaser T={T} />)}
+      </ModuleErrorBoundary>
     </div>
   );
 

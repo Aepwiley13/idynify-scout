@@ -283,3 +283,71 @@ One correction stands, and is confirmed: an earlier brief said Command Center
 does not — Hunter's sub-nav is Blitz Mode, All People, Companies, Follow Up
 Now, Today's Actions, Replied, Active, New. Command Center is a first-class
 sidebar item and stays exactly where it is.
+
+---
+
+## Post-gate fixes — Basecamp CSM
+
+Four of five real-device checks passed on `60b66f0`. Basecamp remained broken,
+showing `Illegal constructor` inside the module error boundary. Two things were
+wrong and they were not the same thing.
+
+### 1. `Illegal constructor` — `BasecampMain.jsx:162`
+
+`CSMTeaser` rendered `<Lock size={28} color={BASECAMP_GREEN} />`. `Lock` was
+never imported.
+
+That is not a `ReferenceError`, because `Lock` is a real browser global — the
+interface object of the Web Locks API. The JSX tag resolved to `window.Lock`,
+React called it as a plain function, and a Web IDL constructor invoked without
+`new` throws exactly `TypeError: Illegal constructor`. The stack said
+`renderWithHooks → mountIndeterminateComponent` and named no file, which is why
+the message was so hard to place: React does not know it called a DOM
+interface, only that a function component threw.
+
+The brief asked us to look for `new Worker()`, `new IntersectionObserver()`,
+`new ResizeObserver()` — an unguarded Web API constructor. That was the right
+instinct and the wrong direction. There is no `new` anywhere in the Basecamp
+tree. The constructor was being called *without* `new`, by React, on our
+behalf.
+
+It hit **every user**, not only Starter accounts. `useSubscription` begins at
+`tier === null`, so `isProTier` is false on the first render for everybody; the
+teaser renders once before the Firestore read resolves. Under StrictMode that
+first render happens twice — which is where the reported `Illegal constructor`
+×2 came from.
+
+Fixed by importing `Lock` from `lucide-react`. Verified in Chromium on both
+paths: Starter renders the teaser with its padlock, Pro renders the dashboard,
+and all four Basecamp tabs report zero page errors.
+
+**Regression guard:** `src/test/noUndefinedJsxTags.test.js` parses every source
+file and asserts that each capitalised JSX tag is bound in its module scope.
+Nothing in the existing toolchain catches this class of bug — ESLint's
+`no-undef` is satisfied by browser globals, and the JSX transform does not care
+what an identifier resolves to. The test was confirmed to fail on the real
+defect (`BasecampMain.jsx:162 <Lock>`) before the fix was restored.
+
+### 2. The panel that disappeared was Layer 2, not Layer 1
+
+The report was "the sidebar disappears when navigating to the CSM tab". Two
+panels answer to that name:
+
+- **The global sidebar** is a sibling of `.main-content` in `MainLayout`, and
+  the boundary sits inside `.main-content` wrapping `<Outlet/>`. A boundary
+  cannot unmount its own siblings, so the global sidebar was never removable by
+  a module crash — and was confirmed present in the failure screenshots.
+- **Basecamp's own 190px sub-nav** did vanish, and correctly reproduced the
+  complaint. The shell-level boundary catches *above* `BasecampMain`, so it
+  replaced the entire module — sub-nav included. A user who landed on the
+  broken CSM tab had no way to click back to People.
+
+Fixed with a second boundary *inside* the module, wrapping the section only and
+keyed by `activeTab`. People / Companies / Engage stay reachable when CSM
+fails, and the message names the section ("CSM could not load") rather than the
+module. `src/test/basecampSectionContainment.test.jsx` pins all three
+behaviours.
+
+Also fixed: the shell boundary's `resetKey` was `location.pathname`, so a
+`?tab=` change did not clear a caught error. It is now
+`location.pathname + location.search`.

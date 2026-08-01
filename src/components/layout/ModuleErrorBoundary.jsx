@@ -26,7 +26,7 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 class ModuleErrorBoundaryInner extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, stack: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -41,6 +41,21 @@ class ModuleErrorBoundaryInner extends React.Component {
       error,
       info?.componentStack
     );
+
+    // Kept in state as well, because the console is not reachable on a phone.
+    // A tester who can only photograph the screen still needs to be able to
+    // report WHICH component threw — otherwise every round-trip is a guess.
+    this.setState({ stack: info?.componentStack || null });
+  }
+
+  /** The first few frames — enough to name the file, short enough to read. */
+  topFrames() {
+    return (this.state.stack || '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .join('\n');
   }
 
   render() {
@@ -71,9 +86,19 @@ class ModuleErrorBoundaryInner extends React.Component {
           Try again
         </button>
 
-        {/* The message, not the stack: enough for a user to quote back to
-            support without turning the screen into a debugger. */}
+        {/* The message is always visible; the component stack is one tap away.
+            "Illegal constructor" on its own names nothing — the stack is what
+            turns a bug report into a file and a line. Collapsed by default so
+            the screen is not a debugger, available so a phone tester can
+            photograph it. */}
         <p className="module-error-detail">{String(error?.message || error)}</p>
+
+        {this.state.stack && (
+          <details className="module-error-stack">
+            <summary>Where it happened</summary>
+            <pre>{this.topFrames()}</pre>
+          </details>
+        )}
       </div>
     );
   }

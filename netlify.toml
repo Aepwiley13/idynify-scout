@@ -41,6 +41,12 @@
 [functions."process-barry-inbox-queue"]
   timeout = 300
 
+# Scheduled every 10 minutes. Walks up to 50 connected Gmail accounts and
+# ingests each new message through Team B's pipeline — needs room beyond the
+# default synchronous timeout. The worker also enforces its own time budget.
+[functions."gmail-sync-worker"]
+  timeout = 300
+
 [functions."adminGetUsers"]
   timeout = 26
 

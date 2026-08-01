@@ -703,3 +703,70 @@
      cannot silently become a full-height block on a wide screen. */
   .module-mobile { display: none; }
 }
+
+/* ── Module crash fallback ──
+   Shown by ModuleErrorBoundary in place of module content. Deliberately plain:
+   the shell around it still works, and the point is to say so. */
+.module-error {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.module-error-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(180, 68, 63, 0.1);
+  border: 1px solid rgba(180, 68, 63, 0.22);
+  color: #b4443f;
+}
+
+.module-error-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.module-error-body {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.module-error-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.module-error-detail {
+  margin: 4px 0 0;
+  max-width: 44ch;
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}

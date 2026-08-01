@@ -10,6 +10,13 @@
   margin: 0 auto;
   padding: 2rem 1.5rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  /* Never wider than what contains it. Without this the page could grow past
+     the viewport, and because the header is text-align:center it then centres
+     inside the OVERSIZED box — which is what "the title bleeds off-screen"
+     actually was. The title itself is the word "RECON"; it was never too wide. */
+  max-width: min(1400px, 100%);
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* ── Header — Finding 10: Scout's centered enterprise-header ── */
@@ -231,17 +238,36 @@
 
 .recon-heatmap-tiles {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* minmax(0, 1fr), not 1fr. A bare 1fr has an implicit min-width of AUTO, so
+     a column cannot shrink below its content — seven of those on a 390px
+     screen forced the page 225px wider than the viewport. This is the actual
+     source of the horizontal overflow; the header was the symptom. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.5rem;
 }
 
 .recon-heatmap-tile {
   position: relative;
+  min-width: 0;
   cursor: pointer;
   transition: all 0.2s ease;
   border-radius: 0.5rem;
   padding: 0.75rem;
   text-align: center;
+  /* Seven columns on a phone leave ~40px each. Long module names wrap rather
+     than pushing the grid wide. */
+  overflow-wrap: anywhere;
+}
+
+/* Phone: seven columns of ~40px is unreadable regardless of overflow, so the
+   heatmap becomes a 4-column grid rather than a squeezed 7. */
+@media (max-width: 768px) {
+  .recon-heatmap-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .recon-heatmap-tile { padding: 0.5rem 0.375rem; }
+
+  .recon-overview { padding: 1.25rem 1rem; }
+  .recon-page-title { font-size: 1.5rem; }
+  .recon-page-subtitle { font-size: 0.9375rem; }
 }
 
 .recon-heatmap-tile.trained {

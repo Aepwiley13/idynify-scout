@@ -35,6 +35,7 @@ import {
   stripQuotedReply,
   extractSignature,
   classifyMessage,
+  isAutomatedSender,
   normalizeMessage,
   shouldProcessMessage,
   isKnownContact,
@@ -339,6 +340,63 @@ describe('classifyMessage', () => {
     expect(classifyMessage(headers, 'body', 'news@acme.com', USER)).toBe('automated');
   });
 
+  // ── Calendar / auto-responder subject prefixes ────────────────────────────
+  // Regression: a production Google Calendar notification was classified
+  // "unknown" and flowed through the whole pipeline instead of being filtered.
+  it('classifies the production Calendar invite that was misclassified as unknown', () => {
+    const headers = [
+      header('Subject', 'Updated invitation: Follow Up: Post-Screening Dinner @ Fri Aug 21, 2026'),
+    ];
+    expect(classifyMessage(headers, 'body', 'realtylayne@gmail.com', USER)).toBe('automated');
+  });
+
+  it.each([
+    ['Updated invitation:', 'Updated invitation: Dinner @ Fri Aug 21, 2026'],
+    ['Invitation:',         'Invitation: Intro call @ Mon Aug 24, 2026'],
+    ['Accepted:',           'Accepted: Intro call @ Mon Aug 24, 2026'],
+    ['Declined:',           'Declined: Intro call @ Mon Aug 24, 2026'],
+    ['Tentative:',          'Tentative: Intro call @ Mon Aug 24, 2026'],
+    ['Canceled:',           'Canceled: Intro call @ Mon Aug 24, 2026'],
+    ['Cancelled:',          'Cancelled: Intro call @ Mon Aug 24, 2026'],
+    ['Event reminder:',     'Event reminder: Intro call @ Mon Aug 24, 2026'],
+    ['Reminder:',           'Reminder: Intro call @ Mon Aug 24, 2026'],
+  ])('classifies the Calendar prefix %s as automated', (_label, subject) => {
+    const headers = [header('Subject', subject)];
+    expect(classifyMessage(headers, 'body', 'jane@acme.com', USER)).toBe('automated');
+  });
+
+  it.each([
+    ['Automatic reply:', 'Automatic reply: Out of the country'],
+    ['Auto-reply:',      'Auto-reply: I am away'],
+    ['Auto reply:',      'Auto reply: I am away'],
+    ['Out of office:',   'Out of office: back Monday'],
+    ['OOO:',             'OOO: back Monday'],
+  ])('classifies the auto-responder prefix %s as automated', (_label, subject) => {
+    const headers = [header('Subject', subject)];
+    expect(classifyMessage(headers, 'body', 'jane@acme.com', USER)).toBe('automated');
+  });
+
+  it.each([
+    ['Delivery Status Notification', 'Delivery Status Notification (Failure)'],
+    ['Mail Delivery Subsystem',      'Mail Delivery Subsystem — returned to sender'],
+    ['Undeliverable:',               'Undeliverable: Intro call'],
+    ['Returned mail:',               'Returned mail: see transcript for details'],
+  ])('classifies the bounce notice %s as automated', (_label, subject) => {
+    const headers = [header('Subject', subject)];
+    expect(classifyMessage(headers, 'body', 'jane@acme.com', USER)).toBe('automated');
+  });
+
+  // The prefixes are anchored — these are the cases that would break if they
+  // were matched anywhere in the subject.
+  it.each([
+    ['a mid-subject reminder',  'Quick reminder: can you send the deck?'],
+    ['a mid-subject invitation','Following up on the invitation: are you free?'],
+    ['a human reply to a Calendar thread', 'Re: Updated invitation: Dinner @ Fri Aug 21, 2026'],
+  ])('does not treat %s as automated', (_label, subject) => {
+    const headers = [header('Subject', subject)];
+    expect(classifyMessage(headers, 'body', 'jane@acme.com', USER)).not.toBe('automated');
+  });
+
   it('classifies a same-domain test address as internal', () => {
     const headers = [header('Subject', 'Ping')];
     expect(classifyMessage(headers, 'body', 'test@idynify.com', USER)).toBe('internal');
@@ -347,6 +405,59 @@ describe('classifyMessage', () => {
   it('does not classify a same-domain colleague as internal', () => {
     const headers = [header('Subject', 'Ping')];
     expect(classifyMessage(headers, 'body', 'sarah@idynify.com', USER)).toBe('unknown');
+  });
+
+  // ── Sender-level automation, independent of the subject ───────────────────
+  it.each([
+    ['calendar-notification@google.com', 'calendar-notification@google.com'],
+    ['a calendar.google.com address',    'notifications@calendar.google.com'],
+    ['a calendar.google.com subdomain',  'bot@mail.calendar.google.com'],
+    ['noreply@',                         'noreply@acme.com'],
+    ['no-reply@',                        'no-reply@acme.com'],
+    ['donotreply@',                      'donotreply@acme.com'],
+    ['a noreply address with a suffix',  'noreply-billing@acme.com'],
+  ])('classifies %s as automated whatever the subject says', (_label, from) => {
+    // A subject that would otherwise read as a genuine human reply.
+    const headers = [header('Subject', 'Re: Thanks for the intro call')];
+    expect(classifyMessage(headers, 'body', from, USER)).toBe('automated');
+  });
+
+  it('leaves an ordinary sender alone', () => {
+    const headers = [header('Subject', 'Re: Thanks for the intro call')];
+    expect(classifyMessage(headers, 'body', 'jane@acme.com', USER)).toBe('reply');
+  });
+});
+
+describe('isAutomatedSender', () => {
+  it.each([
+    'calendar-notification@google.com',
+    'CALENDAR-NOTIFICATION@GOOGLE.COM',
+    'anything@calendar.google.com',
+    'bot@mail.calendar.google.com',
+    'noreply@acme.com',
+    'no-reply@acme.com',
+    'no.reply@acme.com',
+    'donotreply@acme.com',
+    'do-not-reply@acme.com',
+  ])('flags %s', (email) => {
+    expect(isAutomatedSender(email)).toBe(true);
+  });
+
+  it.each([
+    'jane@acme.com',
+    'realtylayne@gmail.com',
+    'calendar@acme.com',
+    // Not a Google Calendar domain — a lookalike must not be trusted.
+    'bot@calendar.google.com.evil.test',
+    'replyto@acme.com',
+  ])('does not flag %s', (email) => {
+    expect(isAutomatedSender(email)).toBe(false);
+  });
+
+  it('handles missing or malformed input', () => {
+    expect(isAutomatedSender(null)).toBe(false);
+    expect(isAutomatedSender('')).toBe(false);
+    expect(isAutomatedSender('not-an-email')).toBe(false);
   });
 });
 

@@ -64,6 +64,9 @@ export const CONTACT_STATUSES = {
   PARTNER: 'Partner',
   NETWORK: 'Network',
 
+  // Barry auto-handoff statuses
+  BARRY_STAGED: 'Barry Staged',
+
   // Legacy statuses (maintained for backward compatibility — do not use for new contacts)
   IN_CAMPAIGN: 'In Campaign',
   ACTIVE_MISSION: 'Active Mission',

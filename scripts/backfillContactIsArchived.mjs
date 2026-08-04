@@ -14,51 +14,97 @@
  *   already in the database.
  *
  * What this script does:
- *   For every users/{userId}/contacts/{contactId}:
- *     - If `is_archived` is missing → write `is_archived = false`
- *     - If `is_archived` already exists → skip, whatever its value
+ *   For every users/{userId}/contacts/{contactId} that has no `is_archived`
+ *   field, it infers the value from the record's own archival evidence:
  *
- *   It never overwrites an existing value. A contact archived by the user
- *   stays archived; a contact archived through Barry (which writes
- *   `is_archived: true`) stays archived.
+ *     is_archived: true   ← status === 'people_mode_archived', OR a truthy
+ *                           `archived_at`. These were deliberately rejected;
+ *                           the UI archived them but never wrote the boolean,
+ *                           so they must stay out of search.
+ *     is_archived: false  ← everything else.
  *
- *   One exception is reported but NOT written: documents whose `status` is
- *   'people_mode_archived' were archived by a left-swipe that never set the
- *   boolean. Those are listed in the summary so you can decide whether to
- *   archive them for real — automatically flipping them to true here would be
- *   this script making a product decision.
+ *   It never overwrites an existing value. A contact already carrying
+ *   `is_archived` — true or false — is skipped, so anything archived through
+ *   Barry or the normal archive flow keeps the state it has.
  *
- * Usage:
+ *   Note that `archived_at: null` does NOT count as archived. The people
+ *   schema initialises the field to null on unarchived records, so only a
+ *   truthy timestamp is treated as evidence.
  *
- *   Step 1 — Dry run (read only, no writes, see scope):
+ * ─────────────────────────────────────────────────────────────────────────
+ * HOW TO RUN — in this order. Do not skip step 2.
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ *   Step 0 — credentials (once per shell):
+ *
+ *     export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
+ *     export FIREBASE_PROJECT_ID=<your-project-id>        # only if not auto-detected
+ *
+ *   Step 1 — DRY RUN. Reads only. Writes nothing. Prints how many documents
+ *            would be updated, split by the value each would receive:
+ *
  *     node scripts/backfillContactIsArchived.mjs --dry-run
  *
- *   Step 2 — Single user (live write, then verify):
- *     node scripts/backfillContactIsArchived.mjs --user-id=<uid>
- *     node scripts/backfillContactIsArchived.mjs --user-id=<uid> --verify
+ *   Step 2 — REVIEW THE OUTPUT before going further. Check that:
+ *              · "would set is_archived: true" matches roughly how many leads
+ *                you remember rejecting. If it is implausibly large, stop —
+ *                that many contacts are about to be hidden from search.
+ *              · "would set is_archived: false" is the bulk of the workspace.
+ *              · "already correct" plus the two above equals contacts scanned.
+ *            Scoping to yourself first is the safest way to sanity-check:
  *
- *   Step 3 — Full run (all users, then verify):
- *     node scripts/backfillContactIsArchived.mjs
+ *     node scripts/backfillContactIsArchived.mjs --dry-run --user-id=<your-uid>
+ *
+ *   Step 3 — LIVE RUN. Only after step 2 looks right:
+ *
+ *     node scripts/backfillContactIsArchived.mjs --user-id=<your-uid>   # one user first
+ *     node scripts/backfillContactIsArchived.mjs                        # then everyone
+ *
+ *   Step 4 — VERIFY. Reports any contact still missing the field. Writes
+ *            nothing. Expect "Every contact has is_archived.":
+ *
  *     node scripts/backfillContactIsArchived.mjs --verify
  *
  * Flags:
  *   --dry-run          Scan and report only. No Firestore writes.
- *   --user-id=<uid>    Scope to a single user.
+ *   --user-id=<uid>    Scope to a single user. Combines with the other flags.
  *   --verify           Verification pass: reports contacts still missing the
  *                      field. No writes.
  *
  * Prerequisites:
- *   GOOGLE_APPLICATION_CREDENTIALS env var pointing to your service account
- *   JSON, OR a GCP environment with Application Default Credentials.
- *   Set FIREBASE_PROJECT_ID if not auto-detected.
- *
- * Run the dry run first and read the counts. If "missing" is zero, the data is
- * already clean and there is nothing to do.
+ *   GOOGLE_APPLICATION_CREDENTIALS pointing at your service account JSON, OR a
+ *   GCP environment with Application Default Credentials.
  */
 
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
+import { pathToFileURL } from 'url';
+
+// ── The rule ─────────────────────────────────────────────
+//
+// Exported and unit-tested (src/test/backfillArchivalRule.test.js). This one
+// function decides which contacts disappear from search, so it is not left
+// buried in a loop where the only way to check it is to run the migration.
+
+/**
+ * Should a contact with no `is_archived` field be backfilled as archived?
+ *
+ * @param   {Object}  data  The contact document.
+ * @returns {boolean}
+ */
+export function inferIsArchived(data = {}) {
+  // A left swipe in people mode. The UI archived them; the write recorded
+  // status and archived_at but never the boolean.
+  if (data.status === 'people_mode_archived') return true;
+
+  // Any archival timestamp is evidence of the same thing from another path.
+  // Truthiness matters: the people schema initialises archived_at to null on
+  // records that are NOT archived, and Firestore returns that null back.
+  if (data.archived_at) return true;
+
+  return false;
+}
 
 // ── Parse CLI flags ───────────────────────────────────────
 
@@ -68,44 +114,26 @@ const IS_DRY_RUN  = args.includes('--dry-run');
 const IS_VERIFY   = args.includes('--verify');
 const USER_ID_ARG = args.find(a => a.startsWith('--user-id='));
 const TARGET_USER = USER_ID_ARG ? USER_ID_ARG.split('=')[1] : null;
-const PROJECT_ID  = process.env.FIREBASE_PROJECT_ID;
 
 const MODE = IS_VERIFY ? 'verify' : IS_DRY_RUN ? 'dry-run' : 'live';
 
 // Firestore caps a batch at 500 operations.
 const BATCH_LIMIT = 450;
 
-// ── Init Firebase Admin ───────────────────────────────────
-
-if (!getApps().length) {
-  const appConfig = PROJECT_ID ? { projectId: PROJECT_ID } : {};
-
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    const serviceAccount = JSON.parse(
-      readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')
-    );
-    initializeApp({ credential: cert(serviceAccount), ...appConfig });
-  } else {
-    initializeApp(appConfig);
-  }
-}
-
-const db = getFirestore();
-
 // ── Counters ─────────────────────────────────────────────
 
-let totalUsers      = 0;
-let totalContacts   = 0;
-let totalPatched    = 0;
-let totalSkipped    = 0;
-let totalMissing    = 0;   // verify mode: still missing after the run
-let totalSwipeArchived = 0;
+let totalUsers        = 0;
+let totalContacts     = 0;
+let totalPatchedTrue  = 0;
+let totalPatchedFalse = 0;
+let totalSkipped      = 0;
+let totalMissing      = 0;   // verify mode: still missing
 
-const swipeArchivedSamples = [];
+const archivedSamples = [];
 
 // ── Core: process one user's contacts ────────────────────
 
-async function processUser(userId) {
+async function processUser(db, userId) {
   const contactsRef = db.collection('users').doc(userId).collection('contacts');
   const snap = await contactsRef.get();
   if (snap.empty) return;
@@ -117,16 +145,6 @@ async function processUser(userId) {
     totalContacts++;
     const data = contactDoc.data();
     const hasField = Object.prototype.hasOwnProperty.call(data, 'is_archived');
-
-    // Report-only: left-swiped leads that never got the boolean. Counted
-    // whether or not this run writes anything, because the point is to
-    // surface them for a human decision.
-    if (!hasField && data.status === 'people_mode_archived') {
-      totalSwipeArchived++;
-      if (swipeArchivedSamples.length < 20) {
-        swipeArchivedSamples.push(`user=${userId} contact=${contactDoc.id} name=${data.name ?? '(none)'}`);
-      }
-    }
 
     if (IS_VERIFY) {
       if (!hasField) {
@@ -143,14 +161,27 @@ async function processUser(userId) {
       continue;
     }
 
-    totalPatched++;
+    const value = inferIsArchived(data);
+
+    if (value) {
+      totalPatchedTrue++;
+      if (archivedSamples.length < 20) {
+        archivedSamples.push(
+          `user=${userId} contact=${contactDoc.id} name=${data.name ?? '(none)'} status=${data.status ?? '(none)'}`
+        );
+      }
+    } else {
+      totalPatchedFalse++;
+    }
 
     if (IS_DRY_RUN) {
-      console.log(`  [WOULD PATCH] user=${userId} contact=${contactDoc.id} name=${data.name ?? '(none)'}`);
+      console.log(
+        `  [WOULD SET ${String(value).padEnd(5)}] user=${userId} contact=${contactDoc.id} name=${data.name ?? '(none)'}`
+      );
       continue;
     }
 
-    batch.update(contactDoc.ref, { is_archived: false });
+    batch.update(contactDoc.ref, { is_archived: value });
     opsInBatch++;
 
     if (opsInBatch >= BATCH_LIMIT) {
@@ -168,7 +199,26 @@ async function processUser(userId) {
 // ── Main ─────────────────────────────────────────────────
 
 async function main() {
-  console.log(`\n── backfillContactIsArchived — mode: ${MODE} ──\n`);
+  if (!getApps().length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const appConfig = projectId ? { projectId } : {};
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      const serviceAccount = JSON.parse(
+        readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')
+      );
+      initializeApp({ credential: cert(serviceAccount), ...appConfig });
+    } else {
+      initializeApp(appConfig);
+    }
+  }
+
+  const db = getFirestore();
+
+  console.log(`\n── backfillContactIsArchived — mode: ${MODE} ──`);
+  if (TARGET_USER) console.log(`   scoped to user: ${TARGET_USER}`);
+  if (MODE === 'dry-run') console.log('   NO WRITES WILL BE MADE\n');
+  else console.log('');
 
   let userIds;
   if (TARGET_USER) {
@@ -180,41 +230,54 @@ async function main() {
 
   for (const userId of userIds) {
     totalUsers++;
-    await processUser(userId);
+    await processUser(db, userId);
   }
+
+  const verb = IS_DRY_RUN ? 'would set' : 'set';
 
   console.log('\n── Summary ──');
-  console.log(`  mode:              ${MODE}`);
-  console.log(`  users scanned:     ${totalUsers}`);
-  console.log(`  contacts scanned:  ${totalContacts}`);
+  console.log(`  mode:                       ${MODE}`);
+  console.log(`  users scanned:              ${totalUsers}`);
+  console.log(`  contacts scanned:           ${totalContacts}`);
+
   if (IS_VERIFY) {
-    console.log(`  still missing:     ${totalMissing}`);
-    console.log(`  already correct:   ${totalSkipped}`);
+    console.log(`  still missing is_archived:  ${totalMissing}`);
+    console.log(`  already correct:            ${totalSkipped}`);
   } else {
-    console.log(`  ${IS_DRY_RUN ? 'would patch' : 'patched'}:       ${totalPatched}`);
-    console.log(`  skipped (had it):  ${totalSkipped}`);
+    console.log(`  ${verb} is_archived: true    ${totalPatchedTrue}   (rejected — stay out of search)`);
+    console.log(`  ${verb} is_archived: false   ${totalPatchedFalse}   (live contacts — searchable)`);
+    console.log(`  already had the field:      ${totalSkipped}   (untouched)`);
+    console.log(`  ────────────────────────────`);
+    console.log(`  total documents ${IS_DRY_RUN ? 'to update' : 'updated'}:  ${totalPatchedTrue + totalPatchedFalse}`);
   }
 
-  if (totalSwipeArchived > 0) {
-    console.log(`\n  ⚠️  ${totalSwipeArchived} contact(s) have status 'people_mode_archived' but no is_archived.`);
-    console.log('     They were set to is_archived: false like any other record — a left');
-    console.log('     swipe archived them in the UI but never wrote the boolean. Decide');
-    console.log('     whether they should be archived for real, then patch deliberately.');
-    for (const sample of swipeArchivedSamples) console.log(`       ${sample}`);
-    if (totalSwipeArchived > swipeArchivedSamples.length) {
-      console.log(`       … and ${totalSwipeArchived - swipeArchivedSamples.length} more`);
+  if (totalPatchedTrue > 0) {
+    console.log(`\n  Contacts being archived (first ${Math.min(20, totalPatchedTrue)}):`);
+    for (const sample of archivedSamples) console.log(`    ${sample}`);
+    if (totalPatchedTrue > archivedSamples.length) {
+      console.log(`    … and ${totalPatchedTrue - archivedSamples.length} more`);
     }
+    console.log('\n  These will disappear from search. If that number looks wrong, stop here.');
   }
 
+  if (IS_DRY_RUN) {
+    console.log('\n  Nothing was written. Re-run without --dry-run once the numbers look right.');
+  }
   if (IS_VERIFY && totalMissing === 0) {
     console.log('\n  ✅ Every contact has is_archived.');
   }
   console.log('');
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch(err => {
-    console.error('\n❌ Backfill failed:', err);
-    process.exit(1);
-  });
+// Only run when invoked directly, so the rule above can be imported by tests.
+const invokedDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  main()
+    .then(() => process.exit(0))
+    .catch(err => {
+      console.error('\n❌ Backfill failed:', err);
+      process.exit(1);
+    });
+}

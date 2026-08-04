@@ -290,6 +290,60 @@ describe('QuickSearch', () => {
     expect(whereFn).toHaveBeenCalledWith('status', '!=', 'archived');
   });
 
+  it('finds contacts that have no is_archived field at all', async () => {
+    // The bug this guards. Almost no write path in the app sets is_archived —
+    // only AddFromEmailButton does — so the old
+    // where('is_archived','==',false) matched almost nothing, and contacts
+    // visible everywhere else in the product were unfindable by search.
+    // Firestore does not match documents that lack the filtered field.
+    let callCount = 0;
+    mockGetDocs.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({ docs: [
+          // Exactly what CompanyDetail / DailyLeads / ManualContactForm write:
+          // a name, no is_archived.
+          { id: 'ct-legacy', data: () => ({ name: 'Gentry Moyes', title: 'Founder', company: 'Northwind' }) },
+        ] });
+      }
+      return Promise.resolve({ docs: [] });
+    });
+    renderQuickSearch();
+    const input = screen.getByPlaceholderText('Search contacts or companies...');
+    await userEvent.type(input, 'Gentry');
+
+    await waitFor(() => {
+      expect(screen.getByText('Gentry Moyes')).toBeInTheDocument();
+    });
+  });
+
+  it('excludes archived contacts in memory rather than in the query', async () => {
+    let callCount = 0;
+    mockGetDocs.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({ docs: [
+          { id: 'ct-live', data: () => ({ name: 'Archie Live', is_archived: false }) },
+          { id: 'ct-gone', data: () => ({ name: 'Archie Gone', is_archived: true }) },
+        ] });
+      }
+      return Promise.resolve({ docs: [] });
+    });
+    renderQuickSearch();
+    const input = screen.getByPlaceholderText('Search contacts or companies...');
+    await userEvent.type(input, 'Archie');
+
+    await waitFor(() => {
+      expect(screen.getByText('Archie Live')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Archie Gone')).not.toBeInTheDocument();
+
+    // And the exclusion must not have come from the query — the whole point is
+    // that Firestore is no longer asked to filter on a field most records lack.
+    const { where: whereFn } = await import('firebase/firestore');
+    expect(whereFn).not.toHaveBeenCalledWith('is_archived', '==', false);
+  });
+
   it('shows both contacts and companies together', async () => {
     setupDefaultMock();
     renderQuickSearch();

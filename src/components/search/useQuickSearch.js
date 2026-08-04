@@ -23,7 +23,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 
@@ -138,14 +138,30 @@ export default function useQuickSearch({ onNavigate } = {}) {
     const promise = (async () => {
       if (!activeUserId) return [];
       const peopleRef = collection(db, 'users', activeUserId, 'contacts');
-      const q = query(
-        peopleRef,
-        where('is_archived', '==', false),
-        orderBy('name', 'asc'),
-        limit(500)
-      );
+      // Unfiltered, unordered — deliberately.
+      //
+      // This query used to be where('is_archived','==',false) +
+      // orderBy('name','asc'), and it returned nothing for contacts that
+      // plainly exist. Firestore only matches documents that HAVE the field:
+      // an equality filter skips records where it is absent, and an orderBy
+      // skips records missing the sort key. Almost no write path in the app
+      // sets is_archived — only AddFromEmailButton does, and the schema
+      // factory that sets it correctly (peopleService.createPerson) has no
+      // callers — so every contact saved through Scout was invisible to
+      // search while still showing up everywhere that does not filter on it.
+      //
+      // Archiving is now applied in memory below, where a missing field reads
+      // as "not archived" — the same thing the rest of the app assumes.
+      // Backfilling the field at the source is the real fix and is tracked
+      // separately; this makes search honest in the meantime.
+      // The 500 ceiling is unchanged, but without the orderBy it now takes the
+      // first 500 by document ID instead of by name. Both are arbitrary once a
+      // workspace exceeds the cap; neither is a substitute for paging.
+      const q = query(peopleRef, limit(500));
       const snap = await getDocs(q);
-      const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const records = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => !c.is_archived);
       contactCacheRef.current = records;
       return records;
     })();

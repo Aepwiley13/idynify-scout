@@ -43,6 +43,25 @@ export function rankResults(items, term, nameGetter) {
   }).sort((a, b) => a.rank - b.rank).map(r => r.item);
 }
 
+/**
+ * The user sees "Search could not be completed. Try again." — deliberately
+ * vague, and useless to anyone debugging it. PR #506 caught these with a bare
+ * `catch {}`, which discarded the only evidence that mattered: which of the
+ * two queries failed, and why. Staging then hit exactly that wall.
+ *
+ * Firestore's error code is the whole diagnosis:
+ *   permission-denied    → the path is not the signed-in user's (impersonation)
+ *   failed-precondition  → a composite index is missing (message carries a link)
+ *   unavailable          → offline or blocked
+ */
+function logSearchFailure(source, err, activeUserId) {
+  console.error(
+    `[quick-search] ${source} query failed`,
+    { code: err?.code, message: err?.message, activeUserId, path: `users/${activeUserId}/${source}` },
+    err
+  );
+}
+
 export function contactName(contact) {
   return contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
 }
@@ -132,7 +151,10 @@ export default function useQuickSearch({ onNavigate } = {}) {
     })();
 
     contactLoadPromiseRef.current = promise;
-    promise.catch(() => { contactLoadPromiseRef.current = null; });
+    promise.catch((err) => {
+      logSearchFailure('contacts', err, activeUserId);
+      contactLoadPromiseRef.current = null;
+    });
     return promise;
   }, [activeUserId]);
 
@@ -151,7 +173,10 @@ export default function useQuickSearch({ onNavigate } = {}) {
     })();
 
     companyLoadPromiseRef.current = promise;
-    promise.catch(() => { companyLoadPromiseRef.current = null; });
+    promise.catch((err) => {
+      logSearchFailure('companies', err, activeUserId);
+      companyLoadPromiseRef.current = null;
+    });
     return promise;
   }, [activeUserId]);
 
@@ -197,7 +222,11 @@ export default function useQuickSearch({ onNavigate } = {}) {
         setContactResults(filterContacts(contacts, term));
         setCompanyResults(filterCompanies(companies, term));
         setSearchLoading(false);
-      } catch {
+      } catch (err) {
+        // Reached either because a loader rejected — already logged above with
+        // its Firestore code — or because filtering threw on a malformed
+        // record, which nothing else would report.
+        console.error('[quick-search] search failed', { term, activeUserId }, err);
         if (seq !== querySeqRef.current) return;
         setSearchError(true);
         setSearchLoading(false);
@@ -205,7 +234,7 @@ export default function useQuickSearch({ onNavigate } = {}) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [inputValue, loadContacts, loadCompanies]);
+  }, [inputValue, loadContacts, loadCompanies, activeUserId]);
 
   const reset = useCallback(() => {
     setInputValue('');

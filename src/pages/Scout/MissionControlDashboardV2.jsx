@@ -18,6 +18,7 @@ import RecentOutreachActivity from '../../components/mission-control/RecentOutre
 import HunterReadinessBanner from '../../components/mission-control/HunterReadinessBanner';
 import MissionControlRightRail from '../../components/mission-control/MissionControlRightRail';
 import MobileCompanyCard from '../../components/mission-control/MobileCompanyCard';
+import QuickSearch from '../../components/mission-control/QuickSearch';
 import useRecommendations from '../../hooks/useRecommendations';
 import { useShell } from '../../context/ShellContext';
 import '../../components/mission-control/MissionControlLayout.css';
@@ -694,7 +695,6 @@ export default function MissionControlDashboardV2() {
 
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [industryFilter, setIndustryFilter] = useState('');
   const [scoreFilter, setScoreFilter] = useState('all');
   const [page, setPage] = useState(0);
@@ -814,8 +814,6 @@ export default function MissionControlDashboardV2() {
   const industries = [...new Set(companies.map(c => c.industry).filter(Boolean))].sort();
 
   const filtered = companies.filter(c => {
-    const name = (c.name || c.company_name || '').toLowerCase();
-    if (searchTerm && !name.includes(searchTerm.toLowerCase())) return false;
     if (industryFilter && c.industry !== industryFilter) return false;
     if (scoreFilter === '90+' && (c.fit_score || 0) < 90) return false;
     if (scoreFilter === '70-89' && ((c.fit_score || 0) < 70 || (c.fit_score || 0) >= 90)) return false;
@@ -933,20 +931,7 @@ export default function MissionControlDashboardV2() {
           <div style={{
             display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center',
           }}>
-            <div style={{ position: 'relative', flex: '1 1 200px' }}>
-              <Search size={16} color={T.textFaint} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-                placeholder="Search companies..."
-                style={{
-                  width: '100%', padding: '10px 12px 10px 36px', borderRadius: 10,
-                  border: `1.5px solid ${T.border2}`, background: T.input,
-                  color: T.text, fontSize: 13, outline: 'none', boxSizing: 'border-box',
-                }}
-              />
-            </div>
+            <QuickSearch />
             <select
               value={industryFilter}
               onChange={(e) => { setIndustryFilter(e.target.value); setPage(0); }}
@@ -1002,7 +987,7 @@ export default function MissionControlDashboardV2() {
             {/* Table Rows */}
             {pageCompanies.length === 0 ? (
               <div style={{ padding: 40, textAlign: 'center', color: T.textMuted, fontSize: 14 }}>
-                {searchTerm || industryFilter || scoreFilter !== 'all'
+                {industryFilter || scoreFilter !== 'all'
                   ? 'No companies match your filters.'
                   : 'No companies yet. Head to Scout to start finding prospects.'}
               </div>
@@ -1160,7 +1145,7 @@ export default function MissionControlDashboardV2() {
                 borderRadius: 14, padding: 40, textAlign: 'center',
                 color: T.textMuted, fontSize: 14,
               }}>
-                {searchTerm || industryFilter || scoreFilter !== 'all'
+                {industryFilter || scoreFilter !== 'all'
                   ? 'No companies match your filters.'
                   : 'No companies yet. Head to Scout to start finding prospects.'}
               </div>

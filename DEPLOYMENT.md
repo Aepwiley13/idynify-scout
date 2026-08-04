@@ -54,6 +54,36 @@ service cloud.firestore {
 }
 ```
 
+### 1.4b Deploy Firestore Indexes
+
+`firestore.indexes.json` is the source of truth for composite indexes. **Nothing
+deploys it on merge** — Netlify builds the frontend only, and CI runs tests
+only. Indexes reach Firebase when someone deploys them.
+
+```bash
+cd functions
+npm run deploy:indexes     # indexes alone
+npm run deploy             # functions + indexes together
+```
+
+Indexes take a few minutes to build. Queries against a missing index fail with
+`FirebaseError: The query requires an index` and the message carries a console
+link that creates it.
+
+**Create indexes through this file, not the console link.** An index created by
+clicking the link exists in that one project and nowhere else — the file stays
+unaware of it, and a fresh environment deployed from this repo comes up without
+it. That is exactly how the `contacts (is_archived, name)` index went missing:
+it existed in production from earlier manual work, was absent from the repo, and
+the failure only surfaced when a new query needed it.
+
+To check what a project actually has, against what the repo declares:
+
+```bash
+firebase firestore:indexes            # what is deployed
+cat ../firestore.indexes.json         # what the repo declares
+```
+
 ### 1.5 Get Firebase Config (Client-Side)
 1. Go to Project Settings → General → Your apps
 2. Click "Web app" (</> icon)

@@ -4,6 +4,7 @@ import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { Search, Building2, Globe, Check, X } from 'lucide-react';
 import './CompanySearch.css';
+import { createCompanyRecord } from '../../schemas/companySchema';
 
 /**
  * Company Search Component
@@ -124,7 +125,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
       }
 
       // Add company to Firestore
-      const docRef = await addDoc(companiesRef, {
+      const docRef = await addDoc(companiesRef, createCompanyRecord({
         apollo_organization_id: company.apollo_organization_id,
         name: company.name,
         industry: company.industry,
@@ -141,7 +142,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
         source: 'manual_search',
         found_at: new Date(),
         saved_at: new Date()
-      });
+      }));
 
       console.log('✅ Company added successfully');
 
@@ -229,6 +230,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
         sourceType: 'website',
         source: 'website',
         status: 'saved',
+        is_archived: false,   // required by every contact reader — never omit
         saved_at: new Date(),
         found_at: new Date(),
         last_enriched_at: null

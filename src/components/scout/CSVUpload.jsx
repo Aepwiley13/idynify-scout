@@ -4,6 +4,7 @@ import { collection, writeBatch, doc, query, where, getDocs } from 'firebase/fir
 import { Upload, AlertTriangle, CheckCircle, Users, Building2 } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { createCompanyRecord } from '../../schemas/companySchema';
 
 export default function CSVUpload({ onContactsAdded, onCancel }) {
   const [uploadType, setUploadType] = useState(null); // 'leads' or 'companies'
@@ -274,7 +275,7 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
         const companiesRef = collection(db, 'users', user.uid, 'companies');
 
         for (const company of preview.items) {
-          const companyData = {
+          const companyData = createCompanyRecord({
             name: company.name,
             website_url: company.website_url || null,
             industry: company.industry || null,
@@ -296,7 +297,7 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
             phone: null,
             logo_url: null,
             employee_count: null,
-          };
+          });
 
           const newDocRef = doc(companiesRef);
           batch.set(newDocRef, companyData);

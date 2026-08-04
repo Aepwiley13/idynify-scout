@@ -376,14 +376,33 @@ describe('search and navigation', () => {
     });
   });
 
-  it('shows the error state when the search cannot be completed', async () => {
-    mockGetDocs.mockRejectedValue(new Error('offline'));
-    renderHost();
-    await openViaIcon();
-    await userEvent.type(searchInput(), 'Acme');
-    await waitFor(() => {
-      expect(screen.getByText('Search could not be completed. Try again.')).toBeInTheDocument();
-    });
+  it('shows the error state when the search cannot be completed, and logs why', async () => {
+    // The user-facing copy is deliberately vague. The console line is not:
+    // staging hit this state with nothing logged to go on, which is what the
+    // logging exists to prevent happening twice.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const failure = Object.assign(new Error('Missing or insufficient permissions.'), {
+        code: 'permission-denied',
+      });
+      mockGetDocs.mockRejectedValue(failure);
+      renderHost();
+      await openViaIcon();
+      await userEvent.type(searchInput(), 'Acme');
+      await waitFor(() => {
+        expect(screen.getByText('Search could not be completed. Try again.')).toBeInTheDocument();
+      });
+
+      const messages = logged.mock.calls.map(c => c[0]);
+      expect(messages).toContain('[quick-search] contacts query failed');
+      expect(messages).toContain('[quick-search] companies query failed');
+      // The Firestore code is the diagnosis — it has to survive into the log.
+      const detail = logged.mock.calls.find(c => c[0] === '[quick-search] contacts query failed')[1];
+      expect(detail).toMatchObject({ code: 'permission-denied', activeUserId: 'test-user' });
+      expect(detail.path).toBe('users/test-user/contacts');
+    } finally {
+      logged.mockRestore();
+    }
   });
 
   it('reads only the authenticated workspace, and writes nothing', async () => {

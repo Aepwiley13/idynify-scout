@@ -41,6 +41,7 @@ import BarryChatPanel from '../dashboard/BarryChatPanel';
 import NotificationCenter from '../notifications/NotificationCenter';
 import QuickEngageDrawer from '../engage/QuickEngageDrawer';
 import ShellAnnouncements from './ShellAnnouncements';
+import CommandBar from './CommandBar';
 import { auth } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 import { ShellProvider, useShell } from '../../context/ShellContext';
@@ -106,6 +107,7 @@ function ShellChrome({ children, user }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = React.useState(false);
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [commandBarOpen, setCommandBarOpen] = React.useState(false);
 
   const {
     shellUser,
@@ -210,16 +212,19 @@ function ShellChrome({ children, user }) {
           </div>
 
           <div className="top-bar-right">
-            {/* Global search — mount point reserved, feature not built.
-                Phase 0 constraint C2: the brief lists a global search entry
-                point among shell responsibilities, but no global search
-                exists in the product. A disabled, labelled affordance is
-                honest; a non-functional input would not be. */}
+            {/* Global search. The affordance sat here disabled through Phase 0
+                because no global search existed — an honest placeholder rather
+                than a dead input. It exists now: CommandBar, mounted once at
+                the bottom of this shell, opened from here or with ⌘K.
+                Focus returns to this button when the overlay closes, because
+                CommandBar restores whatever had focus when it opened. */}
             <button
-              className="topbar-icon-btn"
-              disabled
-              aria-label="Global search — coming soon"
-              title="Global search — coming soon"
+              className={`topbar-icon-btn${commandBarOpen ? ' active' : ''}`}
+              onClick={() => setCommandBarOpen(true)}
+              aria-label="Search contacts and companies"
+              aria-haspopup="dialog"
+              aria-expanded={commandBarOpen}
+              title="Search (⌘K)"
             >
               <Search size={18} />
             </button>
@@ -302,6 +307,16 @@ function ShellChrome({ children, user }) {
       )}
 
       <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+
+      {/* Global search overlay. Mounted here — once, above every route — and
+          never conditionally: the ⌘K listener lives inside it, so unmounting
+          while closed would take the shortcut with it. It renders no panel
+          until opened. */}
+      <CommandBar
+        isOpen={commandBarOpen}
+        onOpen={() => setCommandBarOpen(true)}
+        onClose={() => setCommandBarOpen(false)}
+      />
 
       {/* Stage-transition announcements. Only explicit announce() calls
           surface here — routine navigation never produces one. */}

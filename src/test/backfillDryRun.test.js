@@ -70,11 +70,13 @@ vi.mock('firebase-admin/firestore', () => ({
 let output = '';
 
 beforeAll(async () => {
-  vi.spyOn(process, 'exit').mockImplementation(() => undefined);
+  // globalThis.process, because the eslint config declares browser globals
+  // only and this is one of the few tests that genuinely needs the Node one.
+  vi.spyOn(globalThis.process, 'exit').mockImplementation(() => undefined);
   vi.spyOn(console, 'log').mockImplementation((...parts) => { output += parts.join(' ') + '\n'; });
 
   // The script only runs when invoked directly, so pose as the CLI.
-  process.argv = ['node', SCRIPT, '--dry-run'];
+  globalThis.process.argv = ['node', SCRIPT, '--dry-run'];
 
   await import('../../scripts/backfillContactIsArchived.mjs');
   await vi.waitFor(() => expect(output).toContain('Summary'), { timeout: 4000 });

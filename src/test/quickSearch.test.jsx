@@ -265,6 +265,31 @@ describe('QuickSearch', () => {
     expect(mockGetDocs.mock.calls.length).toBe(firstCallCount);
   });
 
+  it('excludes archived companies from results', async () => {
+    let callCount = 0;
+    mockGetDocs.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve({ docs: MOCK_CONTACT_DOCS });
+      // Company docs include an archived company
+      return Promise.resolve({ docs: [
+        ...MOCK_COMPANY_DOCS,
+        { id: 'co-archived', data: () => ({ name: 'Dead Company', industry: 'Defunct', domain: 'dead.com', status: 'archived' }) },
+      ] });
+    });
+    renderQuickSearch();
+    const input = screen.getByPlaceholderText('Search contacts or companies...');
+    await userEvent.type(input, 'Dead');
+
+    // The archived company was returned by Firestore in the mock, but the
+    // real query uses where('status', '!=', 'archived') so it would never
+    // arrive. Since we're mocking getDocs, we verify the query construction
+    // is correct by checking that the where() mock was called with the
+    // archived-exclusion filter. The integration contract is: archived
+    // companies are excluded at the Firestore query level.
+    const { where: whereFn } = await import('firebase/firestore');
+    expect(whereFn).toHaveBeenCalledWith('status', '!=', 'archived');
+  });
+
   it('shows both contacts and companies together', async () => {
     setupDefaultMock();
     renderQuickSearch();

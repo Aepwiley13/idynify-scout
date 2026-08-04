@@ -97,7 +97,8 @@ export default function QuickSearch() {
     const promise = (async () => {
       if (!activeUserId) return [];
       const companiesRef = collection(db, 'users', activeUserId, 'companies');
-      const snap = await getDocs(companiesRef);
+      const q = query(companiesRef, where('status', '!=', 'archived'));
+      const snap = await getDocs(q);
       const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       companyCacheRef.current = records;
       return records;

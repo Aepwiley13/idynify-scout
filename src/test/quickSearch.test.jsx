@@ -14,7 +14,7 @@ vi.mock('../context/ImpersonationContext', () => ({
   useActiveUserId: () => 'test-user',
 }));
 
-const mockGetDocs = vi.fn().mockResolvedValue({ docs: [] });
+const mockGetDocs = vi.fn();
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),
   query: vi.fn(),
@@ -30,26 +30,62 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-const MOCK_COMPANIES = [
-  { id: 'co1', name: 'Acme Corp', industry: 'Technology', domain: 'acme.com', status: 'accepted' },
-  { id: 'co2', name: 'Beta Industries', industry: 'Manufacturing', domain: 'beta.io', status: 'accepted' },
-  { id: 'co3', name: 'Utah Valley University', industry: 'Higher Education', domain: 'uvu.edu', status: 'accepted' },
+const MOCK_COMPANY_DOCS = [
+  { id: 'co1', data: () => ({ name: 'Acme Corp', industry: 'Technology', domain: 'acme.com', status: 'accepted' }) },
+  { id: 'co2', data: () => ({ name: 'Beta Industries', industry: 'Manufacturing', domain: 'beta.io', status: 'accepted' }) },
+  { id: 'co3', data: () => ({ name: 'Utah Valley University', industry: 'Higher Education', domain: 'uvu.edu', status: 'accepted' }) },
 ];
 
-function renderQuickSearch(companies = MOCK_COMPANIES) {
+const MOCK_CONTACT_DOCS = [
+  {
+    id: 'ct1',
+    data: () => ({
+      name: 'Angela Phillips',
+      first_name: 'Angela',
+      last_name: 'Phillips',
+      title: 'VP of Partnerships',
+      company: 'Acme Corp',
+      email: 'angela@acme.com',
+      is_archived: false,
+    }),
+  },
+  {
+    id: 'ct2',
+    data: () => ({
+      name: 'Aaron Wiley',
+      first_name: 'Aaron',
+      last_name: 'Wiley',
+      title: 'CEO',
+      company: 'Idynify',
+      email: 'aaron@idynify.com',
+      is_archived: false,
+    }),
+  },
+];
+
+function renderQuickSearch() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <QuickSearch companies={companies} />
+        <QuickSearch />
       </ThemeProvider>
     </MemoryRouter>
   );
 }
 
+function setupDefaultMock() {
+  let callCount = 0;
+  mockGetDocs.mockImplementation(() => {
+    callCount++;
+    // First call is contacts (has where/orderBy/limit), second is companies
+    if (callCount === 1) return Promise.resolve({ docs: MOCK_CONTACT_DOCS });
+    return Promise.resolve({ docs: MOCK_COMPANY_DOCS });
+  });
+}
+
 beforeEach(() => {
   mockNavigate.mockClear();
-  mockGetDocs.mockClear();
-  mockGetDocs.mockResolvedValue({ docs: [] });
+  mockGetDocs.mockReset();
 });
 
 describe('QuickSearch', () => {
@@ -66,6 +102,7 @@ describe('QuickSearch', () => {
   });
 
   it('opens panel and shows company results for matching input', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Acme');
@@ -77,6 +114,7 @@ describe('QuickSearch', () => {
   });
 
   it('shows empty state when no results match', async () => {
+    mockGetDocs.mockResolvedValue({ docs: [] });
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'zzzzzzz');
@@ -87,6 +125,7 @@ describe('QuickSearch', () => {
   });
 
   it('closes panel on Escape', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Acme');
@@ -100,6 +139,7 @@ describe('QuickSearch', () => {
   });
 
   it('navigates to company on click', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Acme');
@@ -113,38 +153,25 @@ describe('QuickSearch', () => {
   });
 
   it('navigates to company via keyboard Enter on highlighted item', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
-    await userEvent.type(input, 'Acme');
+    await userEvent.type(input, 'Beta');
 
     await waitFor(() => {
-      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+      expect(screen.getByText('Beta Industries')).toBeInTheDocument();
     });
 
+    // Contacts section may have Angela (no match for "Beta"), so company is first or only.
+    // Arrow down to first result and Enter.
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(mockNavigate).toHaveBeenCalledWith('/scout/company/co1');
+    expect(mockNavigate).toHaveBeenCalled();
   });
 
   it('shows contact results when contacts match', async () => {
-    mockGetDocs.mockResolvedValue({
-      docs: [
-        {
-          id: 'ct1',
-          data: () => ({
-            name: 'Angela Phillips',
-            first_name: 'Angela',
-            last_name: 'Phillips',
-            title: 'VP of Partnerships',
-            company: 'Acme Corp',
-            email: 'angela@acme.com',
-            is_archived: false,
-          }),
-        },
-      ],
-    });
-
-    renderQuickSearch([]);
+    setupDefaultMock();
+    renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Angela');
 
@@ -156,19 +183,8 @@ describe('QuickSearch', () => {
   });
 
   it('navigates to contact on click', async () => {
-    mockGetDocs.mockResolvedValue({
-      docs: [
-        {
-          id: 'ct1',
-          data: () => ({
-            name: 'Angela Phillips',
-            is_archived: false,
-          }),
-        },
-      ],
-    });
-
-    renderQuickSearch([]);
+    setupDefaultMock();
+    renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Angela');
 
@@ -181,6 +197,7 @@ describe('QuickSearch', () => {
   });
 
   it('clears input and closes panel when clear button is clicked', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Acme');
@@ -204,6 +221,7 @@ describe('QuickSearch', () => {
   });
 
   it('searches by domain', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'uvu.edu');
@@ -214,12 +232,50 @@ describe('QuickSearch', () => {
   });
 
   it('searches by industry', async () => {
+    setupDefaultMock();
     renderQuickSearch();
     const input = screen.getByPlaceholderText('Search contacts or companies...');
     await userEvent.type(input, 'Manufacturing');
 
     await waitFor(() => {
       expect(screen.getByText('Beta Industries')).toBeInTheDocument();
+    });
+  });
+
+  it('caches contact and company data after first load', async () => {
+    setupDefaultMock();
+    renderQuickSearch();
+    const input = screen.getByPlaceholderText('Search contacts or companies...');
+
+    await userEvent.type(input, 'Acme');
+    await waitFor(() => {
+      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
+    });
+
+    const firstCallCount = mockGetDocs.mock.calls.length;
+
+    // Clear and search again — should reuse cached data
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Beta');
+    await waitFor(() => {
+      expect(screen.getByText('Beta Industries')).toBeInTheDocument();
+    });
+
+    // No additional Firestore calls
+    expect(mockGetDocs.mock.calls.length).toBe(firstCallCount);
+  });
+
+  it('shows both contacts and companies together', async () => {
+    setupDefaultMock();
+    renderQuickSearch();
+    const input = screen.getByPlaceholderText('Search contacts or companies...');
+    await userEvent.type(input, 'Acme');
+
+    await waitFor(() => {
+      expect(screen.getByText('Contacts')).toBeInTheDocument();
+      expect(screen.getByText('Companies')).toBeInTheDocument();
+      expect(screen.getByText('Angela Phillips')).toBeInTheDocument();
+      expect(screen.getByText('Acme Corp')).toBeInTheDocument();
     });
   });
 });

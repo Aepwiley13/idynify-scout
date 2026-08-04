@@ -931,7 +931,7 @@ export default function MissionControlDashboardV2() {
           <div style={{
             display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center',
           }}>
-            <QuickSearch companies={companies} />
+            <QuickSearch />
             <select
               value={industryFilter}
               onChange={(e) => { setIndustryFilter(e.target.value); setPage(0); }}

@@ -39,7 +39,7 @@ function rankResults(items, term, nameGetter) {
   }).sort((a, b) => a.rank - b.rank).map(r => r.item);
 }
 
-export default function QuickSearch({ companies = [] }) {
+export default function QuickSearch() {
   const T = useT();
   const navigate = useNavigate();
   const activeUserId = useActiveUserId();
@@ -56,12 +56,22 @@ export default function QuickSearch({ companies = [] }) {
   const inputRef = useRef(null);
   const querySeqRef = useRef(0);
 
+  // Session-level caches: loaded once from Firestore on first search, reused
+  // for all subsequent queries within this Mission Control session.
+  const contactCacheRef = useRef(null);
+  const companyCacheRef = useRef(null);
+  const contactLoadPromiseRef = useRef(null);
+  const companyLoadPromiseRef = useRef(null);
+
   const allResults = [...contactResults, ...companyResults];
   const totalResults = allResults.length;
 
-  const searchContacts = useCallback(async (term, seq) => {
-    if (!activeUserId) return [];
-    try {
+  const loadContacts = useCallback(() => {
+    if (contactCacheRef.current) return Promise.resolve(contactCacheRef.current);
+    if (contactLoadPromiseRef.current) return contactLoadPromiseRef.current;
+
+    const promise = (async () => {
+      if (!activeUserId) return [];
       const peopleRef = collection(db, 'users', activeUserId, 'contacts');
       const q = query(
         peopleRef,
@@ -70,30 +80,61 @@ export default function QuickSearch({ companies = [] }) {
         limit(500)
       );
       const snap = await getDocs(q);
-      if (seq !== querySeqRef.current) return [];
+      const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      contactCacheRef.current = records;
+      return records;
+    })();
 
-      const lowerTerm = term.toLowerCase();
-      const matches = [];
-      snap.docs.forEach(d => {
-        const data = { id: d.id, ...d.data() };
-        const name = (data.name || `${data.first_name || ''} ${data.last_name || ''}`.trim()).toLowerCase();
-        const company = (data.company || '').toLowerCase();
-        const email = (data.email || '').toLowerCase();
-        const title = (data.title || '').toLowerCase();
-        if (name.includes(lowerTerm) || company.includes(lowerTerm) ||
-            email.includes(lowerTerm) || title.includes(lowerTerm)) {
-          matches.push(data);
-        }
-      });
-      return rankResults(matches, term, c =>
-        c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim()
-      ).slice(0, 5);
-    } catch {
-      throw new Error('Contact search failed');
-    }
+    contactLoadPromiseRef.current = promise;
+    promise.catch(() => { contactLoadPromiseRef.current = null; });
+    return promise;
   }, [activeUserId]);
 
-  const searchCompanies = useCallback((term) => {
+  const loadCompanies = useCallback(() => {
+    if (companyCacheRef.current) return Promise.resolve(companyCacheRef.current);
+    if (companyLoadPromiseRef.current) return companyLoadPromiseRef.current;
+
+    const promise = (async () => {
+      if (!activeUserId) return [];
+      const companiesRef = collection(db, 'users', activeUserId, 'companies');
+      const snap = await getDocs(companiesRef);
+      const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      companyCacheRef.current = records;
+      return records;
+    })();
+
+    companyLoadPromiseRef.current = promise;
+    promise.catch(() => { companyLoadPromiseRef.current = null; });
+    return promise;
+  }, [activeUserId]);
+
+  // Invalidate caches when user changes (e.g. impersonation switch).
+  useEffect(() => {
+    contactCacheRef.current = null;
+    companyCacheRef.current = null;
+    contactLoadPromiseRef.current = null;
+    companyLoadPromiseRef.current = null;
+  }, [activeUserId]);
+
+  function filterContacts(contacts, term) {
+    const lowerTerm = term.toLowerCase();
+    const matches = [];
+    for (const data of contacts) {
+      const name = (data.name || `${data.first_name || ''} ${data.last_name || ''}`.trim()).toLowerCase();
+      const company = (data.company || '').toLowerCase();
+      const email = (data.email || '').toLowerCase();
+      const title = (data.title || '').toLowerCase();
+      if (name.includes(lowerTerm) || company.includes(lowerTerm) ||
+          email.includes(lowerTerm) || title.includes(lowerTerm)) {
+        matches.push(data);
+      }
+    }
+    return rankResults(matches, term, c =>
+      c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim()
+    ).slice(0, 5);
+  }
+
+  function filterCompanies(companies, term) {
     const lowerTerm = term.toLowerCase();
     const matches = companies.filter(c => {
       const name = (c.name || c.company_name || '').toLowerCase();
@@ -102,7 +143,7 @@ export default function QuickSearch({ companies = [] }) {
       return name.includes(lowerTerm) || domain.includes(lowerTerm) || industry.includes(lowerTerm);
     });
     return rankResults(matches, term, c => c.name || c.company_name || '').slice(0, 5);
-  }, [companies]);
+  }
 
   useEffect(() => {
     const term = inputValue.trim();
@@ -120,27 +161,25 @@ export default function QuickSearch({ companies = [] }) {
     setHighlightIndex(-1);
     const seq = ++querySeqRef.current;
 
-    const companyMatches = searchCompanies(term);
-
     const timer = setTimeout(async () => {
       try {
-        const contactMatches = await searchContacts(term, seq);
+        const [contacts, companies] = await Promise.all([
+          loadContacts(),
+          loadCompanies(),
+        ]);
         if (seq !== querySeqRef.current) return;
-        setContactResults(contactMatches);
-        setCompanyResults(companyMatches);
+        setContactResults(filterContacts(contacts, term));
+        setCompanyResults(filterCompanies(companies, term));
         setSearchLoading(false);
       } catch {
         if (seq !== querySeqRef.current) return;
         setSearchError(true);
         setSearchLoading(false);
-        setCompanyResults(companyMatches);
       }
     }, 300);
 
-    setCompanyResults(companyMatches);
-
     return () => clearTimeout(timer);
-  }, [inputValue, searchContacts, searchCompanies]);
+  }, [inputValue, loadContacts, loadCompanies]);
 
   useEffect(() => {
     function handleClickOutside(e) {

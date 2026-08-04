@@ -374,6 +374,47 @@ const NOREPLY_LOCAL_PART =
 const AUTOMATED_SUBJECTS =
   /(out of (the )?office|automatic reply|auto[- ]?reply|autoreply|delivery (status )?notification|undeliverable|mail delivery (failed|subsystem)|returned mail|read receipt|unsubscribe confirmation|password reset|verify your email|your receipt|invoice #)/i;
 
+/**
+ * Subject *prefixes* that mark a machine-generated message — Google Calendar
+ * invite/RSVP notifications and out-of-office auto-responders.
+ *
+ * Anchored to the start of the subject on purpose. These words are ordinary
+ * human phrasing in the middle of a sentence ("Quick reminder: can you send the
+ * deck?", "Accepted: here are the terms"), and a wrong "automated" call is not
+ * cosmetic — shouldProcessMessage drops automated mail on an unknown thread, so
+ * an unanchored match would silently bin real prospect replies.
+ *
+ * Anchoring also keeps a human reply *to* a calendar thread out of the net:
+ * "Re: Updated invitation: …" does not start with the prefix, so it falls
+ * through to the reply rule where it belongs.
+ */
+const AUTOMATED_SUBJECT_PREFIXES =
+  /^\s*(updated invitation|invitation|accepted|declined|tentative|cancell?ed|event reminder|reminder|automatic reply|auto[- ]?reply|out of office|ooo)\s*:/i;
+
+/** Senders that are automated regardless of what the subject says. */
+const AUTOMATED_SENDER_ADDRESSES = ['calendar-notification@google.com'];
+
+/** Local-part prefixes that mark a send-only mailbox. */
+const AUTOMATED_LOCAL_PREFIX = /^(no[-._]?reply|do[-._]?not[-._]?reply|donotreply)/i;
+
+/**
+ * True when the sending address itself identifies an automated system.
+ * Checked independently of the subject.
+ * @param {string} fromEmail — already lowercased and trimmed by the caller
+ */
+export function isAutomatedSender(fromEmail) {
+  const email = (fromEmail || '').toLowerCase().trim();
+  if (!email || !email.includes('@')) return false;
+
+  if (AUTOMATED_SENDER_ADDRESSES.includes(email)) return true;
+
+  const [localPart, domain] = email.split('@');
+  if (domain === 'calendar.google.com' || domain.endsWith('.calendar.google.com')) return true;
+  if (AUTOMATED_LOCAL_PREFIX.test(localPart)) return true;
+
+  return false;
+}
+
 const INTERNAL_LOCAL_PART = /(^|[.+_-])(test|qa|staging|dev|sandbox)([.+_-]|$)/i;
 
 const INTERNAL_SUBJECT = /^\s*\[(test|qa|staging|internal)\]/i;
@@ -401,6 +442,13 @@ function looksAutomated(headers, fromEmail) {
 
   const subject = getHeader(headers, 'Subject') || '';
   if (AUTOMATED_SUBJECTS.test(subject)) return true;
+  if (AUTOMATED_SUBJECT_PREFIXES.test(subject)) return true;
+
+  // Sender-level check — independent of the subject. Google Calendar sends
+  // invite notifications *as the organiser*, so a real person's address can
+  // still be carrying machine-generated mail; the subject prefix above is what
+  // catches those.
+  if (isAutomatedSender(fromEmail)) return true;
 
   const localPart = (fromEmail || '').split('@')[0] || '';
   if (NOREPLY_LOCAL_PART.test(localPart)) return true;

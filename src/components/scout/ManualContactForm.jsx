@@ -86,6 +86,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         contact_status_updated_at: new Date().toISOString(),
         export_ready: true,
         addedAt: new Date().toISOString(),
+        is_archived: false,   // required by every contact reader — never omit
 
         // Placeholder for future enrichment
         apollo_data: null,

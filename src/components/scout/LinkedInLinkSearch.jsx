@@ -6,6 +6,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
+import { createCompanyRecord } from '../../schemas/companySchema';
 
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const T = useT();
@@ -76,6 +77,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
         seniority: contact.seniority || null,
         location: contact.location || null,
         status: 'active',
+        is_archived: false,   // required by every contact reader — never omit
         saved_at: new Date().toISOString(),
         source: 'LinkedIn Link',
         match_quality: 100
@@ -120,7 +122,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       if (!snap.empty) return snap.docs[0].id;
     }
     const companyId = apolloOrgId || `company_${Date.now()}`;
-    await setDoc(doc(db, 'users', userId, 'companies', companyId), {
+    await setDoc(doc(db, 'users', userId, 'companies', companyId), createCompanyRecord({
       apollo_id: apolloOrgId || null,
       name: companyName,
       industry: contact.organization?.industry || null,
@@ -134,7 +136,7 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       status: 'accepted',
       contact_count: 0,
       apolloEnriched: false
-    });
+    }));
     return companyId;
   };
 

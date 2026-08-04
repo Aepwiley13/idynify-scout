@@ -371,6 +371,7 @@ export default function CompanyDetail() {
 
       // Metadata
       status: 'pending_enrichment',
+      is_archived: false,   // required by every contact reader — never omit
       saved_at: new Date().toISOString(),
       source: 'apollo_people_search'
     });
@@ -523,6 +524,7 @@ export default function CompanyDetail() {
 
           // Metadata
           status: 'pending_enrichment',
+          is_archived: false,   // required by every contact reader — never omit
           saved_at: new Date().toISOString(),
           source: 'decision_makers'
         });

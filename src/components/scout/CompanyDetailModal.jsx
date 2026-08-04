@@ -277,6 +277,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
 
           // Metadata
           status: 'active',
+          is_archived: false,   // required by every contact reader — never omit
           saved_at: new Date().toISOString(),
           source: 'apollo'
         });

@@ -4,6 +4,7 @@ import { collection, addDoc, doc, setDoc, getDoc, updateDoc, query, where, getDo
 import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { createCompanyRecord } from '../../schemas/companySchema';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const [image, setImage] = useState(null);
@@ -189,7 +190,8 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         // Placeholder for future enrichment
         apollo_data: null,
         enriched: false,
-        status: 'active'
+        status: 'active',
+        is_archived: false   // required by every contact reader — never omit
       };
 
       const contactsRef = collection(db, 'users', user.uid, 'contacts');
@@ -227,7 +229,7 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     const companyId = `company_${Date.now()}`;
     const companyRef = doc(db, 'users', userId, 'companies', companyId);
 
-    const companyData = {
+    const companyData = createCompanyRecord({
       name: companyName,
       website_url: website || null,
       domain: website ? extractDomain(website) : null,
@@ -240,7 +242,7 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
       // For future enrichment
       apolloEnriched: false
-    };
+    });
 
     await setDoc(companyRef, companyData);
     console.log('✅ Company created from business card:', companyId);

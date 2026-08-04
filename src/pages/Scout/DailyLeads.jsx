@@ -1597,6 +1597,9 @@ export default function DailyLeads({ onNavigate }) {
                   ...person, company_id: company.id, company_name: company.name,
                   lead_owner: user.uid, status: 'suggested', source: 'icp_auto_discovery',
                   discovered_at: new Date().toISOString(),
+                  // Set after the spread, never from it: `person` is an
+                  // enrichment API payload and carries no archival state.
+                  is_archived: false,
                 });
               }
               await updateDoc(companyRef, { auto_contact_status: 'completed', auto_contact_count: result.people.length, auto_contact_searched_at: new Date().toISOString() });
@@ -1912,7 +1915,9 @@ export default function DailyLeads({ onNavigate }) {
     const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
     try {
       if (direction === 'right') {
-        await setDoc(contactRef, { ...person, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString(), ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}) }, { merge: true });
+        // is_archived is set after the spread, never from it — `person` is an
+        // enrichment API payload and carries no archival state.
+        await setDoc(contactRef, { ...person, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString(), is_archived: false, ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}) }, { merge: true });
         if (company.status === 'pending') {
           const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
           await updateDoc(companyRef, { status: 'accepted', swipedAt: new Date().toISOString(), swipeDirection: 'right', swipe_source: 'people_mode' });
@@ -1922,7 +1927,10 @@ export default function DailyLeads({ onNavigate }) {
           }
         }
       } else if (direction === 'left') {
-        await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', archived_at: new Date().toISOString(), ...(feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}) }, { merge: true });
+        // Rejecting a lead archives it. This wrote status and archived_at but
+        // not is_archived, so readers that key off the boolean — quick search
+        // among them — kept treating rejected people as live contacts.
+        await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', is_archived: true, archived_at: new Date().toISOString(), ...(feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}) }, { merge: true });
       } else if (direction === 'skip') {
         await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_skipped', source: 'people_mode', skipped_date: today }, { merge: true });
       }

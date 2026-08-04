@@ -3,6 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { createCompanyRecord } from '../../schemas/companySchema';
 
 export default function FindContact({ onContactAdded, onCancel, initialSearchParams }) {
   const [searchParams, setSearchParams] = useState({
@@ -204,6 +205,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
 
         // Metadata
         status: 'active',
+        is_archived: false,   // required by every contact reader — never omit
         saved_at: new Date().toISOString(),
         source: 'Found via Search',
 
@@ -255,7 +257,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
     const companyId = apolloOrgId || `company_${Date.now()}`;
     const companyRef = doc(db, 'users', userId, 'companies', companyId);
 
-    const companyData = {
+    const companyData = createCompanyRecord({
       apollo_id: apolloOrgId || null,
       name: companyName,
       industry: contact.organization?.industry || null,
@@ -274,7 +276,7 @@ export default function FindContact({ onContactAdded, onCancel, initialSearchPar
 
       // For future enrichment
       apolloEnriched: false
-    };
+    });
 
     await setDoc(companyRef, companyData);
     console.log('✅ Company saved:', companyId);

@@ -50,6 +50,7 @@ import {
   runGmailSync,
   syncUserInbox,
   findConnectedGmailUsers,
+  isMessageGoneError,
   SYNC_SCHEDULE,
   SYNC_STATE_FIELDS,
   SYNC_STATUS,
@@ -177,6 +178,29 @@ describe('worker configuration', () => {
       'lastSyncError',
       'nextSyncAt',
     ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('isMessageGoneError', () => {
+  it.each([
+    ['code 404', Object.assign(new Error('Not Found'), { code: 404 })],
+    ['status 404', Object.assign(new Error('Not Found'), { status: 404 })],
+    ['response.status 404', Object.assign(new Error('x'), { response: { status: 404 } })],
+    ['notFound reason', Object.assign(new Error('x'), { errors: [{ reason: 'notFound' }] })],
+    ['the Gmail message text', new Error('Requested entity was not found.')],
+  ])('recognises %s', (_label, err) => {
+    expect(isMessageGoneError(err)).toBe(true);
+  });
+
+  it.each([
+    ['a 500', Object.assign(new Error('backend error'), { code: 500 })],
+    ['a rate limit', Object.assign(new Error('rate limited'), { status: 429 })],
+    ['a network failure', Object.assign(new Error('getaddrinfo'), { code: 'ENOTFOUND' })],
+    ['an unrelated error', new Error('something else broke')],
+    ['nothing at all', null],
+  ])('does not treat %s as a vanished message', (_label, err) => {
+    expect(isMessageGoneError(err)).toBe(false);
   });
 });
 
@@ -467,6 +491,99 @@ describe('syncUserInbox — cursor safety', () => {
     expect(summary.failed).toBe(1);
     expect(processNormalizedMessage).toHaveBeenCalledTimes(2); // m3 never attempted
     expect(finalState(user).lastHistoryId).toBeUndefined();
+  });
+
+  it('advances the cursor past a message Gmail no longer has', async () => {
+    // The history feed records what happened, not what still exists — a message
+    // added then deleted stays in the feed while messages.get 404s.
+    const gmail = makeGmail({
+      historyResponse: {
+        historyId: '9200',
+        history: [
+          { id: '9150', messagesAdded: [{ message: { id: 'gone' } }] },
+          { id: '9180', messagesAdded: [{ message: { id: 'm2' } }] },
+        ],
+      },
+      messagesById: { m2: inboundMessage('m2') },
+    });
+    // messagesById has no fixture for "gone" — make it 404 the way Gmail does.
+    const realGet = gmail.users.messages.get;
+    gmail.users.messages.get = async (args) => {
+      if (args.id === 'gone') {
+        throw Object.assign(new Error('Requested entity was not found.'), { code: 404 });
+      }
+      return realGet(args);
+    };
+    globalThis.__fakeGmail = gmail;
+
+    const user = makeUser('u1', { lastHistoryId: '9100' });
+    const summary = await syncUserInbox({}, user);
+
+    // A deleted message is not a failure, and it must not stop the batch.
+    expect(summary.failed).toBe(0);
+    expect(summary.deleted).toBe(1);
+    expect(summary.skipped).toBe(1);
+    expect(summary.processed).toBe(1);          // m2 behind it still got through
+    expect(processNormalizedMessage).toHaveBeenCalledTimes(1);
+
+    const state = finalState(user);
+    expect(state.lastHistoryId).toBe('9200');   // cursor moved past it
+    expect(state.syncStatus).toBe(SYNC_STATUS.IDLE);
+    expect(state.lastSyncError).toBeNull();
+  });
+
+  it('does not wedge when every message in the batch is gone', async () => {
+    const gmail = makeGmail({
+      historyResponse: {
+        historyId: '9200',
+        history: [{ id: '9150', messagesAdded: [{ message: { id: 'gone' } }] }],
+      },
+      messagesById: {},
+    });
+    gmail.users.messages.get = async () => {
+      throw Object.assign(new Error('Requested entity was not found.'), { code: 404 });
+    };
+    globalThis.__fakeGmail = gmail;
+
+    const user = makeUser('u1', { lastHistoryId: '9100' });
+    const summary = await syncUserInbox({}, user);
+
+    expect(summary.status).toBe(SYNC_STATUS.IDLE);
+    // Without the cursor advancing, the next run replays the same dead batch
+    // forever and nothing behind it is ever ingested.
+    expect(finalState(user).lastHistoryId).toBe('9200');
+  });
+
+  it.each([
+    ['code 404', { code: 404 }],
+    ['status 404', { status: 404 }],
+    ['response.status 404', { response: { status: 404 } }],
+    ['errors[].reason notFound', { errors: [{ reason: 'notFound' }] }],
+  ])('recognises a vanished message reported as %s', async (_label, shape) => {
+    const gmail = makeGmail({
+      listIds: ['gone'],
+      messagesById: {},
+    });
+    gmail.users.messages.get = async () => {
+      throw Object.assign(new Error('Requested entity was not found.'), shape);
+    };
+    globalThis.__fakeGmail = gmail;
+
+    const summary = await syncUserInbox({}, makeUser('u1'));
+    expect(summary.deleted).toBe(1);
+    expect(summary.failed).toBe(0);
+  });
+
+  it('recognises the bare message text with no status attached', async () => {
+    const gmail = makeGmail({ listIds: ['gone'], messagesById: {} });
+    gmail.users.messages.get = async () => {
+      throw new Error('Requested entity was not found.');
+    };
+    globalThis.__fakeGmail = gmail;
+
+    const summary = await syncUserInbox({}, makeUser('u1'));
+    expect(summary.deleted).toBe(1);
+    expect(summary.failed).toBe(0);
   });
 
   it('keeps the cursor when fetching a message throws', async () => {

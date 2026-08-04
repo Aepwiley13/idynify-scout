@@ -92,6 +92,31 @@ export const SYNC_STATUS = Object.freeze({
 const log = (...args) => console.log('[gmail-sync]', ...args);
 const warn = (...args) => console.warn('[gmail-sync]', ...args);
 
+/**
+ * True when Gmail says the message no longer exists.
+ *
+ * A history record is a record of what *happened*, not of what still exists —
+ * a message added and then deleted (or moved out of the mailbox) stays in the
+ * history feed while messages.get returns 404 "Requested entity was not found".
+ * That is an ordinary Gmail state, not a processing failure, and it must never
+ * hold the cursor: treating it as an error wedges the account, because the next
+ * run replays the same batch, hits the same missing message, and stops again —
+ * so nothing behind it is ever ingested.
+ *
+ * @param {Error & { code?: number|string, status?: number, response?: object }} err
+ */
+export function isMessageGoneError(err) {
+  if (!err) return false;
+
+  // googleapis surfaces the HTTP status on any of these, depending on version
+  // and whether the failure came from the transport or the API layer.
+  if (err.status === 404 || err.code === 404 || err.response?.status === 404) return true;
+
+  if (Array.isArray(err.errors) && err.errors.some((e) => e?.reason === 'notFound')) return true;
+
+  return /requested entity was not found/i.test(String(err.message || ''));
+}
+
 function nextSyncAtIso() {
   return new Date(Date.now() + SYNC_INTERVAL_MINUTES * 60_000).toISOString();
 }
@@ -151,10 +176,18 @@ export async function findConnectedGmailUsers(db, limit = MAX_USERS_PER_RUN) {
 /**
  * Ingest one message: fetch, normalize, filter, validate, hand to Team B.
  *
- * @returns {Promise<{ status: 'processed'|'skipped'|'invalid'|'failed', reason?: string }>}
+ * @returns {Promise<{ status: 'processed'|'skipped'|'deleted'|'invalid'|'failed', reason?: string }>}
  */
 async function ingestMessage(db, gmail, messageId, userId, gmailAccountId, threadCountCache) {
-  const raw = await fetchMessage(gmail, messageId);
+  let raw;
+  try {
+    raw = await fetchMessage(gmail, messageId);
+  } catch (err) {
+    // Deleted between landing in the history feed and this fetch — expected,
+    // and the cursor must still move past it.
+    if (isMessageGoneError(err)) return { status: 'deleted', reason: 'message_no_longer_exists' };
+    throw err;
+  }
   if (!raw?.id) return { status: 'skipped', reason: 'empty_message' };
 
   const labelIds = raw.labelIds || [];
@@ -226,6 +259,7 @@ export async function syncUserInbox(db, user) {
     userId,
     processed: 0,
     skipped: 0,
+    deleted: 0,   // subset of `skipped` — messages Gmail no longer has
     invalid: 0,
     failed: 0,
     mode: null,
@@ -327,6 +361,13 @@ export async function syncUserInbox(db, user) {
 
         if (outcome.status === 'processed') summary.processed += 1;
         else if (outcome.status === 'skipped') summary.skipped += 1;
+        else if (outcome.status === 'deleted') {
+          // Counted as skipped for the run tally, tracked separately so the
+          // logs distinguish "gone from Gmail" from "filtered by our rules".
+          summary.skipped += 1;
+          summary.deleted += 1;
+          log(`message ${entry.id} no longer exists — skipping`);
+        }
         else if (outcome.status === 'invalid') summary.invalid += 1;
         else if (outcome.status === 'failed') {
           summary.failed += 1;
@@ -337,6 +378,15 @@ export async function syncUserInbox(db, user) {
 
         if (entry.historyId) lastGoodHistoryId = entry.historyId;
       } catch (err) {
+        // Safety net: a 404 raised anywhere else in the ingest path is still a
+        // vanished message, and must not wedge the cursor.
+        if (isMessageGoneError(err)) {
+          summary.skipped += 1;
+          summary.deleted += 1;
+          log(`message ${entry.id} no longer exists — skipping`);
+          if (entry.historyId) lastGoodHistoryId = entry.historyId;
+          continue;
+        }
         summary.failed += 1;
         summary.error = err.message;
         console.error(`[gmail-sync] Message ${entry.id} threw:`, err.message);
@@ -366,7 +416,8 @@ export async function syncUserInbox(db, user) {
     await docRef.update(update);
 
     log(
-      `${userId} (${summary.mode}) — processed ${summary.processed}, skipped ${summary.skipped}, ` +
+      `${userId} (${summary.mode}) — processed ${summary.processed}, skipped ${summary.skipped}` +
+      `${summary.deleted > 0 ? ` (${summary.deleted} deleted in Gmail)` : ''}, ` +
       `invalid ${summary.invalid}, failed ${summary.failed}`
     );
     return summary;
@@ -423,15 +474,17 @@ export async function runGmailSync(db, options = {}) {
     (acc, r) => ({
       processed: acc.processed + r.processed,
       skipped: acc.skipped + r.skipped,
+      deleted: acc.deleted + (r.deleted || 0),
       invalid: acc.invalid + r.invalid,
       failed: acc.failed + r.failed,
     }),
-    { processed: 0, skipped: 0, invalid: 0, failed: 0 }
+    { processed: 0, skipped: 0, deleted: 0, invalid: 0, failed: 0 }
   );
 
   log(
     `run complete — ${results.length} account(s), ${totals.processed} processed, ` +
-    `${totals.skipped} skipped, ${totals.invalid} invalid, ${totals.failed} failed`
+    `${totals.skipped} skipped${totals.deleted > 0 ? ` (${totals.deleted} deleted in Gmail)` : ''}, ` +
+    `${totals.invalid} invalid, ${totals.failed} failed`
   );
 
   return {

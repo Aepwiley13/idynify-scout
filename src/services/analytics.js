@@ -100,31 +100,52 @@ export function logEvent(name, params = {}) {
 
   if (!enabled) return;
 
-  // An admin impersonating a customer is READ-ONLY (IMPERSONATION_MODE), and
-  // that has to include analytics. Their clicks are not the customer's
-  // behaviour, and a workspace whose event log is half admin traffic answers
-  // "which module drives engagement" with a number nobody can trust.
-  const realUid = auth.currentUser?.uid ?? null;
-  const activeUid = getActiveUserId();
-  if (!realUid || !activeUid) return;
-  if (realUid !== activeUid) {
-    console.info('[analytics] suppressed — impersonating', { name });
-    return;
-  }
+  // Everything below is inside the guard, not just the write.
+  //
+  // Rule 2 says this never throws, and the write was already wrapped — but
+  // resolving WHO is acting was not, so a failure there propagated straight
+  // through openContact() and into the click that triggered it. CI caught
+  // exactly that: a test whose module mock omitted getActiveUserId turned a
+  // working contact navigation into a thrown error.
+  //
+  // The lesson generalises past the test. `logEvent` is called from inside a
+  // user gesture, and anything it touches — an auth object mid-refresh, a
+  // context that is not mounted yet — must be able to fail without taking the
+  // navigation with it. "Never throws" has to mean the whole function.
+  try {
+    // An admin impersonating a customer is READ-ONLY (IMPERSONATION_MODE), and
+    // that has to include analytics. Their clicks are not the customer's
+    // behaviour, and a workspace whose event log is half admin traffic answers
+    // "which module drives engagement" with a number nobody can trust.
+    const realUid = auth.currentUser?.uid ?? null;
+    const activeUid = getActiveUserId();
+    if (!realUid || !activeUid) return;
+    if (realUid !== activeUid) {
+      console.info('[analytics] suppressed — impersonating', { name });
+      return;
+    }
 
-  // Fire and forget. The navigation already happened; this is bookkeeping.
-  addDoc(collection(db, 'users', realUid, 'analytics_events'), {
-    ...payload,
-    event: name,
-    at: serverTimestamp(),
-  }).catch((err) => {
-    // Swallowed on purpose — see rule 2 in the header. Logged with the
-    // Firestore code so a systemic failure (a rules change, a quota) is
-    // diagnosable rather than merely absent.
-    console.warn('[analytics] event not recorded', {
-      event: name, code: err?.code, message: err?.message,
+    // Fire and forget. The navigation already happened; this is bookkeeping.
+    addDoc(collection(db, 'users', realUid, 'analytics_events'), {
+      ...payload,
+      event: name,
+      at: serverTimestamp(),
+    }).catch((err) => {
+      // Swallowed on purpose — see rule 2 in the header. Logged with the
+      // Firestore code so a systemic failure (a rules change, a quota) is
+      // diagnosable rather than merely absent.
+      console.warn('[analytics] event not recorded', {
+        event: name, code: err?.code, message: err?.message,
+      });
     });
-  });
+  } catch (err) {
+    // Synchronous failure before the write was even issued. Same posture:
+    // logged, never propagated. The event is already in RECENT above, so the
+    // console trace survives even when the write never happens.
+    console.warn('[analytics] event dropped', {
+      event: name, message: err?.message,
+    });
+  }
 }
 
 export default { logEvent, EVENTS, setAnalyticsEnabled, getRecentEvents, clearRecentEvents };

@@ -25,8 +25,10 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: () => '__ts__',
 }));
 
+const getActiveUserIdMock = vi.fn(() => activeUid);
+
 vi.mock('../context/ImpersonationContext', () => ({
-  getActiveUserId: () => activeUid,
+  getActiveUserId: (...args) => getActiveUserIdMock(...args),
 }));
 
 import { logEvent, EVENTS, getRecentEvents, clearRecentEvents } from '../services/analytics';
@@ -38,6 +40,8 @@ beforeEach(() => {
   currentUid = 'u1';
   activeUid = 'u1';
   clearRecentEvents();
+  getActiveUserIdMock.mockReset();
+  getActiveUserIdMock.mockImplementation(() => activeUid);
   vi.spyOn(console, 'info').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -170,6 +174,42 @@ describe('logEvent — the three rules', () => {
 
   it('returns nothing, so no caller can await it', () => {
     expect(logEvent(EVENTS.OPEN_CONTACT, { contactId: 'c1' })).toBeUndefined();
+  });
+
+  it('never throws when resolving WHO is acting fails', () => {
+    // The regression this exists for: the write was wrapped but the identity
+    // lookup was not, so a failure there propagated through openContact() and
+    // into the click that triggered it. CI found it via a test whose module
+    // mock omitted getActiveUserId; the same shape would occur in production
+    // from an auth object mid-refresh.
+    getActiveUserIdMock.mockImplementationOnce(() => {
+      throw new Error('No "getActiveUserId" export is defined on the mock');
+    });
+
+    expect(() => logEvent(EVENTS.OPEN_CONTACT, { contactId: 'c1' })).not.toThrow();
+    expect(addDocMock).not.toHaveBeenCalled();
+    // Still traceable: the event reached the in-memory log before the failure.
+    expect(getRecentEvents()).toHaveLength(1);
+  });
+});
+
+describe('analytics never takes a navigation down with it', () => {
+  it('openContact still navigates when analytics throws', () => {
+    getActiveUserIdMock.mockImplementationOnce(() => { throw new Error('boom'); });
+    const navigate = vi.fn();
+
+    expect(() => openContact({ navigate, contactId: 'c1' })).not.toThrow();
+
+    // The whole point. Instrumentation is not allowed to break the product.
+    expect(navigate).toHaveBeenCalledWith('/contact/c1', expect.any(Object));
+  });
+
+  it('openCompany still navigates when analytics throws', () => {
+    getActiveUserIdMock.mockImplementationOnce(() => { throw new Error('boom'); });
+    const navigate = vi.fn();
+
+    expect(() => openCompany({ navigate, companyId: 'co1' })).not.toThrow();
+    expect(navigate).toHaveBeenCalledWith('/company/co1', expect.any(Object));
   });
 
   it('omits empty params rather than writing nulls', () => {

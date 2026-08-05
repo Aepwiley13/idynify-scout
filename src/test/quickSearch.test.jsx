@@ -11,6 +11,9 @@ vi.mock('../firebase/config', () => ({
 }));
 
 vi.mock('../context/ImpersonationContext', () => ({
+  // Analytics reads this to suppress writes while impersonating. Present so
+  // the search flows exercise the real event path, not the caught-error path.
+  getActiveUserId: () => 'test-user',
   useActiveUserId: () => 'test-user',
 }));
 

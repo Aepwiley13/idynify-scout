@@ -38,8 +38,14 @@ vi.mock('firebase/firestore', () => ({
   updateDoc: async () => {},
 }));
 
+// A mock stands in for the WHOLE module surface its consumers use, not just
+// the part the test happens to think about. `getActiveUserId` is here because
+// analytics reads it to suppress writes during impersonation — omitting it
+// made openContact() throw, which is how this file went red in CI while every
+// assertion in it still passed.
 vi.mock('../context/ImpersonationContext', () => ({
   getEffectiveUser: () => ({ uid: 'u1', getIdToken: async () => 'tok' }),
+  getActiveUserId: () => 'u1',
   useActiveUserId: () => 'u1',
   useImpersonation: () => ({ isReadOnly: false }),
   ImpersonationProvider: ({ children }) => children,

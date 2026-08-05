@@ -12,6 +12,7 @@ import {
 import { db, auth } from '../../firebase/config';
 import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation, ENTRY_POINTS } from '../../utils/navigation';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import {
   ArrowLeft, Building2, Users, Globe, Linkedin, MapPin, Calendar,
@@ -28,6 +29,7 @@ import { searchPeople, updatePerson } from '../../services/peopleService';
 export default function CompanyProfileView({ companyId, onBack }) {
   const T = useT();
   const navigate = useNavigate();
+  const { openContact } = useCanonicalNavigation();
   const impersonatedUserId = useActiveUserId();
   const { isImpersonating } = useImpersonation();
 
@@ -666,7 +668,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                         style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <Zap size={13} />Engage
                       </button>
-                      <button onClick={() => navigate(`/scout/contact/${c.id}`)}
+                      <button onClick={() => openContact({ contactId: c.id, entryPoint: ENTRY_POINTS.COMPANY })}
                         style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                         View Full Profile →
                       </button>
@@ -711,7 +713,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                           style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                           <Zap size={13} />Engage
                         </button>
-                        <button onClick={() => navigate(`/scout/contact/${savedContact.id}`)}
+                        <button onClick={() => openContact({ contactId: savedContact.id, entryPoint: ENTRY_POINTS.COMPANY })}
                           style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                           View Full Profile →
                         </button>

@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { X, UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { openContact, ENTRY_POINTS, DISPLAY_MODES } from '../../utils/navigation';
 import ManualContactForm from './ManualContactForm';
 import CSVUpload from './CSVUpload';
 import BusinessCardCapture from './BusinessCardCapture';
@@ -32,7 +33,7 @@ export default function AddContactModal({ onClose, onContactAdded }) {
     onClose();
     // Single contact: go directly to their profile
     if (addedContacts.length === 1 && addedContacts[0]?.id) {
-      navigate(`/scout/contact/${addedContacts[0].id}`);
+      openContact({ navigate, contactId: addedContacts[0].id, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
     } else {
       navigate('/scout/all-leads');
     }

@@ -18,6 +18,9 @@ import {
 import { useT } from '../../../theme/ThemeContext';
 import { BRAND } from '../../../theme/tokens';
 import { getEffectiveUser } from '../../../context/ImpersonationContext';
+import { createSniperRecord } from '../../../services/sniperWriteGuard';
+import { prepareContactWrite, applyContactMerge } from '../../../services/contactWriteGuard';
+import { STAGE } from '../../../constants/statusModel';
 
 const SNIPER_TEAL = '#14b8a6';
 
@@ -287,16 +290,56 @@ export default function PipelineSection() {
 
   useEffect(() => { loadContacts(); }, []);
 
+  /**
+   * Add a Sniper target typed straight into the pipeline board.
+   *
+   * SNIPER WRITE FREEZE. This form previously created a sniper_contacts
+   * document with no link to anything — a person who existed only inside
+   * Sniper, invisible to every other module and unmigratable. Now the
+   * canonical contact is created (or matched) FIRST, and the Sniper record
+   * links to it.
+   */
   const handleAdd = async (form) => {
     const user = getEffectiveUser();
     if (!user) return;
     try {
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'sniper_contacts'), {
-        ...form,
-        createdAt: serverTimestamp(),
-        lastTouchAt: serverTimestamp(),
-      });
-      setContacts(prev => [{ id: docRef.id, ...form, createdAt: new Date(), lastTouchAt: new Date() }, ...prev]);
+      const name = form.name || [form.firstName, form.lastName].filter(Boolean).join(' ').trim();
+
+      const decision = await prepareContactWrite(user.uid, {
+        email: form.email,
+        phone: form.phone,
+        name,
+        company: form.company,
+        source: 'sniper_manual',
+      }, { source: 'Sniper.PipelineSection', stage: STAGE.SNIPER });
+
+      let canonicalContactId;
+      if (decision.action === 'merge') {
+        await applyContactMerge(user.uid, decision);
+        canonicalContactId = decision.contactId;
+      } else {
+        const contactRef = await addDoc(collection(db, 'users', user.uid, 'contacts'), {
+          ...decision.fields,
+          name,
+          first_name: form.firstName || '',
+          last_name: form.lastName || '',
+          email: form.email || null,
+          title: form.title || '',
+          company_name: form.company || null,
+          person_type: 'lead',
+          stage_source: 'sniper_add',
+          source: 'sniper_manual',
+          addedAt: new Date().toISOString(),
+        });
+        canonicalContactId = contactRef.id;
+      }
+
+      const sniperId = await createSniperRecord(user.uid, canonicalContactId, form);
+      setContacts(prev => [{
+        id: sniperId, ...form,
+        canonical_contact_id: canonicalContactId,
+        createdAt: new Date(), lastTouchAt: new Date(),
+      }, ...prev]);
     } catch (err) {
       console.error('Error adding SNIPER contact:', err);
     }

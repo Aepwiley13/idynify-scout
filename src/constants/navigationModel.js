@@ -291,6 +291,21 @@ export function resolveModule(pathname) {
   return best || MISSION_CONTROL;
 }
 
+/**
+ * Look a destination up by id.
+ *
+ * Exists for the canonical Contact and Company routes, which belong to no
+ * module and take their breadcrumb from the module the user arrived FROM —
+ * an id carried in navigation intent, not a path. Returns null rather than a
+ * Mission Control default so the caller can distinguish "no origin declared"
+ * from "the origin is Mission Control"; those want different fallbacks.
+ */
+export function resolveDestination(id) {
+  if (!id) return null;
+  if (id === MISSION_CONTROL.id) return MISSION_CONTROL;
+  return ALL_DESTINATIONS.find(d => d.id === id) ?? null;
+}
+
 /** Locked label for a pathname's module. Never invent a synonym for these. */
 export function resolveModuleLabel(pathname) {
   return resolveModule(pathname).label;

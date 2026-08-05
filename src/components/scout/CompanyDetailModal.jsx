@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
+import { RECORD_STATUS } from '../../constants/statusModel';
+import { useCanonicalNavigation } from '../../utils/navigation';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User, Phone } from 'lucide-react';
@@ -10,6 +13,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function CompanyDetailModal({ company, onClose, onFindMoreContacts, sourceModule = 'scout' }) {
   const navigate = useNavigate();
+  const { openCompany } = useCanonicalNavigation();
   const [enrichedData, setEnrichedData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -250,10 +254,31 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
       if (!user) throw new Error('Not authenticated');
 
       // Save each selected decision maker as a contact
+      let created = 0;
       for (const person of selectedDecisionMakers) {
         const contactId = `${company.id}_${person.id}`;
 
+        const decision = await prepareContactWrite(user.uid, {
+          contactId,
+          apollo_person_id: person.id,
+          email: person.email,
+          linkedin_url: person.linkedin_url,
+          phone: person.phone,
+          name: person.name,
+          company_id: company.id,
+          company_name: company.name,
+          source: 'apollo',
+        }, { source: 'CompanyDetailModal.decisionMakers', recordStatus: RECORD_STATUS.SUGGESTED });
+
+        if (decision.action === 'merge') {
+          await applyContactMerge(user.uid, decision);
+          continue;
+        }
+        created += 1;
+
         await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
+          ...decision.fields,
+
           // Apollo IDs
           apollo_person_id: person.id,
 
@@ -288,8 +313,9 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
       const companyDoc = await getDoc(companyRef);
       const currentContactCount = companyDoc.data()?.contact_count || 0;
 
+      // Only newly created records count. See CompanyDetail for the same fix.
       await updateDoc(companyRef, {
-        contact_count: currentContactCount + selectedDecisionMakers.length
+        contact_count: currentContactCount + created
       });
 
       console.log(`✅ Added ${selectedDecisionMakers.length} decision makers as leads`);
@@ -312,7 +338,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
     if (onFindMoreContacts) {
       onFindMoreContacts(company.id);
     } else {
-      navigate(`/scout/company/${company.id}`);
+      openCompany({ companyId: company.id });
     }
     onClose();
   }

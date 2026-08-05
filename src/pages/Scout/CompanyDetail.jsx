@@ -8,9 +8,30 @@ import './ScoutMain.css';
 import './CompanyDetail.css';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { openContact, ENTRY_POINTS } from '../../utils/navigation';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
+import { RECORD_STATUS } from '../../constants/statusModel';
 
-export default function CompanyDetail() {
-  const { companyId } = useParams();
+/**
+ * @param {object}   props
+ * @param {string}   [props.companyId]    Overrides the route param.
+ * @param {string}   [props.returnTo]     Where Back goes. From navigation intent.
+ * @param {string}   [props.returnLabel]
+ * @param {Node}     [props.banner]       Rendered above the company card.
+ * @param {boolean}  [props.preview]      Force preview mode. Defaults to auto-detect
+ *                                        from the record's status — see isPreview below.
+ * @param {Function} [props.onApproved]   Called after a preview record is accepted.
+ */
+export default function CompanyDetail({
+  companyId: propCompanyId,
+  returnTo = null,
+  returnLabel = 'Back to Scout',
+  banner = null,
+  preview: forcePreview = null,
+  onApproved = null,
+} = {}) {
+  const { companyId: paramCompanyId } = useParams();
+  const companyId = propCompanyId || paramCompanyId;
   const navigate = useNavigate();
 
   const [company, setCompany] = useState(null);
@@ -37,7 +58,27 @@ export default function CompanyDetail() {
   const [selectedPeopleToAdd, setSelectedPeopleToAdd] = useState([]);
   const [addingPeopleToCompany, setAddingPeopleToCompany] = useState(false);
   const [addPeopleSuccess, setAddPeopleSuccess] = useState(false);
+  const [approvingCompany, setApprovingCompany] = useState(false);
   const searchTimeoutRef = useRef(null);
+
+  /**
+   * PREVIEW MODE — an unsaved discovery record, opened without accepting it.
+   *
+   * "Unsaved" is a product word, not a storage one. Discovery companies ARE
+   * Firestore documents from the moment search-companies.js writes them; what
+   * they are not is KEPT. `status: 'pending'` means the user has not said yes,
+   * and until they do, opening the record must not change it.
+   *
+   * That is the whole distinction this mode encodes. In preview:
+   *   · the two write-on-load side effects are suppressed (ICP title
+   *     persistence and the auto-enrichment write) — opening a record the user
+   *     has not accepted must not mutate it, and both of those did;
+   *   · a preview banner states the record is not yet in the pipeline and
+   *     offers Approve;
+   *   · Approve flips status to 'accepted' and the SAME screen becomes the
+   *     saved experience. No second component, no navigation, no reload.
+   */
+  const isPreview = forcePreview ?? (company?.status === 'pending');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -68,6 +109,10 @@ export default function CompanyDetail() {
       const companyData = { id: companyDoc.id, ...companyDoc.data() };
       setCompany(companyData);
 
+      // A record the user has not accepted yet. Everything below that WRITES
+      // is gated on this — see the isPreview docstring.
+      const previewOnly = forcePreview ?? (companyData.status === 'pending');
+
       // Get selected titles
       let titles = companyData.selected_titles || [];
 
@@ -84,12 +129,17 @@ export default function CompanyDetail() {
                 score: 100 - (index * 10),
                 source: 'icp',
               }));
-              // Persist so they're saved to the company for next load
-              await updateDoc(doc(db, 'users', userId, 'companies', companyId), {
-                selected_titles: titles,
-                titles_source: 'icp_auto',
-                titles_updated_at: new Date().toISOString(),
-              });
+              // Persist so they're saved to the company for next load — but
+              // never for a record the user has not accepted. Writing ICP
+              // titles onto a pending company is a mutation caused purely by
+              // LOOKING at it, which is what preview mode exists to prevent.
+              if (!previewOnly) {
+                await updateDoc(doc(db, 'users', userId, 'companies', companyId), {
+                  selected_titles: titles,
+                  titles_source: 'icp_auto',
+                  titles_updated_at: new Date().toISOString(),
+                });
+              }
               console.log('🎯 Auto-loaded ICP titles:', titles.map(t => t.title));
             }
           }
@@ -110,10 +160,12 @@ export default function CompanyDetail() {
         searchContacts(companyData, titles);
       }
 
-      // Auto-trigger enrichment if no cached data or cache is stale
+      // Auto-trigger enrichment if no cached data or cache is stale. Skipped in
+      // preview: enrichment writes back to the company document, and it also
+      // spends an Apollo credit on a record the user may be about to reject.
       const isStale = !companyData.apolloEnrichedAt ||
         Date.now() - companyData.apolloEnrichedAt > 14 * 24 * 60 * 60 * 1000;
-      if (!companyData.apolloEnrichment || isStale) {
+      if (!previewOnly && (!companyData.apolloEnrichment || isStale)) {
         enrichCompanyData(false);
       }
     } catch (error) {
@@ -346,11 +398,45 @@ export default function CompanyDetail() {
     }
   }
 
-  // Save contact to Firestore
+  /**
+   * Save a contact to Firestore, after identity resolution.
+   *
+   * The composite id (`{companyId}_{apolloPersonId}`) stays: it is stable for
+   * this company/person pair and re-approving the same person overwrites
+   * rather than duplicating. What it never caught is the same HUMAN arriving
+   * from a different source — a manual add, a Gmail import, a LinkedIn URL —
+   * because none of those produce this id. That is what the resolver adds.
+   *
+   * @returns {Promise<string>} the contact id that now holds this person,
+   *   which may be an existing record rather than the composite id.
+   */
   async function saveContact(userId, contact) {
     const contactId = `${companyId}_${contact.id}`;
 
+    const decision = await prepareContactWrite(userId, {
+      contactId,
+      apollo_person_id: contact.id,
+      email: contact.email,
+      linkedin_url: contact.linkedin_url,
+      phone: contact.phone_numbers?.[0],
+      name: contact.name,
+      company_id: companyId,
+      company_name: company?.name,
+      source: 'apollo_people_search',
+    }, { source: 'CompanyDetail.saveContact', recordStatus: RECORD_STATUS.SUGGESTED });
+
+    if (decision.action === 'merge') {
+      await applyContactMerge(userId, decision);
+      console.log('✅ Contact already known — identifiers merged:', decision.contactId);
+      return decision.contactId;
+    }
+
     await setDoc(doc(db, 'users', userId, 'contacts', contactId), {
+      // Identity envelope: normalized identifiers + the three status
+      // dimensions + is_archived. Spread FIRST so an explicit field below
+      // still wins — this adds, it does not override.
+      ...decision.fields,
+
       // Apollo IDs
       apollo_person_id: contact.id,
 
@@ -377,6 +463,7 @@ export default function CompanyDetail() {
     });
 
     console.log('✅ Contact saved with basic info');
+    return contactId;
   }
 
   // Enrich contact with full Apollo data
@@ -495,10 +582,31 @@ export default function CompanyDetail() {
       if (!user) throw new Error('Not authenticated');
 
       // Save each selected decision maker as a contact/lead
+      let created = 0;
       for (const person of selectedDecisionMakers) {
         const contactId = `${companyId}_${person.id}`;
 
+        const decision = await prepareContactWrite(user.uid, {
+          contactId,
+          apollo_person_id: person.id,
+          email: person.email,
+          linkedin_url: person.linkedin_url,
+          phone: person.phone,
+          name: person.name,
+          company_id: companyId,
+          company_name: company?.name,
+          source: 'decision_makers',
+        }, { source: 'CompanyDetail.decisionMakers', recordStatus: RECORD_STATUS.SUGGESTED });
+
+        if (decision.action === 'merge') {
+          await applyContactMerge(user.uid, decision);
+          continue;
+        }
+        created += 1;
+
         await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
+          ...decision.fields,
+
           // Apollo IDs
           apollo_person_id: person.id,
 
@@ -538,11 +646,14 @@ export default function CompanyDetail() {
       const companyDoc = await getDoc(companyRef);
       const currentContactCount = companyDoc.data()?.contact_count || 0;
 
+      // Count what was actually CREATED, not what was selected. Incrementing
+      // by the selection size double-counted every person who resolved to an
+      // existing record, and contact_count is what Saved Companies displays.
       await updateDoc(companyRef, {
-        contact_count: currentContactCount + selectedDecisionMakers.length
+        contact_count: currentContactCount + created
       });
 
-      console.log(`✅ Added ${selectedDecisionMakers.length} decision makers as leads`);
+      console.log(`✅ Added ${created} decision makers as leads (${selectedDecisionMakers.length - created} already known)`);
 
       // Reload approved contacts and clear selection
       await loadApprovedContacts();
@@ -754,6 +865,44 @@ export default function CompanyDetail() {
     }
   }
 
+  /**
+   * Approve a previewed company — the one transition preview mode allows.
+   *
+   * This is the moment the record stops being a suggestion. Same document,
+   * same screen: status flips to 'accepted' and every write suppressed above
+   * becomes available, because the user has now said yes. Nothing navigates —
+   * "Approve" that threw you to another page would lose the position you had
+   * just decided from.
+   */
+  async function handleApproveCompany() {
+    if (approvingCompany || !company) return;
+    setApprovingCompany(true);
+    try {
+      const userId = getEffectiveUser()?.uid;
+      if (!userId) throw new Error('Not authenticated');
+
+      await updateDoc(doc(db, 'users', userId, 'companies', companyId), {
+        status: 'accepted',
+        approvedAt: new Date().toISOString(),
+        approved_from: 'company_detail_preview',
+      });
+
+      setCompany(prev => ({ ...prev, status: 'accepted' }));
+      onApproved?.({ ...company, status: 'accepted' });
+    } catch (error) {
+      console.error('Failed to approve company:', error);
+      alert('Failed to save this company. Please try again.');
+    } finally {
+      setApprovingCompany(false);
+    }
+  }
+
+  /** Leave this company. returnTo when the arrival carried one; Scout otherwise. */
+  function goBack() {
+    if (returnTo) { navigate(returnTo); return; }
+    navigate('/scout', { state: { activeTab: 'saved-companies' } });
+  }
+
   // Archive this company (with cascade to contacts)
   async function handleArchiveCompany() {
     const confirmed = window.confirm(
@@ -805,13 +954,52 @@ export default function CompanyDetail() {
     return (
       <div className="company-detail-error">
         <p>Company not found</p>
-        <button onClick={() => navigate('/scout')}>← Back to Scout</button>
+        <button onClick={goBack}>← {returnLabel}</button>
       </div>
     );
   }
 
+  // Match intelligence carried by discovery records. Read here rather than in
+  // the preview banner's own component because the field names differ by
+  // source — the inline Mission Control panel resolves the same four aliases.
+  const fitScore = Math.round(company.fit_score || 0);
+  const matchReasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
+  const matchReason = company.matchReason || company.match_reason || '';
+
   return (
     <div className="company-detail">
+      {/* Arrival banner — supplied by the canonical page from navigation intent. */}
+      {banner}
+
+      {/* PREVIEW BANNER — an unsaved discovery record.
+          Carries the match intelligence the inline Mission Control panel
+          showed (fit score, why it matched) so approving from here is as
+          informed a decision as approving from there. */}
+      {isPreview && (
+        <div className="company-preview-banner" role="status">
+          <div className="company-preview-banner-text">
+            <span className="company-preview-banner-title">
+              Preview — not yet in your pipeline
+            </span>
+            <span className="company-preview-banner-desc">
+              {matchReason
+                || (matchReasons.length > 0 ? matchReasons.slice(0, 2).join(' · ') : null)
+                || 'Looking at this company does not add it. Approve to save it and its contacts.'}
+              {fitScore > 0 && <> {' · '}<strong>{fitScore}% fit</strong></>}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="company-preview-approve-btn"
+            onClick={handleApproveCompany}
+            disabled={approvingCompany}
+            aria-label={`Approve and save ${company.name}`}
+          >
+            {approvingCompany ? 'Saving…' : 'Approve & Save'}
+          </button>
+        </div>
+      )}
+
       {/* Company Info Card */}
       <div className="company-detail-content">
         <div className="company-info-card">
@@ -1153,7 +1341,7 @@ export default function CompanyDetail() {
                     {/* View Profile Button - Primary Action */}
                     <button
                       className="saved-contact-primary-btn"
-                      onClick={() => navigate(`/scout/contact/${contact.id}`)}
+                      onClick={() => openContact({ navigate, contactId: contact.id, entryPoint: ENTRY_POINTS.COMPANY, returnTo: `/company/${companyId}` })}
                     >
                       View Full Profile →
                     </button>

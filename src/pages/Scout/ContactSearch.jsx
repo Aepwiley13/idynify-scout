@@ -4,6 +4,8 @@ import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs } fro
 import { Search, Loader, CheckCircle, X, AlertCircle, User, Building2, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 import './ContactSearch.css';
 import { createCompanyRecord } from '../../schemas/companySchema';
+import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 /**
  * Contact Search Component
@@ -163,37 +165,37 @@ export default function ContactSearch() {
         throw new Error('You must be logged in');
       }
 
-      // Check for duplicate by apollo ID (same doc ID would be used)
-      if (selectedContact.id) {
-        const existingRef = doc(db, 'users', user.uid, 'contacts', selectedContact.id);
-        const existingDoc = await getDoc(existingRef);
-        if (existingDoc.exists()) {
-          setError(`${selectedContact.name} is already in your pipeline.`);
-          return;
-        }
-      }
-
-      // Check for duplicate by email
-      if (selectedContact.email) {
-        const emailQ = query(
-          collection(db, 'users', user.uid, 'contacts'),
-          where('email', '==', selectedContact.email)
-        );
-        const emailSnap = await getDocs(emailQ);
-        if (!emailSnap.empty) {
-          setError(`A contact with email ${selectedContact.email} is already in your pipeline.`);
-          return;
-        }
-      }
-
       // Step 1: Ensure company exists in Saved Companies
       const companyId = await ensureCompanyExists(selectedContact, user.uid);
+
+      // Identity resolution replaces the document-id and case-sensitive email
+      // checks that were here. Same change as FindContact, which this file is
+      // a near-copy of — consolidating the two is out of scope for this sprint.
+      const resolution = await prepareContactWrite(user.uid, {
+        contactId: selectedContact.id,
+        apollo_person_id: selectedContact.id,
+        email: selectedContact.email,
+        linkedin_url: selectedContact.linkedin_url,
+        phone: selectedContact.phone_numbers?.[0]?.sanitized_number,
+        name: selectedContact.name,
+        company_id: companyId,
+        company_name: selectedContact.organization_name ?? selectedContact.organization?.name,
+        source: 'Found via Search',
+      }, { source: 'ContactSearch' });
+
+      if (resolution.action === 'merge') {
+        await applyContactMerge(user.uid, resolution);
+        setError(`${selectedContact.name} is already in your pipeline. Anything new from this search has been added to the existing record.`);
+        return;
+      }
 
       // Step 2: Save contact to /users/{uid}/contacts
       const contactId = selectedContact.id || `apollo_${Date.now()}`;
       const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
 
       const contactData = {
+        ...resolution.fields,
+
         // Apollo IDs
         apollo_person_id: selectedContact.id,
 
@@ -220,7 +222,6 @@ export default function ContactSearch() {
 
         // Metadata
         status: 'active',
-        is_archived: false,   // required by every contact reader — never omit
         saved_at: new Date().toISOString(),
         source: 'Found via Search',
 
@@ -267,23 +268,17 @@ export default function ContactSearch() {
       return null;
     }
 
-    // Check if company already exists by apollo_id
-    if (apolloOrgId) {
-      const companiesRef = collection(db, 'users', userId, 'companies');
-      const q = query(companiesRef, where('apollo_id', '==', apolloOrgId));
-      const snapshot = await getDocs(q);
-
-      if (!snapshot.empty) {
-        return snapshot.docs[0].id;
-      }
-    }
+    // Dedup on both Apollo id field names — see companyIdentityService.
+    const match = await resolveCompany(userId, { apollo_organization_id: apolloOrgId, name: companyName },
+      { source: 'ContactSearch.ensureCompanyExists' });
+    if (match.companyId) return match.companyId;
 
     // Create new company
     const companyId = apolloOrgId || `company_${Date.now()}`;
     const companyRef = doc(db, 'users', userId, 'companies', companyId);
 
     const companyData = createCompanyRecord({
-      apollo_id: apolloOrgId || null,
+      ...apolloIdFields(apolloOrgId),
       name: companyName,
       industry: contact.organization?.industry || null,
       website_url: contact.organization?.website_url || null,

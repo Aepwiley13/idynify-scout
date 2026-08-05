@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation, ENTRY_POINTS } from '../../../utils/navigation';
 import { Award, TrendingUp, ArrowRightLeft, Star, ChevronRight } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
@@ -34,6 +35,7 @@ function QualityBadge({ score, T }) {
 export default function LeaderboardSection() {
   const T = useT();
   const navigate = useNavigate();
+  const { openContact } = useCanonicalNavigation();
   const activeUser = useActiveUser();
   const userId = activeUser?.uid || activeUser?.id || auth.currentUser?.uid;
 
@@ -71,7 +73,7 @@ export default function LeaderboardSection() {
           {leaderboard.map((source, i) => (
             <div
               key={source.contact_id}
-              onClick={() => navigate(`/scout/contact/${source.contact_id}`)}
+              onClick={() => openContact({ contactId: source.contact_id, entryPoint: ENTRY_POINTS.REINFORCEMENTS })}
               style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 background: T.cardBg, border: `1px solid ${T.border2}`,

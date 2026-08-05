@@ -5,6 +5,8 @@ import { Upload, AlertTriangle, CheckCircle, Users, Building2 } from 'lucide-rea
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { createCompanyRecord } from '../../schemas/companySchema';
+import { resolveCompany } from '../../services/companyIdentityService';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 export default function CSVUpload({ onContactsAdded, onCancel }) {
   const [uploadType, setUploadType] = useState(null); // 'leads' or 'companies'
@@ -275,6 +277,13 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
         const companiesRef = collection(db, 'users', user.uid, 'companies');
 
         for (const company of preview.items) {
+          // Name is the only signal a CSV row carries. Skipping rather than
+          // creating keeps a re-uploaded file from doubling the list, which is
+          // the single most common way this collection got duplicates.
+          const match = await resolveCompany(user.uid, { name: company.name },
+            { source: 'CSVUpload.companies' });
+          if (match.companyId) { skippedCount += 1; continue; }
+
           const companyData = createCompanyRecord({
             name: company.name,
             website_url: company.website_url || null,
@@ -308,7 +317,30 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
         const contactsRef = collection(db, 'users', user.uid, 'contacts');
 
         for (const contact of itemsToProcess) {
+          // Identity resolution per row. The pre-pass above already dropped
+          // exact email duplicates, but a CSV row may carry a phone or a
+          // LinkedIn URL and no email at all, and those matched nothing.
+          //
+          // Merges are applied outside the batch, on purpose: a WriteBatch
+          // cannot read, so the patch has to be computed and written
+          // separately. Rows that merge contribute nothing to the batch.
+          const decision = await prepareContactWrite(user.uid, {
+            email: contact.email,
+            phone: contact.phone,
+            linkedin_url: contact.linkedin_url,
+            name: contact.name,
+            company: contact.company,
+            source: 'csv_import',
+          }, { source: 'CSVUpload.contacts' });
+
+          if (decision.action === 'merge') {
+            await applyContactMerge(user.uid, decision);
+            skippedCount += 1;
+            continue;
+          }
+
           const contactData = {
+            ...decision.fields,
             name: contact.name,
             email: contact.email || null,
             phone: contact.phone || null,

@@ -18,6 +18,8 @@ import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons } from '../../utils/icpScoring';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
+import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
@@ -1593,13 +1595,36 @@ export default function DailyLeads({ onNavigate }) {
             if (result.success && result.people?.length > 0) {
               for (const person of result.people) {
                 const contactId = `${company.id}_${person.id}`;
+
+                // Identity resolution before every auto-discovered write.
+                // This path runs in the BACKGROUND after a swipe, so a
+                // duplicate created here is one the user never saw made and
+                // has no reason to look for.
+                const decision = await prepareContactWrite(user.uid, {
+                  contactId,
+                  apollo_person_id: person.id,
+                  email: person.email,
+                  linkedin_url: person.linkedin_url,
+                  name: person.name,
+                  company_id: company.id,
+                  company_name: company.name,
+                  source: 'icp_auto_discovery',
+                }, { source: 'DailyLeads.autoDiscovery', recordStatus: RECORD_STATUS.SUGGESTED });
+
+                if (decision.action === 'merge') {
+                  await applyContactMerge(user.uid, decision);
+                  continue;
+                }
+
                 await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
-                  ...person, company_id: company.id, company_name: company.name,
+                  ...person,
+                  // Identity envelope after the spread, never from it: `person`
+                  // is an enrichment API payload and carries no archival state,
+                  // no normalized identifiers and no status dimensions.
+                  ...decision.fields,
+                  company_id: company.id, company_name: company.name,
                   lead_owner: user.uid, status: 'suggested', source: 'icp_auto_discovery',
                   discovered_at: new Date().toISOString(),
-                  // Set after the spread, never from it: `person` is an
-                  // enrichment API payload and carries no archival state.
-                  is_archived: false,
                 });
               }
               await updateDoc(companyRef, { auto_contact_status: 'completed', auto_contact_count: result.people.length, auto_contact_searched_at: new Date().toISOString() });
@@ -1915,9 +1940,28 @@ export default function DailyLeads({ onNavigate }) {
     const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
     try {
       if (direction === 'right') {
-        // is_archived is set after the spread, never from it — `person` is an
-        // enrichment API payload and carries no archival state.
-        await setDoc(contactRef, { ...person, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString(), is_archived: false, ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}) }, { merge: true });
+        // Identity resolution before the write. The composite id already
+        // dedups THIS person at THIS company; the resolver catches the same
+        // human already saved from a different source.
+        const decision = await prepareContactWrite(user.uid, {
+          contactId,
+          apollo_person_id: person.id,
+          email: person.email,
+          linkedin_url: person.linkedin_url,
+          name: person.name,
+          company_id: company.id,
+          company_name: company.name,
+          source: 'people_mode',
+        }, { source: 'DailyLeads.peopleSwipe', recordStatus: RECORD_STATUS.SUGGESTED });
+
+        if (decision.action === 'merge') {
+          await applyContactMerge(user.uid, decision);
+        } else {
+          // The identity envelope goes after the spread, never from it —
+          // `person` is an enrichment API payload and carries no archival
+          // state, no normalized identifiers and no status dimensions.
+          await setDoc(contactRef, { ...person, ...decision.fields, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString(), ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}) }, { merge: true });
+        }
         if (company.status === 'pending') {
           const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
           await updateDoc(companyRef, { status: 'accepted', swipedAt: new Date().toISOString(), swipeDirection: 'right', swipe_source: 'people_mode' });

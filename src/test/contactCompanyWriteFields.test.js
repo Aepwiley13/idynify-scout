@@ -121,12 +121,54 @@ function objectsByVariable(ast) {
   return map;
 }
 
+/**
+ * Field guarantees that arrive via a resolved spread rather than a literal key.
+ *
+ * `...decision.fields` comes from prepareContactWrite (contactWriteGuard),
+ * whose payload is built by createStatusFields — which ALWAYS emits
+ * `is_archived`, and throws rather than emitting an unknown status. So a write
+ * spreading it carries the field just as surely as one that types it out.
+ *
+ * This is a hole worth naming: the guarantee now depends on a function this
+ * parser cannot follow. What keeps it honest is statusModel.test.js, which
+ * asserts createStatusFields emits is_archived, plus the assertion below that
+ * the spread is actually the resolver's and not an arbitrary object.
+ */
+const SPREAD_GUARANTEES = {
+  // <spread expression> : [fields it guarantees]
+  'decision.fields': ['is_archived', 'record_status', 'relationship_status', 'stage'],
+  'resolution.fields': ['is_archived', 'record_status', 'relationship_status', 'stage'],
+};
+
+/** Render a spread's source as text, for lookup in SPREAD_GUARANTEES. */
+function spreadName(argument) {
+  if (argument.type === 'MemberExpression'
+      && argument.object?.type === 'Identifier'
+      && argument.property?.type === 'Identifier') {
+    return `${argument.object.name}.${argument.property.name}`;
+  }
+  if (argument.type === 'Identifier') return argument.name;
+  if (argument.type === 'CallExpression' && argument.callee?.type === 'Identifier') {
+    return `${argument.callee.name}()`;
+  }
+  return null;
+}
+
 /** Property keys on an object literal, including those from spreads we can see. */
 function propertyNames(node) {
   if (!node || node.type !== 'ObjectExpression') return null;
-  return node.properties
+
+  const keys = node.properties
     .filter(p => p.type === 'ObjectProperty')
     .map(p => (p.key.type === 'Identifier' ? p.key.name : p.key.value));
+
+  for (const p of node.properties) {
+    if (p.type !== 'SpreadElement') continue;
+    const guaranteed = SPREAD_GUARANTEES[spreadName(p.argument)];
+    if (guaranteed) keys.push(...guaranteed);
+  }
+
+  return keys;
 }
 
 /**
@@ -191,7 +233,11 @@ function collectWrites(collectionName) {
       const keys = propertyNames(payload);
       if (keys === null) continue; // Not a literal we can inspect.
 
-      found.push({ file: relPath, line: n.loc.start.line, keys, viaFactory });
+      const viaEnvelope = payload.properties.some(
+        p => p.type === 'SpreadElement' && SPREAD_GUARANTEES[spreadName(p.argument)]
+      );
+
+      found.push({ file: relPath, line: n.loc.start.line, keys, viaFactory, viaEnvelope });
     }
   }
   return found;
@@ -216,8 +262,33 @@ describe('contact documents always carry is_archived', () => {
       'Firestore will not match them in where("is_archived","==",false) —',
       'they will be invisible to search and to every people lens.',
       'Add is_archived: false to the document (explicitly, not via a spread',
-      'from an API payload), or add a documented PARTIAL_UPDATE_ALLOWLIST',
-      'entry if the write updates an existing record.',
+      'from an API payload), spread the identity envelope from',
+      'prepareContactWrite (`...decision.fields`), or add a documented',
+      'PARTIAL_UPDATE_ALLOWLIST entry if the write updates an existing record.',
+    ].join('\n')).toEqual([]);
+  });
+
+  it('the writes that satisfy it via the envelope really do spread the resolver', () => {
+    // Guards the guard. SPREAD_GUARANTEES credits `...decision.fields` with
+    // is_archived because prepareContactWrite always produces it — but only if
+    // the spread is genuinely the resolver's output. If someone renamed a local
+    // variable to `decision` and spread something else, this parser would
+    // credit it wrongly. So: every file relying on the envelope must import the
+    // guard that produces it.
+    const relyingFiles = new Set(
+      writes
+        .filter(w => w.viaEnvelope)
+        .map(w => w.file)
+    );
+
+    const notImportingGuard = [...relyingFiles].filter(
+      f => !/from '.*contactWriteGuard'/.test(readFileSync(f, 'utf8'))
+    );
+
+    expect(notImportingGuard, [
+      'These files spread `decision.fields` / `resolution.fields` into a contact',
+      'write, but never import contactWriteGuard — so the spread is some other',
+      'object and the is_archived guarantee above is not real.',
     ].join('\n')).toEqual([]);
   });
 });

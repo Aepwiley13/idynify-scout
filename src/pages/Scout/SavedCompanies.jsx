@@ -9,6 +9,7 @@ import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, writeBat
 import { db, auth } from '../../firebase/config';
 import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation, ENTRY_POINTS } from '../../utils/navigation';
 import { Building2, Users, Search, Globe, Linkedin, Target, Archive, RotateCcw, TrendingUp, Award } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
@@ -20,6 +21,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 export default function SavedCompanies({ onSelectCompany }) {
   const T = useT();
   const navigate = useNavigate();
+  const { openCompany } = useCanonicalNavigation();
 
   const [companies, setCompanies] = useState([]);
   const [archivedCompanies, setArchivedCompanies] = useState([]);
@@ -128,7 +130,7 @@ export default function SavedCompanies({ onSelectCompany }) {
       if (company.contact_count > 0) {
         navigate(`/scout/company/${company.id}/leads`);
       } else {
-        navigate(`/scout/company/${company.id}`);
+        openCompany({ companyId: company.id, entryPoint: ENTRY_POINTS.SCOUT });
       }
     }
   }
@@ -334,7 +336,7 @@ export default function SavedCompanies({ onSelectCompany }) {
             } else {
               const c = [...companies, ...archivedCompanies].find(x => x.id === id);
               if (c && c.contact_count > 0) navigate(`/scout/company/${id}/leads`);
-              else navigate(`/scout/company/${id}`);
+              else openCompany({ companyId: id, entryPoint: ENTRY_POINTS.SCOUT });
             }
           }}
         />

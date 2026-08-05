@@ -5,6 +5,8 @@ import { db, auth } from '../../firebase/config';
 import { Search, Building2, Globe, Check, X } from 'lucide-react';
 import './CompanySearch.css';
 import { createCompanyRecord } from '../../schemas/companySchema';
+import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 /**
  * Company Search Component
@@ -111,22 +113,20 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
 
       console.log('➕ Adding company to saved list:', company.name);
 
-      // Check if company already exists
+      // Dedup across BOTH Apollo id field names. This path only ever checked
+      // `apollo_organization_id`, so a company already saved via LinkedIn
+      // import (which wrote `apollo_id`) was invisible to it.
       const companiesRef = collection(db, 'users', user.uid, 'companies');
-      const existingQuery = query(
-        companiesRef,
-        where('apollo_organization_id', '==', company.apollo_organization_id)
-      );
-      const existingSnapshot = await getDocs(existingQuery);
+      const match = await resolveCompany(user.uid, company, { source: 'CompanySearch.handleAddCompany' });
 
-      if (!existingSnapshot.empty) {
+      if (match.companyId) {
         setError(`${company.name} is already in your Saved Companies`);
         return;
       }
 
       // Add company to Firestore
       const docRef = await addDoc(companiesRef, createCompanyRecord({
-        apollo_organization_id: company.apollo_organization_id,
+        ...apolloIdFields(readApolloOrgId(company)),
         name: company.name,
         industry: company.industry,
         employee_count: company.employee_count,
@@ -220,7 +220,23 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
       const user = auth.currentUser;
       if (!user) throw new Error('You must be logged in');
 
+      const resolution = await prepareContactWrite(user.uid, {
+        email: websiteContact.email,
+        name: websiteContact.companyName,
+        company: websiteContact.companyName,
+        source: 'website',
+      }, { source: 'CompanySearch.websiteContact' });
+
+      if (resolution.action === 'merge') {
+        await applyContactMerge(user.uid, resolution);
+        setWebsiteSaveSuccess(true);
+        setWebsiteContact(null);
+        setWebsiteUrl('');
+        return;
+      }
+
       await addDoc(collection(db, 'users', user.uid, 'contacts'), {
+        ...resolution.fields,
         name: websiteContact.companyName,
         email: websiteContact.email || null,
         emailSource: 'website',
@@ -230,7 +246,6 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
         sourceType: 'website',
         source: 'website',
         status: 'saved',
-        is_archived: false,   // required by every contact reader — never omit
         saved_at: new Date(),
         found_at: new Date(),
         last_enriched_at: null

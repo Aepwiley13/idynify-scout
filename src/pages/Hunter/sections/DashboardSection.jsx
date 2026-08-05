@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { openContact, ENTRY_POINTS, DISPLAY_MODES } from '../../../utils/navigation';
 import { db, auth } from '../../../firebase/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { backfillMissionContactNames } from '../../../utils/backfillMissionContacts';
@@ -155,7 +156,11 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
 
   function handleOpenContact(contactId) {
     if (contactId) {
-      navigate(`/scout/contact/${contactId}`);
+      // PANEL mode preserves Hunter's current destination exactly. Moving
+      // Hunter to the canonical page is an entry-point update the brief
+      // defers until the canonical routes are staging-validated; routing
+      // through the helper now means that change is a one-line diff later.
+      openContact({ navigate, contactId, entryPoint: ENTRY_POINTS.HUNTER, displayMode: DISPLAY_MODES.PANEL });
     }
   }
 

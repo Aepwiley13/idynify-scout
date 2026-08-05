@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
@@ -46,6 +46,8 @@ import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
 import ContactProfile from './pages/Scout/ContactProfile';
 import ContactProfilePanel from './pages/Scout/ContactProfilePanel';
+import ContactPage from './pages/Scout/ContactPage';
+import CompanyPage from './pages/Scout/CompanyPage';
 import ScoutGame from './pages/Scout/ScoutGame';
 import CadencesList from './pages/Scout/CadencesList';
 import CadenceDetail from './pages/Scout/CadenceDetail';
@@ -159,6 +161,21 @@ function ShellRoute({ loading, user, userData, requirePayment = true }) {
       <Outlet />
     </MainLayout>
   );
+}
+
+/**
+ * /scout/company/:companyId → /company/:companyId
+ *
+ * `replace` so the redirect does not sit in history: a user who lands on the
+ * old URL and presses Back must go where they came from, not bounce through
+ * the redirect forever. Search and hash are carried across because company
+ * links in email carry tracking params, and dropping them would silently
+ * change what the destination sees.
+ */
+function RedirectToCanonicalCompany() {
+  const { companyId } = useParams();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/company/${companyId}${search}${hash}`} replace />;
 }
 
 function App() {
@@ -433,6 +450,27 @@ function App() {
         {SHELL_MIGRATION.enabled ? (
           <Route element={<ShellRoute loading={loading} user={user} userData={userData} />}>
             <Route path="/mission-control-v2" element={<MissionControlDashboardV2 />} />
+
+            {/* ══ CANONICAL RECORD ROUTES ══════════════════════════════════
+                /contact/:contactId and /company/:companyId are the ONE
+                destination for a person and for an organization, reachable
+                from every module.
+
+                They are siblings of the modules, not children of Scout. That
+                is the whole change: as children of /scout they mounted
+                ScoutMain underneath, so a user who clicked a Mission Control
+                priority landed on their contact with Scout's Daily Leads
+                behind it and a breadcrumb claiming they were in Scout. Here
+                they render directly into the shell's Outlet, and the
+                breadcrumb takes its origin from navigation intent instead of
+                from the URL.
+
+                Scout's /scout/contact/:id below is NOT a legacy alias — it is
+                the PANEL display mode of the same canonical experience, and it
+                stays because Scout has a filtered list worth preserving behind
+                the panel. Same loader, same actions, same Barry context. */}
+            <Route path="/contact/:contactId" element={<ContactPage />} />
+            <Route path="/company/:companyId" element={<CompanyPage />} />
             {/* Contact Profile is a CHILD of Scout, not a sibling. That is
                 what keeps Scout mounted while a contact is open, so closing
                 the panel restores the list, its filters and its scroll
@@ -440,7 +478,14 @@ function App() {
             <Route path="/scout" element={<ScoutMain />}>
               <Route path="contact/:contactId" element={<ContactProfilePanel />} />
             </Route>
-            <Route path="/scout/company/:companyId" element={<CompanyDetail />} />
+            {/* /scout/company/:id redirects to the canonical route.
+                Unlike /scout/contact/:id — which is a real display mode — the
+                company route had no panel and no list to preserve: it rendered
+                the same full page the canonical route now renders, just under
+                a path that claimed Scout owned it. Redirecting rather than
+                duplicating means there is exactly one company URL, and every
+                existing link, bookmark and email still resolves. */}
+            <Route path="/scout/company/:companyId" element={<RedirectToCanonicalCompany />} />
             <Route path="/scout/company/:companyId/leads" element={<CompanyLeads />} />
             <Route path="/scout/total-market" element={<TotalMarket />} />
             <Route path="/scout/cadences" element={<CadencesList />} />
@@ -493,13 +538,23 @@ function App() {
                 Scout renders inside it — Scout no longer carries its own
                 rail, so it must not be rendered bare. */}
             <Route path="/scout" element={<ProtectedRoute withLayout={true}><ScoutMain /></ProtectedRoute>} />
+            {/* Canonical routes exist in degraded mode too. Rolling the shell
+                migration back must not 404 every link this sprint created. */}
+            <Route
+              path="/contact/:contactId"
+              element={<ProtectedRoute withLayout={true}><ContactPage /></ProtectedRoute>}
+            />
+            <Route
+              path="/company/:companyId"
+              element={<ProtectedRoute withLayout={true}><CompanyPage /></ProtectedRoute>}
+            />
             <Route
               path="/scout/contact/:contactId"
               element={<ProtectedRoute withLayout={true}><ContactProfile /></ProtectedRoute>}
             />
             <Route
               path="/scout/company/:companyId"
-              element={<ProtectedRoute withLayout={true}><CompanyDetail /></ProtectedRoute>}
+              element={<RedirectToCanonicalCompany />}
             />
             <Route
               path="/scout/company/:companyId/leads"

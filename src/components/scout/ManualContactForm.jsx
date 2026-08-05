@@ -5,6 +5,7 @@ import { UserPlus, Search, X, Loader } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [formData, setFormData] = useState({
@@ -58,8 +59,30 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
     setSaving(true);
 
     try {
+      // Identity resolution BEFORE the write. A hand-typed contact is the most
+      // likely to duplicate someone already imported from Apollo or Gmail —
+      // the user is typing from memory, not from a record.
+      const resolution = await prepareContactWrite(user.uid, {
+        email: formData.email,
+        phone: formData.phone,
+        linkedin_url: formData.linkedin_url,
+        name: formData.name,
+        company: formData.company,
+        source: referredBy ? 'referral' : 'manual',
+      }, { source: 'ManualContactForm' });
+
+      if (resolution.action === 'merge') {
+        await applyContactMerge(user.uid, resolution);
+        setSaving(false);
+        setErrors({
+          email: `${formData.name.trim()} is already in your pipeline. Any new details you entered have been added to the existing record.`,
+        });
+        return;
+      }
+
       // Create contact with manual source
       const contactData = {
+        ...resolution.fields,
         name: formData.name.trim(),
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
@@ -71,7 +94,6 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
         // Relationship classification
         person_type: 'lead',
-        stage: 'scout',
         stage_source: 'auto',
 
         // Source tracking

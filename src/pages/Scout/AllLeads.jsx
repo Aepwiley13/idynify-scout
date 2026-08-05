@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
+import { openContact, openCompany, ENTRY_POINTS, DISPLAY_MODES } from '../../utils/navigation';
 import { useActiveUserId, useImpersonation, getEffectiveUser } from '../../context/ImpersonationContext';
 import {
   Users, Building2, Mail, Linkedin, Search, Download,
@@ -18,6 +19,7 @@ import {
   Factory, MapPin, Filter, MoreHorizontal, Archive,
 } from 'lucide-react';
 import { archivePerson } from '../../services/peopleService';
+import { createSniperRecord } from '../../services/sniperWriteGuard';
 import { BRIGADES, BRIGADE_MAP } from '../../components/contacts/BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
@@ -1165,7 +1167,11 @@ function ContactProfileView({ contactId, onBack }) {
 
   // Navigate to full profile page
   useEffect(() => {
-    navigate(`/scout/contact/${contactId}`);
+    // PANEL mode — the exact path this always used. AllLeads renders in
+    // Scout, Basecamp, Fallback and Command Center; moving the non-Scout
+    // consumers to the canonical page is an entry-point change the brief
+    // defers, so this preserves today's behaviour through the helper.
+    openContact({ navigate, contactId, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
   }, [contactId]);
 
   return null;
@@ -1408,8 +1414,12 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     const user = getEffectiveUser();
     if (!user) return;
     try {
-      await addDoc(collection(db, 'users', user.uid, 'sniper_contacts'), {
-        contactRef: contact.id,
+      // SNIPER WRITE FREEZE. Goes through the guard so the record carries
+      // canonical_contact_id and the canonical contact learns its stage.
+      // `stage: 'demo_done'` here is the SNIPER PIPELINE stage, not the
+      // module stage — two different fields on two different records that
+      // unfortunately share a name. See docs/SNIPER_MIGRATION.md.
+      await createSniperRecord(user.uid, contact.id, {
         firstName: contact.name?.split(' ')[0] || '',
         lastName: contact.name?.split(' ').slice(1).join(' ') || '',
         name: contact.name || '',
@@ -1417,8 +1427,6 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         company: contact.company_name || companies[contact.company_id]?.name || '',
         email: contact.email || contact.work_email || '',
         stage: 'demo_done',
-        createdAt: serverTimestamp(),
-        lastTouchAt: serverTimestamp(),
       });
       setSniperIds(prev => new Set([...prev, contact.id]));
     } catch (err) {
@@ -2179,7 +2187,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   }}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
-                      ? () => navigate(`/scout/company/${c.company_id}`)
+                      ? () => openCompany({ navigate, companyId: c.company_id, entryPoint: ENTRY_POINTS.SCOUT })
                       : c.company_name
                         ? () => navigate('/scout?tab=scout-plus', { state: { initialView: 'company-search', searchCompanyName: c.company_name } })
                         : undefined
@@ -2223,7 +2231,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   }}
                   onCompanyClick={
                     c.company_id && companies[c.company_id]
-                      ? () => navigate(`/scout/company/${c.company_id}`)
+                      ? () => openCompany({ navigate, companyId: c.company_id, entryPoint: ENTRY_POINTS.SCOUT })
                       : c.company_name
                         ? () => navigate('/scout?tab=scout-plus', { state: { initialView: 'company-search', searchCompanyName: c.company_name } })
                         : undefined

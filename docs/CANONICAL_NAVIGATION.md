@@ -178,3 +178,81 @@ A full accessibility audit is a separate sprint. These are the minimum.
 | Arrival / breadcrumb | Revert `useArrival` in the two pages. `MainLayout` falls back to `resolveModule(pathname)` on its own when `arrival.originModuleId` is null — no second change needed. |
 
 Nothing here writes to Firestore, so there is no data to roll back.
+
+---
+
+## Analytics
+
+Both helpers emit a product event after navigating. `src/services/analytics.js`
+writes to `users/{uid}/analytics_events`.
+
+```
+open_contact  { contactId, entryPoint, displayMode, reason, returnTo }
+open_company  { companyId, entryPoint, displayMode, reason, returnTo }
+```
+
+This is only possible because the helpers are the single way to open a record —
+the navigation contract and the analytics are the same change. The question it
+exists to answer is **which modules actually drive contact engagement**, and
+`entryPoint` × `displayMode` is the whole answer: Mission Control page opens vs
+Scout panel opens vs Command Bar lookups, counted separately.
+
+Params are read off the built **intent**, not the caller's arguments, so the
+event and the navigation can never disagree — including about defaults the
+builder filled in that the caller never passed.
+
+Three rules, all load-bearing:
+
+1. **Never blocks.** Fire-and-forget, emitted *after* `navigate()`. Analytics
+   must never sit between a click and the screen it opens.
+2. **Never throws.** A rejected write must not turn a working contact page into
+   an error boundary. Failures are logged with their Firestore code and
+   swallowed — the one place in this sprint where swallowing is correct,
+   because there is no user-visible outcome to get wrong.
+3. **Never writes while impersonating.** An admin's clicks are not the
+   customer's behaviour, and a workspace whose event log is half admin traffic
+   answers the engagement question with a number nobody can trust.
+
+Not Firebase Analytics: this codebase does not initialise it, and adding an SDK
+to ship two event types would be the new external dependency the sprint forbids.
+Not the contact document either — decision 7 stands.
+
+**Rollback:** revert `src/services/analytics.js` and the two `emitOpenEvent`
+calls in `navigation.js`. Navigation is unaffected; it never depended on them.
+
+---
+
+## Duplicate detection
+
+`scripts/detectDuplicateContacts.mjs` — **read-only**, no `--live` flag, no
+merge logic, no write path at all. This sprint stopped new duplicates from
+being created; the script counts the ones already there, as the input to the
+dedup sprint.
+
+```bash
+node scripts/detectDuplicateContacts.mjs                     # every workspace
+node scripts/detectDuplicateContacts.mjs --user-id=<uid>     # one workspace
+node scripts/detectDuplicateContacts.mjs --verbose           # every group
+node scripts/detectDuplicateContacts.mjs --json > dupes.json # machine-readable
+```
+
+It reports groups per the locked hierarchy, and separates them by what a merge
+could safely do:
+
+| Signal | Merge posture |
+|---|---|
+| Email (lowercase + trim) | mechanical |
+| Apollo person ID | mechanical |
+| LinkedIn URL (normalized) | mechanical |
+| Phone (digits) | mechanical |
+| **Name + company** | **needs a human** |
+
+The headline "contacts involved in a duplicate group" counts **safe signals
+only**. Two people can share a name at one company, and quoting them as
+mergeable would scope the dedup sprint against records it must not touch.
+
+Normalization is imported from `src/utils/identityNormalization.js` — the exact
+module the live resolver uses. That module was extracted for this reason: a
+report that normalized differently would flag pairs the product would not have
+merged and miss ones it would, while looking authoritative. Grouping logic is
+covered by `src/test/duplicateDetection.test.js`.

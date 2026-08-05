@@ -35,8 +35,9 @@
  * with no reason to be told why a screen they are already looking at opened.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { logEvent, EVENTS } from '../services/analytics';
 
 /** The key navigation intent travels under inside router state. */
 export const NAVIGATION_INTENT_KEY = 'navigationIntent';
@@ -212,6 +213,7 @@ export function openContact({ navigate, ...params }) {
   }
   const { to, options } = buildContactNavigation(params);
   navigate(to, options);
+  emitOpenEvent(EVENTS.OPEN_CONTACT, options.state[NAVIGATION_INTENT_KEY], 'contactId');
   return to;
 }
 
@@ -222,7 +224,30 @@ export function openCompany({ navigate, ...params }) {
   }
   const { to, options } = buildCompanyNavigation(params);
   navigate(to, options);
+  emitOpenEvent(EVENTS.OPEN_COMPANY, options.state[NAVIGATION_INTENT_KEY], 'companyId');
   return to;
+}
+
+/**
+ * Emit the product event for an open, from the intent that was just built.
+ *
+ * Read off the INTENT rather than the caller's arguments, so the event and the
+ * navigation can never disagree — including about defaults the builder filled
+ * in (`displayMode`, `entryPoint`) that the caller never passed.
+ *
+ * Fired AFTER navigate() on purpose. Analytics must never sit between a click
+ * and the screen it opens, and logEvent is fire-and-forget precisely so this
+ * ordering costs nothing.
+ */
+function emitOpenEvent(event, intent, idField) {
+  if (!intent) return;
+  logEvent(event, {
+    [idField]: intent.entityId,
+    entryPoint: intent.entryPoint,
+    displayMode: intent.displayMode,
+    reason: intent.reason,
+    returnTo: intent.returnTo,
+  });
 }
 
 /**
@@ -240,16 +265,14 @@ export function useCanonicalNavigation() {
   const location = useLocation();
   const here = location.pathname + (location.search || '');
 
-  const open = useCallback((builder, params) => {
-    const { to, options } = builder({ returnTo: here, ...omitUndefined(params) });
-    navigate(to, options);
-    return to;
-  }, [navigate, here]);
-
+  // Delegates to the standalone helpers rather than re-implementing them, so
+  // the hook and the direct call cannot drift — most importantly, so both emit
+  // the same analytics event. The hook's only addition is the `returnTo`
+  // default.
   return useMemo(() => ({
-    openContact: (params) => open(buildContactNavigation, params),
-    openCompany: (params) => open(buildCompanyNavigation, params),
-  }), [open]);
+    openContact: (params) => openContact({ navigate, returnTo: here, ...omitUndefined(params) }),
+    openCompany: (params) => openCompany({ navigate, returnTo: here, ...omitUndefined(params) }),
+  }), [navigate, here]);
 }
 
 /** Drop undefined keys so they cannot clobber a default via spread. */

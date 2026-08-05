@@ -1,7 +1,59 @@
 /**
  * contactIdentityService — prevention, not cleanup.
  *
- * WHAT THIS IS
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  PLATFORM PRINCIPLE                                                      ║
+ * ║                                                                          ║
+ * ║      DISCOVERY ENRICHES. IT NEVER REPLACES.                              ║
+ * ║                                                                          ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ *
+ * Read this before changing anything below, and before writing any new code
+ * that reconciles two records describing the same person or organization.
+ *
+ * WHAT IT MEANS
+ * A record already in the workspace is the product of decisions someone made:
+ * a name they corrected, a company they picked, a stage they moved, three
+ * months of timeline, and everything Barry has learned about the relationship.
+ * A newly discovered record is a fresh observation from an external source
+ * that has never met the user. When the two describe the same person, the
+ * observation is EVIDENCE, not an update. It contributes what the record does
+ * not have. It does not get to overrule what the record already knows.
+ *
+ * WHAT FOLLOWS FROM IT, CONCRETELY
+ *
+ *   · A match MERGES rather than skips. The old duplicate checks all said
+ *     "already in your pipeline" and threw the new source away — including the
+ *     LinkedIn URL or Apollo id the record was missing, which is precisely why
+ *     the NEXT import created the duplicate instead. Every near-miss now makes
+ *     the next match more certain. See mergeIdentifiers().
+ *
+ *   · Identifiers accrete; canonical fields do not. A Gmail header saying the
+ *     name is "j.doe" never overwrites "Jane Doe". CANONICAL_FIELDS below is
+ *     the enumerated list of what discovery may not touch, and a field being
+ *     absent from a record is the only reason a merge may fill it in.
+ *
+ *   · Counts count creations, not attempts. `contact_count` on a company used
+ *     to increment by the number of people selected, which double-counted
+ *     everyone who resolved to an existing record. Enrichment added no rows,
+ *     so it must add no count.
+ *
+ *   · A weak signal never merges at all. Name + company is an observation that
+ *     two records MIGHT be one person. Acting on it would destroy one of them.
+ *     It is flagged for a human instead — see hierarchy step 6.
+ *
+ *   · Preview does not write. Opening an unaccepted discovery record must not
+ *     mutate it (CompanyDetail preview mode) — looking is not deciding, and
+ *     enrichment that fires on a record the user is about to reject has
+ *     replaced their decision with a page load.
+ *
+ * THE FAILURE THIS AVOIDS
+ * The opposite policy — last writer wins — is the one that feels obvious and
+ * silently destroys history. It is invisible in review, it produces no error,
+ * and the user discovers it months later when a contact they curated has been
+ * flattened back into whatever Apollo last returned.
+ *
+ * WHAT IS
  * ────────────
  * Ten separate code paths can create a contact. Each one built its own
  * duplicate check, and they disagreed: some queried email exactly as typed,
@@ -50,6 +102,12 @@
 
 import { collection, doc, getDoc, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import {
+  extractIdentifiers,
+  normalizeEmail,
+  normalizeLinkedInUrl,
+  normalizePhone,
+} from '../utils/identityNormalization';
 
 /** How a match was made. Ordered — index is the hierarchy rank. */
 export const MATCH_SIGNALS = Object.freeze([
@@ -78,115 +136,16 @@ export const RESOLUTION = Object.freeze({
 });
 
 // ── Normalization ───────────────────────────────────────────────────────────
+//
+// Lives in src/utils/identityNormalization.js, not here, and is RE-EXPORTED so
+// existing importers of this service keep working. The reason for the split is
+// scripts/detectDuplicateContacts.mjs: it runs under Node with the Admin SDK
+// and cannot import this file, which pulls in the Firestore web SDK. A report
+// that normalized differently from the resolver would flag duplicates the
+// product would not have merged and miss ones it would — worse than no report,
+// because it looks authoritative.
 
-/**
- * Normalize an email for matching: lowercase, trim.
- *
- * Deliberately NOT doing more than the brief specifies. Gmail dot-stripping and
- * plus-tag removal are tempting and wrong here: `a.b@gmail.com` and
- * `ab@gmail.com` are the same Gmail inbox but different addresses at most other
- * providers, and `user+acme@` is a real routing distinction people rely on.
- * Over-normalizing merges two people; under-normalizing creates a duplicate the
- * user can see and fix. The second failure is the recoverable one.
- *
- * @returns {string|null} normalized address, or null if there isn't one
- */
-export function normalizeEmail(email) {
-  if (typeof email !== 'string') return null;
-  const trimmed = email.trim().toLowerCase();
-  if (!trimmed || !trimmed.includes('@')) return null;
-  return trimmed;
-}
-
-/**
- * Normalize a LinkedIn URL for matching.
- *
- * The same profile arrives as `https://www.linkedin.com/in/jane-doe/`,
- * `http://linkedin.com/in/jane-doe`, and `linkedin.com/in/jane-doe?trk=…`.
- * Scheme, `www.`, trailing slash, query string and case are all noise.
- */
-export function normalizeLinkedInUrl(url) {
-  if (typeof url !== 'string') return null;
-  let value = url.trim().toLowerCase();
-  if (!value) return null;
-  value = value.split('?')[0].split('#')[0];
-  value = value.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
-  return value || null;
-}
-
-/**
- * Normalize a phone number to its digits, keeping a leading +.
- *
- * `(415) 555-0100`, `415-555-0100` and `+1 415 555 0100` are the same number
- * written three ways. Note the last one normalizes to `+14155550100` and the
- * first two to `4155550100` — this does NOT infer a country code, because
- * guessing +1 for a workspace selling into Europe would merge unrelated people.
- */
-export function normalizePhone(phone) {
-  if (typeof phone !== 'string' && typeof phone !== 'number') return null;
-  const raw = String(phone).trim();
-  if (!raw) return null;
-  const digits = raw.replace(/[^\d]/g, '');
-  if (digits.length < 7) return null; // too short to identify anyone
-  return raw.startsWith('+') ? `+${digits}` : digits;
-}
-
-/** Normalize a name/company for the weak comparison in step 6. */
-function normalizeLoose(value) {
-  if (typeof value !== 'string') return null;
-  const out = value.trim().toLowerCase().replace(/\s+/g, ' ');
-  return out || null;
-}
-
-// ── Candidate shaping ───────────────────────────────────────────────────────
-
-/**
- * Pull the identifiers out of whatever shape a write path happens to hold.
- *
- * Apollo payloads, Gmail headers, OCR output and hand-typed forms all name
- * these fields differently — `organization_name` vs `company_name` vs
- * `company`, `phone_numbers[0].sanitized_number` vs `phone`. Every caller
- * normalizing that itself is how the ten write paths diverged in the first
- * place, so it happens once, here.
- */
-export function extractIdentifiers(candidate = {}) {
-  const email = normalizeEmail(
-    candidate.email
-    ?? candidate.work_email
-    ?? candidate.email_address
-    ?? null
-  );
-
-  const phoneSource =
-    candidate.phone
-    ?? candidate.phone_mobile
-    ?? candidate.mobile_phone
-    ?? candidate.phone_numbers?.[0]?.sanitized_number
-    ?? candidate.phone_numbers?.[0]
-    ?? null;
-
-  return {
-    contactId: candidate.contactId ?? candidate.contact_id ?? null,
-    email,
-    apolloPersonId: candidate.apollo_person_id ?? candidate.apolloPersonId ?? null,
-    linkedinUrl: normalizeLinkedInUrl(candidate.linkedin_url ?? candidate.linkedinUrl ?? null),
-    phone: normalizePhone(phoneSource),
-    name: normalizeLoose(
-      candidate.name
-      ?? [candidate.first_name ?? candidate.firstName, candidate.last_name ?? candidate.lastName]
-        .filter(Boolean).join(' ')
-    ),
-    company: normalizeLoose(
-      candidate.company_name
-      ?? candidate.companyName
-      ?? candidate.company
-      ?? candidate.organization_name
-      ?? candidate.organization?.name
-      ?? null
-    ),
-    companyId: candidate.company_id ?? candidate.companyId ?? null,
-  };
-}
+export { extractIdentifiers, normalizeEmail, normalizeLinkedInUrl, normalizePhone };
 
 // ── Logging ─────────────────────────────────────────────────────────────────
 

@@ -3,6 +3,10 @@
 Short list. Each one exists because breaking it produced a defect that was
 invisible in code review.
 
+The decisions these principles came out of are recorded as ADRs in
+[`adr/`](adr/) — this file is the *why we keep doing it*, those are the *what we
+decided and when*.
+
 ---
 
 ## Discovery enriches. It never replaces.

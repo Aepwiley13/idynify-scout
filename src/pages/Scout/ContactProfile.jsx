@@ -46,6 +46,7 @@ import './ContactProfile.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
 import { MODULES } from '../../constants/navigationModel';
+import { openCompany, ENTRY_POINTS } from '../../utils/navigation';
 
 // Stage peek card — shown in Action column when user previews a non-active stage.
 // Defined at module scope to avoid React remount on every render.
@@ -92,7 +93,29 @@ function StagePeekCard({ stageId, activeStageId, onBack, T }) {
   );
 }
 
-export default function ContactProfile({ contactId: propContactId, onClose, autoEngage, autoEngageContext = null, onReadyForHunter = null } = {}) {
+/**
+ * @param {object}   props
+ * @param {string}   [props.contactId]     Overrides the route param (panel/embedded use).
+ * @param {Function} [props.onClose]       Present ⇒ PANEL mode. See ContactProfilePanel.
+ * @param {string}   [props.returnTo]      Where Back goes in PAGE mode. Ephemeral —
+ *                                          comes from navigation intent, never from the record.
+ * @param {string}   [props.returnLabel]   Label for the Back button.
+ * @param {Node|Function} [props.banner]   Rendered above the page's own banners. A
+ *                                          function receives { triggerEngage } so an
+ *                                          arrival banner's recommended action can drive
+ *                                          the same engagement flow every other entry
+ *                                          point uses, rather than a second one.
+ */
+export default function ContactProfile({
+  contactId: propContactId,
+  onClose,
+  autoEngage,
+  autoEngageContext = null,
+  onReadyForHunter = null,
+  returnTo = null,
+  returnLabel = 'Back to People',
+  banner = null,
+} = {}) {
   const { contactId: paramContactId } = useParams();
   const contactId = propContactId || paramContactId;
   const navigate = useNavigate();
@@ -294,6 +317,37 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
   function handleContactUpdate(updatedContact) {
     setContact(updatedContact);
+  }
+
+  /**
+   * Leave this contact.
+   *
+   * Three destinations, in priority order, and the order is the whole point:
+   *
+   *   panel mode   → close the panel; Scout's list is still mounted behind it
+   *   returnTo     → the screen the user was on when they opened this contact
+   *   fallback     → Scout's people list
+   *
+   * The fallback used to be the ONLY behaviour. That is why clicking a
+   * priority in Mission Control and pressing Back landed the user in Scout:
+   * the page had no idea where they had come from, so it guessed, and it
+   * guessed the same thing every time.
+   */
+  function goBack() {
+    if (isPanelMode) { onClose(); return; }
+    if (returnTo) { navigate(returnTo); return; }
+    navigate('/scout', { state: { activeTab: 'all-leads' } });
+  }
+
+  /** Open this contact's company on the canonical, module-agnostic route. */
+  function openCompanyRecord() {
+    if (!contact?.company_id) return;
+    openCompany({
+      navigate,
+      companyId: contact.company_id,
+      entryPoint: ENTRY_POINTS.COMPANY,
+      returnTo: location.pathname + (location.search || ''),
+    });
   }
 
   function triggerInlineEngagement() {
@@ -639,11 +693,7 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
       await archivePerson(user.uid, contact.id, archiveReason);
 
       setShowArchiveModal(false);
-      if (isPanelMode) {
-        onClose();
-      } else {
-        navigate('/scout', { state: { activeTab: 'all-leads' } });
-      }
+      goBack();
     } catch (err) {
       console.error('Failed to archive contact:', err);
       setArchiving(false);
@@ -667,10 +717,10 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>Contact Not Found</h3>
         <p style={{ margin: 0, fontSize: 13, color: T.textFaint }}>The contact you're looking for doesn't exist or has been removed.</p>
         <button
-          onClick={() => isPanelMode ? onClose() : navigate('/scout', { state: { activeTab: 'all-leads' } })}
+          onClick={goBack}
           style={{ padding: '8px 18px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}
         >
-          <ArrowLeft size={14} /><span>Back to People</span>
+          <ArrowLeft size={14} /><span>{returnLabel}</span>
         </button>
       </div>
     );
@@ -686,10 +736,11 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
         >
           <div className="profile-nav-inner">
             <button
-              onClick={() => navigate('/scout', { state: { activeTab: 'all-leads' } })}
+              onClick={goBack}
+              aria-label={returnLabel}
               style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 8, padding: '7px 14px', color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <ArrowLeft size={13} />Back to People
+              <ArrowLeft size={13} />{returnLabel}
             </button>
             <div style={{ display: 'flex', gap: 9 }}>
               <button
@@ -713,6 +764,12 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
 
       {/* Profile wrapper — full-width, contains banners + 3-col grid */}
       <div className="contact-profile-wrapper">
+
+        {/* Arrival banner — why this screen opened. Supplied by the canonical
+            page from ephemeral navigation intent; absent for a bookmark, a
+            refresh, or the Scout panel, all of which are arrivals with no
+            reason to explain. */}
+        {typeof banner === 'function' ? banner({ triggerEngage: triggerInlineEngagement }) : banner}
 
         {/* ── Banners ── */}
         {enrichSuccess && (
@@ -802,10 +859,11 @@ export default function ContactProfile({ contactId: propContactId, onClose, auto
             {contact.company_id && (
               <div
                 className="contact-company-context-card"
-                onClick={() => navigate(`/scout/company/${contact.company_id}`)}
+                onClick={openCompanyRecord}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter') navigate(`/scout/company/${contact.company_id}`); }}
+                aria-label={`Open company ${contact.company_name || ''}`.trim()}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCompanyRecord(); } }}
               >
                 <Building2 size={14} className="contact-company-icon" />
                 <span className="contact-company-name">{contact.company_name || 'View Company'}</span>

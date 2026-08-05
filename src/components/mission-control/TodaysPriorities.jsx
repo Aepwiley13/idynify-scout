@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { STATUS } from '../../theme/tokens';
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import usePriorityNavigation from './usePriorityNavigation';
 
 const URGENCY_COLOR = { high: STATUS.red, medium: STATUS.amber, low: STATUS.green };
 const DEFAULT_VISIBLE = 3;
@@ -22,8 +22,9 @@ function SkeletonCard({ T }) {
 }
 
 function PriorityCard({ item, T }) {
-  const navigate = useNavigate();
+  const openPriority = usePriorityNavigation();
   const color = URGENCY_COLOR[item.urgency] || URGENCY_COLOR.low;
+  const canOpen = Boolean(item.route || (item.entityType === 'contact' && item.entityId));
 
   return (
     <div style={{
@@ -47,9 +48,10 @@ function PriorityCard({ item, T }) {
       }}>
         {item.reason}
       </div>
-      {item.route && (
+      {canOpen && (
         <button
-          onClick={() => navigate(item.route)}
+          onClick={() => openPriority(item)}
+          aria-label={`${item.actionLabel} — ${item.title}`}
           style={{
             fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
             background: `${T.accent}18`, color: T.accent, border: `1px solid ${T.accent}35`,

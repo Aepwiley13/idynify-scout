@@ -22,10 +22,16 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
+import {
+  openContact as navigateToContact,
+  openCompany as navigateToCompany,
+  ENTRY_POINTS,
+  DISPLAY_MODES,
+} from '../../utils/navigation';
 
 export const MAX_RESULTS_PER_SECTION = 5;
 export const MIN_QUERY_LENGTH = 2;
@@ -104,7 +110,19 @@ function filterCompanies(companies, term) {
  */
 export default function useQuickSearch({ onNavigate } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const activeUserId = useActiveUserId();
+
+  /**
+   * Where the user was when they searched.
+   *
+   * Read from `location` at call time rather than captured at mount: the
+   * command bar is mounted once for the life of the shell, so a value captured
+   * at mount would be whatever route the app happened to boot on, forever.
+   * Search is not a place; the place is the screen behind it, and that is what
+   * Back returns to.
+   */
+  const searchedFrom = location.pathname + (location.search || '');
 
   const [inputValue, setInputValue] = useState('');
   const [contactResults, setContactResults] = useState([]);
@@ -263,17 +281,41 @@ export default function useQuickSearch({ onNavigate } = {}) {
     querySeqRef.current++;
   }, []);
 
+  /**
+   * Open a result on its canonical route.
+   *
+   * These used to navigate to /scout/contact/:id, which mounted Scout beneath
+   * the record. A user searching from Hunter watched the application switch to
+   * Scout underneath them, and Back returned them to Scout rather than to
+   * Hunter. Now the destination is module-agnostic and `returnTo` carries the
+   * screen they searched from, so opening a record from ⌘K is a detour, not a
+   * relocation.
+   */
   const openContact = useCallback((contact) => {
     onNavigateRef.current?.();
     setInputValue('');
-    navigate(`/scout/contact/${contact.id}`);
-  }, [navigate]);
+    navigateToContact({
+      navigate,
+      contactId: contact.id,
+      entryPoint: ENTRY_POINTS.COMMAND_BAR,
+      reason: 'search_result',
+      returnTo: searchedFrom,
+      displayMode: DISPLAY_MODES.PAGE,
+    });
+  }, [navigate, searchedFrom]);
 
   const openCompany = useCallback((company) => {
     onNavigateRef.current?.();
     setInputValue('');
-    navigate(`/scout/company/${company.id}`);
-  }, [navigate]);
+    navigateToCompany({
+      navigate,
+      companyId: company.id,
+      entryPoint: ENTRY_POINTS.COMMAND_BAR,
+      reason: 'search_result',
+      returnTo: searchedFrom,
+      displayMode: DISPLAY_MODES.PAGE,
+    });
+  }, [navigate, searchedFrom]);
 
   function selectAt(index) {
     if (index < 0 || index >= totalResults) return;

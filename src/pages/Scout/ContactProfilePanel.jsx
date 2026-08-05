@@ -29,13 +29,16 @@
  * <name> so the trail is visible rather than assumed.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { X, Zap, ArrowLeft } from 'lucide-react';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
-import { useShell, useShellEntity } from '../../context/ShellContext';
+import { useArrival, useShell, useShellEntity } from '../../context/ShellContext';
+import { readNavigationIntent, originModuleId, barrySessionKey } from '../../utils/navigation';
+import { resolveDestination, resolveModule } from '../../constants/navigationModel';
+import ArrivalBanner from '../../components/contacts/ArrivalBanner';
 import ContactProfile from './ContactProfile';
 
 function displayName(contact) {
@@ -51,10 +54,28 @@ export default function ContactProfilePanel() {
   const { contactId } = useParams();
   const outlet = useOutletContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const { openQuickEngage } = useShell();
 
   const panelRef = useRef(null);
+  // What had focus when the panel opened. Restored on close, so a keyboard
+  // user who opened a contact from row 40 of the list lands back on row 40
+  // rather than at the top of the document.
+  const returnFocusRef = useRef(null);
   const [summary, setSummary] = useState(null);
+
+  // The panel is a display mode of the same canonical experience, so it reads
+  // the same intent. A contact opened in panel mode from another module keeps
+  // that module's breadcrumb — the panel does not assume Scout either.
+  const intent = useMemo(
+    () => readNavigationIntent(location, { entityType: 'contact', entityId: contactId }),
+    [location, contactId],
+  );
+  const origin = originModuleId(intent, resolveModule);
+  const originDestination = resolveDestination(origin);
+  const sessionKey = useMemo(() => barrySessionKey(intent, contactId), [intent, contactId]);
+
+  useArrival({ intent, originModuleId: origin, sessionKey, memoryLoaded: false });
 
   // Stable identity: this is an effect dependency and a prop that decides
   // ContactProfile's panel mode, so it must not be a new function each render.
@@ -94,18 +115,32 @@ export default function ContactProfilePanel() {
     label: summary ? displayName(summary) : null,
   });
 
-  // Focus moves into the panel when it opens, and Escape closes it. Focus
-  // returns to the document flow behind the panel on close because the list
-  // was never unmounted.
+  // Focus moves into the panel when it opens, Escape closes it, and focus goes
+  // back to whatever opened it. The list is never unmounted, so the triggering
+  // element is still in the document and still focusable — which is precisely
+  // why this can be a real focus RESTORE rather than a best-effort jump to the
+  // top of the list.
   useEffect(() => {
-    const node = panelRef.current;
-    node?.focus();
+    const opener = document.activeElement;
+    if (opener && opener !== document.body) returnFocusRef.current = opener;
+
+    panelRef.current?.focus();
 
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
     };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      const previous = returnFocusRef.current;
+      if (previous && typeof previous.focus === 'function' && document.contains(previous)) {
+        previous.focus();
+      }
+    };
   }, [onClose]);
 
   const name = summary ? displayName(summary) : 'Contact';
@@ -155,7 +190,18 @@ export default function ContactProfilePanel() {
         {/* onClose is what puts ContactProfile into panel mode
             (isPanelMode = !!onClose), which suppresses its own page header
             and the hardcoded "Back to People" button. */}
-        <ContactProfile contactId={contactId} onClose={onClose} />
+        <ContactProfile
+          contactId={contactId}
+          onClose={onClose}
+          banner={({ triggerEngage }) => (
+            <ArrivalBanner
+              intent={intent}
+              entryLabel={originDestination?.label ?? null}
+              onAction={triggerEngage}
+              onBack={onClose}
+            />
+          )}
+        />
       </div>
     </aside>
   );

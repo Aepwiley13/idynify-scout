@@ -29,6 +29,9 @@ vi.mock('../firebase/config', () => ({
 }));
 
 vi.mock('../context/ImpersonationContext', () => ({
+  // Analytics reads this to suppress writes while impersonating. Present so
+  // the search flows exercise the real event path, not the caught-error path.
+  getActiveUserId: () => 'test-user',
   useActiveUserId: () => 'test-user',
 }));
 
@@ -319,7 +322,19 @@ describe('search and navigation', () => {
     await waitFor(() => expect(screen.getByText('Angela Phillips')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Angela Phillips'));
-    expect(mockNavigate).toHaveBeenCalledWith('/scout/contact/ct1');
+    expect(mockNavigate).toHaveBeenCalledWith('/contact/ct1', {
+      state: {
+        navigationIntent: {
+          entityType: 'contact',
+          entityId: 'ct1',
+          entryPoint: 'command_bar',
+          reason: 'search_result',
+          returnTo: '/',
+          displayMode: 'page',
+        },
+      },
+      replace: false,
+    });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -331,7 +346,19 @@ describe('search and navigation', () => {
     await waitFor(() => expect(screen.getByText('Acme Corp')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Acme Corp'));
-    expect(mockNavigate).toHaveBeenCalledWith('/scout/company/co1');
+    expect(mockNavigate).toHaveBeenCalledWith('/company/co1', {
+      state: {
+        navigationIntent: {
+          entityType: 'company',
+          entityId: 'co1',
+          entryPoint: 'command_bar',
+          reason: 'search_result',
+          returnTo: '/',
+          displayMode: 'page',
+        },
+      },
+      replace: false,
+    });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -350,7 +377,19 @@ describe('search and navigation', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     // Index 1 is the company — contacts are listed first.
-    expect(mockNavigate).toHaveBeenCalledWith('/scout/company/co1');
+    expect(mockNavigate).toHaveBeenCalledWith('/company/co1', {
+      state: {
+        navigationIntent: {
+          entityType: 'company',
+          entityId: 'co1',
+          entryPoint: 'command_bar',
+          reason: 'search_result',
+          returnTo: '/',
+          displayMode: 'page',
+        },
+      },
+      replace: false,
+    });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

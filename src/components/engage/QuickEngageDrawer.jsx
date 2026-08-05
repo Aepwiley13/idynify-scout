@@ -22,6 +22,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation } from '../../utils/navigation';
 import {
   X, Mail, MessageSquare, Phone, Linkedin,
   Loader2, CheckCircle2, ExternalLink, AlertTriangle, ArrowUpRight,
@@ -54,6 +55,7 @@ function contactName(contact) {
 
 export default function QuickEngageDrawer() {
   const navigate = useNavigate();
+  const { openContact } = useCanonicalNavigation();
   const { quickEngage, closeQuickEngage, announce } = useShell();
   const contact = quickEngage?.contact;
 
@@ -281,7 +283,7 @@ export default function QuickEngageDrawer() {
           <button
             type="button"
             className="quick-engage-fullview"
-            onClick={() => { closeQuickEngage(); navigate(`/scout/contact/${contact.id}`); }}
+            onClick={() => { closeQuickEngage(); openContact({ contactId: contact.id }); }}
           >
             Open full profile and message composer
             <ArrowUpRight size={13} aria-hidden="true" />

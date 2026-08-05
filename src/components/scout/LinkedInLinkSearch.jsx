@@ -5,8 +5,10 @@ import { Search, Loader, CheckCircle, AlertCircle, Linkedin, MapPin, Building2, 
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
 import { createCompanyRecord } from '../../schemas/companySchema';
+import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
 
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const T = useT();
@@ -62,7 +64,31 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       setSaveStatus('processing');
       const companyId = await ensureCompanyExists(contact, user.uid);
       const contactId = contact.id || `apollo_${Date.now()}`;
+
+      const resolution = await prepareContactWrite(user.uid, {
+        contactId,
+        apollo_person_id: contact.id,
+        email: contact.email,
+        linkedin_url: contact.linkedin_url,
+        phone: contact.phone_numbers?.[0]?.sanitized_number,
+        name: contact.name,
+        company_id: companyId,
+        company_name: contact.organization_name,
+        source: referredBy ? 'referral' : 'LinkedIn Link',
+      }, { source: 'LinkedInLinkSearch' });
+
+      if (resolution.action === 'merge') {
+        // Not an error state. The LinkedIn URL the user just pasted is exactly
+        // the identifier the existing record may have been missing, so the
+        // merge is the valuable part of this save.
+        await applyContactMerge(user.uid, resolution);
+        setSaveStatus('saved');
+        onContactAdded([{ id: resolution.contactId, ...resolution.existing }]);
+        return;
+      }
+
       const contactData = {
+        ...resolution.fields,
         apollo_person_id: contact.id,
         name: contact.name || 'Unknown',
         title: contact.title || '',
@@ -77,7 +103,6 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
         seniority: contact.seniority || null,
         location: contact.location || null,
         status: 'active',
-        is_archived: false,   // required by every contact reader — never omit
         saved_at: new Date().toISOString(),
         source: 'LinkedIn Link',
         match_quality: 100
@@ -116,14 +141,17 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
     const companyName = contact.organization_name || contact.organization?.name;
     const apolloOrgId = contact.organization_id || contact.organization?.id;
     if (!companyName) return null;
-    if (apolloOrgId) {
-      const q = query(collection(db, 'users', userId, 'companies'), where('apollo_id', '==', apolloOrgId));
-      const snap = await getDocs(q);
-      if (!snap.empty) return snap.docs[0].id;
-    }
+    // Dedup on BOTH Apollo id field names. This path wrote and queried
+    // `apollo_id` while Scout discovery used `apollo_organization_id`, so the
+    // same organization saved through both routes produced two documents,
+    // each invisible to the other's check.
+    const match = await resolveCompany(userId, { apollo_organization_id: apolloOrgId, name: companyName },
+      { source: 'LinkedInLinkSearch.ensureCompanyExists' });
+    if (match.companyId) return match.companyId;
+
     const companyId = apolloOrgId || `company_${Date.now()}`;
     await setDoc(doc(db, 'users', userId, 'companies', companyId), createCompanyRecord({
-      apollo_id: apolloOrgId || null,
+      ...apolloIdFields(apolloOrgId),
       name: companyName,
       industry: contact.organization?.industry || null,
       website_url: contact.organization?.website_url || null,

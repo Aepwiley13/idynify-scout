@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation, ENTRY_POINTS } from '../../utils/navigation';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import './CompanyLeads.css';
@@ -8,6 +9,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 export default function CompanyLeads() {
   const { companyId } = useParams();
   const navigate = useNavigate();
+  const { openContact, openCompany } = useCanonicalNavigation();
   const [company, setCompany] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,7 @@ export default function CompanyLeads() {
           My Companies
         </button>
         <span>›</span>
-        <button onClick={() => navigate(`/scout/company/${companyId}`)}>
+        <button onClick={() => openCompany({ companyId, entryPoint: ENTRY_POINTS.COMPANY })}>
           {company?.name}
         </button>
         <span>›</span>
@@ -109,7 +111,7 @@ export default function CompanyLeads() {
         <div className="header-actions">
           <button
             className="back-to-company-btn"
-            onClick={() => navigate(`/scout/company/${companyId}`)}
+            onClick={() => openCompany({ companyId, entryPoint: ENTRY_POINTS.COMPANY })}
           >
             ← Back to Company
           </button>
@@ -128,7 +130,7 @@ export default function CompanyLeads() {
           <p>No contacts approved for this company yet.</p>
           <button
             className="add-contacts-btn"
-            onClick={() => navigate(`/scout/company/${companyId}`)}
+            onClick={() => openCompany({ companyId, entryPoint: ENTRY_POINTS.COMPANY })}
           >
             Scout+
           </button>
@@ -139,7 +141,7 @@ export default function CompanyLeads() {
             <div
               key={contact.id}
               className="contact-card"
-              onClick={() => navigate(`/scout/contact/${contact.id}`)}
+              onClick={() => openContact({ contactId: contact.id, entryPoint: ENTRY_POINTS.COMPANY })}
             >
               <div className="contact-card-header">
                 <div className="contact-avatar">
@@ -203,7 +205,7 @@ export default function CompanyLeads() {
 
         <button
           className="add-more-btn"
-          onClick={() => navigate(`/scout/company/${companyId}`)}
+          onClick={() => openCompany({ companyId, entryPoint: ENTRY_POINTS.COMPANY })}
         >
           + Add More Contacts
         </button>

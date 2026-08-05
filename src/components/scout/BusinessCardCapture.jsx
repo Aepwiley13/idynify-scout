@@ -5,6 +5,8 @@ import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { createCompanyRecord } from '../../schemas/companySchema';
+import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
+import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const [image, setImage] = useState(null);
@@ -131,18 +133,22 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     setError(null);
 
     try {
-      // Check for duplicate by email before saving
-      if (formData.email && formData.email.trim()) {
-        const emailQ = query(
-          collection(db, 'users', user.uid, 'contacts'),
-          where('email', '==', formData.email.trim().toLowerCase())
-        );
-        const emailSnap = await getDocs(emailQ);
-        if (!emailSnap.empty) {
-          setError(`A contact with email ${formData.email.trim()} is already in your pipeline.`);
-          setSaving(false);
-          return;
-        }
+      // Identity resolution replaces the email-only check. A business card
+      // often carries a phone and no email, which the old check could not use
+      // at all — so the same person scanned twice created two records.
+      const resolution = await prepareContactWrite(user.uid, {
+        email: formData.email,
+        phone: formData.phone,
+        name: formData.name,
+        company: formData.company,
+        source: 'Scanned Business Card',
+      }, { source: 'BusinessCardCapture' });
+
+      if (resolution.action === 'merge') {
+        await applyContactMerge(user.uid, resolution);
+        setError(`${formData.name.trim()} is already in your pipeline. Details from this card have been added to the existing record.`);
+        setSaving(false);
+        return;
       }
 
       // Step 1: Ensure company exists in Saved Companies (if company provided)
@@ -153,6 +159,7 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
       // Step 2: Save contact to /users/{uid}/contacts
       const contactData = {
+        ...resolution.fields,
         name: formData.name.trim(),
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
@@ -165,7 +172,6 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
         // Relationship classification
         person_type: 'lead',
-        stage: 'scout',
         stage_source: 'auto',
 
         // Source tracking
@@ -190,8 +196,7 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         // Placeholder for future enrichment
         apollo_data: null,
         enriched: false,
-        status: 'active',
-        is_archived: false   // required by every contact reader — never omit
+        status: 'active'
       };
 
       const contactsRef = collection(db, 'users', user.uid, 'contacts');
@@ -216,14 +221,12 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
   const ensureCompanyExists = async (companyName, website, userId) => {
     if (!companyName) return null;
 
-    // Check if company already exists by name (simple deduplication)
-    const companiesRef = collection(db, 'users', userId, 'companies');
-    const q = query(companiesRef, where('name', '==', companyName));
-    const snapshot = await getDocs(q);
-
-    if (!snapshot.empty) {
-      return snapshot.docs[0].id;
-    }
+    // Business cards carry no Apollo id, so this resolves on name — the same
+    // check as before, now through the shared resolver so every company path
+    // agrees on what "already have it" means.
+    const match = await resolveCompany(userId, { name: companyName },
+      { source: 'BusinessCardCapture.ensureCompanyExists' });
+    if (match.companyId) return match.companyId;
 
     // Create new company
     const companyId = `company_${Date.now()}`;

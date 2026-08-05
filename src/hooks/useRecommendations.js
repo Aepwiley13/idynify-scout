@@ -11,6 +11,15 @@
  * Locked contract (per item):
  *   { id, type, title, reason, urgency, actionLabel, route, entityId, entityType }
  *
+ * EXTENDED for the canonical navigation sprint (additive — nothing above
+ * changed shape):
+ *   { reasonCode, recommendedAction, priorityId, taskId }
+ *
+ * These exist because a priority click now has to carry WHY. `reason` is prose
+ * for the card; `reasonCode` is the engine's machine type, which is what the
+ * arrival banner and Barry key off. Both are needed: the card shows a
+ * sentence, and the destination needs something it can switch on.
+ *
  * Field provenance (see PR notes):
  *   id, type        → passed through from the engine unchanged
  *   actionLabel     → REMAPPED from the engine's nested `action.label`
@@ -27,6 +36,7 @@
 import { useState, useEffect } from 'react';
 import { generateDashboardRecommendations } from '../utils/recommendationEngine';
 import { formatRecommendationTitle } from '../utils/recommendationCopy';
+import { contactPath } from '../utils/navigation';
 
 // priorityWeight → urgency. Weights come from PRIORITY_WEIGHTS in the engine:
 //   0 = critical_contact, 1 = approaching_deadline, 2 = stalled_high_value, 3 = general_gap
@@ -46,11 +56,11 @@ function resolveEntity(rec) {
 }
 
 // Real routes in App.jsx — NOT the brief's illustrative '/contacts/:id'.
-//   contact  → /scout/contact/:contactId
+//   contact  → /contact/:contactId  (canonical, module-agnostic)
 //   mission  → /hunter/mission/:missionId
 //   campaign → /hunter (no id param)
 function routeFromEntity(entity) {
-  if (entity.type === 'contact' && entity.id) return `/scout/contact/${entity.id}`;
+  if (entity.type === 'contact' && entity.id) return contactPath(entity.id);
   if (entity.type === 'mission' && entity.id) return `/hunter/mission/${entity.id}`;
   if (entity.type === 'campaign') return '/hunter';
   return null;
@@ -64,9 +74,10 @@ export function normalizeRecommendation(rec) {
   const entity = resolveEntity(rec);
   const actionLabel = rec.action?.label || 'View';
   const reason = rec.reasoning?.observed || rec.reasoning?.whyItMatters || '';
+  const id = rec.id ?? (entity.id ? `${rec.type}_${entity.id}` : rec.type);
 
   return {
-    id: rec.id ?? (entity.id ? `${rec.type}_${entity.id}` : rec.type),
+    id,
     type: rec.type ?? null,
     title: formatRecommendationTitle(rec),
     reason,
@@ -75,6 +86,17 @@ export function normalizeRecommendation(rec) {
     route: routeFromEntity(entity),
     entityId: entity.id,
     entityType: entity.type,
+
+    // Navigation intent. Carried on the item so the card can hand it to
+    // openContact() without reaching back into the raw engine object — the
+    // normalized contract stays the only shape Mission Control ever sees.
+    reasonCode: rec.type ?? null,
+    recommendedAction: rec.action?.type ?? null,
+    priorityId: id,
+    // The engine does not currently emit a task id. Read defensively rather
+    // than omitted, so the field starts flowing the moment it does without a
+    // second change here.
+    taskId: rec.taskId ?? rec.stepId ?? rec.next_step_id ?? null,
   };
 }
 

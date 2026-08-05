@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation } from '../../utils/navigation';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
@@ -301,6 +302,7 @@ async function loadCompanies(mode, uid) {
 export default function SharedCompaniesView({ mode = 'scout' }) {
   const T = useT();
   const navigate = useNavigate();
+  const { openCompany } = useCanonicalNavigation();
 
   const [companies, setCompanies] = useState([]);
   const [archivedCompanies, setArchivedCompanies] = useState([]);
@@ -361,7 +363,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
       if (company.contact_count > 0) {
         navigate(`/scout/company/${company.id}/leads`);
       } else {
-        navigate(`/scout/company/${company.id}`);
+        openCompany({ companyId: company.id });
       }
     } else {
       handleCardClick(company);
@@ -575,7 +577,7 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
             setDetailCompany(null);
             const co = [...companies, ...archivedCompanies].find(x => x.id === id);
             if (co && co.contact_count > 0) navigate(`/scout/company/${id}/leads`);
-            else navigate(`/scout/company/${id}`);
+            else openCompany({ companyId: id });
           }}
           sourceModule={mode}
         />

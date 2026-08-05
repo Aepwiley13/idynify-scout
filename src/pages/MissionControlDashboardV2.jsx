@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { openContact, openCompany, ENTRY_POINTS } from '../utils/navigation';
+import { MISSION_CONTROL } from '../constants/navigationModel';
 import { useMissionControlTheme } from '../theme/useMissionControlTheme';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -176,7 +178,15 @@ export default function MissionControlDashboardV2() {
   const handleRecommendationAction = (recommendation) => {
     // Route to the appropriate surface based on action type
     if (recommendation.contactId) {
-      navigate(`/scout/contact/${recommendation.contactId}`);
+      openContact({
+        navigate,
+        contactId: recommendation.contactId,
+        entryPoint: ENTRY_POINTS.MISSION_CONTROL,
+        reason: recommendation.type ?? null,
+        recommendedAction: recommendation.action?.type ?? null,
+        priorityId: recommendation.id ?? null,
+        returnTo: MISSION_CONTROL.path,
+      });
     } else if (recommendation.missionId) {
       navigate(`/hunter/mission/${recommendation.missionId}`);
     } else if (recommendation.campaignId) {
@@ -398,7 +408,7 @@ export default function MissionControlDashboardV2() {
                 return (
                   <li
                     key={company.id}
-                    onClick={() => navigate(`/scout/company/${company.id}`)}
+                    onClick={() => openCompany({ navigate, companyId: company.id, entryPoint: ENTRY_POINTS.MISSION_CONTROL, returnTo: MISSION_CONTROL.path })}
                     className="flex items-center gap-4 px-5 py-3.5 hover:bg-cyan-500/5 cursor-pointer transition-colors"
                   >
                     <div

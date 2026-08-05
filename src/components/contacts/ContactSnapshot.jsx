@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation } from '../../utils/navigation';
 import { X, ExternalLink } from 'lucide-react';
 import { getContactStatus } from '../../utils/contactStateMachine';
 import HeroHeader from './HeroHeader';
@@ -11,6 +12,9 @@ import './ContactSnapshot.css';
 
 export default function ContactSnapshot({ contact, onClose, onUpdate, context = 'leads' }) {
   const navigate = useNavigate();
+  // returnTo defaults to wherever the snapshot was opened from, so "open
+  // full profile" is a detour the user can come back from.
+  const { openContact } = useCanonicalNavigation();
   const [hasScroll, setHasScroll] = useState(false);
   const [barryContext, setBarryContext] = useState(contact.barryContext || null);
   const [hunterDrawerOpen, setHunterDrawerOpen] = useState(false);
@@ -43,7 +47,7 @@ export default function ContactSnapshot({ contact, onClose, onUpdate, context = 
 
   function handleOpenFullProfile() {
     onClose();
-    navigate(`/scout/contact/${contact.id}`);
+    openContact({ contactId: contact.id });
   }
 
   function handleContactUpdate(updatedContact) {

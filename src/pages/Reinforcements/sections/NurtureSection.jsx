@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation, ENTRY_POINTS } from '../../../utils/navigation';
 import { Heart, Clock, ArrowRightLeft, MessageSquare, ChevronRight } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
@@ -33,6 +34,7 @@ function UrgencyIndicator({ days, T }) {
 export default function NurtureSection() {
   const T = useT();
   const navigate = useNavigate();
+  const { openContact } = useCanonicalNavigation();
   const activeUser = useActiveUser();
   const userId = activeUser?.uid || activeUser?.id || auth.currentUser?.uid;
 
@@ -70,7 +72,7 @@ export default function NurtureSection() {
           {overdue.map((source, i) => (
             <div
               key={source.contact_id}
-              onClick={() => navigate(`/scout/contact/${source.contact_id}`)}
+              onClick={() => openContact({ contactId: source.contact_id, entryPoint: ENTRY_POINTS.REINFORCEMENTS })}
               style={{
                 background: T.cardBg, border: `1px solid ${T.border2}`,
                 borderRadius: 12, padding: '16px 20px',

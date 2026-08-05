@@ -4,7 +4,7 @@
  * and which two contacts should meet each other.
  */
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCanonicalNavigation, ENTRY_POINTS } from '../../../utils/navigation';
 import { Lightbulb, ArrowRight, Users, Building2, MapPin, Tag, RefreshCw } from 'lucide-react';
 import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
@@ -13,7 +13,8 @@ import { detectReferralOpportunities } from '../../../services/referralIntellige
 
 const ACCENT = '#f59e0b';
 
-function OpportunityCard({ opp, T, navigate }) {
+function OpportunityCard({ opp, T }) {
+  const { openContact } = useCanonicalNavigation();
   const isMutual = opp.type === 'mutual_intro';
 
   return (
@@ -94,7 +95,7 @@ function OpportunityCard({ opp, T, navigate }) {
         <div
           onClick={() => {
             const contactId = isMutual ? opp.contact_a_id : opp.introducer_id;
-            if (contactId) navigate(`/scout/contact/${contactId}`);
+            if (contactId) openContact({ contactId, entryPoint: ENTRY_POINTS.REINFORCEMENTS });
           }}
           style={{
             fontSize: 11, fontWeight: 500, color: ACCENT,
@@ -111,7 +112,6 @@ function OpportunityCard({ opp, T, navigate }) {
 
 export default function OpportunitiesSection() {
   const T = useT();
-  const navigate = useNavigate();
   const activeUser = useActiveUser();
   const userId = activeUser?.uid || activeUser?.id || auth.currentUser?.uid;
 
@@ -180,7 +180,7 @@ export default function OpportunitiesSection() {
       {filtered.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map((opp, i) => (
-            <OpportunityCard key={i} opp={opp} T={T} navigate={navigate} />
+            <OpportunityCard key={i} opp={opp} T={T} />
           ))}
         </div>
       ) : (

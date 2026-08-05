@@ -11,6 +11,9 @@ vi.mock('../firebase/config', () => ({
 }));
 
 vi.mock('../context/ImpersonationContext', () => ({
+  // Analytics reads this to suppress writes while impersonating. Present so
+  // the search flows exercise the real event path, not the caught-error path.
+  getActiveUserId: () => 'test-user',
   useActiveUserId: () => 'test-user',
 }));
 
@@ -149,7 +152,19 @@ describe('QuickSearch', () => {
     });
 
     fireEvent.click(screen.getByText('Acme Corp'));
-    expect(mockNavigate).toHaveBeenCalledWith('/scout/company/co1');
+    expect(mockNavigate).toHaveBeenCalledWith('/company/co1', {
+      state: {
+        navigationIntent: {
+          entityType: 'company',
+          entityId: 'co1',
+          entryPoint: 'command_bar',
+          reason: 'search_result',
+          returnTo: '/',
+          displayMode: 'page',
+        },
+      },
+      replace: false,
+    });
   });
 
   it('navigates to company via keyboard Enter on highlighted item', async () => {
@@ -193,7 +208,19 @@ describe('QuickSearch', () => {
     });
 
     fireEvent.click(screen.getByText('Angela Phillips'));
-    expect(mockNavigate).toHaveBeenCalledWith('/scout/contact/ct1');
+    expect(mockNavigate).toHaveBeenCalledWith('/contact/ct1', {
+      state: {
+        navigationIntent: {
+          entityType: 'contact',
+          entityId: 'ct1',
+          entryPoint: 'command_bar',
+          reason: 'search_result',
+          returnTo: '/',
+          displayMode: 'page',
+        },
+      },
+      replace: false,
+    });
   });
 
   it('clears input and closes panel when clear button is clicked', async () => {

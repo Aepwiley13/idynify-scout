@@ -1,12 +1,13 @@
-import { useNavigate } from 'react-router-dom';
 import BarryMorningBrief from './BarryMorningBrief';
 import { STATUS } from '../../theme/tokens';
+import usePriorityNavigation from './usePriorityNavigation';
 
 const URGENCY_COLOR = { high: STATUS.red, medium: STATUS.amber, low: STATUS.green };
 
 function QuickActionCard({ item, T }) {
-  const navigate = useNavigate();
+  const openPriority = usePriorityNavigation();
   const color = URGENCY_COLOR[item.urgency] || URGENCY_COLOR.low;
+  const canOpen = Boolean(item.route || (item.entityType === 'contact' && item.entityId));
 
   return (
     <div style={{
@@ -42,9 +43,10 @@ function QuickActionCard({ item, T }) {
           {item.reason}
         </div>
       )}
-      {item.route && (
+      {canOpen && (
         <button
-          onClick={() => navigate(item.route)}
+          onClick={() => openPriority(item)}
+          aria-label={`${item.actionLabel} — ${item.title}`}
           style={{
             fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
             background: `${T.accent}18`, color: T.accent,

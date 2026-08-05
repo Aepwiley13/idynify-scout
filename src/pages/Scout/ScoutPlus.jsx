@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { openContact, ENTRY_POINTS, DISPLAY_MODES } from '../../utils/navigation';
 import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2, Search } from 'lucide-react';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
@@ -28,7 +29,7 @@ export default function ScoutPlus() {
     const isCompanyUpload = items.length > 0 && items[0]?._uploadType === 'companies';
     // Auto-navigate to the contact profile when a single LinkedIn contact is saved
     if (currentView === 'linkedin-link' && items.length === 1 && items[0]?.id && !isCompanyUpload) {
-      navigate(`/scout/contact/${items[0].id}`);
+      openContact({ navigate, contactId: items[0].id, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
       return;
     }
     setAddedItems(items);
@@ -40,7 +41,7 @@ export default function ScoutPlus() {
     if (lastUploadType === 'companies') {
       navigate('/scout', { state: { activeTab: 'saved-companies' } });
     } else if (addedItems.length === 1 && addedItems[0]?.id) {
-      navigate(`/scout/contact/${addedItems[0].id}`);
+      openContact({ navigate, contactId: addedItems[0].id, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
     } else {
       navigate('/scout', { state: { activeTab: 'all-leads' } });
     }

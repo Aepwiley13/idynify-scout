@@ -12,6 +12,7 @@ import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, addD
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
+import { prepareContactWrite, applyContactMerge, resolveOrPrepare } from '../../services/contactWriteGuard';
 
 /**
  * Parse email address from a Gmail "From" header.
@@ -56,13 +57,17 @@ export default function AddFromEmailButton({ fromHeader, onContactAdded }) {
       const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Check if contact already exists in Scout
-      const existingQuery = query(
-        collection(db, 'users', user.uid, 'contacts'),
-        where('email', '==', parsed.email)
-      );
-      const existingSnap = await getDocs(existingQuery);
-      if (!existingSnap.empty) {
+      // Identity resolution, replacing a raw case-sensitive email query.
+      // `where('email','==',parsed.email)` missed every record stored with a
+      // different case — Apollo lowercases, Gmail headers do not — so the same
+      // person could be added twice from the same address.
+      const existing = await resolveOrPrepare(user.uid, {
+        email: parsed.email,
+        name: parsed.name,
+        source: 'Gmail Import',
+      }, { source: 'AddFromEmailButton.lookup' });
+
+      if (existing.existed) {
         setError('This contact is already in your pipeline');
         setState('error');
         return;
@@ -111,7 +116,29 @@ export default function AddFromEmailButton({ fromHeader, onContactAdded }) {
         ? `apollo_${enrichedContact.id}`
         : `email_${Date.now()}`;
 
+      const resolution = await prepareContactWrite(user.uid, {
+        contactId,
+        apollo_person_id: enrichedContact.id,
+        email: enrichedContact.email || parsed.email,
+        linkedin_url: enrichedContact.linkedin_url,
+        phone: enrichedContact.phone_numbers?.[0]?.sanitized_number,
+        name: enrichedContact.name || parsed.name,
+        company_name: enrichedContact.organization_name,
+        source: referredBy ? 'referral' : 'Gmail Import',
+      }, { source: 'AddFromEmailButton.save' });
+
+      // Re-checked at save time, not just at lookup: enrichment runs between
+      // the two and can return an Apollo id or a LinkedIn URL that matches an
+      // existing record the bare email did not.
+      if (resolution.action === 'merge') {
+        await applyContactMerge(user.uid, resolution);
+        setState('saved');
+        if (onContactAdded) onContactAdded({ id: resolution.contactId, ...resolution.existing });
+        return;
+      }
+
       const contactData = {
+        ...resolution.fields,
         name: enrichedContact.name || parsed.name || 'Unknown',
         email: enrichedContact.email || parsed.email,
         title: enrichedContact.title || null,
@@ -134,7 +161,6 @@ export default function AddFromEmailButton({ fromHeader, onContactAdded }) {
         saved_at: new Date().toISOString(),
         addedAt: new Date().toISOString(),
         enrichment_status: enrichedContact.id ? 'apollo_enriched' : 'email_extracted',
-        is_archived: false,
       };
 
       await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), contactData);

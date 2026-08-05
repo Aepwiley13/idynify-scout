@@ -45,7 +45,7 @@ import CommandBar from './CommandBar';
 import { auth } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 import { ShellProvider, useShell } from '../../context/ShellContext';
-import { resolveModule, MISSION_CONTROL } from '../../constants/navigationModel';
+import { resolveModule, resolveDestination, MISSION_CONTROL } from '../../constants/navigationModel';
 import { supportMailto } from '../../constants/support';
 import { bottomNavFor } from '../../constants/mobileNavigation';
 import { useT } from '../../theme/ThemeContext';
@@ -117,6 +117,7 @@ function ShellChrome({ children, user }) {
     barryPageContext,
     navigationContext,
     quickEngage,
+    arrival,
   } = useShell();
 
   const barryButtonRef = useRef(null);
@@ -125,6 +126,22 @@ function ShellChrome({ children, user }) {
 
   const module = resolveModule(location.pathname);
   const moduleHasOwnMore = Boolean(bottomNavFor(module.id)?.overflow?.length);
+
+  /**
+   * The module the BREADCRUMB names.
+   *
+   * /contact/:id and /company/:id belong to no module by design — that is what
+   * makes them reachable from every module without dragging Scout's shell
+   * along. So the trail comes from where the user actually came from, which
+   * the canonical page declares via useArrival(). Without an arrival (a
+   * bookmark, a refresh, a pasted link) this falls back to path resolution,
+   * which lands on Mission Control — honest, since there is no origin to name.
+   *
+   * Only the breadcrumb is overridden. The bottom nav, the More sheet and the
+   * content padding still follow the route, because those describe where the
+   * user IS, not how they got here.
+   */
+  const breadcrumbModule = resolveDestination(arrival?.originModuleId) ?? module;
 
   // Route-aware Barry readiness. Only Mission Control reports KPI context
   // upward, so gate on the real signal there and treat every other route as
@@ -205,7 +222,7 @@ function ShellChrome({ children, user }) {
               <Menu size={24} />
             </button>
             <Breadcrumb
-              module={module}
+              module={breadcrumbModule}
               entityLabel={navigationContext?.entity_label}
               onNavigate={navigate}
             />

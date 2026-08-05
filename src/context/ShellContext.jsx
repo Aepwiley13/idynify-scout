@@ -74,7 +74,18 @@ const FALLBACK_SHELL = {
   closeQuickEngage: () => {},
   sidebarMode: 'wide',
   toggleSidebar: () => {},
+  arrival: null,
+  setArrival: () => {},
+  clearArrival: () => {},
 };
+
+/** Nothing arrived. Frozen so resetting arrival state is referentially stable. */
+const NO_ARRIVAL = Object.freeze({
+  intent: null,
+  originModuleId: null,
+  sessionKey: null,
+  memoryLoaded: false,
+});
 
 /**
  * Sidebar mode is shell state, not sidebar state.
@@ -124,6 +135,14 @@ export function ShellProvider({ children, user, userData }) {
   // thing that knows it. Carried alongside rather than in a second store.
   const [entity, setEntity] = useState(EMPTY_ENTITY);
   const [currentAction, setCurrentAction] = useState(null);
+
+  // ── Arrival: the ephemeral "why am I here" ──────────────────────────────
+  // Set by the canonical Contact and Company pages from router state, read by
+  // the breadcrumb and by Barry. Deliberately shell state and not a contact
+  // field: the reason a screen opened belongs to the navigation, not to the
+  // person. It is cleared on every pathname change alongside entity context,
+  // so an intent cannot follow the user to an unrelated screen.
+  const [arrival, setArrivalState] = useState(NO_ARRIVAL);
 
   // Quick Engage drawer — shell-owned, see openQuickEngage below.
   const [quickEngage, setQuickEngage] = useState(null);
@@ -179,6 +198,9 @@ export function ShellProvider({ children, user, userData }) {
       setCurrentAction(null);
       // A drawer must never outlive the screen it was opened over.
       setQuickEngage(null);
+      // Neither must an arrival. The canonical page re-declares it on mount
+      // from the new location's state; if there is none, there was none.
+      setArrivalState(NO_ARRIVAL);
     }
   }
 
@@ -255,6 +277,28 @@ export function ShellProvider({ children, user, userData }) {
     setEntity(EMPTY_ENTITY);
   }, []);
 
+  const setArrival = useCallback((next) => {
+    setArrivalState(prev => {
+      const merged = {
+        intent: next?.intent ?? null,
+        originModuleId: next?.originModuleId ?? null,
+        sessionKey: next?.sessionKey ?? null,
+        memoryLoaded: Boolean(next?.memoryLoaded),
+      };
+      if (
+        prev.intent === merged.intent &&
+        prev.originModuleId === merged.originModuleId &&
+        prev.sessionKey === merged.sessionKey &&
+        prev.memoryLoaded === merged.memoryLoaded
+      ) {
+        return prev; // referential stability — effects depend on this object
+      }
+      return merged;
+    });
+  }, []);
+
+  const clearArrival = useCallback(() => setArrivalState(NO_ARRIVAL), []);
+
   // ── Quick Engage ────────────────────────────────────────────────────────
   // Shell-owned so it can open from a Scout row or from Contact Profile and
   // overlay whatever is underneath without touching global navigation. The
@@ -298,6 +342,24 @@ export function ShellProvider({ children, user, userData }) {
 
     // Beyond the required minimum — drives the shell breadcrumb.
     entity_label: entity.label,
+
+    // ── Arrival (ephemeral) ───────────────────────────────────────────────
+    // This is what lets Barry open with "the follow-up here is overdue —
+    // that's why Mission Control surfaced this" instead of "how can I help".
+    // It travels to Barry on every message and is never written to Firestore;
+    // the contact record holds the OUTCOME of what the user does next, not the
+    // reason the screen was opened.
+    entry_point: arrival.intent?.entryPoint ?? null,
+    arrival_reason: arrival.intent?.reason ?? null,
+    recommended_action: arrival.intent?.recommendedAction ?? null,
+    return_to: arrival.intent?.returnTo ?? null,
+    source_module: arrival.originModuleId ?? null,
+
+    // Barry's session key for this screen — contact-scoped memory, with a
+    // separate session beneath it per originating module. See decision 6 of
+    // the sprint brief and docs/STATUS_ARCHITECTURE.md.
+    barry_session_key: arrival.sessionKey ?? null,
+    barry_memory_loaded: arrival.memoryLoaded,
   }), [
     user?.id, user?.uid,
     userData?.organizationId, userData?.tenantId,
@@ -306,6 +368,7 @@ export function ShellProvider({ children, user, userData }) {
     entity.type, entity.id, entity.stage, entity.label,
     currentAction,
     sourceRoute, nav.history,
+    arrival,
   ]);
 
   /**
@@ -349,6 +412,9 @@ export function ShellProvider({ children, user, userData }) {
     closeQuickEngage,
     sidebarMode,
     toggleSidebar,
+    arrival,
+    setArrival,
+    clearArrival,
   }), [
     shellUser, updateDisplayName,
     barryOpen, openBarry, closeBarry, toggleBarry,
@@ -357,6 +423,7 @@ export function ShellProvider({ children, user, userData }) {
     announce, announcements, dismissAnnouncement,
     quickEngage, openQuickEngage, closeQuickEngage,
     sidebarMode, toggleSidebar,
+    arrival, setArrival, clearArrival,
   ]);
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;
@@ -379,6 +446,23 @@ export function useShellEntity({ type, id, stage, label } = {}) {
     setEntityContext({ type, id, stage, label });
     return () => clearEntityContext();
   }, [type, id, stage, label, setEntityContext, clearEntityContext]);
+}
+
+/**
+ * Declare the arrival this screen was opened by.
+ *
+ * Called by the canonical Contact and Company pages with the intent read from
+ * router state. Clears on unmount, so leaving the record takes the reason with
+ * it — an arrival is a property of a navigation, not of a session.
+ */
+export function useArrival({ intent, originModuleId, sessionKey, memoryLoaded } = {}) {
+  const { setArrival, clearArrival } = useShell();
+
+  useEffect(() => {
+    if (!intent && !originModuleId) return undefined;
+    setArrival({ intent, originModuleId, sessionKey, memoryLoaded });
+    return () => clearArrival();
+  }, [intent, originModuleId, sessionKey, memoryLoaded, setArrival, clearArrival]);
 }
 
 /**

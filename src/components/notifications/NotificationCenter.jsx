@@ -8,7 +8,8 @@
  * Backed by Firestore: users/{userId}/notifications
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { openContact, ENTRY_POINTS } from '../../utils/navigation';
 import {
   Bell,
   X,
@@ -38,6 +39,7 @@ const TABS = [
 
 export default function NotificationCenter({ userId, T }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState([]);
   const [allNotifications, setAllNotifications] = useState([]);
@@ -87,7 +89,16 @@ export default function NotificationCenter({ userId, T }) {
   const handleAction = async (notification) => {
     const formatted = formatNotification(notification);
     if (formatted.action === 'view_profile' && notification.contactId) {
-      navigate(`/scout/contact/${notification.contactId}`);
+      openContact({
+        navigate,
+        contactId: notification.contactId,
+        entryPoint: ENTRY_POINTS.NOTIFICATIONS,
+        // The notification's machine type is the reason code. ArrivalBanner
+        // humanizes anything it does not have prose for, so a new
+        // notification type reads sensibly without a copy change here.
+        reason: notification.type ?? null,
+        returnTo: location.pathname + (location.search || ''),
+      });
       setOpen(false);
     }
     await markNotificationRead(userId, notification.id);

@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { openContact, ENTRY_POINTS } from '../../utils/navigation';
 import { auth, db } from '../../firebase/config';
 import {
   collection, query, orderBy, limit, getDocs, where, collectionGroup,
@@ -156,7 +157,7 @@ export default function BarrySessionHistoryPanel({ isOpen, onClose }) {
             title: data.name || 'Unknown Contact',
             summary: session.summary || null,
             sortTs: data.engage_state?.last_session_at || null,
-            nav: () => navigate(`/scout/contact/${d.id}`),
+            nav: () => openContact({ navigate, contactId: d.id, entryPoint: ENTRY_POINTS.BARRY }),
           });
         });
       }

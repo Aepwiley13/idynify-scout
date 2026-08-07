@@ -3,8 +3,8 @@
 **Idynify · Document 1 of 5 · Team B**
 **Date: 2026-08-07**
 **Repository: aepwiley13/idynify-scout**
-**Source of Truth: docs/audits/barry-os-foundation-audit.md (canonical audit)**
-**Pending Source: docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md (Team A addendum)**
+**Source of Truth: docs/audits/BARRY_OS_FOUNDATION_AUDIT.md (canonical audit — pinned to commit 09e90f9)**
+**Pending: docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md (Team A addendum)**
 
 ---
 
@@ -31,6 +31,41 @@ Implementation Plan         ← build order
 ```
 
 Items marked `[PENDING RECONCILIATION]` await confirmation from Team A's reconciliation addendum. They are flagged clearly and designed to be updatable without restructuring this document.
+
+## Evidence Levels
+
+Every major architectural claim in this document carries one of three evidence levels:
+
+```
+CONFIRMED   Verified in the canonical audit at a specific file or line.
+            This finding exists in the repository today.
+
+PENDING     Awaiting confirmation from Team A's reconciliation addendum.
+            The architecture is designed around this finding but it has
+            not yet been verified at the call-site level.
+
+PROPOSED    A new architectural recommendation not present in the codebase today.
+            Justified explicitly. Requires approval before implementation begins.
+```
+
+| Component | Evidence Level |
+|---|---|
+| 15 Skills Registry | CONFIRMED (audit Step 10) |
+| 7 Workflows Registry — 2 promoted | CONFIRMED (audit Step 2 — `process-barry-inbox-queue`, `barryHunterProcessEngage`) |
+| 7 Workflows Registry — 5 new | PROPOSED |
+| Think Layer extending `barryStrategyRecommender.js` | PENDING |
+| Six memory types (first five) | CONFIRMED (audit Step 3) |
+| Artifact Memory (sixth type) | PROPOSED |
+| `barrySessionKey` unified conversation store | PENDING |
+| Surface registration model | PROPOSED |
+| Morning Brief Data Contract | PROPOSED |
+| Context Resolution Contract | PROPOSED (extends CONFIRMED `barryContextAssembler` pattern) |
+| Four Awareness Projections schemas | PROPOSED (projections absent today — CONFIRMED by audit Step 3) |
+| Signal Bus envelope format | PROPOSED (no normalized format exists today — CONFIRMED by audit Step 4) |
+| Action Queue Contract | PROPOSED (NBS is closest equivalent — CONFIRMED by audit Step 10) |
+| Capability Registry Contract | PROPOSED (extends CONFIRMED `barryActions.js` generative/side-effect pattern) |
+| Data Ownership Matrix | PROPOSED (codifies CONFIRMED `barry_intel` violation from audit Step 9) |
+| Observation processing step | PROPOSED |
 
 ---
 
@@ -151,29 +186,35 @@ A surface may display objects from multiple layers — Mission Control shows awa
 Barry's full reasoning flow:
 
 ```
-Observe
-    ↓
-Understand
-    ↓
-Think (synthesize, compare priorities, weigh tradeoffs, choose strategy)
-    ↓
-Recommend
-    ↓
-Prepare
-    ↓
-Execute
+Signal
+  ↓
+Observe / Interpret          ← deterministic, owned by Awareness pipeline
+  ↓
+Awareness                    ← persistent, continuously updated
+  ↓
+Context Resolution           ← per-request packaging
+  ↓
+Think                        ← synthesis, prioritization, strategy selection
+  ↓
+Recommendation
+  ↓
+Prepared Action
+  ↓
+Executed Action
 ```
 
 Each step maps to a concrete system component:
 
 | Step | Component | Exists Today? |
 |---|---|---|
-| Observe | Signal Bus | No — no event bus, no normalized format |
-| Understand | Awareness Layer | Partial — `engage_state` + `engagement_summary` per contact |
+| Signal | Signal Bus | No — no event bus, no normalized format |
+| Observe / Interpret | Observation pipeline (deterministic) | No — signals are not normalized into observations |
+| Awareness | Awareness Layer | Partial — `engage_state` + `engagement_summary` per contact |
+| Context Resolution | Context Resolver | Partial — 3 competing implementations |
 | Think | Think Layer | See `[PENDING RECONCILIATION]` below |
-| Recommend | Think Layer output → Action Queue | No — recommendations are inline in chat responses |
-| Prepare | Skills + Workflows | No — all capabilities are monolithic functions |
-| Execute | Action Executor + Capability Registry | Partial — `barryActions.js` handles Gmail/Calendar with confirmation |
+| Recommendation | Think Layer output → Action Queue | No — recommendations are inline in chat responses |
+| Prepared Action | Skills + Workflows | No — all capabilities are monolithic functions |
+| Executed Action | Action Executor + Capability Registry | Partial — `barryActions.js` handles Gmail/Calendar with confirmation |
 
 ### Think Layer — Current State
 
@@ -241,6 +282,36 @@ The existing `barryGuardrail.js` (rule-based relationship/intent mismatch detect
 ---
 
 ## 4. The Reference Architecture — Layer by Layer
+
+### Subsystem Classification
+
+Barry OS subsystems belong to one of four categories. Every engineer must know which category a subsystem belongs to before touching it — runtime and persistence responsibilities must never blur.
+
+```
+Runtime Layer
+  Signal Bus
+  Context Resolver
+  Think Layer
+  Workflow Engine (Orchestrator)
+
+Storage Layer
+  Awareness Projections
+  Memory (all six types)
+  Artifact Store
+  Action Queue
+
+Interface Layer
+  Capability Registry
+  Skills Registry
+
+Presentation Layer
+  Barry Surfaces (Mission Control, Drawer, Morning Brief, Contact surfaces)
+```
+
+A change to a **Storage Layer** subsystem requires a schema migration decision.
+A change to a **Runtime Layer** subsystem requires a cost and latency review.
+A change to an **Interface Layer** subsystem requires a capability contract update.
+A change to a **Presentation Layer** subsystem must not introduce new data fetching.
 
 ### 4.1 Barry Surfaces (UI Layer)
 
@@ -345,6 +416,15 @@ Signal {
 - Poll-based awareness (Gmail replies) with signal-driven awareness
 - Direct-call patterns where modules call Barry functions instead of publishing events
 
+**Accountability**
+```
+Owner:        Platform modules and integrations (producers); Barry OS (consumer)
+Readers:      Observation pipeline → Awareness Layer, Think Layer (via context), audit log
+Writers:      Module event producers (Gmail, Calendar, Apollo, platform business logic)
+Invalidated:  N/A — signals are immutable, append-only
+Rebuilt by:   N/A — signals are the source of truth; nothing rebuilds them
+```
+
 ### 4.3 Canonical Domain Data
 
 **What it does:** Stores the platform's source of truth — contacts, companies, messages, campaigns, missions. Barry reads this layer. Barry never writes to it.
@@ -385,6 +465,40 @@ This separation is a migration concern (Document 5). During transition, both loc
 | Business Awareness | **Does not exist** | `barryOrientationBrief` computes pipeline stats at query time. `recommendationEngine` derives recommendations ad hoc. No persistent state. |
 | Mission Awareness | **Does not exist** | Mission progress stored on mission documents. Not aggregated. Barry learns about missions only through context stack. |
 | User Awareness | **Minimal** | User Barry Memory at `users/{userId}/barry_memory` tracks tone and channel preferences only. No approval patterns, timing preferences, or communication style. |
+
+### The Observation Step
+
+Between a Signal arriving and an Awareness projection updating, there is a named processing step: Observation.
+
+A Signal is a raw fact:
+```
+contact.reply_received at 10:32am
+```
+
+An Observation is a normalized interpretation of that signal:
+```
+contact.reengaged = true
+reply.sentiment = positive
+contact.response_latency = 19_hours
+```
+
+Observations are derived deterministically from signals — no AI call required for most of them. The Think layer is not involved. Observations are the inputs that Awareness projections aggregate over time.
+
+Awareness is what combines observations:
+```
+relationship.momentum = improving
+awaiting_response = true
+```
+
+Only after Awareness is updated does the Think layer reason:
+```
+"High-value relationship, positive reply, meeting tomorrow. Prioritize above
+ the three cold follow-ups."
+```
+
+Observations should be persisted when provenance, signal replay, debugging, or auditability requires it. They are not required to be persisted by default.
+
+The five object layers (Signal, Fact/Awareness, Recommendation, Prepared Action, Executed Action) are unchanged. Observation is a processing step, not a persisted business object.
 
 **What needs to be built — the four projections:**
 
@@ -488,6 +602,42 @@ UserAwareness {
 - Projections are derived and rebuildable — deleting the awareness tree and replaying signals must reproduce it
 - Barry writes projections. Barry never writes canonical domain data.
 
+**Accountability — Relationship Awareness**
+```
+Owner:        Barry OS (derived — never user-written)
+Readers:      Context Resolver, Mission Control, Morning Brief, Hunter surfaces, Think Layer
+Writers:      Observation pipeline (on contact.reply_received, contact.email_sent, contact.status_changed, etc.)
+Invalidated:  Any signal whose entity_id matches this contact's id; after 24 hours
+Rebuilt by:   Replay of all signals for this contact through the observation pipeline
+```
+
+**Accountability — Business Awareness**
+```
+Owner:        Barry OS (derived — never user-written)
+Readers:      Context Resolver, Mission Control, Morning Brief, Think Layer
+Writers:      Observation pipeline (any contact or mission signal triggers recomputation)
+Invalidated:  Any signal; after 15 minutes
+Rebuilt by:   Aggregation query across all Relationship Awareness projections + mission state
+```
+
+**Accountability — Mission Awareness**
+```
+Owner:        Barry OS (derived — never user-written)
+Readers:      Context Resolver, Mission Control, Morning Brief, Hunter surfaces, Think Layer
+Writers:      Observation pipeline (on mission.step_completed, mission.deadline_approaching, mission.created)
+Invalidated:  Any mission signal; after 6 hours
+Rebuilt by:   Aggregation query across all active mission documents + step outcomes
+```
+
+**Accountability — User Awareness**
+```
+Owner:        Barry OS (derived — never user-written)
+Readers:      Context Resolver, Think Layer (for strategy selection, tone recommendation)
+Writers:      Nightly batch job from user action signals (approvals, edits, dismissals, send windows)
+Invalidated:  After 7 days; on explicit user preference change
+Rebuilt by:   Statistical aggregation across all user action signals within rolling window
+```
+
 ### 4.5 Context Resolution Layer
 
 **What it does:** Determines what subset of canonical data, awareness, memory, temporal information, session state, and artifacts Barry needs for a specific reasoning operation. This is the contract every Barry operation uses to receive its input.
@@ -564,19 +714,30 @@ BarryContext {
 - `barryContextStore.js` (client-side pub/sub) — refactored to publish entity context only; context resolution moves server-side
 - `barryContextAssembler.js` (server-side per-contact) — absorbed into the unified context resolver, with its priority-tiered prompt building preserved
 
+**Accountability**
+```
+Owner:        Barry OS (runtime service)
+Readers:      Think Layer, Skills, Workflows, Barry chat surfaces
+Writers:      N/A — Context Resolver reads from Awareness, Memory, canonical data, and session state; it does not write
+Invalidated:  Per-request — context is assembled fresh for each operation (no caching at this layer)
+Rebuilt by:   Re-invocation with the same surface declaration and entity scope
+```
+
 ### The Awareness → Context Relationship
 
 ```
 Canonical Data + Signals
         ↓
-    Awareness            ← updated continuously, independent of user sessions
+   Observe / Derive          ← named deterministic processing step
         ↓
-  Context Resolver       ← packages awareness for a specific operation at request time
+      Awareness              ← updated continuously, independent of user sessions
+        ↓
+   Context Resolver          ← packages awareness for a specific operation at request time
         ↓
       Think
 ```
 
-Awareness is a persistent, continuously-updated layer. Context Resolution is a per-request packaging step that assembles the right subset of awareness (plus entity data, session state, and temporal information) for a specific Think invocation.
+Awareness is a persistent, continuously-updated layer. Observation is the deterministic processing step that interprets signals into normalized observations before Awareness aggregates them (see Section 4.4). Context Resolution is a per-request packaging step that assembles the right subset of awareness (plus entity data, session state, and temporal information) for a specific Think invocation.
 
 ### 4.6 Think Layer
 
@@ -656,6 +817,15 @@ ThinkResult {
   trace: ReasoningTrace                 // full chain for auditability
   computedAt: timestamp
 }
+```
+
+**Accountability**
+```
+Owner:        Barry OS (runtime service)
+Readers:      Action Queue (receives prioritized recommendations), Skills/Workflows (receive strategy selection), reasoning trace log
+Writers:      Think Layer itself — consumes Context Resolver output, produces ThinkResult
+Invalidated:  Per-invocation — each Think call is fresh; reasoning traces are persisted for audit
+Rebuilt by:   Re-invocation with the same context input; traces are append-only and never rebuilt
 ```
 
 ### 4.7 Skills & Workflows Layer
@@ -824,9 +994,27 @@ The Action Queue replaces:
 - NBS one-at-a-time pending actions (NBS becomes one type of action item in the queue)
 - The implicit "prepared action" state where drafts exist in `barry_sessions` without a queue entry
 
+**Accountability**
+```
+Owner:        Barry OS (storage service)
+Readers:      Mission Control, Morning Brief, Barry Surfaces (for prepared action display), Action Executor
+Writers:      Think Layer (queues recommendations), Skills/Workflows (queue prepared actions), Action Executor (updates status to executing/completed)
+Invalidated:  Items expire at expires_at; dismissed items are terminal; completed items are immutable
+Rebuilt by:   Re-derivation from Think Layer — but completed/dismissed history is append-only and never rebuilt
+```
+
 ### 4.10 Memory Layer
 
 See Section 5 (The Six Memory Types) for the full specification.
+
+**Accountability**
+```
+Owner:        Barry OS (storage service)
+Readers:      Context Resolver (packages memory for Think invocations), Barry Surfaces (display)
+Writers:      Promotion pipeline (session → durable via defined gates), signal processors (relationship memory), nightly batch (learned intelligence), Skills (artifact memory)
+Invalidated:  Per type — User Memory: permanent until superseded; Relationship Memory: until superseded; Session Memory: session-scoped; see Section 5 for full retention rules
+Rebuilt by:   User and Relationship Memory are source-of-truth and not rebuilt; Learned Intelligence can be re-aggregated from signal history; Artifacts can be regenerated by their source Skill
+```
 
 ### 4.11 Barry Surfaces (Rendering Layer)
 
@@ -948,6 +1136,28 @@ For Phase 1: all side-effect capabilities ceiling at **Approval**. Generative ca
 
 ## 8. What Barry OS Will NOT Do
 
+### Barry Data Ownership Matrix
+
+| Object | Owner | Barry may read | Barry may write |
+|---|---|---|---|
+| Contact | Platform | Yes | No |
+| Company | Platform | Yes | No |
+| Campaign | Platform | Yes | No |
+| Mission | Platform | Yes | No |
+| Message | Platform | Yes | No |
+| Signal | Platform | Yes | No (publishers only) |
+| Awareness | Barry | Yes | Yes |
+| Memory | Barry | Yes | Yes (via promotion pipeline) |
+| Artifact | Barry | Yes | Yes |
+| Recommendation | Barry | Yes | Yes |
+| Prepared Action | Barry | Yes | Yes |
+| Executed Action | Barry | Yes | Yes (write-once) |
+| Conversation | Barry | Yes | Yes |
+
+This is the authoritative ownership model. Any sprint that writes Barry-derived data onto a Platform-owned object violates the architecture. The current violation — `search-companies.js` writing `barry_intel` onto canonical company documents — is the reference example of what this rule prevents.
+
+### Hard Boundaries
+
 These are hard boundaries. Any sprint that violates them should be rejected at review.
 
 Barry OS will not:
@@ -961,6 +1171,7 @@ Barry OS will not:
 - **Call AI for decisions that should be computed deterministically.** Contact validation (`barryValidateContact`), outcome attribution (`barryOutcomeAttribution`), send approval (`barry-approve-send`), and mode detection in `barryMissionChat` are deterministic operations. They must not use AI (audit Step 6, "AI used for deterministic logic").
 - **Create a new Barry implementation for each new integration.** Adding LinkedIn messaging should require registering a capability and publishing signals — not touching 8+ files (audit Step 9).
 - **Produce a Recommendation it cannot explain.** Every recommendation carries a reasoning trace from signals → awareness → synthesis → recommendation. If the trace cannot be produced, the recommendation does not ship.
+- **Allow Mission Control to query modules directly.** Mission Control is a consumer of Barry's Awareness projections, not an aggregator of module data. The data flow is Mission Control → Awareness → Signals → Modules. Mission Control must never know where data originates. This keeps the UI thin and Barry authoritative.
 
 ---
 
@@ -1062,6 +1273,7 @@ These are the architectural laws every future Barry sprint must follow. No sprin
 22. Between awareness and recommendation, Barry thinks — synthesizing information, comparing priorities, and choosing strategy. This Think layer is where Idynify's differentiation lives.
 23. Skills are atomic. Workflows are compositions of Skills. Neither is a Barry context implementation.
 24. Barry OS will not own CRM records, bypass permissions, mutate external systems without policy, invent relationship state, or replace module-specific business logic.
+25. Skills are atomic. Workflows compose Skills. Neither is a Barry context implementation. A Skill is the smallest independently executable Barry capability. A Workflow is a named, ordered composition of Skills that accomplishes a larger goal. No Skill contains workflow logic. No Workflow duplicates Skill logic. Neither a Skill nor a Workflow owns context — context is resolved before either is invoked.
 
 ---
 

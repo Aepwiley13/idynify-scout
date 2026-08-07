@@ -26,7 +26,7 @@ import { isContactSnoozed } from './snoozeManager';
 
 /**
  * Build a CSM-specific context object for Barry prompt injection.
- * This is passed to BarryChat via the barryContextStore.
+ * This is passed to the shell Barry panel as part of its context.
  *
  * @param {Object} params
  * @param {Array} params.customers — array of customer contact documents

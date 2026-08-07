@@ -4,7 +4,7 @@
 **Date: 2026-08-07**
 **Repository: aepwiley13/idynify-scout**
 **Source of Truth: docs/audits/BARRY_OS_FOUNDATION_AUDIT.md (canonical audit — pinned to commit 09e90f9)**
-**Pending: docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md (Team A addendum)**
+**Discovery Authority: docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md (reconciliation complete)**
 
 ---
 
@@ -30,7 +30,7 @@ Capability Contracts        ← Skills, Workflows, Actions
 Implementation Plan         ← build order
 ```
 
-Items marked `[PENDING RECONCILIATION]` await confirmation from Team A's reconciliation addendum. They are flagged clearly and designed to be updatable without restructuring this document.
+All items previously marked `[PENDING RECONCILIATION]` have been resolved to `[CONFIRMED]` following completion of Team A's reconciliation addendum.
 
 ## Evidence Levels
 
@@ -53,10 +53,10 @@ PROPOSED    A new architectural recommendation not present in the codebase today
 | 15 Skills Registry | CONFIRMED (audit Step 10) |
 | 7 Workflows Registry — 2 promoted | CONFIRMED (audit Step 2 — `process-barry-inbox-queue`, `barryHunterProcessEngage`) |
 | 7 Workflows Registry — 5 new | PROPOSED |
-| Think Layer extending `barryStrategyRecommender.js` | PENDING |
+| Think Layer extending `barryStrategyRecommender.js` | CONFIRMED (reconciliation §4 — 4 verified consumers, 3 of 4 Think functions satisfied) |
 | Six memory types (first five) | CONFIRMED (audit Step 3) |
 | Artifact Memory (sixth type) | PROPOSED |
-| `barrySessionKey` unified conversation store | PENDING |
+| `barrySessionKey` unified conversation store | CONFIRMED (reconciliation §7 — computed every request, zero server-side readers) |
 | Surface registration model | PROPOSED |
 | Morning Brief Data Contract | PROPOSED |
 | Context Resolution Contract | PROPOSED (extends CONFIRMED `barryContextAssembler` pattern) |
@@ -75,7 +75,7 @@ PROPOSED    A new architectural recommendation not present in the codebase today
 
 Barry is not a chatbot. Barry is not a collection of AI features. Barry is the runtime for Aaron's business relationships. Scout, Hunter, Sniper, Basecamp, Recon, and Reinforcements are applications running on Barry OS.
 
-Today Barry exists as approximately 37 Netlify AI functions, 9 client-side services, 8 distinct context implementations, 7 conversation stores, and 19 component-level surfaces — wired together by convention rather than contract (canonical audit, Steps 1–3). Improving Barry in one place does not improve Barry everywhere. Barry OS replaces this with one intelligence runtime that every Idynify module runs on.
+Today Barry exists as 38 AI endpoints (40 AI-calling modules, 46 AI call sites), 13 non-AI Barry services (client), 9 context implementations (all assembly paths), 6 conversation stores, and 47 architectural surfaces / 13 logical surfaces / 78 component files (59 live, 19 dead) — wired together by convention rather than contract (canonical audit, Steps 1–3). Improving Barry in one place does not improve Barry everywhere. Barry OS replaces this with one intelligence runtime that every Idynify module runs on.
 
 ### Barry OS Principles
 
@@ -211,7 +211,7 @@ Each step maps to a concrete system component:
 | Observe / Interpret | Observation pipeline (deterministic) | No — signals are not normalized into observations |
 | Awareness | Awareness Layer | Partial — `engage_state` + `engagement_summary` per contact |
 | Context Resolution | Context Resolver | Partial — 3 competing implementations |
-| Think | Think Layer | See `[PENDING RECONCILIATION]` below |
+| Think | Think Layer | Partial — `barryStrategyRecommender.js` (331 lines, 4 consumers, 3 of 4 Think functions) |
 | Recommendation | Think Layer output → Action Queue | No — recommendations are inline in chat responses |
 | Prepared Action | Skills + Workflows | No — all capabilities are monolithic functions |
 | Executed Action | Action Executor + Capability Registry | Partial — `barryActions.js` handles Gmail/Calendar with confirmation |
@@ -219,30 +219,28 @@ Each step maps to a concrete system component:
 ### Think Layer — Current State
 
 ```
-[PENDING RECONCILIATION — Think layer scope]
+[CONFIRMED — verified at call sites, reconciliation §4]
 
-The canonical audit identifies barryStrategyRecommender.js
-(netlify/functions/utils/barryStrategyRecommender.js) as a rule-based
-pre-generation intelligence module that scores four engagement strategies
-(direct, warm, value, humor) and recommends which approach will most likely
-succeed. It produces { recommendation, promptGuidance, strategyScores }
-and reaches exactly 4 endpoints:
+barryStrategyRecommender.js is confirmed as a partial Think layer.
+331 lines of AI-free reasoning. Verified consumers:
 
-  1. generate-engagement-message.js (line 251)
-  2. barryHunterProcessEngage.js (line 310)
-  3. barryHunterGenerateStep.js (line 147)
-  4. barryGenerateSequenceStep.js (line 110)
+  1. generate-engagement-message.js (line 259) — destructures recommendation + promptGuidance
+  2. barryHunterProcessEngage.js (line 317) — destructures recommendation + promptGuidance
+  3. barryHunterGenerateStep.js (line 147) — destructures promptGuidance only
+  4. barryGenerateSequenceStep.js (line 110) — destructures promptGuidance only
 
-Whether this constitutes a partial Think layer (strategy selection for
-message generation) or merely a pre-generation helper is a reconciliation
-item. This architecture treats it as the seed of the Think layer and
-designs the full Think layer to extend rather than replace it.
+strategyScores confirmed discarded by all four consumers.
+The recommendation object (with reasons[]) is persisted by 2 of 4 consumers —
+partial auditability already exists.
 
-Key finding: strategyScores — the four scored strategies with reasons —
-are produced but never persisted. The scores flow into promptGuidance
-(a string injected into the Claude prompt) and are discarded. The
-architecture requires these to be persisted as part of the reasoning
-trace.
+The existing Think layer satisfies three of the four Think functions:
+  ✓ Contact-level strategy selection
+  ✓ Recency-weighted outcome attribution
+  ✓ Explainable reasoning with reasons[]
+  ✗ Cross-entity priority comparison (who first, across relationships) — absent
+
+P5 is permanently named: Think Layer Promotion & Expansion.
+The architecture extends barryStrategyRecommender.js. It does not replace it.
 ```
 
 ### Think Layer — Target Architecture
@@ -319,7 +317,7 @@ A change to a **Presentation Layer** subsystem must not introduce new data fetch
 
 **What exists today (audit Step 1):**
 
-19 Barry component files across 7 directories, organized into 13 audited surfaces:
+78 Barry component files (59 live, 19 dead) across 7 directories, organized into 47 architectural surfaces / 13 logical surfaces:
 
 | Surface | Component(s) | Module | Layer Conflation | Direct-Call Violation |
 |---|---|---|---|---|
@@ -337,7 +335,7 @@ A change to a **Presentation Layer** subsystem must not introduce new data fetch
 | Onboarding Barry | `BarryOnboarding.jsx` + `BarryTyping.jsx` | Onboarding | Recommendation | None |
 | Session History | `BarrySessionHistoryPanel.jsx` | Contact | Awareness | None |
 
-7 conversation stores exist today (audit Step 3): `drawer_{module}` (9 possible keys), `missionControl`, `reconCoach_{sectionId}`, `icpChat`, `icp`, plus separate `barry_sessions` at both user-level and contact-level. These do not cross-reference each other.
+6 conversation stores exist today (audit Step 3): `drawer_{module}` (9 possible keys), `missionControl`, `reconCoach_{sectionId}`, `icpChat`, `icp`, plus separate `barry_sessions` at both user-level and contact-level. These do not cross-reference each other.
 
 **What needs to be built:**
 
@@ -347,11 +345,32 @@ A **surface registration model** where each surface declares:
 - What capabilities it may invoke (write email, move stage, generate brief)
 - Its `barrySessionKey` (the canonical session identifier — already defined in `src/utils/navigation.js` lines 351-362 with shape `{ entityType, entityId, sessionType, sourceModule }`)
 
-One conversation store keyed by `barrySessionKey`. The existing function already produces the correct composite key — it distinguishes the same contact viewed from Mission Control vs. Hunter. All 7 current stores collapse to documents under `users/{userId}/barryConversations/{barrySessionKey}`.
+One conversation store keyed by `barrySessionKey`. The existing function already produces the correct composite key — it distinguishes the same contact viewed from Mission Control vs. Hunter. All 6 current stores collapse to documents under `users/{userId}/barryConversations/{barrySessionKey}`.
+
+```
+[CONFIRMED — verified at src/utils/navigation.js:351, reconciliation §7]
+
+barrySessionKey is computed on every request and carried through the stack.
+It is read by nothing server-side — zero destructuring in any Netlify function.
+
+Current schema (navigation.js):
+  { module, entityType, entityId, sessionType, timestamp }
+
+The final canonical key format approved for P9 is:
+  {entityType}:{entityId}:{sessionType}
+
+sourceModule is carried as metadata, not as part of the identity key.
+Rationale: the same contact relationship entered from Scout vs Mission Control
+is the same conversation. sourceModule in the key would fragment it.
+
+This consolidation is scoped to P9 (Surface Consolidation).
+```
+
+> `sourceModule` is metadata carried alongside the session key — it is not part of the identity key. A conversation about the same contact entered from Scout, Mission Control, or the Hunter drawer is the same conversation. Including `sourceModule` in the key would fragment it across entry points, recreating exactly the problem the unified store is designed to solve.
 
 **What it replaces:**
-- 8 distinct context implementations → 1 context resolver
-- 7 conversation stores → 1 store keyed by `barrySessionKey`
+- 9 context implementations (all assembly paths) → 1 context resolver
+- 6 conversation stores → 1 store keyed by `barrySessionKey`
 - Per-surface context assembly (e.g., `buildContextStack()` loading 500 contacts client-side) → server-side context resolution scoped to what each surface declared it needs
 
 ### 4.2 Signal / Event Layer
@@ -644,7 +663,7 @@ Rebuilt by:   Statistical aggregation across all user action signals within roll
 
 **What exists today (audit Step 3):**
 
-8 distinct context implementations, three of which are primary assembly paths:
+9 context implementations (all assembly paths), three of which are primary:
 
 1. **`barryContextStore.js`** (client-side, global) — lightweight pub/sub singleton. Each module page calls `setBarryContext()` on mount. Context is merged, not replaced — **cross-module contamination risk** when navigating between modules.
 2. **`barryContextStack.js`** (client-side, Mission Control) — loads up to 500 contacts, active missions, RECON data, ICP profile, service profiles, calendar events. Cached 5 min in sessionStorage. **Sends entire payload to every AI call.** This is the largest cost problem in the codebase.
@@ -744,21 +763,28 @@ Awareness is a persistent, continuously-updated layer. Observation is the determ
 **What it does:** Synthesizes information, compares competing priorities across relationships and missions, weighs tradeoffs, chooses strategy, and produces an explainable reasoning trace. This is where Idynify's differentiation lives.
 
 ```
-[PENDING RECONCILIATION — Think layer scope]
+[CONFIRMED — verified at call sites, reconciliation §4]
 
-The canonical audit found that barryStrategyRecommender.js (a rule-based
-strategy selector reaching exactly 4 endpoints) is the closest existing
-component to a Think layer. It selects engagement strategy (direct, warm,
-value, humor) and recommended channel for message generation.
+barryStrategyRecommender.js is confirmed as a partial Think layer.
+331 lines of AI-free reasoning. Verified consumers:
 
-barryGuardrail.js (a rule-based relationship/intent mismatch detector
-reaching 2 endpoints) is a pre-Think validation that checks whether the
-user's engagement tone mismatches the contact's actual signals.
+  1. generate-engagement-message.js (line 259) — destructures recommendation + promptGuidance
+  2. barryHunterProcessEngage.js (line 317) — destructures recommendation + promptGuidance
+  3. barryHunterGenerateStep.js (line 147) — destructures promptGuidance only
+  4. barryGenerateSequenceStep.js (line 110) — destructures promptGuidance only
 
-The reconciliation addendum will confirm whether any additional Think-layer
-logic exists in the codebase beyond these two utilities. This architecture
-designs the Think layer to extend them rather than replace them, regardless
-of the reconciliation finding.
+strategyScores confirmed discarded by all four consumers.
+The recommendation object (with reasons[]) is persisted by 2 of 4 consumers —
+partial auditability already exists.
+
+The existing Think layer satisfies three of the four Think functions:
+  ✓ Contact-level strategy selection
+  ✓ Recency-weighted outcome attribution
+  ✓ Explainable reasoning with reasons[]
+  ✗ Cross-entity priority comparison (who first, across relationships) — absent
+
+P5 is permanently named: Think Layer Promotion & Expansion.
+The architecture extends barryStrategyRecommender.js. It does not replace it.
 ```
 
 **Target architecture:**
@@ -830,11 +856,11 @@ Rebuilt by:   Re-invocation with the same context input; traces are append-only 
 
 ### 4.7 Skills & Workflows Layer
 
-**What it does:** Defines atomic capabilities (Skills) and named combinations of Skills (Workflows). Today neither exists as a named registry — the audit found 37 Netlify functions and 9 client services, of which 12 functions (32%) are duplicates (audit Step 5).
+**What it does:** Defines atomic capabilities (Skills) and named combinations of Skills (Workflows). Today neither exists as a named registry — the audit found 38 AI endpoints (40 AI-calling modules) and 13 non-AI Barry services (client), with 20 duplicate implementation groups (audit Step 5).
 
 **What exists today:**
 
-38 AI endpoints that collapse to approximately 15 Skills. The canonical audit identified 8 duplication patterns across message generation (6 implementations), step generation (3 implementations), recon coaching (2 implementations), and context assembly (2 implementations).
+38 AI endpoints (40 AI-calling modules, 46 AI call sites) that collapse to approximately 15 Skills. The canonical audit identified 20 duplicate implementation groups across message generation (6 implementations), step generation (3 implementations), recon coaching (2 implementations), and context assembly (2 implementations).
 
 Two existing function chains qualify as proto-Workflows:
 1. **`process-barry-inbox-queue.js`** — chains 9 sequential steps: queue processing → reply analysis (`barryInboxAnalyzer`) → write analysis → update relationship context → draft composition (`barryDraftComposer`) → write draft → update timeline → advance conversation state → mark complete. This is a true Workflow.
@@ -1048,7 +1074,7 @@ The 13 current surfaces collapse directionally to ~12 surfaces (audit Step 10, M
 | Relationship Memory | `contacts/{cid}.barry_memory` + `contacts/{cid}.engage_state` + `contacts/{cid}.engagement_summary` | `users/{uid}/barry_awareness/relationships/{cid}` (awareness) + `users/{uid}/barry_memory/relationships/{cid}` (durable memory) |
 | Mission Memory | `missions/{mid}` fields (barry_reasoning, step outcomes) | `users/{uid}/barry_memory/missions/{mid}` |
 | Learned Intelligence | `users/{uid}/barry_memory` (tone_usage, channel_usage) + `barry_attributions` | `users/{uid}/barry_memory/learned` — expanded with approval patterns, edit tracking, outcome attribution |
-| Session Memory | `barryConversations/{key}` (7 distinct keys) + `barry_sessions` (2 levels) | `users/{uid}/barryConversations/{barrySessionKey}` — unified |
+| Session Memory | `barryConversations/{key}` (6 distinct keys) + `barry_sessions` (2 levels) | `users/{uid}/barryConversations/{barrySessionKey}` — unified |
 | Artifact Memory | Does not exist | `users/{uid}/barry_artifacts/{artifactId}` |
 
 ### Critical Rule: Session-to-Durable Memory Gate
@@ -1181,15 +1207,15 @@ This is not a migration plan — that is Document 5. This is the directional sta
 
 | Current State | Evidence | Barry OS Target |
 |---|---|---|
-| ~19 Barry component files, 13 audited surfaces | Audit Step 1 | ~12 surfaces with unified contract |
-| 8 context implementations, 3 primary assembly paths | Audit Step 3 | 1 context resolver (server-side) |
-| 7 conversation stores (drawer_{module} × 9, missionControl, reconCoach_{sectionId}, icpChat, icp, user-level sessions, contact-level sessions) | Audit Step 3 | 1 store keyed by `barrySessionKey` |
-| 37 AI Netlify functions, 12 with duplication (32%) | Audit Step 2, Step 5 | 15 named Skills |
+| 78 Barry component files (59 live, 19 dead), 47 architectural surfaces, 13 logical surfaces | Audit Step 1 | ~12 surfaces with unified contract |
+| 9 context implementations, all assembly paths — P2 retires assembly, not storage | Audit Step 3 | 1 context resolver (server-side) |
+| 6 conversation stores (drawer_{module} × 9, missionControl, reconCoach_{sectionId}, icpChat, icp, user-level sessions, contact-level sessions) | Audit Step 3 | 1 store keyed by `barrySessionKey` |
+| 38 AI endpoints (40 modules), 20 duplicate groups | Audit Step 2, Step 5 | 15 named Skills |
 | 6 message generation implementations | Audit Step 5 | WriteEmailSkill (1 Skill, multiple modes) |
 | 3 morning brief paths (orientation brief, inline chat brief, recommendationEngine) | Audit Step 2 | 1 MorningBriefWorkflow over awareness projections |
 | 0 persisted awareness projections (all computed per-request) | Audit Step 3 | 4 persisted awareness projections |
-| Think layer reaching 4 of 37 endpoints | barryStrategyRecommender.js call sites | Think layer routing through all 15 Skills |
-| 0 named Workflows | Audit Step 1 | 7 Workflows (2 promoted, 5 new) |
+| Think layer reaching 4 of 38 endpoints — satisfies 3 of 4 Think functions; cross-entity priority comparison absent | barryStrategyRecommender.js call sites | Think layer routing through all 15 Skills |
+| 0 named Workflows (2 existing chains qualify for promotion: process-barry-inbox-queue, barryHunterProcessEngage) | Audit Step 1 | 7 Workflows (2 promoted, 5 new) |
 | Cost unmeasurable — `logApiUsage` tracks Apollo credits only, not Anthropic tokens | Audit Step 6 | Full telemetry: provider, model, tokens, latency, trace |
 | Client-side context assembly shipping 500 contacts per turn | `barryContextStack.js` (audit Step 3) | Server-side entity-scoped context resolution |
 | 4 AI-for-deterministic antipatterns | Audit Step 6 | 0 — all deterministic logic computed, not generated |
@@ -1383,3 +1409,33 @@ Every component traces back to this experience. Every section in this architectu
 ---
 
 *No code was written or changed during this audit. This document is an architecture specification only.*
+
+---
+
+## Document Status
+
+| Field | Value |
+|---|---|
+| **Discovery source** | `docs/audits/BARRY_OS_FOUNDATION_AUDIT.md` (commit `09e90f9`) |
+| **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
+| **Architecture status** | Approved |
+| **Supersedes** | None |
+| **Superseded by** | Barry OS Domain & Lifecycle Model (Document 2) upon completion |
+| **Frozen** | Yes — see freeze declaration below |
+
+## Freeze Declaration
+
+Document 1 is frozen as of 2026-08-07.
+
+This document may only be modified if a factual error is discovered during
+implementation that directly contradicts an architectural assumption stated here.
+
+It may not be modified to:
+- Add new architectural concepts
+- Refine or expand existing sections
+- Incorporate new ideas discovered during Documents 2–5
+
+If implementation uncovers a genuine architectural conflict, flag it to Aaron
+before making any change. The bar for reopening a frozen document is high.
+
+All future architecture derives from this document. It does not chase them.

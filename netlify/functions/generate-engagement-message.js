@@ -552,6 +552,9 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     // Log API usage
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'generate-engagement-message', 'success', {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
+      usage: claudeResponse?.usage,
       responseTime,
       metadata: {
         contactName: fullName,

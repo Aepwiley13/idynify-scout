@@ -236,10 +236,14 @@ export const handler = async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  let userId, authToken, message, context, confirm, pendingAction;
+  let userId, authToken, message, context, confirm, pendingAction, rawTraceId;
   try {
-    ({ userId, authToken, message, context = {}, confirm = false, pendingAction = null } = JSON.parse(event.body));
+    ({ userId, authToken, message, context = {}, confirm = false, pendingAction = null, traceId: rawTraceId } = JSON.parse(event.body));
     if (!userId || !authToken) throw new Error('Missing userId or authToken');
+    // Client-supplied and untrusted — bound it before it reaches a log field.
+    rawTraceId = typeof rawTraceId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(rawTraceId.trim())
+      ? rawTraceId.trim()
+      : null;
   } catch (err) {
     return { statusCode: 400, body: JSON.stringify({ error: err.message }) };
   }
@@ -264,7 +268,7 @@ export const handler = async (event) => {
         return { statusCode: 400, body: JSON.stringify({ error: 'Action type not executable via confirm' }) };
       }
 
-      await logApiUsage(userId, 'barryActions', 'success', { responseTime: Date.now() - startTime, metadata: { action: pendingAction.action_type } });
+      await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: pendingAction.action_type } });
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -291,7 +295,7 @@ export const handler = async (event) => {
         result = { draft: intent.parameters };
       }
 
-      await logApiUsage(userId, 'barryActions', 'success', { responseTime: Date.now() - startTime, metadata: { action: intent.action_type } });
+      await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: intent.action_type } });
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -309,7 +313,7 @@ export const handler = async (event) => {
     }
 
     // Low confidence or no action — return clarification message
-    await logApiUsage(userId, 'barryActions', 'success', { responseTime: Date.now() - startTime, metadata: { action: 'none' } });
+    await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: 'none' } });
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },

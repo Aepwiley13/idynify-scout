@@ -622,13 +622,15 @@ export const handler = async (event) => {
     await markWebsiteAnalyzed(userId);
 
     await logApiUsage(userId, 'analyzeWebsite', 'success', {
+      provider: 'anthropic',
+      model: MODEL,
+      // extractWithBarry returns the usage from whichever attempt succeeded.
+      usage,
       responseTime: Date.now() - startTime,
       metadata: {
         url: normalizedUrl,
         confidence: extraction.confidence,
         fieldsWritten: writtenFields.length,
-        inputTokens: usage?.input_tokens,
-        outputTokens: usage?.output_tokens,
       },
     }).catch(() => {});
 

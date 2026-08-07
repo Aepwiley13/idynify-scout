@@ -189,6 +189,19 @@ function buildIcpSummary(icpProfile) {
   return parts.length ? parts.join(' — ') : 'your current profile';
 }
 
+/**
+ * One id per user turn, sent with every function call that turn fans out to
+ * (P0B / defect A2). A Mission Control message can hit barryActions and then
+ * barryMissionChat; without this they land in apiLogs as unrelated rows and
+ * the real cost of a single user action cannot be reconstructed.
+ *
+ * Format is constrained to what the server accepts: [A-Za-z0-9_-], max 64.
+ */
+function newTraceId() {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `mc-${Date.now().toString(36)}-${rand}`;
+}
+
 // ── Action intent detection (routes to barryActions instead of barryMissionChat) ──
 
 const ACTION_PATTERNS = [
@@ -586,6 +599,8 @@ export default function BarryChatPanel({
   async function handleActionMessage(userMessage) {
     setSending(true);
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    // One trace for this whole turn, including the barryMissionChat fallback.
+    const traceId = newTraceId();
 
     try {
       const user = getEffectiveUser();
@@ -620,7 +635,7 @@ export default function BarryChatPanel({
       const res = await fetch('/.netlify/functions/barryActions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, authToken, message: userMessage, context })
+        body: JSON.stringify({ userId, authToken, message: userMessage, context, traceId })
       });
       const data = await res.json();
 
@@ -672,7 +687,8 @@ export default function BarryChatPanel({
             message: userMessage,
             conversationHistory,
             barryMode: mode,
-            contextStack
+            contextStack,
+            traceId
           })
         });
         const missionData = await missionRes.json();

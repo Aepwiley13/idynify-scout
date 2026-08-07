@@ -147,6 +147,9 @@ Respond ONLY with valid JSON in this exact format:
     // Log API usage
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryValidateContact', 'success', {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-5-20250929',
+      usage: claudeResponse?.usage,
       responseTime,
       metadata: {
         resultsCount: results.length,

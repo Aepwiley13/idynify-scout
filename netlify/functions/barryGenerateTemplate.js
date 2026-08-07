@@ -156,6 +156,9 @@ export const handler = async (event) => {
     ];
 
     await logApiUsage(userId, 'barryGenerateTemplate', 'success', {
+      provider: 'anthropic',
+      model: 'claude-3-5-haiku-20241022',
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
       metadata: { stage },
     }).catch(() => {});

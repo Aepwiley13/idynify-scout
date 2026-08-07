@@ -150,6 +150,9 @@ Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence
 
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryHunterCardRead', 'success', {
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      usage: response?.usage,
       responseTime,
       metadata: { contactName: name, relationshipState, cached: false }
     });

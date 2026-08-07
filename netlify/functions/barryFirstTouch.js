@@ -194,6 +194,9 @@ Return valid JSON only:
     const timeout = setTimeout(() => controller.abort(), 12000);
 
     let result = null;
+    // Hoisted so telemetry can report tokens — the response is scoped to the
+    // try block below.
+    let aiUsage = null;
     try {
       const response = await anthropic.messages.create(
         {
@@ -203,6 +206,7 @@ Return valid JSON only:
         },
         { signal: controller.signal }
       );
+      aiUsage = response.usage || null;
       result = extractJson(response.content[0].text);
     } catch (aiErr) {
       if (controller.signal.aborted) console.warn('[barryFirstTouch] Timed out');
@@ -216,6 +220,9 @@ Return valid JSON only:
     }
 
     await logApiUsage(userId, 'barryFirstTouch', 'success', {
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      usage: aiUsage,
       responseTime: Date.now() - startTime,
       metadata: { contactId, serviceProfileId, hasUserContext: !!userContext },
     });

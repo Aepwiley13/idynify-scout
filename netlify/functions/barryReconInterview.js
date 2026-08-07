@@ -202,8 +202,11 @@ export const handler = async (event) => {
     const message = response.content[0].text.trim();
 
     await logApiUsage(userId, 'barryReconInterview', 'success', {
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
-      metadata: { sectionId, mode, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      metadata: { sectionId, mode },
     });
 
     return {

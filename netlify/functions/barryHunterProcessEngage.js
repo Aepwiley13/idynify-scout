@@ -99,7 +99,14 @@ function buildMissionSteps(outcomeGoal) {
 }
 
 // ── Step 1 draft generation (4 angles) ──────────────────────────────────────
-async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '') {
+/**
+ * NOTE (P0B): `lastSessionSummary` and `daysSinceLastContact` are parameters.
+ * They previously appeared in the prompt below as bare identifiers resolved
+ * from the handler's scope, which they are not in — this function threw
+ * `ReferenceError: lastSessionSummary is not defined` on every call, so the
+ * whole Hunter engage path failed. See the commit message for detail.
+ */
+async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '', lastSessionSummary = null, daysSinceLastContact = null) {
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Contact';
   const firstName = contact.first_name || name.split(' ')[0];
 
@@ -367,7 +374,8 @@ export const handler = async (event) => {
     // 7. Generate step 1 draft (4 angles) — the main AI call
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const step1Draft = await generateStep1Draft(
-      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext, strategyGuidance, guardrailModifier
+      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext, strategyGuidance, guardrailModifier,
+      lastSessionSummary, daysSinceLastContact
     );
     steps[0].draft = step1Draft;
 
@@ -400,7 +408,7 @@ export const handler = async (event) => {
     });
 
     const responseTime = Date.now() - startTime;
-    await logApiUsage(userId, 'barryHunterProcessEngage', 'success', {
+    await logApiUsage(userId, 'barryHunterProcessEngage', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001',
       responseTime,
       metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, hasBarryMemory: !!barryMemoryContext, hasStrategyGuidance: !!strategyGuidance, guardrailAction, missionId }
     });

@@ -294,7 +294,9 @@ async function generateForContact(anthropic, contact, sharedBody, reconBlock, us
     const openingLine = cleanOpeningLine(response.content?.[0]?.text);
     if (!openingLine) throw new Error('Model returned an empty opening line');
 
-    return { contactId, openingLine, success: true };
+    // _usage is internal telemetry only. It is summed by the handler and
+    // stripped before the response — the client contract is unchanged.
+    return { contactId, openingLine, success: true, _usage: response.usage || null };
   } catch (err) {
     const error = controller.signal.aborted ? 'Generation timed out' : (err.message || 'Generation failed');
     console.warn(`[barryBulkPersonalize] Contact ${contactId} failed: ${error}`);
@@ -363,7 +365,22 @@ export const handler = async (event) => {
 
     const successCount = results.filter((r) => r.success).length;
 
+    // This endpoint fans out to one model call per contact, so the tokens that
+    // matter are the sum, not any single call. Reporting one call's usage here
+    // would under-report a 25-contact batch by 96%.
+    const totals = results.reduce(
+      (acc, r) => ({
+        input: acc.input + (r._usage?.input_tokens || 0),
+        output: acc.output + (r._usage?.output_tokens || 0),
+      }),
+      { input: 0, output: 0 }
+    );
+
     await logApiUsage(userId, 'barryBulkPersonalize', 'success', {
+      provider: 'anthropic',
+      model: MODEL,
+      inputTokens: totals.input,
+      outputTokens: totals.output,
       responseTime: Date.now() - startTime,
       metadata: {
         contactCount: contacts.length,
@@ -371,10 +388,12 @@ export const handler = async (event) => {
         failCount: contacts.length - successCount,
         reconUsed: !!reconBlock,
         mode,
+        aiCalls: contacts.length,
       },
     });
 
-    return respond(200, { results });
+    // eslint-disable-next-line no-unused-vars
+    return respond(200, { results: results.map(({ _usage, ...rest }) => rest) });
   } catch (error) {
     console.error('[barryBulkPersonalize] Error:', error.message);
     try {

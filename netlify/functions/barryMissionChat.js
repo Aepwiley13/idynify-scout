@@ -805,6 +805,16 @@ export const handler = async (event) => {
       : null;
     // Phase 7 navigation context contract, sent by the global shell.
     const navigationContext = body.navigationContext || null;
+    // Links every function this user turn fans out to into one trace (A2/A3).
+    // Client-supplied and untrusted, so it is length-capped and character-bound
+    // before it can reach a log field.
+    const rawTraceId = typeof body.traceId === 'string' ? body.traceId.trim() : '';
+    const traceId = /^[A-Za-z0-9_-]{1,64}$/.test(rawTraceId) ? rawTraceId : null;
+
+    // Handler-scoped so each of the three response paths below can report its
+    // token usage: every response is declared inside its own try block, and the
+    // AI call is allowed to fail without failing the request.
+    let aiUsage = null;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -905,6 +915,7 @@ Return valid JSON only:
           { signal: briefController.signal }
         );
 
+        aiUsage = claudeResponse.usage || null;
         const rawText = claudeResponse.content[0].text;
         parsed = extractJson(rawText);
         if (!parsed?.response_text) throw new Error('Invalid brief structure');
@@ -930,6 +941,10 @@ Return valid JSON only:
       }
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        usage: aiUsage,
+        traceId,
         responseTime: Date.now() - startTime,
         metadata: { type: 'opening_brief', mode: currentMode }
       });
@@ -992,6 +1007,7 @@ Return valid JSON only:
           { signal: icpController.signal }
         );
 
+        aiUsage = icpResponse.usage || null;
         const rawText = icpResponse.content[0].text;
         icpParsed = extractJson(rawText);
         if (!icpParsed?.response_text) throw new Error('Invalid ICP response structure');
@@ -1031,6 +1047,10 @@ Return valid JSON only:
       }
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        usage: aiUsage,
+        traceId,
         responseTime: Date.now() - startTime,
         metadata: { type: 'icp_reclarification' }
       });
@@ -1162,6 +1182,7 @@ Return valid JSON only:
           { signal: chatController.signal }
         );
 
+        aiUsage = chatResponse.usage || null;
         const rawText = chatResponse.content[0].text;
         parsed = extractJson(rawText);
         if (!parsed) {
@@ -1198,6 +1219,10 @@ Return valid JSON only:
       ];
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        usage: aiUsage,
+        traceId,
         responseTime: Date.now() - startTime,
         metadata: {
           type: 'conversation',

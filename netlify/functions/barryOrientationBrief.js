@@ -232,6 +232,10 @@ Return valid JSON only:
 
     let brief = '';
     let suggestedPrompts = [];
+    // Hoisted so the telemetry call below can report tokens: the response is
+    // scoped to the try block, and the AI call is allowed to fail without
+    // failing the brief.
+    let aiUsage = null;
 
     try {
       const response = await anthropic.messages.create(
@@ -242,6 +246,7 @@ Return valid JSON only:
         },
         { signal: controller.signal }
       );
+      aiUsage = response.usage || null;
       const parsed = extractJson(response.content[0].text);
       if (parsed?.response_text) {
         brief = parsed.response_text;
@@ -280,6 +285,9 @@ Return valid JSON only:
     const mode = missions.length === 0 ? 'GROWTH' : staleMissions.length > 0 ? 'PRIORITIZE' : 'SUGGEST';
 
     await logApiUsage(userId, 'barryOrientationBrief', 'success', {
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      usage: aiUsage,
       responseTime: Date.now() - startTime,
       metadata: {
         reconScore,

@@ -466,7 +466,7 @@ export const handler = async (event) => {
 
     // Log API usage
     const responseTime = Date.now() - startTime;
-    await logApiUsage(userId, 'barryICPConversation', 'success', {
+    await logApiUsage(userId, 'barryICPConversation', 'success', { provider: 'anthropic', model: 'claude-sonnet-4-5-20250929',
       responseTime,
       metadata: { action, currentStep }
     });

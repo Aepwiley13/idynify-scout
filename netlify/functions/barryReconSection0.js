@@ -182,8 +182,11 @@ export const handler = async (event) => {
     ].every(f => profileUpdate[f] !== undefined);
 
     await logApiUsage(userId, 'barryReconSection0', 'success', {
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
-      metadata: { mode, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      metadata: { mode },
     });
 
     return {

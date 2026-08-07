@@ -230,6 +230,9 @@ Output — valid JSON only:
     await db.collection('users').doc(userId).collection('missions').doc(missionId).update(updatePath);
 
     await logApiUsage(userId, 'barryHunterGenerateStep', 'success', {
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
       metadata: { stepIndex, previousOutcome, outcomeGoal: mission.outcome_goal }
     });

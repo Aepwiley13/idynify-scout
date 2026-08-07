@@ -176,6 +176,9 @@ Respond with ONLY the assessment and recommendation. No labels, no headers.`;
 
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryCSMRead', 'success', {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      usage: response?.usage,
       responseTime,
       metadata: { contactName: name, healthBucket, cached: false },
     });

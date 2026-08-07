@@ -141,8 +141,11 @@ export const handler = async (event) => {
     });
 
     await logApiUsage(userId, 'barryCoachSection', 'success', {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
-      metadata: { sectionId, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      metadata: { sectionId },
     });
 
     // ── Parse response ──────────────────────────────────────────────────────

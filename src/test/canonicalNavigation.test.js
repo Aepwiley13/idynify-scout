@@ -117,6 +117,57 @@ describe('readNavigationIntent', () => {
   });
 });
 
+describe('panel mode implies a list behind it', () => {
+  // The staging bug this encodes: Scout+'s "Go to Lead" used panel mode, and
+  // panel mode routes under /scout — which mounts ScoutMain on its default tab.
+  // Saving a contact through a FORM dropped the user onto Daily Lead Insights
+  // with their new contact panelled over a list they had never opened.
+  //
+  // The rule: panel mode is only correct when the user was already looking at
+  // the list it opens over. Every other origin gets the page.
+  const ORIGINS_WITH_A_LIST = ['scout', 'hunter'];
+
+  it('routes panel mode under /scout, which is why it needs a list', () => {
+    const { to } = buildContactNavigation({ contactId: 'c1', displayMode: DISPLAY_MODES.PANEL });
+    expect(to.startsWith('/scout/')).toBe(true);
+  });
+
+  it('Scout+ opens the page, not the panel', () => {
+    const { to, options } = buildContactNavigation({
+      contactId: 'c1',
+      entryPoint: ENTRY_POINTS.SCOUT_PLUS,
+      returnTo: '/scout?tab=scout-plus',
+      displayMode: DISPLAY_MODES.PAGE,
+    });
+
+    expect(to).toBe('/contact/c1');
+    expect(options.state[NAVIGATION_INTENT_KEY].entryPoint).toBe('scout_plus');
+  });
+
+  it('Scout+ is not one of the origins that has a list behind it', () => {
+    expect(ORIGINS_WITH_A_LIST).not.toContain(ENTRY_POINTS.SCOUT_PLUS);
+  });
+
+  it('Scout+ still shows Scout in the breadcrumb', () => {
+    // A distinct entry point for display purposes, the same module for
+    // navigational ones. Scout+ lives inside Scout.
+    expect(originModuleId({ entryPoint: ENTRY_POINTS.SCOUT_PLUS }, resolveModule)).toBe('scout');
+  });
+
+  it('Scout+ returnTo is a route that actually resolves', () => {
+    // `/scout/scout-plus` matches nothing and falls through to the catch-all,
+    // which would send Back to the homepage. Scout's views are query params.
+    const { options } = buildContactNavigation({
+      contactId: 'c1',
+      entryPoint: ENTRY_POINTS.SCOUT_PLUS,
+      returnTo: '/scout?tab=scout-plus',
+    });
+    const { returnTo } = options.state[NAVIGATION_INTENT_KEY];
+
+    expect(resolveModule(returnTo.split('?')[0]).id).toBe('scout');
+  });
+});
+
 describe('originModuleId — what the breadcrumb names', () => {
   it('names the module the user clicked from', () => {
     expect(originModuleId({ entryPoint: 'mission_control' }, resolveModule)).toBe('mission-control');

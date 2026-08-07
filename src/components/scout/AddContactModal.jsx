@@ -29,13 +29,30 @@ export default function AddContactModal({ onClose, onContactAdded }) {
     onContactAdded(contacts);
   };
 
+  /**
+   * NOTE: this component currently has no callers. Kept in sync with
+   * ScoutPlus's success screen anyway — it is the same screen in modal form,
+   * and a divergent copy is what someone reaches for when they revive it.
+   *
+   * PAGE mode, not panel: a contact saved through a form has no list behind it
+   * to preserve, and panel mode would drop the user onto Scout's default tab.
+   * Same fix as ScoutPlus.openSavedContact — see the comment there.
+   */
   const handleViewLeads = () => {
     onClose();
     // Single contact: go directly to their profile
     if (addedContacts.length === 1 && addedContacts[0]?.id) {
-      openContact({ navigate, contactId: addedContacts[0].id, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
+      openContact({
+        navigate,
+        contactId: addedContacts[0].id,
+        entryPoint: ENTRY_POINTS.SCOUT_PLUS,
+        returnTo: '/scout?tab=scout-plus',
+        displayMode: DISPLAY_MODES.PAGE,
+      });
     } else {
-      navigate('/scout/all-leads');
+      // Was '/scout/all-leads', which is not a route — it matched the catch-all
+      // and redirected to the homepage. Scout's views are query params.
+      navigate('/scout?tab=all-leads');
     }
   };
 

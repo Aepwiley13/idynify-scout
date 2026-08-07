@@ -53,6 +53,10 @@ export const ENTRY_POINTS = Object.freeze({
   MISSION_CONTROL: 'mission_control',
   COMMAND_BAR: 'command_bar',
   SCOUT: 'scout',
+  // Scout+ is the add/import flow, not the Scout list. Distinct from SCOUT
+  // because a contact saved through a form has no list behind it to preserve —
+  // see the SCOUT_PLUS entry in ENTRY_POINT_MODULE and ADR-001.
+  SCOUT_PLUS: 'scout_plus',
   HUNTER: 'hunter',
   SNIPER: 'sniper',
   BASECAMP: 'basecamp',
@@ -77,6 +81,9 @@ export const ENTRY_POINTS = Object.freeze({
 export const ENTRY_POINT_MODULE = Object.freeze({
   [ENTRY_POINTS.MISSION_CONTROL]: 'mission-control',
   [ENTRY_POINTS.SCOUT]: 'scout',
+  // Scout+ lives inside Scout, so the breadcrumb says Scout. Only the display
+  // mode differs, and that is decided at the call site, not here.
+  [ENTRY_POINTS.SCOUT_PLUS]: 'scout',
   [ENTRY_POINTS.HUNTER]: 'hunter',
   [ENTRY_POINTS.SNIPER]: 'sniper',
   [ENTRY_POINTS.BASECAMP]: 'basecamp',

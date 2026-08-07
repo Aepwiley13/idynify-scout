@@ -54,6 +54,18 @@ openContact({
 a helper whose `returnTo` is optional and unset produces a Back button with
 nowhere to go — the exact failure the canonical routes exist to remove.
 
+**Choosing the display mode.** `panel` routes under `/scout`, which mounts
+ScoutMain — so it is correct *only* when the user was already looking at Scout's
+list and closing should return them to it. Every other origin gets `page`. Scout+
+is the cautionary case: it is inside Scout but it is a FORM, and panel mode
+dropped users onto Scout's default tab with their new contact panelled over a
+list they had never opened. No list behind you → page.
+
+**Scout's routes are query params.** `/scout?tab=all-leads`,
+`/scout?tab=scout-plus`. Path-style variants like `/scout/all-leads` match
+nothing and fall through to the catch-all, which redirects to the homepage — so
+a `returnTo` written that way silently sends Back to the wrong place.
+
 A future sprint that bypasses the helpers reintroduces a raw path string, and
 that is visible in review.
 
@@ -104,6 +116,7 @@ by `MainLayout`.
 |---|---|
 | `mission_control` | Mission Control |
 | `scout`, `hunter`, `sniper`, `basecamp`, `reinforcements`, `fallback`, `recon`, `command_center` | that module |
+| `scout_plus` | Scout — Scout+ lives inside it. A distinct entry point for *display mode*, the same module for the trail |
 | `command_bar` | whatever `returnTo` resolves to — search is not a place |
 | nothing (bookmark, refresh, pasted link) | falls back to path resolution → Mission Control |
 

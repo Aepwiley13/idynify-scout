@@ -29,7 +29,7 @@ export default function ScoutPlus() {
     const isCompanyUpload = items.length > 0 && items[0]?._uploadType === 'companies';
     // Auto-navigate to the contact profile when a single LinkedIn contact is saved
     if (currentView === 'linkedin-link' && items.length === 1 && items[0]?.id && !isCompanyUpload) {
-      openContact({ navigate, contactId: items[0].id, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
+      openSavedContact(items[0].id);
       return;
     }
     setAddedItems(items);
@@ -37,11 +37,40 @@ export default function ScoutPlus() {
     setCurrentView('success');
   };
 
+  /**
+   * Open a contact the user just saved here. PAGE mode, deliberately.
+   *
+   * This was PANEL, and panel mode routes to /scout/contact/:id — a CHILD of
+   * /scout, which mounts ScoutMain underneath. Scout opens on its default tab,
+   * so saving a contact through Scout+ dropped the user onto Daily Lead
+   * Insights with their new contact in a panel over a list they had never
+   * looked at. Staging caught it.
+   *
+   * The panel exists to preserve a list the user built — filters, sort, scroll.
+   * Scout+ is a FORM. There is no list behind it, so there is nothing to
+   * preserve and everything to be confused by. Same reasoning as Mission
+   * Control: no list → page. See ADR-001.
+   *
+   * returnTo is `/scout?tab=scout-plus`, which is the real route. Scout's views
+   * are query params (App.jsx redirects /scout-plus → /scout?tab=scout-plus);
+   * a path-style `/scout/scout-plus` matches nothing and falls through to the
+   * catch-all, which would send Back to the homepage.
+   */
+  const openSavedContact = (contactId) => {
+    openContact({
+      navigate,
+      contactId,
+      entryPoint: ENTRY_POINTS.SCOUT_PLUS,
+      returnTo: '/scout?tab=scout-plus',
+      displayMode: DISPLAY_MODES.PAGE,
+    });
+  };
+
   const handleViewResults = () => {
     if (lastUploadType === 'companies') {
       navigate('/scout', { state: { activeTab: 'saved-companies' } });
     } else if (addedItems.length === 1 && addedItems[0]?.id) {
-      openContact({ navigate, contactId: addedItems[0].id, entryPoint: ENTRY_POINTS.SCOUT, displayMode: DISPLAY_MODES.PANEL });
+      openSavedContact(addedItems[0].id);
     } else {
       navigate('/scout', { state: { activeTab: 'all-leads' } });
     }

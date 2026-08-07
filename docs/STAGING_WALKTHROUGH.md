@@ -1,12 +1,12 @@
 # Staging walkthrough — canonical identity, routes & navigation
 
 **PR:** #511 · **Branch:** `claude/canonical-identity-routes-nav-yhcoq2`
-**Gate:** all seven flows pass → merge.
+**Gate:** all eight flows pass → merge.
 
-Seven flows. Six verify that behaviour changed correctly or did not change at
+Eight flows. Six verify that behaviour changed correctly or did not change at
 all; **Flow 7 verifies a data guarantee and is the highest-risk item in the
 PR** — it is the only one where a failure corrupts records rather than
-inconveniencing a user.
+inconveniencing a user. Flow 8 was added after staging found a regression.
 
 Automated coverage exists for the *logic* behind most of these
 (`src/test/canonicalRoutes.test.jsx` asserts Flow 1 clause by clause, including
@@ -168,6 +168,27 @@ This is the flow that proves **discovery enriches, it never replaces**
 
 ---
 
+## Flow 8 — Scout+ "Go to Lead" *(regression, found in staging)*
+
+1. Scout+ → Add Contact → manual form. Save one contact.
+2. On the success screen, click **Go to Lead**.
+
+| Check | Expected |
+|---|---|
+| URL | `/contact/:contactId` |
+| What you see | The contact you just saved. **No Daily Lead Insights, no Scout list behind it** |
+| Breadcrumb | **Scout** ▸ contact name |
+| Back | Returns to `/scout?tab=scout-plus` |
+
+Repeat via **LinkedIn Link**, which auto-navigates on save without the success
+screen — same expectations.
+
+**What was wrong:** the button used panel display mode, which routes under
+`/scout` and mounts ScoutMain on its default tab. **Fails if** you land on
+Daily Lead Insights, or Back goes to the homepage.
+
+---
+
 ## Optional — duplicate baseline
 
 Before or after the walkthrough, capture the pre-existing duplicate count. This
@@ -193,8 +214,9 @@ Read-only. No write path exists in that script.
 | 5 — Company preview, no writes | | |
 | 6 — Barry continuity | | |
 | 7 — Duplicate prevention | | |
+| 8 — Scout+ "Go to Lead" (regression) | | |
 
-All seven pass → merge PR #511.
+All eight pass → merge PR #511.
 Any failure → report it; the rollback for each change is documented in
 `docs/CANONICAL_NAVIGATION.md`, `docs/STATUS_ARCHITECTURE.md` and
 `docs/SNIPER_MIGRATION.md`.

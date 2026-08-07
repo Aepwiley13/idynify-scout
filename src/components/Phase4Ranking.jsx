@@ -24,15 +24,13 @@ export default function Phase4Ranking({ phase3Data, scoutData, onComplete }) {
         setProgress(prev => Math.min(prev + Math.random() * 10, 95));
       }, 300);
 
-      const response = await fetch('/.netlify/functions/barry-phase4-rank', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: auth.currentUser.uid,
-          contacts: phase3Data.selectedContacts,
-          scoutData: scoutData
-        })
-      });
+      const response = await Promise.reject(new Error(
+        // P0B (A5): the /.netlify/functions/barry-phase4-rank endpoint does not exist.
+        // The call is removed rather than reimplemented — this surface is
+        // rebuilt under the Skills registry in P4. Failing loudly here beats
+        // a silent 404 that looks like a network blip.
+        'Phase 4 ranking is unavailable — this surface is being rebuilt.'
+      ));
 
       clearInterval(progressInterval);
       setProgress(100);

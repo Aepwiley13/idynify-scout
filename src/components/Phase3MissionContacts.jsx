@@ -35,15 +35,13 @@ export default function Phase3MissionContacts({ phase2Data, scoutData, onComplet
 
       console.log('🎯 Scanning company:', currentCompany.name);
 
-      const response = await fetch('/.netlify/functions/barry-phase3-people', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: auth.currentUser.uid,
-          selectedCompanies: [currentCompany], // Send ONE company at a time
-          targetTitles: scoutData.jobTitles || scoutData.targetTitles || []
-        })
-      });
+      const response = await Promise.reject(new Error(
+        // P0B (A5): the /.netlify/functions/barry-phase3-people endpoint does not exist.
+        // The call is removed rather than reimplemented — this surface is
+        // rebuilt under the Skills registry in P4. Failing loudly here beats
+        // a silent 404 that looks like a network blip.
+        'Phase 3 contact discovery is unavailable — this surface is being rebuilt.'
+      ));
 
       clearInterval(progressInterval);
       setProgress(100);

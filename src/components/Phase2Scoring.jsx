@@ -32,16 +32,13 @@ export default function Phase2Scoring({ phase1Data, onComplete }) {
         setProgress(prev => Math.min(prev + Math.random() * 15, 95));
       }, 500);
 
-      const response = await fetch('/.netlify/functions/barry-phase2-score', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: auth.currentUser.uid,
-          companies: phase1Data.companies,
-          validation: phase1Data.validation,
-          scoutData: phase1Data.validation // This should have scoutData from parent
-        })
-      });
+      const response = await Promise.reject(new Error(
+        // P0B (A5): the /.netlify/functions/barry-phase2-score endpoint does not exist.
+        // The call is removed rather than reimplemented — this surface is
+        // rebuilt under the Skills registry in P4. Failing loudly here beats
+        // a silent 404 that looks like a network blip.
+        'Phase 2 scoring is unavailable — this surface is being rebuilt.'
+      ));
 
       clearInterval(progressInterval);
       setProgress(100);

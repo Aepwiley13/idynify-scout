@@ -77,16 +77,13 @@ const LaunchSequence = () => {
       console.log('🚀 Calling generate-leads API...');
       
       // Call the generate-leads API
-      const response = await fetch('/.netlify/functions/generate-leads', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: userId,
-          scoutData: userData.scoutData
-        })
-      });
+      const response = await Promise.reject(new Error(
+        // P0B (A5): the /.netlify/functions/generate-leads endpoint does not exist.
+        // The call is removed rather than reimplemented — this surface is
+        // rebuilt under the Skills registry in P4. Failing loudly here beats
+        // a silent 404 that looks like a network blip.
+        'Lead generation is unavailable — this surface is being rebuilt.'
+      ));
 
       if (!response.ok) {
         throw new Error('Failed to generate leads');

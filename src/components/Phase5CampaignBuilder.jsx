@@ -38,16 +38,13 @@ export default function Phase5CampaignBuilder({ phase4Data, scoutData, onComplet
       for (const contact of selectedContactObjs) {
         setGeneratingFor(contact.id);
 
-        const response = await fetch('/.netlify/functions/barry-phase5-campaign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: auth.currentUser.uid,
-            contact: contact,
-            scoutData: scoutData,
-            campaignType: campaignType
-          })
-        });
+        const response = await Promise.reject(new Error(
+        // P0B (A5): the /.netlify/functions/barry-phase5-campaign endpoint does not exist.
+        // The call is removed rather than reimplemented — this surface is
+        // rebuilt under the Skills registry in P4. Failing loudly here beats
+        // a silent 404 that looks like a network blip.
+        'Phase 5 campaign building is unavailable — this surface is being rebuilt.'
+      ));
 
         const data = await response.json();
         

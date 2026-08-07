@@ -20,6 +20,22 @@
  *   1. barry_drafts/{messageRecordId} → approvalStatus/draftStatus "sent"
  *   2. contacts/{contactId}           → conversationState, lastOutboundAt, updatedAt
  *   3. contacts/{contactId}/timeline  → a reply_sent event
+ *
+ * SEND-ONCE GUARANTEE (P0A / defect A1)
+ * ─────────────────────────────────────
+ * Sending an email is irreversible, so the draft is CLAIMED in a transaction
+ * before Gmail is called. Two clicks, two tabs, or a client retry all race on
+ * the same document, and exactly one wins:
+ *
+ *   awaiting_user ──claim──> sending ──gmail ok──> sent
+ *                               │
+ *                               └──gmail failed──> (reverted to prior status)
+ *
+ * A replay that arrives after "sent" is answered 200 with alreadySent:true and
+ * the original message id, because a duplicate click is not a user error — it
+ * must simply not produce a second email. A claim still held after
+ * STALE_CLAIM_MS is reclaimable, so a function that dies mid-send cannot
+ * strand the draft permanently.
  */
 
 import { google } from 'googleapis';
@@ -42,6 +58,83 @@ const json = (statusCode, payload) => ({
   headers: CORS_HEADERS,
   body: JSON.stringify(payload),
 });
+
+/**
+ * How long a "sending" claim is honoured before another request may take it.
+ * Longer than any realistic Gmail round trip, short enough that a crashed
+ * invocation does not strand the draft past the user's patience.
+ */
+const STALE_CLAIM_MS = 2 * 60 * 1000;
+
+/** Firestore Timestamp | ISO string | Date | null → epoch ms (0 when unusable). */
+function claimStartedMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Take exclusive ownership of a draft so only one request can send it.
+ *
+ * @returns {Promise<
+ *   { ok: true, tracked: boolean, priorStatus: string|null } |
+ *   { ok: false, reason: 'already_sent', sentMessageId: string|null, sentThreadId: string|null } |
+ *   { ok: false, reason: 'send_in_progress' }
+ * >}
+ */
+async function claimDraftForSend(draftRef) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(draftRef);
+
+    // No stored draft is legitimate — a reply can be composed without one.
+    // There is nothing to claim, and nothing that could be sent twice from it.
+    if (!snap.exists) return { ok: true, tracked: false, priorStatus: null };
+
+    const data = snap.data() || {};
+    // Captured before the update below. Reading it afterwards would hand back
+    // whatever this claim just wrote instead of the status it replaced.
+    const priorStatus = data.approvalStatus || null;
+
+    if (data.approvalStatus === 'sent') {
+      return {
+        ok: false,
+        reason: 'already_sent',
+        sentMessageId: data.sentMessageId || null,
+        sentThreadId: data.sentThreadId || null,
+      };
+    }
+
+    if (data.approvalStatus === 'sending') {
+      const heldFor = Date.now() - claimStartedMillis(data.sendingStartedAt);
+      if (heldFor < STALE_CLAIM_MS) return { ok: false, reason: 'send_in_progress' };
+      // Older than the stale window — the previous attempt died. Reclaim it.
+    }
+
+    tx.update(draftRef, {
+      approvalStatus: 'sending',
+      sendingStartedAt: FieldValue.serverTimestamp(),
+    });
+
+    return { ok: true, tracked: true, priorStatus };
+  });
+}
+
+/**
+ * Hand a claimed draft back when the send did not happen, so the user can retry.
+ * Best-effort: the stale-claim window already covers the case where this fails.
+ */
+async function releaseDraftClaim(draftRef, priorStatus) {
+  try {
+    await draftRef.update({
+      approvalStatus: priorStatus || 'awaiting_user',
+      sendingStartedAt: FieldValue.delete(),
+    });
+  } catch (err) {
+    console.error('[barry-approve-send] Failed to release draft claim:', err.message);
+  }
+}
 
 /** Plain text → HTML. Mirrors toHtml() in gmail-send-quick.js. */
 function toHtml(text) {
@@ -128,6 +221,11 @@ export const handler = async (event) => {
     return json(405, { error: 'Method not allowed' });
   }
 
+  // Declared out here so the catch below can hand the claim back if anything
+  // between claiming and sending throws.
+  let draftRef = null;
+  let claim = null;
+
   try {
     let body;
     try {
@@ -184,6 +282,45 @@ export const handler = async (event) => {
 
     const replySubject = buildReplySubject(commRecord.subject);
 
+    // ── Claim the draft before anything irreversible happens ──────────────
+    // Everything above this point is a read. Everything below can send mail.
+    draftRef = db
+      .collection('users').doc(userId)
+      .collection('contacts').doc(contactId)
+      .collection('barry_drafts').doc(messageRecordId);
+
+    try {
+      claim = await claimDraftForSend(draftRef);
+    } catch (claimErr) {
+      console.error('[barry-approve-send] Draft claim failed:', claimErr.message);
+      return json(500, { error: `Could not lock the draft for sending: ${claimErr.message}` });
+    }
+
+    if (!claim.ok && claim.reason === 'already_sent') {
+      // A duplicate click, not a failure. Report the original send.
+      console.log(`[barry-approve-send] Replay ignored — ${messageRecordId} already sent`);
+      return json(200, {
+        success: true,
+        alreadySent: true,
+        gmailMessageId: claim.sentMessageId,
+        gmailThreadId: claim.sentThreadId || gmailThreadId,
+      });
+    }
+
+    if (!claim.ok && claim.reason === 'send_in_progress') {
+      return json(409, {
+        error: 'This reply is already being sent.',
+        code: 'SEND_IN_PROGRESS',
+      });
+    }
+
+    // From here on, any early return must release the claim or the draft is
+    // stuck until the stale window expires.
+    const abandonSend = async (statusCode, payload) => {
+      if (claim.tracked) await releaseDraftClaim(draftRef, claim.priorStatus);
+      return json(statusCode, payload);
+    };
+
     // ── Gmail OAuth (same pattern as gmail-send-quick.js) ─────────────────
     const gmailDoc = await db
       .collection('users').doc(userId)
@@ -191,7 +328,7 @@ export const handler = async (event) => {
       .get();
 
     if (!gmailDoc.exists || gmailDoc.data().status !== 'connected') {
-      return json(400, { error: 'Gmail is not connected', code: 'GMAIL_NOT_CONNECTED' });
+      return abandonSend(400, { error: 'Gmail is not connected', code: 'GMAIL_NOT_CONNECTED' });
     }
     const gmailData = gmailDoc.data();
 
@@ -223,7 +360,7 @@ export const handler = async (event) => {
         });
       } catch (refreshErr) {
         console.error('[barry-approve-send] Token refresh failed:', refreshErr.message);
-        return json(400, {
+        return abandonSend(400, {
           error: 'Gmail connection expired. Please reconnect Gmail.',
           code: 'GMAIL_REFRESH_FAILED',
         });
@@ -255,8 +392,13 @@ export const handler = async (event) => {
       });
     } catch (sendErr) {
       console.error('[barry-approve-send] Gmail send failed:', sendErr.message);
-      return json(502, { error: `Gmail rejected the send: ${sendErr.message}` });
+      // Gmail refused it, so nothing left the building — the user may retry.
+      return abandonSend(502, { error: `Gmail rejected the send: ${sendErr.message}` });
     }
+
+    // Past this line the mail is gone. The claim must never be released again,
+    // whatever happens to the Firestore writes below.
+    claim = { ...claim, tracked: false };
 
     const sentMessageId = sendResult.data.id;
     const sentThreadId = sendResult.data.threadId || gmailThreadId;
@@ -276,6 +418,8 @@ export const handler = async (event) => {
           draftStatus: 'sent',
           sentAt: FieldValue.serverTimestamp(),
           sentMessageId,
+          sentThreadId,
+          sendingStartedAt: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         });
 
@@ -302,6 +446,26 @@ export const handler = async (event) => {
         `[barry-approve-send] Sent ${sentMessageId} but Firestore update failed:`,
         writeErr.message
       );
+
+      // The mail is already gone. The one write that MUST land is the draft's
+      // terminal status — while it still reads "sending", the stale-claim
+      // window would eventually let a retry send the same reply again. Try it
+      // once more on its own, with the smallest possible payload.
+      try {
+        await draftRef.update({
+          approvalStatus: 'sent',
+          draftStatus: 'sent',
+          sentMessageId,
+          sendingStartedAt: FieldValue.delete(),
+        });
+      } catch (sealErr) {
+        console.error(
+          `[barry-approve-send] CRITICAL: ${sentMessageId} sent but the draft could not be ` +
+          `marked sent (${sealErr.message}). Draft ${messageRecordId} stays claimed until the ` +
+          `stale window expires and could be re-sent by a manual retry.`
+        );
+      }
+
       return json(200, {
         success: true,
         gmailMessageId: sentMessageId,
@@ -320,6 +484,12 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('[barry-approve-send] Error:', error);
+    // If we claimed the draft but never reached the send, hand it back so the
+    // user is not locked out of retrying. `tracked` is cleared the moment the
+    // mail actually leaves, so this can never re-open a sent draft.
+    if (claim?.tracked && draftRef) {
+      await releaseDraftClaim(draftRef, claim.priorStatus);
+    }
     return json(500, { error: error.message });
   }
 };

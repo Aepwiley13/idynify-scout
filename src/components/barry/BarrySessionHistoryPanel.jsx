@@ -6,6 +6,13 @@
  *   Mission  → users/{uid}/barry_sessions
  *   Hunter   → contacts with engage_state.last_barry_session (lightweight, no subcollection fan-out)
  *
+ * ⚠️ The Mission source is the USER-scoped users/{uid}/barry_sessions, which is
+ * a different collection from the contact-scoped
+ * users/{uid}/contacts/{cid}/barry_sessions despite the identical name
+ * (P0A / defect A9). Only BarryChatPanel writes the one read here, which is why
+ * conversations held inside a module do not appear in this feed — the Hunter
+ * row above is a partial stand-in. Unifying the two is Barry OS work.
+ *
  * Unified feed ordered by updatedAt desc.
  * Search filters across all summaries.
  */

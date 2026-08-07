@@ -8,6 +8,7 @@
  *   - the send is threaded, and reply headers use the RFC Message-ID
  *   - the contact document gains only conversationState/lastOutboundAt/updatedAt
  *   - a Firestore failure after a successful send is not reported as a failure
+ *   - the same reply is never sent twice (P0A / defect A1)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -36,7 +37,7 @@ vi.mock('googleapis', () => ({
 }));
 
 vi.mock('firebase-admin/firestore', () => ({
-  FieldValue: { serverTimestamp: () => '__ts__' },
+  FieldValue: { serverTimestamp: () => '__ts__', delete: () => '__delete__' },
 }));
 
 const verifyAuthToken = vi.fn(async () => ({ tokenUserId: 'user_1' }));
@@ -70,32 +71,52 @@ const state = {
     exists: true,
     data: { status: 'connected', accessToken: 'at', refreshToken: 'rt', expiresAt: Date.now() + 3600000 },
   },
+  // The draft the send claims before touching Gmail. `approvalStatus` is what
+  // makes a second click a no-op instead of a second email.
+  draft: {
+    exists: true,
+    data: { approvalStatus: 'awaiting_user' },
+  },
   contactUpdates: [],
   draftUpdates: [],
   timelineAdds: [],
   failWrites: false,
+  // Fails only the contact/timeline writes, leaving draft writes working —
+  // the partial outage that would otherwise strand a claim.
+  failContactWrites: false,
 };
+
+function makeDraftRef() {
+  return {
+    get: async () => ({
+      exists: state.draft.exists,
+      // A copy, like a real snapshot. Handing back the live object would let a
+      // write inside a transaction retroactively change what the read saw.
+      data: () => ({ ...state.draft.data }),
+    }),
+    update: async (patch) => {
+      if (state.failWrites) throw new Error('firestore unavailable');
+      state.draftUpdates.push(patch);
+      // Mirror the write back so a follow-up claim sees the new status, the
+      // way a real Firestore would.
+      Object.assign(state.draft.data, patch);
+    },
+  };
+}
 
 function makeContactRef() {
   return {
     update: async (patch) => {
-      if (state.failWrites) throw new Error('firestore unavailable');
+      if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
       state.contactUpdates.push(patch);
     },
     collection: (name) => {
       if (name === 'barry_drafts') {
-        return {
-          doc: () => ({
-            update: async (patch) => {
-              if (state.failWrites) throw new Error('firestore unavailable');
-              state.draftUpdates.push(patch);
-            },
-          }),
-        };
+        return { doc: () => makeDraftRef() };
       }
       return {
         add: async (doc) => {
-          if (state.failWrites) throw new Error('firestore unavailable');
+          if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
           state.timelineAdds.push(doc);
         },
       };
@@ -105,6 +126,19 @@ function makeContactRef() {
 
 vi.mock('../../netlify/functions/firebase-admin.js', () => ({
   db: {
+    // Writes buffer and apply at commit, like a real transaction — so a write
+    // that fails throws out of runTransaction rather than vanishing into an
+    // unhandled rejection. Contention itself is covered by driving
+    // `state.draft` to the contended status directly.
+    runTransaction: async (fn) => {
+      const writes = [];
+      const result = await fn({
+        get: (ref) => ref.get(),
+        update: (ref, patch) => { writes.push([ref, patch]); },
+      });
+      for (const [ref, patch] of writes) await ref.update(patch);
+      return result;
+    },
     collection: (name) => {
       if (name === 'communication_records') {
         return {
@@ -180,6 +214,8 @@ beforeEach(() => {
     exists: true,
     data: { status: 'connected', accessToken: 'at', refreshToken: 'rt', expiresAt: Date.now() + 3600000 },
   };
+  state.draft = { exists: true, data: { approvalStatus: 'awaiting_user' } };
+  state.failContactWrites = false;
   state.contactUpdates = [];
   state.draftUpdates = [];
   state.timelineAdds = [];
@@ -347,12 +383,16 @@ describe('sending', () => {
     expect(mime).toContain('A user-edited reply.');
   });
 
-  it('surfaces a Gmail rejection as 502 without writing anything', async () => {
+  it('surfaces a Gmail rejection as 502 without recording an outcome', async () => {
     sendMock.mockRejectedValue(new Error('Invalid thread'));
     const res = await post(validBody);
     expect(res.statusCode).toBe(502);
     expect(state.contactUpdates).toHaveLength(0);
-    expect(state.draftUpdates).toHaveLength(0);
+    expect(state.timelineAdds).toHaveLength(0);
+    // The draft is written twice — claimed, then handed back — but never
+    // recorded as sent. Claim bookkeeping is not an outcome.
+    expect(state.draft.data.approvalStatus).toBe('awaiting_user');
+    expect(state.draftUpdates.some((p) => p.approvalStatus === 'sent')).toBe(false);
   });
 });
 
@@ -360,7 +400,8 @@ describe('sending', () => {
 describe('Firestore updates', () => {
   it('marks the draft sent', async () => {
     await post(validBody);
-    expect(state.draftUpdates[0]).toMatchObject({
+    // draftUpdates[0] is the pre-send claim; the outcome is the last write.
+    expect(state.draftUpdates.at(-1)).toMatchObject({
       approvalStatus: 'sent',
       draftStatus: 'sent',
       sentMessageId: 'sent_1',
@@ -403,11 +444,112 @@ describe('Firestore updates', () => {
   });
 
   it('reports success with a warning when the email sent but Firestore failed', async () => {
-    state.failWrites = true;
+    state.failContactWrites = true;
     const res = await post(validBody);
     // The mail is already gone — telling the user it failed makes them send twice.
     expect(res.statusCode).toBe(200);
     expect(parse(res)).toMatchObject({ success: true, gmailMessageId: 'sent_1' });
     expect(parse(res).warning).toMatch(/could not be updated/i);
+  });
+
+  it('refuses to send at all when the claim cannot be written', async () => {
+    // If Firestore is unavailable the send cannot be made idempotent, and an
+    // un-guarded send is exactly the defect this endpoint had. Refuse instead.
+    state.failWrites = true;
+    const res = await post(validBody);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(500);
+    expect(parse(res).error).toMatch(/lock the draft/i);
+  });
+});
+
+// ── Send-once guarantee (P0A / defect A1) ────────────────────────────────────
+//
+// Sending is irreversible, so the draft is claimed in a transaction before
+// Gmail is called. These tests are the reason that claim exists: without it,
+// two clicks put two emails in front of the same prospect.
+
+describe('send-once guarantee', () => {
+  it('claims the draft before calling Gmail', async () => {
+    await post(validBody);
+    // The claim must be the FIRST write, and it must land before the send.
+    expect(state.draftUpdates[0]).toMatchObject({ approvalStatus: 'sending' });
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not send a second time when the draft is already sent', async () => {
+    state.draft.data = { approvalStatus: 'sent', sentMessageId: 'sent_1', sentThreadId: 'thr_1' };
+    const res = await post(validBody);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    // A duplicate click is not a user error — report the original send so the
+    // UI settles instead of showing a failure and inviting another attempt.
+    expect(res.statusCode).toBe(200);
+    expect(parse(res)).toMatchObject({
+      success: true,
+      alreadySent: true,
+      gmailMessageId: 'sent_1',
+    });
+  });
+
+  it('refuses a send that is already in flight', async () => {
+    state.draft.data = { approvalStatus: 'sending', sendingStartedAt: Date.now() };
+    const res = await post(validBody);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(409);
+    expect(parse(res).code).toBe('SEND_IN_PROGRESS');
+  });
+
+  it('reclaims a stale in-flight claim so a crash cannot strand the draft', async () => {
+    // Older than STALE_CLAIM_MS — the invocation that claimed it never finished.
+    state.draft.data = {
+      approvalStatus: 'sending',
+      sendingStartedAt: Date.now() - 10 * 60 * 1000,
+    };
+    const res = await post(validBody);
+
+    expect(res.statusCode).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands the claim back when Gmail rejects the send', async () => {
+    sendMock.mockRejectedValueOnce(new Error('rate limited'));
+    const res = await post(validBody);
+
+    expect(res.statusCode).toBe(502);
+    // Nothing left the building, so the user must be able to try again.
+    expect(state.draft.data.approvalStatus).toBe('awaiting_user');
+  });
+
+  it('hands the claim back when Gmail is not connected', async () => {
+    state.gmailIntegration = { exists: true, data: { status: 'disconnected' } };
+    const res = await post(validBody);
+
+    expect(res.statusCode).toBe(400);
+    expect(state.draft.data.approvalStatus).toBe('awaiting_user');
+  });
+
+  it('still marks the draft sent when the contact write fails after sending', async () => {
+    // A partial outage: the mail is gone and the contact update fails. If the
+    // draft were left at "sending", the stale-claim window would eventually let
+    // a retry send the very same reply a second time.
+    state.failContactWrites = true;
+    const res = await post(validBody);
+
+    expect(res.statusCode).toBe(200);
+    expect(parse(res).warning).toMatch(/could not be updated/i);
+    expect(state.draft.data.approvalStatus).toBe('sent');
+  });
+
+  it('still sends when no stored draft exists', async () => {
+    // Not every reply has a draft document behind it. Nothing to claim, and
+    // nothing that could be double-sent from it.
+    state.draft = { exists: false, data: {} };
+    const res = await post(validBody);
+
+    expect(res.statusCode).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });

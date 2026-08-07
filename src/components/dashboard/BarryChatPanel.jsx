@@ -81,10 +81,41 @@ async function loadConversation(userId) {
 }
 
 // ── Per-session history (barry_sessions subcollection) ─────────────────────────
+//
+// ⚠️ NAME COLLISION — READ BEFORE TOUCHING THIS (P0A / defect A9)
+// ───────────────────────────────────────────────────────────────
+// "barry_sessions" names TWO UNRELATED COLLECTIONS with different parents and
+// incompatible schemas:
+//
+//   users/{uid}/barry_sessions/{sessionId}
+//       ← THIS ONE. Mission Control chat-panel transcripts.
+//         Written here, read by BarrySessionHistoryPanel.
+//         Shape: { type, module, summary, messages[], messageCount, ... }
+//
+//   users/{uid}/contacts/{contactId}/barry_sessions/{sessionId}
+//       ← A DIFFERENT COLLECTION. Per-contact engagement session records.
+//         Written by src/services/barryMemoryService.js, read by
+//         netlify/functions/utils/barryContextAssembler.js.
+//         Shape: { started_at, goal, generated_messages[], session_summary, ... }
+//
+// They are not two views of one thing. Writing this shape into the contact
+// path would corrupt Barry's relationship memory, because the context
+// assembler reads `session_summary` from those documents and injects it into
+// every generation prompt for that contact.
+//
+// P0A isolates the collision by naming it. It does NOT rename or migrate —
+// unifying the conversation store is Barry OS architecture work (ADR-005 says
+// memory is keyed by contact with sessions beneath it, which this collection
+// contradicts). Until then: never reuse this helper for a contact-scoped path.
+
+/** Path for a Mission Control chat transcript. USER-scoped — see the note above. */
+function missionControlSessionRef(userId, sessionId) {
+  return doc(db, 'users', userId, 'barry_sessions', sessionId);
+}
 
 async function createSessionDoc(userId, sessionId, module) {
   try {
-    await setDoc(doc(db, 'users', userId, 'barry_sessions', sessionId), {
+    await setDoc(missionControlSessionRef(userId, sessionId), {
       type: 'mission_control',
       module: module || 'mission-control',
       summary: null,
@@ -103,7 +134,7 @@ async function updateSessionDoc(userId, sessionId, messages, summary) {
     const assistantMsgs = messages.filter(m => m.role === 'assistant');
     const derivedSummary = summary
       || (assistantMsgs[0]?.content ? assistantMsgs[0].content.slice(0, 120) : null);
-    await setDoc(doc(db, 'users', userId, 'barry_sessions', sessionId), {
+    await setDoc(missionControlSessionRef(userId, sessionId), {
       messages: messages.slice(-30).map(m => ({
         role: m.role,
         content: typeof m.content === 'string' ? m.content.slice(0, 500) : '',

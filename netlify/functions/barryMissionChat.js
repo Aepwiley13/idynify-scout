@@ -397,6 +397,10 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
   const userStyle = contextStack?.user_style || null;
   const icpProfile = contextStack?.icpProfile || null;
   const calendarEvents = contextStack?.calendarEvents || [];
+  // P0A / defect A6: an unreachable calendar is not an empty calendar. Older
+  // clients send no status at all, so treat a missing value as 'unknown'
+  // rather than silently claiming the calendar was readable.
+  const calendarStatus = contextStack?.calendarStatus || 'unknown';
 
   // Capability block replaces the binary "Not configured" ICP check.
   // Passed in from the handler after buildCapabilityBlock() is called with dashboardData.
@@ -495,7 +499,11 @@ ${calendarEvents.length > 0
   ? calendarEvents.map(ev =>
       `  "${ev.title}" on ${ev.startDateTime ? new Date(ev.startDateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'TBD'}${ev.contactName ? ` — with ${ev.contactName} (id: ${ev.contactId})` : ''}`
     ).join('\n')
-  : 'No upcoming calendar meetings with Hunter contacts.'}
+  : calendarStatus === 'error' || calendarStatus === 'unknown'
+    ? 'CALENDAR UNAVAILABLE — the calendar could not be read on this request. You do NOT know whether the user has meetings. Never say they have no meetings; say you could not reach their calendar.'
+    : calendarStatus === 'not_connected'
+      ? 'Google Calendar is not connected, so meetings are invisible to you. Suggest connecting it if the user asks about meetings.'
+      : 'No upcoming calendar meetings with Hunter contacts.'}
 
 IMPORTANT: If you see a calendar event with a Hunter contact, that contact likely had a meeting booked and should be moved to Sniper. Proactively suggest this with a MOVE_TO_SNIPER action.
 

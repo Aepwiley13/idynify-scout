@@ -170,6 +170,27 @@ export async function findConnectedGmailUsers(db, limit = MAX_USERS_PER_RUN) {
     return aAt < bAt ? -1 : aAt > bAt ? 1 : 0;
   });
 
+  // P0A / defect A8: the cap used to truncate in silence, so account 51 simply
+  // never synced and nothing said so. Least-recently-synced sort means the
+  // overflow does get picked up on later runs — but at a slower cadence than
+  // the schedule advertises, and that has to be visible to be actionable.
+  if (users.length > limit) {
+    warn(
+      `${users.length} connected Gmail account(s) found but only ${limit} sync per run ` +
+      `(MAX_USERS_PER_RUN) — ${users.length - limit} deferred to a later run. ` +
+      'Raise the cap or shorten the schedule if this persists.'
+    );
+  }
+
+  // The pre-filter fetches limit*4 integration docs. Hitting that ceiling means
+  // the true account count is unknown and may exceed what is reported above.
+  if (snap.size >= limit * 4) {
+    warn(
+      `Integration pre-filter returned its maximum of ${limit * 4} document(s) — there may be ` +
+      'connected Gmail accounts this run never even considered.'
+    );
+  }
+
   return users.slice(0, limit);
 }
 

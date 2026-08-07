@@ -208,10 +208,18 @@ export const handler = async (event) => {
     let barryFullContext = null;
     try {
       if (contactId) {
-        const { promptContext, context: fullCtx } = await assembleBarryContext(db, userId, contactId);
+        const { promptContext, context: fullCtx, status, error: ctxError } =
+          await assembleBarryContext(db, userId, contactId);
         barryMemoryContext = promptContext || '';
         barryFullContext = fullCtx;
-        if (barryMemoryContext) {
+        if (status === 'error') {
+          // P0A / defect A7: memory was lost, not absent. Say so — this run is
+          // about to write cold copy for a possibly warm relationship.
+          console.warn(
+            `⚠️ Barry memory FAILED to load for contact=${contactId} (${ctxError}). ` +
+            'Generating without memory.'
+          );
+        } else if (barryMemoryContext) {
           console.log('✅ Barry memory context loaded');
         }
       }

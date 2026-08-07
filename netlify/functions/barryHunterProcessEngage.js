@@ -286,10 +286,17 @@ export const handler = async (event) => {
     let barryMemoryContext = '';
     let barryFullContext = null;
     try {
-      const { promptContext, context: fullCtx } = await assembleBarryContext(db, userId, contactId);
+      const { promptContext, context: fullCtx, status, error: ctxError } =
+        await assembleBarryContext(db, userId, contactId);
       barryMemoryContext = promptContext || '';
       barryFullContext = fullCtx;
-      if (barryMemoryContext) {
+      if (status === 'error') {
+        // P0A / defect A7: distinguish "lost the memory" from "has no memory".
+        console.warn(
+          `[barryHunterProcessEngage] Barry memory FAILED for contact=${contactId} ` +
+          `(${ctxError}). Generating without memory.`
+        );
+      } else if (barryMemoryContext) {
         console.log(`[barryHunterProcessEngage] Barry memory loaded for contact=${contactId}`);
       }
     } catch (memErr) {

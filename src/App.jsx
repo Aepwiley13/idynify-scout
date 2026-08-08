@@ -29,14 +29,8 @@ import ReconSection0 from './pages/Recon/ReconSection0';
 import BarryTraining from './pages/Recon/BarryTraining';
 import AlignmentBrief from './pages/Recon/AlignmentBrief';
 import ReconErrorBoundary from './components/recon/ReconErrorBoundary';
-import Prospects from './pages/Prospects';
 import Questionnaire from './pages/Questionnaire';
 import UnifiedDashboard from './pages/UnifiedDashboard';
-import MissionPhase1Page from './pages/MissionPhase1Page';
-import MissionPhase2Page from './pages/MissionPhase2Page';
-import MissionPhase3Page from './pages/MissionPhase3Page';
-import MissionPhase4Page from './pages/MissionPhase4Page';
-import MissionPhase5Page from './pages/MissionPhase5Page';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
 import ScoutMain from './pages/Scout/ScoutMain';
 import PeopleMain from './pages/Scout/PeopleMain';
@@ -70,8 +64,6 @@ import UpdateBanner from './components/UpdateBanner';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ProtectedSuperAdminRoute from './components/ProtectedSuperAdminRoute';
 import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
-import LaunchSequence from './components/LaunchSequence';
-import Phase1Discovery from './components/Phase1Discovery';
 import ICPBuilder from './components/ICPBuilder';
 import ICPBriefView from './components/ICPBriefView';
 import CompanyList from './components/CompanyList';
@@ -380,54 +372,6 @@ function App() {
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />
         <Route path="/icp-validation" element={<Navigate to="/mission-control-v2" />} />
-        <Route
-          path="/launch-sequence"
-          element={
-            <ProtectedRoute>
-              <MissionPhase1Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase1"
-          element={
-            <ProtectedRoute>
-              <MissionPhase1Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase2"
-          element={
-            <ProtectedRoute>
-              <MissionPhase2Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase3"
-          element={
-            <ProtectedRoute>
-              <MissionPhase3Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase4"
-          element={
-            <ProtectedRoute>
-              <MissionPhase4Page />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/mission-phase5"
-          element={
-            <ProtectedRoute>
-              <MissionPhase5Page />
-            </ProtectedRoute>
-          }
-        />
 
         {/* ══════════════════════════════════════════════════════════════════
             GLOBAL SHELL — Sprint 1 vertical slice
@@ -856,14 +800,6 @@ function App() {
           element={
             <ProtectedRoute>
               <Questionnaire />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/prospects"
-          element={
-            <ProtectedRoute>
-              <Prospects />
             </ProtectedRoute>
           }
         />

@@ -219,3 +219,49 @@ operation it measures.** The corollary is that telemetry can fail silently: a
 run of missing rows indicates a write failure, not an absence of activity. The
 `✅ API log:` line emitted on each successful write is the corroborating signal
 in the Netlify function logs.
+
+---
+
+## Known Gaps
+
+Gaps recorded here are documented, not scheduled. Implementation belongs to
+Document 5 planning.
+
+### B-001 — Relationship Bounce Blind Spot
+
+Contact outreach is sent through Gmail. No repository path ingests delivery
+failure or bounce events for Gmail relationship email. `contact.email_bounced`
+therefore has no current implementation. Barry cannot incorporate relationship
+delivery failure into Awareness.
+
+**Existing infrastructure**
+
+```
+resendWebhook.js → receives Resend email.bounced (system email only)
+                 → writes emailLogs and emailSuppressionList
+                 → does not update Contact state
+                 → does not publish a Barry OS signal
+```
+
+**Repository evidence**
+
+| Fact | Location |
+|---|---|
+| Resend bounce events are received and classified hard/soft | `resendWebhook.js:65-66`, `:138-158`, `:213-249` |
+| Bounce state is written to the email log, not the contact | `emailLog.js:189-196` — `bouncedAt`, `bounceType` |
+| Hard bounces enter the suppression list | `resendWebhook.js:153-156` |
+| Resend carries system email | `send-welcome-email.js:29` — the only Resend send path |
+| Contact outreach goes through Gmail | `gmail-send.js`, `barry-approve-send.js` |
+| Neither outreach path writes to the email log | No `emailLog` / `logEmail` reference in either file |
+| No Gmail function processes bounce events | No `bounce` reference in any `gmail-*.js` |
+
+The one Gmail-adjacent match is `gmailMessageService.js:372`, a regex of
+automated-sender local-parts (`bounce`, `mailer-daemon`, `postmaster`). That is
+inbound sender filtering, not bounce event processing — it reads like a bounce
+producer to a text search and is not one.
+
+**Future implementation**
+
+A relationship-email delivery adapter (Gmail, or a future supported delivery
+channel) must publish `contact.email_bounced`. Scheduled for Document 5
+planning. **Do not implement during baseline week.**

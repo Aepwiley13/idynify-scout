@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { MODEL_DEEP } from './utils/models.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -183,7 +184,7 @@ RULES:
     console.log('🤖 Calling Claude API for ICP Brief synthesis...');
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_DEEP,
       max_tokens: 4096,
       temperature: 0.5,
       messages: [{
@@ -219,7 +220,7 @@ RULES:
     output.metadata = {
       sectionsAnalyzed: 10,
       generationTime,
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL_DEEP,
       tokensUsed: message.usage.input_tokens + message.usage.output_tokens
     };
 

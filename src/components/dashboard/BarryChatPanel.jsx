@@ -81,10 +81,41 @@ async function loadConversation(userId) {
 }
 
 // ── Per-session history (barry_sessions subcollection) ─────────────────────────
+//
+// ⚠️ NAME COLLISION — READ BEFORE TOUCHING THIS (P0A / defect A9)
+// ───────────────────────────────────────────────────────────────
+// "barry_sessions" names TWO UNRELATED COLLECTIONS with different parents and
+// incompatible schemas:
+//
+//   users/{uid}/barry_sessions/{sessionId}
+//       ← THIS ONE. Mission Control chat-panel transcripts.
+//         Written here, read by BarrySessionHistoryPanel.
+//         Shape: { type, module, summary, messages[], messageCount, ... }
+//
+//   users/{uid}/contacts/{contactId}/barry_sessions/{sessionId}
+//       ← A DIFFERENT COLLECTION. Per-contact engagement session records.
+//         Written by src/services/barryMemoryService.js, read by
+//         netlify/functions/utils/barryContextAssembler.js.
+//         Shape: { started_at, goal, generated_messages[], session_summary, ... }
+//
+// They are not two views of one thing. Writing this shape into the contact
+// path would corrupt Barry's relationship memory, because the context
+// assembler reads `session_summary` from those documents and injects it into
+// every generation prompt for that contact.
+//
+// P0A isolates the collision by naming it. It does NOT rename or migrate —
+// unifying the conversation store is Barry OS architecture work (ADR-005 says
+// memory is keyed by contact with sessions beneath it, which this collection
+// contradicts). Until then: never reuse this helper for a contact-scoped path.
+
+/** Path for a Mission Control chat transcript. USER-scoped — see the note above. */
+function missionControlSessionRef(userId, sessionId) {
+  return doc(db, 'users', userId, 'barry_sessions', sessionId);
+}
 
 async function createSessionDoc(userId, sessionId, module) {
   try {
-    await setDoc(doc(db, 'users', userId, 'barry_sessions', sessionId), {
+    await setDoc(missionControlSessionRef(userId, sessionId), {
       type: 'mission_control',
       module: module || 'mission-control',
       summary: null,
@@ -103,7 +134,7 @@ async function updateSessionDoc(userId, sessionId, messages, summary) {
     const assistantMsgs = messages.filter(m => m.role === 'assistant');
     const derivedSummary = summary
       || (assistantMsgs[0]?.content ? assistantMsgs[0].content.slice(0, 120) : null);
-    await setDoc(doc(db, 'users', userId, 'barry_sessions', sessionId), {
+    await setDoc(missionControlSessionRef(userId, sessionId), {
       messages: messages.slice(-30).map(m => ({
         role: m.role,
         content: typeof m.content === 'string' ? m.content.slice(0, 500) : '',
@@ -156,6 +187,19 @@ function buildIcpSummary(icpProfile) {
   if (icpProfile.isNationwide) parts.push('nationwide');
   else if (icpProfile.locations?.length) parts.push(icpProfile.locations.slice(0, 2).join(', '));
   return parts.length ? parts.join(' — ') : 'your current profile';
+}
+
+/**
+ * One id per user turn, sent with every function call that turn fans out to
+ * (P0B / defect A2). A Mission Control message can hit barryActions and then
+ * barryMissionChat; without this they land in apiLogs as unrelated rows and
+ * the real cost of a single user action cannot be reconstructed.
+ *
+ * Format is constrained to what the server accepts: [A-Za-z0-9_-], max 64.
+ */
+function newTraceId() {
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `mc-${Date.now().toString(36)}-${rand}`;
 }
 
 // ── Action intent detection (routes to barryActions instead of barryMissionChat) ──
@@ -555,6 +599,8 @@ export default function BarryChatPanel({
   async function handleActionMessage(userMessage) {
     setSending(true);
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    // One trace for this whole turn, including the barryMissionChat fallback.
+    const traceId = newTraceId();
 
     try {
       const user = getEffectiveUser();
@@ -589,7 +635,7 @@ export default function BarryChatPanel({
       const res = await fetch('/.netlify/functions/barryActions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, authToken, message: userMessage, context })
+        body: JSON.stringify({ userId, authToken, message: userMessage, context, traceId })
       });
       const data = await res.json();
 
@@ -641,7 +687,8 @@ export default function BarryChatPanel({
             message: userMessage,
             conversationHistory,
             barryMode: mode,
-            contextStack
+            contextStack,
+            traceId
           })
         });
         const missionData = await missionRes.json();

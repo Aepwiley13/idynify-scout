@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -192,7 +193,7 @@ BODY:
 [email body here]`;
 
         const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-5-20250929',
+          model: LEGACY_SONNET_4_5,
           max_tokens: 1024,
           messages: [{ role: 'user', content: prompt }]
         });

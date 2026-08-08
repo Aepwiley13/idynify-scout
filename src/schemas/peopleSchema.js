@@ -427,6 +427,18 @@ export const PEOPLE_PATHS = {
     `users/${userId}/contacts/${contactId}/timeline/${eventId}`,
 
   // Barry sessions (full session records — richer than timeline events)
+  //
+  // ⚠️ NAME COLLISION (P0A / defect A9): "barry_sessions" also exists at
+  // users/{uid}/barry_sessions — a SEPARATE, USER-scoped collection holding
+  // Mission Control chat transcripts (written by BarryChatPanel.jsx, read by
+  // BarrySessionHistoryPanel.jsx). Different parent, different schema, no
+  // relationship to these documents.
+  //
+  // These CONTACT-scoped documents are engagement session records. The context
+  // assembler reads their `session_summary` into every generation prompt for
+  // the contact, so writing a chat transcript here would poison Barry's
+  // relationship memory. Always resolve contact-scoped session paths through
+  // these helpers rather than composing the string by hand.
   barrySessions: (userId, contactId) =>
     `users/${userId}/contacts/${contactId}/barry_sessions`,
 

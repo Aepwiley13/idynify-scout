@@ -9,12 +9,18 @@
  * barry_drafts subcollection. That is two reads per contact — fine at the scale
  * this runs at (a user rarely has more than 5-10 replies waiting at once).
  *
+ * The per-contact reads run in parallel, which is what makes the scale
+ * assumption load-bearing rather than merely optimistic: the fan-out is as wide
+ * as the result set. It is therefore capped at PENDING_REPLIES_SCAN_LIMIT
+ * (P0A / defect A10) so a workspace that violates the assumption degrades to a
+ * partial list instead of a read storm on every Mission Control load.
+ *
  * Team B writes barry_drafts and barry_analysis. Team Alpha only reads them,
  * plus the approvalStatus transitions driven by the reply card.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, limit as fsLimit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { getEffectiveUser } from '../context/ImpersonationContext';
 
@@ -37,6 +43,21 @@ export const DRAFT_APPROVAL = {
 export const OPEN_APPROVAL_STATUSES = [DRAFT_APPROVAL.AWAITING, DRAFT_APPROVAL.SNOOZED];
 
 const URGENCY_ORDER = { high: 0, medium: 1, low: 2 };
+
+/**
+ * Most contacts this sweep will examine in one pass (P0A / defect A10).
+ *
+ * The sweep costs two reads per contact and fans them all out at once, so the
+ * contact query being unbounded meant a workspace with 400 contacts awaiting a
+ * reply fired ~800 concurrent reads on every Mission Control load. The cap
+ * bounds that at ~100.
+ *
+ * 50 is far above the 5-10 a real user carries, so in practice nothing is cut;
+ * when it is, `truncated` says so rather than quietly under-reporting. The
+ * durable fix is a top-level pending-drafts index, which is Barry OS work, not
+ * a production safety patch.
+ */
+export const PENDING_REPLIES_SCAN_LIMIT = 50;
 
 /**
  * Firestore Timestamps sort by `seconds`; ISO strings and Dates are handled too
@@ -122,12 +143,16 @@ export async function fetchPendingDraftForContact(userId, contactId, options = {
  * All contacts with a Barry reply waiting on the user, most urgent first.
  *
  * @returns {{ pendingReplies: Array<{contact: object, draft: object, analysis: object|null}>,
- *             loading: boolean, error: string|null, refresh: () => void }}
+ *             loading: boolean, error: string|null, truncated: boolean,
+ *             refresh: () => void }}
+ *   `truncated` is true when the sweep hit PENDING_REPLIES_SCAN_LIMIT, meaning
+ *   the list is a partial view rather than everything waiting.
  */
 export function usePendingReplies() {
   const [pendingReplies, setPendingReplies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [truncated, setTruncated] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
   // Guards setState after unmount when a slow Firestore read resolves late.
@@ -156,9 +181,18 @@ export function usePendingReplies() {
         const contactsSnap = await getDocs(
           query(
             collection(db, 'users', user.uid, 'contacts'),
-            where('conversationState', '==', 'user_action_required')
+            where('conversationState', '==', 'user_action_required'),
+            fsLimit(PENDING_REPLIES_SCAN_LIMIT)
           )
         );
+
+        const hitScanLimit = contactsSnap.size >= PENDING_REPLIES_SCAN_LIMIT;
+        if (hitScanLimit) {
+          console.warn(
+            `[usePendingReplies] Scan hit its ${PENDING_REPLIES_SCAN_LIMIT}-contact limit — ` +
+            'the pending list may be incomplete.'
+          );
+        }
 
         const results = [];
         await Promise.all(
@@ -175,6 +209,7 @@ export function usePendingReplies() {
 
         if (cancelled || !mounted.current) return;
         setPendingReplies(sortByUrgency(results));
+        setTruncated(hitScanLimit);
       } catch (err) {
         if (cancelled || !mounted.current) return;
         console.error('[usePendingReplies] load failed:', err);
@@ -188,5 +223,5 @@ export function usePendingReplies() {
     return () => { cancelled = true; };
   }, [reloadToken]);
 
-  return { pendingReplies, loading, error, refresh };
+  return { pendingReplies, loading, error, truncated, refresh };
 }

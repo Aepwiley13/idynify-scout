@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
+import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 // Apollo Industries for mapping
 const APOLLO_INDUSTRIES = [
@@ -466,7 +467,7 @@ export const handler = async (event) => {
 
     // Log API usage
     const responseTime = Date.now() - startTime;
-    await logApiUsage(userId, 'barryICPConversation', 'success', {
+    await logApiUsage(userId, 'barryICPConversation', 'success', { provider: 'anthropic', model: LEGACY_SONNET_4_5,
       responseTime,
       metadata: { action, currentStep }
     });
@@ -623,7 +624,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
 }`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: LEGACY_SONNET_4_5,
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -801,7 +802,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
 }`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: LEGACY_SONNET_4_5,
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -934,7 +935,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
 }`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: LEGACY_SONNET_4_5,
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -1027,7 +1028,7 @@ RESPOND IN JSON:
 }`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: LEGACY_SONNET_4_5,
     max_tokens: 500,
     messages: [{ role: 'user', content: prompt }]
   });

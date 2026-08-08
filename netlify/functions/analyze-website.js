@@ -9,7 +9,7 @@
  *   1. Verify auth (shared verifyAuthToken util — supports admin impersonation).
  *   2. Fetch the URL with the built-in fetch (10s timeout, realistic User-Agent).
  *   3. Strip scripts/styles/tags → keep first 8000 chars of visible text.
- *   4. Ask Barry (claude-sonnet-4-6) for a structured JSON business profile.
+ *   4. Ask Barry (MODEL_DEEP) for a structured JSON business profile.
  *   5. Merge the extracted fields into the user's RECON sections
  *      (dashboards/{uid}), never overwriting fields the user already filled in.
  *   6. Return { success: true, data } — or a friendly { success: false, message }.
@@ -30,10 +30,11 @@ import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import { MODEL_DEEP } from './utils/models.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = MODEL_DEEP;
 const FETCH_TIMEOUT_MS = 10000;
 const MAX_TEXT_CHARS = 8000;
 const MIN_BODY_CHARS = 200; // Below this the page is almost certainly JS-rendered
@@ -622,13 +623,15 @@ export const handler = async (event) => {
     await markWebsiteAnalyzed(userId);
 
     await logApiUsage(userId, 'analyzeWebsite', 'success', {
+      provider: 'anthropic',
+      model: MODEL,
+      // extractWithBarry returns the usage from whichever attempt succeeded.
+      usage,
       responseTime: Date.now() - startTime,
       metadata: {
         url: normalizedUrl,
         confidence: extraction.confidence,
         fieldsWritten: writtenFields.length,
-        inputTokens: usage?.input_tokens,
-        outputTokens: usage?.output_tokens,
       },
     }).catch(() => {});
 

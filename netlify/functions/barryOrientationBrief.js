@@ -12,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { db } from './firebase-admin.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { computeReconState } from './utils/reconCapability.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 async function verifyAuthToken(authToken, userId) {
   const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
@@ -232,16 +233,21 @@ Return valid JSON only:
 
     let brief = '';
     let suggestedPrompts = [];
+    // Hoisted so the telemetry call below can report tokens: the response is
+    // scoped to the try block, and the AI call is allowed to fail without
+    // failing the brief.
+    let aiUsage = null;
 
     try {
       const response = await anthropic.messages.create(
         {
-          model: 'claude-haiku-4-5-20251001',
+          model: LEGACY_HAIKU_4_5,
           max_tokens: 300,
           messages: [{ role: 'user', content: orientationPrompt }],
         },
         { signal: controller.signal }
       );
+      aiUsage = response.usage || null;
       const parsed = extractJson(response.content[0].text);
       if (parsed?.response_text) {
         brief = parsed.response_text;
@@ -280,6 +286,9 @@ Return valid JSON only:
     const mode = missions.length === 0 ? 'GROWTH' : staleMissions.length > 0 ? 'PRIORITIZE' : 'SUGGEST';
 
     await logApiUsage(userId, 'barryOrientationBrief', 'success', {
+      provider: 'anthropic',
+      model: LEGACY_HAIKU_4_5,
+      usage: aiUsage,
       responseTime: Date.now() - startTime,
       metadata: {
         reconScore,

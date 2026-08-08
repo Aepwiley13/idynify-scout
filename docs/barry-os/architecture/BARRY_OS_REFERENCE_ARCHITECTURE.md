@@ -1416,6 +1416,7 @@ Every component traces back to this experience. Every section in this architectu
 
 | Field | Value |
 |---|---|
+| **Decision log** | `docs/barry-os/BARRY_OS_DECISION_LOG.md` |
 | **Discovery source** | `docs/audits/BARRY_OS_FOUNDATION_AUDIT.md` (commit `09e90f9`) |
 | **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
 | **Architecture status** | Approved |

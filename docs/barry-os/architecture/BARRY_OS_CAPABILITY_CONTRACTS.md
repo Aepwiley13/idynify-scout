@@ -52,7 +52,7 @@ Before defining contracts, this document resolves open architectural questions i
 
 ## Resolution R4-001: Canonical Ownership of Bounce Events
 
-**Status:** RESOLVED
+**Status:** RESOLVED (signal ownership decided) / PENDING (bounce producer verification)
 
 **Problem:** Document 3 (Signal Specification, frozen) defines two signals for the same real-world event — an outbound email bouncing:
 
@@ -65,14 +65,20 @@ Both signals are PROPOSED (no emission point exists in the repository). Both pro
 
 **Current codebase evidence:**
 
-Bounce events enter the system through Resend webhooks, not Gmail directly:
+```
+[PENDING REPOSITORY VERIFICATION — bounce producer]
+Team B finding: resendWebhook.js (Resend) may be canonical producer.
+Team A verification required before Document 3 correction or Document 4 freeze.
+```
 
-- `resendWebhook.js` (line 66) receives `email.bounced` events from Resend
+Team B's initial investigation suggests bounce events enter the system through Resend webhooks, not Gmail directly:
+
+- `resendWebhook.js` (line 66) appears to receive `email.bounced` events from Resend
 - `handleEmailBounced()` (lines 138–158) updates `emailLogs` with bounce status and, for hard bounces, adds the recipient to `emailSuppressionList`
 - **The gap:** No contact document update, no timeline event, no signal emission, no Awareness projection update, no user notification. A bounced contact stays in whatever `conversationState` it was in (e.g., `awaiting_reply`) with no transition.
 - `peopleSchema.js` (line 246) defines `'bounced'` as a valid `OUTCOME_TYPE`; `healthScore.js` (line 120) scores `'bounced'` at 10 (lowest); `engagement_summary.last_outcome` can be `'bounced'` — but nothing writes this value when a bounce occurs.
 
-Document 3's `contact.email_bounced` lists `gmail` as the producer source. The actual producer is `resend` (via webhook). Document 3 is frozen, so the catalog entry stays as written. This resolution corrects the producer for implementation purposes.
+Document 3's `contact.email_bounced` lists `gmail` as the producer source. Team B's finding suggests the actual producer may be `resend` (via webhook). This finding is pending Team A repository verification. Document 3 is frozen regardless.
 
 **Analysis:**
 
@@ -89,11 +95,11 @@ The underlying fact is: *an outbound email failed to deliver*. This fact has two
 `message.bounced` is **retired as a separate signal type**. The Message object's lifecycle transition to `bounced` is a **downstream effect** of the `contact.email_bounced` signal, not a separate event. The Observation pipeline handles this:
 
 ```
-Real-world event: Resend webhook delivers email.bounced
+Real-world event: email delivery fails (bounce notification received)
         ↓
-resendWebhook.js receives bounce notification
+Bounce producer emits event [PENDING REPOSITORY VERIFICATION — bounce producer]
         ↓
-Signal emitted: contact.email_bounced (producer: resend, not gmail)
+Signal emitted: contact.email_bounced
         ↓
 Observation pipeline (Stage 3: Observation Generation):
    Observation 1: relationship_event → Relationship Awareness update
@@ -111,7 +117,7 @@ One signal, one fact, multiple projections
 
 3. **Awareness updates target Relationship and Business projections.** Both projections are keyed by Contact/Company, not by Message. The signal's natural home is the entity whose awareness projections it feeds.
 
-4. **The producer is the Resend webhook.** Resend reports bounces per-recipient via `handleEmailBounced()` in `resendWebhook.js`. The handler already extracts the recipient email for suppression — the signal's natural shape matches the Contact entity. Document 3 lists `gmail` as the source; the actual emission point is `resendWebhook.js`. This correction is for implementation (Document 5) — Document 3 is frozen.
+4. **The producer reports bounces per-recipient, not per-message.** The signal's natural shape matches the Contact entity. `[PENDING REPOSITORY VERIFICATION — bounce producer]` Team B's finding suggests `resendWebhook.js` is the emission point; Team A verification required.
 
 **Impact on Document 3 (frozen):**
 
@@ -232,6 +238,34 @@ Document 3's signal catalog retains `contact.email_bounced` unchanged. `message.
 | `barryMissionChat` (mode detection) | AI-classified mode switching | Deterministic heuristics (already present) | Mode detection already uses simple heuristics. The AI call is redundant. |
 
 These four eliminations remove ~4 AI call sites, saving an estimated 5,000–10,000 tokens per active user per day.
+
+---
+
+## Gap B-001 — Bounce Signal Not Emitted
+
+**Status:** Implementation gap — approved architecture, missing implementation
+
+```
+Gap B-001 — Bounce Signal Not Emitted
+
+Current implementation:
+  Resend → resendWebhook.js → emailLogs + emailSuppressionList
+
+Missing:
+  SignalBus.publish(contact.email_bounced)
+
+This is a missing implementation of approved architecture,
+not an architecture change. Scheduled for P1 Signal Bus implementation.
+```
+
+`contact.email_bounced` is correctly defined in Document 3 (frozen). The signal's payload schema, priority, awareness updates, and observation pipeline mappings are all specified. The implementation gap is that no code currently emits this signal when a bounce occurs.
+
+Evidence of the gap:
+- `handleEmailBounced()` updates `emailLogs` and `emailSuppressionList` but does not update the contact document, write a timeline event, or emit a signal
+- `peopleSchema.js` defines `'bounced'` as a valid outcome type; `healthScore.js` scores it at 10 — but nothing writes this value when a bounce occurs
+- A bounced contact stays in its current `conversationState` with no transition
+
+This gap does not require changing any frozen document. Document 5 schedules the implementation as part of the P1 Signal Bus buildout: extend the bounce handler to emit `contact.email_bounced` to the Signal Bus after the existing `emailLogs` write.
 
 ---
 
@@ -1803,9 +1837,9 @@ All AI model selection is governed by a centralized policy. Skills declare which
 | Fast | `MODEL_FAST` | `claude-haiku-4-5` | 1 | Current — on policy tier |
 | Reasoning | `MODEL_DEEP` | `claude-sonnet-4-6` | 17 | Current — on policy tier |
 | Legacy | `LEGACY_HAIKU_4_5` | `claude-haiku-4-5-20251001` | 10 | Migration needed — pinned to old model ID |
-| Legacy | `LEGACY_SONNET_4_5` | `claude-sonnet-4-5-20250929` | 8 | **URGENT** — retirement floor 2026-09-29 (~7 weeks) |
+| Legacy | `LEGACY_SONNET_4_5` | `claude-sonnet-4-5-20250929` | 8 | **AT RISK** — pending provider lifecycle verification |
 
-8 modules on `LEGACY_SONNET_4_5` must migrate to `MODEL_DEEP` before 2026-09-29. The tier correction is a prerequisite for Document 5's build sequence. `models.js` documents this risk at lines 70–74.
+8 modules reference `LEGACY_SONNET_4_5` (`claude-sonnet-4-5-20250929`). The model ID encodes a date suffix that `models.js` (lines 70–74) flags as a potential retirement floor. The exact retirement timeline is unverified. Team A must confirm the provider lifecycle status for this model before any migration is scheduled. Until verified, no retirement date is asserted — only that these 8 modules are pinned to a legacy constant instead of the policy tier and must migrate to `MODEL_DEEP` regardless of retirement timing. The tier correction is a prerequisite for Document 5's build sequence.
 
 **Cost guardrails:**
 

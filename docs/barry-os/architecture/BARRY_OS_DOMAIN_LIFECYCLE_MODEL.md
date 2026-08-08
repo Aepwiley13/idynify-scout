@@ -915,11 +915,10 @@ Signal {
 **5. Storage:** `users/{uid}/observations/{observationId}`
 
 ```
-[PROPOSED — persisted Observation trace]
+[PROPOSED — persisted Observation trace; architecture approved in Document 3, implementation absent today]
 Persisting Observation records is an implementation choice for auditability
 and replay support. Observation remains a processing step, not an
-architectural object layer. The persistence contract will be confirmed
-in Document 3 (Signal Specification).
+architectural object layer. Document 5 schedules the implementation.
 ```
 
 Persisted because: (a) awareness projection checkpoints require knowing what observations have been applied since the last checkpoint, and (b) the reasoning trace requires knowing what observations fed each awareness update.
@@ -1529,7 +1528,22 @@ ready_for_review
 
 **12. Retention rule:** Ephemeral. Dismissed and expired retained for 7 days. Approved retained until their Executed Action reaches a terminal state.
 
-**13. Fields:**
+**13. Migration note — `barry_drafts` collection:**
+
+The existing `barry_drafts` collection is the current implementation of Prepared Actions. Its lifecycle today is `awaiting_user → sending → sent`, where `sending` is a transactional claim that prevents double-sends — the A1 idempotency guarantee from P0A. This guarantee has a home in the Barry OS model: the Executed Action object carries `idempotency_key` and an `executing` state that owns the send-once contract after the Prepared Action is approved.
+
+Migration path:
+
+```
+barry_drafts.awaiting_user  →  prepared_actions (ready_for_review)
+barry_drafts.sending        →  executed_action (executing) — claim moves here
+barry_drafts.sent           →  executed_action (completed) + message (queued → sent)
+barry_drafts.alreadySent    →  executed_action idempotency_key replay
+```
+
+Note that Document 5 must schedule this migration to preserve the A1 guarantee. This cannot be a simple collection rename.
+
+**14. Fields:**
 
 ```
 PreparedAction {
@@ -2803,7 +2817,7 @@ Every component in Barry OS either feeds this loop or serves it. Awareness proje
 | **Discovery source** | `docs/audits/BARRY_OS_FOUNDATION_AUDIT.md` (commit `09e90f9`) |
 | **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
 | **Architecture source** | `docs/barry-os/architecture/BARRY_OS_REFERENCE_ARCHITECTURE.md` (Document 1 — frozen 2026-08-07) |
-| **Architecture status** | Corrections applied — pending Team A evidence review |
+| **Architecture status** | Team A evidence review complete (2026-08-08). Five corrections applied: (1) `barry_drafts` migration mapping added, (2–3) `contact.email_bounced` and `message.bounced` evidence labels corrected in Document 3, (4) `score-icp-fit` marked PROPOSED in Document 3, (5) Observation persistence label corrected in Document 3. Pending Aaron's final approval. |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical domain model) |
 | **Frozen** | No — pending approval |

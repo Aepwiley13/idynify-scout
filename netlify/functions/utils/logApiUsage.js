@@ -86,9 +86,20 @@ export async function logApiUsage(userId, operation, status, options = {}) {
   try {
     if (!userId) return;
 
-    const projectId =
-      process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'idynify-scout-dev';
-    const environment = projectId.includes('dev') ? 'dev' : 'prod';
+    // The logical application environment, and nothing else. It is NOT derived
+    // from the Firebase project: FIREBASE_PROJECT_ID selects the physical
+    // database, BARRY_ENV names the environment, and neither may be inferred
+    // from the other (BO-011).
+    //
+    // The previous implementation tested the project ID for the substring
+    // "dev". The one project serving production is named `idynify-scout-dev`,
+    // so that test returned 'dev' for every row ever written and the field
+    // distinguished nothing.
+    //
+    // No fallback by design. An absent variable records 'unknown' rather than a
+    // guess — a wrong label is worse than an admittedly missing one, because it
+    // reads as measurement.
+    const environment = process.env.BARRY_ENV || 'unknown';
 
     const provider = options.provider || 'apollo';
     const endpoint = `${provider.toUpperCase()}_${operation.toUpperCase()}`;

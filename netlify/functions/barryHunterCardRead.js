@@ -171,6 +171,8 @@ Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence
       const { userId } = JSON.parse(event.body);
       if (userId) {
         await logApiUsage(userId, 'barryHunterCardRead', 'error', {
+          provider: 'anthropic',
+          model: LEGACY_HAIKU_4_5,
           responseTime: Date.now() - startTime,
           errorCode: error.message,
           metadata: {}

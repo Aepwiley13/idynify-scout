@@ -203,6 +203,8 @@ Respond with ONLY the assessment and recommendation. No labels, no headers.`;
     try {
       const body = JSON.parse(event.body || '{}');
       await logApiUsage(body.userId || 'unknown', 'barryCSMRead', 'error', {
+        provider: 'anthropic',
+        model: MODEL_DEEP,
         responseTime,
         errorCode: error.message,
       });

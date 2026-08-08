@@ -280,6 +280,8 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
       if (userId) {
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'barryGenerateContext', 'error', {
+          provider: 'anthropic',
+          model: LEGACY_SONNET_4_5,
           responseTime,
           errorCode: error.message,
           metadata: {}

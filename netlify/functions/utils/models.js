@@ -53,21 +53,34 @@ export const MODEL_FAST = process.env.BARRY_MODEL_FAST || 'claude-haiku-4-5';
 export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 
 // ─── Pre-policy models, still in effect until Step 3 ─────────────────────────
+//
+// Support status below was re-verified against the provider's model catalogue
+// on 2026-08-08. Record the date whenever you touch these — an unsourced
+// status claim in this block is what produced the error corrected in §1 of
+// docs/audits/P0B_MODEL_INVENTORY.md.
 
 /**
- * Deprecated by the provider — scheduled to retire 2026-06-15. Used by the
- * twelve RECON generators, which the reconciliation consolidates into one
- * Skill at P4. Retiring this constant is part of that consolidation, so that
- * twelve near-identical files are rewritten once rather than twice.
+ * Deprecated by the provider, retirement date **not yet announced** (verified
+ * 2026-08-08). Deprecated is not retired: this model still serves, so the
+ * twelve RECON generators that use it are not broken.
+ *
+ * An earlier revision of this comment asserted a retirement date of
+ * 2026-06-15. That date was never published by the provider and was wrong.
+ *
+ * Those twelve generators consolidate into one Skill at P4. Retiring this
+ * constant is part of that consolidation, so twelve near-identical files are
+ * rewritten once rather than twice. If a retirement date is announced before
+ * P4 lands, that changes — migrate to MODEL_DEEP immediately and do not wait
+ * for the consolidation.
  */
 export const LEGACY_SONNET_4 = 'claude-sonnet-4-20250514';
 
-/** Dated snapshot, still supported. Sequence and ICP generation. */
+/** Dated snapshot, active (verified 2026-08-08). Sequence and ICP generation. */
 export const LEGACY_SONNET_4_5 = 'claude-sonnet-4-5-20250929';
 
 /**
- * Dated snapshot of the same model MODEL_FAST names. Kept as a distinct
- * literal so Step 1 changes nothing on the ten endpoints that pin it; they
- * collapse onto MODEL_FAST at Step 3.
+ * Dated snapshot of the same model MODEL_FAST names, active (verified
+ * 2026-08-08). Kept as a distinct literal so Step 1 changes nothing on the ten
+ * endpoints that pin it; they collapse onto MODEL_FAST at Step 3.
  */
 export const LEGACY_HAIKU_4_5 = 'claude-haiku-4-5-20251001';

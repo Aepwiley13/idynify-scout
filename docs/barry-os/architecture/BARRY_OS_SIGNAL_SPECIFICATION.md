@@ -1810,27 +1810,25 @@ Dead letter signals are retained for 30 days for debugging. They do not count to
 | **Discovery source** | `docs/audits/BARRY_OS_FOUNDATION_AUDIT.md` (commit `09e90f9`) |
 | **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
 | **Architecture source** | `docs/barry-os/architecture/BARRY_OS_REFERENCE_ARCHITECTURE.md` (Document 1 — frozen) |
-| **Domain model** | `docs/barry-os/architecture/BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md` (Document 2 — pending approval) |
-| **Architecture status** | Team A evidence review complete (2026-08-08). Four corrections applied: (1) `contact.email_bounced` CONFIRMED→PROPOSED, (2) `message.bounced` CONFIRMED→PROPOSED, (3) `score-icp-fit` producer marked PROPOSED, (4) Observation persistence label corrected — architecture approved, implementation absent. Pending Aaron's final approval. |
+| **Domain model** | `docs/barry-os/architecture/BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md` (Document 2 — FROZEN 2026-08-08) |
+| **Architecture status** | APPROVED / FROZEN — 2026-08-08. Team A evidence review complete. Four corrections applied: (1) `contact.email_bounced` CONFIRMED→PROPOSED, (2) `message.bounced` CONFIRMED→PROPOSED, (3) `score-icp-fit` producer marked PROPOSED, (4) Observation persistence label corrected — architecture approved, implementation absent. |
+| **Approved by** | Aaron Wiley — 2026-08-08 |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical signal specification) |
-| **Frozen** | No — pending approval |
+| **Frozen** | Yes — 2026-08-08 |
 
 ## Freeze Declaration
 
-Document 3 will be frozen upon approval by Aaron after Team A evidence review.
+Document 3 is APPROVED and FROZEN as of 2026-08-08.
 
-This document may only be modified if a factual error is discovered during
-implementation that directly contradicts a signal contract stated here.
+No further changes except factual corrections that directly invalidate an approved
+statement. Any such correction requires Aaron's explicit approval before modification.
 
 It may not be modified to:
 - Add new signal types without Aaron's approval
 - Redefine the Observation pipeline semantics established here
 - Change the checkpoint mechanism in ways that contradict Document 2's retention rules
 - Incorporate new ideas discovered during Documents 4–5
-
-If implementation uncovers a genuine conflict with a signal contract, flag it to Aaron
-before making any change. The bar for reopening a frozen document is high.
 
 All future signal references in Documents 4 and 5 derive from this document. They do not redefine signal contracts.
 

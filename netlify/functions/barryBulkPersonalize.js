@@ -33,8 +33,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = LEGACY_HAIKU_4_5;
 const MAX_CONTACTS = 25;
 const PER_CONTACT_TIMEOUT_MS = 15000;
 

@@ -23,6 +23,7 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -184,7 +185,7 @@ Output format — return valid JSON only:
 }`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: LEGACY_HAIKU_4_5,
     max_tokens: 2500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -408,7 +409,7 @@ export const handler = async (event) => {
     });
 
     const responseTime = Date.now() - startTime;
-    await logApiUsage(userId, 'barryHunterProcessEngage', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001',
+    await logApiUsage(userId, 'barryHunterProcessEngage', 'success', { provider: 'anthropic', model: LEGACY_HAIKU_4_5,
       responseTime,
       metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, hasBarryMemory: !!barryMemoryContext, hasStrategyGuidance: !!strategyGuidance, guardrailAction, missionId }
     });

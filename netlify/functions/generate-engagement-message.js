@@ -6,6 +6,7 @@ import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
+import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -507,7 +508,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     console.log('🤖 Calling Claude API...');
 
     const claudeResponse = await createMessageWithRetry(anthropic, {
-      model: 'claude-sonnet-4-5-20250929',
+      model: LEGACY_SONNET_4_5,
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -553,7 +554,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'generate-engagement-message', 'success', {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-5-20250929',
+      model: LEGACY_SONNET_4_5,
       usage: claudeResponse?.usage,
       responseTime,
       metadata: {

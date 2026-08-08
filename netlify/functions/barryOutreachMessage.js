@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { MODEL_DEEP } from './utils/models.js';
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -104,7 +105,7 @@ Requirements:
 Output the message only. No labels, no subject line, no preamble.`;
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL_DEEP,
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     });

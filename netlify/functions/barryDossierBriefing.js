@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { MODEL_DEEP } from './utils/models.js';
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -94,7 +95,7 @@ ${icpLines}
 Write a 3-5 sentence briefing explaining why this company is or isn't a strong target right now, what's happening at the company that's relevant to the rep's ICP, and one specific angle the rep could use to open a conversation. Be specific. Be confident. No fluff. Tone: classified intelligence briefing. Flowing prose only — no bullet points.`;
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL_DEEP,
       max_tokens: 200,
       messages: [{ role: 'user', content: prompt }],
     });

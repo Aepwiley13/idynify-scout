@@ -20,6 +20,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -132,7 +133,7 @@ advocate → ask for referral or case study
 Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       max_tokens: 60,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -151,7 +152,7 @@ Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryHunterCardRead', 'success', {
       provider: 'anthropic',
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       usage: response?.usage,
       responseTime,
       metadata: { contactName: name, relationshipState, cached: false }

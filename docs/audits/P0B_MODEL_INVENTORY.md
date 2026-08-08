@@ -2,7 +2,14 @@
 
 **Idynify · Team A · Defect A13**
 **Date: 2026-08-07**
-**Status: PROPOSAL — no model strings have been changed. Awaiting Aaron's approval.**
+**Status: APPROVED. Step 1 executed 2026-08-08. Steps 2 and 3 outstanding — see §6.**
+
+> **Amended 2026-08-08 after provider verification.** Two claims in the original
+> proposal did not survive verification and are corrected in place below:
+> the two 2024 strings are **retired, not merely legacy** (§1, §6.1), and the
+> recommendation to pin dated identifiers is **withdrawn** (§4.2, §5). The
+> original text of both is preserved in the amendment notes so the reasoning
+> trail stays intact.
 
 ---
 
@@ -13,8 +20,10 @@
 Three consequences:
 
 1. **Cost per call is unpredictable.** `barryHunterCardRead` produces one sentence and `generate-section-1` produces a full RECON section, yet the ten `generate-section-*` files all run a model generation older than the one used for a one-line card read.
-2. **There is no upgrade path.** Changing a model means finding and editing 39 files. Two of them are legacy strings nobody has revisited since 2024.
-3. **Identifier form is inconsistent.** Five identifiers carry an explicit date suffix; `claude-sonnet-4-6` does not. Whether that is a deliberate floating alias or an oversight has never been decided.
+2. **There is no upgrade path.** Changing a model means finding and editing 39 files. Two of them are legacy strings nobody has revisited since 2024 — and verification has since shown both were **retired by the provider and returning 404 in production**. That is the cost of having no upgrade path, realised: two endpoints failed silently and the codebase gave nobody a place to notice.
+3. **Identifier form is inconsistent.** Five identifiers carry an explicit date suffix; `claude-sonnet-4-6` does not.
+
+   > **Amended.** The original text continued: *"Whether that is a deliberate floating alias or an oversight has never been decided."* Verification shows it is neither. The provider stopped publishing dated snapshot IDs with the 4.6 generation — `claude-sonnet-4-6` has no dated form, and the undated ID is the complete canonical identifier rather than an alias for one. The inconsistency is generational, not an oversight, and it resolves itself as older models retire. See §4.2.
 
 ---
 
@@ -24,20 +33,20 @@ Every model identifier in the codebase, by endpoint. `calls` counts distinct `me
 
 | Endpoint | Current model string | Calls | max_tokens | Status |
 |---|---|---|---|---|
-| `generate-section-1.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-2.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-3.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-4.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-5.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-6.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-7.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-8.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-9.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-section-10.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-icp-brief.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Legacy generation** |
-| `generate-all-reports.js` | `claude-sonnet-4-20250514` | 1 | 6144 | **Legacy generation** |
-| `generate-text-messages.js` | `claude-3-5-sonnet-20241022` | 1 | 300 | **Oldest string in the codebase** |
-| `barryGenerateTemplate.js` | `claude-3-5-haiku-20241022` | 1 | 1500 | **Oldest string in the codebase** |
+| `generate-section-1.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-2.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-3.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-4.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-5.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-6.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-7.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-8.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-9.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-section-10.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-icp-brief.js` | `claude-sonnet-4-20250514` | 1 | 4096 | **Deprecated — retires 2026-06-15** |
+| `generate-all-reports.js` | `claude-sonnet-4-20250514` | 1 | 6144 | **Deprecated — retires 2026-06-15** |
+| `generate-text-messages.js` | `claude-3-5-sonnet-20241022` | 1 | 300 | **RETIRED 2025-10-28 — 404 in production** |
+| `barryGenerateTemplate.js` | `claude-3-5-haiku-20241022` | 1 | 1500 | **RETIRED 2026-02-19 — 404 in production** |
 | `barryGenerateContext.js` | `claude-sonnet-4-5-20250929` | 1 | 1500 | Current-ish |
 | `barryGenerateMissionSequence.js` | `claude-sonnet-4-5-20250929` | 1 | 1800 | Current-ish |
 | `barryGenerateSequenceStep.js` | `claude-sonnet-4-5-20250929` | 1 | 1000 | Current-ish |
@@ -72,12 +81,12 @@ Every model identifier in the codebase, by endpoint. `calls` counts distinct `me
 
 | Model identifier | Modules | Generation | Notes |
 |---|---|---|---|
-| `claude-sonnet-4-20250514` | 12 | Oldest in active use | Entire RECON generation surface |
+| `claude-sonnet-4-20250514` | 12 | Oldest in active use | Entire RECON generation surface · **deprecated, retires 2026-06-15** |
 | `claude-haiku-4-5-20251001` | 10 | Current fast | |
 | `claude-sonnet-4-5-20250929` | 8 | Current deep | |
-| `claude-sonnet-4-6` | 7 | Newest | **The only identifier with no date suffix** |
-| `claude-3-5-sonnet-20241022` | 1 | Legacy | |
-| `claude-3-5-haiku-20241022` | 1 | Legacy | |
+| `claude-sonnet-4-6` | 7 | Newest | No date suffix — **none exists**; this is the canonical ID |
+| `claude-3-5-sonnet-20241022` | 1 | Legacy | **Retired — 404** |
+| `claude-3-5-haiku-20241022` | 1 | Legacy | **Retired — 404** |
 
 ---
 
@@ -101,14 +110,14 @@ Three one-liner endpoints run the deep tier; the two heaviest reasoning endpoint
 
 ---
 
-## 3. Proposed two-model policy
+## 3. The two-model policy
 
 Two constants, declared once, referenced everywhere. No endpoint hard-codes a model string.
 
 ```js
-// netlify/functions/utils/models.js  — proposed, not yet created
-export const MODEL_FAST = process.env.BARRY_MODEL_FAST || '<fast model>';
-export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || '<deep model>';
+// netlify/functions/utils/models.js  — created 2026-08-08 (Step 1)
+export const MODEL_FAST = process.env.BARRY_MODEL_FAST || 'claude-haiku-4-5';
+export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 ```
 
 Env-overridable so a model can be rolled forward or back without a deploy, and so dev and prod can diverge during evaluation.
@@ -163,27 +172,77 @@ The twelve RECON endpoints are consolidated into a single Skill at P4. **Recomme
 
 ---
 
-## 4. What must be verified before any change
+## 4. Verification results
 
-**Model support status is a configuration concern to verify at execution time, not a claim made in this document.** No deprecation dates are asserted here, deliberately.
+The original §4 required that model support status be verified at execution time rather than asserted here. That verification ran on 2026-08-08, against the provider's current model catalogue. Results:
 
-Before switching anything:
+### 4.1 Every identifier in the inventory, checked
 
-1. **Confirm current availability and exact identifier form** for the intended fast and deep models against the provider. Do not carry any identifier forward on the assumption it still resolves.
-2. **Resolve the `claude-sonnet-4-6` question.** It is the only identifier in the codebase without a date suffix. Decide deliberately whether the policy pins dated identifiers — reproducible, requires explicit upgrades — or floating aliases — auto-upgrading, but a model change can alter output with no commit. Then apply that decision to both constants. Recommendation: **pin dated identifiers**, because Barry's output is customer-facing and a silent model change would be indistinguishable from a prompt regression.
-3. **Re-baseline cost after the switch.** The telemetry fixed in P0B (`f27c280`) now records `provider`, `model`, and real token counts, so this is measurable for the first time. Capture a week of `apiLogs` before changing models, so the comparison is against data rather than the estimates in the canonical audit.
-4. **Watch the two moves most likely to regress.** `barryHunterGenerateStep` and `barryHunterProcessEngage` move from fast to deep at 2500 max_tokens; latency will rise on the Hunter engage path. `barryCSMRead` and `barryDossierBriefing` move down to fast; check the one-sentence output quality holds.
+| Identifier | Status | Consequence |
+|---|---|---|
+| `claude-3-5-sonnet-20241022` | **Retired 2025-10-28** | `generate-text-messages` has been returning 404 since that date |
+| `claude-3-5-haiku-20241022` | **Retired 2026-02-19** | `barryGenerateTemplate` has been returning 404 since that date |
+| `claude-sonnet-4-20250514` | Deprecated, retires **2026-06-15** | The twelve RECON generators are on a clock |
+| `claude-sonnet-4-5-20250929` | Active | Dated snapshot, still supported |
+| `claude-haiku-4-5-20251001` | Active | Dated snapshot of Haiku 4.5 |
+| `claude-sonnet-4-6` | Active | Canonical identifier — see §4.2 |
+
+The two retirements are the material finding. The audit classified those strings as *old*; they are in fact *dead*, and had been for months. Nothing in the product surfaced it, because a 404 from the model API is indistinguishable from any other generation failure in the current error handling.
+
+### 4.2 The `claude-sonnet-4-6` question — resolved
+
+**The recommendation to pin dated identifiers is withdrawn, because it is not executable.**
+
+The provider stopped publishing dated snapshot IDs with the 4.6 generation. `claude-sonnet-4-6` has no dated form; the undated string is the complete canonical identifier, not a floating alias that resolves to some dated snapshot underneath. The dated identifiers still in the codebase (`claude-sonnet-4-5-20250929`, `claude-haiku-4-5-20251001`, `claude-sonnet-4-20250514`) belong to earlier generations that did publish them.
+
+So the choice the original §4.2 posed — pin versus float — does not exist for the deep tier. The policy instead uses **the provider's published identifier for whichever model each tier names**, whatever form that takes.
+
+The change-control concern behind the "pin dated" recommendation is still valid and is still met: both constants live in one committed file, so changing Barry's model is a one-line reviewable diff. What is lost is protection against the provider silently re-pointing an identifier — that risk is now carried by the tier-change baseline in §6.2 rather than by the string.
+
+### 4.3 Still outstanding
+
+1. **Re-baseline cost before changing tiers.** The telemetry fixed in P0B (`f27c280`) records `provider`, `model`, and real token counts, so this is measurable for the first time. Capture a week of `apiLogs` first, so the Step 3 comparison is against data rather than the estimates in the canonical audit.
+2. **Watch the two moves most likely to regress.** `barryHunterGenerateStep` and `barryHunterProcessEngage` move from fast to deep at 2500 max_tokens; latency will rise on the Hunter engage path. `barryCSMRead` and `barryDossierBriefing` move down to fast; check the one-sentence output quality holds.
 
 ---
 
-## 5. Requested decision
+## 5. Decisions
 
-| # | Decision | Recommendation |
+Approved 2026-08-08. Adoption was approved in three steps rather than one — see §6.
+
+| # | Decision | Outcome |
 |---|---|---|
-| 1 | Adopt a two-constant model policy with env override? | Yes |
-| 2 | Pin dated identifiers or use floating aliases? | **Pin dated** — customer-facing output should not change without a commit |
-| 3 | Which fast model and which deep model? | Verify availability first (§4.1), then pin |
-| 4 | Apply the 6 isolated tier corrections + 2 legacy retirements in P0B? | Yes — single-line, immediate effect |
-| 5 | Defer the 12 RECON endpoints to the P4 consolidation? | Yes — avoids rewriting twelve files that P4 deletes |
+| 1 | Adopt a two-constant model policy with env override? | **Approved.** `netlify/functions/utils/models.js` created; all 39 modules route through it |
+| 2 | Pin dated identifiers or use floating aliases? | **Neither — question withdrawn.** No dated form exists for the deep tier (§4.2). Policy uses the provider's canonical identifier per tier |
+| 3 | Which fast model and which deep model? | `MODEL_FAST = claude-haiku-4-5`, `MODEL_DEEP = claude-sonnet-4-6` — both verified active |
+| 4 | Apply the 6 isolated tier corrections + 2 legacy retirements? | **Split.** The 2 retirements shipped in Step 1 (reliability — those endpoints were 404ing). The 6 tier corrections are held for Step 3, after a baseline exists |
+| 5 | Defer the 12 RECON endpoints to the P4 consolidation? | **Approved.** Deferred regardless of Step 3 |
 
-**No model strings have been changed. Nothing in this proposal is implemented.**
+---
+
+## 6. Execution record
+
+### 6.1 Step 1 — centralisation (done, 2026-08-08)
+
+`netlify/functions/utils/models.js` declares `MODEL_FAST` and `MODEL_DEEP` plus three `LEGACY_*` constants holding the pre-policy identifiers. **39 modules, 78 model references** now resolve through it. No model literal is passed to the Anthropic SDK — or recorded in telemetry — from anywhere but that one file.
+
+**This step changed what one endpoint calls in exactly two places**, both forced by §4.1:
+
+| Endpoint | Was | Now | Why |
+|---|---|---|---|
+| `generate-text-messages` | `claude-3-5-sonnet-20241022` | `MODEL_FAST` | Retired string, 404. Endpoint is FAST tier in §3 |
+| `barryGenerateTemplate` | `claude-3-5-haiku-20241022` | `MODEL_FAST` | Retired string, 404. Endpoint is FAST tier in §3 |
+
+Every other endpoint calls the identical model string it called before. The seven modules already on `claude-sonnet-4-6` now import `MODEL_DEEP`, which resolves to the same string; the other thirty import a `LEGACY_*` constant carrying their exact prior value.
+
+**Deliberately not routed through `models.js`:** the `"model"` field inside the RECON prompt templates (`generate-section-*`, `generate-icp-brief`, `generate-all-reports`). That is prompt text asking Claude to echo a value into `metadata.model` — not a routing decision. Editing it would change the prompt, which Step 1 excludes. It goes away with the P4 consolidation.
+
+**Interop note:** two of the routed modules (`generate-text-messages`, `generate-followup`) are CommonJS and reach `models.js` via `require()`. Verified by bundling both with the project's esbuild bundler and executing the result — the constant resolves, and the env override is honoured at runtime.
+
+### 6.2 Step 2 — baseline (outstanding)
+
+Collect a minimum of one week of `apiLogs` before any tier changes. Not skippable: without it, Step 3 has nothing to be compared against, and the P0B telemetry fix exists precisely so this measurement can be taken.
+
+### 6.3 Step 3 — tier corrections (not approved)
+
+The 6 tier corrections and the retirement of the three `LEGACY_*` constants execute as a separate controlled change, after the baseline is reported. The 12 RECON endpoints stay deferred to P4 regardless.

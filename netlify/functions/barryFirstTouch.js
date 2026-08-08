@@ -15,6 +15,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { db } from './firebase-admin.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 async function verifyAuthToken(authToken, userId) {
   const firebaseApiKey = process.env.FIREBASE_API_KEY;
@@ -200,7 +201,7 @@ Return valid JSON only:
     try {
       const response = await anthropic.messages.create(
         {
-          model: 'claude-haiku-4-5-20251001',
+          model: LEGACY_HAIKU_4_5,
           max_tokens: 800,
           messages: [{ role: 'user', content: prompt }],
         },
@@ -221,7 +222,7 @@ Return valid JSON only:
 
     await logApiUsage(userId, 'barryFirstTouch', 'success', {
       provider: 'anthropic',
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       usage: aiUsage,
       responseTime: Date.now() - startTime,
       metadata: { contactId, serviceProfileId, hasUserContext: !!userContext },

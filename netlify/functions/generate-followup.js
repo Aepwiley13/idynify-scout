@@ -12,6 +12,7 @@
 
 const admin = require('firebase-admin');
 const Anthropic = require('@anthropic-ai/sdk');
+const { LEGACY_SONNET_4_5 } = require('./utils/models.js');
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -86,7 +87,7 @@ REQUIREMENTS:
 Generate the follow-up email body:`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: LEGACY_SONNET_4_5,
       max_tokens: 1000,
       messages: [
         {

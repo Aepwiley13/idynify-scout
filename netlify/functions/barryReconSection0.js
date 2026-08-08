@@ -20,6 +20,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // Firebase Admin init
 if (getApps().length === 0) {
@@ -147,7 +148,7 @@ export const handler = async (event) => {
     }
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       max_tokens: 500,
       system: SECTION0_SYSTEM,
       messages,
@@ -183,7 +184,7 @@ export const handler = async (event) => {
 
     await logApiUsage(userId, 'barryReconSection0', 'success', {
       provider: 'anthropic',
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       usage: response?.usage,
       responseTime: Date.now() - startTime,
       metadata: { mode },

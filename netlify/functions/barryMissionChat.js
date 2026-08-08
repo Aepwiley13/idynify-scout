@@ -27,6 +27,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -907,7 +908,7 @@ Return valid JSON only:
       try {
         const claudeResponse = await anthropic.messages.create(
           {
-            model: 'claude-haiku-4-5-20251001',
+            model: LEGACY_HAIKU_4_5,
             max_tokens: 600,
             system: systemPrompt,
             messages: [{ role: 'user', content: briefPrompt }]
@@ -942,7 +943,7 @@ Return valid JSON only:
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
         provider: 'anthropic',
-        model: 'claude-haiku-4-5-20251001',
+        model: LEGACY_HAIKU_4_5,
         usage: aiUsage,
         traceId,
         responseTime: Date.now() - startTime,
@@ -999,7 +1000,7 @@ Return valid JSON only:
       try {
         const icpResponse = await anthropic.messages.create(
           {
-            model: 'claude-haiku-4-5-20251001',
+            model: LEGACY_HAIKU_4_5,
             max_tokens: 800,
             system: icpSystemPrompt,
             messages: icpMessages,
@@ -1048,7 +1049,7 @@ Return valid JSON only:
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
         provider: 'anthropic',
-        model: 'claude-haiku-4-5-20251001',
+        model: LEGACY_HAIKU_4_5,
         usage: aiUsage,
         traceId,
         responseTime: Date.now() - startTime,
@@ -1174,7 +1175,7 @@ Return valid JSON only:
       try {
         const chatResponse = await anthropic.messages.create(
           {
-            model: 'claude-haiku-4-5-20251001',
+            model: LEGACY_HAIKU_4_5,
             max_tokens: 2000,
             system: systemPrompt,
             messages
@@ -1220,7 +1221,7 @@ Return valid JSON only:
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
         provider: 'anthropic',
-        model: 'claude-haiku-4-5-20251001',
+        model: LEGACY_HAIKU_4_5,
         usage: aiUsage,
         traceId,
         responseTime: Date.now() - startTime,

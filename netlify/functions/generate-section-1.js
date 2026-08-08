@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { LEGACY_SONNET_4 } from './utils/models.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -185,7 +186,7 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     console.log('🤖 Calling Claude API...');
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: LEGACY_SONNET_4,
       max_tokens: 4096,
       temperature: 0.7,
       messages: [{
@@ -235,7 +236,7 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     const generationTime = (Date.now() - startTime) / 1000;
     output.metadata = {
       generationTime,
-      model: 'claude-sonnet-4-20250514',
+      model: LEGACY_SONNET_4,
       tokensUsed: message.usage.input_tokens + message.usage.output_tokens,
       editHistory: []
     };

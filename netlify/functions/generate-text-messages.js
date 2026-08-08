@@ -10,6 +10,7 @@
 
 const admin = require('firebase-admin');
 const Anthropic = require('@anthropic-ai/sdk');
+const { MODEL_FAST } = require('./utils/models.js');
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -94,7 +95,7 @@ REQUIREMENTS:
 Generate ONLY the text message body (no subject, no explanations):`;
 
       const message = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: MODEL_FAST,
         max_tokens: 300,
         messages: [
           {

@@ -2,7 +2,7 @@
  * barryCSMRead — Barry's CSM health read for a customer contact.
  *
  * Generates a natural-language health assessment and recommendation
- * for a specific customer. Uses claude-sonnet-4-6 (not Haiku) for
+ * for a specific customer. Runs on MODEL_DEEP (not the fast tier) for
  * deeper analysis as specified in the CSM module spec.
  *
  * Caching: result is written back to the contact record as:
@@ -22,6 +22,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
+import { MODEL_DEEP } from './utils/models.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -153,7 +154,7 @@ VOICE RULES:
 Respond with ONLY the assessment and recommendation. No labels, no headers.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL_DEEP,
       max_tokens: 150,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -177,7 +178,7 @@ Respond with ONLY the assessment and recommendation. No labels, no headers.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryCSMRead', 'success', {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: MODEL_DEEP,
       usage: response?.usage,
       responseTime,
       metadata: { contactName: name, healthBucket, cached: false },

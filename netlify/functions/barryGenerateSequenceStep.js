@@ -5,6 +5,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
+import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 /**
  * BARRY SEQUENCE STEP CONTENT GENERATOR (Step 5)
@@ -274,7 +275,7 @@ Respond ONLY with valid JSON.`;
     });
 
     const claudeResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: LEGACY_SONNET_4_5,
       max_tokens: 1000,
       messages: [
         {
@@ -314,7 +315,7 @@ Respond ONLY with valid JSON.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryGenerateSequenceStep', 'success', {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-5-20250929',
+      model: LEGACY_SONNET_4_5,
       usage: claudeResponse?.usage,
       responseTime,
       metadata: {

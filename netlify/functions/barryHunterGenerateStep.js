@@ -27,6 +27,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // Barry's step adaptation map (spec-exact)
 const STEP_ADAPTATION = {
@@ -207,7 +208,7 @@ Output — valid JSON only:
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       max_tokens: 2500,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -231,7 +232,7 @@ Output — valid JSON only:
 
     await logApiUsage(userId, 'barryHunterGenerateStep', 'success', {
       provider: 'anthropic',
-      model: 'claude-haiku-4-5-20251001',
+      model: LEGACY_HAIKU_4_5,
       usage: response?.usage,
       responseTime: Date.now() - startTime,
       metadata: { stepIndex, previousOutcome, outcomeGoal: mission.outcome_goal }

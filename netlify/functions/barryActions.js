@@ -25,6 +25,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 if (getApps().length === 0) {
   initializeApp({
@@ -123,7 +124,7 @@ Rules:
 async function parseIntent(message, context, anthropic) {
   const contextStr = context ? `\nContext: ${JSON.stringify(context)}` : '';
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: LEGACY_HAIKU_4_5,
     max_tokens: 400,
     messages: [{
       role: 'user',
@@ -268,7 +269,7 @@ export const handler = async (event) => {
         return { statusCode: 400, body: JSON.stringify({ error: 'Action type not executable via confirm' }) };
       }
 
-      await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: pendingAction.action_type } });
+      await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: LEGACY_HAIKU_4_5, traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: pendingAction.action_type } });
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -295,7 +296,7 @@ export const handler = async (event) => {
         result = { draft: intent.parameters };
       }
 
-      await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: intent.action_type } });
+      await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: LEGACY_HAIKU_4_5, traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: intent.action_type } });
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -313,7 +314,7 @@ export const handler = async (event) => {
     }
 
     // Low confidence or no action — return clarification message
-    await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: 'none' } });
+    await logApiUsage(userId, 'barryActions', 'success', { provider: 'anthropic', model: LEGACY_HAIKU_4_5, traceId: rawTraceId, responseTime: Date.now() - startTime, metadata: { action: 'none' } });
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },

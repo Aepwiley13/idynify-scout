@@ -10,8 +10,9 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { createMessageWithRetry } from './anthropicRetry.js';
+import { MODEL_DEEP } from './models.js';
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = MODEL_DEEP;
 const MAX_TOKENS = 2000;
 
 /**

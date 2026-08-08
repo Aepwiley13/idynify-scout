@@ -442,6 +442,8 @@ export const handler = async (event) => {
     try {
       if (userId) {
         await logApiUsage(userId, 'barryHunterProcessEngage', 'error', {
+          provider: 'anthropic',
+          model: LEGACY_HAIKU_4_5,
           responseTime: Date.now() - startTime,
           errorCode: error.message,
           metadata: {}

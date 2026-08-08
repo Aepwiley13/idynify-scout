@@ -600,6 +600,8 @@ export const handler = async (event) => {
 
     if (!result) {
       await logApiUsage(userId, 'analyzeWebsite', 'error', {
+        provider: 'anthropic',
+        model: MODEL,
         responseTime: Date.now() - startTime,
         errorCode: 'invalid_json',
         metadata: { url: normalizedUrl },
@@ -646,6 +648,8 @@ export const handler = async (event) => {
   } catch (err) {
     console.error('[analyze-website] Unexpected error:', err);
     await logApiUsage(userId || 'unknown', 'analyzeWebsite', 'error', {
+      provider: 'anthropic',
+      model: MODEL,
       responseTime: Date.now() - startTime,
       errorCode: err.message,
     }).catch(() => {});

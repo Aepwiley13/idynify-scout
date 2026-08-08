@@ -400,6 +400,8 @@ export const handler = async (event) => {
     try {
       if (userId) {
         await logApiUsage(userId, 'barryBulkPersonalize', 'error', {
+          provider: 'anthropic',
+          model: MODEL,
           responseTime: Date.now() - startTime,
           errorCode: error.message,
           metadata: {},

@@ -492,6 +492,8 @@ export const handler = async (event) => {
       if (userId) {
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'barryICPConversation', 'error', {
+          provider: 'anthropic',
+          model: LEGACY_SONNET_4_5,
           responseTime,
           errorCode: error.message,
           metadata: {}

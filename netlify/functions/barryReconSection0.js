@@ -205,6 +205,8 @@ export const handler = async (event) => {
   } catch (err) {
     console.error('[barryReconSection0] error:', err);
     await logApiUsage(userId || 'unknown', 'barryReconSection0', 'error', {
+      provider: 'anthropic',
+      model: LEGACY_HAIKU_4_5,
       responseTime: Date.now() - startTime,
       errorCode: err.message,
     }).catch(() => {});

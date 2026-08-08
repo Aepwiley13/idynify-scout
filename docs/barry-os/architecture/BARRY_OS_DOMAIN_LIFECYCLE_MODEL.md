@@ -44,7 +44,7 @@ Every object in Barry OS is classified on two independent axes.
 | Authority | Definition |
 |---|---|
 | **Canonical** | The authoritative business record. Platform-owned. Barry reads, never writes. |
-| **Derived** | Computed knowledge built from Canonical objects and Signals. Barry-owned. Rebuildable by replaying signals. |
+| **Derived** | Computed knowledge built from Canonical objects and Signals. Barry-owned. Rebuildable from the latest validated projection checkpoint plus retained Signals and Observations since that checkpoint (Document 3 defines checkpoint, replay, and retention mechanics). |
 | **Operational** | System execution and history objects used to coordinate or audit Barry's actions. |
 
 ### Axis 2 — Persistence
@@ -154,38 +154,28 @@ Every object definition follows this structure:
 **8. Lifecycle states:**
 
 ```
-discovered
-   ↓ (imported, enriched, or manually added)
-qualified
-   ↓ (passes ICP scoring or user acceptance)
-   ├── rejected (terminal — user explicitly rejected)
-   └── engaged
-         ↓ (active communication established)
-         active
-            ↓ (no interaction within staleness threshold)
-            dormant
-               ├── re-engaged → active
-               └── archived (terminal — user archives)
+active
+   ├── archived (terminal — user explicitly archives)
+   └── merged   (terminal — duplicate resolved)
 ```
+
+Contact lifecycle tracks record-state facts only — not engagement or qualification. Concepts previously modeled as lifecycle states migrate as follows:
+
+- `qualified` → ICP evaluation result stored as fields on the Contact record (`icp_qualified`, `icp_score`), set by ScoreICPFitSkill
+- `engaged` / `active` (as engagement) / `dormant` → `RelationshipAwareness.engagement_status` (Derived, Barry-owned)
+- `rejected` → ICP evaluation decision: `icp_qualified: false` on the Contact record
 
 **9. Transitions:**
 
 | From | To | Trigger |
 |---|---|---|
-| discovered | qualified | Enrichment complete OR ICP score computed |
-| qualified | rejected | User rejects OR ICP score below threshold |
-| qualified | engaged | First outreach sent OR first meeting booked |
-| engaged | active | Reply received OR meeting completed |
-| active | dormant | No interaction within staleness window (per warmth level) |
-| dormant | active | New signal involving this contact |
-| dormant | archived | User explicitly archives |
 | active | archived | User explicitly archives |
+| active | merged | Duplicate resolution merges this record into another |
 
 **10. Illegal transitions:**
 
-- `rejected → engaged` — a rejected contact must be re-discovered, not silently re-engaged
-- `archived → active` — archived contacts must be explicitly restored through a user action that creates a `contact.restored` signal
-- `active → discovered` — lifecycle only moves forward; a contact cannot un-become known
+- `archived → active` — archived contacts must be explicitly restored through a user action that creates a `contact.restored` signal, producing a new `active` record
+- `merged → active` — a merged contact cannot be unmerged; the surviving record is the canonical one
 
 **11. Relationships:**
 
@@ -218,12 +208,18 @@ Contact {
   company_id: string | null
   company_name: string | null
   
-  // Platform lifecycle
-  lifecycle_state: string                // discovered | qualified | rejected | engaged | active | dormant | archived
+  // Platform lifecycle (record-state facts only)
+  lifecycle_state: string                // active | archived | merged
   lifecycle_changed_at: timestamp
+  merged_into: string | null             // contactId of surviving record (set when merged)
+  
+  // ICP evaluation (fact about scoring, not engagement state)
+  icp_qualified: boolean | null          // set by ScoreICPFitSkill
+  icp_score: number | null              // 1-10
+  icp_evaluated_at: timestamp | null
   
   // Enrichment
-  enrichment_status: string | null       // pending | complete | failed
+  enrichment_status: string | null       // pending | complete | failed | not_requested
   enrichment_provenance: object | null   // source, enriched_at, fields_enriched[]
   
   // Platform metadata
@@ -233,9 +229,12 @@ Contact {
   archived_at: timestamp | null
   
   // Existing fields mapping:
-  //   contact_status    → lifecycle_state
-  //   lead_status       → superseded (derived from lifecycle_state + Relationship Awareness)
-  //   brigade_history[] → superseded (brigade is a UI concept, not a lifecycle state)
+  //   contact_status    → lifecycle_state (simplified to record-state only)
+  //   lead_status       → RETIRED — engagement state migrated to RelationshipAwareness.engagement_status
+  //   qualified         → icp_qualified + icp_score (fact about evaluation, not lifecycle state)
+  //   engaged/active/dormant → RETIRED — migrated to RelationshipAwareness.engagement_status
+  //   rejected          → icp_qualified: false (evaluation result, not lifecycle state)
+  //   brigade_history[] → RETIRED (brigade is a UI concept, not a lifecycle state)
   //   barry_memory      → migrated to Relationship Memory (separate object)
   //   engage_state      → migrated to Relationship Awareness (separate object)
   //   engagement_summary → migrated to Relationship Awareness (separate object)
@@ -260,48 +259,33 @@ Contact {
 
 **6. Who may read:** All Barry surfaces, Scout module, Context Resolver, Awareness Layer, Skills (ScoreICPFitSkill, ResearchCompanySkill)
 
-**7. Who may write:** Platform (user actions, Scout discovery, Apollo enrichment). Barry may NOT write to this document. The existing `barry_intel` field on company documents (written by `search-companies.js` at line 991) is a confirmed violation (audit Step 9) and must be migrated to a Barry-owned Awareness or Artifact object.
+**7. Who may write:** Platform (user actions, Scout discovery, Apollo enrichment). Barry may NOT write to this document. The existing `barry_intel` field on company documents (written by `search-companies.js` at line 991) is a confirmed violation (audit Step 9, reconciliation §9) and must be migrated to a Barry-owned CompanyIntelArtifact stored at `users/{uid}/barry_artifacts/{artifactId}` with `artifact_type: 'company_intel'`.
 
 **8. Lifecycle states:**
 
 ```
-discovered
-   ↓ (found via Scout search, import, or manual add)
-evaluated
-   ↓ (ICP scoring complete)
-   ├── rejected (terminal — user swipes left / rejects)
-   └── accepted
-         ↓ (contacts identified and qualified)
-         targeted
-            ↓ (active mission involving this company's contacts)
-            engaged
-               ↓ (deal won or ongoing relationship)
-               active
-                  ↓ (no activity within window)
-                  dormant
-                     ├── re-engaged → engaged
-                     └── archived (terminal)
+active
+   ├── archived (terminal — user explicitly archives)
+   └── merged   (terminal — duplicate resolved)
 ```
+
+Company lifecycle tracks record-state facts only. Three concepts previously mixed into one lifecycle are separated:
+
+- **Record existence** (`active → archived / merged`) — the lifecycle above
+- **ICP evaluation** — stored as fields on the Company record (`icp_evaluation_status`, `icp_decision`, `icp_score`, `icp_evaluated_at`)
+- **Engagement state** (`targeted`, `engaged`, `active`, `dormant`) — belongs to Business Awareness and Relationship Awareness projections, not to the canonical Company record
 
 **9. Transitions:**
 
 | From | To | Trigger |
 |---|---|---|
-| discovered | evaluated | ICP score computed (ScoreICPFitSkill) |
-| evaluated | rejected | User rejects OR barryFeedback score below threshold |
-| evaluated | accepted | User accepts (swipe right / explicit acceptance) |
-| accepted | targeted | Contact(s) at this company enter `qualified` or `engaged` state |
-| targeted | engaged | Active outreach or meeting with company contacts |
-| engaged | active | Ongoing business relationship established |
-| active | dormant | No interaction within staleness window |
-| dormant | engaged | New signal involving this company's contacts |
-| dormant | archived | User explicitly archives |
+| active | archived | User explicitly archives |
+| active | merged | Duplicate resolution merges this record into another |
 
 **10. Illegal transitions:**
 
-- `rejected → accepted` — a rejected company must go through re-evaluation
-- `discovered → engaged` — cannot skip evaluation and acceptance
-- `archived → active` — must be explicitly restored
+- `archived → active` — must be explicitly restored through a user action
+- `merged → active` — a merged company cannot be unmerged; the surviving record is canonical
 
 **11. Relationships:**
 
@@ -326,11 +310,14 @@ Company {
   location: string | null
   employee_count: number | null
   
-  // Platform lifecycle
-  lifecycle_state: string            // discovered | evaluated | rejected | accepted | targeted | engaged | active | dormant | archived
+  // Platform lifecycle (record-state facts only)
+  lifecycle_state: string            // active | archived | merged
   lifecycle_changed_at: timestamp
+  merged_into: string | null         // companyId of surviving record (set when merged)
   
-  // ICP evaluation
+  // ICP evaluation (facts about scoring, not engagement state)
+  icp_evaluation_status: string      // not_evaluated | evaluated
+  icp_decision: string | null        // pending | accepted | rejected
   icp_score: number | null           // 1-10 (from barryFeedback.score)
   icp_evaluated_at: timestamp | null
   
@@ -345,10 +332,13 @@ Company {
   archived_at: timestamp | null
   
   // Existing fields mapping:
-  //   status          → lifecycle_state
-  //   barryFeedback   → icp_score + icp_evaluated_at
-  //   barry_intel     → VIOLATION — migrate to Barry-owned Artifact or Awareness
-  //   swipe_*         → acceptance/rejection signals (lifecycle transitions)
+  //   status          → lifecycle_state (simplified to record-state only)
+  //   barryFeedback   → icp_score + icp_evaluated_at + icp_decision
+  //   barry_intel     → VIOLATION — migrate to Barry-owned CompanyIntelArtifact
+  //                     (stored at users/{uid}/barry_artifacts/{artifactId} with artifact_type: 'company_intel')
+  //   swipe_*         → icp_decision (acceptance/rejection is an evaluation result, not a lifecycle state)
+  //   targeted/engaged/active/dormant → RETIRED — engagement state migrated to Business Awareness
+  //                                     and Relationship Awareness projections
 }
 ```
 
@@ -368,38 +358,39 @@ Company {
 
 **6. Who may read:** Barry (all layers), all module UIs, Context Resolver
 
-**7. Who may write:** Platform only. Created when a Contact enters `engaged` state. Updated by explicit user actions (categorization, notes). Barry never writes here — Barry's understanding lives in Relationship Awareness (Derived) and Relationship Memory (Derived).
+**7. Who may write:** Platform only. Created when a meaningful interaction is first established with a Contact. Updated by explicit user actions (categorization, notes). Barry never writes here — Barry's understanding lives in Relationship Awareness (Derived) and Relationship Memory (Derived).
 
 **8. Lifecycle states:**
 
 ```
 initiated
    ↓ (first meaningful interaction — email sent, meeting booked, or reply received)
-developing
-   ↓ (multiple interactions established, pattern of engagement)
-established
-   ├── at_risk  (engagement declining — no reply to recent outreach, meeting cancelled)
-   │      ├── recovered → established
-   │      └── ended (terminal — explicit user action)
-   └── ended (terminal — user marks relationship as concluded)
+active
+   ↓ (explicit user action or contact archived)
+ended (terminal)
 ```
+
+Relationship lifecycle tracks factual connection state only — not engagement quality or risk. Concepts previously modeled as lifecycle states migrate as follows:
+
+- `developing` / `established` → Awareness interpretations of interaction count and quality, not canonical facts. Live in `RelationshipAwareness.engagement_status` and `RelationshipAwareness.health_score`.
+- `at_risk` → Barry's derived interpretation of signal patterns. Lives in `RelationshipAwareness.risk_score` + `momentum_direction`.
+- Staleness computation → `RelationshipAwareness.projection_state`
+- Health score → `RelationshipAwareness.health_score`
+
+The transition from `active` to `ended` is triggered by explicit user action only — not by signal patterns or staleness thresholds. Barry may *recommend* ending a relationship, but the canonical record only changes when the user acts.
 
 **9. Transitions:**
 
 | From | To | Trigger |
 |---|---|---|
-| initiated | developing | Second meaningful interaction OR reply received |
-| developing | established | 3+ interactions AND at least one positive signal (reply, meeting, deal progress) |
-| established | at_risk | Staleness threshold exceeded OR negative signal pattern (bounced emails, no-shows) |
-| at_risk | established | Positive signal received (reply, meeting attended) |
-| at_risk | ended | User explicitly ends relationship OR contact archived |
-| established | ended | User explicitly ends relationship |
+| initiated | active | First meaningful interaction (email sent, meeting booked, reply received) |
+| active | ended | User explicitly ends relationship OR contact archived |
 
 **10. Illegal transitions:**
 
 - `ended → initiated` — an ended relationship cannot restart; a new relationship must be created
-- `initiated → established` — cannot skip developing stage
-- `at_risk → initiated` — lifecycle does not regress
+- `ended → active` — same; create a new Relationship record
+- `active → initiated` — lifecycle does not regress
 
 **11. Relationships:**
 
@@ -419,8 +410,8 @@ Relationship {
   contact_id: string
   company_id: string | null
   
-  // Lifecycle
-  lifecycle_state: string            // initiated | developing | established | at_risk | ended
+  // Lifecycle (factual connection state only — not engagement quality or risk)
+  lifecycle_state: string            // initiated | active | ended
   lifecycle_changed_at: timestamp
   
   // Facts (Platform-owned)
@@ -431,14 +422,17 @@ Relationship {
   // History
   initiated_at: timestamp
   ended_at: timestamp | null
-  ended_reason: string | null        // user_action | contact_archived | no_response
+  ended_reason: string | null        // user_action | contact_archived
   
   // Existing fields mapping:
   //   This is a NEW canonical object. Today, relationship facts are scattered across:
-  //     engage_state.status         → lifecycle_state
+  //     engage_state.status         → lifecycle_state (simplified: initiated | active | ended)
   //     engage_state.current_goal   → NOT a relationship fact — migrates to Recommendation
   //     barry_memory.who_they_are   → migrates to Relationship Memory (Barry-owned)
   //     warmth_level                → migrates to Relationship Awareness (Barry-derived)
+  //     developing/established      → RETIRED — migrated to RelationshipAwareness (engagement quality)
+  //     at_risk                     → RETIRED — migrated to RelationshipAwareness.risk_score
+  //     staleness threshold         → RETIRED — migrated to RelationshipAwareness.projection_state
 }
 ```
 
@@ -706,7 +700,7 @@ Cadence {
 
 ## Message
 
-**1. Purpose:** A communication artifact — email, LinkedIn message, or text — sent, drafted, or received in the context of a business relationship.
+**1. Purpose:** A communication artifact — email, LinkedIn message, or text — sent or received in the context of a business relationship. A Message is a canonical record of a communication that actually happened (or is authorized to happen). Barry-generated drafts are Prepared Actions until approved and sent.
 
 **2. Authority:** Canonical
 
@@ -718,60 +712,61 @@ Cadence {
 
 **6. Who may read:** Barry (Context Resolver, Skills — AnalyzeReplySkill, WriteEmailSkill), all module UIs
 
-**7. Who may write:** Platform (user sends, integration receives, Barry-prepared drafts promoted to messages on send)
+**7. Who may write:** Platform (user sends, integration receives). Message records are created by the Executed Action on successful authorization — not by Barry's drafting process. The creation rule is: Prepared Action (approved) → Executed Action → Message (queued → sent → ...).
 
 **8. Lifecycle states:**
 
+**Outbound:**
+
 ```
-drafted
-   ↓ (user or Barry composes)
 queued
-   ↓ (user approves send)
-   ├── failed (terminal — delivery error; produces retry Signal)
-   └── sent
-         ↓ (delivery confirmed)
-         delivered
-            ├── opened (email tracking confirms open)
-            │      └── replied (contact responds — produces Signal)
-            └── bounced (terminal — invalid address)
+   ↓ (authorization received from Executed Action)
+sent
+   ↓ (delivery confirmed)
+   delivered
+      ├── opened (email tracking confirms open)
+      │      └── replied (contact responds — produces contact.reply_received Signal)
+      ├── bounced (terminal — invalid address)
+      └── failed  (terminal — delivery error; produces retry Signal)
 ```
 
-For inbound messages:
+**Inbound:**
 
 ```
-received
-   ↓ (detected by poll or webhook)
-analyzed
-   ↓ (AnalyzeReplySkill processes)
-   └── processed (terminal — awareness updated, recommendations generated)
+received (terminal — the fact of receipt)
 ```
+
+A `contact.reply_received` Signal is produced when a message is received. The Observation pipeline handles interpretation — the canonical Message record does not track Barry's analysis of it.
+
+`drafted` is NOT a Message state. A Barry-generated email draft is a Prepared Action until it is approved and sent. Only at the point of authorization does a canonical Message record get created.
+
+`analyzed` and `processed` are NOT Message states. These describe Barry's processing of the message, not the message itself — they are Signal and Observation pipeline states.
 
 **9. Transitions:**
 
 | From | To | Trigger |
 |---|---|---|
-| drafted | queued | User approves send |
 | queued | sent | Integration sends successfully |
 | queued | failed | Integration returns error |
 | sent | delivered | Delivery confirmation (where available) |
 | delivered | opened | Open tracking pixel triggered |
 | delivered | bounced | Bounce notification received |
 | opened | replied | `contact.reply_received` Signal |
-| received | analyzed | AnalyzeReplySkill completes |
-| analyzed | processed | Awareness and Recommendations updated |
 
 **10. Illegal transitions:**
 
-- `sent → drafted` — a sent message cannot become a draft; create a new message
+- `sent → queued` — a sent message cannot be re-queued; create a new message
 - `bounced → delivered` — a bounced message cannot be re-delivered
-- `failed → sent` — a failed send must be retried as a new queue entry with idempotency key
+- `failed → sent` — a failed send must be retried as a new Executed Action with idempotency key
+- `received → queued` — an inbound message cannot become outbound
 
 **11. Relationships:**
 
 - Belongs to one Contact
 - May belong to one Campaign / Cadence
 - Produces Signals on state transitions (`contact.email_sent`, `contact.reply_received`, `email.opened`, `email.bounced`)
-- May be produced by a Prepared Action (draft → queued on approval)
+- Outbound messages are created by an Executed Action (Prepared Action approved → Executed Action → Message created at `queued`)
+- Inbound messages produce a `contact.reply_received` Signal on receipt
 
 **12. Retention rule:** Indefinite. All messages retained for relationship history and Learned Intelligence.
 
@@ -787,8 +782,9 @@ Message {
   direction: string                  // outbound | inbound
   channel: string                    // email | linkedin | text | call_note
   
-  // Lifecycle
-  lifecycle_state: string            // drafted | queued | sent | delivered | opened | replied | bounced | failed | received | analyzed | processed
+  // Lifecycle (outbound: queued | sent | delivered | opened | replied | bounced | failed)
+  //          (inbound: received)
+  lifecycle_state: string            // queued | sent | delivered | opened | replied | bounced | failed | received
   lifecycle_changed_at: timestamp
   
   // Content
@@ -799,8 +795,8 @@ Message {
   // Provenance
   campaign_id: string | null
   cadence_id: string | null
-  prepared_action_id: string | null  // if Barry drafted this
-  skill_id: string | null            // which Skill generated content
+  executed_action_id: string | null  // if created by an Executed Action (Barry-authored messages)
+  skill_id: string | null            // which Skill generated content (via Prepared Action chain)
   
   // Delivery
   sent_at: timestamp | null
@@ -871,7 +867,7 @@ Terminal states: `invalid` (schema validation failed), `expired` (TTL elapsed be
 - May be produced by an Executed Action (closing the loop)
 - Feeds into one or more Awareness projections (via Observation)
 
-**12. Retention rule:** 90-day rolling window. Signals older than 90 days archived to cold storage. Awareness projections are the durable derivative — they survive signal expiration because they are continuously rebuilt.
+**12. Retention rule:** 90-day rolling window. Signals older than 90 days archived to cold storage. Awareness projections are the durable derivative — they survive signal expiration via validated projection checkpoints. Document 3 defines checkpoint, replay, and retention mechanics.
 
 **13. Fields:**
 
@@ -916,7 +912,17 @@ Signal {
 
 **4. Owner:** Barry
 
-**5. Storage:** `users/{uid}/observations/{observationId}` — persisted for auditability and replay. This is a processing step, but its output is persisted because: (a) awareness projections must be rebuildable from observations if corrupted, and (b) the reasoning trace requires knowing what observations fed each awareness update.
+**5. Storage:** `users/{uid}/observations/{observationId}`
+
+```
+[PROPOSED — persisted Observation trace]
+Persisting Observation records is an implementation choice for auditability
+and replay support. Observation remains a processing step, not an
+architectural object layer. The persistence contract will be confirmed
+in Document 3 (Signal Specification).
+```
+
+Persisted because: (a) awareness projection checkpoints require knowing what observations have been applied since the last checkpoint, and (b) the reasoning trace requires knowing what observations fed each awareness update.
 
 **6. Who may read:** Awareness Layer, Think Layer (for reasoning trace), audit surfaces
 
@@ -989,7 +995,7 @@ Observation {
 
 # Part III: Barry-Owned Objects — Awareness Layer
 
-Awareness is Barry's persistent, continuously-updated understanding of the business environment. Four projections, each defined separately. All are Derived and Durable (rebuildable by replaying signals through the observation pipeline).
+Awareness is Barry's persistent, continuously-updated understanding of the business environment. Four projections, each defined separately. All are Derived and Durable — rebuildable from the latest validated projection checkpoint plus retained Signals and Observations since that checkpoint. Document 3 defines checkpoint, replay, and retention mechanics.
 
 ---
 
@@ -1046,7 +1052,7 @@ rebuilding
 - Consumed by Context Resolver for Think Layer input
 - Staleness thresholds vary by warmth level (warm: 7 days, cool: 14 days, cold: 30 days)
 
-**12. Retention rule:** Indefinite. Rebuildable from Signals. Retained as long as the Contact exists. When Contact is archived, Relationship Awareness is frozen (no further updates) but retained.
+**12. Retention rule:** Indefinite. Rebuildable from the latest validated projection checkpoint plus retained Signals and Observations since that checkpoint (Document 3 defines checkpoint, replay, and retention mechanics). Retained as long as the Contact exists. When Contact is archived, Relationship Awareness is frozen (no further updates) but retained.
 
 **13. Fields:**
 
@@ -2797,7 +2803,7 @@ Every component in Barry OS either feeds this loop or serves it. Awareness proje
 | **Discovery source** | `docs/audits/BARRY_OS_FOUNDATION_AUDIT.md` (commit `09e90f9`) |
 | **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
 | **Architecture source** | `docs/barry-os/architecture/BARRY_OS_REFERENCE_ARCHITECTURE.md` (Document 1 — frozen 2026-08-07) |
-| **Architecture status** | Pending Team A review |
+| **Architecture status** | Corrections applied — pending Team A evidence review |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical domain model) |
 | **Frozen** | No — pending approval |

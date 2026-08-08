@@ -15,9 +15,23 @@
  * On failure: status → "failed", errorMessage written, continue to next entry.
  * Idempotent: re-running on the same entry produces the same result.
  *
- * POST — no auth required (internal/scheduled). Returns processing summary.
+ * SCHEDULING (P0A / defect A4)
+ * ───────────────────────────
+ * This is a scheduled function. Before P0A it had no trigger of any kind — no
+ * cron, and no caller anywhere in the repository — so every entry
+ * `messageProcessor` enqueued sat pending forever and no inbound reply was ever
+ * analysed or drafted. It now runs on QUEUE_SCHEDULE, following the same
+ * `schedule()` convention as gmail-sync-worker and process-barry-queue.
+ *
+ * The cadence is deliberately faster than the 10-minute Gmail sync so the queue
+ * drains rather than grows. QUEUE_LIMIT is still 10 entries per run, which caps
+ * throughput at 120 messages/hour; raising it is a P1 concern, not a P0A one.
+ *
+ * Invocation is otherwise unchanged: a scheduled run arrives with no
+ * httpMethod, and a manual POST still works for local testing.
  */
 
+import { schedule } from '@netlify/functions';
 import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { analyzeInboundMessage } from './utils/barryInboxAnalyzer.js';
@@ -33,12 +47,17 @@ const CORS_HEADERS = {
 
 const QUEUE_LIMIT = 10;
 
-export const handler = async (event) => {
+/** Every 5 minutes — twice the rate of the 10-minute Gmail sync that feeds it. */
+export const QUEUE_SCHEDULE = '*/5 * * * *';
+
+export const processInboxQueue = async (event = {}) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: '' };
   }
 
-  if (event.httpMethod !== 'POST') {
+  // A scheduled invocation carries no httpMethod. Only reject a request that
+  // explicitly arrives as something other than POST.
+  if (event.httpMethod && event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers: CORS_HEADERS,
@@ -255,3 +274,5 @@ export const handler = async (event) => {
     };
   }
 };
+
+export const handler = schedule(QUEUE_SCHEDULE, processInboxQueue);

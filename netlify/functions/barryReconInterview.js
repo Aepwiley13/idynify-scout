@@ -10,6 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // ─── Section context map ───────────────────────────────────────────────────────
 
@@ -194,7 +195,7 @@ export const handler = async (event) => {
 
     const anthropic = new Anthropic({ apiKey: claudeApiKey });
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',  // Fast model for real-time guidance
+      model: LEGACY_HAIKU_4_5,  // Fast model for real-time guidance
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -202,8 +203,11 @@ export const handler = async (event) => {
     const message = response.content[0].text.trim();
 
     await logApiUsage(userId, 'barryReconInterview', 'success', {
+      provider: 'anthropic',
+      model: LEGACY_HAIKU_4_5,
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
-      metadata: { sectionId, mode, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      metadata: { sectionId, mode },
     });
 
     return {

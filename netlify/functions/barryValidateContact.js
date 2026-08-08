@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -107,7 +108,7 @@ Respond ONLY with valid JSON in this exact format:
 
     // Call Claude API using SDK
     const claudeResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: LEGACY_SONNET_4_5,
       max_tokens: 500,
       messages: [
         {
@@ -147,6 +148,9 @@ Respond ONLY with valid JSON in this exact format:
     // Log API usage
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryValidateContact', 'success', {
+      provider: 'anthropic',
+      model: LEGACY_SONNET_4_5,
+      usage: claudeResponse?.usage,
       responseTime,
       metadata: {
         resultsCount: results.length,

@@ -23,6 +23,7 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -99,7 +100,14 @@ function buildMissionSteps(outcomeGoal) {
 }
 
 // ── Step 1 draft generation (4 angles) ──────────────────────────────────────
-async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '') {
+/**
+ * NOTE (P0B): `lastSessionSummary` and `daysSinceLastContact` are parameters.
+ * They previously appeared in the prompt below as bare identifiers resolved
+ * from the handler's scope, which they are not in — this function threw
+ * `ReferenceError: lastSessionSummary is not defined` on every call, so the
+ * whole Hunter engage path failed. See the commit message for detail.
+ */
+async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '', lastSessionSummary = null, daysSinceLastContact = null) {
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Contact';
   const firstName = contact.first_name || name.split(' ')[0];
 
@@ -177,7 +185,7 @@ Output format — return valid JSON only:
 }`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: LEGACY_HAIKU_4_5,
     max_tokens: 2500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -286,10 +294,17 @@ export const handler = async (event) => {
     let barryMemoryContext = '';
     let barryFullContext = null;
     try {
-      const { promptContext, context: fullCtx } = await assembleBarryContext(db, userId, contactId);
+      const { promptContext, context: fullCtx, status, error: ctxError } =
+        await assembleBarryContext(db, userId, contactId);
       barryMemoryContext = promptContext || '';
       barryFullContext = fullCtx;
-      if (barryMemoryContext) {
+      if (status === 'error') {
+        // P0A / defect A7: distinguish "lost the memory" from "has no memory".
+        console.warn(
+          `[barryHunterProcessEngage] Barry memory FAILED for contact=${contactId} ` +
+          `(${ctxError}). Generating without memory.`
+        );
+      } else if (barryMemoryContext) {
         console.log(`[barryHunterProcessEngage] Barry memory loaded for contact=${contactId}`);
       }
     } catch (memErr) {
@@ -360,7 +375,8 @@ export const handler = async (event) => {
     // 7. Generate step 1 draft (4 angles) — the main AI call
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const step1Draft = await generateStep1Draft(
-      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext, strategyGuidance, guardrailModifier
+      anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext, strategyGuidance, guardrailModifier,
+      lastSessionSummary, daysSinceLastContact
     );
     steps[0].draft = step1Draft;
 
@@ -393,7 +409,7 @@ export const handler = async (event) => {
     });
 
     const responseTime = Date.now() - startTime;
-    await logApiUsage(userId, 'barryHunterProcessEngage', 'success', {
+    await logApiUsage(userId, 'barryHunterProcessEngage', 'success', { provider: 'anthropic', model: LEGACY_HAIKU_4_5,
       responseTime,
       metadata: { outcomeGoal, isFirstContact, hasRecon: !!reconContext, hasBarryMemory: !!barryMemoryContext, hasStrategyGuidance: !!strategyGuidance, guardrailAction, missionId }
     });

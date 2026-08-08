@@ -136,16 +136,30 @@ async function getServiceProfiles(userId) {
 /**
  * Check if a Google Calendar integration is connected for this user.
  * Returns a lightweight calendar summary: upcoming meetings with Hunter contacts.
- * Non-blocking — returns empty array on any failure.
+ *
+ * FAILURE IS NOT EMPTINESS (P0A / defect A6)
+ * ──────────────────────────────────────────
+ * This used to return `[]` for every outcome — not connected, token expired,
+ * network error, and genuinely no meetings all looked identical. Barry then
+ * told the user "no meetings today" when the truth was "I could not see your
+ * calendar", which is the worst possible answer: confidently wrong about
+ * something the user is relying on.
+ *
+ * It now returns a status alongside the events so callers can tell the
+ * difference. Still non-blocking — a calendar failure never fails the stack.
+ *
+ * @returns {Promise<{ status: 'connected'|'not_connected'|'error', events: Array }>}
  */
 async function getCalendarContext(userId, contacts) {
   try {
     // Check if calendar is connected
     const calSnap = await getDoc(doc(db, 'users', userId, 'integrations', 'googleCalendar'));
-    if (!calSnap.exists() || calSnap.data().status !== 'connected') return [];
+    if (!calSnap.exists() || calSnap.data().status !== 'connected') {
+      return { status: 'not_connected', events: [] };
+    }
 
     const user = auth.currentUser;
-    if (!user) return [];
+    if (!user) return { status: 'error', events: [] };
     const authToken = await user.getIdToken();
 
     // Fetch upcoming 30-day calendar events
@@ -154,11 +168,14 @@ async function getCalendarContext(userId, contacts) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, authToken, maxResults: 30 }),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn('[barryContextStack] Calendar fetch failed with status', res.status);
+      return { status: 'error', events: [] };
+    }
 
     const data = await res.json();
     const events = data.events || [];
-    if (events.length === 0) return [];
+    if (events.length === 0) return { status: 'connected', events: [] };
 
     // Match calendar events to Hunter contacts by email
     const hunterContactEmails = new Set(
@@ -174,7 +191,7 @@ async function getCalendarContext(userId, contacts) {
       .map(c => ({ id: c.id, name: c.name?.toLowerCase(), email: c.email?.toLowerCase() }))
       .filter(c => c.name);
 
-    return events
+    const matchedEvents = events
       .filter(ev => {
         const attendeeEmails = (ev.attendees || []).map(a => a.email?.toLowerCase());
         // Direct email match
@@ -199,9 +216,11 @@ async function getCalendarContext(userId, contacts) {
           contactName: matched?.name || null,
         };
       });
+
+    return { status: 'connected', events: matchedEvents };
   } catch (err) {
     console.warn('[barryContextStack] Calendar context load failed (non-fatal):', err.message);
-    return [];
+    return { status: 'error', events: [] };
   }
 }
 
@@ -254,7 +273,7 @@ export async function buildContextStack(userId) {
     ]);
 
     // Load calendar context after contacts are resolved (needs contact list for matching)
-    const calendarEvents = await getCalendarContext(userId, contacts);
+    const calendar = await getCalendarContext(userId, contacts);
 
     const dashboardData = dashboardDoc.exists() ? dashboardDoc.data() : null;
     const reconConfidence = calculateReconConfidence(dashboardData);
@@ -283,7 +302,10 @@ export async function buildContextStack(userId) {
       recon,
       icpProfile: icpProfile || null,
       serviceProfiles,
-      calendarEvents,
+      calendarEvents: calendar.events,
+      // 'connected' | 'not_connected' | 'error'. Barry must be able to say "I
+      // could not see your calendar" instead of "you have no meetings".
+      calendarStatus: calendar.status,
       user_style: dashboardData?.communicationStyle || null,
       timestamp: new Date().toISOString()
     };
@@ -311,6 +333,8 @@ function emptyStack() {
     icpProfile: null,
     serviceProfiles: [],
     calendarEvents: [],
+    // The empty stack is itself a failure state — the whole build threw.
+    calendarStatus: 'error',
     timestamp: new Date().toISOString()
   };
 }

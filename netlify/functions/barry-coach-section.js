@@ -9,6 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
+import { MODEL_DEEP } from './utils/models.js';
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
 
@@ -135,14 +136,17 @@ export const handler = async (event) => {
 
     const anthropic = new Anthropic({ apiKey: claudeApiKey });
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL_DEEP,
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }],
     });
 
     await logApiUsage(userId, 'barryCoachSection', 'success', {
+      provider: 'anthropic',
+      model: MODEL_DEEP,
+      usage: response?.usage,
       responseTime: Date.now() - startTime,
-      metadata: { sectionId, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+      metadata: { sectionId },
     });
 
     // ── Parse response ──────────────────────────────────────────────────────

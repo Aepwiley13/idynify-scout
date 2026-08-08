@@ -27,6 +27,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
+import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -397,6 +398,10 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
   const userStyle = contextStack?.user_style || null;
   const icpProfile = contextStack?.icpProfile || null;
   const calendarEvents = contextStack?.calendarEvents || [];
+  // P0A / defect A6: an unreachable calendar is not an empty calendar. Older
+  // clients send no status at all, so treat a missing value as 'unknown'
+  // rather than silently claiming the calendar was readable.
+  const calendarStatus = contextStack?.calendarStatus || 'unknown';
 
   // Capability block replaces the binary "Not configured" ICP check.
   // Passed in from the handler after buildCapabilityBlock() is called with dashboardData.
@@ -495,7 +500,11 @@ ${calendarEvents.length > 0
   ? calendarEvents.map(ev =>
       `  "${ev.title}" on ${ev.startDateTime ? new Date(ev.startDateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'TBD'}${ev.contactName ? ` — with ${ev.contactName} (id: ${ev.contactId})` : ''}`
     ).join('\n')
-  : 'No upcoming calendar meetings with Hunter contacts.'}
+  : calendarStatus === 'error' || calendarStatus === 'unknown'
+    ? 'CALENDAR UNAVAILABLE — the calendar could not be read on this request. You do NOT know whether the user has meetings. Never say they have no meetings; say you could not reach their calendar.'
+    : calendarStatus === 'not_connected'
+      ? 'Google Calendar is not connected, so meetings are invisible to you. Suggest connecting it if the user asks about meetings.'
+      : 'No upcoming calendar meetings with Hunter contacts.'}
 
 IMPORTANT: If you see a calendar event with a Hunter contact, that contact likely had a meeting booked and should be moved to Sniper. Proactively suggest this with a MOVE_TO_SNIPER action.
 
@@ -797,6 +806,16 @@ export const handler = async (event) => {
       : null;
     // Phase 7 navigation context contract, sent by the global shell.
     const navigationContext = body.navigationContext || null;
+    // Links every function this user turn fans out to into one trace (A2/A3).
+    // Client-supplied and untrusted, so it is length-capped and character-bound
+    // before it can reach a log field.
+    const rawTraceId = typeof body.traceId === 'string' ? body.traceId.trim() : '';
+    const traceId = /^[A-Za-z0-9_-]{1,64}$/.test(rawTraceId) ? rawTraceId : null;
+
+    // Handler-scoped so each of the three response paths below can report its
+    // token usage: every response is declared inside its own try block, and the
+    // AI call is allowed to fail without failing the request.
+    let aiUsage = null;
 
     if (!userId || !authToken) throw new Error('Missing required parameters: userId, authToken');
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -889,7 +908,7 @@ Return valid JSON only:
       try {
         const claudeResponse = await anthropic.messages.create(
           {
-            model: 'claude-haiku-4-5-20251001',
+            model: LEGACY_HAIKU_4_5,
             max_tokens: 600,
             system: systemPrompt,
             messages: [{ role: 'user', content: briefPrompt }]
@@ -897,6 +916,7 @@ Return valid JSON only:
           { signal: briefController.signal }
         );
 
+        aiUsage = claudeResponse.usage || null;
         const rawText = claudeResponse.content[0].text;
         parsed = extractJson(rawText);
         if (!parsed?.response_text) throw new Error('Invalid brief structure');
@@ -922,6 +942,10 @@ Return valid JSON only:
       }
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
+        provider: 'anthropic',
+        model: LEGACY_HAIKU_4_5,
+        usage: aiUsage,
+        traceId,
         responseTime: Date.now() - startTime,
         metadata: { type: 'opening_brief', mode: currentMode }
       });
@@ -976,7 +1000,7 @@ Return valid JSON only:
       try {
         const icpResponse = await anthropic.messages.create(
           {
-            model: 'claude-haiku-4-5-20251001',
+            model: LEGACY_HAIKU_4_5,
             max_tokens: 800,
             system: icpSystemPrompt,
             messages: icpMessages,
@@ -984,6 +1008,7 @@ Return valid JSON only:
           { signal: icpController.signal }
         );
 
+        aiUsage = icpResponse.usage || null;
         const rawText = icpResponse.content[0].text;
         icpParsed = extractJson(rawText);
         if (!icpParsed?.response_text) throw new Error('Invalid ICP response structure');
@@ -1023,6 +1048,10 @@ Return valid JSON only:
       }
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
+        provider: 'anthropic',
+        model: LEGACY_HAIKU_4_5,
+        usage: aiUsage,
+        traceId,
         responseTime: Date.now() - startTime,
         metadata: { type: 'icp_reclarification' }
       });
@@ -1146,7 +1175,7 @@ Return valid JSON only:
       try {
         const chatResponse = await anthropic.messages.create(
           {
-            model: 'claude-haiku-4-5-20251001',
+            model: LEGACY_HAIKU_4_5,
             max_tokens: 2000,
             system: systemPrompt,
             messages
@@ -1154,6 +1183,7 @@ Return valid JSON only:
           { signal: chatController.signal }
         );
 
+        aiUsage = chatResponse.usage || null;
         const rawText = chatResponse.content[0].text;
         parsed = extractJson(rawText);
         if (!parsed) {
@@ -1190,6 +1220,10 @@ Return valid JSON only:
       ];
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
+        provider: 'anthropic',
+        model: LEGACY_HAIKU_4_5,
+        usage: aiUsage,
+        traceId,
         responseTime: Date.now() - startTime,
         metadata: {
           type: 'conversation',

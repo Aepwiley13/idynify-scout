@@ -63,12 +63,26 @@ function setCachedContext(userId, contactId, value) {
 /**
  * Assemble full Barry context for a contact using Firebase Admin SDK.
  *
+ * FAILURE IS NOT ABSENCE OF MEMORY (P0A / defect A7)
+ * ──────────────────────────────────────────────────
+ * This used to return `{ context: null, promptContext: '' }` for both "this
+ * contact has no memory yet" and "the Firestore read threw". Callers could not
+ * tell them apart, so a transient failure made Barry generate cold-prospect
+ * copy for a warm relationship he has known for months — silently, with no
+ * signal to the user or the logs that anything had been lost.
+ *
+ * The return now carries a `status`. `promptContext` is still '' in every
+ * failure case, so callers that only read `{ context, promptContext }` behave
+ * exactly as before; callers that care can degrade honestly.
+ *
  * @param {import('firebase-admin/firestore').Firestore} db - Admin Firestore instance
  * @param {string} userId
  * @param {string} contactId
- * @returns {Promise<Object>} { context, promptContext }
- *   - context: full structured object for programmatic use
+ * @returns {Promise<Object>} { status, context, promptContext, error }
+ *   - status: 'ok' | 'not_found' | 'error'
+ *   - context: full structured object for programmatic use, null unless 'ok'
  *   - promptContext: string ready for injection into Claude prompts (~300 tokens)
+ *   - error: message when status is 'error', otherwise null
  */
 export async function assembleBarryContext(db, userId, contactId) {
   // Check cache first
@@ -86,7 +100,7 @@ export async function assembleBarryContext(db, userId, contactId) {
     ]);
 
     if (!contactSnap.exists) {
-      return { context: null, promptContext: '' };
+      return { status: 'not_found', context: null, promptContext: '', error: null };
     }
 
     const contact = { id: contactSnap.id, ...contactSnap.data() };
@@ -171,12 +185,18 @@ export async function assembleBarryContext(db, userId, contactId) {
     // Build prompt-ready string (capped at ~300 tokens)
     const promptContext = buildPromptContext(context);
 
-    const result = { context, promptContext };
+    const result = { status: 'ok', context, promptContext, error: null };
     setCachedContext(userId, contactId, result);
     return result;
   } catch (error) {
-    console.error('[BarryContextAssembler] Failed to assemble context:', error);
-    return { context: null, promptContext: '' };
+    // Deliberately NOT cached. Caching a failure would keep Barry amnesiac
+    // about this contact for the whole TTL, long after the cause cleared.
+    console.error(
+      `[BarryContextAssembler] Failed to assemble context for contact ${contactId} ` +
+      `(user ${userId}) — Barry is generating WITHOUT memory:`,
+      error
+    );
+    return { status: 'error', context: null, promptContext: '', error: error.message };
   }
 }
 

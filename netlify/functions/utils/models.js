@@ -55,34 +55,58 @@ export const MODEL_FAST = process.env.BARRY_MODEL_FAST || 'claude-haiku-4-5';
 /** Reasoning, long structured output, or anything persisted and reused. */
 export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 
-// ─── Pre-policy models, still in effect until Step 3 ─────────────────────────
+// ─── Model lifecycle ─────────────────────────────────────────────────────────
 //
-// Support status below was re-verified against the provider's model catalogue
-// on 2026-08-08. Record the date whenever you touch these — an unsourced
-// status claim in this block is what produced the error corrected in §1 of
-// docs/audits/P0B_MODEL_INVENTORY.md.
+// Verified 2026-08-08 against Anthropic's published deprecation history:
+//   https://platform.claude.com/docs/en/about-claude/model-deprecations
+//
+// Idynify calls the Anthropic Claude API directly (@anthropic-ai/sdk +
+// ANTHROPIC_API_KEY). There is no Bedrock or Vertex client in this repository,
+// so that page is the governing lifecycle — partner platforms publish their own
+// schedules and their dates do not apply here.
+//
+//   claude-sonnet-4-6          Active — retirement not sooner than 2027-02-17
+//   claude-haiku-4-5-20251001  Active — retirement not sooner than 2026-10-15
+//   claude-sonnet-4-5-20250929 Active — retirement not sooner than 2026-09-29 ⚠
+//
+// The 4-5 floor is ~7 weeks out and 8 modules still use it. Recorded, not acted
+// on: model routing is frozen until the baseline report. Re-verify all three at
+// the start of the tier-correction PR.
+//
+// Removed because the provider retired them. Every one of these was still being
+// called in production after its retirement date:
+//
+//   claude-sonnet-4-20250514    retired 2026-06-15  → 12 RECON generators
+//   claude-3-5-haiku-20241022   retired 2026-02-19  → barryGenerateTemplate
+//   claude-3-5-sonnet-20241022  retired 2025-10-28  → generate-text-messages
+//
+// Three of the six identifiers this codebase shipped had been retired. That is
+// what having no central routing and no lifecycle check actually cost.
+//
+// RULE: a status claim in this block carries the URL it came from and the date
+// it was fetched. This file twice asserted a lifecycle status from recollection
+// while describing it as verified — once claiming a retirement date that turned
+// out to be right, then "correcting" it to a deprecated-only status that was
+// wrong, which briefly made a retired model look safe. An uncited status is a
+// recollection, whatever the sentence around it says. Full account:
+// docs/audits/P0B_MODEL_INVENTORY.md §8.
 
-// LEGACY_SONNET_4 = 'claude-sonnet-4-20250514' was removed on 2026-08-08.
-// The twelve RECON generators that imported it — generate-section-1..10,
-// generate-icp-brief, generate-all-reports — now call MODEL_DEEP.
+// ─── Dated snapshots still pinned by pre-policy endpoints ────────────────────
 //
-// Recording the basis accurately, because an earlier revision of this file did
-// not: that string was verified on 2026-08-08 as **deprecated, retirement date
-// not announced**. It was still serving. It is not on the provider's retired
-// list, unlike the two 2024 strings replaced in 97e5653, which are. So the
-// migration was a decision to leave a deprecated model early, not a repair of
-// a broken one. An earlier comment here claimed a 2026-06-15 retirement date;
-// that date was never published and is retracted. See §7 of
-// docs/audits/P0B_MODEL_INVENTORY.md.
-//
-// The constant is gone rather than kept-and-marked because nothing imports it.
+// Both are Active per the verification above. They collapse onto MODEL_DEEP /
+// MODEL_FAST at Step 3, after the baseline. Do not remove either while an
+// import remains — 16 endpoints resolve their model through these.
 
-/** Dated snapshot, active (verified 2026-08-08). Sequence and ICP generation. */
+/**
+ * Active; retirement not sooner than 2026-09-29 (verified 2026-08-08).
+ * Sequence, ICP, and campaign generation — 8 modules.
+ * Nearest retirement floor in the codebase; see the ⚠ note above.
+ */
 export const LEGACY_SONNET_4_5 = 'claude-sonnet-4-5-20250929';
 
 /**
- * Dated snapshot of the same model MODEL_FAST names, active (verified
- * 2026-08-08). Kept as a distinct literal so Step 1 changes nothing on the ten
- * endpoints that pin it; they collapse onto MODEL_FAST at Step 3.
+ * Active; retirement not sooner than 2026-10-15 (verified 2026-08-08).
+ * The dated snapshot of the same model MODEL_FAST names. Kept as a distinct
+ * literal so Step 1 changed nothing on the ten endpoints that pin it.
  */
 export const LEGACY_HAIKU_4_5 = 'claude-haiku-4-5-20251001';

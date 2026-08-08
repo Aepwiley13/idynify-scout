@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { LEGACY_SONNET_4 } from './utils/models.js';
+import { MODEL_DEEP } from './utils/models.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -307,7 +307,7 @@ RULES:
     console.log('🤖 Calling Claude API for comprehensive reports...');
 
     const message = await anthropic.messages.create({
-      model: LEGACY_SONNET_4,
+      model: MODEL_DEEP,
       max_tokens: 6144,
       temperature: 0.5,
       messages: [{
@@ -344,7 +344,7 @@ RULES:
       sectionsAnalyzed: 10,
       reportsGenerated: Object.keys(output.reports).length,
       generationTime,
-      model: LEGACY_SONNET_4,
+      model: MODEL_DEEP,
       tokensUsed: message.usage.input_tokens + message.usage.output_tokens
     };
 

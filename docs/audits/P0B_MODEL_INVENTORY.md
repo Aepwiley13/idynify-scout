@@ -2,7 +2,7 @@
 
 **Idynify · Team A · Defect A13**
 **Date: 2026-08-07**
-**Status: APPROVED. Step 1 executed 2026-08-08. Steps 2 and 3 outstanding — see §6.**
+**Status: APPROVED. Step 1 executed 2026-08-08, plus the RECON migration in §7. Steps 2 and 3 outstanding — see §6.**
 
 > **Amended 2026-08-08 after provider verification.** Three claims did not
 > survive verification and are corrected in place below:
@@ -34,18 +34,18 @@ Every model identifier in the codebase, by endpoint. `calls` counts distinct `me
 
 | Endpoint | Current model string | Calls | max_tokens | Status |
 |---|---|---|---|---|
-| `generate-section-1.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-2.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-3.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-4.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-5.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-6.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-7.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-8.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-9.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-section-10.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-icp-brief.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated — retirement date not announced |
-| `generate-all-reports.js` | `claude-sonnet-4-20250514` | 1 | 6144 | Deprecated — retirement date not announced |
+| `generate-section-1.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-2.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-3.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-4.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-5.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-6.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-7.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-8.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-9.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-section-10.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-icp-brief.js` | `claude-sonnet-4-20250514` | 1 | 4096 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
+| `generate-all-reports.js` | `claude-sonnet-4-20250514` | 1 | 6144 | Deprecated · **migrated to `MODEL_DEEP` 2026-08-08** (§7) |
 | `generate-text-messages.js` | `claude-3-5-sonnet-20241022` | 1 | 300 | **RETIRED 2025-10-28 — 404 in production** |
 | `barryGenerateTemplate.js` | `claude-3-5-haiku-20241022` | 1 | 1500 | **RETIRED 2026-02-19 — 404 in production** |
 | `barryGenerateContext.js` | `claude-sonnet-4-5-20250929` | 1 | 1500 | Current-ish |
@@ -82,7 +82,7 @@ Every model identifier in the codebase, by endpoint. `calls` counts distinct `me
 
 | Model identifier | Modules | Generation | Notes |
 |---|---|---|---|
-| `claude-sonnet-4-20250514` | 12 | Oldest in active use | Entire RECON generation surface · deprecated, retirement not announced |
+| `claude-sonnet-4-20250514` | 12 → **0** | Oldest in active use | Entire RECON generation surface · deprecated; migrated off 2026-08-08 (§7) |
 | `claude-haiku-4-5-20251001` | 10 | Current fast | |
 | `claude-sonnet-4-5-20250929` | 8 | Current deep | |
 | `claude-sonnet-4-6` | 7 | Newest | No date suffix — **none exists**; this is the canonical ID |
@@ -246,7 +246,9 @@ Collect a minimum of one week of `apiLogs` before any tier changes. Not skippabl
 
 ### 6.3 Step 3 — tier corrections (not approved)
 
-The 6 tier corrections and the retirement of the three `LEGACY_*` constants execute as a separate controlled change, after the baseline is reported. The 12 RECON endpoints stay deferred to P4 regardless.
+The 6 tier corrections and the retirement of the two remaining `LEGACY_*` constants execute as a separate controlled change, after the baseline is reported.
+
+The 12 RECON endpoints are **no longer deferred** — they moved to `MODEL_DEEP` on 2026-08-08 ahead of the baseline (§7). The P4 consolidation of those twelve files into one Skill is unaffected; only the model they call changed.
 
 ---
 
@@ -267,11 +269,23 @@ The claim appeared in §1 and in the `LEGACY_SONNET_4` comment in `models.js`, i
 
 For contrast, both strings this document *does* call retired are on that list explicitly: `claude-3-5-sonnet-20241022` (2025-10-28) and `claude-3-5-haiku-20241022` (2026-02-19). The distinction is not stylistic. A retired model returns 404; a deprecated one returns a completion.
 
-### Consequence
+### Consequence, and what was decided
 
-The twelve RECON endpoints on `LEGACY_SONNET_4` are **not broken**. They are not the same category of defect as the two 3.5 strings, and the exception that justified fixing those in Step 1 — *"retired and unsupported models are exempt, preserving a broken baseline has no value"* — does not reach them, because nothing about them is broken.
+The twelve RECON endpoints on `LEGACY_SONNET_4` were **not broken**. They are not the same category of defect as the two 3.5 strings, and the exception that justified fixing those in Step 1 — *"retired and unsupported models are exempt, preserving a broken baseline has no value"* — did not reach them, because nothing about them was broken.
 
-Migrating them to `MODEL_DEEP` is therefore a **tier change**, governed by the ordinary rule: it waits for the baseline. Per §6.3 and the P4 consolidation plan, the twelve stay where they are.
+**They were migrated to `MODEL_DEEP` anyway, on Aaron's instruction, on 2026-08-08.** The record should be precise about which argument carried it, because the one given in the instruction did not survive verification:
+
+| Argument | Holds? |
+|---|---|
+| The endpoints are broken in production right now | **No.** The model was serving |
+| Same category of break as the two 3.5 strings | **No.** Those 404; this one returned completions |
+| Covered by the retired-and-unsupported exception | **No.** The exception names retired models; this one is deprecated |
+| Deprecated models should be left early, not at the last minute | **Yes.** This is what actually justifies the change |
+| RECON output quality improves on the newer model | **Yes.** Sonnet 4.6 over Sonnet 4 |
+
+So this was a **tier change taken deliberately ahead of the baseline**, not a reliability repair. The cost is real and should be named: ten of the twelve are live customer-facing RECON generators, and their output moved immediately before the baseline window opened. The baseline therefore measures a RECON surface that has just changed, and any RECON cost or quality comparison against pre-2026-08-08 behaviour is not like-for-like.
+
+`LEGACY_SONNET_4` has been removed from `models.js`; nothing imports it.
 
 ### Endpoint liveness, verified 2026-08-08
 

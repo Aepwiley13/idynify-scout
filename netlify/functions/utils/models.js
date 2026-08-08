@@ -41,7 +41,10 @@
  *   - The `"model"` field inside the RECON prompt templates
  *     (generate-section-*, generate-icp-brief, generate-all-reports). That is
  *     prompt text asking Claude to echo a value into `metadata.model`, not a
- *     routing decision. Editing it would change the prompt.
+ *     routing decision. Editing it would change the prompt. It is also inert:
+ *     each handler overwrites `output.metadata` wholesale after parsing, so
+ *     the persisted `metadata.model` is the constant this module supplied,
+ *     never the string the template asked for.
  */
 
 // ─── Policy tiers ────────────────────────────────────────────────────────────
@@ -59,21 +62,20 @@ export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 // status claim in this block is what produced the error corrected in §1 of
 // docs/audits/P0B_MODEL_INVENTORY.md.
 
-/**
- * Deprecated by the provider, retirement date **not yet announced** (verified
- * 2026-08-08). Deprecated is not retired: this model still serves, so the
- * twelve RECON generators that use it are not broken.
- *
- * An earlier revision of this comment asserted a retirement date of
- * 2026-06-15. That date was never published by the provider and was wrong.
- *
- * Those twelve generators consolidate into one Skill at P4. Retiring this
- * constant is part of that consolidation, so twelve near-identical files are
- * rewritten once rather than twice. If a retirement date is announced before
- * P4 lands, that changes — migrate to MODEL_DEEP immediately and do not wait
- * for the consolidation.
- */
-export const LEGACY_SONNET_4 = 'claude-sonnet-4-20250514';
+// LEGACY_SONNET_4 = 'claude-sonnet-4-20250514' was removed on 2026-08-08.
+// The twelve RECON generators that imported it — generate-section-1..10,
+// generate-icp-brief, generate-all-reports — now call MODEL_DEEP.
+//
+// Recording the basis accurately, because an earlier revision of this file did
+// not: that string was verified on 2026-08-08 as **deprecated, retirement date
+// not announced**. It was still serving. It is not on the provider's retired
+// list, unlike the two 2024 strings replaced in 97e5653, which are. So the
+// migration was a decision to leave a deprecated model early, not a repair of
+// a broken one. An earlier comment here claimed a 2026-06-15 retirement date;
+// that date was never published and is retracted. See §7 of
+// docs/audits/P0B_MODEL_INVENTORY.md.
+//
+// The constant is gone rather than kept-and-marked because nothing imports it.
 
 /** Dated snapshot, active (verified 2026-08-08). Sequence and ICP generation. */
 export const LEGACY_SONNET_4_5 = 'claude-sonnet-4-5-20250929';

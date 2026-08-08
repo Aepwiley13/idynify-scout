@@ -344,7 +344,7 @@ Every signal type is defined with: its namespace, what it means, who produces it
 - Relationship Awareness: `consecutive_no_replies` += 1 (if hard bounce), `risk_score` increase, flag `channel_effectiveness.email` degradation
 - Business Awareness: pipeline health signal
 
-**Current state:** CONFIRMED — engagement_summary field (audit Step 4).
+**Current state:** PROPOSED — no emission point exists in the repository. Signal design and payload schema are correct. Evidence references are schema comments and CSS animations only.
 
 ---
 
@@ -621,6 +621,8 @@ Every signal type is defined with: its namespace, what it means, who produces it
 
 **Awareness updates:**
 - Same as `contact.email_bounced`
+
+**Current state:** PROPOSED — no emission point exists in the repository. Signal design and payload schema are correct.
 
 ---
 
@@ -1256,7 +1258,7 @@ These signals close the loop. They are produced by Executed Actions (Document 2,
 | `contact.reply_received` | Critical | gmail | contact | Poll-based |
 | `contact.email_sent` | High | gmail | contact | CONFIRMED |
 | `contact.email_opened` | Medium | platform | contact | CONFIRMED |
-| `contact.email_bounced` | High | gmail | contact | CONFIRMED |
+| `contact.email_bounced` | High | gmail | contact | PROPOSED |
 | `contact.added` | Medium | platform | contact | CONFIRMED |
 | `contact.enriched` | Medium | apollo | contact | CONFIRMED |
 | `contact.archived` | Low | user_action | contact | CONFIRMED |
@@ -1266,7 +1268,7 @@ These signals close the loop. They are produced by Executed Actions (Document 2,
 | `company.icp_evaluated` | Medium | platform | company | CONFIRMED (renamed) |
 | `company.enriched` | Medium | apollo | company | CONFIRMED |
 | `message.delivered` | Medium | gmail | message | PROPOSED |
-| `message.bounced` | High | gmail | message | CONFIRMED |
+| `message.bounced` | High | gmail | message | PROPOSED |
 | `meeting.today` | Critical | calendar | meeting | CONFIRMED (pull-based) |
 | `meeting.created` | Medium | calendar | meeting | Partial |
 | `meeting.completed` | High | calendar | meeting | PROPOSED |
@@ -1312,7 +1314,7 @@ Awareness (aggregate state)
 ## Observation Persistence
 
 ```
-[PROPOSED — persisted Observation trace — CONFIRMED by this document]
+[PROPOSED — persisted Observation trace; architecture approved in Document 3, implementation absent today]
 
 Observation records are persisted at users/{uid}/observations/{observationId}
 for auditability and replay support. Observation remains a processing step,
@@ -1326,7 +1328,7 @@ Justification:
   (c) Debugging awareness state requires inspecting the observation
       history
 
-Persistence contract confirmed. Document 5 schedules the implementation.
+Document 5 schedules the implementation.
 ```
 
 ## Pipeline Processing Rules
@@ -1634,20 +1636,20 @@ Any module or integration that wants Barry to know about an event writes a Signa
 
 ### Current producers and their migration
 
-| Current System | Current Behavior | Target Signal(s) |
-|---|---|---|
-| `gmail-poll-replies` | Polls Gmail, writes to `barry_processing_queue` | `contact.reply_received` |
-| `gmail-send` / `barry-approve-send` | Sends email, records in contact timeline | `contact.email_sent` |
-| `track-open` | Records email open event | `contact.email_opened` |
-| `search-companies` | Creates company record | `company.discovered` |
-| `score-icp-fit` | Evaluates company ICP | `company.icp_evaluated` |
-| `calendar-list-events` | Polls calendar for today's events | `meeting.today` |
-| NBS UI actions | Updates `next_best_step` field | `nbs.confirmed`, `nbs.dismissed` |
-| Mission step completion | Updates mission step status | `mission.step_completed` |
-| Contact creation | Creates contact document | `contact.added` |
-| Enrichment pipeline | Enriches contact/company data | `contact.enriched`, `company.enriched` |
-| Barry chat handler | Starts/closes conversations | `session.started`, `session.closed` |
-| Action Executor | Executes approved actions | `action.completed`, `action.failed`, `action.verified` |
+| Current System | Current Behavior | Target Signal(s) | Status |
+|---|---|---|---|
+| `gmail-poll-replies` | Polls Gmail, writes to `barry_processing_queue` | `contact.reply_received` | CONFIRMED |
+| `gmail-send` / `barry-approve-send` | Sends email, records in contact timeline | `contact.email_sent` | CONFIRMED |
+| `track-open` | Records email open event | `contact.email_opened` | CONFIRMED |
+| `search-companies` | Creates company record | `company.discovered` | CONFIRMED |
+| `score-icp-fit` | Evaluates company ICP | `company.icp_evaluated` | PROPOSED — file does not exist in repository |
+| `calendar-list-events` | Polls calendar for today's events | `meeting.today` | CONFIRMED |
+| NBS UI actions | Updates `next_best_step` field | `nbs.confirmed`, `nbs.dismissed` | CONFIRMED |
+| Mission step completion | Updates mission step status | `mission.step_completed` | CONFIRMED |
+| Contact creation | Creates contact document | `contact.added` | CONFIRMED |
+| Enrichment pipeline | Enriches contact/company data | `contact.enriched`, `company.enriched` | CONFIRMED |
+| Barry chat handler | Starts/closes conversations | `session.started`, `session.closed` | CONFIRMED |
+| Action Executor | Executes approved actions | `action.completed`, `action.failed`, `action.verified` | CONFIRMED |
 
 ---
 
@@ -1809,7 +1811,7 @@ Dead letter signals are retained for 30 days for debugging. They do not count to
 | **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
 | **Architecture source** | `docs/barry-os/architecture/BARRY_OS_REFERENCE_ARCHITECTURE.md` (Document 1 — frozen) |
 | **Domain model** | `docs/barry-os/architecture/BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md` (Document 2 — pending approval) |
-| **Architecture status** | Pending Team A review |
+| **Architecture status** | Team A evidence review complete (2026-08-08). Four corrections applied: (1) `contact.email_bounced` CONFIRMED→PROPOSED, (2) `message.bounced` CONFIRMED→PROPOSED, (3) `score-icp-fit` producer marked PROPOSED, (4) Observation persistence label corrected — architecture approved, implementation absent. Pending Aaron's final approval. |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical signal specification) |
 | **Frozen** | No — pending approval |

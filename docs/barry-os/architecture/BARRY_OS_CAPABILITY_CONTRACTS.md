@@ -52,7 +52,7 @@ Before defining contracts, this document resolves open architectural questions i
 
 ## Resolution R4-001: Canonical Ownership of Bounce Events
 
-**Status:** RESOLUTION REQUIRED
+**Status:** RESOLVED
 
 **Problem:** Document 3 (Signal Specification, frozen) defines two signals for the same real-world event — an outbound email bouncing:
 
@@ -62,6 +62,17 @@ Before defining contracts, this document resolves open architectural questions i
 | `message.bounced` | Message | "Same as `contact.email_bounced`" | PROPOSED |
 
 Both signals are PROPOSED (no emission point exists in the repository). Both produce identical awareness updates. Two canonical signals for one real-world event violates the Single Source of Truth principle (Document 1, Section 1).
+
+**Current codebase evidence:**
+
+Bounce events enter the system through Resend webhooks, not Gmail directly:
+
+- `resendWebhook.js` (line 66) receives `email.bounced` events from Resend
+- `handleEmailBounced()` (lines 138–158) updates `emailLogs` with bounce status and, for hard bounces, adds the recipient to `emailSuppressionList`
+- **The gap:** No contact document update, no timeline event, no signal emission, no Awareness projection update, no user notification. A bounced contact stays in whatever `conversationState` it was in (e.g., `awaiting_reply`) with no transition.
+- `peopleSchema.js` (line 246) defines `'bounced'` as a valid `OUTCOME_TYPE`; `healthScore.js` (line 120) scores `'bounced'` at 10 (lowest); `engagement_summary.last_outcome` can be `'bounced'` — but nothing writes this value when a bounce occurs.
+
+Document 3's `contact.email_bounced` lists `gmail` as the producer source. The actual producer is `resend` (via webhook). Document 3 is frozen, so the catalog entry stays as written. This resolution corrects the producer for implementation purposes.
 
 **Analysis:**
 
@@ -78,9 +89,11 @@ The underlying fact is: *an outbound email failed to deliver*. This fact has two
 `message.bounced` is **retired as a separate signal type**. The Message object's lifecycle transition to `bounced` is a **downstream effect** of the `contact.email_bounced` signal, not a separate event. The Observation pipeline handles this:
 
 ```
-Real-world event: Gmail reports delivery failure
+Real-world event: Resend webhook delivers email.bounced
         ↓
-Signal emitted: contact.email_bounced
+resendWebhook.js receives bounce notification
+        ↓
+Signal emitted: contact.email_bounced (producer: resend, not gmail)
         ↓
 Observation pipeline (Stage 3: Observation Generation):
    Observation 1: relationship_event → Relationship Awareness update
@@ -98,7 +111,7 @@ One signal, one fact, multiple projections
 
 3. **Awareness updates target Relationship and Business projections.** Both projections are keyed by Contact/Company, not by Message. The signal's natural home is the entity whose awareness projections it feeds.
 
-4. **The producer is the Gmail integration.** Gmail reports bounces per-recipient, not per-message. The signal shape matches the producer's output.
+4. **The producer is the Resend webhook.** Resend reports bounces per-recipient via `handleEmailBounced()` in `resendWebhook.js`. The handler already extracts the recipient email for suppression — the signal's natural shape matches the Contact entity. Document 3 lists `gmail` as the source; the actual emission point is `resendWebhook.js`. This correction is for implementation (Document 5) — Document 3 is frozen.
 
 **Impact on Document 3 (frozen):**
 
@@ -1782,6 +1795,17 @@ All AI model selection is governed by a centralized policy. Skills declare which
 - Default to Fast tier for all Skills unless the task requires multi-source synthesis or structured reasoning
 - Escalate to Reasoning tier when: complexity score > 0.7, input sources > 3, or the Skill's contract specifies it
 - Never use a model outside these two tiers without explicit governance approval
+
+**Current model migration status:**
+
+| Tier | Model Constant | Model ID | Module Count | Status |
+|---|---|---|---|---|
+| Fast | `MODEL_FAST` | `claude-haiku-4-5` | 1 | Current — on policy tier |
+| Reasoning | `MODEL_DEEP` | `claude-sonnet-4-6` | 17 | Current — on policy tier |
+| Legacy | `LEGACY_HAIKU_4_5` | `claude-haiku-4-5-20251001` | 10 | Migration needed — pinned to old model ID |
+| Legacy | `LEGACY_SONNET_4_5` | `claude-sonnet-4-5-20250929` | 8 | **URGENT** — retirement floor 2026-09-29 (~7 weeks) |
+
+8 modules on `LEGACY_SONNET_4_5` must migrate to `MODEL_DEEP` before 2026-09-29. The tier correction is a prerequisite for Document 5's build sequence. `models.js` documents this risk at lines 70–74.
 
 **Cost guardrails:**
 

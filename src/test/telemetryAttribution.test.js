@@ -17,7 +17,7 @@
  * is invisible to both. Scanning the source is the only guard that covers all
  * of them at once.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -117,6 +117,57 @@ describe('A2 — Anthropic failures must not be booked as Apollo credits', () =>
 
     expect(lastLogEntry().provider).toBe('apollo');
     expect(lastLogEntry().creditsUsed).toBe(1);
+  });
+});
+
+describe('environment is BARRY_ENV, and nothing else', () => {
+  // vi.stubEnv rather than touching process.env directly: it restores cleanly
+  // and keeps this file free of `process`, which the browser eslint config
+  // does not define.
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const envOf = async () => {
+    await logApiUsage('user-1', 'barryCSMRead', 'success', {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+    });
+    return lastLogEntry().environment;
+  };
+
+  it('records production when BARRY_ENV=production', async () => {
+    vi.stubEnv('BARRY_ENV', 'production');
+    await expect(envOf()).resolves.toBe('production');
+  });
+
+  it('records deploy-preview when BARRY_ENV=deploy-preview', async () => {
+    vi.stubEnv('BARRY_ENV', 'deploy-preview');
+    await expect(envOf()).resolves.toBe('deploy-preview');
+  });
+
+  it('records unknown when BARRY_ENV is unset — it does not guess', async () => {
+    vi.stubEnv('BARRY_ENV', undefined);
+    await expect(envOf()).resolves.toBe('unknown');
+  });
+
+  it('ignores the Firebase project entirely (BO-011)', async () => {
+    // The physical database and the logical environment are independent.
+    // A project ID containing "dev" must not colour the label, and its absence
+    // must not either — this is the specific defect being retired.
+    vi.stubEnv('BARRY_ENV', undefined);
+    vi.stubEnv('FIREBASE_PROJECT_ID', 'idynify-scout-dev');
+    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'idynify-scout-dev');
+    await expect(envOf()).resolves.toBe('unknown');
+
+    vi.stubEnv('BARRY_ENV', 'production');
+    vi.stubEnv('FIREBASE_PROJECT_ID', 'idynify-scout-dev');
+    await expect(envOf()).resolves.toBe('production');
+  });
+
+  it('passes the value through verbatim — no normalising, no mapping', async () => {
+    vi.stubEnv('BARRY_ENV', 'branch-deploy');
+    await expect(envOf()).resolves.toBe('branch-deploy');
   });
 });
 

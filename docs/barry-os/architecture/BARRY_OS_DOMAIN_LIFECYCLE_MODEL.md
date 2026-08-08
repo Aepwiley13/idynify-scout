@@ -2817,25 +2817,23 @@ Every component in Barry OS either feeds this loop or serves it. Awareness proje
 | **Discovery source** | `docs/audits/BARRY_OS_FOUNDATION_AUDIT.md` (commit `09e90f9`) |
 | **Discovery authority** | `docs/audits/BARRY_OS_AUDIT_RECONCILIATION.md` |
 | **Architecture source** | `docs/barry-os/architecture/BARRY_OS_REFERENCE_ARCHITECTURE.md` (Document 1 — frozen 2026-08-07) |
-| **Architecture status** | Team A evidence review complete (2026-08-08). Five corrections applied: (1) `barry_drafts` migration mapping added, (2–3) `contact.email_bounced` and `message.bounced` evidence labels corrected in Document 3, (4) `score-icp-fit` marked PROPOSED in Document 3, (5) Observation persistence label corrected in Document 3. Pending Aaron's final approval. |
+| **Architecture status** | APPROVED / FROZEN — 2026-08-08. Team A evidence review complete. Five corrections applied: (1) `barry_drafts` migration mapping added, (2–3) `contact.email_bounced` and `message.bounced` evidence labels corrected in Document 3, (4) `score-icp-fit` marked PROPOSED in Document 3, (5) Observation persistence label corrected in Document 3. |
+| **Approved by** | Aaron Wiley — 2026-08-08 |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical domain model) |
-| **Frozen** | No — pending approval |
+| **Frozen** | Yes — 2026-08-08 |
 
 ## Freeze Declaration
 
-Document 2 will be frozen upon approval by Aaron after Team A evidence review.
+Document 2 is APPROVED and FROZEN as of 2026-08-08.
 
-This document may only be modified if a factual error is discovered during
-implementation that directly contradicts an object definition stated here.
+No further changes except factual corrections that directly invalidate an approved
+statement. Any such correction requires Aaron's explicit approval before modification.
 
 It may not be modified to:
 - Add new objects without Aaron's approval
 - Refine or expand lifecycle states beyond what is defined here
 - Incorporate new ideas discovered during Documents 3–5
-
-If implementation uncovers a genuine conflict with an object definition, flag it to Aaron
-before making any change. The bar for reopening a frozen document is high.
 
 All future object references in Documents 3, 4, and 5 derive from this document. They do not redefine objects.
 

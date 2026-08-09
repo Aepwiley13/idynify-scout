@@ -265,3 +265,180 @@ producer to a text search and is not one.
 A relationship-email delivery adapter (Gmail, or a future supported delivery
 channel) must publish `contact.email_bounced`. Scheduled for Document 5
 planning. **Do not implement during baseline week.**
+
+---
+
+## Infrastructure Constraints
+
+### Netlify Function Environment Payload
+
+```
+AWS Lambda compatibility mode: 4KB environment variable limit
+Trigger: BARRY_ENV addition exposed platform was at or near the limit
+Investigation date: 2026-08-08
+```
+
+The build succeeded, tests passed, and Functions bundled. Deployment failed only
+when AWS Lambda rejected the environment payload for exceeding 4096 bytes. The
+limit counts **key bytes plus value bytes** for the whole payload, so variable
+count matters as much as secret length.
+
+#### Size inventory
+
+Key lengths are exact. **Value lengths are estimates** from known credential
+formats — actual values are not visible from the repository. `+2` per variable
+covers the `=` and separator.
+
+| Group | Vars | Est. bytes | Share of 4096 |
+|---|---:|---:|---:|
+| Runtime, consumed by Functions | 28 | ~3641 | 89% |
+| Client/build only, not consumed by any Function | 11 | ~660 | 16% |
+| **User-configured subtotal** | **39** | **~4301** | **105%** |
+| Netlify-injected (`URL`, `DEPLOY_URL`, `NETLIFY_URL`, `NODE_ENV`, internal) | — | ~600 | 15% |
+| **Estimated grand total** | | **~4901** | **120%** |
+
+Single largest contributor:
+
+| Variable | Key | Est. value | Est. total | Share |
+|---|---:|---:|---:|---:|
+| `FIREBASE_PRIVATE_KEY` | 20 | ~1850 | ~1872 | **46%** |
+
+One RSA-2048 PEM service-account key consumes nearly half the entire payload.
+
+#### Scope analysis
+
+**No variable scoping is configured in the repository.** `netlify.toml` contains
+`[build]`, `[build.environment]` (`NODE_VERSION` only), `[functions]`,
+per-function `timeout` blocks, `[dev]`, `[[headers]]` and `[[redirects]]`. There
+are **no `[context.*.environment]` blocks and no scope declarations of any
+kind**, so nothing in version control differentiates which variables reach
+Functions, the build, or the client.
+
+Duplicated server/client pairs, found by enumerating every `process.env.*` in
+`netlify/functions/` and every `VITE_` token in `src/`:
+
+| Pair | Function runtime use | Client use |
+|---|---|---|
+| `FIREBASE_PROJECT_ID` / `VITE_FIREBASE_PROJECT_ID` | Both — the `VITE_` one only as a fallback | Neither |
+| `FIREBASE_API_KEY` / `VITE_FIREBASE_API_KEY` | Both | Neither |
+| `GOOGLE_PLACES_API_KEY` / `VITE_GOOGLE_PLACES_API_KEY` | Both | Neither |
+| `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` | Server only | Client only |
+| `GOOGLE_REDIRECT_URI` / `VITE_GOOGLE_REDIRECT_URI` | Server only | Client only |
+
+**Four variables are consumed by nothing.** `VITE_FIREBASE_APP_ID`,
+`VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_MESSAGING_SENDER_ID` and
+`VITE_FIREBASE_STORAGE_BUCKET` are declared in `.env.example` but read by no
+code: the client Firebase config is **hardcoded** at `src/firebase/config.js:6-11`
+rather than read from the environment. ~251 bytes for nothing.
+
+#### Runtime dependency inventory
+
+| Variable | Used by | Required |
+|---|---|---|
+| `FIREBASE_PRIVATE_KEY` | `firebase-admin.js:14`, `adminGetApiLogs.js`, other admin fns | Yes |
+| `FIREBASE_CLIENT_EMAIL` | `firebase-admin.js:21` | Yes |
+| `FIREBASE_PROJECT_ID` | `firebase-admin.js:20` + many | Yes |
+| `FIREBASE_API_KEY` | auth-related functions | Yes |
+| `ANTHROPIC_API_KEY` | every AI function | Yes |
+| `APOLLO_API_KEY` | search/enrichment functions | Yes |
+| `BARRY_MODEL_FAST` / `BARRY_MODEL_DEEP` | `utils/models.js` | Optional — literal defaults exist |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` | checkout / webhook fns | Yes |
+| `RESEND_API_KEY` | `send-welcome-email.js` | Yes |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_REDIRECT_URI` | Gmail/Calendar OAuth | Yes |
+| `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID` | search enrichment | Yes |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY` + `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | search enrichment | **Possible duplicate of the pair above — verify** |
+| `GOOGLE_PLACES_API_KEY`, `GOOGLE_VISION_API_KEY` | enrichment functions | Yes |
+| `ADMIN_USER_IDS`, `SUPER_ADMIN_USER_IDS` | `adminGetApiLogs.js:191` + admin fns | Yes |
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_GOOGLE_PLACES_API_KEY` | Function fallbacks only | **No — non-`VITE_` twin exists** |
+| `VITE_FIREBASE_APP_ID`, `_AUTH_DOMAIN`, `_MESSAGING_SENDER_ID`, `_STORAGE_BUCKET` | **nothing** | **No — client config hardcoded** |
+| Remaining `VITE_*` (`ADMIN_API_BASE`, `CRISP_WEBSITE_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI`, `SHELL_MIGRATION`, `STRIPE_ENABLED`, `SUPPORT_EMAIL`) | client bundle at build time | Not needed at Function runtime |
+
+#### Conclusion
+
+```
+INSUFFICIENT EVIDENCE
+```
+
+The failure is real and its cause is bounded, but **the repository cannot
+distinguish CONFIGURATION from BOTH**, because the decision turns on actual
+value byte counts that live only in Netlify.
+
+What is established from the repository:
+
+- No scoping is configured in version control
+- 11 variables (~660 bytes) are not consumed by any Function
+- 4 of those (~251 bytes) are consumed by nothing at all
+- 3 `VITE_*` Function fallbacks are redundant with non-`VITE_` twins
+- One variable, `FIREBASE_PRIVATE_KEY`, is ~46% of the entire limit
+
+Why that is not enough to choose: with every non-runtime variable scoped out,
+estimated runtime payload is ~3641 plus ~600 Netlify-injected ≈ **~4241 against
+a 4096 limit** — still over, which would indicate BOTH. But the estimate's error
+bars span the limit. A private key at 1700 rather than 1850, or Netlify overhead
+at 300 rather than 600, puts the same configuration under 4096, which would
+indicate CONFIGURATION. **The decision boundary sits inside the margin of
+error.**
+
+One measurement closes it — actual byte totals from the Netlify environment:
+
+```
+netlify env:list --json | jq '[to_entries[]
+  | {k: .key, bytes: (.key|length) + ((.value//"")|length) + 2}]
+  | sort_by(-.bytes)'
+```
+
+Decision rule, fixed in advance so the follow-up is one step:
+
+| Measured runtime-only total | Conclusion |
+|---|---|
+| < ~3600 after scoping | CONFIGURATION — cleanup alone resolves it |
+| ~3600–4096 after scoping | BOTH — clears now, no sustainable headroom |
+| > 4096 after scoping | PLATFORM — migration required |
+
+Dashboard-level scoping, if configured in the Netlify UI rather than
+`netlify.toml`, is also invisible from here and would change the client/build
+figures.
+
+#### Remediation options
+
+**Option A — Configuration cleanup only**
+- *Advantages:* No code or architecture change. Removes ~660 bytes of
+  non-runtime variables and ~251 bytes consumed by nothing. Reversible.
+  Improves secret hygiene by keeping client values out of the Function runtime.
+- *Risks:* Headroom may be thin or absent — by estimate it may not clear 4096 at
+  all. Every future variable re-opens the question. Scoping mistakes can remove a
+  variable a Function silently depends on, and telemetry is the only detector.
+- *Estimated effort:* Low — Netlify scope settings plus deleting four unused
+  variables; optionally removing three `VITE_*` fallbacks (a code change).
+- *Expected longevity:* Unknown, possibly zero. Depends entirely on the
+  measurement above.
+
+**Option B — Runtime migration only**
+- *Advantages:* Removes the 4KB ceiling as a class of problem. Structural, not
+  incremental. `FIREBASE_PRIVATE_KEY` at 46% stops being an architectural
+  constraint.
+- *Risks:* Largest blast radius. Changes the execution substrate for every
+  Function during a measurement week. Leaves the underlying configuration
+  disorder — four unused variables and absent scoping — in place, so the same
+  hygiene problem reappears in a new venue.
+- *Estimated effort:* High.
+- *Expected longevity:* Long for this constraint; the hygiene debt persists.
+
+**Option C — Configuration cleanup + runtime migration**
+- *Advantages:* Resolves the immediate failure and the structural ceiling.
+  Cleanup is independently valuable and can land first, potentially unblocking
+  the deploy while migration is planned.
+- *Risks:* Largest combined change surface. If sequenced together, a failure is
+  harder to attribute. Cleanup first, migration second is the lower-risk order
+  and preserves attribution.
+- *Estimated effort:* Low then High, sequenceable.
+- *Expected longevity:* Longest.
+
+**No recommendation.** The evidence does not clearly favour one, and which is
+correct depends on the measurement above. If the measured total shows cleanup
+clears 4096 with real headroom, A is sufficient and C is over-engineering. If it
+does not, A is wasted motion on its own.
+
+```
+Decision: pending — awaiting Aaron approval
+```

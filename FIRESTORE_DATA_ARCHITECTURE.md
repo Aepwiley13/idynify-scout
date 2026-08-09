@@ -442,3 +442,206 @@ does not, A is wasted motion on its own.
 ```
 Decision: pending — awaiting Aaron approval
 ```
+
+---
+
+## Deployment & Secret Architecture
+
+### The four-layer contract
+
+```
+Environment variable
+        ↓
+Required consumer
+        ↓
+Allowed scope (Functions / Build / Both / Unused)
+        ↓
+Allowed deploy context (Production / Preview / Branch / Local)
+```
+
+A variable is only correctly configured when all four layers are answered. Today
+only the first is answered anywhere.
+
+### Current confirmed status
+
+```
+CONFIRMED: All 33 variables use All Scopes across all deploy contexts.
+CONFIRMED: Same configured values available across Production, Deploy Preview,
+           and Branch Deploy.
+CONFIRMED: Inappropriate scoping contributes to Function environment payload.
+CONFIRMED: The 4KB limit applies only in Lambda compatibility mode. The modern
+           Netlify Functions runtime removes it entirely.
+CONFIRMED: Lambda compatibility mode is deprecated. Deploys containing it are
+           not accepted after 2027-07-01.
+PENDING:   Whether properly scoped required Function variables exceed 4KB.
+PENDING:   Whether modern runtime migration is required or optional after
+           cleanup.
+```
+
+**Count reconciliation.** The dashboard reports 33 configured variables; the
+repository references 39 distinct names. The gap is variables referenced in code
+but not configured (they fall back to literals or are inert), and possibly
+configured variables no code reads. The matrix below covers the referenced
+union — reconciling it against the dashboard's 33 requires the dashboard list.
+
+### Sensitivity of shared values — evidence, not assumption
+
+The dashboard proves the same values are present in every context. What those
+values *are* is only partly determinable:
+
+| Credential | Determination | Evidence |
+|---|---|---|
+| Firebase (`FIREBASE_*`) | **Development-project credentials serving production** | One Firebase project exists, `idynify-scout-dev`, hardcoded at `src/firebase/config.js:6-11`. There is no production project (`DEPLOYMENT.md:23` names one only as a setup example) |
+| Stripe, Anthropic, Apollo, Resend, Google | **UNKNOWN — live vs test not determinable** | Key prefixes (`sk_live_` vs `sk_test_`) would settle it, but values are not visible from the repository |
+
+Not assumed to be production credentials. For Stripe specifically, the
+distinction is decidable in one glance at the key prefix and should be checked
+before any context split.
+
+### Remediation matrix
+
+Scope: `FUNCTIONS` / `BUILD` / `BOTH` / `UNUSED`.
+Context: `PRODUCTION_ONLY` / `PREVIEW_SAFE` / `CONTEXT_SPECIFIC` / `UNKNOWN`.
+Sensitivity: `PUBLIC_CONFIG` / `INTERNAL_CONFIG` / `SECRET` / `HIGH_VALUE_SECRET`.
+
+| Variable | Sensitivity | Scope | Context | Consumers | Recommendation |
+|---|---|---|---|---|---|
+| `FIREBASE_PRIVATE_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `firebase-admin.js:14` | Scope to Functions. Preview needs *a* key for previews to work — use a sandbox service account, not `none` |
+| `FIREBASE_CLIENT_EMAIL` | SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `firebase-admin.js:21` | Pairs with the key above |
+| `FIREBASE_PROJECT_ID` | INTERNAL_CONFIG | FUNCTIONS | CONTEXT_SPECIFIC | `firebase-admin.js:20` + many | Scope to Functions |
+| `FIREBASE_API_KEY` | SECRET | FUNCTIONS | UNKNOWN | auth functions | Scope to Functions |
+| `ANTHROPIC_API_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | every AI function | Scope to Functions. Preview should use a separate key so preview spend is attributable and revocable independently |
+| `APOLLO_API_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | search/enrichment | Scope to Functions. Credit-bearing — preview usage spends real credits |
+| `STRIPE_SECRET_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | checkout | Scope to Functions. **Check the `sk_live_` / `sk_test_` prefix first** — if live, previews can move real money |
+| `STRIPE_WEBHOOK_SECRET` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `stripe-webhook.js` | Scope to Functions |
+| `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STARTER` | INTERNAL_CONFIG | FUNCTIONS | CONTEXT_SPECIFIC | checkout | Scope to Functions; must match the key's mode |
+| `RESEND_API_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `send-welcome-email.js` | Scope to Functions. Sends real email — previews should not use the production sender |
+| `GOOGLE_CLIENT_SECRET` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | OAuth | Scope to Functions |
+| `GOOGLE_CLIENT_ID` | INTERNAL_CONFIG | FUNCTIONS | CONTEXT_SPECIFIC | OAuth | Scope to Functions |
+| `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_REDIRECT_URI` | INTERNAL_CONFIG | FUNCTIONS | **CONTEXT_SPECIFIC** | OAuth | Scope to Functions. Preview URLs differ per deploy — a production redirect URI in preview breaks OAuth there |
+| `GOOGLE_SEARCH_API_KEY`, `GOOGLE_SEARCH_ENGINE_ID` | SECRET / INTERNAL_CONFIG | FUNCTIONS | PREVIEW_SAFE | search enrichment | Scope to Functions |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY`, `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | SECRET / INTERNAL_CONFIG | FUNCTIONS | UNKNOWN | search enrichment | **Verify against the pair above — likely the same integration configured twice** (~118 bytes) |
+| `GOOGLE_PLACES_API_KEY`, `GOOGLE_VISION_API_KEY` | SECRET | FUNCTIONS | PREVIEW_SAFE | enrichment | Scope to Functions |
+| `ADMIN_USER_IDS`, `SUPER_ADMIN_USER_IDS` | INTERNAL_CONFIG | FUNCTIONS | PREVIEW_SAFE | `adminGetApiLogs.js:191` | Scope to Functions |
+| `BARRY_ENV` | PUBLIC_CONFIG | FUNCTIONS | **CONTEXT_SPECIFIC** | `logApiUsage.js` | Scope to Functions. Its entire purpose is differing per context |
+| `BARRY_MODEL_FAST`, `BARRY_MODEL_DEEP` | PUBLIC_CONFIG | FUNCTIONS | PREVIEW_SAFE | `utils/models.js` | Optional — literal defaults exist. Removal candidate (~76 bytes) |
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_GOOGLE_PLACES_API_KEY` | PUBLIC_CONFIG | BUILD | PREVIEW_SAFE | Function *fallbacks* only | Redundant — non-`VITE_` twin exists. Removing the fallback is a code change (~173 bytes) |
+| `VITE_FIREBASE_APP_ID`, `_AUTH_DOMAIN`, `_MESSAGING_SENDER_ID`, `_STORAGE_BUCKET` | PUBLIC_CONFIG | **UNUSED** | — | **none** | **Removal candidates** (~251 bytes). Client config is hardcoded. Hold pending dashboard/plugin verification |
+| `VITE_ADMIN_API_BASE`, `VITE_CRISP_WEBSITE_ID`, `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_REDIRECT_URI`, `VITE_SHELL_MIGRATION`, `VITE_STRIPE_ENABLED`, `VITE_SUPPORT_EMAIL` | PUBLIC_CONFIG | BUILD | CONTEXT_SPECIFIC (URLs) | client bundle | Scope to Build only — not needed in Function runtime |
+
+**Preview functionality rule applied.** No secret is recommended for removal
+from preview contexts on hygiene grounds alone. Where previews need a
+capability — Firebase, Anthropic, Apollo, Resend, Stripe — the recommendation is
+a **sandbox or non-production credential**, never `none`.
+
+### Payload projection
+
+Value bytes remain estimates. Netlify-injected overhead assumed ~600.
+
+| Scenario | Runtime | +Netlify | % of 4096 |
+|---|---:|---:|---:|
+| Current — all 39 vars, no scoping | 4301 | 4901 | **120%** |
+| A. Scope client/build out of Functions | 3653 | 4253 | **104%** |
+| B. + drop the 3 `VITE_` Function fallbacks | 3480 | 4080 | **100%** |
+| C. + drop `BARRY_MODEL_*` (defaults exist) | 3404 | 4004 | **98%** |
+| D. + drop `GOOGLE_CUSTOM_SEARCH_*` if duplicate | 3286 | 3886 | **95%** |
+
+**Scoping alone (A) does not clear the limit.** Even maximal cleanup (D) lands
+at 95% — above the 90% threshold at which the runtime concern stays urgent.
+`FIREBASE_PRIVATE_KEY` is 48% of a fully-cleaned runtime payload: one credential
+occupies half the budget, and no amount of variable hygiene changes that.
+
+### Conclusion
+
+Cleanup is necessary and insufficient. Two independent findings support the
+same conclusion, and the second does not depend on any byte estimate:
+
+1. **Headroom.** Maximal cleanup leaves ≤5% margin. Any new secret re-opens the
+   failure.
+2. **Deadline.** Lambda compatibility mode is deprecated and deploys containing
+   it are **not accepted after 2027-07-01**. Migration is scheduled work, not
+   optional work — cleanup only decides whether it happens under a deadline or
+   under an outage.
+
+The modern runtime removes the 4KB limit entirely, so migration resolves the
+constraint as a class rather than deferring it.
+
+---
+
+## Runtime Migration Readiness — Netlify Modern Functions
+
+Assessment only. Nothing migrated.
+
+> **Source limitation.** `developers.netlify.com` and `docs.netlify.com` are
+> blocked by this environment's egress proxy, so the guide named as source of
+> truth could not be read directly. Findings below come from search results
+> citing Netlify's own documentation and are marked accordingly. **Verify
+> against the primary guide before acting.**
+
+### Inventory
+
+| Measure | Count |
+|---|---|
+| Total deployed Functions | **112** (plus 31 `utils/` modules, not deployed) |
+| ESM `export const handler` | 96 |
+| ESM `export async function handler` | 2 |
+| CommonJS `exports.handler` / `module.exports` | **10** |
+| `export default` | 3 |
+| Scheduled Functions (`schedule()` from `@netlify/functions`) | **5** |
+| Background Functions (`-background` suffix) | 0 |
+| Functions with custom timeouts in `netlify.toml` | **14** (nine at 900s, three at 300s, three at 26s) |
+
+Scheduled: `daily-leads-refresh`, `gmail-sync-worker`, `process-barry-inbox-queue`,
+`process-barry-queue`, `process-scheduled-engagements`.
+
+### Lambda-specific semantics — the migration cost
+
+| Pattern | Files | Modern equivalent |
+|---|---:|---|
+| `event.httpMethod` | **106** | `request.method` |
+| `event.body` | **100** | `await request.json()` / `.text()` |
+| `return { statusCode, body }` | **110** | `new Response(body, { status })` |
+| `event.headers` | 3 | `request.headers.get()` |
+| `event.queryStringParameters` | 3 | `new URL(request.url).searchParams` |
+| `context.*` | 5 | modern `context` differs |
+| `event.path` | 0 | — |
+
+**Essentially the entire surface is Lambda-shaped.** 110 of 112 Functions
+construct a `statusCode`/`body` response object, and 106 branch on
+`event.httpMethod`. This is not a handful of files.
+
+`package.json` declares `"type": "module"` and `@netlify/functions@^5.3.0`, so
+ESM is already in place — the gap is request/response semantics, not module
+format. The 10 CommonJS Functions need both.
+
+### Migration effort: **HIGH**
+
+Not because any single change is hard — each is mechanical — but because it
+touches ~110 files, and each carries a small independent risk of a behavioural
+difference in body parsing, header casing, or status handling. Against a
+repository whose test coverage does not reach most Function runtimes (15 of 16
+AI endpoints have no runtime test, and the build does not bundle `netlify/`),
+mechanical breadth is exactly the risk profile that produced the near-miss in
+`28da0e9`.
+
+### Transitional path
+
+`@netlify/aws-lambda-compat` **exists** and runs Lambda-style handlers on the
+modern runtime *(source: search results citing Netlify docs; not verified
+against the primary guide)*. If accurate, it is a viable transitional path:
+adopt the modern runtime — removing the 4KB limit — while keeping the existing
+handler signature, then convert handlers incrementally.
+
+That ordering matters here. It separates *"escape the environment limit"* from
+*"rewrite 110 request/response contracts"*, so the urgent constraint can be
+resolved without a 110-file change during a measurement week.
+
+**Verify before relying on it:** whether the compat layer supports `schedule()`,
+the 900-second timeouts, and per-function `netlify.toml` configuration. Those
+are the three places this codebase is unusual, and all three are load-bearing.
+
+### Deadline
+
+Lambda compatibility mode is deprecated; deploys containing it are **not
+accepted after 2027-07-01** *(source: search results citing Netlify docs)*.
+Migration is scheduled work whether or not the 4KB issue forces it sooner.

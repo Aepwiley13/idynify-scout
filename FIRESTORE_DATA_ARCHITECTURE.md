@@ -687,11 +687,23 @@ against real customers.** This is the highest-severity item in Phase 1 and is
 independent of the 4KB problem — it would remain a defect even if the payload
 were comfortably under the limit.
 
-**Related exposure, client-side, outside the env-var scope.** `CheckoutPage.jsx:71-72`
-hardcodes **live Stripe Payment Links** (`https://buy.stripe.com/…`) directly in
-the client bundle. Those ship to every deploy context, including previews, and
-no environment variable governs them. Scoping `STRIPE_SECRET_KEY` does not
-address this path. Recorded for Document 5; not in Phase 1 scope.
+```
+Live Stripe Payment Links in preview environments
+CheckoutPage.jsx:71-72
+
+Payment Link URLs are public-facing and are not secret credentials.
+The risk is environment isolation, not credential exposure.
+
+Preview and branch deployments currently direct users to the live
+Stripe environment. Testing or interacting with checkout from a
+preview can create real production payment activity.
+
+Phase 1 secret scoping does not change this behavior — it closes
+the Functions path only.
+
+Scheduled for Document 5: preview/branch contexts should use
+test-mode Payment Links or have live checkout disabled.
+```
 
 ### Stripe classifications
 
@@ -720,6 +732,48 @@ fallbacks:
 after remediation.** If it is scoped to Build only, the deploy succeeds, the
 acceptance criteria for the 4KB error pass, and `environment` silently records
 `unknown` — a green deploy that fails the actual objective.
+
+### Rollback mapping
+
+Every variable whose configuration changes in Phase 1. **Configuration mapping
+only — no secret values.** This is the rollback plan if a downstream Function
+breaks hours after a deploy that looked successful.
+
+Current state is identical for every row — All scopes, all contexts — which is
+also the rollback target for every row. That uniformity is the reason a partial
+rollback is safe: restoring any single variable to All/All cannot conflict with
+another.
+
+| Variable | Current scope/context | Approved scope/context | Rollback scope/context | Verification method |
+|---|---|---|---|---|
+| `BARRY_ENV` | All scopes, all contexts | Functions + per-context values | All scopes, all contexts | Telemetry row shows `environment: production` |
+| `STRIPE_SECRET_KEY` | All scopes, all contexts | Functions, **Production live key only**; preview/branch test key or absent | All scopes, all contexts | Checkout session creation succeeds in production |
+| `STRIPE_WEBHOOK_SECRET` | All scopes, all contexts | Functions, Production only; preview needs its own test endpoint secret | All scopes, all contexts | Production retains correct live signing secret — see Verification methods |
+| `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STARTER` | All scopes, all contexts | Functions; mode must match the key in that context | All scopes, all contexts | Checkout renders correct plan pricing |
+| `GOOGLE_CLIENT_SECRET` | All scopes, all contexts | Functions + contexts requiring OAuth | All scopes, all contexts | OAuth refresh on a dedicated test account |
+| `GOOGLE_CLIENT_ID` | All scopes, all contexts | Functions + contexts requiring OAuth | All scopes, all contexts | Paired with the secret above |
+| `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_REDIRECT_URI` | All scopes, all contexts | Functions, **context-specific values** — preview URLs differ per deploy | All scopes, all contexts | OAuth round-trip completes on the target context |
+| `FIREBASE_PRIVATE_KEY` | All scopes, all contexts | Functions; production key in Production, sandbox key elsewhere | All scopes, all contexts | Any Firestore-touching Function returns 200 |
+| `FIREBASE_CLIENT_EMAIL` | All scopes, all contexts | Functions; paired with the key above | All scopes, all contexts | Paired — same check |
+| `FIREBASE_PROJECT_ID` | All scopes, all contexts | Functions | All scopes, all contexts | Telemetry row written to the expected project |
+| `FIREBASE_API_KEY` | All scopes, all contexts | Functions | All scopes, all contexts | Auth-path Function succeeds |
+| `ANTHROPIC_API_KEY` | All scopes, all contexts | Functions; separate key per context | All scopes, all contexts | Telemetry row shows `provider: anthropic`, `status: success` |
+| `APOLLO_API_KEY` | All scopes, all contexts | Functions; separate key per context | All scopes, all contexts | Search/enrichment call succeeds |
+| `RESEND_API_KEY` | All scopes, all contexts | Functions; production sender in Production only | All scopes, all contexts | Welcome-email path succeeds without sending to a customer |
+| `GOOGLE_SEARCH_API_KEY`, `GOOGLE_SEARCH_ENGINE_ID` | All scopes, all contexts | Functions | All scopes, all contexts | Search enrichment returns results |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY`, `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | All scopes, all contexts | Functions — **or removed if confirmed duplicate** | All scopes, all contexts | Search enrichment unchanged after removal |
+| `GOOGLE_PLACES_API_KEY`, `GOOGLE_VISION_API_KEY` | All scopes, all contexts | Functions | All scopes, all contexts | Enrichment call succeeds |
+| `ADMIN_USER_IDS`, `SUPER_ADMIN_USER_IDS` | All scopes, all contexts | Functions | All scopes, all contexts | Admin endpoint authorises a known admin |
+| `BARRY_MODEL_FAST`, `BARRY_MODEL_DEEP` | All scopes, all contexts | Functions — **or removed**, literal defaults exist | All scopes, all contexts | Telemetry `model` field matches expected tier |
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_GOOGLE_PLACES_API_KEY` | All scopes, all contexts | **Build only** — Function fallbacks are redundant | All scopes, all contexts | Functions still resolve via non-`VITE_` twin |
+| `VITE_FIREBASE_APP_ID`, `_AUTH_DOMAIN`, `_MESSAGING_SENDER_ID`, `_STORAGE_BUCKET` | All scopes, all contexts | **Removal candidates** — held pending verification | All scopes, all contexts | Client app loads and authenticates |
+| `VITE_ADMIN_API_BASE`, `VITE_CRISP_WEBSITE_ID`, `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_REDIRECT_URI`, `VITE_SHELL_MIGRATION`, `VITE_STRIPE_ENABLED`, `VITE_SUPPORT_EMAIL` | All scopes, all contexts | **Build only** | All scopes, all contexts | Client build succeeds; affected UI renders |
+
+**Rollback trigger.** Any of the nine acceptance criteria failing, or any
+Function error surfacing in the hours after the deploy. Because telemetry is the
+detector and `logApiUsage` swallows its own failures, **an absence of error rows
+is not evidence of success** — check for the presence of expected rows, not the
+absence of failures.
 
 ### Payload projection
 
@@ -779,7 +833,27 @@ Assessment:
 Two rotation risks worth stating: `STRIPE_WEBHOOK_SECRET` and
 `GOOGLE_CLIENT_SECRET` both fail **silently or on a delay** rather than loudly.
 Neither surfaces as an immediate error, so neither is caught by a smoke test
-immediately after rotation.
+immediately after rotation. Verification methods below are written accordingly.
+
+#### Verification methods
+
+```
+Stripe webhook validation:
+Verify Production retains the correct live webhook signing secret.
+If preview Stripe webhook functionality is required, validate with
+a dedicated Stripe test-mode endpoint and signing secret.
+Do not require a preview webhook secret if previews intentionally
+do not process Stripe webhooks.
+
+Google OAuth validation:
+Verify GOOGLE_CLIENT_SECRET remains available to Functions requiring
+OAuth and token refresh. Use a dedicated test account or controlled
+non-customer verification path. Do not force-refresh a customer
+account solely for this deployment check.
+
+Principle: validate required configuration without creating
+unnecessary production-side effects.
+```
 
 ### Deployment Change Checklist — Phase 1
 
@@ -833,22 +907,35 @@ optimisation. Move Barry safely.
 | `generate-leads` | **does not exist** | 900s | — | — | None | **Stale config — delete the block** |
 | `generate-leads-v2` | **does not exist** | 900s | — | — | None | **Stale config — delete the block** |
 
-### Two configuration defects found while classifying
+### RECON long-running workload risk
 
-**1. Stale timeout blocks.** `netlify.toml` configures 900-second timeouts for
-`generate-leads` and `generate-leads-v2`. **Neither file exists** — they were
-removed in the P0B dead-file cleanup and the configuration was not. Harmless
-today, but it misrepresents the deployed surface to anyone reading the config.
+```
+RECON long-running workload risk — HIGH MIGRATION RISK CANDIDATES
 
-**2. Timeout coverage is inconsistent across the RECON generators.**
-`generate-section-1` and `-2` carry 900-second timeouts. **Sections 3 through 10
-carry none** and run at the default. All ten are the same shape: one Claude call
-at 4096 `max_tokens`, now on `MODEL_DEEP`. Either sections 1–2 do not need 900s,
-or sections 3–10 are under-provisioned and can time out under load. Both cannot
-be right.
+generate-section-1 and generate-section-2 have 900-second timeout
+configuration. Sections 3-10 appear structurally similar but do not
+have equivalent timeout configuration. generate-icp-brief and
+generate-all-reports require individual invocation/timeout verification.
 
-This is a live production question, not a migration question — **but it is not a
-measurement blocker and is not authorized work.** Recorded for Document 5.
+Do not assume these workloads must become background Functions from
+timeout declarations alone. For each one, Phase 2 must verify:
+  - current invocation type
+  - actual observed/runtime duration where measurable
+  - whether a caller waits synchronously for the response
+  - whether modern synchronous limits would be exceeded
+  - whether background/queue semantics would alter the product experience
+
+Classify as HIGH MIGRATION RISK CANDIDATES until verified.
+If a workload genuinely requires more than the modern synchronous
+limit, reclassification becomes a behavioral migration requiring
+explicit UX and workflow design — not a mechanical wrapper change.
+
+generate-leads and generate-leads-v2: stale 900s timeout blocks for
+functions that no longer exist. Remove as dead configuration in Phase 2.
+
+Sections 1-2 vs 3-10 timeout inconsistency: resolve during Phase 2
+readiness work. Do not infer which side is correct from current evidence.
+```
 
 ### Dependency graphs — scheduled and background workflows
 

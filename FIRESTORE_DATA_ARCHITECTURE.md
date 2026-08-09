@@ -645,3 +645,276 @@ are the three places this codebase is unusual, and all three are load-bearing.
 Lambda compatibility mode is deprecated; deploys containing it are **not
 accepted after 2027-07-01** *(source: search results citing Netlify docs)*.
 Migration is scheduled work whether or not the 4KB issue forces it sooner.
+
+---
+
+## Phase 1 — Approved Direction and Final Matrix
+
+```
+Architectural Direction: Option C approved as roadmap.
+Implementation gated — Phase 1 requires matrix approval,
+Phase 2 requires separate project brief and approval.
+
+Phase 1: scope/context cleanup → unblock #521 → baseline.
+Phase 2: zero-behavior-change migration before 2027-07-01.
+
+Infrastructure principle (proposed for Document 5):
+No single credential should consume more than 25% of the
+Function runtime environment payload.
+FIREBASE_PRIVATE_KEY currently at ~48%.
+```
+
+### Confirmed facts
+
+```
+CONFIRMED: Lambda compatibility mode is deprecated. Deploys will not be
+           accepted after 2027-07-01.
+CONFIRMED: Migrating to the modern runtime removes the 4KB environment
+           variable limit entirely.
+CONFIRMED: @netlify/aws-lambda-compat is the officially supported transitional
+           path preserving Lambda-style handler contracts. Each handler must
+           still be wrapped and exported with withLambda() — handler contracts
+           survive, execution semantics may not.
+CONFIRMED: STRIPE_SECRET_KEY is a live production key (sk_live_), currently
+           available to Deploy Preview and Branch Deploy Functions.
+```
+
+### 🔴 Security priority — live Stripe key in preview contexts
+
+`STRIPE_SECRET_KEY` is `sk_live_` and is currently readable by Deploy Preview
+and Branch Deploy Functions. **Any preview deploy can create real charges
+against real customers.** This is the highest-severity item in Phase 1 and is
+independent of the 4KB problem — it would remain a defect even if the payload
+were comfortably under the limit.
+
+**Related exposure, client-side, outside the env-var scope.** `CheckoutPage.jsx:71-72`
+hardcodes **live Stripe Payment Links** (`https://buy.stripe.com/…`) directly in
+the client bundle. Those ship to every deploy context, including previews, and
+no environment variable governs them. Scoping `STRIPE_SECRET_KEY` does not
+address this path. Recorded for Document 5; not in Phase 1 scope.
+
+### Stripe classifications
+
+| Variable | Classification | Evidence | Recommendation |
+|---|---|---|---|
+| `STRIPE_SECRET_KEY` | **HIGH_VALUE_SECRET**, live (`sk_live_`) | Confirmed by Aaron | Production keeps the live key. Preview and branch use a **Stripe test secret key** if Stripe functionality is required there — never the live key |
+| `STRIPE_WEBHOOK_SECRET` | **HIGH_VALUE_SECRET**, per-endpoint signing secret | `stripe-webhook.js:44` — `stripe.webhooks.constructEvent`. Belongs to the endpoint `/.netlify/functions/stripe-webhook` on the **production site domain** | **Not classifiable from the API key prefix** — it is a separate secret per endpoint. Preview and branch deploys have different URLs, so they need their **own test webhook endpoint and its own signing secret**. A production signing secret in preview cannot validate preview-delivered events |
+| `STRIPE_PUBLISHABLE_KEY` | **NOT PRESENT** | Exhaustive search of `src/`, `netlify/` and `.env.example` finds no `STRIPE_PUBLISHABLE_KEY`, no `pk_live_`, no `pk_test_` | **No classification required — the architecture does not use one.** Checkout runs through hosted Stripe Payment Links (`CheckoutPage.jsx:71-72`) and a server-created session URL (`create-checkout-session.js:91`); neither needs a client publishable key. If one exists in the dashboard, it is unused and is a removal candidate |
+| `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STARTER` | INTERNAL_CONFIG | checkout | Must match the mode of the key in that context — test price IDs with a test key |
+
+### 33 vs 39 variable gap — ledger item
+
+The dashboard reports **33** configured variables; the repository references
+**39** distinct names. The gap is not resolvable from the repository. Six
+referenced names are the likeliest unconfigured candidates, all with safe
+fallbacks:
+
+| Variable | If unconfigured | Risk to the `BARRY_ENV` deployment path |
+|---|---|---|
+| `BARRY_MODEL_FAST`, `BARRY_MODEL_DEEP` | Literal defaults in `models.js` | **None** |
+| `VITE_SHELL_MIGRATION`, `VITE_SUPPORT_EMAIL` | Client-side, falsy | **None** |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY`, `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | Search enrichment degrades | **None on the deploy path** |
+| `BARRY_ENV` | Records `unknown` | **Yes — this is the one that matters.** Confirmed configured by Aaron, but it must survive the scope change and be present in the **Functions** scope specifically |
+
+**Flag for Phase 1 verification: `BARRY_ENV` must remain in the Functions scope
+after remediation.** If it is scoped to Build only, the deploy succeeds, the
+acceptance criteria for the 4KB error pass, and `environment` silently records
+`unknown` — a green deploy that fails the actual objective.
+
+### Payload projection
+
+```
+Current Function payload:
+~4,900 bytes (120% of 4,096 limit)
+
+Projected payload after approved scope/context remediation:
+~3,900 bytes (95% of 4,096 limit)
+
+Assessment:
+
+  Operational hypothesis:
+    Expected to fall below the AWS Lambda 4KB deployment limit.
+
+  Architectural assessment:
+    Still exceeds the 90% headroom standard.
+
+  Evidence status:
+    Projection only. Actual deployment result after remediation
+    determines whether the hypothesis is confirmed.
+```
+
+### Phase 1 acceptance criteria — all nine must pass
+
+```
+✓ PR #521 deploy succeeds
+✓ All Netlify Functions upload successfully
+✓ No 4KB environment error occurs
+✓ Production Functions still have all required secrets
+✓ No Function loses required runtime configuration after scope changes
+✓ Normal production Barry call succeeds
+✓ Telemetry row shows environment: production
+✓ No production-only secret exposed to preview/branch contexts
+✓ STRIPE_SECRET_KEY live key not present in Deploy Preview or Branch Deploy
+```
+
+### Secret Classification Matrix
+
+| Secret | Criticality | Rotation Difficulty | Break Impact | Rotation Owner |
+|---|---|---|---|---|
+| `FIREBASE_PRIVATE_KEY` | Critical | High | Entire backend — every Function that touches Firestore or Auth | Aaron |
+| `FIREBASE_CLIENT_EMAIL` | Critical | High | Paired with the key; same blast radius | Aaron |
+| `STRIPE_SECRET_KEY` | Critical | Medium | Payments — checkout and subscription management | Aaron |
+| `STRIPE_WEBHOOK_SECRET` | Critical | Low | Subscription state drifts silently: events are rejected, Stripe retries, entitlements go stale without a user-visible error | Aaron |
+| `ANTHROPIC_API_KEY` | High | Low | All AI disabled — every Barry surface | Aaron |
+| `APOLLO_API_KEY` | High | Low | Search and enrichment disabled; credit-bearing | Aaron |
+| `GOOGLE_CLIENT_SECRET` | High | Medium | Gmail and Calendar OAuth breaks; existing tokens survive until refresh, so failure is delayed and looks intermittent | Aaron |
+| `RESEND_API_KEY` | Medium | Low | Transactional email disabled (welcome emails) | Aaron |
+| `FIREBASE_API_KEY` | Medium | Medium | Auth-related Function paths | Aaron |
+| `GOOGLE_SEARCH_API_KEY` | Medium | Low | Search enrichment degrades | Aaron |
+| `GOOGLE_PLACES_API_KEY` | Medium | Low | Place enrichment degrades | Aaron |
+| `GOOGLE_VISION_API_KEY` | Medium | Low | Vision enrichment degrades | Aaron |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY` | Low | Low | Possibly none — suspected duplicate | Aaron |
+| `ADMIN_USER_IDS`, `SUPER_ADMIN_USER_IDS` | Medium | Low | Admin lockout, or unintended admin access if wrong | Aaron |
+
+Two rotation risks worth stating: `STRIPE_WEBHOOK_SECRET` and
+`GOOGLE_CLIENT_SECRET` both fail **silently or on a delay** rather than loudly.
+Neither surfaces as an immediate error, so neither is caught by a smoke test
+immediately after rotation.
+
+### Deployment Change Checklist — Phase 1
+
+```
+Deployment Change Checklist — Phase 1
+
+Before changing Netlify:
+□ Export current variable list
+□ Screenshot current scopes and contexts for all variables
+□ Record current configuration as rollback reference
+
+Applying changes:
+□ Apply approved remediation matrix variable by variable
+□ Verify each context assignment matches the approved matrix
+□ Verify Function scope assignments are correct
+
+After applying changes:
+□ Confirm all required Function variables are still present
+□ Trigger a new deploy
+□ Verify all 9 acceptance criteria
+□ Confirm BARRY_ENV row shows environment: production
+□ Start baseline if all criteria pass
+```
+
+---
+
+## Phase 2 — Migration Risk Assessment
+
+Planning only. No implementation authorized.
+
+**Goal: zero observable behaviour change for customers.** Not a redesign, not an
+optimisation. Move Barry safely.
+
+### Workload classification — every function with a custom timeout
+
+| Function | Current type | Timeout | Modern target | Compat risk | Business impact if delayed | Required change |
+|---|---|---|---|---|---|---|
+| `generate-all-reports` | synchronous HTTP | 900s | background | **HIGH** | Reporting unavailable | Reclassify — 900s synchronous cannot survive a modern request timeout |
+| `generate-icp-brief` | synchronous HTTP | 900s | background | **HIGH** | ICP briefs unavailable | Reclassify. Also an A5-b dead-endpoint candidate — verify before investing |
+| `generate-section-1` | synchronous HTTP | 900s | background | **HIGH** | RECON section 1 unavailable | Reclassify |
+| `generate-section-2` | synchronous HTTP | 900s | background | **HIGH** | RECON section 2 unavailable | Reclassify |
+| `generate-section-3` … `-10` | synchronous HTTP | **default** | background | **HIGH** | RECON sections 3–10 unavailable | Reclassify. **See the inconsistency below** |
+| `daily-leads-refresh` | scheduled `0 9 * * 1-5` | 900s | scheduled | MEDIUM | Daily lead refresh stops | Verify modern scheduled duration limit accommodates it |
+| `process-barry-queue` | scheduled `0 9 * * 1-5` | 900s | scheduled | MEDIUM | Barry queue stops draining | Verify duration limit |
+| `process-scheduled-engagements` | scheduled `*/15 * * * *` | 900s | scheduled | MEDIUM | Scheduled sends stop | Verify duration limit |
+| `process-barry-inbox-queue` | scheduled `*/5 * * * *` **+ HTTP** | 300s | scheduled | MEDIUM | Inbox analysis stops | Hybrid — exports `schedule()` *and* handles `event.httpMethod`. Both paths must survive |
+| `gmail-sync-worker` | scheduled `*/10 * * * *` | 300s | scheduled | MEDIUM | Gmail sync stops | Verify duration limit fits the 50-account walk |
+| `adminGetUsers` | synchronous HTTP | 26s | synchronous | LOW | Admin user list slow/unavailable | Standard conversion |
+| `barryBulkPersonalize` | synchronous HTTP | 26s | synchronous | LOW | Bulk personalisation unavailable | Standard conversion |
+| `analyze-website` | synchronous HTTP | 26s | synchronous | LOW | Website analysis unavailable | Standard conversion |
+| `generate-leads` | **does not exist** | 900s | — | — | None | **Stale config — delete the block** |
+| `generate-leads-v2` | **does not exist** | 900s | — | — | None | **Stale config — delete the block** |
+
+### Two configuration defects found while classifying
+
+**1. Stale timeout blocks.** `netlify.toml` configures 900-second timeouts for
+`generate-leads` and `generate-leads-v2`. **Neither file exists** — they were
+removed in the P0B dead-file cleanup and the configuration was not. Harmless
+today, but it misrepresents the deployed surface to anyone reading the config.
+
+**2. Timeout coverage is inconsistent across the RECON generators.**
+`generate-section-1` and `-2` carry 900-second timeouts. **Sections 3 through 10
+carry none** and run at the default. All ten are the same shape: one Claude call
+at 4096 `max_tokens`, now on `MODEL_DEEP`. Either sections 1–2 do not need 900s,
+or sections 3–10 are under-provisioned and can time out under load. Both cannot
+be right.
+
+This is a live production question, not a migration question — **but it is not a
+measurement blocker and is not authorized work.** Recorded for Document 5.
+
+### Dependency graphs — scheduled and background workflows
+
+```
+process-barry-inbox-queue  (*/5 * * * *, 300s, hybrid scheduled + HTTP)
+        ↓ firebase-admin (Firestore: barry_processing_queue)
+        ↓ utils/barryInboxAnalyzer  → Anthropic
+        ↓ utils/barryDraftComposer  → Anthropic
+        ↓ Firestore: barry_drafts
+        ↓ contact timeline → notifications
+
+gmail-sync-worker  (*/10 * * * *, 300s)
+        ↓ utils/messageProcessor
+        ↓ Gmail API (walks up to 50 connected accounts)
+        ↓ Firestore: barry_processing_queue  → feeds process-barry-inbox-queue
+
+process-barry-queue  (0 9 * * 1-5, 900s)
+        ↓ firebase-admin (Firestore queue)
+        ↓ Anthropic
+        ↓ Firestore writes
+
+process-scheduled-engagements  (*/15 * * * *, 900s)
+        ↓ firebase-admin
+        ↓ utils/gmailSignature
+        ↓ Gmail send
+        ↓ contact timeline
+
+daily-leads-refresh  (0 9 * * 1-5, 900s)
+        ↓ Apollo / search enrichment
+        ↓ Firestore: companies, leads
+```
+
+**The critical coupling:** `gmail-sync-worker` writes into
+`barry_processing_queue` every 10 minutes, and `process-barry-inbox-queue`
+drains it every 5. The cadences are deliberately paired. **Migrating either one
+alone changes the pairing**, and the failure mode is a silently growing queue
+rather than an error — the same class of defect as A4, where the queue had no
+trigger at all and nothing surfaced it.
+
+### Scheduled wrapper migration
+
+All five scheduled functions use `schedule()` imported from `@netlify/functions`
+and export `handler = schedule(CRON, fn)`. Under the modern API these move to a
+`config.schedule` export. The cron expressions themselves are unchanged:
+
+| Function | Cron | Current form | Modern form |
+|---|---|---|---|
+| `process-barry-inbox-queue` | `*/5 * * * *` | `export const handler = schedule(QUEUE_SCHEDULE, …)` | `export const config = { schedule: '*/5 * * * *' }` |
+| `gmail-sync-worker` | `*/10 * * * *` | `export const handler = schedule(SYNC_SCHEDULE, …)` | `export const config = { schedule: '*/10 * * * *' }` |
+| `process-scheduled-engagements` | `*/15 * * * *` | `schedule(…)` | `config.schedule` |
+| `process-barry-queue` | `0 9 * * 1-5` | `schedule(…)` | `config.schedule` |
+| `daily-leads-refresh` | `0 9 * * 1-5` | `schedule(…)` | `config.schedule` |
+
+Both `process-barry-inbox-queue` and `gmail-sync-worker` export their cron as a
+named constant (`QUEUE_SCHEDULE`, `SYNC_SCHEDULE`), so the value is testable and
+the migration is mechanical.
+
+### Overall effort: HIGH
+
+The `withLambda()` wrapper preserves handler *contracts* but not necessarily
+*execution semantics* — and the semantics are where this codebase carries its
+risk: five scheduled workflows with paired cadences, four (plus eight
+unconfigured) synchronous 900-second generators that cannot remain synchronous,
+and one hybrid scheduled/HTTP function.
+
+**The 900-second synchronous generators are the real work.** They are not a
+wrapper problem; they need reclassification to background or queue-driven
+execution, and that is a behavioural change to the RECON generation path — the
+one surface Aaron has repeatedly protected.

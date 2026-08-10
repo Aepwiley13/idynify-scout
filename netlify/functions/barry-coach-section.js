@@ -223,6 +223,8 @@ export const handler = async (event) => {
   } catch (err) {
     console.error('[barry-coach-section] error:', err);
     await logApiUsage(userId || 'unknown', 'barryCoachSection', 'error', {
+      provider: 'anthropic',
+      model: MODEL_DEEP,
       responseTime: Date.now() - startTime,
       errorCode: err.message,
     }).catch(() => {});

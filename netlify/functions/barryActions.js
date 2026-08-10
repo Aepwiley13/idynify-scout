@@ -332,7 +332,7 @@ export const handler = async (event) => {
         body: JSON.stringify({ success: false, error: 'not_connected', service, message: `${service} is not connected. Go to Settings > Integrations to connect it.` }),
       };
     }
-    await logApiUsage(userId || 'unknown', 'barryActions', 'error', { responseTime: Date.now() - startTime, errorCode: err.message }).catch(() => {});
+    await logApiUsage(userId || 'unknown', 'barryActions', 'error', { provider: 'anthropic', model: LEGACY_HAIKU_4_5, responseTime: Date.now() - startTime, errorCode: err.message }).catch(() => {});
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };

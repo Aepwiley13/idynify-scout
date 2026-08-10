@@ -326,7 +326,9 @@ Every signal type is defined with: its namespace, what it means, who produces it
 
 **Purpose:** An outbound email bounced — delivery failed.
 
-**Producer:** Gmail integration (bounce notification)
+**Producer:** None implemented. Relationship email is sent through Gmail
+(`gmail-send.js`, `barry-approve-send.js`) and no repository path ingests Gmail
+bounce or delivery-failure events.
 
 **Source:** `gmail`
 
@@ -344,7 +346,17 @@ Every signal type is defined with: its namespace, what it means, who produces it
 - Relationship Awareness: `consecutive_no_replies` += 1 (if hard bounce), `risk_score` increase, flag `channel_effectiveness.email` degradation
 - Business Awareness: pipeline health signal
 
-**Current state:** PROPOSED — no emission point exists in the repository. Signal design and payload schema are correct. Evidence references are schema comments and CSS animations only.
+**Current state:** PROPOSED — no relationship-email bounce producer exists in
+the repository. Signal design and payload schema are correct.
+
+Bounce ingestion does exist, for a different channel: `resendWebhook.js:65-66`
+receives Resend `email.bounced`, classifies hard/soft, and writes `emailLogs`
+and the suppression list. That path covers **system email only**
+(`send-welcome-email.js`), never updates Contact state, and publishes no Barry
+OS signal. Contact outreach does not go through Resend and does not write to
+the email log, so it provides no relationship-email bounce ingestion.
+
+Tracked as gap **B-001** in `FIRESTORE_DATA_ARCHITECTURE.md`.
 
 ---
 

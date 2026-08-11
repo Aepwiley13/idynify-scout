@@ -151,7 +151,7 @@ describe('environment is BARRY_ENV, and nothing else', () => {
     await expect(envOf()).resolves.toBe('unknown');
   });
 
-  it('ignores the Firebase project entirely (BO-011)', async () => {
+  it('ignores the Firebase project entirely (A2, P0B)', async () => {
     // The physical database and the logical environment are independent.
     // A project ID containing "dev" must not colour the label, and its absence
     // must not either — this is the specific defect being retired.

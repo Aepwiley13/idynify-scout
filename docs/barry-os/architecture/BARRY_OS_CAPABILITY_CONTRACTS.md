@@ -1352,6 +1352,26 @@ The P6 migration window requires a **stable per-action migration identity** with
    - Not from `messageRecordId` — scoped to the reply flow; not present on all external side-effect paths
    - Not from `draftId` or other collection-specific document identifiers — not bridgeable across collections
 
+#### Migration Identity Contract
+
+Where no stable pre-existing identifier satisfies the properties above, a stable migration identity must be established before the logical action becomes eligible for coexistence or dual-path execution and before either the legacy or target representation can attempt the external side effect.
+
+The migration identity contract requires all of the following:
+
+1. Both legacy and target representations of the same logical action must deterministically resolve to the same migration identity throughout the coexistence window
+2. Once established, the identity remains immutable for the full migration lifecycle through retirement
+3. The identity must not be derived from or depend upon mutable caller-supplied parameters, including but not limited to `contactId`
+4. Each logical external action must resolve to exactly one migration identity
+5. Each migration identity must correspond to exactly one logical external action
+6. The identity identifies the logical action — not merely the user, contact, session, record type, collection location, or execution attempt
+7. The identity must remain stable across:
+   - Retries
+   - Content regeneration and editing
+   - Contact merge and re-parenting
+   - Rollback
+   - Backfill
+   - Partial migration
+
 Document 4 defines this requirement. Document 5's P6 Definition of Ready specifies the implementation that satisfies it.
 
 ### Authority Relationship
@@ -1361,11 +1381,34 @@ The migration identity is a **logical-action identifier**, not an execution auth
 - The migration identity establishes that legacy and target representations correspond to the same logical action during the `barry_drafts` → Prepared Action coexistence window
 - The migration identity is not itself an execution authority — it does not authorize, veto, expire, or recover execution claims
 - During coexistence, migration synchronization must use this stable identity to ensure legacy and target execution attempts converge on one send-once decision
-- The Executed Action keyed by `idempotency_key` remains the target-state execution claim authority defined by this Part
-- Any temporary synchronization mechanism required during coexistence must retire when no executable legacy `barry_drafts` path remains capable of producing an external side effect
+- The Executed Action keyed by `idempotency_key` remains the sole permanent target-state execution claim authority defined by this Part
 - The migration identity requirement does not modify the permanent `idempotency_key` contract or the Prepared Action → Executed Action authority chain
 
-If satisfying this requirement necessitates introducing another object that can independently authorize, veto, expire, or recover execution claims — a second execution authority alongside the Executed Action — this Part requires redesign. That determination is a governance decision.
+#### Permanent Prohibition on Second Execution Authorities
+
+No permanent second execution authority may enter the Barry OS target architecture. An object or mechanism that independently governs execution claims outside a migration coexistence window — or that persists as an execution authority after the coexistence window closes — violates this Part.
+
+#### Temporary Migration Synchronization Invariant
+
+A temporary migration synchronization primitive is permitted during a legacy-to-target coexistence window only if **all six** of the following conditions are simultaneously satisfied. These conditions are conjunctive — all six must hold. A primitive that fails any single condition is a second execution authority and is prohibited.
+
+1. **Bounded coexistence window** — the primitive exists only during a specifically defined legacy-to-target coexistence window with explicit start and capability-based end conditions.
+
+2. **Permanent authority remains unchanged** — Executed Action remains the sole permanent target-state execution authority defined by Document 4 Part V. During coexistence, the temporary primitive may exercise only the minimum cross-path execution-control behavior necessary to enforce the send-once invariant. It may not alter, supersede, extend, or replace the Executed Action's target-state authority.
+
+3. **Mutual exclusion only** — the primitive may coordinate or enforce mutual exclusion between legacy and target execution attempts only for the duration of the coexistence window. It may not accumulate authority over time or make execution decisions whose operational effect extends beyond that window.
+
+4. **Automatic capability-based retirement** — the primitive retires unconditionally and automatically when no executable legacy path remains capable of producing the external side effect. Retirement is not optional, not deferrable, not tied solely to a phase number, and must not depend upon an operator deciding later to disable it.
+
+5. **No permanent promotion** — the primitive cannot become a permanent Barry OS object or permanent execution authority under any circumstance, including partial migration, rollback, migration delay, or indefinite deferral.
+
+6. **Operationally inert after retirement** — after retirement, temporary synchronization state becomes operationally inert. It may not participate in authorization, mutual exclusion, retry decisions, stale-claim recovery, execution recovery, or any future external side effect. Historical state may be retained or consulted solely for audit, observability, incident investigation, or migration evidence.
+
+This is a narrowly scoped migration exception. It does not generalize to other Barry OS execution contexts.
+
+#### Escalation Clause
+
+If satisfying the mutual exclusion requirement for a migration window would require the temporary primitive to independently authorize, veto, expire, or recover execution claims outside the narrowly defined synchronization behavior permitted during the coexistence window, or in any manner that persists beyond that window or survives retirement — or if no mechanism can simultaneously satisfy the convergence requirement and all six temporary synchronization conditions — stop implementation and return DOCUMENT 4 REDESIGN REQUIRED — AARON DECISION REQUIRED before proceeding.
 
 ### Stable Identity Requirement for External Side-Effect Migration
 

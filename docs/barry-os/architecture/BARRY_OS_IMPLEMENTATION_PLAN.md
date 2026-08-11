@@ -623,7 +623,7 @@ These claims are in different Firestore collections. A Firestore transaction can
 
 The execution claims ledger is a **temporary P6 migration synchronization mechanism** for the legacy `barry_drafts` → Prepared Action coexistence window. It exists solely to provide mutual exclusion while legacy and target execution paths coexist. It is subordinate to the target architecture defined in Document 4 and does not become a permanent Barry OS object or a third execution authority.
 
-**Retirement condition:** The execution claims ledger is retired when no executable legacy `barry_drafts` path remains capable of producing an external side effect. Specifically: when `barry-approve-send.js` no longer calls `gmail.users.messages.send` through the legacy `barry_drafts` claim path, and no other legacy send function retains its pre-migration execution path, the ledger has no cross-path exclusion role and must be removed. After retirement, Executed Action (Document 4, Part V) is the sole execution claim authority.
+**Retirement condition:** The execution claims ledger is retired when no executable legacy `barry_drafts` path remains capable of producing an external side effect. Specifically: when `barry-approve-send.js` no longer calls `gmail.users.messages.send` through the legacy `barry_drafts` claim path, and no other legacy send function retains its pre-migration execution path, the ledger has no cross-path exclusion role and must be retired. After retirement, Executed Action (Document 4, Part V) is the sole execution claim authority. Retirement means the ledger ceases all execution-control behavior (authorize, veto, expire, recover) and becomes operationally inert — no code path consults it for execution decisions. Historical claim records may be retained solely for audit, observability, or migration evidence, but they must not participate in any execution decision after retirement.
 
 **Rollback constraint:** If the migration is rolled back to the legacy path, the execution claims ledger continues to provide cross-path exclusion for the duration of the rollback window. Rollback must not accidentally convert the temporary ledger into a permanent authority — rollback should either (a) retire the ledger and revert fully to `barry_drafts.sending` as the sole claim path, or (b) keep the ledger operative only while both paths remain simultaneously reachable. Once only one execution path exists (legacy or target), the ledger has no role.
 
@@ -699,7 +699,7 @@ The migration-window idempotency mechanism specified below applies to the `barry
 
 Mechanism A is recommended. It is an implementation of Document 4's existing invariant — "only one Executed Action per `idempotency_key` can enter `executing`" (Part V, §Idempotency Contract) — as a temporary migration synchronization mechanism, without changing its authority model or transaction boundary.
 
-**Why this does not require a governance decision:** The execution claims ledger is a temporary migration-window equivalent of the Executed Action collection. Document 4 Part V step 5 states: "The `executing` state is the transactional claim. Only one Executed Action per `idempotency_key` can enter `executing`." The temporary ledger applies this same invariant at the `messageRecordId` level during the window when both paths coexist. It does not extend or alter the frozen Action Executor authority — it implements it across the migration boundary and is retired when the migration completes.
+**Document 4 Part V compliance:** This mechanism is a temporary migration synchronization primitive under Document 4 Part V (§Temporary Migration Synchronization Invariant). It must satisfy all six conjunctive conditions to be permitted. The six-condition evaluation appears below (see Document 4 Part V Compliance).
 
 **Specification:**
 
@@ -724,6 +724,26 @@ barry_drafts.approvalStatus         ← legacy authority (retired with legacy pa
 ```
 
 After the legacy `barry_drafts` execution path is removed, the temporary ledger is retired and this hierarchy collapses to Document 4's target: Executed Action as sole authority.
+
+#### Document 4 Part V Compliance
+
+The temporary execution claims ledger is evaluated below against Document 4 Part V (§Temporary Migration Synchronization Invariant). A temporary migration synchronization primitive is permitted if and only if it satisfies convergence plus all six conjunctive conditions. Each condition is evaluated against the mechanism as specified above.
+
+**Convergence requirement** (Document 4 Part V, §Migration Identity Contract): The mechanism converges to a single execution authority — Executed Action — when the legacy path is removed and the ledger is retired. **PASS.**
+
+**Condition 1 — Bounded coexistence window:** The ledger operates only during the `barry_drafts → prepared_actions` dual-write coexistence window. It is created at P6 entry (when dual-write begins) and retired at legacy path removal (when `barry-approve-send.js` and all other legacy send functions no longer call `gmail.users.messages.send` through the legacy claim path). The window is bounded by the migration timeline, not open-ended. **PASS.**
+
+**Condition 2 — Permanent authority unchanged:** The ledger does not modify, replace, or supersede the Executed Action as the permanent execution authority defined in Document 4 Part V. Both legacy (`barry_drafts.approvalStatus`) and target (`Executed Action.executing`) authorities continue to operate through their own transaction boundaries. The ledger provides the minimum cross-path execution-control behavior necessary to enforce the send-once invariant during coexistence — it does not alter the authority model of either path. **PASS.**
+
+**Condition 3 — Mutual exclusion only:** The ledger's sole function is mutual exclusion: ensuring that at most one execution path produces the external side effect (Gmail send) for a given logical action. It does not route actions, select execution paths, schedule execution, transform payloads, or perform any function beyond cross-path claim arbitration. **PASS.**
+
+**Condition 4 — Automatic capability-based retirement:** The ledger retires automatically when no legacy path can produce an external side effect — i.e., when the capability it synchronizes (cross-path mutual exclusion) has no remaining operational role. Retirement is triggered by the removal of legacy execution paths, not by a manual decision or calendar date. Once retired, the ledger ceases all execution-control behavior. **PASS.**
+
+**Condition 5 — No permanent promotion:** The ledger is specified as temporary and migration-only throughout this document (see P6 Definition of Ready, §Temporary Migration Synchronization Mechanism, §Recommended Mechanism, and the authority hierarchy diagram). No upgrade path, feature extension, or post-migration role is defined or permitted. The ledger does not appear in Document 4's target architecture. **PASS.**
+
+**Condition 6 — Operationally inert after retirement:** After retirement, the ledger ceases all execution-control behavior (authorize, veto, expire, recover). No code path consults it for execution decisions. Historical claim records may be retained solely for audit, observability, or migration evidence, but they do not participate in any execution decision. The ledger is operationally inert. **PASS.**
+
+**Escalation clause status:** All six conditions are satisfied. Convergence is demonstrated. The escalation clause (Document 4 Part V, §Escalation Clause) is not triggered.
 
 #### Concurrency Acceptance Condition
 

@@ -74,7 +74,7 @@ Before defining contracts, this document resolves open architectural questions i
 
 ## Resolution R4-001: Canonical Ownership of Bounce Events
 
-**Status:** RESOLVED (signal ownership decided) / PENDING (bounce producer verification)
+**Status:** RESOLVED
 
 **Problem:** Document 3 (Signal Specification, frozen) defines two signals for the same real-world event — an outbound email bouncing:
 
@@ -85,22 +85,19 @@ Before defining contracts, this document resolves open architectural questions i
 
 Both signals are PROPOSED (no emission point exists in the repository). Both produce identical awareness updates. Two canonical signals for one real-world event violates the Single Source of Truth principle (Document 1, Section 1).
 
-**Current codebase evidence:**
+**Current codebase evidence:** CONFIRMED — verified by Team A against `origin/main`.
 
-```
-[PENDING REPOSITORY VERIFICATION — bounce producer]
-Team B finding: resendWebhook.js (Resend) may be canonical producer.
-Team A verification required before Document 3 correction or Document 4 freeze.
-```
+`resendWebhook.js` is **not** a candidate producer for `contact.email_bounced`. It processes every bounce Resend delivers — the handler applies no system-mail filter — but it only ever sees system mail, because only system mail is sent through Resend (`send-welcome-email.js:29`, `daily-leads-refresh.js:293`, `adminRetryEmailSend.js:140`; `emailLog.js:14-23`). Relationship email is sent through Gmail and never touches Resend.
 
-Team B's initial investigation suggests bounce events enter the system through Resend webhooks, not Gmail directly:
+This constraint is **structural, not filtered**. If relationship outreach were ever routed through Resend, this webhook would begin receiving those bounces with no code change — and would still not update contact state.
 
-- `resendWebhook.js` (line 66) appears to receive `email.bounced` events from Resend
+Document 3's `contact.email_bounced` entry is **accurate as written**: its `Producer` field already reads "None implemented," and its `Source: gmail` names the send channel, not a producer. **No Document 3 correction is required.**
+
+Additional verified evidence:
+
 - `handleEmailBounced()` (lines 138–158) updates `emailLogs` with bounce status and, for hard bounces, adds the recipient to `emailSuppressionList`
 - **The gap:** No contact document update, no timeline event, no signal emission, no Awareness projection update, no user notification. A bounced contact stays in whatever `conversationState` it was in (e.g., `awaiting_reply`) with no transition.
 - `peopleSchema.js` (line 246) defines `'bounced'` as a valid `OUTCOME_TYPE`; `healthScore.js` (line 120) scores `'bounced'` at 10 (lowest); `engagement_summary.last_outcome` can be `'bounced'` — but nothing writes this value when a bounce occurs.
-
-Document 3's `contact.email_bounced` lists `gmail` as the producer source. Team B's finding suggests the actual producer may be `resend` (via webhook). This finding is pending Team A repository verification. Document 3 is frozen regardless.
 
 **Analysis:**
 
@@ -119,7 +116,7 @@ The underlying fact is: *an outbound email failed to deliver*. This fact has two
 ```
 Real-world event: email delivery fails (bounce notification received)
         ↓
-Bounce producer emits event [PENDING REPOSITORY VERIFICATION — bounce producer]
+Bounce producer emits event (producer absent — see Gap B-001)
         ↓
 Signal emitted: contact.email_bounced
         ↓
@@ -139,7 +136,7 @@ One signal, one fact, multiple projections
 
 3. **Awareness updates target Relationship and Business projections.** Both projections are keyed by Contact/Company, not by Message. The signal's natural home is the entity whose awareness projections it feeds.
 
-4. **The producer reports bounces per-recipient, not per-message.** The signal's natural shape matches the Contact entity. `[PENDING REPOSITORY VERIFICATION — bounce producer]` Team B's finding suggests `resendWebhook.js` is the emission point; Team A verification required.
+4. **The producer reports bounces per-recipient, not per-message.** The signal's natural shape matches the Contact entity.
 
 **Impact on Document 3 (frozen):**
 
@@ -168,7 +165,7 @@ Document 3's signal catalog retains `contact.email_bounced` unchanged. `message.
 
 **The 15 Skills — confirmed from reconciliation:**
 
-| # | Skill ID | Deterministic | Current Endpoints Absorbed |
+| # | Skill ID | Deterministic | Current Implementations Absorbed |
 |---|---|---|---|
 | 1 | `WriteEmailSkill` | no | `barryHunterProcessEngage`, `barryOutreachMessage`, `barryFirstTouch`, `generate-engagement-message`, `generate-campaign-messages`, `barryBulkPersonalize`, `generate-followup` |
 | 2 | `ResearchCompanySkill` | no | `barryEnrich` (company), `enrichCompany`, `analyze-website`, `barryEnrich` (contact), `enrichContact` |
@@ -266,9 +263,9 @@ A Skill may not invoke a Workflow. A Workflow may not invoke another Workflow. T
 | Current Implementation | Current Behavior | Replacement | Rationale |
 |---|---|---|---|
 | `barryValidateContact` | AI-powered contact validation (Sonnet) | Deterministic field validation rules | Email format, required fields, duplicate detection are pattern-matching — not reasoning. Classified `Deterministic: yes` — no LLM permitted. |
-| `barryActions` (intent parsing) | AI-classified action type parsing | Typed tool schemas with deterministic routing | Action routing among 6 enumerated types (`gmail_send`, `gmail_draft`, `gmail_read`, `calendar_book`, `calendar_check`, `pipeline_action`) is a lookup, not reasoning. |
+| `barryActions` (intent parsing) | AI-classified action type parsing | Typed tool schemas with deterministic routing | Action routing among 5 enumerated types plus `none` (`gmail_send`, `gmail_draft`, `gmail_read`, `calendar_book`, `calendar_check`, `none` — `barryActions.js:93`) is a lookup, not reasoning. |
 
-These eliminations enforce BO-010 (Law 20): AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
+These eliminations enforce Law 20 of the Barry OS Constitution: AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
 
 ---
 
@@ -317,7 +314,7 @@ Existing endpoints absorbed: [list with disposition]
 Migration risk: LOW | MEDIUM | HIGH
 ```
 
-**Architectural invariant:** Every Skill with `Deterministic: yes` must NOT invoke an LLM. This enforces BO-010 — AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
+**Architectural invariant:** Every Skill with `Deterministic: yes` must NOT invoke an LLM. This enforces Law 20 of the Barry OS Constitution — AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
 
 ---
 
@@ -683,7 +680,7 @@ PrepareMeetingBriefOutput {
 **Idempotent:** yes
 **Side effects:** none
 **Migration risk:** LOW
-**Evidence:** PROPOSED — no LinkedIn message generation exists in the repository. `linkedinSearch.js` performs profile lookup as a fallback enrichment source; no composition capability exists. Note: `linkedinSearch.js` currently returns 404 at its endpoint — the backend route is not wired. LinkedIn integration requires both composition (this Skill) and a functioning profile lookup path.
+**Evidence:** PROPOSED — no LinkedIn message generation exists in the repository. Note: `linkedinSearch.js` is a **utility module** (`netlify/functions/utils/linkedinSearch.js`), not a routed endpoint. It exports named helpers and no `handler`, and files under `utils/` are not routed by `netlify.toml`'s `[functions] directory` setting — so no endpoint exists **by design**. Profile lookup is fully functional as a library, consumed by `barryEnrich.js:31` and `retryLinkedInPhoto.js:23`. LinkedIn *composition* (this Skill) is genuinely absent; LinkedIn *lookup* is not.
 
 **Inputs:**
 
@@ -759,7 +756,7 @@ GenerateSubjectLineOutput {
 **Idempotent:** yes
 **Side effects:** none
 **Migration risk:** LOW
-**Evidence:** CONFIRMED — `barryOutcomeAttribution.js` performs rule-based outcome attribution with no AI calls. The canonical audit explicitly classifies this implementation as deterministic. Per BO-010, outcome attribution is computed, not generated.
+**Evidence:** CONFIRMED — `barryOutcomeAttribution.js` performs rule-based outcome attribution with no AI calls. The canonical audit explicitly classifies this implementation as deterministic. Per Law 20 of the Barry OS Constitution, outcome attribution is computed, not generated.
 
 **Inputs:**
 
@@ -1437,7 +1434,7 @@ When multiple recommendations compete for the same time slot, the Think Layer ap
 1. Critical (0) always wins
 2. Within the same priority level, sort by: urgency (`due_by`), relationship health score (worse = higher priority), revenue potential
 3. The synthesized priority list is the Think Layer's primary output — the queue of what Barry should do next
-4. `strategyScores` are persisted (not discarded as today) for the reasoning trace per BO-011
+4. `strategyScores` are persisted (not discarded as today) for the reasoning trace per Document 1 (Reference Architecture, Section 4.6: "`strategyScores` — persisted, not discarded")
 
 ---
 
@@ -1504,7 +1501,7 @@ All AI model selection is governed by a centralized policy. Skills declare which
 | PrepareMeetingBriefSkill | DEEP | Multi-source synthesis, result is persisted |
 | ComposeLinkedInSkill | FAST | Short-form generation |
 | GenerateSubjectLineSkill | FAST | Short-form generation |
-| EvaluateResponseSkill | N/A (Deterministic) | Rule-based attribution — no LLM per BO-010 |
+| EvaluateResponseSkill | N/A (Deterministic) | Rule-based attribution — no LLM per Law 20 |
 | IdentifyObjectionsSkill | FAST | Extraction from text |
 | SuggestToneSkill | FAST | Inference from structured data |
 | RefineICPSkill | DEEP | Coaching requires nuanced reasoning |
@@ -1565,7 +1562,7 @@ These map to `RefineICPSkill` (Skill 13). If RECON section generation requires m
 
 Document 4 implies new Firestore paths for Skills, Workflows, the Capability Registry, and the Action Queue. Before any new path is included, it must route through `FIRESTORE_DATA_ARCHITECTURE.md`.
 
-Every new path must declare: exact path, owner (Platform or Barry), authority classification, persistence classification, writers and readers, retention rule, and security rule requirement. This is BO-011 in effect.
+Every new path must declare: exact path, owner (Platform or Barry), authority classification, persistence classification, writers and readers, retention rule, and security rule requirement. This follows the documentation framework established by `FIRESTORE_DATA_ARCHITECTURE.md`.
 
 ---
 

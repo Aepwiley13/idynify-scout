@@ -205,11 +205,13 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 
 **Affected functions with custom timeouts (CONFIRMED CURRENT):**
 
-| Function | Current Timeout | Risk |
+| Function | Configured Timeout Ceiling | Risk |
 |---|---|---|
-| `generate-section-1` through `generate-section-10` (10 functions) | 900s | HIGH — RECON, likely exceeds 60s |
-| `generate-icp-brief` | 900s | HIGH — RECON |
-| `generate-all-reports` | 900s | HIGH — RECON |
+| `generate-icp-brief` | 900s (explicit) | HIGH — RECON |
+| `generate-all-reports` | 900s (explicit) | HIGH — RECON |
+| `generate-section-1` | 900s (explicit) | HIGH — RECON |
+| `generate-section-2` | 900s (explicit) | HIGH — RECON |
+| `generate-section-3` through `generate-section-10` (8 functions) | No explicit timeout configured; platform runtime default governs | HIGH — RECON |
 | `generate-leads` | 900s | MEDIUM |
 | `generate-leads-v2` | 900s | MEDIUM |
 | `daily-leads-refresh` | 900s | MEDIUM |
@@ -221,7 +223,7 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 | `barryBulkPersonalize` | 26s | LOW |
 | `analyze-website` | 26s | LOW |
 
-**Barry phases blocked:** P4 (Skills Registry) — RECON Skill execution model must be decided before RECON endpoints can be consolidated into Skills.
+**Barry phases blocked:** RECON generator Barry OS capability disposition is deferred until the execution model decision is made. P4 executes the 28 R4-002 dispositions independently; RECON generators are not assigned to any Skill until the Migration Blocker is resolved.
 
 **Barry phases parallel to:** P1, P2, P3. Non-RECON functions can migrate independently.
 
@@ -455,18 +457,17 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 
 ## P4 — Skills Registry
 
-**Goal:** Consolidate 38 AI endpoints into 15 named Skills with standardized contracts, model tier compliance, and registry-based invocation.
+**Goal:** Consolidate the 28 AI endpoints with R4-002 dispositions into 15 named Skills with standardized contracts, model tier compliance, and registry-based invocation. RECON generators (12 endpoints) are excluded — their Barry OS capability disposition is deferred pending the RECON Migration Blocker decision.
 
 **Primary dependency:** P2 (context resolver), P3 (awareness projections readable). I1 (model migration) should be complete — all endpoints on policy tiers.
 
-**Architectural debt retired:** 38 endpoints → 15 Skills (Document 4, R4-002). Nine message generators → 1 (`WriteEmailSkill`). R4-004: `barryValidateContact` replaced with deterministic validation, `barryActions` intent parsing replaced with typed tool schemas.
+**Architectural debt retired:** 28 R4-002 dispositions executed (Document 4, R4-002). Nine message generators → 1 (`WriteEmailSkill`). R4-004: `barryValidateContact` replaced with deterministic validation, `barryActions` intent parsing replaced with typed tool schemas. RECON generators excluded — see RECON Decision Gate.
 
 **Definition of Ready:**
 - P2 and P3 complete — context and awareness available to Skills
 - All 15 Skills defined with contracts (Document 4, Part II — FROZEN)
 - Two-model policy in place: `MODEL_FAST` and `MODEL_DEEP` (CONFIRMED CURRENT — `models.js`)
 - I1 complete — all endpoints on policy tiers (or waived if LEGACY floor extended)
-- RECON execution model decision gate completed (see RECON Decision Gate — Migration Blocker)
 - `barryValidateContact` replacement logic specified (Document 4, R4-004 — deterministic field validation)
 - `barryActions` typed tool schema specified (Document 4, R4-004 — 5 types plus `none`)
 
@@ -475,11 +476,10 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 - Each Skill declares its model tier, deterministic flag, inputs, and outputs per Document 4 contracts
 - `barryValidateContact` deleted — replaced by deterministic validation rules (Document 4, R4-004)
 - `barryActions` intent parsing deleted — replaced by typed tool schemas (Document 4, R4-004)
-- RECON generators (12 endpoints) consolidated under `RefineICPSkill` using the selected execution model
 - All 28 R4-002 dispositions (delete, refactor, absorb) executed
 - Each Skill with `Deterministic: yes` verified to invoke no LLM (Law 20)
 
-**Exit gate:** Skills Registry lists all 15 Skills. Each Skill invocable with its declared inputs, producing declared outputs. Zero direct calls to absorbed/deleted endpoints remain. Production telemetry shows all AI invocations routing through Skills.
+**Exit gate:** Skills Registry lists all 15 Skills. Each Skill invocable with its declared inputs, producing declared outputs. Zero direct calls to the 28 R4-002 absorbed/deleted endpoints remain. Production telemetry shows all AI invocations (excluding RECON generators pending disposition) routing through Skills.
 
 **Rollout mode:** feature-flag — new Skills deployed alongside existing endpoints. Traffic shifted per-Skill once output parity confirmed. Old endpoints deleted after cutover.
 
@@ -488,7 +488,7 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 | Disposition | Count | Details |
 |---|---|---|
 | Delete | 12 | `barryOutreachMessage`, `barryFirstTouch`, `generate-engagement-message`, `generate-campaign-messages`, `barryBulkPersonalize`, `generate-followup`, `enrichCompany`, `enrichContact`, `barryHunterGenerateStep`, `barryGenerateSequenceStep`, `barryReconInterview`, `barryValidateContact` |
-| Refactor | 14 | `barryHunterProcessEngage`, `barryEnrich` (2 paths), `analyze-website`, `barryICPConversation`, `assembleBarryContext`, `barryGenerateContext`, `barryDossierBriefing`, `nextBestStepService`, `process-barry-inbox-queue` (2 steps), `barryInboxAnalyzer`, `barry-coach-section`, `barryOrientationBrief`, `barryOutcomeAttribution` |
+| Refactor | 15 | `barryHunterProcessEngage`, `barryEnrich` (2 paths), `analyze-website`, `barryICPConversation`, `assembleBarryContext`, `barryGenerateContext`, `barryDossierBriefing`, `nextBestStepService`, `process-barry-inbox-queue` (2 steps), `barryInboxAnalyzer`, `barry-coach-section`, `barryOrientationBrief`, `barryOutcomeAttribution` |
 | Non-AI refactor | 1 | `barry-approve-send` → Action Executor handler (P6) |
 | PROPOSED (new) | 4 | `ComposeLinkedInSkill`, `GenerateSubjectLineSkill`, `IdentifyObjectionsSkill`, `CategorizeFeedbackSkill` |
 
@@ -497,9 +497,22 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 - Skill invocation telemetry extension
 
 **Known risks:**
-- RECON execution model decision is a prerequisite — blocks 12 of 38 endpoint consolidations (Migration Blocker)
 - 28 refactor/delete operations across production endpoints — high coordination risk
 - PROPOSED Skills (4) have no existing implementation to validate against
+
+**RECON generator disposition:**
+
+```
+Barry OS disposition: DEFERRED — RECON Migration Blocker
+
+Infrastructure Track I2 owns the runtime/execution feasibility work
+required to resolve the blocker. The RECON Decision Gate determines
+the execution model. Only after that decision may the generators
+receive their final Barry OS capability disposition through the
+appropriate governance process.
+```
+
+The 12 RECON generators (`generate-section-1` through `generate-section-10`, `generate-icp-brief`, `generate-all-reports`) are not assigned to any Skill in P4. Document 4's R4-002 disposition table does not include them. The migration risk note in Document 4 Part X (RefineICPSkill) identifies the execution model dependency and states the generators "map to `RefineICPSkill`," but this does not appear in R4-002's binding disposition table. Their Barry OS capability assignment requires Aaron's execution model decision first, followed by a governance determination of the appropriate Skill mapping.
 
 **Estimated scope:** HIGH
 
@@ -511,7 +524,7 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 
 **Primary dependency:** P3 (awareness inputs), P4 (Skills reach — all 15 Skills must be invocable)
 
-**Architectural debt retired:** Think layer reaching 4 of 38 endpoints → all 15 Skills. Discarded `strategyScores` → persisted (Document 1, Section 4.6). Law 11 (explainable recommendations) satisfiable. BO-010: promotion, not creation.
+**Architectural debt retired:** Think layer reaching 4 endpoints → all 15 Skills. Discarded `strategyScores` → persisted (Document 1, Section 4.6). Law 11 (explainable recommendations) satisfiable. BO-010: promotion, not creation.
 
 **Definition of Ready:**
 - P3 and P4 complete — awareness readable, all 15 Skills registered
@@ -556,26 +569,27 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 
 **Primary dependency:** P5 (Think Layer emitting recommendations)
 
-**Architectural debt retired:** `barryActions` prompt-based intent parsing (replaced at P4). Unguarded send paths. A14 residual risk (compound failure: Gmail succeeds, terminal writes fail). `barry_drafts → prepared_actions` migration.
+**Architectural debt retired:** `barryActions` prompt-based intent parsing (replaced at P4 per R4-004 — intent parsing only; the Gmail external-side-effect execution capability, currently implemented as `executeGmailSend` or its P4 successor, survives and migrates behind Action Executor at P6). Unguarded send paths. A14 residual risk (compound failure: Gmail succeeds, terminal writes fail). `barry_drafts → prepared_actions` migration.
 
 **Definition of Ready:**
 - P5 complete — Think Layer emitting recommendations with reasoning traces
 - Capability manifest schema approved (Document 4, Part IV — FROZEN)
 - A1 idempotency guarantee confirmed preserved across migration boundary (Document 4, Part V)
 - Autonomy spectrum defined with Phase 1 ceilings (Document 4, Part IV): side-effect capabilities ceiling at Approval, generative capabilities at Prepare or below
+- Every external side-effect path migrating behind Action Executor has a repository-verified stable logical-action identity (see Migration-Window Idempotency — Stable Cross-System Identity below). This includes the Gmail send capability (currently `barryActions.js:executeGmailSend` or its P4 successor), which remains reachable after P4 (R4-004 deletes intent parsing, not execution — see path inventory correction below)
 
 **Definition of Done:**
 - Capability Registry operational: all capabilities registered with type (generative/side_effect), autonomy ceiling, idempotency key requirements
 - Phase 1 ceiling enforced structurally: no side-effect capability executes without Approval
 - Action Executor operational with idempotency contract:
   - `idempotency_key` required for all side-effect capabilities
-  - `barry_drafts.sending` transactional claim maps to Executed Action `executing` state
   - Write-once contract for Executed Action enforced
 - A14 addressed: outbox or idempotent executor architecture handles the compound-failure case (Gmail succeeds, terminal writes fail)
 - `barry_drafts` collection migrated to `prepared_actions`
 - Action Queue operational
+- **Migration-window idempotency demonstrated:** concurrent execution attempts through legacy (`barry_drafts.sending`) and new (Action Executor) paths for the same logical action cannot both produce an external side effect (see Migration-Window Idempotency below)
 
-**Exit gate:** Side-effect capability invoked through Action Executor in production. Idempotency key prevents duplicate execution. `barry_drafts` collection empty or retired. A14 compound-failure scenario tested and handled.
+**Exit gate:** Side-effect capability invoked through Action Executor in production. Idempotency key prevents duplicate execution. `barry_drafts` collection empty or retired. A14 compound-failure scenario tested and handled. Migration-window concurrency acceptance condition passed (see below).
 
 **Rollout mode:** dual-write then cutover — new `prepared_actions` written alongside `barry_drafts` during transition. A1 idempotency guarantee verified under dual-write before `barry_drafts` path retired.
 
@@ -588,12 +602,172 @@ Infrastructure workstreams that run in parallel with P1–P12 and may block spec
 - `prepared_actions` Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`)
 - Action Queue Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`)
 - Capability Registry Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`)
+- Execution claims ledger Firestore path (temporary — migration-only; retired when legacy path cannot produce external side effect; must route through `FIRESTORE_DATA_ARCHITECTURE.md`) — see Migration-Window Idempotency
 
 **Known risks:**
 - `barry_drafts → prepared_actions` migration must preserve the A1 send-once guarantee — any gap enables double-sends to real customers (Critical)
 - A14 outbox pattern adds a new abstraction — scope and complexity may exceed estimate
 
 **Estimated scope:** HIGH
+
+### Migration-Window Idempotency — G3-1
+
+During the `barry_drafts → prepared_actions` dual-write coexistence window, two execution paths exist simultaneously:
+
+- **Legacy path:** `barry-approve-send.js` claims execution via `barry_drafts.approvalStatus: 'sending'` (Firestore transaction on `users/{userId}/contacts/{contactId}/barry_drafts/{messageRecordId}`)
+- **New path:** Action Executor claims execution via Executed Action `executing` state (Firestore transaction on `executed_actions/{idempotency_key}`)
+
+These claims are in different Firestore collections. A Firestore transaction cannot atomically span both. Without a cross-path exclusion mechanism, two workers entering through different paths could both cause the external side effect (Gmail send) for the same logical action.
+
+#### Temporary Migration Synchronization Mechanism
+
+The execution claims ledger is a **temporary P6 migration synchronization mechanism** for the legacy `barry_drafts` → Prepared Action coexistence window. It exists solely to provide mutual exclusion while legacy and target execution paths coexist. It is subordinate to the target architecture defined in Document 4 and does not become a permanent Barry OS object or a third execution authority.
+
+**Retirement condition:** The execution claims ledger is retired when no executable legacy `barry_drafts` path remains capable of producing an external side effect. Specifically: when `barry-approve-send.js` no longer calls `gmail.users.messages.send` through the legacy `barry_drafts` claim path, and no other legacy send function retains its pre-migration execution path, the ledger has no cross-path exclusion role and must be retired. After retirement, Executed Action (Document 4, Part V) is the sole execution claim authority. Retirement means the ledger ceases all execution-control behavior (authorize, veto, expire, recover) and becomes operationally inert — no code path consults it for execution decisions. Historical claim records may be retained solely for audit, observability, or migration evidence, but they must not participate in any execution decision after retirement.
+
+**Rollback constraint:** If the migration is rolled back to the legacy path, the execution claims ledger continues to provide cross-path exclusion for the duration of the rollback window. Rollback must not accidentally convert the temporary ledger into a permanent authority — rollback should either (a) retire the ledger and revert fully to `barry_drafts.sending` as the sole claim path, or (b) keep the ledger operative only while both paths remain simultaneously reachable. Once only one execution path exists (legacy or target), the ledger has no role.
+
+#### Stable Cross-System Identity
+
+##### Identity for the legacy reply-send migration
+
+The migration identity for the `barry-approve-send` flow must remain stable across:
+- Retries (same user clicking Send again)
+- Regeneration and editing (user edits the draft body before sending)
+- Contact merge and re-parenting (contact record changes its parent or is merged with another)
+- Migration and backfill (draft moves from `barry_drafts` to `prepared_actions`)
+- Rollback (migration reverted to legacy path)
+- Legacy-to-Prepared-Action conversion
+
+**Repository-verified candidate: `messageRecordId`**
+
+The `messageRecordId` is a Firestore auto-generated document ID created at `communication_records.add()` (`messageProcessor.js:111`). It is:
+
+- **Immutable once created** — Firestore auto-IDs do not change (CONFIRMED CURRENT)
+- **Independent of `contactId`** — created in the top-level `communication_records` collection, not under the `contacts/{contactId}` subtree (CONFIRMED CURRENT — `messageProcessor.js:111`)
+- **Stable across contact merge** — if a contact is merged or re-parented, the `contactId` in the `barry_drafts` path changes but the `messageRecordId` remains the same globally unique identifier of the original inbound message
+- **Already used as the document key** — `barry_drafts` is keyed by `messageRecordId` (`barry-approve-send.js:290`, `process-barry-inbox-queue.js:169`)
+
+The `contactId` is **not** part of the stable identity because it is mutable — it appears in the `barry_drafts` document path (`users/{userId}/contacts/{contactId}/barry_drafts/{messageRecordId}`) but changes if the contact is merged or re-parented. Using `contactId` in the identity derivation would create a second executable identity for the same logical action when a contact merge occurs during the coexistence window.
+
+**Identity derivation for the legacy reply-send migration:**
+
+```
+logical_action_id = messageRecordId
+```
+
+The `messageRecordId` alone is sufficient for this migration scope. It is globally unique, immutable, does not contain `contactId`, and already serves as the document key in both `communication_records` (top-level) and `barry_drafts` (nested). No new persistent identity field or Barry OS object is required.
+
+The `idempotency_key` used by Document 4's Action Executor (Part V: `{prepared_action_id}_{capability_id}_{timestamp}`) incorporates the `prepared_action_id`, which must carry a deterministic back-reference to the `messageRecordId` so the mapping is persisted and survives rollback. During the migration window, the `prepared_action` document stores `messageRecordId` as a persisted field.
+
+##### P6 Definition of Ready — stable identity requirement
+
+Every external side-effect path entering Action Executor must first have a repository-verified stable logical-action identity. That identity must remain stable across:
+- Retries
+- Regeneration and editing
+- Contact merge and re-parenting
+- Migration and backfill
+- Rollback
+- Legacy-to-Prepared-Action conversion
+
+A path without a proven stable identity may not migrate behind Action Executor.
+
+**Repository-confirmed external side-effect implementations (CONFIRMED CURRENT):**
+
+| Implementation | External Side Effect | Current Identity | Stable Across Contact Merge? | Migration Scope |
+|---|---|---|---|---|
+| `barry-approve-send.js` | Gmail send (reply) | `messageRecordId` (Firestore auto-ID from `communication_records`) | Yes — `messageRecordId` is in top-level collection, not under `contactId` | Legacy reply-send migration (this section) |
+| `gmail-send.js` | Gmail send (campaign) | `campaignId` + `messageIndex` | Needs verification — `campaignId` may reference contact | Separate migration; not in `barry_drafts` scope |
+| `gmail-send-quick.js` | Gmail send (quick engage) | None — no idempotency claim | Needs identity design | Separate migration; not in `barry_drafts` scope |
+| `gmail-send-wave.js` | Gmail send (batch wave) | Per-recipient in batch | Needs verification | Separate migration; not in `barry_drafts` scope |
+| `send-followup.js` | Gmail send (manual follow-up) | `campaignId` (created per send) | Needs verification | Separate migration; not in `barry_drafts` scope |
+| `process-scheduled-engagements.js` | Gmail send (scheduled) | `scheduledEngagements/{docId}` | Needs verification — path includes `userId` | Separate migration; not in `barry_drafts` scope |
+| `barryActions.js:executeGmailSend` | Gmail send (AI-driven action) | None — no idempotency claim | Reachable after P4 — R4-004 deletes intent parsing, not execution | Separate migration; requires stable identity before dual-path eligibility |
+
+**`barryActions.js:executeGmailSend` disposition — correction:** R4-004 (Document 4) establishes deletion of `barryActions` **intent parsing** — the AI-classified action routing layer (`parseIntent`, lines 87–142). It does not establish deletion of the action executor functions. At P4, intent parsing is replaced by typed tool schemas with deterministic routing (R4-004: "Action routing among 5 enumerated types plus `none` is a lookup, not reasoning"). The typed tool schemas route to execution functions — they do not eliminate the Gmail side-effect capability. After P4, the `gmail_send` tool type still requires an executor that calls `gmail.users.messages.send` (currently `executeGmailSend`, line 165). This execution path remains reachable and produces the same external side effect (`gmail.send_email` capability, Document 4 Part IV). At P6, this path must route through the Action Executor with the `gmail.send_email` capability contract (Document 4 Part IV: side-effect, approval required, idempotency key required). A stable logical-action identity satisfying corrected Document 4 Part V must be established before this path becomes dual-path eligible. The migration matrix (below) reflects the corrected target state: "Typed tool schemas" at P4 is an intent-routing change, not an execution-path deletion.
+
+The migration-window idempotency mechanism specified below applies to the `barry-approve-send` legacy reply-send path only. Other external side-effect paths — including `barryActions.js:executeGmailSend` — have independent stable-identity requirements that must be resolved as P6 Definition of Ready items before they can migrate behind Action Executor.
+
+#### Candidate Mechanism Evaluation
+
+| Candidate | Claim Authority | Cross-Path Exclusion | Retry Behavior | Rollback Behavior | Doc 4 Compatibility | Recommendation |
+|---|---|---|---|---|---|---|
+| **A. Temporary execution claims ledger** — a single Firestore collection (`execution_claims/{messageRecordId}`) checked by both paths before any external call; retired when legacy path removed | Single document per `messageRecordId`; whoever creates it first wins | Both paths transactionally create-or-check the same document before Gmail call; second writer sees existing claim and aborts | Retry finds existing claim → returns existing result (replay) | Claim document persists independently of both `barry_drafts` and `prepared_actions`; rollback to legacy path still sees the claim; ledger retires when only one path remains | Implements Document 4 Part V invariant ("only one Executed Action per `idempotency_key` can enter `executing`") as a temporary migration mechanism without changing its authority model | **RECOMMENDED** |
+| **B. Legacy collection as single authority** — new path checks `barry_drafts.approvalStatus` before executing; legacy path unchanged | `barry_drafts` document is sole claim authority | New path reads `barry_drafts` status in the same transaction that creates the Prepared Action; aborts if `'sending'` or `'sent'` | Safe — retries blocked by `barry_drafts` status | Natural — rollback simply stops writing `prepared_actions`; `barry_drafts` is unchanged | Contradicts Document 4: the Action Executor's Executed Action is supposed to be the execution claim (Part V, step 5). Making `barry_drafts` the authority during migration means Document 4's claim model is not operative until `barry_drafts` is fully retired | Not recommended — delays Document 4 invariant validation |
+| **C. Dual-check with eventual consistency** — each path checks the other path's collection before executing | Split authority — two independent claims that attempt coordination | Each path queries the other's collection before executing; relies on Firestore read consistency | Race window: between the cross-check read and the Gmail call, the other path could claim and execute | Requires cleanup of both collections' state during rollback | Violates "one authoritative execution claim per logical action" — two authorities with a coordination gap | Not recommended — window for double-send exists |
+| **D. Hard cutover (no coexistence)** — migrate all `barry_drafts` to `prepared_actions` atomically, switch all traffic at once | Clean — only one authority at any time | No cross-path scenario exists | Safe under single authority | Rollback requires full reverse migration under downtime | Compatible — Document 4 authority is fully operative after cutover | Not recommended — high blast radius; any bug during cutover means production downtime or double-sends for all in-flight actions |
+
+#### Recommended Mechanism: Temporary Execution Claims Ledger
+
+Mechanism A is recommended. It is an implementation of Document 4's existing invariant — "only one Executed Action per `idempotency_key` can enter `executing`" (Part V, §Idempotency Contract) — as a temporary migration synchronization mechanism, without changing its authority model or transaction boundary.
+
+**Document 4 Part V compliance:** This mechanism is a temporary migration synchronization primitive under Document 4 Part V (§Temporary Migration Synchronization Invariant). It must satisfy all six conjunctive conditions to be permitted. The six-condition evaluation appears below (see Document 4 Part V Compliance).
+
+**Specification:**
+
+1. Before making any external call (Gmail send), both paths must transactionally create a claim document at `execution_claims/{messageRecordId}`
+2. The claim document records: `messageRecordId`, `source_path` (`legacy` | `executor`), `claimed_at` (server timestamp), `status` (`claiming` | `completed` | `failed`)
+3. If the document already exists → the claiming path aborts. If `status: 'completed'` → return the existing result (replay, not re-execute). If `status: 'claiming'` and held < stale threshold → return `claim_in_progress`. If `status: 'claiming'` and held > stale threshold → reclaim (preserving the existing `barry-approve-send.js` stale-claim pattern, currently 2 minutes)
+4. The stale-claim reclaim pattern is preserved from the existing A1 implementation (`STALE_CLAIM_MS` in `barry-approve-send.js:67`) — this is not a new mechanism
+5. After successful external execution → update claim to `completed` with result reference
+6. After failed external execution → update claim to `failed`; release claim so retry can succeed
+7. The `prepared_action` document stores `messageRecordId` as a persisted field; the identity derivation uses it, making the mapping deterministic and surviving rollback
+
+**Authority hierarchy during migration window:**
+
+```
+Document 4 Part V (frozen)          ← defines the target authority model
+    ↓ implemented by
+Executed Action collection          ← permanent authority (new path)
+    ↓ synchronized with (temporary)
+execution_claims/{messageRecordId}  ← migration-only cross-path exclusion
+    ↑ synchronized with (temporary)
+barry_drafts.approvalStatus         ← legacy authority (retired with legacy path)
+```
+
+After the legacy `barry_drafts` execution path is removed, the temporary ledger is retired and this hierarchy collapses to Document 4's target: Executed Action as sole authority.
+
+#### Document 4 Part V Compliance
+
+The temporary execution claims ledger is evaluated below against Document 4 Part V (§Temporary Migration Synchronization Invariant). A temporary migration synchronization primitive is permitted if and only if it satisfies convergence plus all six conjunctive conditions. Each condition is evaluated against the mechanism as specified above.
+
+**Convergence requirement** (Document 4 Part V, §Migration Identity Contract): The mechanism converges to a single execution authority — Executed Action — when the legacy path is removed and the ledger is retired. **PASS.**
+
+**Condition 1 — Bounded coexistence window:** The ledger operates only during the `barry_drafts → prepared_actions` dual-write coexistence window. It is created at P6 entry (when dual-write begins) and retired at legacy path removal (when `barry-approve-send.js` and all other legacy send functions no longer call `gmail.users.messages.send` through the legacy claim path). The window is bounded by the migration timeline, not open-ended. **PASS.**
+
+**Condition 2 — Permanent authority unchanged:** The ledger does not modify, replace, or supersede the Executed Action as the permanent execution authority defined in Document 4 Part V. Both legacy (`barry_drafts.approvalStatus`) and target (`Executed Action.executing`) authorities continue to operate through their own transaction boundaries. The ledger provides the minimum cross-path execution-control behavior necessary to enforce the send-once invariant during coexistence — it does not alter the authority model of either path. **PASS.**
+
+**Condition 3 — Mutual exclusion only:** The ledger's sole function is mutual exclusion: ensuring that at most one execution path produces the external side effect (Gmail send) for a given logical action. It does not route actions, select execution paths, schedule execution, transform payloads, or perform any function beyond cross-path claim arbitration. **PASS.**
+
+**Condition 4 — Automatic capability-based retirement:** The ledger retires automatically when no legacy path can produce an external side effect — i.e., when the capability it synchronizes (cross-path mutual exclusion) has no remaining operational role. Retirement is triggered by the removal of legacy execution paths, not by a manual decision or calendar date. Once retired, the ledger ceases all execution-control behavior. **PASS.**
+
+**Condition 5 — No permanent promotion:** The ledger is specified as temporary and migration-only throughout this document (see P6 Definition of Ready, §Temporary Migration Synchronization Mechanism, §Recommended Mechanism, and the authority hierarchy diagram). No upgrade path, feature extension, or post-migration role is defined or permitted. The ledger does not appear in Document 4's target architecture. **PASS.**
+
+**Condition 6 — Operationally inert after retirement:** After retirement, the ledger ceases all execution-control behavior (authorize, veto, expire, recover). No code path consults it for execution decisions. Historical claim records may be retained solely for audit, observability, or migration evidence, but they do not participate in any execution decision. The ledger is operationally inert. **PASS.**
+
+**Escalation clause status:** All six conditions are satisfied. Convergence is demonstrated. The escalation clause (Document 4 Part V, §Escalation Clause) is not triggered.
+
+#### Concurrency Acceptance Condition
+
+P6's exit gate requires demonstrating the following before the migration window opens:
+
+> **Two workers entering through different paths (legacy `barry_drafts.sending` and new Action Executor) for the same logical action cannot both produce an external side effect.**
+
+**Test 1 — Concurrent cross-path execution:**
+1. Create a `barry_draft` with a known `messageRecordId`
+2. Create a corresponding `prepared_action` referencing the same `messageRecordId`
+3. Concurrently trigger both the legacy send path and the new Action Executor path
+4. Verify: exactly one Gmail send occurs. The second path receives either `claim_in_progress` or a replay of the first result.
+5. Repeat under: normal conditions, stale-claim reclaim conditions, and crash-recovery conditions (function dies between claim and Gmail call)
+
+**Test 2 — Mutable-identity (contact merge during coexistence):**
+1. Create a `barry_draft` for contact A with `messageRecordId` M
+2. Merge contact A into contact B (re-parent)
+3. Verify: the execution claims ledger keyed by `messageRecordId` M prevents a second executable identity from being created under contact B's path
+4. Attempt send through both old path (contact A) and new path (contact B) for the same `messageRecordId` M
+5. Verify: at most one Gmail send occurs regardless of which `contactId` path is used
+
+Both tests must pass before the dual-write window is opened to production traffic.
 
 ---
 
@@ -867,13 +1041,17 @@ The RECON generators are classified HIGH MIGRATION RISK (Document 4, RefineICPSk
 
 ## Affected Functions (CONFIRMED CURRENT)
 
-| Function | Current Timeout | Runtime |
+| Function | Configured Timeout Ceiling | Evidence |
 |---|---|---|
-| `generate-section-1` through `generate-section-10` | 900s each | Lambda compatibility, synchronous |
-| `generate-icp-brief` | 900s | Lambda compatibility, synchronous |
-| `generate-all-reports` | 900s | Lambda compatibility, synchronous |
+| `generate-icp-brief` | 900s (explicit — `netlify.toml`) | CONFIRMED CURRENT |
+| `generate-all-reports` | 900s (explicit — `netlify.toml`) | CONFIRMED CURRENT |
+| `generate-section-1` | 900s (explicit — `netlify.toml`) | CONFIRMED CURRENT |
+| `generate-section-2` | 900s (explicit — `netlify.toml`) | CONFIRMED CURRENT |
+| `generate-section-3` through `generate-section-10` | No explicit timeout configured; the applicable platform runtime default governs | CONFIRMED CURRENT |
 
-Total: 12 functions. All are synchronous Netlify Functions with 900-second timeout configurations.
+Total: 12 functions. Four have explicit 900-second configured ceilings in `netlify.toml`. Eight (`generate-section-3` through `generate-section-10`) have no explicit timeout configuration — the applicable platform runtime default governs their timeout behavior.
+
+Configured timeout ceilings are not observed execution durations. Actual execution durations remain PENDING BASELINE until the August 17 baseline provides runtime telemetry evidence.
 
 Under the modern Netlify runtime, synchronous functions are limited to 60 seconds.
 
@@ -907,7 +1085,7 @@ The user initiates RECON section generation and waits for completion. The UI pre
 
 Document 5 schedules the decision gate. Document 5 does not select the execution model.
 
-**Decision required before:** P4 (Skills Registry) — RECON endpoints cannot be consolidated into `RefineICPSkill` until the execution model is selected.
+**Decision required before:** RECON generators can receive their final Barry OS capability disposition. P4 executes the 28 R4-002 dispositions independently; RECON generator disposition is deferred until this decision is made.
 
 **Decision informed by:** August 17 baseline execution time data (PENDING BASELINE), A5-b dead endpoint verification.
 
@@ -924,56 +1102,54 @@ Baseline Report (Aug 17)
     │
     ├─── I4 (Stripe Isolation) ──────────────── parallel to all
     │
-    ├─── I2 (Netlify Migration) ─────────┐
-    │    └── RECON Decision Gate ────────┐│
-    │                                    ││
-    v                                    ││
-    P1 (Signal Bus)                      ││
-    │                                    ││
-    v                                    ││
-    P2 (Context Resolver)                ││
-    │                                    ││
-    v                                    ││
-    P3 (Awareness Projections)           ││
-    │                                    ││
-    v                                    ││
-    P4 (Skills Registry) ◄──────────────┘│
-    │                                     │
-    v                                     │
-    P5 (Think Layer)                      │
-    │                                     │
-    v                                     │
-    P6 (Capability Registry              │
-    │   + Action Executor)               │
-    │                                     │
-    ├───────────┐                         │
-    v           v                         │
-    P7          P8 (Morning Brief)        │
-    (Workflows)  │                        │
-    │           │                         │
-    ├───────────┘                         │
-    v                                     │
-    P9 (Surface Consolidation)            │
-    │                                     │
-    v                                     │
-    P10 (Memory Promotion)                │
-    │                                     │
-    v                                     │
-    P11 (Orchestration) ◄── P7, P8        │
-    │                                     │
-    v                                     │
-    P12 (Controlled Autonomy) ◄── E5, E7  │
-                                          │
-    I2 (Netlify Migration) ◄──────────────┘
-        (non-RECON functions can proceed
-         independently throughout)
+    ├─── I2 (Netlify Migration)
+    │    └── RECON Decision Gate ──── blocks RECON capability disposition
+    │                                 (not P4 — P4 executes 28 R4-002
+    │                                  dispositions independently)
+    │
+    v
+    P1 (Signal Bus)
+    │
+    v
+    P2 (Context Resolver)
+    │
+    v
+    P3 (Awareness Projections)
+    │
+    v
+    P4 (Skills Registry) ◄── I1 (model migration)
+    │
+    v
+    P5 (Think Layer)
+    │
+    v
+    P6 (Capability Registry
+    │   + Action Executor)
+    │
+    ├───────────┐
+    v           v
+    P7          P8 (Morning Brief)
+    (Workflows)  │
+    │           │
+    ├───────────┘
+    v
+    P9 (Surface Consolidation)
+    │
+    v
+    P10 (Memory Promotion)
+    │
+    v
+    P11 (Orchestration) ◄── P7, P8
+    │
+    v
+    P12 (Controlled Autonomy) ◄── E5, E7
 ```
 
 **Critical path:** Baseline → P1 → P2 → P3 → P4 → P5 → P6 → P7/P8 → P9 → P10 → P11 → P12
 
 **Blocking dependencies:**
 - I1 blocks P4 (all endpoints must be on policy tiers before Skills consolidation)
-- I2 RECON decision blocks P4 (RECON endpoints cannot consolidate without execution model)
+- I2 RECON decision blocks RECON generator capability disposition (not P4 — P4 executes R4-002 dispositions independently)
 - I3 supports P5 (complete telemetry needed for reasoning trace observability)
 
 **Non-blocking parallelism:**
@@ -1016,12 +1192,12 @@ Complete disposition of every current implementation's path to Barry OS.
 | `closeBarrySession()` | Auto-write to durable memory | CONFIRMED HISTORICAL | Promotion pipeline | P10 | HIGH | read-old/write-new | BO-007 confirmed violation |
 | `barry_intel` on Company docs | BO violation — derived intel in canonical storage | CONFIRMED HISTORICAL | `CompanyIntelArtifact` | P1 | LOW | immediate | A12, `search-companies.js:991` |
 | `barrySessionKey` | Computed everywhere, used nowhere server-side | CONFIRMED HISTORICAL | Unified conversation store key | P9 | MEDIUM | migration | BO-009, reconciliation §7 |
-| RECON generators (12) | Synchronous, 900s timeout | CONFIRMED CURRENT | Execution model TBD — Migration Blocker | P4 / I2 | HIGH | TBD | Requires Aaron decision |
+| RECON generators (12) | Synchronous; 4 with explicit 900s configured ceiling, 8 governed by platform runtime default | CONFIRMED CURRENT | Execution model TBD — Migration Blocker; Barry OS capability disposition DEFERRED | I2 | HIGH | TBD | Requires Aaron decision |
 | `barryValidateContact` | AI-powered field validation (Sonnet) | CONFIRMED CURRENT | Deterministic validation rules | P4 | LOW | immediate | R4-004, Law 20 |
 | `barryActions` | AI-classified intent parsing (Haiku) | CONFIRMED CURRENT | Typed tool schemas | P4 | LOW | immediate | R4-004, Law 20 |
 | 9 context implementations | Independent assembly paths | CONFIRMED HISTORICAL | Single context resolver | P2 | HIGH | shadow → cutover | Reconciliation §2.3 |
 | 5 business-awareness computations | Duplicate on-demand | CONFIRMED HISTORICAL | Signal-driven projection | P3 | MEDIUM | shadow | Reconciliation §9 |
-| 38 AI endpoints | Scattered across 40 modules | CONFIRMED HISTORICAL | 15 Skills | P4 | HIGH | feature-flag | R4-002 |
+| 28 R4-002 dispositions | Scattered across modules | CONFIRMED HISTORICAL | 15 Skills | P4 | HIGH | feature-flag | R4-002 (RECON generators excluded — disposition DEFERRED) |
 | 47 architectural surfaces | Across 7 directories | CONFIRMED HISTORICAL | ~12 surfaces | P9 | HIGH | migration → cutover | Canonical audit |
 | 6 conversation stores | Independent, no cross-reference | CONFIRMED HISTORICAL | 1 store, `barrySessionKey` | P9 | HIGH | migration | Reconciliation §2.4 |
 | 6 message generators | Independent implementations | CONFIRMED HISTORICAL | `WriteEmailSkill` | P4 | MEDIUM | feature-flag | R4-002 |
@@ -1032,8 +1208,8 @@ Complete disposition of every current implementation's path to Barry OS.
 | 3 morning-brief implementations | Independent | CONFIRMED HISTORICAL | Single Morning Brief | P8 | MEDIUM | cutover | Reconciliation §9 |
 | 3 recommendation vocabularies | Independent | CONFIRMED HISTORICAL | Unified vocabulary | P8 | LOW | cutover | Reconciliation §9 |
 | Legacy memory entries | No provenance, no confidence | CONFIRMED HISTORICAL | Marked `pre_promotion_pipeline` | P10 | LOW | drain (30-day) | Reconciliation §6.3 |
-| `generate-icp-brief` | Possibly dead endpoint | PENDING BASELINE | Delete or migrate | P4 / I2 | MEDIUM | TBD | A5-b |
-| `generate-all-reports` | Possibly dead endpoint | PENDING BASELINE | Delete or migrate | P4 / I2 | MEDIUM | TBD | A5-b |
+| `generate-icp-brief` | Possibly dead endpoint; explicit 900s configured ceiling | PENDING BASELINE | Delete or migrate — RECON disposition DEFERRED | I2 | MEDIUM | TBD | A5-b |
+| `generate-all-reports` | Possibly dead endpoint; explicit 900s configured ceiling | PENDING BASELINE | Delete or migrate — RECON disposition DEFERRED | I2 | MEDIUM | TBD | A5-b |
 | 8 LEGACY_SONNET_4_5 modules | Legacy model identifier | CONFIRMED CURRENT | MODEL_DEEP | I1 | MEDIUM | immediate | BO-006, floor ~2026-09-29 |
 | 10 LEGACY_HAIKU_4_5 modules | Dated snapshot identifier | CONFIRMED CURRENT | MODEL_FAST | I1 | LOW | immediate | BO-006, floor ~2026-10-15 |
 | Stripe Payment Links | Live in all deploy contexts | CONFIRMED CURRENT | Environment-conditional | I4 | MEDIUM | immediate | `CheckoutPage.jsx:70-74` |

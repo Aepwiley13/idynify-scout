@@ -512,7 +512,7 @@ receive their final Barry OS capability disposition through the
 appropriate governance process.
 ```
 
-The 12 RECON generators (`generate-section-1` through `generate-section-10`, `generate-icp-brief`, `generate-all-reports`) are not assigned to any Skill in P4. Document 4's R4-002 disposition table does not include them. The migration risk note in Document 4 (RefineICPSkill) identifies the execution model dependency but does not establish a disposition. Their Barry OS capability assignment requires Aaron's execution model decision first, followed by a governance determination of the appropriate Skill mapping.
+The 12 RECON generators (`generate-section-1` through `generate-section-10`, `generate-icp-brief`, `generate-all-reports`) are not assigned to any Skill in P4. Document 4's R4-002 disposition table does not include them. The migration risk note in Document 4 Part X (RefineICPSkill) identifies the execution model dependency and states the generators "map to `RefineICPSkill`," but this does not appear in R4-002's binding disposition table. Their Barry OS capability assignment requires Aaron's execution model decision first, followed by a governance determination of the appropriate Skill mapping.
 
 **Estimated scope:** HIGH
 
@@ -576,6 +576,7 @@ The 12 RECON generators (`generate-section-1` through `generate-section-10`, `ge
 - Capability manifest schema approved (Document 4, Part IV — FROZEN)
 - A1 idempotency guarantee confirmed preserved across migration boundary (Document 4, Part V)
 - Autonomy spectrum defined with Phase 1 ceilings (Document 4, Part IV): side-effect capabilities ceiling at Approval, generative capabilities at Prepare or below
+- Every external side-effect path migrating behind Action Executor has a repository-verified stable logical-action identity (see Migration-Window Idempotency — Stable Cross-System Identity below)
 
 **Definition of Done:**
 - Capability Registry operational: all capabilities registered with type (generative/side_effect), autonomy ceiling, idempotency key requirements
@@ -601,7 +602,7 @@ The 12 RECON generators (`generate-section-1` through `generate-section-10`, `ge
 - `prepared_actions` Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`)
 - Action Queue Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`)
 - Capability Registry Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`)
-- Execution claims ledger Firestore path (must route through `FIRESTORE_DATA_ARCHITECTURE.md`) — see Migration-Window Idempotency
+- Execution claims ledger Firestore path (temporary — migration-only; retired when legacy path cannot produce external side effect; must route through `FIRESTORE_DATA_ARCHITECTURE.md`) — see Migration-Window Idempotency
 
 **Known risks:**
 - `barry_drafts → prepared_actions` migration must preserve the A1 send-once guarantee — any gap enables double-sends to real customers (Critical)
@@ -613,51 +614,116 @@ The 12 RECON generators (`generate-section-1` through `generate-section-10`, `ge
 
 During the `barry_drafts → prepared_actions` dual-write coexistence window, two execution paths exist simultaneously:
 
-- **Legacy path:** `barry-approve-send.js` claims execution via `barry_drafts.approvalStatus: 'sending'` (Firestore transaction on `barry_drafts/{messageRecordId}`)
+- **Legacy path:** `barry-approve-send.js` claims execution via `barry_drafts.approvalStatus: 'sending'` (Firestore transaction on `users/{userId}/contacts/{contactId}/barry_drafts/{messageRecordId}`)
 - **New path:** Action Executor claims execution via Executed Action `executing` state (Firestore transaction on `executed_actions/{idempotency_key}`)
 
 These claims are in different Firestore collections. A Firestore transaction cannot atomically span both. Without a cross-path exclusion mechanism, two workers entering through different paths could both cause the external side effect (Gmail send) for the same logical action.
 
+#### Temporary Migration Synchronization Mechanism
+
+The execution claims ledger is a **temporary P6 migration synchronization mechanism** for the legacy `barry_drafts` → Prepared Action coexistence window. It exists solely to provide mutual exclusion while legacy and target execution paths coexist. It is subordinate to the target architecture defined in Document 4 and does not become a permanent Barry OS object or a third execution authority.
+
+**Retirement condition:** The execution claims ledger is retired when no executable legacy `barry_drafts` path remains capable of producing an external side effect. Specifically: when `barry-approve-send.js` no longer calls `gmail.users.messages.send` through the legacy `barry_drafts` claim path, and no other legacy send function retains its pre-migration execution path, the ledger has no cross-path exclusion role and must be removed. After retirement, Executed Action (Document 4, Part V) is the sole execution claim authority.
+
+**Rollback constraint:** If the migration is rolled back to the legacy path, the execution claims ledger continues to provide cross-path exclusion for the duration of the rollback window. Rollback must not accidentally convert the temporary ledger into a permanent authority — rollback should either (a) retire the ledger and revert fully to `barry_drafts.sending` as the sole claim path, or (b) keep the ledger operative only while both paths remain simultaneously reachable. Once only one execution path exists (legacy or target), the ledger has no role.
+
 #### Stable Cross-System Identity
 
-The stable identity that survives retries, migration, and rollback is the **logical action ID** — derived deterministically from the `messageRecordId` that identifies the user-approved draft:
+##### Identity for the legacy reply-send migration
+
+The migration identity for the `barry-approve-send` flow must remain stable across:
+- Retries (same user clicking Send again)
+- Regeneration and editing (user edits the draft body before sending)
+- Contact merge and re-parenting (contact record changes its parent or is merged with another)
+- Migration and backfill (draft moves from `barry_drafts` to `prepared_actions`)
+- Rollback (migration reverted to legacy path)
+- Legacy-to-Prepared-Action conversion
+
+**Repository-verified candidate: `messageRecordId`**
+
+The `messageRecordId` is a Firestore auto-generated document ID created at `communication_records.add()` (`messageProcessor.js:111`). It is:
+
+- **Immutable once created** — Firestore auto-IDs do not change (CONFIRMED CURRENT)
+- **Independent of `contactId`** — created in the top-level `communication_records` collection, not under the `contacts/{contactId}` subtree (CONFIRMED CURRENT — `messageProcessor.js:111`)
+- **Stable across contact merge** — if a contact is merged or re-parented, the `contactId` in the `barry_drafts` path changes but the `messageRecordId` remains the same globally unique identifier of the original inbound message
+- **Already used as the document key** — `barry_drafts` is keyed by `messageRecordId` (`barry-approve-send.js:290`, `process-barry-inbox-queue.js:169`)
+
+The `contactId` is **not** part of the stable identity because it is mutable — it appears in the `barry_drafts` document path (`users/{userId}/contacts/{contactId}/barry_drafts/{messageRecordId}`) but changes if the contact is merged or re-parented. Using `contactId` in the identity derivation would create a second executable identity for the same logical action when a contact merge occurs during the coexistence window.
+
+**Identity derivation for the legacy reply-send migration:**
 
 ```
-logical_action_id = deterministic_hash(userId, contactId, messageRecordId)
+logical_action_id = messageRecordId
 ```
 
-This identity does not depend on collection-specific document IDs. It is the same whether the action enters through `barry_drafts` or `prepared_actions`. The `idempotency_key` used by Document 4's Action Executor (Part V: `{prepared_action_id}_{capability_id}_{timestamp}`) incorporates the `prepared_action_id`, which must carry a deterministic back-reference to the `messageRecordId` so the mapping is persisted and survives rollback.
+The `messageRecordId` alone is sufficient for this migration scope. It is globally unique, immutable, does not contain `contactId`, and already serves as the document key in both `communication_records` (top-level) and `barry_drafts` (nested). No new persistent identity field or Barry OS object is required.
 
-During migration, the `prepared_action` document must store the originating `messageRecordId` as a persisted field. The `idempotency_key` derivation during the migration window uses the `logical_action_id` (not the `prepared_action_id` alone) to ensure cross-system identity.
+The `idempotency_key` used by Document 4's Action Executor (Part V: `{prepared_action_id}_{capability_id}_{timestamp}`) incorporates the `prepared_action_id`, which must carry a deterministic back-reference to the `messageRecordId` so the mapping is persisted and survives rollback. During the migration window, the `prepared_action` document stores `messageRecordId` as a persisted field.
+
+##### P6 Definition of Ready — stable identity requirement
+
+Every external side-effect path entering Action Executor must first have a repository-verified stable logical-action identity. That identity must remain stable across:
+- Retries
+- Regeneration and editing
+- Contact merge and re-parenting
+- Migration and backfill
+- Rollback
+- Legacy-to-Prepared-Action conversion
+
+A path without a proven stable identity may not migrate behind Action Executor.
+
+**Repository-confirmed external side-effect implementations (CONFIRMED CURRENT):**
+
+| Implementation | External Side Effect | Current Identity | Stable Across Contact Merge? | Migration Scope |
+|---|---|---|---|---|
+| `barry-approve-send.js` | Gmail send (reply) | `messageRecordId` (Firestore auto-ID from `communication_records`) | Yes — `messageRecordId` is in top-level collection, not under `contactId` | Legacy reply-send migration (this section) |
+| `gmail-send.js` | Gmail send (campaign) | `campaignId` + `messageIndex` | Needs verification — `campaignId` may reference contact | Separate migration; not in `barry_drafts` scope |
+| `gmail-send-quick.js` | Gmail send (quick engage) | None — no idempotency claim | Needs identity design | Separate migration; not in `barry_drafts` scope |
+| `gmail-send-wave.js` | Gmail send (batch wave) | Per-recipient in batch | Needs verification | Separate migration; not in `barry_drafts` scope |
+| `send-followup.js` | Gmail send (manual follow-up) | `campaignId` (created per send) | Needs verification | Separate migration; not in `barry_drafts` scope |
+| `process-scheduled-engagements.js` | Gmail send (scheduled) | `scheduledEngagements/{docId}` | Needs verification — path includes `userId` | Separate migration; not in `barry_drafts` scope |
+| `barryActions.js:executeGmailSend` | Gmail send (AI-driven action) | None — no idempotency claim | N/A — deleted at P4 per R4-004 | Retired before Action Executor; no migration required |
+
+The migration-window idempotency mechanism specified below applies to the `barry-approve-send` legacy reply-send path only. Other external side-effect paths have independent stable-identity requirements that must be resolved as P6 Definition of Ready items before they can migrate behind Action Executor.
 
 #### Candidate Mechanism Evaluation
 
 | Candidate | Claim Authority | Cross-Path Exclusion | Retry Behavior | Rollback Behavior | Doc 4 Compatibility | Recommendation |
 |---|---|---|---|---|---|---|
-| **A. Shared execution claims ledger** — a single Firestore collection (`execution_claims/{logical_action_id}`) checked by both paths before any external call | Single document per logical action; whoever creates it first wins | Both paths transactionally create-or-check the same document before Gmail call; second writer sees existing claim and aborts | Retry finds existing claim → returns existing result (replay) | Claim document persists independently of both `barry_drafts` and `prepared_actions`; rollback to legacy path still sees the claim | Implements Document 4 Part V invariant ("only one Executed Action per `idempotency_key` can enter `executing`") without changing its authority model; the claims ledger is the migration-window embodiment of the Executed Action collection | **RECOMMENDED** |
+| **A. Temporary execution claims ledger** — a single Firestore collection (`execution_claims/{messageRecordId}`) checked by both paths before any external call; retired when legacy path removed | Single document per `messageRecordId`; whoever creates it first wins | Both paths transactionally create-or-check the same document before Gmail call; second writer sees existing claim and aborts | Retry finds existing claim → returns existing result (replay) | Claim document persists independently of both `barry_drafts` and `prepared_actions`; rollback to legacy path still sees the claim; ledger retires when only one path remains | Implements Document 4 Part V invariant ("only one Executed Action per `idempotency_key` can enter `executing`") as a temporary migration mechanism without changing its authority model | **RECOMMENDED** |
 | **B. Legacy collection as single authority** — new path checks `barry_drafts.approvalStatus` before executing; legacy path unchanged | `barry_drafts` document is sole claim authority | New path reads `barry_drafts` status in the same transaction that creates the Prepared Action; aborts if `'sending'` or `'sent'` | Safe — retries blocked by `barry_drafts` status | Natural — rollback simply stops writing `prepared_actions`; `barry_drafts` is unchanged | Contradicts Document 4: the Action Executor's Executed Action is supposed to be the execution claim (Part V, step 5). Making `barry_drafts` the authority during migration means Document 4's claim model is not operative until `barry_drafts` is fully retired | Not recommended — delays Document 4 invariant validation |
 | **C. Dual-check with eventual consistency** — each path checks the other path's collection before executing | Split authority — two independent claims that attempt coordination | Each path queries the other's collection before executing; relies on Firestore read consistency | Race window: between the cross-check read and the Gmail call, the other path could claim and execute | Requires cleanup of both collections' state during rollback | Violates "one authoritative execution claim per logical action" — two authorities with a coordination gap | Not recommended — window for double-send exists |
 | **D. Hard cutover (no coexistence)** — migrate all `barry_drafts` to `prepared_actions` atomically, switch all traffic at once | Clean — only one authority at any time | No cross-path scenario exists | Safe under single authority | Rollback requires full reverse migration under downtime | Compatible — Document 4 authority is fully operative after cutover | Not recommended — high blast radius; any bug during cutover means production downtime or double-sends for all in-flight actions |
 
-#### Recommended Mechanism: Shared Execution Claims Ledger
+#### Recommended Mechanism: Temporary Execution Claims Ledger
 
-Mechanism A is recommended. It is an implementation of Document 4's existing invariant — "only one Executed Action per `idempotency_key` can enter `executing`" (Part V, §Idempotency Contract) — without changing its authority model or transaction boundary.
+Mechanism A is recommended. It is an implementation of Document 4's existing invariant — "only one Executed Action per `idempotency_key` can enter `executing`" (Part V, §Idempotency Contract) — as a temporary migration synchronization mechanism, without changing its authority model or transaction boundary.
 
-**Why this does not require a governance decision:** The execution claims ledger is the migration-window equivalent of the Executed Action collection. Document 4 Part V step 5 states: "The `executing` state is the transactional claim. Only one Executed Action per `idempotency_key` can enter `executing`." The claims ledger applies this same invariant at the `logical_action_id` level during the window when both paths coexist. It does not extend or alter the frozen Action Executor authority — it implements it across the migration boundary.
+**Why this does not require a governance decision:** The execution claims ledger is a temporary migration-window equivalent of the Executed Action collection. Document 4 Part V step 5 states: "The `executing` state is the transactional claim. Only one Executed Action per `idempotency_key` can enter `executing`." The temporary ledger applies this same invariant at the `messageRecordId` level during the window when both paths coexist. It does not extend or alter the frozen Action Executor authority — it implements it across the migration boundary and is retired when the migration completes.
 
 **Specification:**
 
-1. Before making any external call (Gmail send), both paths must transactionally create a claim document at `execution_claims/{logical_action_id}`
-2. The claim document records: `logical_action_id`, `source_path` (`legacy` | `executor`), `claimed_at` (server timestamp), `status` (`claiming` | `completed` | `failed`)
+1. Before making any external call (Gmail send), both paths must transactionally create a claim document at `execution_claims/{messageRecordId}`
+2. The claim document records: `messageRecordId`, `source_path` (`legacy` | `executor`), `claimed_at` (server timestamp), `status` (`claiming` | `completed` | `failed`)
 3. If the document already exists → the claiming path aborts. If `status: 'completed'` → return the existing result (replay, not re-execute). If `status: 'claiming'` and held < stale threshold → return `claim_in_progress`. If `status: 'claiming'` and held > stale threshold → reclaim (preserving the existing `barry-approve-send.js` stale-claim pattern, currently 2 minutes)
 4. The stale-claim reclaim pattern is preserved from the existing A1 implementation (`STALE_CLAIM_MS` in `barry-approve-send.js:67`) — this is not a new mechanism
 5. After successful external execution → update claim to `completed` with result reference
 6. After failed external execution → update claim to `failed`; release claim so retry can succeed
-7. The `prepared_action` document stores `messageRecordId` as a persisted field; the `logical_action_id` derivation uses it, making the mapping deterministic and surviving rollback
+7. The `prepared_action` document stores `messageRecordId` as a persisted field; the identity derivation uses it, making the mapping deterministic and surviving rollback
 
-**Rollback behavior:** If the migration is rolled back to the legacy path, the execution claims ledger remains operative. Legacy-path `barry-approve-send.js` continues to check the ledger before executing. The ledger is retired only after the full migration is complete and `barry_drafts` is retired.
+**Authority hierarchy during migration window:**
 
-**Preservation of Document 4's Prepared Action → Executed Action contract:** After the migration window closes, the execution claims ledger is retired. The Executed Action collection (Document 4, Part V) becomes the sole execution claim authority. The ledger's `logical_action_id` maps deterministically to the Executed Action's `idempotency_key` — the claim transfers, not duplicates.
+```
+Document 4 Part V (frozen)          ← defines the target authority model
+    ↓ implemented by
+Executed Action collection          ← permanent authority (new path)
+    ↓ synchronized with (temporary)
+execution_claims/{messageRecordId}  ← migration-only cross-path exclusion
+    ↑ synchronized with (temporary)
+barry_drafts.approvalStatus         ← legacy authority (retired with legacy path)
+```
+
+After the legacy `barry_drafts` execution path is removed, the temporary ledger is retired and this hierarchy collapses to Document 4's target: Executed Action as sole authority.
 
 #### Concurrency Acceptance Condition
 
@@ -665,14 +731,21 @@ P6's exit gate requires demonstrating the following before the migration window 
 
 > **Two workers entering through different paths (legacy `barry_drafts.sending` and new Action Executor) for the same logical action cannot both produce an external side effect.**
 
-Test scenario:
+**Test 1 — Concurrent cross-path execution:**
 1. Create a `barry_draft` with a known `messageRecordId`
-2. Create a corresponding `prepared_action` with the same `logical_action_id`
+2. Create a corresponding `prepared_action` referencing the same `messageRecordId`
 3. Concurrently trigger both the legacy send path and the new Action Executor path
 4. Verify: exactly one Gmail send occurs. The second path receives either `claim_in_progress` or a replay of the first result.
 5. Repeat under: normal conditions, stale-claim reclaim conditions, and crash-recovery conditions (function dies between claim and Gmail call)
 
-This test must pass before the dual-write window is opened to production traffic.
+**Test 2 — Mutable-identity (contact merge during coexistence):**
+1. Create a `barry_draft` for contact A with `messageRecordId` M
+2. Merge contact A into contact B (re-parent)
+3. Verify: the execution claims ledger keyed by `messageRecordId` M prevents a second executable identity from being created under contact B's path
+4. Attempt send through both old path (contact A) and new path (contact B) for the same `messageRecordId` M
+5. Verify: at most one Gmail send occurs regardless of which `contactId` path is used
+
+Both tests must pass before the dual-write window is opened to production traffic.
 
 ---
 

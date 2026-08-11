@@ -2571,7 +2571,7 @@ Same as Skill.
 
 - Composes one or more Skills in a defined order
 - Invoked by Think Layer recommendations
-- Produces one or more Prepared Actions (one per step)
+- Produces one or more Prepared Actions (one per terminal step that generates user-facing content — intermediate computation steps produce data consumed by subsequent steps, not Prepared Actions)
 - May produce Artifacts as compound output
 
 **12. Retention rule:** Same as Skill.

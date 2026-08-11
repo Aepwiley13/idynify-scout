@@ -1338,6 +1338,41 @@ This preserves the current `barry_drafts.sending` guarantee while moving it to i
 
 **Residual risk A14:** If Gmail succeeds but the terminal Firestore write fails, the email is sent but the Executed Action is not recorded. This risk is accepted until P6 (advanced reliability). The current `barry_drafts` implementation carries the same risk — this migration does not introduce new failure modes.
 
+## Migration Identity Requirement
+
+During the `barry_drafts` → Prepared Action coexistence window (Document 5, P6), two execution paths exist simultaneously. The existing `idempotency_key` (`{prepared_action_id}_{capability_id}_{timestamp}`) is a carried token — it is assigned at Prepared Action creation time, includes a timestamp component, and is not present on `barry_drafts` documents. It cannot be re-derived from observable state. It therefore cannot serve as the cross-system identity that bridges legacy and target execution paths during migration.
+
+The P6 migration window requires a **stable per-action migration identity** with the following properties:
+
+1. **Present before execution** — the identity must exist on the legacy document (`barry_drafts`) before any execution attempt, not only on the target-state object (`prepared_actions`)
+2. **Immutable** — the identity must not change across contact merge, re-parenting, retry, regeneration, rollback, or backfill
+3. **Distinct from `idempotency_key`** — the existing `idempotency_key` is a carried token that includes a timestamp and is not reproducible from observable state; the migration identity is a separate concept that identifies the logical action independent of when or how it enters the execution pipeline
+4. **Not derived from mutable or scope-limited fields:**
+   - Not from `contactId` — mutable under contact merge and re-parenting
+   - Not from `messageRecordId` — scoped to the reply flow; not present on all external side-effect paths
+   - Not from `draftId` or other collection-specific document identifiers — not bridgeable across collections
+
+Document 4 defines this requirement. Document 5's P6 Definition of Ready specifies the implementation that satisfies it.
+
+### Authority Relationship
+
+The migration identity is a **logical-action identifier**, not an execution authority or claim object:
+
+- The migration identity establishes that legacy and target representations correspond to the same logical action during the `barry_drafts` → Prepared Action coexistence window
+- The migration identity is not itself an execution authority — it does not authorize, veto, expire, or recover execution claims
+- During coexistence, migration synchronization must use this stable identity to ensure legacy and target execution attempts converge on one send-once decision
+- The Executed Action keyed by `idempotency_key` remains the target-state execution claim authority defined by this Part
+- Any temporary synchronization mechanism required during coexistence must retire when no executable legacy `barry_drafts` path remains capable of producing an external side effect
+- The migration identity requirement does not modify the permanent `idempotency_key` contract or the Prepared Action → Executed Action authority chain
+
+If satisfying this requirement necessitates introducing another object that can independently authorize, veto, expire, or recover execution claims — a second execution authority alongside the Executed Action — this Part requires redesign. That determination is a governance decision.
+
+### Stable Identity Requirement for External Side-Effect Migration
+
+Every external side-effect path entering the Action Executor must carry a stable logical-action identity before migrating behind the Action Executor. A path without a proven stable identity may not migrate behind the Action Executor.
+
+The specific path inventory and per-path identity verification status are defined in Document 5's P6 Definition of Ready. This Part establishes the contract obligation; Document 5 establishes its satisfaction.
+
 ---
 
 # Part VI: Context Resolution Contract

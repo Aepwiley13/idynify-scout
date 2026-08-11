@@ -569,14 +569,14 @@ The 12 RECON generators (`generate-section-1` through `generate-section-10`, `ge
 
 **Primary dependency:** P5 (Think Layer emitting recommendations)
 
-**Architectural debt retired:** `barryActions` prompt-based intent parsing (replaced at P4 per R4-004 — intent parsing only; execution paths including `executeGmailSend` survive and migrate behind Action Executor at P6). Unguarded send paths. A14 residual risk (compound failure: Gmail succeeds, terminal writes fail). `barry_drafts → prepared_actions` migration.
+**Architectural debt retired:** `barryActions` prompt-based intent parsing (replaced at P4 per R4-004 — intent parsing only; the Gmail external-side-effect execution capability, currently implemented as `executeGmailSend` or its P4 successor, survives and migrates behind Action Executor at P6). Unguarded send paths. A14 residual risk (compound failure: Gmail succeeds, terminal writes fail). `barry_drafts → prepared_actions` migration.
 
 **Definition of Ready:**
 - P5 complete — Think Layer emitting recommendations with reasoning traces
 - Capability manifest schema approved (Document 4, Part IV — FROZEN)
 - A1 idempotency guarantee confirmed preserved across migration boundary (Document 4, Part V)
 - Autonomy spectrum defined with Phase 1 ceilings (Document 4, Part IV): side-effect capabilities ceiling at Approval, generative capabilities at Prepare or below
-- Every external side-effect path migrating behind Action Executor has a repository-verified stable logical-action identity (see Migration-Window Idempotency — Stable Cross-System Identity below). This includes `barryActions.js:executeGmailSend`, which remains reachable after P4 (R4-004 deletes intent parsing, not execution — see path inventory correction below)
+- Every external side-effect path migrating behind Action Executor has a repository-verified stable logical-action identity (see Migration-Window Idempotency — Stable Cross-System Identity below). This includes the Gmail send capability (currently `barryActions.js:executeGmailSend` or its P4 successor), which remains reachable after P4 (R4-004 deletes intent parsing, not execution — see path inventory correction below)
 
 **Definition of Done:**
 - Capability Registry operational: all capabilities registered with type (generative/side_effect), autonomy ceiling, idempotency key requirements

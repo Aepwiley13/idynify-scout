@@ -265,7 +265,7 @@ A Skill may not invoke a Workflow. A Workflow may not invoke another Workflow. T
 | `barryValidateContact` | AI-powered contact validation (Sonnet) | Deterministic field validation rules | Email format, required fields, duplicate detection are pattern-matching — not reasoning. Classified `Deterministic: yes` — no LLM permitted. |
 | `barryActions` (intent parsing) | AI-classified action type parsing | Typed tool schemas with deterministic routing | Action routing among 5 enumerated types plus `none` (`gmail_send`, `gmail_draft`, `gmail_read`, `calendar_book`, `calendar_check`, `none` — `barryActions.js:93`) is a lookup, not reasoning. |
 
-These eliminations enforce BO-010 (Law 20): AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
+These eliminations enforce Law 20 of the Barry OS Constitution: AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
 
 ---
 
@@ -314,7 +314,7 @@ Existing endpoints absorbed: [list with disposition]
 Migration risk: LOW | MEDIUM | HIGH
 ```
 
-**Architectural invariant:** Every Skill with `Deterministic: yes` must NOT invoke an LLM. This enforces BO-010 — AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
+**Architectural invariant:** Every Skill with `Deterministic: yes` must NOT invoke an LLM. This enforces Law 20 of the Barry OS Constitution — AI is used for reasoning, judgment, and language. Deterministic business logic is computed, not generated.
 
 ---
 
@@ -756,7 +756,7 @@ GenerateSubjectLineOutput {
 **Idempotent:** yes
 **Side effects:** none
 **Migration risk:** LOW
-**Evidence:** CONFIRMED — `barryOutcomeAttribution.js` performs rule-based outcome attribution with no AI calls. The canonical audit explicitly classifies this implementation as deterministic. Per BO-010, outcome attribution is computed, not generated.
+**Evidence:** CONFIRMED — `barryOutcomeAttribution.js` performs rule-based outcome attribution with no AI calls. The canonical audit explicitly classifies this implementation as deterministic. Per Law 20 of the Barry OS Constitution, outcome attribution is computed, not generated.
 
 **Inputs:**
 
@@ -1434,7 +1434,7 @@ When multiple recommendations compete for the same time slot, the Think Layer ap
 1. Critical (0) always wins
 2. Within the same priority level, sort by: urgency (`due_by`), relationship health score (worse = higher priority), revenue potential
 3. The synthesized priority list is the Think Layer's primary output — the queue of what Barry should do next
-4. `strategyScores` are persisted (not discarded as today) for the reasoning trace per BO-011
+4. `strategyScores` are persisted (not discarded as today) for the reasoning trace per Document 1 (Reference Architecture, Section 4.6: "`strategyScores` — persisted, not discarded")
 
 ---
 
@@ -1501,7 +1501,7 @@ All AI model selection is governed by a centralized policy. Skills declare which
 | PrepareMeetingBriefSkill | DEEP | Multi-source synthesis, result is persisted |
 | ComposeLinkedInSkill | FAST | Short-form generation |
 | GenerateSubjectLineSkill | FAST | Short-form generation |
-| EvaluateResponseSkill | N/A (Deterministic) | Rule-based attribution — no LLM per BO-010 |
+| EvaluateResponseSkill | N/A (Deterministic) | Rule-based attribution — no LLM per Law 20 |
 | IdentifyObjectionsSkill | FAST | Extraction from text |
 | SuggestToneSkill | FAST | Inference from structured data |
 | RefineICPSkill | DEEP | Coaching requires nuanced reasoning |
@@ -1562,7 +1562,7 @@ These map to `RefineICPSkill` (Skill 13). If RECON section generation requires m
 
 Document 4 implies new Firestore paths for Skills, Workflows, the Capability Registry, and the Action Queue. Before any new path is included, it must route through `FIRESTORE_DATA_ARCHITECTURE.md`.
 
-Every new path must declare: exact path, owner (Platform or Barry), authority classification, persistence classification, writers and readers, retention rule, and security rule requirement. This is BO-011 in effect.
+Every new path must declare: exact path, owner (Platform or Barry), authority classification, persistence classification, writers and readers, retention rule, and security rule requirement. This follows the documentation framework established by `FIRESTORE_DATA_ARCHITECTURE.md`.
 
 ---
 

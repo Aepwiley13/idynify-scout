@@ -89,7 +89,7 @@ export async function logApiUsage(userId, operation, status, options = {}) {
     // The logical application environment, and nothing else. It is NOT derived
     // from the Firebase project: FIREBASE_PROJECT_ID selects the physical
     // database, BARRY_ENV names the environment, and neither may be inferred
-    // from the other (established by A2 defect resolution, P0B).
+    // from the other (established during P0B environment configuration (2026-08-08)).
     //
     // The previous implementation tested the project ID for the substring
     // "dev". The one project serving production is named `idynify-scout-dev`,

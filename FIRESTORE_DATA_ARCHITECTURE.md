@@ -13,7 +13,7 @@ brought under Barry OS governance.
 
 ### Four independent identities
 
-These are four separate concepts. **None may be inferred from another** (established by A2 defect resolution, P0B).
+These are four separate concepts. **None may be inferred from another** (established during P0B environment configuration (2026-08-08)).
 Conflating any two of them is what produced the `environment: "dev"` defect.
 
 ```

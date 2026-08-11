@@ -569,14 +569,14 @@ The 12 RECON generators (`generate-section-1` through `generate-section-10`, `ge
 
 **Primary dependency:** P5 (Think Layer emitting recommendations)
 
-**Architectural debt retired:** `barryActions` prompt-based intent parsing (replaced at P4). Unguarded send paths. A14 residual risk (compound failure: Gmail succeeds, terminal writes fail). `barry_drafts → prepared_actions` migration.
+**Architectural debt retired:** `barryActions` prompt-based intent parsing (replaced at P4 per R4-004 — intent parsing only; execution paths including `executeGmailSend` survive and migrate behind Action Executor at P6). Unguarded send paths. A14 residual risk (compound failure: Gmail succeeds, terminal writes fail). `barry_drafts → prepared_actions` migration.
 
 **Definition of Ready:**
 - P5 complete — Think Layer emitting recommendations with reasoning traces
 - Capability manifest schema approved (Document 4, Part IV — FROZEN)
 - A1 idempotency guarantee confirmed preserved across migration boundary (Document 4, Part V)
 - Autonomy spectrum defined with Phase 1 ceilings (Document 4, Part IV): side-effect capabilities ceiling at Approval, generative capabilities at Prepare or below
-- Every external side-effect path migrating behind Action Executor has a repository-verified stable logical-action identity (see Migration-Window Idempotency — Stable Cross-System Identity below)
+- Every external side-effect path migrating behind Action Executor has a repository-verified stable logical-action identity (see Migration-Window Idempotency — Stable Cross-System Identity below). This includes `barryActions.js:executeGmailSend`, which remains reachable after P4 (R4-004 deletes intent parsing, not execution — see path inventory correction below)
 
 **Definition of Done:**
 - Capability Registry operational: all capabilities registered with type (generative/side_effect), autonomy ceiling, idempotency key requirements
@@ -682,9 +682,11 @@ A path without a proven stable identity may not migrate behind Action Executor.
 | `gmail-send-wave.js` | Gmail send (batch wave) | Per-recipient in batch | Needs verification | Separate migration; not in `barry_drafts` scope |
 | `send-followup.js` | Gmail send (manual follow-up) | `campaignId` (created per send) | Needs verification | Separate migration; not in `barry_drafts` scope |
 | `process-scheduled-engagements.js` | Gmail send (scheduled) | `scheduledEngagements/{docId}` | Needs verification — path includes `userId` | Separate migration; not in `barry_drafts` scope |
-| `barryActions.js:executeGmailSend` | Gmail send (AI-driven action) | None — no idempotency claim | N/A — deleted at P4 per R4-004 | Retired before Action Executor; no migration required |
+| `barryActions.js:executeGmailSend` | Gmail send (AI-driven action) | None — no idempotency claim | Reachable after P4 — R4-004 deletes intent parsing, not execution | Separate migration; requires stable identity before dual-path eligibility |
 
-The migration-window idempotency mechanism specified below applies to the `barry-approve-send` legacy reply-send path only. Other external side-effect paths have independent stable-identity requirements that must be resolved as P6 Definition of Ready items before they can migrate behind Action Executor.
+**`barryActions.js:executeGmailSend` disposition — correction:** R4-004 (Document 4) establishes deletion of `barryActions` **intent parsing** — the AI-classified action routing layer (`parseIntent`, lines 87–142). It does not establish deletion of the action executor functions. At P4, intent parsing is replaced by typed tool schemas with deterministic routing (R4-004: "Action routing among 5 enumerated types plus `none` is a lookup, not reasoning"). The typed tool schemas route to execution functions — they do not eliminate the Gmail side-effect capability. After P4, the `gmail_send` tool type still requires an executor that calls `gmail.users.messages.send` (currently `executeGmailSend`, line 165). This execution path remains reachable and produces the same external side effect (`gmail.send_email` capability, Document 4 Part IV). At P6, this path must route through the Action Executor with the `gmail.send_email` capability contract (Document 4 Part IV: side-effect, approval required, idempotency key required). A stable logical-action identity satisfying corrected Document 4 Part V must be established before this path becomes dual-path eligible. The migration matrix (below) reflects the corrected target state: "Typed tool schemas" at P4 is an intent-routing change, not an execution-path deletion.
+
+The migration-window idempotency mechanism specified below applies to the `barry-approve-send` legacy reply-send path only. Other external side-effect paths — including `barryActions.js:executeGmailSend` — have independent stable-identity requirements that must be resolved as P6 Definition of Ready items before they can migrate behind Action Executor.
 
 #### Candidate Mechanism Evaluation
 

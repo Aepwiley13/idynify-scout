@@ -26,12 +26,12 @@ Domain & Lifecycle Model    ← Document 2 — FROZEN 2026-08-08
         ↓
 Signal Specification        ← Document 3 — FROZEN 2026-08-08
         ↓
-Capability Contracts        ← THIS DOCUMENT — Skills, Workflows, API, Actions
+Capability Contracts        ← THIS DOCUMENT — FROZEN 2026-08-11
         ↓
-Implementation Plan         ← Document 5 — build order
+Implementation Plan         ← Document 5 — FROZEN 2026-08-11
 ```
 
-The architecture freeze rule is in force. Documents 1, 2, and 3 are frozen. This document may reference them, derive from them, and operationalize them. It may not redefine objects, lifecycle states, signal contracts, or ownership boundaries established in those documents.
+The architecture freeze rule is in force. Documents 1–5 are frozen. This document may reference Documents 1–3, derive from them, and operationalize them. It may not redefine objects, lifecycle states, signal contracts, or ownership boundaries established in those documents.
 
 **What this document defines:**
 - Architectural resolutions for open questions from Documents 1–3
@@ -1654,14 +1654,14 @@ Every new path must declare: exact path, owner (Platform or Barry), authority cl
 | **Domain model** | `docs/barry-os/architecture/BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md` (Document 2 — FROZEN 2026-08-08) |
 | **Signal specification** | `docs/barry-os/architecture/BARRY_OS_SIGNAL_SPECIFICATION.md` (Document 3 — FROZEN 2026-08-08) |
 | **Infrastructure baseline** | `FIRESTORE_DATA_ARCHITECTURE.md` |
-| **Architecture status** | Draft — formal brief received 2026-08-10, revision in progress |
+| **Architecture status** | FROZEN 2026-08-11 — approved by Aaron after Team A review |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical capability specification) |
-| **Frozen** | No — pending Team A review and Aaron approval |
+| **Frozen** | Yes — FROZEN 2026-08-11 |
 
 ## Freeze Declaration
 
-Document 4 will be frozen upon approval by Aaron after Team A evidence review.
+Document 4 was frozen 2026-08-11 upon approval by Aaron after Team A evidence review.
 
 This document may only be modified if a factual error is discovered during
 implementation that directly contradicts a capability contract stated here.

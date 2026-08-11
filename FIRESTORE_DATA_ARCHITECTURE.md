@@ -13,7 +13,7 @@ brought under Barry OS governance.
 
 ### Four independent identities
 
-These are four separate concepts. **None may be inferred from another** (BO-011).
+These are four separate concepts. **None may be inferred from another** (established during P0B environment configuration (2026-08-08)).
 Conflating any two of them is what produced the `environment: "dev"` defect.
 
 ```
@@ -219,6 +219,20 @@ operation it measures.** The corollary is that telemetry can fail silently: a
 run of missing rows indicates a write failure, not an absence of activity. The
 `✅ API log:` line emitted on each successful write is the corroborating signal
 in the Netlify function logs.
+
+---
+
+## Signal Bus — `users/{uid}/signals/{signalId}`
+
+Contract fulfillment: this entry transcribes the Signal storage contract already frozen in Documents 2 and 3. No new architectural decisions are introduced.
+
+| Field | Value |
+|---|---|
+| **Path** | `users/{uid}/signals/{signalId}` (Document 2, §Signal item 5) |
+| **Read authority** | Observation pipeline, Awareness Layer, Think Layer, Context Resolver, audit/debugging surfaces (Document 2, §Signal item 6) |
+| **Write authority** | Signal publishers only — integrations (Gmail, Calendar, Apollo), platform event handlers, Action Executor (on action completion). Barry's intelligence layer never writes signals directly (Document 2, §Signal item 7) |
+| **Retention** | 90-day rolling window. Signals older than 90 days archived to cold storage. Awareness projections are the durable derivative — they survive signal expiration via validated projection checkpoints (Document 2, §Signal item 12; Document 3, Part VI) |
+| **Security rules** | The existing generic `users/{userId}/{document=**}` rule (`firestore.rules`) covers this path. A P1-scoped security rule restricting write access to signal publishers only is an implementation requirement — not yet applied. The `firestore.rules` change belongs to P1 implementation after P1 authorization |
 
 ---
 

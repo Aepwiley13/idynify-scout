@@ -1228,14 +1228,14 @@ Complete disposition of every current implementation's path to Barry OS.
 | **Signal specification** | `docs/barry-os/architecture/BARRY_OS_SIGNAL_SPECIFICATION.md` (Document 3 — FROZEN 2026-08-08) |
 | **Capability contracts** | `docs/barry-os/architecture/BARRY_OS_CAPABILITY_CONTRACTS.md` (Document 4 — FROZEN 2026-08-11) |
 | **Infrastructure baseline** | `FIRESTORE_DATA_ARCHITECTURE.md` |
-| **Architecture status** | Draft — pending Team A review and Aaron approval |
+| **Architecture status** | FROZEN 2026-08-11 — approved by Aaron after Team A review |
 | **Supersedes** | None |
 | **Superseded by** | None (this is the canonical implementation plan) |
-| **Frozen** | No — pending Team A review and Aaron approval |
+| **Frozen** | Yes — FROZEN 2026-08-11 |
 
 ## Freeze Declaration
 
-Document 5 will be frozen upon approval by Aaron after Team A evidence review.
+Document 5 was frozen 2026-08-11 upon approval by Aaron after Team A evidence review.
 
 This document may only be modified if:
 - A baseline finding alters readiness or risk status

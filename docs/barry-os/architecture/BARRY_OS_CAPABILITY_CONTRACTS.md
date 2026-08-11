@@ -1340,7 +1340,7 @@ This preserves the current `barry_drafts.sending` guarantee while moving it to i
 
 ## Migration Identity Requirement
 
-During the `barry_drafts` → Prepared Action coexistence window (Document 5, P6), two execution paths exist simultaneously. The existing `idempotency_key` (`{prepared_action_id}_{capability_id}_{timestamp}`) is a carried token — it is assigned at Prepared Action creation time, includes a timestamp component, and is not present on `barry_drafts` documents. It cannot be re-derived from observable state. It therefore cannot serve as the cross-system identity that bridges legacy and target execution paths during migration.
+During the `barry_drafts` → Prepared Action coexistence window (Document 5, P6), two execution paths exist simultaneously. The existing `idempotency_key` (`{prepared_action_id}_{capability_id}_{timestamp}`) is a carried token — `idempotency_key` is assigned at Capability invocation as defined by Document 4 Part V Step 1; it is not assigned at Prepared Action creation and is not part of the Prepared Action schema. It includes a timestamp component and is not present on `barry_drafts` documents. It cannot be re-derived from observable state. It therefore cannot serve as the cross-system identity that bridges legacy and target execution paths during migration.
 
 The P6 migration window requires a **stable per-action migration identity** with the following properties:
 

@@ -1,5 +1,5 @@
 // Idynify Scout Service Worker
-const CACHE_NAME = 'idynify-scout-v2';
+const CACHE_NAME = 'idynify-scout-v3';
 
 // On install, take control immediately
 self.addEventListener('install', (event) => {

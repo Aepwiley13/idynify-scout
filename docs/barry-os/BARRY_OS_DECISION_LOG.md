@@ -107,3 +107,19 @@ Layer satisfying 3 of 4 Think functions. P5 is permanently named Think Layer
 Promotion & Expansion. The architecture extends barryStrategyRecommender.js
 rather than replacing it.
 **Authority:** Barry OS Audit Reconciliation Addendum §4
+
+---
+
+## BO-011 — Product positioning frozen
+**Date:** 2026-08-13
+**Decision:** IDYNIFY is not a lead database with AI added to it. It is an
+intelligence system for understanding and advancing business relationships.
+
+Approved positioning hierarchy:
+- **Brand:** IDYNIFY
+- **Category:** AI Relationship Intelligence for Sales
+- **Framework:** WHO → WHY → NEXT
+- **Promise:** Know who matters, why they matter, and what to do next.
+- **Barry:** The intelligence inside IDYNIFY.
+
+**Authority:** Aaron — 2026-08-13

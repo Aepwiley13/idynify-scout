@@ -1,6 +1,6 @@
 {
-  "name": "Idynify Scout",
-  "short_name": "Scout",
+  "name": "IDYNIFY",
+  "short_name": "IDYNIFY",
   "description": "Find and build relationships with your ideal clients — powered by AI.",
   "start_url": "/scout?tab=daily-leads",
   "display": "standalone",

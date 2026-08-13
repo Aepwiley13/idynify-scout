@@ -1,5 +1,5 @@
 // Idynify Scout Service Worker
-const CACHE_NAME = 'idynify-scout-v1';
+const CACHE_NAME = 'idynify-scout-v2';
 
 // On install, take control immediately
 self.addEventListener('install', (event) => {
@@ -44,7 +44,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // For icons and manifest, cache them
-  if (['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/manifest.json'].includes(url.pathname)) {
+  if (['/icon-192.png', '/icon-512.png', '/icon-512-maskable.png', '/apple-touch-icon.png', '/manifest.json'].includes(url.pathname)) {
     event.respondWith(
       caches.open(CACHE_NAME).then((cache) =>
         cache.match(request).then((cached) => {

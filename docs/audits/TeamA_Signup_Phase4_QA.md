@@ -2,12 +2,12 @@
 
 **Against:** Phase 3 Review / Phase 4 Authorization (Aug 13, 2026)
 **Branch:** `claude/team-a-29qz5h`
-**Status:** QA complete. Awaiting signoff.
+**Status:** QA complete, recapture done against the live policy.
 **Reference:** `docs/design/signup-mockup-approved.png` — the single visual reference.
 
-> ⚠️ **The password checklist in every screenshot in this report is the
-> SIMULATED POST-POLICY STATE.** REL-AUTH-001 has not been executed and cannot
-> be executed from here. See §1 — recapture is required before signoff.
+> **REL-AUTH-001 is live.** The password section has been recaptured against the
+> real configuration — see §1b. One discrepancy was found in the live config and
+> raised as **#546**; it does not affect behaviour today.
 
 ---
 
@@ -21,7 +21,7 @@
 | 200% zoom | ✅ Reflows, no horizontal scroll |
 | Keyboard open | ✅ **Closed** by the authorized sticky CTA — §5b |
 | Error states | ✅ Announced, actionable, form preserved |
-| REL-AUTH-001 | ⬜ **Not executed** — §1 |
+| REL-AUTH-001 | ✅ Live, recaptured — §1b. ⚠️ config discrepancy raised as **#546** |
 | Barry provenance | ✅ §2 |
 | Welcome email fire-and-forget | ✅ §3 |
 | Pre-existing failures | ✅ Issue **#545** opened |
@@ -35,9 +35,9 @@ time. Only the screenshot caught it.
 
 ---
 
-# 1 — REL-AUTH-001: not executed, and I cannot execute it
+# 1 — REL-AUTH-001, before execution *(superseded by §1b)*
 
-**Status: ⬜ NOT RUN.** Two independent reasons:
+Kept for the record. **Status at the time: ⬜ NOT RUN.** Two independent reasons:
 
 1. **No console access, by design.** The runbook assigns execution to Aaron:
    *"Team A does not have and should not have console access."* Changing a
@@ -79,6 +79,101 @@ in force** — Firebase's default 6-character minimum, shown as "6+ characters".
 That is truthful, not broken: the checklist mirrors the console, so it is correct
 before and after, and the transition needs no deploy. It simply will not match
 these screenshots until the console change is made.
+
+---
+
+# 1b — Recapture against the live policy
+
+**REL-AUTH-001 is live.** Fetched directly from the endpoint, three times, stable:
+
+```json
+{
+  "customStrengthOptions": {
+    "minPasswordLength": 8,
+    "maxPasswordLength": 4096,
+    "containsLowercaseCharacter": true,
+    "containsUppercaseCharacter": true,
+    "containsNumericCharacter": true,
+    "containsNonAlphanumericCharacter": false
+  },
+  "enforcementState": "OFF",
+  "forceUpgradeOnSignin": true,
+  "schemaVersion": 1
+}
+```
+
+## ✅ All three displayed rules originate from the live configuration
+
+Driven by the **verbatim live response body**, so the SDK performs its real
+REST-name → SDK-name conversion on the real payload:
+
+| Password | Checklist |
+|---|---|
+| *(empty)* | 8+ characters ✗ · Upper & lowercase letters ✗ · At least one number ✗ |
+| `abcdefgh` | 8+ characters **✓** · Upper & lowercase ✗ · number ✗ |
+| `Abcdefg1` | **✓ ✓ ✓** |
+
+Nothing is hardcoded: `minPasswordLength: 8` produces "8+ characters", and the
+case row appears only because both `containsUppercaseCharacter` and
+`containsLowercaseCharacter` are true in the live policy. Change the console and
+the checklist follows with no deploy.
+
+**Notify mode does not change what the checklist shows.** It reads
+`customStrengthOptions`, which Notify and Require both populate identically —
+now confirmed empirically against a live `enforcementState: "OFF"` response.
+
+## ⚠️ `forceUpgradeOnSignin` is `true` in the live config — raised as #546
+
+The release note records *"Force upgrade on sign-in: OFF"*. The live endpoint
+reports `true`.
+
+**Nothing is broken today, and check 7 passing is consistent with this.** With
+`enforcementState: "OFF"` nothing is enforced, so the flag is inert and no
+existing user is affected.
+
+**It matters for what comes next.** The flag is inert *because* enforcement is
+off — and flipping enforcement to Require, which is exactly what AUTH-POLICY-002
+exists to evaluate, is what would activate it. At that moment every existing user
+with a non-compliant password would be forced to reset at next sign-in: the
+outcome the sprint was explicit about never causing, arriving as a side effect of
+a change nobody intended to be about existing users. The two settings the release
+note describes as separate are currently coupled in the live config.
+
+Tracked as a blocking precondition on **#546**. Set it to `false` and re-fetch
+before evaluating Require.
+
+## How this was captured, precisely
+
+`curl` reaches the endpoint through the agent proxy and returns HTTP 200. **The
+browser cannot**: Playwright's Chromium verifies certificates through an NSS
+store that does not carry the proxy CA, so the intercepted TLS connection is
+reset (`ERR_CONNECTION_RESET`). The CA is present and valid in the system store,
+but `certutil` is not available to add it to NSS, and disabling certificate
+verification is not an acceptable workaround.
+
+So the screenshots replay the **verbatim live response bytes** into the browser
+rather than a composed fixture. Only the network hop is simulated; the payload,
+the SDK conversion and the render path are all real. That is a materially
+stronger claim than the earlier stub, and weaker than a true end-to-end capture —
+stated plainly so it can be judged rather than assumed.
+
+**A genuine end-to-end browser capture needs an environment with outbound egress
+to `identitytoolkit.googleapis.com`.** See §8 — the same constraint applies to
+Phase 5 and is worth settling before that phase starts.
+
+### Documentation correction, applied
+
+Per the release note, this release is **not** described as enforcing stronger
+passwords at the Firebase auth boundary. The accurate description, used
+throughout:
+
+> **Password-strength guidance enabled through the live GCIP policy. Hard
+> enforcement deferred.**
+
+Firebase in Notify mode will still accept a non-compliant password at the API.
+The client-side checklist is guidance, and `PasswordRequirements` was already
+built on that assumption — `onValidityChange` reports guidance, never gates
+submission, and the server remains the authority.
 
 ---
 
@@ -433,12 +528,48 @@ Signup rebuild suite: **33 passed, 0 failed.** Full suite: **1126 passed, 5 fail
 
 ---
 
-# 8 — Phase 5 readiness
+# 8 — Phase 5 readiness, and one environment constraint to settle first
 
-Noted for the next gate, not claimed as done. Automated coverage exists (tests
-10, 11, 12) and the review is explicit that a passing suite is necessary but not
-sufficient, so all three paths need manual end-to-end verification against a real
-Firebase project:
+## The constraint
+
+Phase 5 requires creating real accounts and reading the resulting Firestore
+documents. Reachability to Firebase from this environment was tested rather than
+assumed:
+
+| Client | Reaches `identitytoolkit.googleapis.com` |
+|---|---|
+| `curl` (via the agent proxy) | ✅ HTTP 200 |
+| Node `fetch` (no proxy needed) | ✅ HTTP 200 |
+| **Playwright Chromium** | ❌ fails via the proxy *and* with `--no-proxy-server` |
+
+**So a browser-driven end-to-end signup cannot be performed here.** That is the
+same constraint that forced the §1b replay, and it needs a decision before
+Phase 5 starts rather than three steps into it.
+
+Two viable routes:
+
+**A — Node-hosted integration run.** Mount the real `Signup.jsx` in jsdom wired
+to the **real Firebase SDK against the real project** instead of mocks. Node can
+reach Firebase, so this executes the actual component code — the real `?tier=`
+read, the real `setDoc` payload — creates real accounts, and reads the documents
+back for assertion. It verifies everything Phase 5 asks about except browser
+rendering, which Phase 4 already covered. It does write real accounts to the
+project.
+
+**B — Aaron runs it in a browser** against a normal environment, with Team A
+supplying an exact click-by-click script and the assertions to check.
+
+Team A recommends **A** for the Firestore assertions, because inspecting the
+written document directly is stronger evidence than reading a URL bar, with **B**
+for the interaction checks that need a real browser (keyboard-only flow, sticky
+CTA on real devices, show/hide). `[NEEDS AARON]` — A creates accounts in a live
+project, which is not something to start unasked.
+
+## What gets verified either way
+
+Automated coverage exists (tests 10, 11, 12) and the review is explicit that a
+passing suite is necessary but not sufficient, so all three paths need
+verification against a real Firebase project:
 
 ```
 ?tier=pro     → users/{uid}.selectedTier = 'pro',     credits = 1250 → /checkout?tier=pro
@@ -453,12 +584,15 @@ password can still sign in — immediately after REL-AUTH-001.
 
 # 9 — Signoff blockers
 
-| # | Item | Owner |
+| # | Item | Status |
 |---|---|---|
-| **1** | **Execute REL-AUTH-001**, then run verification check 7 | Aaron |
-| **2** | Team A recaptures the password section against the real policy and replaces the simulated screenshots | Team A, after #1 |
+| ~~1~~ | ~~Execute REL-AUTH-001, then verification check 7~~ | ✅ **Done** — live, check 7 passed |
+| ~~2~~ | ~~Recapture the password section against the real policy~~ | ✅ **Done** — §1b |
+| **3** | `forceUpgradeOnSignin: true` in the live config | ⚠️ **#546** — no behavioural impact today, blocks Notify → Require |
+| **4** | How Phase 5 runs, given the browser cannot reach Firebase here | `[NEEDS AARON]` — §8 |
 
-Sequential, and the only things standing between this report and signoff.
+Items 1 and 2 are closed. **Phase 4 is complete from Team A's side.** Item 3 is
+tracked and does not block signoff. Item 4 blocks Phase 5, not Phase 4.
 
 ~~Item 3 — sticky CTA decision~~ **Resolved.** Authorized in the Phase 4 review
 and implemented; see §5b.

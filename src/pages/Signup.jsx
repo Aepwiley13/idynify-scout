@@ -1,359 +1,257 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Mail, ArrowRight } from 'lucide-react';
+import AuthLayout from '../components/auth/AuthLayout';
+import AuthField from '../components/auth/AuthField';
+import PasswordField from '../components/auth/PasswordField';
+import PasswordRequirements from '../components/auth/PasswordRequirements';
+import BrandMark from '../components/auth/BrandMark';
+import {
+  SIGNUP_EVENTS,
+  beginSignupSession,
+  bufferSignupEvent,
+  bufferSignupEventOnce,
+  flushSignupEvents,
+} from '../services/signupAnalytics';
+
+const WhyIdynify = lazy(() => import('../components/auth/WhyIdynify'));
+
+/**
+ * Firebase error code → what the person reading it should do about it.
+ * `email-already-in-use` is handled separately because its message carries a
+ * link, and a link is not a string.
+ */
+const ERROR_COPY = {
+  'auth/invalid-email':           'Enter a valid email address.',
+  'auth/weak-password':           'Choose a stronger password.',
+  'auth/network-request-failed':  'Connection issue — check your internet and try again.',
+  'auth/too-many-requests':       'Too many attempts. Please try again in a few minutes.',
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [countdown, setCountdown] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [formError, setFormError] = useState(null);   // { code, message }
+  const [submitting, setSubmitting] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Read tier from URL parameter (default to 'starter' if not specified)
+  /**
+   * The tier is invisible on this page by design — the brief removes all
+   * pricing and plan language from signup. It still decides what the account
+   * is created with, so it is read and forwarded exactly as before.
+   *
+   * This is the single most important thing not to lose in a visual rewrite:
+   * nothing on screen would look wrong if it stopped flowing, and a customer
+   * who chose Pro would quietly become Starter. Tests 10 and 11 pin it.
+   */
   const tier = searchParams.get('tier') || 'starter';
 
   useEffect(() => {
-    const calculateCountdown = () => {
-      const now = new Date();
-      const target = new Date();
-      target.setHours(target.getHours() + 24);
-      const diff = target - now;
-      
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      
-      setCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-    };
+    beginSignupSession();
+    bufferSignupEvent(SIGNUP_EVENTS.VIEWED, { tier });
+  }, [tier]);
 
-    calculateCountdown();
-    const interval = setInterval(calculateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const onEmailChange = (e) => {
+    bufferSignupEventOnce(SIGNUP_EVENTS.EMAIL_STARTED);
+    const next = e.target.value;
+    setEmail(next);
+    // Re-validate as they type only once they have already left the field —
+    // correcting a mistake should clear the error immediately, but a partly
+    // typed address is not a mistake yet.
+    if (emailTouched) setEmailError(EMAIL_RE.test(next) ? '' : 'Enter a valid email address.');
+  };
 
-  const handleSignup = async (e) => {
+  const onEmailBlur = () => {
+    // Deliberately not on first blur through an empty field: tabbing past
+    // something you have not filled in yet is not an error worth shouting at.
+    if (!email) return;
+    setEmailTouched(true);
+    setEmailError(EMAIL_RE.test(email) ? '' : 'Enter a valid email address.');
+  };
+
+  const onPasswordChange = (e) => {
+    bufferSignupEventOnce(SIGNUP_EVENTS.PASSWORD_STARTED);
+    setPassword(e.target.value);
+  };
+
+  // Identity so PasswordRequirements' effect does not re-run every render.
+  const noopValidity = useCallback(() => {}, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate password match
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    // The disabled attribute is the visible guard; this is the real one. A
+    // double-tap can land two submits before React re-renders the button, and
+    // the second would try to create the account again.
+    if (submitting) return;
+
+    if (!EMAIL_RE.test(email)) {
+      setEmailTouched(true);
+      setEmailError('Enter a valid email address.');
       return;
     }
 
-    // Validate password length
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setError(''); // Clear any previous errors
+    setFormError(null);
+    setSubmitting(true);
+    bufferSignupEvent(SIGNUP_EVENTS.SUBMITTED, { tier });
+    bufferSignupEvent(SIGNUP_EVENTS.METHOD_SELECTED, { method: 'email' });
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Determine initial credits based on tier
+      // ── UNCHANGED FROM THE PREVIOUS IMPLEMENTATION ──────────────────────
+      // Same keys, same order, same types. `credits` is a number here and is
+      // later replaced by an object in CheckoutPage — a known inconsistency
+      // that this sprint documents rather than fixes, so the shape written at
+      // signup must stay exactly what production writes today. Test 12 asserts
+      // this payload field by field.
       const initialCredits = tier === 'pro' ? 1250 : 400;
 
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: email,
         createdAt: new Date(),
-        selectedTier: tier, // Store the tier they selected (starter or pro)
+        selectedTier: tier,
         subscriptionTier: tier,
-        status: 'pending_payment', // Will change to 'active' after payment
-        hasCompletedPayment: false, // Will be set to true after checkout
-        credits: initialCredits, // Give them credits based on tier
+        status: 'pending_payment',
+        hasCompletedPayment: false,
+        credits: initialCredits,
         monthlyCredits: initialCredits
       });
+      // ────────────────────────────────────────────────────────────────────
 
-      // Send welcome email (async, don't block on this)
-      try {
-        await fetch('/.netlify/functions/send-welcome-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email,
-            userId: userCredential.user.uid
-          })
-        });
-        console.log('✅ Welcome email sent');
-      } catch (emailError) {
-        // Log but don't block signup flow
-        console.error('⚠️ Failed to send welcome email:', emailError);
-      }
+      // Genuinely fire-and-forget now. The previous code awaited this despite
+      // a comment promising it did not, so a slow Resend call sat between the
+      // user pressing the button and reaching checkout. Failures still surface
+      // in logs; they just no longer cost the user time.
+      fetch('/.netlify/functions/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, userId: userCredential.user.uid }),
+      }).catch((emailError) => {
+        console.error('[signup] welcome email failed to send', emailError);
+      });
 
-      // Redirect to checkout with tier parameter
+      // A uid exists from here on, so the buffered funnel can be written.
+      flushSignupEvents(SIGNUP_EVENTS.SUCCEEDED, { tier });
+
       navigate(`/checkout?tier=${tier}`);
     } catch (error) {
-      // Map Firebase error codes to user-friendly messages
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          setError('An account with this email already exists.');
-          break;
-        case 'auth/invalid-email':
-          setError('Please enter a valid email address.');
-          break;
-        case 'auth/weak-password':
-          setError('Password is too weak. Please use at least 6 characters.');
-          break;
-        case 'auth/too-many-requests':
-          setError('Too many attempts. Please try again later.');
-          break;
-        default:
-          setError('Failed to create account. Please try again.');
-      }
+      // Error type only — never the email, never the password.
+      bufferSignupEvent(SIGNUP_EVENTS.FAILED, { code: error?.code || 'unknown' });
+
+      setFormError({
+        code: error?.code,
+        message: ERROR_COPY[error?.code] || 'Something went wrong. Please try again.',
+      });
+      // Form values are deliberately left intact — retyping an email because
+      // the password was wrong is its own small insult.
+      setSubmitting(false);
     }
   };
 
+  const duplicate = formError?.code === 'auth/email-already-in-use';
+
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Starfield Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(200)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute bg-white rounded-full"
-            style={{
-              width: Math.random() * 2 + 1 + 'px',
-              height: Math.random() * 2 + 1 + 'px',
-              top: Math.random() * 100 + '%',
-              left: Math.random() * 100 + '%',
-              opacity: Math.random() * 0.7 + 0.3,
-              animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 3}s`
-            }}
+    <AuthLayout
+      variant="full"
+      below={
+        <Suspense fallback={null}>
+          <WhyIdynify />
+        </Suspense>
+      }
+    >
+      <BrandMark />
+
+      <div className="auth-head">
+        <h1 className="auth-title">
+          Create your<br /><em>IDYNIFY</em> account
+        </h1>
+        <p className="auth-sub">
+          Know who matters, why they matter, and what to do next.
+        </p>
+      </div>
+
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <AuthField
+          label="Email"
+          name="email"
+          type="email"
+          value={email}
+          onChange={onEmailChange}
+          onBlur={onEmailBlur}
+          autoComplete="email"
+          placeholder="you@company.com"
+          icon={Mail}
+          error={emailError}
+          inputMode="email"
+        />
+
+        <div>
+          <PasswordField
+            name="password"
+            value={password}
+            onChange={onPasswordChange}
+            autoComplete="new-password"
+            placeholder="Create a strong password"
           />
-        ))}
-      </div>
-
-      {/* Floating Code Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {['[ANALYZING...]', '[ICP:LOCKED]', '[LEAD:QUALIFIED]', '[DATA:ENCRYPTED]', '[MISSION:ACTIVE]', '[BARRY:ONLINE]'].map((code, i) => (
-          <div
-            key={i}
-            className="absolute text-cyan-400/30 font-mono text-xs"
-            style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animation: `floatCode ${15 + i * 3}s linear infinite`,
-              animationDelay: `${i * 2}s`
-            }}
-          >
-            {code}
-          </div>
-        ))}
-      </div>
-
-      {/* Grid Pattern at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-cyan-900/20 to-transparent">
-        <svg className="w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <defs>
-            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="cyan" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100" height="100" fill="url(#grid)" />
-        </svg>
-      </div>
-
-      {/* Top Left Status */}
-      <div className="absolute top-6 left-6 text-cyan-400 font-mono text-xs space-y-1 z-20">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span>SYSTEM ONLINE</span>
+          <PasswordRequirements password={password} onValidityChange={noopValidity} />
         </div>
-        <div>MISSION: SCOUT</div>
-        <div>STATUS: ACCEPTING CREW</div>
-      </div>
 
-      {/* Top Right Countdown */}
-      <div className="absolute top-6 right-6 text-cyan-400 font-mono text-xs text-right z-20">
-        <div>LAUNCH WINDOW</div>
-        <div className="text-2xl font-bold text-pink-400 tabular-nums">T-{countdown}</div>
-      </div>
-
-      {/* Bottom Left Radar Circle */}
-      <div className="absolute bottom-6 left-6 w-24 h-24 border-2 border-cyan-500/30 rounded-full z-20">
-        <div className="absolute inset-0 rounded-full" style={{
-          background: 'conic-gradient(from 0deg, transparent 0deg, cyan 90deg, transparent 90deg)',
-          animation: 'spin 4s linear infinite',
-          opacity: 0.3
-        }}></div>
-        <div className="absolute inset-4 border border-cyan-500/20 rounded-full"></div>
-        <div className="absolute inset-8 border border-cyan-500/20 rounded-full"></div>
-      </div>
-
-      {/* Main Content */}
-      <div className="relative z-10 py-12 px-4 flex items-center justify-center min-h-screen">
-        <div className="w-full max-w-2xl">
-          {/* Animated Early Access Badge */}
-          <div className="flex justify-center mb-6 animate-bounce">
-            <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-6 py-2 rounded-full font-black text-sm">
-              🚀 EARLY ACCESS - LIMITED SEATS
-            </div>
-          </div>
-
-          <div className="bg-black/60 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-cyan-500/30">
-            {/* Logo/Header */}
-            <div className="text-center mb-8">
-              <img
-                src="/barry-bear.jpg"
-                alt="Barry the Bear"
-                className="w-32 h-32 mx-auto mb-4 rounded-full border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/30"
-                style={{ animation: 'floatBear 6s ease-in-out infinite' }}
-              />
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-                Barry AI
-              </h1>
-              <h2 className="text-3xl font-bold text-cyan-300 mb-4">
-                Mission: Scout
-              </h2>
-              <p className="text-gray-300 text-lg">
-                Data Exploration • Lead Discovery • Mission Ready
-              </p>
-            </div>
-
-            {/* Mission Briefing */}
-            <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-6 mb-8 border border-purple-500/30">
-              <h3 className="text-pink-300 font-bold text-lg mb-3 flex items-center gap-2">
-                <span>📋</span> MISSION BRIEFING
-              </h3>
-              <ul className="space-y-2 text-gray-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Define your Ideal Customer Profile with AI-powered RECON</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Browse unlimited companies matching your ICP (always free)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Enrich {tier === 'pro' ? '125' : '40'} companies/month with full contact data</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-cyan-400 mt-1">▸</span>
-                  <span>Get {tier === 'pro' ? '375' : '120'} verified contacts with email & phone</span>
-                </li>
-              </ul>
-            </div>
-            
-            <form onSubmit={handleSignup} className="space-y-5">
-              <div>
-                <label className="text-cyan-300 text-sm font-semibold mb-2 block font-mono uppercase tracking-wider">
-                  AGENT EMAIL
-                </label>
-                <input
-                  type="email"
-                  placeholder="your.email@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full p-4 bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-cyan-300 text-sm font-semibold mb-2 block font-mono uppercase tracking-wider">
-                  SECURE PASSWORD
-                </label>
-                <input
-                  type="password"
-                  placeholder="Minimum 6 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-4 bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono"
-                  minLength="6"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-cyan-300 text-sm font-semibold mb-2 block font-mono uppercase tracking-wider">
-                  CONFIRM PASSWORD
-                </label>
-                <input
-                  type="password"
-                  placeholder="Re-enter your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full p-4 bg-cyan-950/50 border-2 border-cyan-500/30 rounded-xl text-white placeholder-cyan-700 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 transition-all font-mono"
-                  minLength="6"
-                  required
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-3">
-                  <p className="text-red-300 text-sm font-mono">⚠️ {error}</p>
-                </div>
+        {formError && (
+          <div className="auth-alert" role="alert" aria-live="polite">
+            <span>
+              {duplicate ? (
+                <>
+                  An account already exists with this email.{' '}
+                  <Link className="auth-link-inline" to="/login">Sign in instead</Link>
+                </>
+              ) : (
+                formError.message
               )}
-              
-              <button 
-                type="submit"
-                className="w-full relative overflow-hidden bg-gradient-to-r from-cyan-500 via-purple-600 to-pink-600 text-white p-5 rounded-xl font-black text-xl hover:scale-105 transition-all shadow-2xl shadow-cyan-500/50 group"
-              >
-                <span className="relative z-10">🚀 ACCEPT MISSION & START</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              </button>
-            </form>
-
-            {/* Footer note */}
-            <div className="mt-6 text-center">
-              <p className="text-cyan-500/60 text-sm font-mono">
-                🔒 ENCRYPTED • {tier === 'pro' ? '1,250 CREDITS' : '400 CREDITS'} • INSTANT ACCESS
-              </p>
-              <p className="text-purple-400 text-xs mt-2">
-                {tier === 'pro' ? '$50/month - 125 companies' : '$20/month - 40 companies'} • Cancel anytime
-              </p>
-              <div className="mt-4 space-y-2">
-                <p className="text-gray-400 text-sm">
-                  Already have an account?{' '}
-                  <button
-                    onClick={() => navigate('/login')}
-                    className="text-cyan-400 hover:text-cyan-300 font-bold underline bg-transparent border-0 cursor-pointer"
-                  >
-                    Login here →
-                  </button>
-                </p>
-                <p className="text-gray-400 text-sm">
-                  Forgot your password?{' '}
-                  <button
-                    onClick={() => navigate('/forgot-password')}
-                    className="text-pink-400 hover:text-pink-300 font-bold underline bg-transparent border-0 cursor-pointer"
-                  >
-                    Reset it here →
-                  </button>
-                </p>
-              </div>
-            </div>
+            </span>
           </div>
-        </div>
-      </div>
+        )}
 
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 1; }
-        }
-        @keyframes floatBear {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
-        }
-        @keyframes floatCode {
-          0% { transform: translateY(100vh) translateX(0); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+        <div className="auth-cta-dock">
+          <button type="submit" className="auth-cta" disabled={submitting}>
+            {submitting ? (
+              <>
+                <span className="auth-spinner" aria-hidden="true" />
+                Creating your account...
+              </>
+            ) : (
+              <>
+                Create account
+                <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+
+      <p className="auth-foot">
+        Already have an account?{' '}
+        <Link
+          className="auth-link"
+          to="/login"
+          onClick={() => bufferSignupEvent(SIGNUP_EVENTS.SIGNIN_CLICKED)}
+        >
+          Sign in
+        </Link>
+      </p>
+
+      {/* LEGAL-001 — Terms and Privacy are deferred (D2). The slot is held open
+          so reinstating the line later is a render, not a layout change. */}
+      <div className="auth-legal-slot" />
+    </AuthLayout>
   );
 }

@@ -1,0 +1,622 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Pre-auth surface — signup, sign in, forgot password.
+
+   Every colour here is var(--auth-*), set from tokens.js by AuthLayout.jsx.
+   No literal hex values: the audit found the old pre-auth pages hardcoding a
+   palette that had drifted from BRAND, and a stylesheet with its own hexes
+   would rebuild that drift from scratch.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.auth-root {
+  min-height: 100vh;
+  background: var(--auth-panel);
+  color: var(--auth-text);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+.auth-sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Split ────────────────────────────────────────────────────────────────── */
+
+.auth-split {
+  display: flex;
+  min-height: 100vh;
+  align-items: stretch;
+}
+
+.auth-panel-left {
+  flex: 0 0 56%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  background: var(--auth-panel);
+}
+
+.auth-panel-inner {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-panel-right {
+  flex: 1 1 44%;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(150deg,
+    var(--auth-navy) 0%,
+    var(--auth-indigo) 55%,
+    var(--auth-purple) 100%);
+}
+
+/* The curved divider from the approved mockup. An oversized ellipse anchored
+   off the left edge, so the curve stays gentle at every panel width instead of
+   flattening out the way a fixed border-radius does. */
+.auth-panel-right::before {
+  content: '';
+  position: absolute;
+  top: -12%;
+  left: -14%;
+  width: 30%;
+  height: 124%;
+  background: var(--auth-panel);
+  border-radius: 0 100% 100% 0 / 0 50% 50% 0;
+}
+
+/* ── Barry + speech card ──────────────────────────────────────────────────── */
+
+.auth-hero {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 40px 32px 0;
+}
+
+.auth-speech {
+  background: #fff;
+  color: var(--auth-text);
+  border-radius: 18px;
+  padding: 20px 22px;
+  max-width: 330px;
+  margin-bottom: 8px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.22);
+  position: relative;
+  align-self: flex-end;
+}
+
+/* Speech pointer, aimed down at Barry. */
+.auth-speech::after {
+  content: '';
+  position: absolute;
+  left: 42px;
+  bottom: -11px;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 12px solid #fff;
+}
+
+.auth-speech-hi {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--auth-purple);
+  margin: 0 0 8px;
+}
+
+.auth-speech-body {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--auth-muted);
+  margin: 0 0 10px;
+}
+
+.auth-speech-cta {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--auth-purple);
+  margin: 0;
+}
+
+.auth-barry {
+  display: block;
+  width: 100%;
+  max-width: 400px;
+  margin-top: auto;
+}
+
+.auth-barry img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── Brand mark ───────────────────────────────────────────────────────────── */
+
+.auth-brand-img { display: block; width: 150px; height: auto; }
+.auth-brand-img.compact { width: 40px; }
+
+.auth-brand-fallback {
+  display: inline-block;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  font-style: italic;
+  color: var(--auth-pink);
+}
+.auth-brand-fallback.compact { font-size: 20px; }
+
+/* ── Headline block ───────────────────────────────────────────────────────── */
+
+.auth-head { margin: 34px 0 28px; }
+
+.auth-title {
+  font-size: 46px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  margin: 0 0 14px;
+  color: var(--auth-text);
+}
+
+.auth-title em {
+  font-style: normal;
+  color: var(--auth-indigo);
+}
+
+.auth-sub {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--auth-muted);
+  margin: 0;
+  max-width: 34ch;
+}
+
+/* ── Fields ───────────────────────────────────────────────────────────────── */
+
+.auth-form { display: flex; flex-direction: column; gap: 18px; }
+
+.auth-field-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--auth-text);
+  margin-bottom: 7px;
+}
+
+.auth-field-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--auth-input);
+  border: 1.5px solid var(--auth-border2);
+  border-radius: 11px;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.auth-field-box:focus-within {
+  border-color: var(--auth-indigo);
+  box-shadow: 0 0 0 4px rgb(79 70 229 / 0.13);
+}
+
+.auth-field-box.has-error { border-color: var(--auth-error); }
+.auth-field-box.has-error:focus-within {
+  box-shadow: 0 0 0 4px rgb(220 38 38 / 0.12);
+}
+
+.auth-field-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--auth-faint);
+  pointer-events: none;
+}
+
+.auth-field-input {
+  flex: 1;
+  width: 100%;
+  /* 16px is load-bearing on iOS: anything smaller makes Safari zoom the page
+     on focus, which reads as the form jumping away from the user. */
+  font: 400 16px Inter, system-ui, sans-serif;
+  color: var(--auth-text);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 15px 14px;
+  border-radius: 11px;
+}
+
+.auth-field-input.has-icon { padding-left: 42px; }
+.auth-field-input.has-trailing { padding-right: 48px; }
+.auth-field-input::placeholder { color: var(--auth-faint); }
+
+/* The reveal toggle. 44x44 because it is a touch target, not an icon. */
+.auth-field-toggle {
+  position: absolute;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--auth-muted);
+  cursor: pointer;
+}
+.auth-field-toggle:hover { color: var(--auth-text); }
+.auth-field-toggle:focus-visible {
+  outline: 2px solid var(--auth-indigo);
+  outline-offset: -2px;
+}
+
+.auth-field-error {
+  margin: 7px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--auth-error);
+}
+
+.auth-field-hint {
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: var(--auth-muted);
+}
+
+/* ── Password requirements ────────────────────────────────────────────────── */
+
+.auth-req-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.auth-req {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--auth-muted);
+}
+
+.auth-req-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--auth-border2);
+  color: transparent;
+  transition: background-color .18s, border-color .18s, color .18s;
+}
+
+.auth-req.met { color: var(--auth-text); }
+.auth-req.met .auth-req-mark {
+  background: var(--auth-success);
+  border-color: var(--auth-success);
+  color: #fff;
+}
+
+/* ── Form-level error ─────────────────────────────────────────────────────── */
+
+.auth-alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 13px 15px;
+  border-radius: 11px;
+  background: rgb(220 38 38 / 0.07);
+  border: 1px solid rgb(220 38 38 / 0.28);
+  color: var(--auth-error);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.auth-alert a,
+.auth-alert button.auth-link-inline {
+  color: var(--auth-error);
+  font-weight: 700;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ── CTA ──────────────────────────────────────────────────────────────────── */
+
+.auth-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 16px 22px;
+  border: 0;
+  border-radius: 11px;
+  font: 700 16px Inter, system-ui, sans-serif;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--auth-indigo), var(--auth-purple));
+  transition: filter .18s, box-shadow .18s;
+}
+
+.auth-cta:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: 0 8px 22px rgb(79 70 229 / 0.32);
+}
+
+.auth-cta:focus-visible {
+  outline: 3px solid var(--auth-indigo);
+  outline-offset: 2px;
+}
+
+.auth-cta:disabled { opacity: .62; cursor: not-allowed; }
+
+.auth-cta-arrow { transition: transform .18s; }
+.auth-cta:hover:not(:disabled) .auth-cta-arrow { transform: translateX(3px); }
+
+/* ── Sticky CTA dock (small screens only) ─────────────────────────────────────
+   Phase 4 measured the CTA 22-113px below the fold with the keyboard open on
+   four common phones — the user types a password with no visible way to submit.
+   Tightening the rhythm fixed the largest handset and reduced the rest; this
+   closes the remainder.
+
+   Sticky rather than fixed, deliberately: the CTA stays in normal flow and in
+   normal tab order, and only pins when it would otherwise be out of reach. A
+   fixed bar would float permanently, cover content on every scroll position,
+   and mean shipping the primary action twice.
+
+   `--auth-kb-inset` is 0 unless an on-screen keyboard is covering part of the
+   layout viewport — see useKeyboardInset() in AuthLayout.jsx. Adding it here is
+   what makes one rule correct on both Android (which shrinks the layout
+   viewport, inset 0) and iOS (which does not, inset = keyboard height).
+
+   The panel-coloured padding is a mask: invisible while the button sits in
+   flow, and what keeps content legible behind it once it pins. */
+@media (max-width: 1023px) {
+  .auth-cta-dock {
+    position: sticky;
+    bottom: calc(var(--auth-kb-inset, 0px) + 12px);
+    z-index: 5;
+    background: var(--auth-panel);
+    padding: 10px 0;
+    margin: -10px 0;
+  }
+
+  /* The dock masks whatever it pins over — which, on a short viewport, would
+     otherwise be the field the user is currently typing in. First build of this
+     did exactly that: the CTA sat on top of the password input.
+
+     `scroll-margin-bottom` is the fix, and it is why the dock is safe. When the
+     browser scrolls a focused field into view it now reserves this much space
+     below it, so the field, its checklist and the pinned CTA all land in the
+     visible band instead of stacking on each other.
+
+     The value has to clear everything that sits between a field and the pinned
+     dock, not just the dock: at 160px the CTA still clipped the last
+     requirement row in half, which reads as a rendering bug rather than a
+     deliberate overlay. 190px is checklist (72) + its gap (11) + form gap (15)
+     + CTA (56) + dock padding and offset (~34). */
+  .auth-field-input { scroll-margin-bottom: 190px; }
+}
+
+.auth-spinner {
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgb(255 255 255 / 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: auth-spin .7s linear infinite;
+}
+
+@keyframes auth-spin { to { transform: rotate(360deg); } }
+
+/* ── Footer links ─────────────────────────────────────────────────────────── */
+
+.auth-foot {
+  margin-top: 22px;
+  font-size: 14.5px;
+  color: var(--auth-muted);
+  text-align: center;
+}
+
+/* Links are links: real hrefs, so middle-click and open-in-new-tab work. The
+   old page used <button onClick={navigate}> for the same thing, which reads as
+   a button to assistive tech and measured 20px tall. */
+.auth-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  color: var(--auth-indigo);
+  font-weight: 700;
+  text-decoration: none;
+}
+.auth-link:hover { text-decoration: underline; }
+.auth-link:focus-visible {
+  outline: 2px solid var(--auth-indigo);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* LEGAL-001 — Terms and Privacy are deferred, so no line ships. The space is
+   reserved so reinstating it later is a render, not a reflow. */
+.auth-legal-slot { min-height: 42px; }
+
+/* ── Below-fold ───────────────────────────────────────────────────────────── */
+
+.auth-why {
+  background: var(--auth-surface);
+  padding: 62px 32px 74px;
+  border-top: 1px solid var(--auth-border);
+}
+
+.auth-why-title {
+  text-align: center;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin: 0 0 38px;
+  color: var(--auth-text);
+}
+.auth-why-title em { font-style: normal; color: var(--auth-indigo); }
+
+.auth-why-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.auth-why-card {
+  background: var(--auth-panel);
+  border: 1px solid var(--auth-border);
+  border-radius: 15px;
+  padding: 26px 22px;
+}
+
+.auth-why-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: rgb(79 70 229 / 0.1);
+  color: var(--auth-indigo);
+  margin-bottom: 15px;
+}
+
+.auth-why-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--auth-text);
+}
+
+.auth-why-card p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--auth-muted);
+  margin: 0;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .auth-title { font-size: 40px; }
+  .auth-panel-left { padding: 44px 32px; }
+}
+
+@media (max-width: 1023px) {
+  /* Stacked. Barry moves below the form — see the header note in AuthLayout. */
+  .auth-split { flex-direction: column; min-height: 0; }
+
+  .auth-panel-left {
+    flex: 1 1 auto;
+    padding: 40px 24px 44px;
+  }
+
+  .auth-panel-right { flex: 1 1 auto; min-height: 0; }
+  .auth-panel-right::before { display: none; }
+
+  .auth-root.quiet .auth-panel-right { display: none; }
+
+  .auth-hero {
+    min-height: 0;
+    padding: 34px 24px 0;
+    gap: 6px;
+  }
+
+  .auth-speech { align-self: center; max-width: 420px; }
+  .auth-speech::after { left: 50%; margin-left: -12px; }
+  .auth-barry { max-width: 260px; }
+
+  .auth-why-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .auth-title { font-size: 31px; letter-spacing: -0.8px; }
+  .auth-sub { font-size: 16px; }
+  .auth-panel-left { padding: 24px 20px 36px; }
+  .auth-head { margin: 20px 0 20px; }
+  .auth-brand-img { width: 128px; }
+  .auth-form { gap: 15px; }
+  .auth-req-list { margin-top: 10px; gap: 6px; }
+  .auth-why { padding: 46px 20px 54px; }
+  .auth-why-grid { grid-template-columns: 1fr; }
+  .auth-barry { max-width: 210px; }
+}
+
+/* Short viewports — in practice, a phone with the keyboard open.
+   The band left above the keyboard is roughly 400-580px, and the CTA has to
+   live inside it or the user is typing a password with no visible way to
+   submit. Tightening the rhythm buys back most of that; it cannot buy back all
+   of it on the smallest phones without deleting approved content, so the
+   remaining gap is reported rather than hidden. Height-based, not width-based,
+   because the keyboard shortens the viewport without narrowing it. */
+@media (max-width: 900px) and (max-height: 620px) {
+  .auth-panel-left { padding: 16px 20px 28px; }
+  .auth-head { margin: 14px 0 16px; }
+  .auth-title { font-size: 27px; line-height: 1.12; }
+  .auth-sub { font-size: 15px; }
+  .auth-brand-img { width: 112px; }
+  .auth-form { gap: 13px; }
+  .auth-field-label { margin-bottom: 5px; }
+  .auth-field-input { padding: 13px 14px; }
+  .auth-req-list { margin-top: 9px; gap: 5px; }
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────── */
+
+/* Every animation is opt-in on the reduced-motion query rather than opt-out.
+   Seven CSS files in this repo already honour the preference; the old pre-auth
+   pages ran four infinite animations and honoured none. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-speech {
+    animation: auth-rise .5s cubic-bezier(.22,.9,.3,1) .18s both;
+  }
+  .auth-barry {
+    animation: auth-rise .55s cubic-bezier(.22,.9,.3,1) both;
+  }
+  @keyframes auth-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* The spinner is feedback, not decoration — it must survive reduced motion, so
+   it degrades to a pulse rather than disappearing. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-spinner { animation: auth-pulse 1.1s ease-in-out infinite; }
+  @keyframes auth-pulse { 50% { opacity: .35; } }
+}
+
+/* ── Forced colours ───────────────────────────────────────────────────────── */
+
+/* The old headline used background-clip:text with a transparent colour, which
+   vanishes entirely when the system overrides backgrounds. */
+@media (forced-colors: active) {
+  .auth-cta { border: 2px solid ButtonText; }
+  .auth-field-box { border-color: ButtonBorder; }
+  .auth-req.met .auth-req-mark { forced-color-adjust: none; }
+}

@@ -13,6 +13,7 @@
 export const BRAND = {
   pink:    "#e8197d",   // Primary CTA, active states, highlights
   purple:  "#7c3aed",   // Hunter module accent color
+  indigo:  "#4f46e5",   // Auth gradient mid-stop — navy → indigo → purple
   cyan:    "#00c4cc",   // Secondary — borders, hover glows, tags
   navy:    "#1a1040",   // Deep base — dark backgrounds, depth layers
   black:   "#000000",   // Pure backgrounds on dark theme
@@ -48,6 +49,27 @@ export const ASSETS = {
   barryAvatar:  "/assets/barry_AI.jpg",          // Astronaut bear — circular crop
   logoFull:     "/assets/Idynify_logo1.png",     // Full wordmark — nav expanded / onboarding
   logoMark:     "/assets/Short_Logo_Idynify.png",// Pocket icon — collapsed rail / favicon
+};
+
+// ─── AUTH ASSETS (pre-auth surface only) ─────────────────────────────────────
+// Optimized derivatives, sized to the dimensions they actually render at.
+// Canonical sources live in docs/design/source/ and are never served.
+//
+// Barry's source ships with an opaque white background (verified: 0 of
+// 1,573,520 pixels carried alpha), so the derivative below is the background-
+// removed, white-un-matted cut authorized in Phase 3. The source is untouched.
+export const AUTH_ASSETS = {
+  barry: {
+    avif: "/assets/barry/barry-signup.avif",
+    webp: "/assets/barry/barry-signup.webp",
+    png:  "/assets/barry/barry-signup.png",
+    // Intrinsic size of the derivative — used to reserve space and avoid CLS.
+    width: 640, height: 1140,
+    alt: "Barry, the IDYNIFY bear mascot",
+  },
+  // Raster today. When an official vector lands it swaps here and nowhere else.
+  wordmark: "/assets/brand/idynify-wordmark.png",
+  icon:     "/assets/brand/idynify-icon.png",
 };
 
 // ─── THEMES ───────────────────────────────────────────────────────────────────

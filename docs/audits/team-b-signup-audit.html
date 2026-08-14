@@ -1,0 +1,1647 @@
+<title>Team B Signup Audit</title>
+<style>
+  :root {
+    --ground: #FAFBFC;
+    --surface: #FFFFFF;
+    --surface-alt: #F4F6F9;
+    --text: #1B2332;
+    --text-2: #5A6578;
+    --text-3: #8B95A5;
+    --accent: #2563EB;
+    --accent-light: #EFF4FF;
+    --border: #E2E6EC;
+    --border-2: #D0D5DD;
+    --critical: #DC2626;
+    --critical-bg: #FEF2F2;
+    --critical-border: #FECACA;
+    --high: #D97706;
+    --high-bg: #FFFBEB;
+    --high-border: #FDE68A;
+    --medium: #2563EB;
+    --medium-bg: #EFF6FF;
+    --medium-border: #BFDBFE;
+    --low: #059669;
+    --low-bg: #ECFDF5;
+    --low-border: #A7F3D0;
+    --needs-aaron: #7C3AED;
+    --needs-aaron-bg: #F5F3FF;
+    --code-bg: #F1F3F7;
+    --table-header: #F4F6F9;
+    --shadow: 0 1px 3px rgba(27,35,50,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0F1419;
+      --surface: #1A2332;
+      --surface-alt: #222F3E;
+      --text: #D4DBE5;
+      --text-2: #9EAAB8;
+      --text-3: #6B7A8D;
+      --accent: #60A5FA;
+      --accent-light: #1E3A5F;
+      --border: #2A3544;
+      --border-2: #384758;
+      --critical: #F87171;
+      --critical-bg: #2D1B1B;
+      --critical-border: #5C2020;
+      --high: #FBBF24;
+      --high-bg: #2D2510;
+      --high-border: #5C4B1A;
+      --medium: #60A5FA;
+      --medium-bg: #1A2744;
+      --medium-border: #2A4068;
+      --low: #34D399;
+      --low-bg: #0F2922;
+      --low-border: #1A4A3A;
+      --needs-aaron: #A78BFA;
+      --needs-aaron-bg: #1F1635;
+      --code-bg: #222F3E;
+      --table-header: #1E2A38;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F1419;
+    --surface: #1A2332;
+    --surface-alt: #222F3E;
+    --text: #D4DBE5;
+    --text-2: #9EAAB8;
+    --text-3: #6B7A8D;
+    --accent: #60A5FA;
+    --accent-light: #1E3A5F;
+    --border: #2A3544;
+    --border-2: #384758;
+    --critical: #F87171;
+    --critical-bg: #2D1B1B;
+    --critical-border: #5C2020;
+    --high: #FBBF24;
+    --high-bg: #2D2510;
+    --high-border: #5C4B1A;
+    --medium: #60A5FA;
+    --medium-bg: #1A2744;
+    --medium-border: #2A4068;
+    --low: #34D399;
+    --low-bg: #0F2922;
+    --low-border: #1A4A3A;
+    --needs-aaron: #A78BFA;
+    --needs-aaron-bg: #1F1635;
+    --code-bg: #222F3E;
+    --table-header: #1E2A38;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    margin: 0;
+    padding: 32px 20px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .doc-header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  .doc-header h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 6px;
+    letter-spacing: -0.3px;
+    text-wrap: balance;
+  }
+  .doc-header .subtitle {
+    font-size: 15px;
+    color: var(--text-2);
+    margin: 0 0 16px;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-3);
+  }
+  .meta-row strong { color: var(--text-2); font-weight: 600; }
+
+  /* Sections */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-number {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+  h2 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 24px 0 10px;
+  }
+  h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-2);
+    margin: 18px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  p { margin: 0 0 12px; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 12px 0 18px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .flow .node {
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow .arrow { color: var(--text-3); font-weight: 400; }
+
+  /* Code */
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    margin: 10px 0 16px;
+    color: var(--text);
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 12px 0 18px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  th {
+    background: var(--table-header);
+    font-weight: 700;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-2);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: var(--surface-alt); }
+
+  /* Severity badges */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .badge-critical { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical-border); }
+  .badge-high { background: var(--high-bg); color: var(--high); border: 1px solid var(--high-border); }
+  .badge-medium { background: var(--medium-bg); color: var(--medium); border: 1px solid var(--medium-border); }
+  .badge-low { background: var(--low-bg); color: var(--low); border: 1px solid var(--low-border); }
+  .badge-aaron { background: var(--needs-aaron-bg); color: var(--needs-aaron); border: 1px solid var(--needs-aaron); }
+
+  /* Finding cards */
+  .finding {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 14px 0;
+    overflow: hidden;
+  }
+  .finding-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+  }
+  .finding-header .finding-id {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-3);
+  }
+  .finding-header .finding-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text);
+    flex: 1;
+  }
+  .finding-body {
+    padding: 14px 16px;
+    background: var(--surface);
+  }
+  .finding-body p { font-size: 14px; }
+  .finding-body h4 { margin-top: 14px; }
+
+  .finding.sev-critical { border-left: 3px solid var(--critical); }
+  .finding.sev-high { border-left: 3px solid var(--high); }
+  .finding.sev-medium { border-left: 3px solid var(--medium); }
+  .finding.sev-low { border-left: 3px solid var(--low); }
+
+  /* File references */
+  .file-ref {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* Classification tags */
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 3px;
+    border: 1px solid var(--border-2);
+    color: var(--text-2);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  .tag-required { border-color: var(--low-border); color: var(--low); background: var(--low-bg); }
+  .tag-defer { border-color: var(--high-border); color: var(--high); background: var(--high-bg); }
+  .tag-remove { border-color: var(--critical-border); color: var(--critical); background: var(--critical-bg); }
+  .tag-unknown { border-color: var(--border-2); color: var(--text-3); }
+
+  /* Callouts */
+  .callout {
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin: 14px 0;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+  .callout-aaron {
+    border-color: var(--needs-aaron);
+    background: var(--needs-aaron-bg);
+    color: var(--text);
+  }
+  .callout-aaron strong { color: var(--needs-aaron); }
+
+  /* Lists */
+  ul, ol { padding-left: 22px; margin: 8px 0 14px; }
+  li { margin-bottom: 5px; }
+
+  /* Summary box */
+  .summary-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 16px 0;
+  }
+  .summary-box h3 { margin-top: 0; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    body { padding: 20px 14px 60px; font-size: 14px; }
+    .doc-header h1 { font-size: 22px; }
+    h2 { font-size: 18px; }
+    .meta-row { flex-direction: column; gap: 6px; }
+    pre { font-size: 11.5px; padding: 10px 12px; }
+    th, td { padding: 8px 10px; font-size: 12.5px; }
+  }
+</style>
+
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="doc-header">
+  <h1>IDYNIFY Signup Experience &mdash; Team B Audit</h1>
+  <p class="subtitle">Code, Claims, Auth &amp; Backend</p>
+  <div class="meta-row">
+    <span><strong>Date:</strong> August 14, 2026</span>
+    <span><strong>Scope:</strong> Backend, auth, data, claims accuracy</span>
+    <span><strong>Status:</strong> Audit only &mdash; no production changes</span>
+    <span><strong>Coordinator:</strong> Aaron (Architecture Lead)</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 1 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 1</div>
+  <h2>Signup Flow Map</h2>
+
+  <h3>Full Journey: Page Load &rarr; First Authenticated Screen</h3>
+
+  <div class="flow">
+    <span class="node">Homepage /</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">/signup?tier=starter|pro</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">/checkout?tier=</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">Stripe Payment Link</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">Stripe Webhook</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">/checkout/success</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">/onboarding/barry</span>
+    <span class="arrow">&rarr;</span>
+    <span class="node">/mission-control-v2</span>
+  </div>
+
+  <h4>Step-by-step breakdown</h4>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Step</th><th>Route</th><th>Component</th><th>What Happens</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><code>/signup</code></td>
+          <td><span class="file-ref">src/pages/Signup.jsx</span></td>
+          <td>
+            Reads <code>?tier=</code> from URL (default <code>starter</code>). Renders email + password + confirm password form. On submit:
+            <ol>
+              <li>Client-side validation: password match, min 6 chars</li>
+              <li><code>createUserWithEmailAndPassword(auth, email, password)</code></li>
+              <li>Writes Firestore doc at <code>users/{uid}</code></li>
+              <li>Fires welcome email via <code>/.netlify/functions/send-welcome-email</code></li>
+              <li>Navigates to <code>/checkout?tier={tier}</code></li>
+            </ol>
+          </td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><code>/checkout</code></td>
+          <td><span class="file-ref">src/pages/CheckoutPage.jsx</span></td>
+          <td>
+            <strong>Production</strong> (<code>VITE_STRIPE_ENABLED=true</code>): Redirects browser to Stripe Payment Link with <code>client_reference_id=uid</code> and <code>prefilled_email</code>.<br>
+            <strong>Dev mode</strong>: Client directly writes payment fields to Firestore, then navigates to <code>/checkout/success</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>&mdash;</td>
+          <td><span class="file-ref">netlify/functions/stripe-webhook.js</span></td>
+          <td>On <code>checkout.session.completed</code>: verifies Stripe signature, determines tier from <code>amount_total</code> or metadata, writes payment + credit data to <code>users/{uid}</code>.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><code>/checkout/success</code></td>
+          <td><span class="file-ref">src/pages/CheckoutSuccessPage.jsx</span></td>
+          <td>Shows success message with 3-second countdown. Auto-redirects and manual CTA both point to <code>/onboarding/barry</code> (legacy).</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><code>/onboarding/barry</code><br>or <code>/onboarding</code></td>
+          <td><span class="file-ref">src/pages/Onboarding/BarryOnboarding.jsx</span><br><span class="file-ref">src/pages/Onboarding/OnboardingFlow.jsx</span></td>
+          <td>
+            <strong>Split entry point.</strong> CheckoutSuccessPage sends to <code>/onboarding/barry</code> (legacy conversational ICP builder). SmartRedirect in App.jsx sends returning new users to <code>/onboarding</code> (6-step wizard). Both write to <code>users/{uid}.onboarding</code> flags. See Section 12.
+          </td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><code>/mission-control-v2</code></td>
+          <td><span class="file-ref">src/pages/Scout/MissionControlDashboardV2.jsx</span></td>
+          <td>First authenticated product screen. Protected by <code>ShellRoute</code> which checks <code>userData.hasCompletedPayment</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Firestore Document Created at Signup</h4>
+  <pre>// users/{uid} — written at signup (Signup.jsx:61-69)
+{
+  email: &lt;user input&gt;,
+  createdAt: new Date(),
+  selectedTier: 'starter' | 'pro',
+  subscriptionTier: 'starter' | 'pro',
+  status: 'pending_payment',
+  hasCompletedPayment: false,
+  credits: 400 | 1250,        // ← allocated BEFORE payment
+  monthlyCredits: 400 | 1250  // ← allocated BEFORE payment
+}</pre>
+
+  <h4>Firestore Document Updated by Stripe Webhook</h4>
+  <pre>// users/{uid} — written by stripe-webhook.js on checkout.session.completed
+{
+  hasCompletedPayment: true,
+  paymentCompletedAt: &lt;ISO string&gt;,
+  subscriptionTier: 'starter' | 'pro',
+  subscriptionStatus: 'active',
+  stripeCustomerId: &lt;from Stripe&gt;,
+  stripeSubscriptionId: &lt;from Stripe&gt;,
+  credits: {                    // ← OBJECT, not integer
+    total: 400|1250,
+    used: 0,
+    remaining: 400|1250,
+    resetDate: &lt;ISO string&gt;
+  },
+  tierLimits: { creditsPerMonth, companiesPerMonth, contactsPerMonth, teamSeats: 1, support },
+  features: { mobilePhone: tier === 'pro' },
+  billingCycleDate: &lt;day of month&gt;
+}</pre>
+
+  <p><strong>Data shape mismatch:</strong> Signup writes <code>credits: 400</code> (integer). Stripe webhook overwrites with <code>credits: { total, used, remaining, resetDate }</code> (object). Any code reading <code>user.credits</code> as a number after payment will break, and vice versa.</p>
+
+  <h4>Fields &amp; Validation</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Required</th><th>Client Validation</th><th>Server Validation</th></tr></thead>
+      <tbody>
+        <tr><td>Email</td><td>Yes</td><td>HTML <code>type="email"</code> + <code>required</code></td><td>Firebase Auth validates format &amp; uniqueness</td></tr>
+        <tr><td>Password</td><td>Yes</td><td><code>minLength="6"</code> + JS check <code>password.length &lt; 6</code></td><td>Firebase Auth enforces min 6 chars</td></tr>
+        <tr><td>Confirm Password</td><td>Yes</td><td>JS match check (<code>password !== confirmPassword</code>)</td><td>Not sent to server</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Error Handling</h4>
+  <p>Firebase error codes are mapped to user-friendly messages:</p>
+  <ul>
+    <li><code>auth/email-already-in-use</code> &rarr; "An account with this email already exists." <span class="badge badge-medium">LEAKS INFO</span></li>
+    <li><code>auth/invalid-email</code> &rarr; "Please enter a valid email address."</li>
+    <li><code>auth/weak-password</code> &rarr; "Password is too weak. Please use at least 6 characters."</li>
+    <li><code>auth/too-many-requests</code> &rarr; "Too many attempts. Please try again later."</li>
+    <li>Default &rarr; "Failed to create account. Please try again."</li>
+  </ul>
+
+  <h4>Loading / Success States</h4>
+  <ul>
+    <li><strong>Loading state:</strong> None. No spinner, no button disable. The CTA remains clickable during submission, allowing duplicate submissions.</li>
+    <li><strong>Success state:</strong> No success indicator shown. User is navigated to <code>/checkout</code> immediately.</li>
+    <li><strong>Duplicate submission protection:</strong> None. Rapid double-clicks will call <code>createUserWithEmailAndPassword</code> twice (Firebase will reject the second, but the first Firestore write may race).</li>
+  </ul>
+
+  <h4>Post-Signup State</h4>
+  <ul>
+    <li><strong>Email verification:</strong> None. <code>sendEmailVerification()</code> is never called.</li>
+    <li><strong>Welcome email:</strong> Sent via Resend API (fire-and-forget, no auth required on endpoint).</li>
+    <li><strong>Redirect destination:</strong> <code>/checkout?tier={tier}</code></li>
+    <li><strong>Analytics events:</strong> None fired at signup.</li>
+    <li><strong>Stripe/billing:</strong> No interaction at signup step. Stripe is only invoked at checkout.</li>
+    <li><strong>Trial or credit allocation:</strong> Credits written immediately at signup (before payment). See VULN-4.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 2 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 2</div>
+  <h2>Signup Funnel &amp; Observability Audit</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Stage</th><th>Event Exists?</th><th>Event Name</th><th>Where Recorded</th><th>Data Captured</th><th>Missing?</th></tr></thead>
+      <tbody>
+        <tr><td>Signup viewed</td><td>No</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td><span class="badge badge-critical">Missing</span></td></tr>
+        <tr><td>Signup started</td><td>No</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td><span class="badge badge-critical">Missing</span></td></tr>
+        <tr><td>Email entered</td><td>No</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td><span class="badge badge-critical">Missing</span></td></tr>
+        <tr><td>Submission attempted</td><td>No</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td><span class="badge badge-critical">Missing</span></td></tr>
+        <tr><td>Account created</td><td>Partial</td><td>&mdash;</td><td>Firestore <code>users/{uid}.createdAt</code></td><td>Timestamp only</td><td><span class="badge badge-high">No funnel event</span></td></tr>
+        <tr><td>Verification completed</td><td>No</td><td>&mdash;</td><td>&mdash;</td><td>No email verification exists</td><td><span class="badge badge-critical">Missing</span></td></tr>
+        <tr><td>Onboarding started</td><td>Partial</td><td>&mdash;</td><td>Firestore <code>users/{uid}.onboarding.started</code></td><td>Boolean flag only</td><td><span class="badge badge-high">No timestamped event</span></td></tr>
+        <tr><td>Onboarding completed</td><td>Partial</td><td>&mdash;</td><td>Firestore <code>users/{uid}.onboarding.completedAt</code></td><td>Timestamp</td><td><span class="badge badge-medium">Usable but not event-based</span></td></tr>
+        <tr><td>First meaningful action</td><td>Yes</td><td><code>open_contact</code><br><code>open_company</code></td><td><code>users/{uid}/analytics_events</code></td><td>Module origin, contact/company ID, timestamp</td><td><span class="badge badge-low">Exists</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Assessment</h4>
+  <ul>
+    <li><strong>Failed signup attempts:</strong> Not measurable. Client-side validation errors are shown but never recorded. Firebase Auth rejections are caught and displayed, but not logged anywhere queryable.</li>
+    <li><strong>Failure reasons:</strong> Not captured. The error code from Firebase is used for display only.</li>
+    <li><strong>Existing conversion dashboard:</strong> None found. No Firebase Analytics initialization in the codebase. The only analytics system is the Sprint 2 <code>analytics.js</code> module (<span class="file-ref">src/services/analytics.js</span>), which tracks <code>open_contact</code> and <code>open_company</code> events only.</li>
+    <li><strong>Conversion measurement capability:</strong> Post-redesign, we will not be able to measure whether signup conversion improved unless funnel instrumentation is added first.</li>
+  </ul>
+
+  <div class="callout callout-aaron">
+    <strong>[NEEDS AARON]</strong> Before implementing any signup changes, we need a decision on analytics infrastructure. The codebase has no Firebase Analytics, no Google Analytics, no Segment, no Mixpanel. The custom <code>analytics.js</code> writes to Firestore subcollections, which works for product events but is not designed for funnel analysis. Recommend adding lightweight funnel events to the existing Firestore analytics pattern before launching any signup redesign.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 3 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 3</div>
+  <h2>Signup Entry Points</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Source</th><th>URL / Route</th><th>Query Params</th><th>Different Behavior?</th><th>Brand Issue?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Homepage nav &ldquo;Get Started&rdquo;</td>
+          <td><code>/signup</code></td>
+          <td>None (defaults to <code>starter</code>)</td>
+          <td>No</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Homepage hero CTA</td>
+          <td><code>/signup</code></td>
+          <td>None</td>
+          <td>No</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Homepage pricing &ldquo;Start with Starter&rdquo;</td>
+          <td><code>/signup?tier=starter</code></td>
+          <td><code>tier=starter</code></td>
+          <td>Yes &mdash; sets tier context, adjusts displayed credits/pricing</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Homepage pricing &ldquo;Go Pro&rdquo;</td>
+          <td><code>/signup?tier=pro</code></td>
+          <td><code>tier=pro</code></td>
+          <td>Yes &mdash; sets tier context (1250 credits, $50/mo)</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Homepage final CTA</td>
+          <td><code>/signup</code></td>
+          <td>None</td>
+          <td>No</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Login page &ldquo;Join the crew&rdquo;</td>
+          <td><code>/signup</code> (href)</td>
+          <td>None</td>
+          <td>No</td>
+          <td><span class="badge badge-medium">Yes</span> &mdash; &ldquo;Join the crew&rdquo; reinforces mission/agent language</td>
+        </tr>
+        <tr>
+          <td>Authenticated user on <code>/signup</code></td>
+          <td>Redirects to <code>/checkout</code></td>
+          <td>Tier lost on redirect</td>
+          <td><span class="badge badge-high">Yes</span> &mdash; tier parameter dropped</td>
+          <td>No</td>
+        </tr>
+        <tr>
+          <td>Direct URL <code>/signup</code></td>
+          <td><code>/signup</code></td>
+          <td>None</td>
+          <td>No</td>
+          <td>No</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Findings</h4>
+  <ul>
+    <li><strong>No legacy <code>/register</code> or campaign-specific paths</strong> found. All entry points route to <code>/signup</code>.</li>
+    <li><strong>No invitation or referral flows</strong> exist. There is no invite system.</li>
+    <li><strong>Tier parameter dropped on authenticated redirect:</strong> <code>App.jsx:352</code> sends authenticated users from <code>/signup</code> to <code>/checkout</code> without preserving the <code>?tier=</code> parameter. A user who selected Pro on the pricing page, got interrupted, and returns will land on checkout defaulting to Starter.</li>
+    <li><strong>No Scout-specific signup links:</strong> Despite the &ldquo;Mission: Scout&rdquo; branding on the signup page, no separate Scout signup URL exists.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 4 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 4</div>
+  <h2>Claims Accuracy Audit</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Claim</th><th>Source</th><th>Enforced?</th><th>Accurate?</th><th>Evidence</th><th>Recommendation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Early Access &mdash; Limited Seats</td>
+          <td><span class="file-ref">Signup.jsx:195</span></td>
+          <td>No</td>
+          <td><span class="badge badge-high">Unverifiable</span></td>
+          <td>No seat limit exists in code. No counter, no gate, no cap. The badge is static text with a bouncing animation.</td>
+          <td><span class="badge badge-aaron">NEEDS AARON</span> Remove or make real.</td>
+        </tr>
+        <tr>
+          <td>Launch Window / countdown timer</td>
+          <td><span class="file-ref">Signup.jsx:19-36</span></td>
+          <td>No</td>
+          <td><span class="badge badge-critical">False</span></td>
+          <td>Timer always shows <code>T-24:00:00</code> from page load. It counts down from <code>now + 24 hours</code> on every visit. There is no fixed end date. This is a fake urgency timer.</td>
+          <td><strong>Remove.</strong> This is a dark pattern that damages trust.</td>
+        </tr>
+        <tr>
+          <td>Barry AI</td>
+          <td><span class="file-ref">Signup.jsx:208-210</span></td>
+          <td>N/A</td>
+          <td>Partially</td>
+          <td>Barry exists as an AI-powered feature within the product (onboarding, ICP building, outreach). But it is not the product &mdash; IDYNIFY is.</td>
+          <td>Correct hierarchy per audit brief: IDYNIFY leads, Barry introduced post-signup.</td>
+        </tr>
+        <tr>
+          <td>Mission: Scout</td>
+          <td><span class="file-ref">Signup.jsx:212-214</span></td>
+          <td>N/A</td>
+          <td>Misleading</td>
+          <td>Scout is one module inside IDYNIFY, not the product. Leading with it on signup misrepresents the product hierarchy.</td>
+          <td>Remove from signup. Introduce in onboarding.</td>
+        </tr>
+        <tr>
+          <td>Data Exploration &bull; Lead Discovery &bull; Mission Ready</td>
+          <td><span class="file-ref">Signup.jsx:216</span></td>
+          <td>N/A</td>
+          <td>Vague</td>
+          <td>Describes capabilities loosely. Not false, but not informative.</td>
+          <td>Move to marketing or remove.</td>
+        </tr>
+        <tr>
+          <td>Define your ICP with AI-powered RECON</td>
+          <td><span class="file-ref">Signup.jsx:229</span></td>
+          <td>N/A</td>
+          <td>Accurate</td>
+          <td>RECON module exists and uses AI (Claude API) to analyze websites and build ICP profiles.</td>
+          <td>Move to onboarding. Not needed for account creation decision.</td>
+        </tr>
+        <tr>
+          <td>Browse unlimited companies (always free)</td>
+          <td><span class="file-ref">Signup.jsx:232</span></td>
+          <td>Partially</td>
+          <td><span class="badge badge-aaron">NEEDS AARON</span></td>
+          <td>Company browsing does not consume credits. However, &ldquo;always free&rdquo; is ambiguous &mdash; the product requires a paid subscription to access at all.</td>
+          <td>Clarify: browsing is included in subscription, not &ldquo;free&rdquo; standalone.</td>
+        </tr>
+        <tr>
+          <td>Enrich 40 companies/month (Starter)</td>
+          <td><span class="file-ref">Signup.jsx:235</span></td>
+          <td>Yes</td>
+          <td>Accurate</td>
+          <td>Stripe webhook sets <code>tierLimits.companiesPerMonth: 40</code>. Enforcement depends on credit deduction code (not fully audited here).</td>
+          <td>Keep. Verify enforcement in credit-spending code.</td>
+        </tr>
+        <tr>
+          <td>Get 120 verified contacts with email &amp; phone (Starter)</td>
+          <td><span class="file-ref">Signup.jsx:239</span></td>
+          <td>Partially</td>
+          <td><span class="badge badge-medium">Partially</span></td>
+          <td>Webhook sets <code>tierLimits.contactsPerMonth: 120</code>. Starter tier does NOT include phone &mdash; <code>features.mobilePhone: false</code> for starter. Signup page says &ldquo;email &amp; phone&rdquo; for starter but checkout page says &ldquo;email only&rdquo;.</td>
+          <td><span class="badge badge-critical">Fix</span> &mdash; Signup page claims phone for starter, but code restricts phone to pro tier only.</td>
+        </tr>
+        <tr>
+          <td>400 credits</td>
+          <td><span class="file-ref">Signup.jsx:307</span></td>
+          <td>Yes</td>
+          <td>Accurate</td>
+          <td>Both signup and webhook allocate 400 credits for starter tier.</td>
+          <td>Keep.</td>
+        </tr>
+        <tr>
+          <td>Instant access</td>
+          <td><span class="file-ref">Signup.jsx:307</span></td>
+          <td>Partially</td>
+          <td>Partially</td>
+          <td>After payment, access is immediate. But &ldquo;instant&rdquo; implies no payment step, which is misleading in context.</td>
+          <td>Rephrase: &ldquo;Immediate access after checkout.&rdquo;</td>
+        </tr>
+        <tr>
+          <td>$20/month (Starter)</td>
+          <td><span class="file-ref">Signup.jsx:310</span></td>
+          <td>Yes</td>
+          <td>Accurate</td>
+          <td>Stripe Payment Link for starter is configured. Webhook maps <code>amount_total === 2000</code> to starter.</td>
+          <td>Keep.</td>
+        </tr>
+        <tr>
+          <td>40 companies</td>
+          <td><span class="file-ref">Signup.jsx:310</span></td>
+          <td>Yes</td>
+          <td>Accurate</td>
+          <td>Matches <code>tierLimits.companiesPerMonth</code>.</td>
+          <td>Keep.</td>
+        </tr>
+        <tr>
+          <td>Cancel anytime</td>
+          <td><span class="file-ref">Signup.jsx:310</span></td>
+          <td><span class="badge badge-aaron">NEEDS AARON</span></td>
+          <td>Unverifiable from code</td>
+          <td>No cancellation UI exists in the app. Stripe subscriptions can be canceled from the Stripe customer portal, but no link to it is provided in the product. Webhook handles <code>customer.subscription.deleted</code> correctly.</td>
+          <td><span class="badge badge-aaron">NEEDS AARON</span> &mdash; Is there a Stripe customer portal link? How do users currently cancel?</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 5 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 5</div>
+  <h2>Authentication Architecture</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Auth Method</th><th>Status</th><th>Implementation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Email/Password</td>
+          <td><span class="badge badge-low">Exists</span></td>
+          <td>Firebase Auth <code>createUserWithEmailAndPassword</code> / <code>signInWithEmailAndPassword</code>. Min 6 chars. No complexity requirements beyond length.</td>
+        </tr>
+        <tr>
+          <td>Google OAuth (Sign in with Google)</td>
+          <td><span class="badge badge-critical">Not implemented</span></td>
+          <td>No <code>GoogleAuthProvider</code> import anywhere in the codebase. Firebase Auth supports it out of the box &mdash; would require enabling the provider in Firebase Console + adding the UI button + ~20 lines of code.</td>
+        </tr>
+        <tr>
+          <td>Gmail OAuth (data access)</td>
+          <td><span class="badge badge-low">Exists (post-signup)</span></td>
+          <td>Full Gmail OAuth flow exists via <span class="file-ref">netlify/functions/gmail-oauth-init.js</span> and <span class="file-ref">gmail-oauth-callback.js</span>. Uses <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code> env vars. Scopes include Gmail read/send. Stored at <code>users/{uid}/integrations/gmail</code>. Offered during onboarding Step 4 and available in Hunter module.</td>
+        </tr>
+        <tr>
+          <td>Magic link / OTP</td>
+          <td><span class="badge badge-critical">Not implemented</span></td>
+          <td>Firebase Auth supports email link sign-in (<code>sendSignInLinkToEmail</code>). Not used anywhere. Would require enabling in Firebase Console + implementing the email link handler + landing page.</td>
+        </tr>
+        <tr>
+          <td>TOTP MFA</td>
+          <td><span class="badge badge-low">Exists (opt-in)</span></td>
+          <td>Full implementation at <span class="file-ref">src/utils/mfa.js</span> and <span class="file-ref">src/components/MfaSetup.jsx</span>. TOTP enrollment with QR code, verification on login. Not part of signup flow &mdash; available in settings post-authentication.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Google Sign-In: What Would Be Required</h3>
+  <ol>
+    <li>Enable Google provider in Firebase Console (admin action)</li>
+    <li>Import <code>GoogleAuthProvider</code> and <code>signInWithPopup</code>/<code>signInWithRedirect</code> from Firebase Auth</li>
+    <li>Add &ldquo;Continue with Google&rdquo; button to Signup and Login pages</li>
+    <li>Handle the case where the Google email matches an existing email/password account (Firebase supports account linking)</li>
+    <li>Ensure Firestore user doc creation still runs after Google sign-in (currently only runs in the email/password path)</li>
+  </ol>
+  <p>Estimated effort: &lt;1 day for basic implementation. The existing auth architecture supports it natively.</p>
+
+  <h3>OTP / Magic Link: What Would Be Required</h3>
+  <ol>
+    <li>Enable Email Link sign-in in Firebase Console</li>
+    <li>Implement <code>sendSignInLinkToEmail</code> on the signup/login form</li>
+    <li>Create an email link handler page that completes sign-in via <code>signInWithEmailLink</code></li>
+    <li>Handle the &ldquo;confirm email in different browser&rdquo; edge case (Firebase requires re-entering email)</li>
+  </ol>
+  <p>Estimated effort: 1&ndash;2 days. Would eliminate the password fields entirely, reducing signup to a single email field.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 6 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 6</div>
+  <h2>Gmail Authorization Separation</h2>
+
+  <h4>Are identity auth and Gmail data access separated?</h4>
+  <p><strong>Yes, completely.</strong> They are separate systems with no code overlap:</p>
+  <ul>
+    <li><strong>Identity auth:</strong> Firebase Auth (email/password). No Google scopes requested.</li>
+    <li><strong>Gmail data access:</strong> Custom OAuth2 flow via Netlify Functions (<span class="file-ref">netlify/functions/gmail-oauth-init.js</span>). Uses <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>. Tokens stored at <code>users/{uid}/integrations/gmail</code>.</li>
+  </ul>
+
+  <h4>OAuth Scopes</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>System</th><th>Scopes</th></tr></thead>
+      <tbody>
+        <tr><td>Firebase Auth (identity)</td><td>None &mdash; email/password uses no OAuth scopes</td></tr>
+        <tr><td>Gmail integration (data)</td><td><code>gmail.readonly</code>, <code>gmail.send</code>, <code>gmail.modify</code> (inspection needed to confirm exact scopes from <code>gmail-oauth-init.js</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Can a user create an account without granting Gmail access?</h4>
+  <p><strong>Yes.</strong> Gmail connection is completely optional. It is offered at onboarding Step 4 with a &ldquo;Skip for now&rdquo; option. The onboarding flow derives Gmail connection status live from <code>users/{uid}/integrations/gmail</code> (<span class="file-ref">src/hooks/useOnboardingState.js:54-58</span>).</p>
+
+  <h4>Can Gmail access be granted later?</h4>
+  <p><strong>Yes.</strong> The Hunter module offers Gmail connection at any time. The <code>GmailConnectButton</code> component is used in both onboarding and in-product contexts.</p>
+
+  <h4>Recommendation: When Should Gmail Authorization Occur?</h4>
+
+  <div class="summary-box">
+    <h3>Recommended: During onboarding, with Barry providing context (current approach)</h3>
+    <p>The current architecture already implements Aaron's preliminary direction correctly. Gmail authorization happens at onboarding Step 4, after the user has created their account and begun interacting with Barry. This is the right moment because:</p>
+    <ul>
+      <li><strong>Trust is established.</strong> The user has already seen Barry analyze their website and ask intelligent questions. They understand what Barry does before they're asked to share Gmail.</li>
+      <li><strong>Context is provided.</strong> Barry explains: &ldquo;I can write personalized outreach and send it from your inbox. To do that, I just need permission.&rdquo;</li>
+      <li><strong>Skip is frictionless.</strong> The user can skip and connect later when they encounter a Gmail-dependent feature.</li>
+    </ul>
+    <p><strong>Do not move Gmail authorization to signup.</strong> Asking for Gmail access before the user understands what the product does will damage trust and reduce conversion.</p>
+  </div>
+
+  <p><strong>If Google Sign-In is added:</strong> Firebase Auth identity (Google sign-in) and Gmail data access must remain completely separate OAuth consent screens. The Google sign-in button requests only <code>email</code> and <code>profile</code> scopes. Gmail read/send scopes are only requested later during onboarding or first use. This is already the case architecturally &mdash; the concern is only relevant if someone attempts to combine them.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 7 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 7</div>
+  <h2>Password Implementation Audit</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Show/hide toggle &mdash; password</td><td><span class="badge badge-critical">Missing</span></td><td>Both password fields are <code>type="password"</code> with no toggle. Input is always masked.</td></tr>
+        <tr><td>Show/hide toggle &mdash; confirm</td><td><span class="badge badge-critical">Missing</span></td><td>Same &mdash; no toggle.</td></tr>
+        <tr><td>Requirements displayed before entry</td><td><span class="badge badge-high">Partial</span></td><td>Placeholder text says &ldquo;Minimum 6 characters&rdquo;. Disappears on focus. Not visible after typing begins.</td></tr>
+        <tr><td>Real-time requirement validation</td><td><span class="badge badge-critical">Missing</span></td><td>Validation runs only on form submit. No live feedback as user types.</td></tr>
+        <tr><td>Password match indicator</td><td><span class="badge badge-critical">Missing</span></td><td>Mismatch shown only on submit. No live match/mismatch indicator.</td></tr>
+        <tr><td>Caps Lock warning</td><td><span class="badge badge-critical">Missing</span></td><td>No Caps Lock detection.</td></tr>
+        <tr><td>Password manager / autofill</td><td><span class="badge badge-high">Broken</span></td><td>No <code>autocomplete</code> attributes on any field. Password managers may not recognize these as signup fields.</td></tr>
+        <tr><td>Correct <code>autocomplete</code> attributes</td><td><span class="badge badge-critical">Missing</span></td><td>Email: no <code>autocomplete="email"</code>. Password: no <code>autocomplete="new-password"</code>. Confirm: no <code>autocomplete="new-password"</code>.</td></tr>
+        <tr><td>Accessible labels</td><td><span class="badge badge-high">Broken</span></td><td>Labels use <code>&lt;label&gt;</code> tags but have no <code>htmlFor</code>/<code>for</code> attribute linking them to inputs. Inputs have no <code>id</code> attributes. Labels are decorative, not functional.</td></tr>
+        <tr><td>Keyboard navigation</td><td><span class="badge badge-low">Works</span></td><td>Tab order follows DOM order (email &rarr; password &rarr; confirm &rarr; submit). Standard HTML form behavior.</td></tr>
+        <tr><td>Screen reader support</td><td><span class="badge badge-high">Broken</span></td><td>Labels not linked to inputs (<code>for</code>/<code>id</code> missing). No <code>aria-describedby</code> for error messages. Error div is not associated with any field.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Root Cause of Missing Show/Hide Controls</h4>
+  <p>The signup form uses plain <code>&lt;input type="password"&gt;</code> elements with no wrapper component. The inputs are raw HTML with Tailwind classes &mdash; there is no shared form input component that would provide show/hide functionality. The Login and ForgotPassword pages have the same issue. Fix requires either:</p>
+  <ul>
+    <li><strong>Option A:</strong> Add a show/hide toggle directly to each password input (state variable to swap between <code>type="password"</code> and <code>type="text"</code>, with an eye icon button).</li>
+    <li><strong>Option B:</strong> Create a shared <code>PasswordInput</code> component used across signup, login, and settings.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 8 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 8</div>
+  <h2>Account Recovery &amp; Edge Cases</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>Current UX</th><th>Clear Recovery?</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Existing email attempts signup</td>
+          <td>Error: &ldquo;An account with this email already exists.&rdquo;</td>
+          <td><span class="badge badge-medium">Partial</span></td>
+          <td>Error is shown but no &ldquo;Login instead?&rdquo; link in the error message. User must find the &ldquo;Login here&rdquo; link at page bottom.</td>
+        </tr>
+        <tr>
+          <td>Existing Google account</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>Google sign-in not implemented.</td>
+        </tr>
+        <tr>
+          <td>Partially created account</td>
+          <td>Firebase Auth record exists, Firestore doc may or may not exist</td>
+          <td><span class="badge badge-critical">No</span></td>
+          <td>If Firebase Auth succeeds but Firestore write fails, user has an auth account with no user doc. They can log in but SmartRedirect will fail reading <code>userData</code>. See split-state finding below.</td>
+        </tr>
+        <tr>
+          <td>Unverified email</td>
+          <td>N/A &mdash; no verification exists</td>
+          <td>N/A</td>
+          <td>All accounts are effectively unverified.</td>
+        </tr>
+        <tr>
+          <td>Expired verification link</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>No verification links exist.</td>
+        </tr>
+        <tr>
+          <td>Forgot password</td>
+          <td><span class="file-ref">ForgotPassword.jsx</span> &mdash; sends reset via Firebase <code>sendPasswordResetEmail</code></td>
+          <td><span class="badge badge-low">Yes</span></td>
+          <td>Works correctly. Link visible on both signup and login pages. Note: the <code>auth/user-not-found</code> error message reveals email existence (information leakage).</td>
+        </tr>
+        <tr>
+          <td>User leaves mid-flow and returns</td>
+          <td>If auth created: redirected to <code>/checkout</code> (App.jsx logic). If auth not created: sees signup form fresh.</td>
+          <td><span class="badge badge-medium">Partial</span></td>
+          <td>Tier parameter may be lost on return (no persistence of selected tier beyond URL).</td>
+        </tr>
+        <tr>
+          <td>User refreshes during submission</td>
+          <td>If Firebase Auth call completed: account exists, user may see duplicate-email error on retry. If not: form resets.</td>
+          <td><span class="badge badge-high">Poor</span></td>
+          <td>No idempotency. No duplicate submission protection.</td>
+        </tr>
+        <tr>
+          <td>OAuth cancellation/failure</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>No OAuth in signup flow.</td>
+        </tr>
+        <tr>
+          <td>Network failure during submission</td>
+          <td>Generic error: &ldquo;Failed to create account. Please try again.&rdquo;</td>
+          <td><span class="badge badge-medium">Partial</span></td>
+          <td>Error is displayed but provides no detail about what failed or whether to retry.</td>
+        </tr>
+        <tr>
+          <td><strong>Firebase Auth created but Firestore init fails</strong></td>
+          <td><strong>Split state &mdash; no recovery path</strong></td>
+          <td><span class="badge badge-critical">No</span></td>
+          <td>Signup creates Firebase Auth record first (<code>createUserWithEmailAndPassword</code>), then writes Firestore doc. If the Firestore <code>setDoc</code> throws, the user has a Firebase Auth account but no <code>users/{uid}</code> document. On next login, <code>App.jsx</code> fetches the user doc &mdash; it doesn't exist &mdash; <code>userData</code> is null &mdash; <code>hasCompletedPayment</code> is undefined &mdash; user is redirected to <code>/checkout</code> &mdash; checkout reads <code>auth.currentUser</code> (which works) and attempts to process payment &mdash; Stripe webhook writes to a non-existent user doc (webhook uses <code>update</code> not <code>set</code>, which will throw). <strong>The user is trapped.</strong> They can log in but cannot complete checkout and have no way to re-trigger the missing Firestore initialization.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 9 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 9</div>
+  <h2>Security &amp; Privacy Audit</h2>
+
+  <div class="finding sev-critical">
+    <div class="finding-header">
+      <span class="finding-id">VULN-1</span>
+      <span class="finding-title">Privilege Escalation via Self-Writable Role Field</span>
+      <span class="badge badge-critical">CRITICAL</span>
+    </div>
+    <div class="finding-body">
+      <h4>Files</h4>
+      <p><span class="file-ref">firestore.rules:6-9</span>, <span class="file-ref">netlify/functions/utils/adminAuth.js:36-44</span></p>
+      <h4>Problem</h4>
+      <p>Firestore rules grant any authenticated user full write access to their own document: <code>allow write: if request.auth.uid == userId</code>. The <code>checkAdminAccess()</code> function reads <code>users/{userId}.role</code> from Firestore and grants admin access if <code>role === 'admin'</code>. Any user can set <code>role: 'admin'</code> on their own doc from the browser console and gain access to all admin Netlify Functions: user management, impersonation, audit log export, account suspension, password resets.</p>
+      <h4>Impact</h4>
+      <p>Complete admin takeover. Every authenticated user is one Firestore write away from full admin access.</p>
+      <h4>Fix</h4>
+      <p>Move <code>role</code> to a separate admin-only collection, add field-level validation in Firestore rules preventing writes to <code>role</code>, or rely exclusively on the <code>ADMIN_USER_IDS</code> env var and remove the Firestore role check.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-critical">
+    <div class="finding-header">
+      <span class="finding-id">VULN-2</span>
+      <span class="finding-title">Payment Gate Bypass via Self-Writable hasCompletedPayment</span>
+      <span class="badge badge-critical">CRITICAL</span>
+    </div>
+    <div class="finding-body">
+      <h4>Files</h4>
+      <p><span class="file-ref">firestore.rules:6-9</span>, <span class="file-ref">src/App.jsx</span> (ShellRoute, ProtectedRoute, SmartRedirect)</p>
+      <h4>Problem</h4>
+      <p>The entire payment gate relies on <code>users/{uid}.hasCompletedPayment === true</code>. Since users can write any field to their own doc (same Firestore rules issue), any authenticated user can set this field from the browser console and bypass Stripe entirely. They can also set <code>subscriptionTier: 'pro'</code> and <code>credits: 99999</code>.</p>
+      <h4>Impact</h4>
+      <p>Full product access without paying. Unlimited credits.</p>
+      <h4>Fix</h4>
+      <p>Use Firebase custom claims (server-only, not client-writable), move payment status to a separate collection, or add Firestore rules that prevent client writes to payment-related fields.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-high">
+    <div class="finding-header">
+      <span class="finding-id">VULN-3</span>
+      <span class="finding-title">Dev Mode Payment Simulation in Client Bundle</span>
+      <span class="badge badge-high">HIGH</span>
+    </div>
+    <div class="finding-body">
+      <h4>File</h4>
+      <p><span class="file-ref">src/pages/CheckoutPage.jsx:86-118</span></p>
+      <h4>Problem</h4>
+      <p>When <code>VITE_STRIPE_ENABLED !== 'true'</code>, the checkout page writes <code>hasCompletedPayment: true</code> and full credit allocation directly to Firestore from the client. Even if the var is set correctly in production, the dev-mode code path is visible in the shipped JavaScript bundle, documenting the exact Firestore fields needed to fake a payment.</p>
+      <h4>Fix</h4>
+      <p>Remove dev-mode payment simulation from the client. If needed for testing, implement as a server-side Netlify Function with dev-only env var gating.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-high">
+    <div class="finding-header">
+      <span class="finding-id">VULN-4</span>
+      <span class="finding-title">Credits Allocated Before Payment</span>
+      <span class="badge badge-high">HIGH</span>
+    </div>
+    <div class="finding-body">
+      <h4>File</h4>
+      <p><span class="file-ref">src/pages/Signup.jsx:58-69</span></p>
+      <h4>Problem</h4>
+      <p>At signup, the user doc is created with <code>credits: 400</code> (or 1250) and <code>hasCompletedPayment: false</code>. If any code path checks credits without also checking payment status, an unpaid user could consume enrichments. Additionally, the credits data shape changes from integer (signup) to object (post-payment webhook), creating inconsistency.</p>
+      <h4>Fix</h4>
+      <p>Do not write credits at signup. Let the Stripe webhook be the sole authority for credit allocation.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-header">
+      <span class="finding-id">VULN-5</span>
+      <span class="finding-title">Unauthenticated Welcome Email Endpoint</span>
+      <span class="badge badge-medium">MEDIUM</span>
+    </div>
+    <div class="finding-body">
+      <h4>File</h4>
+      <p><span class="file-ref">netlify/functions/send-welcome-email.js</span></p>
+      <h4>Problem</h4>
+      <p>The endpoint accepts any POST with <code>{ email, userId }</code> and sends a branded email from <code>Aaron Wiley &lt;aaron@idynify.com&gt;</code>. No authentication, no rate limiting, no verification that the email matches the user. Can be used to send unlimited branded emails to arbitrary addresses.</p>
+      <h4>Fix</h4>
+      <p>Add <code>verifyAuthToken()</code> and validate the email matches the authenticated user's email.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-header">
+      <span class="finding-id">VULN-6</span>
+      <span class="finding-title">No Email Verification</span>
+      <span class="badge badge-medium">MEDIUM</span>
+    </div>
+    <div class="finding-body">
+      <p>After <code>createUserWithEmailAndPassword</code>, no email verification is performed. Users can sign up with emails they don't own. Combined with VULN-5, the signup flow can be used to send branded emails to arbitrary addresses.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-header">
+      <span class="finding-id">VULN-7</span>
+      <span class="finding-title">No Bot Protection on Signup</span>
+      <span class="badge badge-medium">MEDIUM</span>
+    </div>
+    <div class="finding-body">
+      <p>No CAPTCHA, rate limiting, or bot detection on the signup form. Firebase Auth has its own rate limiting per-IP, but combined with VULN-5, bots can create accounts and trigger mass email sending.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-header">
+      <span class="finding-id">VULN-8</span>
+      <span class="finding-title">Auth Error Messages Reveal Email Existence</span>
+      <span class="badge badge-medium">MEDIUM</span>
+    </div>
+    <div class="finding-body">
+      <p>Signup: <em>&ldquo;An account with this email already exists&rdquo;</em> confirms the email is registered. Forgot password: <em>&ldquo;No account found with this email address&rdquo;</em> confirms the email is NOT registered. Together, these allow email enumeration.</p>
+      <h4>Fix</h4>
+      <p>Use a generic message for both cases: &ldquo;If an account exists with this email, you'll receive instructions.&rdquo; Firebase Auth can be configured to prevent email enumeration (Email Enumeration Protection).</p>
+    </div>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-header">
+      <span class="finding-id">VULN-9</span>
+      <span class="finding-title">Hardcoded Firebase Configuration</span>
+      <span class="badge badge-low">LOW</span>
+    </div>
+    <div class="finding-body">
+      <p>Firebase config is hardcoded in <span class="file-ref">src/firebase/config.js</span> with project ID <code>idynify-scout-dev</code> instead of reading from <code>VITE_FIREBASE_*</code> env vars. Firebase client config is inherently public, so the security impact is low, but it prevents environment separation.</p>
+    </div>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-header">
+      <span class="finding-id">VULN-10</span>
+      <span class="finding-title">No Terms Acceptance Captured</span>
+      <span class="badge badge-low">LOW</span>
+    </div>
+    <div class="finding-body">
+      <p>The signup form has no Terms of Service checkbox, no Privacy Policy link, and no record of user consent. No <code>termsAccepted</code> field is written to the user doc. No terms or privacy policy pages exist in the codebase.</p>
+      <div class="callout callout-aaron"><strong>[NEEDS AARON]</strong> Do terms of service and privacy policy exist? Are they hosted elsewhere? Legal requirement for signup.</div>
+    </div>
+  </div>
+
+  <h4>Summary by Severity</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Severity</th><th>Count</th><th>Findings</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-critical">Critical</span></td><td>2</td><td>VULN-1 (admin takeover), VULN-2 (payment bypass)</td></tr>
+        <tr><td><span class="badge badge-high">High</span></td><td>2</td><td>VULN-3 (dev mode in bundle), VULN-4 (pre-payment credits)</td></tr>
+        <tr><td><span class="badge badge-medium">Medium</span></td><td>4</td><td>VULN-5 (unauth email), VULN-6 (no verification), VULN-7 (no bot protection), VULN-8 (email enumeration)</td></tr>
+        <tr><td><span class="badge badge-low">Low</span></td><td>2</td><td>VULN-9 (hardcoded config), VULN-10 (no terms)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 10 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 10</div>
+  <h2>Enterprise Readiness Assessment</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Capability</th><th>Current Support</th><th>Blockers Created by Today's Architecture?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Google Workspace accounts</td>
+          <td>Not supported (no Google sign-in)</td>
+          <td><span class="badge badge-low">None</span> &mdash; Firebase Auth supports it natively. Adding Google sign-in now would prepare for this.</td>
+        </tr>
+        <tr>
+          <td>Microsoft authentication</td>
+          <td>Not supported</td>
+          <td><span class="badge badge-low">None</span> &mdash; Firebase Auth supports Microsoft as a provider.</td>
+        </tr>
+        <tr>
+          <td>SSO / SAML</td>
+          <td>Not supported</td>
+          <td><span class="badge badge-medium">Minor</span> &mdash; Firebase Auth supports SAML on the Blaze plan. Current email-only signup would need to coexist with SAML flows. No architectural blocker.</td>
+        </tr>
+        <tr>
+          <td>Passkeys</td>
+          <td>Not supported</td>
+          <td><span class="badge badge-low">None</span> &mdash; Firebase Auth has passkey support in preview.</td>
+        </tr>
+        <tr>
+          <td>MFA</td>
+          <td><span class="badge badge-low">Exists</span> (opt-in TOTP)</td>
+          <td>None. Already implemented correctly.</td>
+        </tr>
+        <tr>
+          <td>Organization / workspace membership</td>
+          <td>Not supported</td>
+          <td><span class="badge badge-high">Potential blocker</span> &mdash; Current data model is single-user. All data lives at <code>users/{uid}/...</code>. Adding orgs would require a new <code>organizations/{orgId}</code> collection and refactoring data ownership. The sooner this is considered, the less painful the migration.</td>
+        </tr>
+        <tr>
+          <td>Invitations</td>
+          <td>Not supported</td>
+          <td><span class="badge badge-medium">Minor</span> &mdash; No invitation model exists. Would need a pending-invitations collection and email flow. Not blocked by current auth.</td>
+        </tr>
+        <tr>
+          <td>Domain-based org discovery</td>
+          <td>Not supported</td>
+          <td><span class="badge badge-medium">Minor</span> &mdash; Email domain is available from Firebase Auth. Would need an org-domain mapping collection.</td>
+        </tr>
+        <tr>
+          <td>Admin-managed accounts</td>
+          <td>Partial (super-admin dashboard exists)</td>
+          <td><span class="badge badge-critical">Blocked by VULN-1</span> &mdash; Admin access is compromised by the self-writable role field. Fix VULN-1 before building on admin capabilities.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Key Recommendation</h4>
+  <p>The only significant architectural decision to avoid creating now: <strong>do not hardcode the assumption that one user = one workspace</strong>. If the Firestore data model eventually needs <code>organizations/{orgId}/...</code> in addition to <code>users/{uid}/...</code>, the signup flow should be ready to handle &ldquo;create account &rarr; join or create org&rdquo; as a future step. For now, this means not building more functionality on the assumption that <code>users/{uid}</code> is the sole data container.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 11 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 11</div>
+  <h2>Perceived Performance Audit</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Moment</th><th>Behavior</th><th>Assessment</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>CTA button press</td>
+          <td>No immediate feedback. No spinner, no disabled state. Button remains fully interactive.</td>
+          <td><span class="badge badge-critical">Bad</span> &mdash; User has no indication anything happened.</td>
+        </tr>
+        <tr>
+          <td>Firebase Auth call (~0.5&ndash;2s)</td>
+          <td>No loading indicator. Page appears frozen.</td>
+          <td><span class="badge badge-critical">Bad</span></td>
+        </tr>
+        <tr>
+          <td>Firestore write (~0.3&ndash;1s)</td>
+          <td>No indicator.</td>
+          <td><span class="badge badge-high">Bad</span></td>
+        </tr>
+        <tr>
+          <td>Welcome email send (~0.5&ndash;2s)</td>
+          <td>Fire-and-forget but still <code>await</code>ed, adding latency to the perceived signup time. The comment says &ldquo;async, don&rsquo;t block on this&rdquo; but the code does <code>await fetch(...)</code>.</td>
+          <td><span class="badge badge-high">Unnecessary delay</span></td>
+        </tr>
+        <tr>
+          <td>Navigation to /checkout</td>
+          <td>Standard React Router <code>navigate()</code>. Instant.</td>
+          <td><span class="badge badge-low">Fine</span></td>
+        </tr>
+        <tr>
+          <td>Checkout &rarr; Stripe redirect</td>
+          <td>Button shows spinner and &ldquo;PROCESSING...&rdquo; text with disabled state. Well implemented.</td>
+          <td><span class="badge badge-low">Good</span></td>
+        </tr>
+        <tr>
+          <td>Stripe &rarr; Success page</td>
+          <td>Success page loads immediately. Shows &ldquo;PAYMENT SUCCESSFUL!&rdquo; with features unlocked list.</td>
+          <td><span class="badge badge-low">Good</span></td>
+        </tr>
+        <tr>
+          <td>Success &rarr; Onboarding</td>
+          <td>3-second countdown then auto-redirect. Manual CTA also available.</td>
+          <td><span class="badge badge-medium">Acceptable</span> but the 3-second delay is unnecessary. Consider immediate redirect with a brief success toast.</td>
+        </tr>
+        <tr>
+          <td>Duplicate submission</td>
+          <td>No protection. Rapid clicks will fire multiple Firebase Auth calls.</td>
+          <td><span class="badge badge-critical">Bad</span></td>
+        </tr>
+        <tr>
+          <td>Error recovery</td>
+          <td>Error message appears in a red box. Form remains editable. User can retry.</td>
+          <td><span class="badge badge-low">Acceptable</span></td>
+        </tr>
+        <tr>
+          <td>Slow network</td>
+          <td>No timeout. No progress indicator. Page appears frozen indefinitely.</td>
+          <td><span class="badge badge-critical">Bad</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Total perceived wait: CTA press &rarr; next screen</h4>
+  <p>On a good network: ~2&ndash;4 seconds with no visual feedback. On a slow network: potentially 10+ seconds of apparent page freeze. The checkout page, by contrast, has excellent loading states. The signup page has none.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 12 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 12</div>
+  <h2>Signup &rarr; Onboarding Handoff</h2>
+
+  <h3>What happens immediately after signup</h3>
+  <p>After signup, the user lands on <code>/checkout</code>. After completing payment, they land on <code>/checkout/success</code>, which redirects to onboarding. <strong>There is a split in the onboarding entry point:</strong></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Path</th><th>Destination</th><th>Flow Type</th><th>When</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>CheckoutSuccessPage auto-redirect</td>
+          <td><code>/onboarding/barry</code></td>
+          <td>Legacy conversational ICP builder (BarryOnboarding.jsx)</td>
+          <td>User completes payment and stays on success page</td>
+        </tr>
+        <tr>
+          <td>CheckoutSuccessPage manual CTA</td>
+          <td><code>/onboarding/barry</code></td>
+          <td>Same legacy flow</td>
+          <td>User clicks &ldquo;MEET BARRY NOW&rdquo;</td>
+        </tr>
+        <tr>
+          <td>SmartRedirect (App.jsx)</td>
+          <td><code>/onboarding</code></td>
+          <td>New 6-step wizard (OnboardingFlow.jsx)</td>
+          <td>User navigates away and returns, or visits <code>/</code> while logged in</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>The two onboarding flows</h4>
+  <ul>
+    <li><strong>Legacy (<code>/onboarding/barry</code>):</strong> Conversational. Barry asks freeform questions to build ICP. Uses Claude API for natural language processing. Saves ICP data to <code>users/{uid}/companyProfile</code>. Does not use the <code>useOnboardingState</code> hook &mdash; manages its own state independently.</li>
+    <li><strong>New (<code>/onboarding</code>):</strong> 6-step wizard. Step 1: Meet Barry. Step 2: Website analysis. Step 3: Smart questions. Step 4: Gmail connection. Step 5: Build prospect list. Step 6: First prospects. Uses <code>useOnboardingState</code> hook with Firestore flags at <code>users/{uid}.onboarding</code>.</li>
+  </ul>
+
+  <h4>Information duplicated between signup and onboarding</h4>
+  <p>Significant overlap exists:</p>
+  <ul>
+    <li>Feature descriptions (&ldquo;Define your ICP with AI-powered RECON&rdquo;) appear on signup and are explained again in onboarding</li>
+    <li>Barry&rsquo;s identity is introduced on signup (large avatar, &ldquo;Barry AI&rdquo; headline) and re-introduced in onboarding Step 1</li>
+    <li>Product capabilities (Scout, RECON) are listed on signup and demonstrated in onboarding</li>
+  </ul>
+
+  <h4>What can be removed from signup</h4>
+  <p>Because the user encounters Barry within 60 seconds of completing signup (via onboarding), the following signup elements are redundant:</p>
+  <ul>
+    <li>Barry avatar and &ldquo;Barry AI&rdquo; headline &mdash; Barry introduces himself in onboarding Step 1</li>
+    <li>Mission Briefing box &mdash; product education belongs in onboarding</li>
+    <li>Feature bullets &mdash; onboarding demonstrates these capabilities interactively</li>
+    <li>&ldquo;Data Exploration &bull; Lead Discovery &bull; Mission Ready&rdquo; &mdash; marketing language, not needed for account creation</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 13 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 13</div>
+  <h2>Time to First Value (Backend Perspective)</h2>
+
+  <h3>Current path: CTA press &rarr; first meaningful outcome</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Step</th><th>Type</th><th>Est. Time</th><th>Classification</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Fill email + password + confirm password</td><td>3 fields</td><td>30&ndash;60s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>2</td><td>Press &ldquo;Accept Mission &amp; Start&rdquo;</td><td>Click</td><td>&lt;1s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>3</td><td>Wait for account creation (no feedback)</td><td>Loading</td><td>2&ndash;4s</td><td><span class="tag tag-defer">DEFER</span> &mdash; add loading state</td></tr>
+        <tr><td>4</td><td>Review checkout page</td><td>Screen</td><td>15&ndash;30s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>5</td><td>Press &ldquo;Complete Purchase&rdquo;</td><td>Click</td><td>&lt;1s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>6</td><td>Complete Stripe payment</td><td>External form</td><td>30&ndash;90s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>7</td><td>Stripe redirects to success page</td><td>Redirect</td><td>2&ndash;5s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>8</td><td>Wait 3-second countdown on success page</td><td>Delay</td><td>3s</td><td><span class="tag tag-remove">REMOVE</span></td></tr>
+        <tr><td>9</td><td>Onboarding Step 1: Meet Barry</td><td>Screen + click</td><td>10&ndash;15s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>10</td><td>Onboarding Step 2: Enter website URL</td><td>1 field + wait</td><td>15&ndash;45s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>11</td><td>Wait for website analysis</td><td>Loading</td><td>3&ndash;15s</td><td><span class="tag tag-required">REQUIRED</span> (good loading UX)</td></tr>
+        <tr><td>12</td><td>Onboarding Step 3: Answer 4 questions</td><td>4 expandable fields</td><td>60&ndash;180s</td><td><span class="tag tag-defer">DEFER</span> &mdash; skippable</td></tr>
+        <tr><td>13</td><td>Onboarding Step 4: Connect Gmail</td><td>OAuth flow or skip</td><td>5&ndash;30s</td><td><span class="tag tag-defer">DEFER</span> &mdash; skippable</td></tr>
+        <tr><td>14</td><td>Onboarding Step 5: Wait for prospect list</td><td>Loading</td><td>3&ndash;15s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+        <tr><td>15</td><td>Onboarding Step 6: View first prospects</td><td>Screen</td><td>15&ndash;30s</td><td><span class="tag tag-required">REQUIRED</span> &mdash; this IS the first value moment</td></tr>
+        <tr><td>16</td><td>Navigate to Mission Control</td><td>Click</td><td>&lt;1s</td><td><span class="tag tag-required">REQUIRED</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Current first-value moment</h3>
+  <p><strong>Onboarding Step 6: &ldquo;Here are your top matches.&rdquo;</strong> Barry shows the user companies ranked by ICP fit score. This is the first moment the user sees the product doing something for them. Total time from CTA press: ~3&ndash;7 minutes (happy path with skipping optional steps).</p>
+
+  <h3>What it should be</h3>
+  <p>The first-value moment is correct. The onboarding flow is well-designed &mdash; Barry analyzes the business, asks targeted questions, and delivers prospects. The problem is what comes <em>before</em> onboarding: signup and checkout add ~2 minutes of friction before the user reaches Barry.</p>
+
+  <h4>Backend processes adding latency</h4>
+  <ul>
+    <li><strong>Welcome email (<code>await fetch</code>):</strong> Adds 0.5&ndash;2s to signup despite being non-critical. Should be truly fire-and-forget (remove <code>await</code>).</li>
+    <li><strong>Stripe webhook processing:</strong> Runs asynchronously after Stripe redirects. If the webhook hasn't fired before the user reaches the success page, the user doc may not yet have <code>hasCompletedPayment: true</code>. The success page doesn't verify payment status &mdash; it trusts the redirect.</li>
+    <li><strong>Website analysis API:</strong> Calls <code>/.netlify/functions/analyze-website</code>. This is a Claude API call that can take 5&ndash;15 seconds. Good loading UX with stepped progress, but the latency is real.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 14 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 14</div>
+  <h2>Three Modernization Options (Backend Perspective)</h2>
+
+  <h3>Option A &mdash; Minimum Viable Fix</h3>
+  <div class="summary-box">
+    <h4>What changes</h4>
+    <ul>
+      <li>Remove fake countdown timer and false &ldquo;Limited Seats&rdquo; badge</li>
+      <li>Fix password fields: add show/hide toggle, <code>autocomplete</code> attributes, accessible labels</li>
+      <li>Add loading state and duplicate submission protection to signup CTA</li>
+      <li>Remove <code>await</code> on welcome email (true fire-and-forget)</li>
+      <li>Fix starter tier contact claim (&ldquo;email &amp; phone&rdquo; &rarr; &ldquo;email only&rdquo;)</li>
+      <li>Update branding: IDYNIFY leads, Barry/Scout demoted</li>
+    </ul>
+    <h4>What stays</h4>
+    <ul>
+      <li>Email/password auth (no Google, no OTP)</li>
+      <li>Same checkout flow (separate page &rarr; Stripe)</li>
+      <li>Same Firestore data model</li>
+      <li>Firestore security rules unchanged (VULN-1 and VULN-2 remain)</li>
+    </ul>
+    <h4>Backend risk</h4>
+    <p><span class="badge badge-high">HIGH</span> &mdash; VULN-1 (admin takeover) and VULN-2 (payment bypass) remain exploitable. These should be fixed regardless of which option is chosen.</p>
+    <h4>Effort</h4>
+    <p>1&ndash;2 days frontend changes. Security fixes (Firestore rules) are an additional 1 day and should be mandatory.</p>
+  </div>
+
+  <h3>Option B &mdash; Modernized Signup</h3>
+  <div class="summary-box">
+    <h4>What changes</h4>
+    <ul>
+      <li>Everything in Option A</li>
+      <li>Add &ldquo;Continue with Google&rdquo; (Firebase Auth Google provider)</li>
+      <li>Simplify form: IDYNIFY wordmark, one-line value statement, email/password + Google, Terms/Privacy inline</li>
+      <li>Remove product education from signup (Mission Briefing, feature bullets, Barry avatar)</li>
+      <li>Fix Firestore rules: field-level validation preventing client writes to <code>role</code>, <code>hasCompletedPayment</code>, <code>credits</code>, <code>subscriptionTier</code>, <code>subscriptionStatus</code></li>
+      <li>Don't write credits at signup &mdash; let webhook be sole authority</li>
+      <li>Add auth to welcome email endpoint</li>
+      <li>Fix onboarding split: CheckoutSuccessPage redirects to <code>/onboarding</code> (new flow), not <code>/onboarding/barry</code></li>
+    </ul>
+    <h4>What stays</h4>
+    <ul>
+      <li>Separate checkout page &rarr; Stripe Payment Link</li>
+      <li>Password option (alongside Google)</li>
+      <li>Current onboarding 6-step flow</li>
+    </ul>
+    <h4>Backend risk</h4>
+    <p><span class="badge badge-low">LOW</span> &mdash; Security fixes are included. Google Auth is well-supported by Firebase. Main risk is handling the &ldquo;Google email matches existing email/password account&rdquo; edge case (Firebase has built-in account linking).</p>
+    <h4>Effort</h4>
+    <p>3&ndash;5 days. Firebase rules refactor (1 day), Google Auth (1 day), signup page simplification (1 day), welcome email auth + onboarding redirect fix (1 day).</p>
+  </div>
+
+  <h3>Option C &mdash; Best-in-Class</h3>
+  <div class="summary-box">
+    <h4>What changes</h4>
+    <ul>
+      <li>Everything in Option B</li>
+      <li>Add OTP/magic link option (Firebase email link sign-in) &mdash; eliminates password fields entirely for users who prefer it</li>
+      <li>Move payment gate from Firestore field to Firebase custom claims (server-only, not client-writable)</li>
+      <li>Add email verification before proceeding to checkout</li>
+      <li>Add signup funnel analytics events at each stage</li>
+      <li>Remove dev-mode payment simulation from client bundle</li>
+      <li>Add bot protection (Firebase App Check or reCAPTCHA)</li>
+      <li>Fix email enumeration (generic error messages)</li>
+      <li>Add Terms/Privacy acceptance tracking in user doc</li>
+      <li>Eliminate 3-second success page delay &mdash; direct to onboarding</li>
+      <li>Handle split-state edge case: if Firestore write fails after auth creation, retry or provide recovery path</li>
+    </ul>
+    <h4>Ideal auth + onboarding flow</h4>
+    <pre>
+/signup
+  → IDYNIFY wordmark + "Find your next customers"
+  → [Continue with Google] or [Email + OTP]
+  → Terms/Privacy inline acceptance
+  → Email verification (if email/password)
+  → /checkout (Stripe)
+  → /onboarding (6-step, no legacy split)
+     Step 1: Barry introduces himself
+     Step 2: Website analysis
+     Step 3: Smart questions
+     Step 4: Gmail (deferred, with Barry context)
+     Step 5: Prospect list generation
+     Step 6: First value — "Here are your matches"
+  → /mission-control-v2</pre>
+    <h4>Backend risk</h4>
+    <p><span class="badge badge-low">LOW</span> &mdash; All security issues addressed. Firebase custom claims are the industry-standard approach for server-managed authorization. OTP is a proven Firebase capability.</p>
+    <h4>Effort</h4>
+    <p>7&ndash;10 days. Includes all security fixes, custom claims migration, OTP implementation, analytics instrumentation, and edge case handling.</p>
+  </div>
+
+  <h3>Recommendation: Option B</h3>
+  <p>Option B delivers the highest value per unit of effort. It addresses all critical security vulnerabilities, simplifies the signup experience to match the audit brief's target architecture, and adds Google Auth &mdash; the single largest conversion improvement available. The onboarding flow (post-signup) is already well-designed; the problem is getting users to it.</p>
+  <p>Option C's additions (OTP, custom claims, App Check) are individually valuable but can be phased in after the core redesign ships. Option A leaves critical security issues unresolved and should not ship.</p>
+  <p><strong>Minimum: fix VULN-1 and VULN-2 regardless of which option is chosen.</strong> These are exploitable today.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 15 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 15</div>
+  <h2>Files &amp; Components Involved</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Category</th><th>File</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td>Signup</td><td><span class="file-ref">src/pages/Signup.jsx</span></td><td>Signup form, Firebase Auth creation, Firestore user doc creation</td></tr>
+        <tr><td>Login</td><td><span class="file-ref">src/pages/Login.jsx</span></td><td>Email/password login with MFA support</td></tr>
+        <tr><td>Password Reset</td><td><span class="file-ref">src/pages/ForgotPassword.jsx</span></td><td>Firebase <code>sendPasswordResetEmail</code></td></tr>
+        <tr><td>Router / Guards</td><td><span class="file-ref">src/App.jsx</span></td><td>Route config, ShellRoute, ProtectedRoute, SmartRedirect</td></tr>
+        <tr><td>Checkout</td><td><span class="file-ref">src/pages/CheckoutPage.jsx</span></td><td>Stripe redirect (prod) or dev simulation</td></tr>
+        <tr><td>Checkout Success</td><td><span class="file-ref">src/pages/CheckoutSuccessPage.jsx</span></td><td>Post-payment success, redirects to onboarding</td></tr>
+        <tr><td>Stripe Webhook</td><td><span class="file-ref">netlify/functions/stripe-webhook.js</span></td><td>Payment verification, credit allocation</td></tr>
+        <tr><td>Welcome Email</td><td><span class="file-ref">netlify/functions/send-welcome-email.js</span></td><td>Unauthenticated email endpoint (Resend API)</td></tr>
+        <tr><td>Firebase Config</td><td><span class="file-ref">src/firebase/config.js</span></td><td>Hardcoded Firebase client config</td></tr>
+        <tr><td>Firestore Rules</td><td><span class="file-ref">firestore.rules</span></td><td>Overly permissive user doc write rules</td></tr>
+        <tr><td>Admin Auth</td><td><span class="file-ref">netlify/functions/utils/adminAuth.js</span></td><td>Admin access check (env var + Firestore role)</td></tr>
+        <tr><td>MFA</td><td><span class="file-ref">src/utils/mfa.js</span></td><td>TOTP enrollment and verification</td></tr>
+        <tr><td>Onboarding (new)</td><td><span class="file-ref">src/pages/Onboarding/OnboardingFlow.jsx</span></td><td>6-step wizard with Barry</td></tr>
+        <tr><td>Onboarding (legacy)</td><td><span class="file-ref">src/pages/Onboarding/BarryOnboarding.jsx</span></td><td>Conversational ICP builder</td></tr>
+        <tr><td>Onboarding State</td><td><span class="file-ref">src/hooks/useOnboardingState.js</span></td><td>Firestore-backed onboarding progress tracking</td></tr>
+        <tr><td>Analytics</td><td><span class="file-ref">src/services/analytics.js</span></td><td>Product events (open_contact/open_company only)</td></tr>
+        <tr><td>Homepage</td><td><span class="file-ref">src/pages/Homepage.jsx</span></td><td>Marketing page with signup CTAs</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 16 -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-number">Section 16</div>
+  <h2>Questions Requiring Aaron's Decision</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Question</th><th>Context</th><th>Impact</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Are VULN-1 and VULN-2 to be fixed immediately, before the signup redesign?</strong></td>
+          <td>Admin takeover and payment bypass are exploitable today. Both are Firestore rules issues fixable in &lt;1 day.</td>
+          <td><span class="badge badge-critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Is &ldquo;Early Access &mdash; Limited Seats&rdquo; a real constraint or should it be removed?</strong></td>
+          <td>No enforcement exists in code. If it's a real business constraint, it needs a backend seat counter. If not, remove it.</td>
+          <td><span class="badge badge-high">Claims accuracy</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>What are the actual production pricing and credit limits?</strong></td>
+          <td>Code shows Starter ($20/400 credits/40 companies/120 contacts) and Pro ($50/1250 credits/125 companies/375 contacts). Are these current?</td>
+          <td><span class="badge badge-aaron">Business</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Do Terms of Service and Privacy Policy exist?</strong></td>
+          <td>No terms or privacy documents found in codebase. No terms acceptance captured at signup. May be a legal requirement.</td>
+          <td><span class="badge badge-aaron">Legal</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>How do users currently cancel their subscription?</strong></td>
+          <td>Signup claims &ldquo;Cancel anytime&rdquo; but no cancellation UI exists. Is there a Stripe customer portal link?</td>
+          <td><span class="badge badge-aaron">Business</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>Is the project using a dev Firebase project in production?</strong></td>
+          <td>Hardcoded project ID is <code>idynify-scout-dev</code>. Is there a separate production Firebase project?</td>
+          <td><span class="badge badge-medium">Architecture</span></td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><strong>Should the legacy onboarding (<code>/onboarding/barry</code>) be deprecated?</strong></td>
+          <td>Two parallel onboarding flows exist. The new 6-step wizard appears to be the intended path, but the success page still points to the legacy flow.</td>
+          <td><span class="badge badge-medium">Architecture</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><strong>Which option (A/B/C) to proceed with?</strong></td>
+          <td>Team B recommends Option B. Coordinates with Team A&rsquo;s design direction. [NEEDS BOTH]</td>
+          <td><span class="badge badge-aaron">Strategic</span></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><strong>Should we add signup funnel analytics before or during the redesign?</strong></td>
+          <td>Without baseline measurement, we cannot quantify whether the redesign improves conversion.</td>
+          <td><span class="badge badge-medium">Analytics</span></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><strong>Does &ldquo;Browse unlimited companies (always free)&rdquo; mean free within the subscription, or free without a subscription?</strong></td>
+          <td>Currently browsing requires a paid subscription to access the app at all. The claim is misleading if &ldquo;free&rdquo; implies no payment.</td>
+          <td><span class="badge badge-aaron">Claims accuracy</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="margin-top:56px; padding-top:20px; border-top:1px solid var(--border); font-size:12px; color:var(--text-3); text-align:center;">
+  Team B Audit &mdash; IDYNIFY Signup Experience &mdash; August 14, 2026<br>
+  Audit only. No production changes authorized.
+</div>
+
+</div>

@@ -130,9 +130,14 @@ The Netlify function is not reachable from the harness, so the call failed for r
 
 # 5 — M1–M8
 
-> **GCIP enforcement mode: Notify — password requirements are currently guidance.
-> Hard enforcement at the Firebase auth boundary is deferred. Client-side
-> enforcement behaviour documented as found.**
+> **GCIP enforcement mode: Notify. The password checklist is currently guidance
+> based on the live policy. A user can sign up with a non-compliant password
+> today — Firebase accepts it under Notify mode. Hard enforcement at the Firebase
+> auth boundary is deferred to #546.**
+
+This release is **not** described as enforcing the 8 + upper + lower + numeric
+policy at the Firebase boundary, because it does not. §M5 below is the live
+evidence for that statement rather than an assumption about it.
 
 Six of the eight were executable here after all, and were run rather than left
 for you. M1, M2 and M6 ran in a **real Chromium** against the dev server. M4, M5
@@ -293,6 +298,26 @@ M1, M2, M4, M5 and M6 have automated equivalents in `src/test/signupAuth.test.js
 
 ---
 
+# 5c — `forceUpgradeOnSignin` — future-change guardrail
+
+Recorded here and in **#546** so it cannot get lost between sprints.
+
+> **`forceUpgradeOnSignin` currently reads `true`. It is inert under Notify mode.
+> Any future move to Require enforcement must include a deliberate review and
+> confirmation of this flag's state before the policy change is made. Do not
+> change enforcement mode without checking this flag first.**
+
+**Not a blocker.** M8 passed on a controlled account whose password the policy
+rejects: it signed in cleanly and was not forced to change anything. The current
+release is safe.
+
+The reason it needs a guardrail rather than a note: the flag is inert *because*
+enforcement is off, not because it is set correctly. Flipping enforcement to
+Require is the single action that would activate it — and it would do so as a
+side effect, in a change nobody intended to be about existing users.
+
+---
+
 # 6 — Test accounts: created, and cleaned up
 
 Per the authorization: minimum count, clearly identified, no existing account touched, read, or modified.
@@ -358,14 +383,74 @@ honestly stand in for:
 
 The sprint closes when those two are confirmed.
 
+---
+
+# 8 — Sprint closeout record
+
+## M3 — real device *(Aaron)*
+
+| Field | |
+|---|---|
+| Result | ⬜ PASS ⬜ FAIL |
+| Device | _________________ |
+| OS version | _________________ |
+| Browser + version | _________________ |
+| CTA visible and reachable | ⬜ |
+| Does not overlap the password field | ⬜ |
+| Does not cover or clip the checklist rows | ⬜ |
+| Page remains scrollable | ⬜ |
+| CTA submits normally | ⬜ |
+
+**Do not claim cross-platform hardware verification if only one platform was
+tested.** If a single device is used, record it as single-platform. The two
+genuinely distinct engines are Android Chrome and WebKit; every iOS browser,
+Chrome included, is WebKit.
+
+## M7 — MFA *(Aaron)*
+
+| Field | |
+|---|---|
+| Result | ⬜ PASS ⬜ FAIL |
+| Controlled account used (not a customer) | ⬜ confirmed |
+| Primary credentials accepted | ⬜ |
+| MFA challenge appears | ⬜ |
+| TOTP code entered | ⬜ |
+| Authentication completes | ⬜ |
+| No regression in the rebuilt login UI | ⬜ |
+
+## Everything else
+
+| Check | Result | Evidence |
+|---|---|---|
+| `?tier=pro` → Pro fields → `/checkout?tier=pro` | ✅ PASS | §1, live Firestore document |
+| `?tier=starter` → Starter fields → `/checkout?tier=starter` | ✅ PASS | §2 |
+| No tier param → Starter, default documented | ✅ PASS | §3 |
+| `credits` shape unchanged (number) | ✅ PASS | asserted per path |
+| M1 keyboard-only flow | ✅ PASS | real Chromium, §5 |
+| M2 show/hide toggle | ✅ PASS | real Chromium, §5 |
+| M3 sticky CTA — sub-checks | ✅ PASS | 6 configurations, §5 |
+| M3 sticky CTA — real hardware | ⬜ | **above** |
+| M4 duplicate email | ✅ PASS | live project, §5 |
+| M5 password policy under Notify | ✅ PASS | live project, both questions answered, §5 |
+| M6 LEGAL-001 | ✅ PASS | real Chromium, §5 |
+| M7 MFA | ⬜ | **above** |
+| M8 existing non-compliant password | ✅ PASS | live project, controlled account, §5 |
+
+Automated: **35 passed** in `signupAuth.test.jsx`; **1128 passed, 5 failed**
+overall, the five being #545 and untouched.
+
+**Phase 5 and the Signup Rebuild sprint close when M3 and M7 are recorded above
+as PASS.**
+
 ## Open items carried out of the sprint
 
-| Item | Where |
-|---|---|
-| `forceUpgradeOnSignin: true` in the live policy — blocks Notify → Require | **#546** |
-| Pre-existing `HunterContactCard` / `ReconSectionEditor` failures | **#545** |
-| Terms and Privacy | **LEGAL-001**, deferred by D2 |
-| Orphaned `analytics_events` from the first verification run | §6 — needs Admin SDK |
+| Item | Where | Status |
+|---|---|---|
+| Terms and Privacy pages | **LEGAL-001** | deferred by D2; layout slot reserved |
+| Pre-existing `HunterContactCard` / `ReconSectionEditor` failures | **#545** | open, untouched |
+| Notify → Require migration + `forceUpgradeOnSignin` review | **#546** | open; guardrail in §5c |
+| Orphaned test data — 5 uids, 4 known | **#547 / CLEANUP-001** | open, **stays open past sprint close** |
+| Password enforcement evaluation | **AUTH-POLICY-002** | tracked on #546 |
 
 ---
 

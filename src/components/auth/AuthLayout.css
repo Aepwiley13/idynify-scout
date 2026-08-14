@@ -510,13 +510,35 @@
 }
 
 @media (max-width: 560px) {
-  .auth-title { font-size: 33px; letter-spacing: -0.8px; }
-  .auth-sub { font-size: 16.5px; }
-  .auth-panel-left { padding: 32px 20px 40px; }
-  .auth-head { margin: 26px 0 24px; }
+  .auth-title { font-size: 31px; letter-spacing: -0.8px; }
+  .auth-sub { font-size: 16px; }
+  .auth-panel-left { padding: 24px 20px 36px; }
+  .auth-head { margin: 20px 0 20px; }
+  .auth-brand-img { width: 128px; }
+  .auth-form { gap: 15px; }
+  .auth-req-list { margin-top: 10px; gap: 6px; }
   .auth-why { padding: 46px 20px 54px; }
   .auth-why-grid { grid-template-columns: 1fr; }
   .auth-barry { max-width: 210px; }
+}
+
+/* Short viewports — in practice, a phone with the keyboard open.
+   The band left above the keyboard is roughly 400-580px, and the CTA has to
+   live inside it or the user is typing a password with no visible way to
+   submit. Tightening the rhythm buys back most of that; it cannot buy back all
+   of it on the smallest phones without deleting approved content, so the
+   remaining gap is reported rather than hidden. Height-based, not width-based,
+   because the keyboard shortens the viewport without narrowing it. */
+@media (max-width: 900px) and (max-height: 620px) {
+  .auth-panel-left { padding: 16px 20px 28px; }
+  .auth-head { margin: 14px 0 16px; }
+  .auth-title { font-size: 27px; line-height: 1.12; }
+  .auth-sub { font-size: 15px; }
+  .auth-brand-img { width: 112px; }
+  .auth-form { gap: 13px; }
+  .auth-field-label { margin-bottom: 5px; }
+  .auth-field-input { padding: 13px 14px; }
+  .auth-req-list { margin-top: 9px; gap: 5px; }
 }
 
 /* ── Motion ───────────────────────────────────────────────────────────────── */

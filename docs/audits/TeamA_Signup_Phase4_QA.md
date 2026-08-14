@@ -1,0 +1,364 @@
+# TEAM A — Signup Rebuild, Phase 4 Visual QA
+
+**Against:** Phase 3 Review / Phase 4 Authorization (Aug 13, 2026)
+**Branch:** `claude/team-a-29qz5h`
+**Status:** QA complete. Awaiting signoff.
+**Reference:** `docs/design/signup-mockup-approved.png` — the single visual reference.
+
+> ⚠️ **The password checklist in every screenshot in this report is the
+> SIMULATED POST-POLICY STATE.** REL-AUTH-001 has not been executed and cannot
+> be executed from here. See §1 — recapture is required before signoff.
+
+---
+
+## Summary
+
+| Check | Result |
+|---|---|
+| Composition vs. approved mockup | ✅ Matches; 10 divergences, all mapped to a decision (§4) |
+| Breakpoints 1440 / 1280 / 1024 / 768 / 430 / 390 / 375 / 320 | ✅ No horizontal scroll, no clipping, no undersized targets |
+| Reduced motion | ✅ **Zero** animated elements when the preference is set |
+| 200% zoom | ✅ Reflows, no horizontal scroll |
+| Keyboard open | ⚠️ **Improved, not eliminated** — measured per device in §5 |
+| Error states | ✅ Announced, actionable, form preserved |
+| REL-AUTH-001 | ⬜ **Not executed** — §1 |
+| Barry provenance | ✅ §2 |
+| Welcome email fire-and-forget | ✅ §3 |
+| Pre-existing failures | ✅ Issue **#545** opened |
+
+**One thing that got worse before it got better, and one that is still not perfect.**
+The keyboard-open case (§5) failed its criterion on first measurement; tightening
+the mobile rhythm fixed it on larger phones and reduced it everywhere, but it is
+not fully solved on a 375px iPhone SE and I have not hidden that.
+
+---
+
+# 1 — REL-AUTH-001: not executed, and I cannot execute it
+
+**Status: ⬜ NOT RUN.** Two independent reasons:
+
+1. **No console access, by design.** The runbook assigns execution to Aaron:
+   *"Team A does not have and should not have console access."* Changing a
+   production authentication setting is not something this sprint should be able
+   to do unilaterally.
+2. **This environment cannot reach the endpoint.** `validatePassword()` fires the
+   correct request — verified in the browser:
+   `GET https://identitytoolkit.googleapis.com/v2/passwordPolicy?key=…` — and it
+   never completes here, because outbound egress is filtered. The component
+   therefore renders **no checklist at all**, which is the specified failure mode
+   working exactly as intended.
+
+**So, per your instruction, every screenshot in this report is labelled
+"simulated post-policy state."** The policy response is stubbed with precisely
+what identitytoolkit will return once the console change lands:
+
+```json
+{ "customStrengthOptions": { "minPasswordLength": 8,
+    "containsUppercaseCharacter": true, "containsLowercaseCharacter": true,
+    "containsNumericCharacter": true },
+  "enforcementState": "ENFORCE", "forceUpgradeOnSignin": false }
+```
+
+Note `"forceUpgradeOnSignin": false` — the stub encodes the mode you authorized,
+not the one you didn't.
+
+### What still has to happen, in order
+
+1. Aaron executes **REL-AUTH-001** (`docs/releases/RELEASE-GCIP-PASSWORD-POLICY.md`)
+2. **Verification check 7 immediately after** — an existing user whose current
+   password does not satisfy the new policy signs in successfully. This is the
+   check that distinguishes the authorized change from the unauthorized one, and
+   it is mandatory before the sprint closes.
+3. Team A recaptures the password section against the real policy and replaces
+   the simulated screenshots.
+
+**Until step 1 lands, the shipped page will display the policy that is actually
+in force** — Firebase's default 6-character minimum, shown as "6+ characters".
+That is truthful, not broken: the checklist mirrors the console, so it is correct
+before and after, and the transition needs no deploy. It simply will not match
+these screenshots until the console change is made.
+
+---
+
+# 2 — Barry derivative: provenance
+
+Asset provenance, not a design review.
+
+| Confirmation | Evidence |
+|---|---|
+| **Canonical source untouched** | `docs/design/source/barry-signup-source.png`, MD5 `0a4265e163c02f9e43fdcc3714d93998` — byte-identical to the file committed at `476ea42`, and touched by no commit since. Verified after the build, not before. |
+| **Original alpha state** | **Baked-in white.** 1,573,520 of 1,573,520 pixels fully opaque; **0** transparent, **0** partially transparent. 63.96% of pixels are opaque near-white (all channels > 245). Every border sample reads ~`rgba(254,254,254,255)`. |
+| **Only the derivative was modified** | Source is read-only input. All output went to `public/assets/barry/`. |
+| **Design not altered** | See below. |
+
+### The transformation, exactly
+
+**Pass 1 — flood fill from the canvas border**, through pixels whose darkest
+channel is ≥ 186, four-way connectivity. Background is defined as *light and
+reachable from the edge*, never as *light*. That distinction is the whole
+method: Barry's spacesuit, gloves highlights and boots are white, and a
+brightness key would have erased them. The fill cannot reach them without
+crossing the bear's dark outline.
+
+**Pass 2 — un-matte the feathered band against white.** The source was
+composited over white, so each edge pixel satisfies `src = fg·α + 255·(1−α)`,
+which inverts exactly to `fg = (src − 255·(1−α)) / α`. Without this step the fur
+silhouette keeps white-blended colour at partial alpha and glows against the
+dark panel.
+
+**Pass 3 — trim** to the content bounding box: 1105×1424 → 735×1309, discarding
+only whitespace.
+
+**Pass 4 — resample** to 640×1140 (aspect ratio preserved to sub-pixel) and
+encode: AVIF q60 · WebP q82 · PNG palette, served through `<picture>`.
+
+| Counter | Value |
+|---|---|
+| Pixels set fully transparent | 992,720 |
+| Pixels feathered (partial alpha) | 17,472 |
+| Of those, colour-corrected | 17,081 |
+| Interior pixels altered | **0** — no pixel inside the figure was touched by passes 1–3 |
+
+### Face, suit, proportions, chest treatment
+
+**Unaltered.** No crop of the figure, no recolour, no redraw, no retouch, no
+warp. Aspect ratio preserved. The only operation reaching the figure is the
+Pass-4 resample, which is a uniform scale to render size.
+
+The **rotated chest badge is intact** — the IDYNIFY activated state you
+confirmed in the Phase 2 response. Visible in every screenshot.
+
+**One thing I checked so it is not mistaken for damage:** there is a cyan rim
+light along the left edge of Barry's fur. I verified it against the untouched
+source on its native white background — **it is in the original artwork**, a
+deliberate rim light, not a matting artifact.
+
+| Output | Size |
+|---|---|
+| `barry-signup.avif` | **56.4 KB** (under the 80 KB target) |
+| `barry-signup.webp` | 87.6 KB |
+| `barry-signup.png` | 175.8 KB (last-resort fallback) |
+
+---
+
+# 3 — Welcome email: fire-and-forget confirmed
+
+**Confirmed. The approved behaviour is in place.**
+
+`src/pages/Signup.jsx`, in order:
+
+| Line | Operation | Awaited? |
+|---|---|---|
+| 109 | `await createUserWithEmailAndPassword(auth, email, password)` | ✅ yes |
+| 119 | `await setDoc(doc(db, 'users', uid), {...})` | ✅ yes |
+| **135** | `fetch('/.netlify/functions/send-welcome-email', {...})` | ❌ **no `await`** |
+| 139 | `.catch(err => console.error('[signup] welcome email failed to send', err))` | — |
+| 146 | `navigate(`/checkout?tier=${tier}`)` | — |
+
+The `fetch` is issued and its promise is dropped. Navigation does not depend on
+it, so **Resend latency cannot delay checkout and Resend failure cannot prevent
+it.** The previous implementation awaited this call despite a comment on the line
+above claiming it did not.
+
+**Failure logging is preserved** — an explicit `.catch` with a `[signup]`-tagged
+`console.error`, so a systemic Resend outage is diagnosable rather than silent.
+
+**Pinned by test 13**, "reaches checkout even when the email service is failing":
+`fetch` is mocked to reject, and the test asserts the user still lands on
+checkout. It fails if anyone re-adds the `await`.
+
+---
+
+# 4 — Annotated mockup comparison
+
+Side-by-side artifact: `docs/design/qa/mockup-comparison.png`.
+
+| # | In the mockup | Built | Authorized by |
+|---|---|---|---|
+| 1 | Google + Microsoft SSO buttons | Removed | **Q5** — Phase 2 authorization |
+| 2 | `or` divider | Removed | **Q5** |
+| 3 | "Your AI-powered sales engine is a few minutes away" | "Know who matters, why they matter, and what to do next." | **N3** / frozen positioning |
+| 4 | "I'm your AI SDR… Let's build your sales engine." | Frozen Barry card copy, verbatim | **N4** |
+| 5 | "Enterprise-grade security / Your data is always protected" | Removed | Security decision, **Option C** |
+| 6 | "By continuing, you agree to our Terms of Service and Privacy Policy" | Removed; space reserved | **D2** — LEGAL-001 |
+| 7 | HubSpot · Google · Palo Alto · Segment · Calendly + star rating | Removed entirely | Brief §Social proof — unverified |
+| 8 | "Your AI SDR, Always On" card | "Barry connects the dots" | Brief §Below-fold copy table |
+| 9 | Top-left: ID badge + plain black type | Canonical neon wordmark | **Aaron §6** — "use the full wordmark" |
+| 10 | "Work Email" label | "Email" | **Q5b** |
+| 11 | Barry drawn into a scene with a grid floor | Delivered PNG, background removed | **A1** — the mockup's Barry is generated art, not this asset placed on a gradient |
+
+### What matches
+
+Two-panel split with the curved divider · white left / gradient right ·
+headline with "IDYNIFY" in the accent · field styling with leading icons and the
+reveal eye · requirement checklist with tick circles · full-width gradient CTA
+with trailing arrow · "Already have an account? Sign in" · Barry lower-right
+with the speech card above him and its pointer aimed down · four-card below-fold
+section.
+
+### Reading the criterion
+
+Six authorized removals take out roughly 40% of the mockup's left-panel content
+and its entire bottom band, so **the built page is visibly shorter and more
+spacious than the mockup, by design.** "Closely matches" is met on composition
+and system, not on content inventory.
+
+---
+
+# 5 — Breakpoints and states
+
+Password pre-filled with a compliant value so the checklist state is visible.
+`?tier=pro` throughout, to confirm the tier is invisible.
+
+| Width | H-scroll | Doc height | CTA top | Barry below CTA | Checklist | Undersized targets |
+|---|---|---|---|---|---|---|
+| 1440 | ✅ none | 1381 | 666 | n/a (side panel) | 3/3 met | 0 |
+| 1280 | ✅ none | 1381 | 666 | n/a | 3/3 | 0 |
+| 1024 | ✅ none | 1400 | 648 | n/a | 3/3 | 0 |
+| 768 | ✅ none | 2131 | 587 | ✅ yes | 3/3 | 0 |
+| 430 | ✅ none | 2345 | 506 | ✅ yes | 3/3 | 0 |
+| 390 | ✅ none | 2345 | 506 | ✅ yes | 3/3 | 0 |
+| 375 | ✅ none | 2367 | 506 | ✅ yes | 3/3 | 0 |
+| 320 | ✅ none | 2457 | 506 | ✅ yes | 3/3 | 0 |
+
+No clipping, no overlap, Barry never above the form on mobile. Compare the old
+page, which had the Early Access badge colliding with both HUD corners at every
+width from 320 to 640 and the radar overlapping the card up to 768.
+
+### Reduced motion — ✅ zero animated elements
+
+With `prefers-reduced-motion: reduce`, enumerating every element whose computed
+`animation-name` is not `none` returns **`[]`**. Every animation is opt-in behind
+`@media (prefers-reduced-motion: no-preference)`. The spinner is the deliberate
+exception, degrading to an opacity pulse — it is feedback, not decoration, and
+must survive.
+
+### 200% zoom — ✅
+
+720 CSS px at 2×: `scrollWidth 720 = clientWidth 720`. Reflows, no horizontal
+scroll. WCAG 1.4.10 satisfied.
+
+### Keyboard open — ⚠️ improved, not eliminated
+
+This is the one criterion that is not fully met, and the numbers are below rather
+than summarised away. Measured with the password field focused and a realistic
+keyboard height subtracted from the visible band:
+
+| Device | Band above keyboard | CTA below fold — before | after tightening |
+|---|---|---|---|
+| iPhone 14 Pro Max 430×932 | 582px | 22px | ✅ **0 — fully visible** |
+| iPhone 14 390×844 | 508px | 96px | **54px** |
+| Android 360×800 | 480px | 107px | **82px** |
+| iPhone SE 375×667 | 407px | 113px | **105px** |
+
+Where the browser shrinks the *layout* viewport (Android Chrome, and landscape),
+a height-scoped media query tightens the rhythm further: **31px** on Android at
+360×480, **3px** at 390×508.
+
+**What was changed:** vertical rhythm only — panel padding, head margins, title
+size, form gap, checklist spacing. **No content was removed.**
+
+**Why it is not zero.** Closing the remaining 105px on a 375px SE would mean
+deleting the subheading or the requirement checklist — both approved content, and
+not Team A's call. Against the old page, where the CTA sat roughly 823px below
+the fold, a 54–105px scroll is a different category of problem. **Flagged rather
+than fixed, and available if you want it:** a sticky mobile CTA would close it
+entirely, but that is a composition change beyond the approved mockup.
+
+**One caveat worth stating:** iOS Safari does not resize the layout viewport when
+the keyboard opens, so the height-scoped query does not fire there. The iPhone
+figures above are the conservative case and assume it does not.
+
+### Error states
+
+| Case | Behaviour |
+|---|---|
+| Duplicate email | *"An account already exists with this email. **Sign in instead**"* — `role="alert"`, a real `<a href="/login">`, and the typed email preserved (verified: `taken@example.com` still in the field) |
+| Invalid email | *"Enter a valid email address."* — `role="alert"`, `aria-invalid="true"`, linked by `aria-describedby`. Does not fire on first blur through an empty field |
+| Network failure | *"Connection issue — check your internet and try again."* |
+| Unknown | *"Something went wrong. Please try again."* — no raw Firebase code ever surfaces |
+
+### Quiet variant
+
+Sign in and Forgot Password captured at 1440 and 390, plus the sign-in error
+state. Same system, no Barry, no below-fold section. The MFA branch is
+re-skinned logic — `resolveMfaSignIn` untouched — pinned by tests 15 and 16.
+
+---
+
+# 6 — Screenshot index
+
+Committed to `docs/design/qa/`:
+
+```
+mockup-comparison.png          annotated side-by-side, 11 divergences
+signup-1440.png   signup-1280.png   signup-1024.png   signup-768.png
+signup-430.png    signup-390.png    signup-375.png    signup-320.png
+reduced-motion-1440.png        zero animations
+zoom-200.png                   720 CSS px at 2x
+keyboard-open-390x400.png      short-viewport state
+error-duplicate-email.png      alert + inline sign-in link
+error-invalid-email.png        field-level validation
+login-1440.png   login-390.png   login-error-1440.png
+forgot-1440.png  forgot-390.png
+```
+
+All signup captures show the **simulated post-policy state** (§1).
+
+---
+
+# 7 — Pre-existing test failures
+
+**Issue #545 opened**, as instructed. Not fixed here.
+
+Reproduced on an unmodified tree by stashing every rebuild change:
+`2 files failed, 5 tests failed, 22 passed` — identical to the result with the
+rebuild applied.
+
+- `HunterContactCard` × 1 — a literal `"3 days ago"` assertion that looks time-dependent
+- `ReconSectionEditor` × 4 — `window.matchMedia` is not implemented in jsdom, so
+  `ReconSectionEditor.jsx:119` throws in a `useState` initializer and the whole
+  block fails at mount
+
+The fix for the four is a `matchMedia` stub in `src/test/setup.js` — a global
+test-environment change touching all 52 test files, which is exactly why it does
+not belong inside this sprint.
+
+Signup rebuild suite: **33 passed, 0 failed.** Full suite: **1126 passed, 5 failed** — those five.
+
+---
+
+# 8 — Phase 5 readiness
+
+Noted for the next gate, not claimed as done. Automated coverage exists (tests
+10, 11, 12) and the review is explicit that a passing suite is necessary but not
+sufficient, so all three paths need manual end-to-end verification against a real
+Firebase project:
+
+```
+?tier=pro     → users/{uid}.selectedTier = 'pro',     credits = 1250 → /checkout?tier=pro
+?tier=starter → users/{uid}.selectedTier = 'starter', credits = 400  → /checkout?tier=starter
+no param      → starter, unchanged from the pre-rebuild baseline
+```
+
+Plus, from §1, **verification check 7** — an existing user with a non-compliant
+password can still sign in — immediately after REL-AUTH-001.
+
+---
+
+# 9 — Signoff blockers
+
+| # | Item | Owner |
+|---|---|---|
+| **1** | **Execute REL-AUTH-001**, then run verification check 7 | Aaron |
+| **2** | Team A recaptures the password section against the real policy and replaces the simulated screenshots | Team A, after #1 |
+| **3** | *(Optional)* decide whether the 54–105px keyboard-open scroll on smaller phones is accepted, or whether a sticky mobile CTA is authorized | Aaron |
+
+Items 1 and 2 are sequential and are the only things standing between this report
+and signoff. Item 3 changes nothing if you accept the current behaviour.
+
+---
+
+**No production behaviour changed in Phase 4. The only code change is mobile
+vertical rhythm in `AuthLayout.css` — spacing values only, no content, no logic,
+no authentication.**

@@ -221,19 +221,21 @@ export default function Signup() {
           </div>
         )}
 
-        <button type="submit" className="auth-cta" disabled={submitting}>
-          {submitting ? (
-            <>
-              <span className="auth-spinner" aria-hidden="true" />
-              Creating your account...
-            </>
-          ) : (
-            <>
-              Create account
-              <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
-            </>
-          )}
-        </button>
+        <div className="auth-cta-dock">
+          <button type="submit" className="auth-cta" disabled={submitting}>
+            {submitting ? (
+              <>
+                <span className="auth-spinner" aria-hidden="true" />
+                Creating your account...
+              </>
+            ) : (
+              <>
+                Create account
+                <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
+              </>
+            )}
+          </button>
+        </div>
       </form>
 
       <p className="auth-foot">

@@ -289,6 +289,29 @@ describe('password reveal', () => {
   });
 });
 
+// ── 7b. Sticky CTA dock ─────────────────────────────────────────────────────
+
+describe('sticky CTA dock', () => {
+  it('wraps the CTA so it can pin above an on-screen keyboard', async () => {
+    await renderSignup();
+    const cta = screen.getByRole('button', { name: /create account/i });
+    // The dock is what carries position:sticky at <=1023px. Without the
+    // wrapper the CTA has nothing to pin with, which is the state Phase 4
+    // measured at 22-113px below the fold.
+    expect(cta.closest('.auth-cta-dock')).not.toBeNull();
+  });
+
+  it('keeps the CTA in the form and in normal tab order', async () => {
+    await renderSignup();
+    const cta = screen.getByRole('button', { name: /create account/i });
+    // Sticky, not fixed: still submits the form it belongs to, still reached by
+    // tabbing rather than needing a separate focus stop.
+    expect(cta.closest('form')).not.toBeNull();
+    expect(cta).toHaveAttribute('type', 'submit');
+    expect(cta.tabIndex).toBe(0);
+  });
+});
+
 // ── 8. Duplicate submission ─────────────────────────────────────────────────
 
 describe('signup — submission', () => {

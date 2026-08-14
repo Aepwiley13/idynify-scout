@@ -102,19 +102,21 @@ export default function Login() {
             </div>
           )}
 
-          <button type="submit" className="auth-cta" disabled={loading || mfaCode.length !== 6}>
-            {loading ? (
-              <>
-                <span className="auth-spinner" aria-hidden="true" />
-                Verifying...
-              </>
-            ) : (
-              <>
-                Verify and continue
-                <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
-              </>
-            )}
-          </button>
+          <div className="auth-cta-dock">
+            <button type="submit" className="auth-cta" disabled={loading || mfaCode.length !== 6}>
+              {loading ? (
+                <>
+                  <span className="auth-spinner" aria-hidden="true" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  Verify and continue
+                  <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
+                </>
+              )}
+            </button>
+          </div>
 
           <button
             type="button"
@@ -158,19 +160,21 @@ export default function Login() {
             </div>
           )}
 
-          <button type="submit" className="auth-cta" disabled={loading}>
-            {loading ? (
-              <>
-                <span className="auth-spinner" aria-hidden="true" />
-                Signing in...
-              </>
-            ) : (
-              <>
-                Sign in
-                <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
-              </>
-            )}
-          </button>
+          <div className="auth-cta-dock">
+            <button type="submit" className="auth-cta" disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="auth-spinner" aria-hidden="true" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
+                </>
+              )}
+            </button>
+          </div>
         </form>
       )}
 

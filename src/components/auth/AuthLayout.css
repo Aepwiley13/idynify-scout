@@ -373,6 +373,51 @@
 .auth-cta-arrow { transition: transform .18s; }
 .auth-cta:hover:not(:disabled) .auth-cta-arrow { transform: translateX(3px); }
 
+/* ── Sticky CTA dock (small screens only) ─────────────────────────────────────
+   Phase 4 measured the CTA 22-113px below the fold with the keyboard open on
+   four common phones — the user types a password with no visible way to submit.
+   Tightening the rhythm fixed the largest handset and reduced the rest; this
+   closes the remainder.
+
+   Sticky rather than fixed, deliberately: the CTA stays in normal flow and in
+   normal tab order, and only pins when it would otherwise be out of reach. A
+   fixed bar would float permanently, cover content on every scroll position,
+   and mean shipping the primary action twice.
+
+   `--auth-kb-inset` is 0 unless an on-screen keyboard is covering part of the
+   layout viewport — see useKeyboardInset() in AuthLayout.jsx. Adding it here is
+   what makes one rule correct on both Android (which shrinks the layout
+   viewport, inset 0) and iOS (which does not, inset = keyboard height).
+
+   The panel-coloured padding is a mask: invisible while the button sits in
+   flow, and what keeps content legible behind it once it pins. */
+@media (max-width: 1023px) {
+  .auth-cta-dock {
+    position: sticky;
+    bottom: calc(var(--auth-kb-inset, 0px) + 12px);
+    z-index: 5;
+    background: var(--auth-panel);
+    padding: 10px 0;
+    margin: -10px 0;
+  }
+
+  /* The dock masks whatever it pins over — which, on a short viewport, would
+     otherwise be the field the user is currently typing in. First build of this
+     did exactly that: the CTA sat on top of the password input.
+
+     `scroll-margin-bottom` is the fix, and it is why the dock is safe. When the
+     browser scrolls a focused field into view it now reserves this much space
+     below it, so the field, its checklist and the pinned CTA all land in the
+     visible band instead of stacking on each other.
+
+     The value has to clear everything that sits between a field and the pinned
+     dock, not just the dock: at 160px the CTA still clipped the last
+     requirement row in half, which reads as a rendering bug rather than a
+     deliberate overlay. 190px is checklist (72) + its gap (11) + form gap (15)
+     + CTA (56) + dock padding and offset (~34). */
+  .auth-field-input { scroll-margin-bottom: 190px; }
+}
+
 .auth-spinner {
   width: 17px;
   height: 17px;

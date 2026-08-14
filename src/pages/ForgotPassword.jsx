@@ -102,19 +102,21 @@ export default function ForgotPassword() {
               </div>
             )}
 
-            <button type="submit" className="auth-cta" disabled={loading}>
-              {loading ? (
-                <>
-                  <span className="auth-spinner" aria-hidden="true" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  Send reset link
-                  <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
-                </>
-              )}
-            </button>
+            <div className="auth-cta-dock">
+              <button type="submit" className="auth-cta" disabled={loading}>
+                {loading ? (
+                  <>
+                    <span className="auth-spinner" aria-hidden="true" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    Send reset link
+                    <ArrowRight className="auth-cta-arrow" size={19} aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </div>
           </form>
 
           <p className="auth-foot">

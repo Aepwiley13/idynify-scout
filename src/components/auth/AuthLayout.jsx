@@ -26,6 +26,7 @@
  * phone. Account creation leads; Barry follows.
  */
 
+import { useEffect } from 'react';
 import { BRAND, THEMES, AUTH_ASSETS } from '../../theme/tokens';
 import './AuthLayout.css';
 
@@ -48,6 +49,51 @@ const VARS = {
   '--auth-error':   '#dc2626',
   '--auth-success': '#10b981',
 };
+
+/**
+ * Publishes how much of the layout viewport the on-screen keyboard is covering,
+ * as `--auth-kb-inset`. The sticky CTA adds it to its offset so it lands above
+ * the keyboard rather than behind it.
+ *
+ * This is NOT keyboard detection by heuristic — no user-agent sniffing, no
+ * height thresholds, no focus/blur guessing. `window.visualViewport` is the
+ * standard API whose entire purpose is reporting the region actually visible,
+ * and the keyboard is the main thing that shrinks it. Reading one number from
+ * it is the least fragile option available, and it is the only one that works
+ * on iOS at all.
+ *
+ * Why it is needed on iOS and not Android: Android Chrome shrinks the LAYOUT
+ * viewport when the keyboard opens, so `bottom: 0` is already above the
+ * keyboard and this returns ~0. iOS Safari leaves the layout viewport at full
+ * height, so `bottom: 0` is behind the keyboard and this returns its height.
+ * Same CSS, correct on both.
+ *
+ * Degrades to nothing: no `visualViewport`, no listener, inset stays 0, and the
+ * sticky CTA behaves exactly as it does on Android.
+ */
+function useKeyboardInset() {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const root = document.documentElement;
+    const update = () => {
+      // What the layout viewport has that the visual viewport does not, below
+      // the fold. Clamped at 0 so pinch-zoom never produces a negative inset.
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      root.style.setProperty('--auth-kb-inset', `${Math.round(inset)}px`);
+    };
+
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      root.style.removeProperty('--auth-kb-inset');
+    };
+  }, []);
+}
 
 /**
  * Barry and his card. Frozen copy — the positioning brief specifies this
@@ -86,6 +132,7 @@ function BarryPanel() {
 
 export default function AuthLayout({ variant = 'quiet', children, below }) {
   const full = variant === 'full';
+  useKeyboardInset();
 
   return (
     <div className={`auth-root ${full ? 'full' : 'quiet'}`} style={VARS}>

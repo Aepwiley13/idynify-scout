@@ -19,17 +19,19 @@
 | Breakpoints 1440 / 1280 / 1024 / 768 / 430 / 390 / 375 / 320 | ✅ No horizontal scroll, no clipping, no undersized targets |
 | Reduced motion | ✅ **Zero** animated elements when the preference is set |
 | 200% zoom | ✅ Reflows, no horizontal scroll |
-| Keyboard open | ⚠️ **Improved, not eliminated** — measured per device in §5 |
+| Keyboard open | ✅ **Closed** by the authorized sticky CTA — §5b |
 | Error states | ✅ Announced, actionable, form preserved |
 | REL-AUTH-001 | ⬜ **Not executed** — §1 |
 | Barry provenance | ✅ §2 |
 | Welcome email fire-and-forget | ✅ §3 |
 | Pre-existing failures | ✅ Issue **#545** opened |
 
-**One thing that got worse before it got better, and one that is still not perfect.**
-The keyboard-open case (§5) failed its criterion on first measurement; tightening
-the mobile rhythm fixed it on larger phones and reduced it everywhere, but it is
-not fully solved on a 375px iPhone SE and I have not hidden that.
+**The keyboard-open case took three attempts and the first two looked fine in the
+metrics.** It failed its criterion on first measurement (§5); tightening the
+mobile rhythm reduced it but left 105px on a 375px SE; the sticky CTA authorized
+in the Phase 4 review closes it entirely (§5b) — after a first build that pinned
+the CTA on top of the password field while reporting "fully visible" the whole
+time. Only the screenshot caught it.
 
 ---
 
@@ -238,7 +240,13 @@ must survive.
 720 CSS px at 2×: `scrollWidth 720 = clientWidth 720`. Reflows, no horizontal
 scroll. WCAG 1.4.10 satisfied.
 
-### Keyboard open — ⚠️ improved, not eliminated
+### Keyboard open — ✅ closed by the authorized sticky CTA
+
+**Updated after the Phase 4 review authorized a sticky mobile CTA.** The
+measurements immediately below are the *pre-fix* state, kept because they are
+what the decision was made on. The post-fix state is §5b.
+
+#### Pre-fix measurements
 
 This is the one criterion that is not fully met, and the numbers are below rather
 than summarised away. Measured with the password field focused and a realistic
@@ -269,6 +277,100 @@ entirely, but that is a composition change beyond the approved mockup.
 the keyboard opens, so the height-scoped query does not fire there. The iPhone
 figures above are the conservative case and assume it does not.
 
+---
+
+# 5b — Sticky CTA (authorized in the Phase 4 review)
+
+**Result: the CTA is fully visible above the keyboard on every device measured,
+including the 375px SE that was 105px short.**
+
+| Device | Band above keyboard | Pre-fix | Post-fix |
+|---|---|---|---|
+| iPhone SE 375×667 | 407px | 105px below fold | ✅ **fully visible** |
+| iPhone 14 390×844 | 508px | 54px | ✅ **fully visible** |
+| iPhone 14 Pro Max 430×932 | 582px | 0 | ✅ fully visible |
+| Android 360×800 → 360×480 | 480px | 82px | ✅ **fully visible** |
+| Landscape 844×390 | 390px | 121px | ✅ **fully visible** |
+| No keyboard, any size | — | fine | ✅ unchanged, not pinned |
+
+Desktop is untouched: at 1440px the dock computes to `position: static`.
+
+## How it works, and why it is not fragile
+
+**Sticky, not fixed.** The CTA stays in normal flow, in normal tab order, and in
+the form it submits. It pins only when it would otherwise be out of reach and
+releases as soon as it would not. A fixed bar would float permanently, cover
+content at every scroll position, and mean shipping the primary action twice.
+
+**One CSS rule covers both platforms:**
+
+```css
+bottom: calc(var(--auth-kb-inset, 0px) + 12px);
+```
+
+- **Android Chrome** shrinks the *layout* viewport when the keyboard opens, so
+  `bottom: 0` is already above it and the inset resolves to ~0.
+- **iOS Safari** leaves the layout viewport at full height, so `bottom: 0` would
+  sit *behind* the keyboard. The inset lifts it clear.
+
+**`--auth-kb-inset` is read from `window.visualViewport`** — 15 lines in
+`useKeyboardInset()`. This is deliberately **not** the fragile keyboard detection
+the review warned against: no user-agent sniffing, no height thresholds, no
+focus/blur guessing. `visualViewport` is the standard API whose entire purpose is
+reporting the actually-visible region, and it is the only mechanism that works on
+iOS at all. Where it is unsupported, no listener is attached, the inset stays 0,
+and the CTA behaves exactly as it does on Android.
+
+## The bug this fix introduced, and how it was caught
+
+**The first build made things worse.** The dock has an opaque background so
+pinned content stays legible — and on a 407px band, what it pinned over was the
+password field the user was typing into. The CTA sat on top of the input. That is
+a worse failure than the scroll it replaced, and it was invisible in the metrics:
+"CTA fully visible" was `true` the whole time. Only the screenshot showed it.
+
+**Fix:** `scroll-margin-bottom` on the inputs. When the browser scrolls a focused
+field into view it now reserves space below it, so the field, its checklist and
+the pinned CTA all land in the band instead of stacking.
+
+**And the first value was wrong too.** At 160px the CTA cleared the input but
+clipped the last requirement row in half — "At least one number" cut through the
+middle, which reads as a rendering bug rather than a deliberate overlay. 190px
+clears the checklist as well: 72px list + 11px gap + 15px form gap + 56px CTA +
+~34px dock padding and offset.
+
+Verified with an explicit overlap test — the CTA's box against the password
+input's box and against the checklist's box — on all six configurations. Both are
+`false` everywhere.
+
+## Known limitation — iOS Safari
+
+Documented per the review, not a blocker.
+
+iOS Safari does not resize the layout viewport when its keyboard opens, so:
+
+- Height-scoped media queries (`@media (max-height: …)`) do **not** fire there.
+  The rhythm tightening from §5 applies on Android and in landscape but not on an
+  iPhone with the keyboard up.
+- The sticky offset on iOS depends entirely on `visualViewport`. It is supported
+  in all current iOS versions, but if it were ever unavailable the CTA would
+  degrade to `bottom: 12px` — behind the keyboard, i.e. the pre-fix behaviour.
+  Nothing breaks; the improvement is simply absent.
+- **Chrome on iOS is WebKit**, so it shares Safari's behaviour exactly. The
+  review asks for verification on "Android and Chrome on iOS" — worth noting
+  those are not two independent engines. Chrome-on-iOS results will match Safari,
+  and Android Chrome is the only genuinely separate case.
+
+The measurements above cover both engine behaviours: the "layout viewport
+shrinks" rows are the Android case, the "inset does the work" rows are the
+WebKit case.
+
+## Coverage
+
+Two tests added (35 total, all passing): the CTA is wrapped in the dock, and it
+remains inside the form, `type="submit"`, and in normal tab order — so a future
+change to `position: fixed` or a detached bar fails the suite.
+
 ### Error states
 
 | Case | Behaviour |
@@ -297,6 +399,9 @@ signup-430.png    signup-390.png    signup-375.png    signup-320.png
 reduced-motion-1440.png        zero animations
 zoom-200.png                   720 CSS px at 2x
 keyboard-open-390x400.png      short-viewport state
+sticky-cta-ios-se-keyboard.png   CTA pinned above a simulated iOS keyboard, 375x667
+sticky-cta-ios-14-keyboard.png   same, 390x844
+sticky-cta-android-keyboard.png  Android, layout viewport shrunk to 360x480
 error-duplicate-email.png      alert + inline sign-in link
 error-invalid-email.png        field-level validation
 login-1440.png   login-390.png   login-error-1440.png
@@ -352,13 +457,16 @@ password can still sign in — immediately after REL-AUTH-001.
 |---|---|---|
 | **1** | **Execute REL-AUTH-001**, then run verification check 7 | Aaron |
 | **2** | Team A recaptures the password section against the real policy and replaces the simulated screenshots | Team A, after #1 |
-| **3** | *(Optional)* decide whether the 54–105px keyboard-open scroll on smaller phones is accepted, or whether a sticky mobile CTA is authorized | Aaron |
 
-Items 1 and 2 are sequential and are the only things standing between this report
-and signoff. Item 3 changes nothing if you accept the current behaviour.
+Sequential, and the only things standing between this report and signoff.
+
+~~Item 3 — sticky CTA decision~~ **Resolved.** Authorized in the Phase 4 review
+and implemented; see §5b.
 
 ---
 
-**No production behaviour changed in Phase 4. The only code change is mobile
-vertical rhythm in `AuthLayout.css` — spacing values only, no content, no logic,
-no authentication.**
+**No production behaviour changed in Phase 4.** The code changes are mobile
+presentation only: vertical rhythm and the sticky CTA dock in `AuthLayout.css`,
+the `useKeyboardInset()` hook in `AuthLayout.jsx`, and a wrapper `<div>` around
+the CTA on the three auth pages. No content, no copy, no routing, no data, no
+authentication.

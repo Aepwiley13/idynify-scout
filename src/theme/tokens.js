@@ -78,7 +78,7 @@ export const AUTH_ASSETS = {
       avif: "/assets/barry/barry-forgot.avif",
       webp: "/assets/barry/barry-forgot.webp",
       png:  "/assets/barry/barry-forgot.png",
-      width: 634, height: 1140,
+      width: 631, height: 1140,
       alt: "Barry, the IDYNIFY bear mascot, waving",
     },
   },

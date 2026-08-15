@@ -6,6 +6,7 @@ import { Mail, ArrowRight, MailCheck } from 'lucide-react';
 import AuthLayout from '../components/auth/AuthLayout';
 import AuthField from '../components/auth/AuthField';
 import BrandMark from '../components/auth/BrandMark';
+import { AUTH_ASSETS } from '../theme/tokens';
 
 /**
  * Forgot password — quiet variant.
@@ -52,7 +53,15 @@ export default function ForgotPassword() {
   };
 
   return (
-    <AuthLayout variant="full">
+    <AuthLayout
+      variant="full"
+      barry={{
+        asset: AUTH_ASSETS.barry.forgot,
+        headline: <>No worries — I&apos;ve got you. <span aria-hidden="true">👋</span></>,
+        body: "A quick reset and you'll be back to what matters.",
+        cta: "Let's get you back in.",
+      }}
+    >
       <BrandMark />
 
       <div className="auth-head">

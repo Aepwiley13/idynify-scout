@@ -8,6 +8,7 @@ import AuthLayout from '../components/auth/AuthLayout';
 import AuthField from '../components/auth/AuthField';
 import PasswordField from '../components/auth/PasswordField';
 import BrandMark from '../components/auth/BrandMark';
+import { AUTH_ASSETS } from '../theme/tokens';
 
 /**
  * Sign in — the quiet variant of the authentication experience.
@@ -68,7 +69,15 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout variant="full">
+    <AuthLayout
+      variant="full"
+      barry={{
+        asset: AUTH_ASSETS.barry.login,
+        headline: "Welcome back!",
+        body: "Good to see you again. Let’s pick up where you left off and get you back to what matters.",
+        cta: "Let’s go.",
+      }}
+    >
       <BrandMark />
 
       <div className="auth-head">

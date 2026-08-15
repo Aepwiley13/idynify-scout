@@ -60,12 +60,27 @@ export const ASSETS = {
 // removed, white-un-matted cut authorized in Phase 3. The source is untouched.
 export const AUTH_ASSETS = {
   barry: {
-    avif: "/assets/barry/barry-signup.avif",
-    webp: "/assets/barry/barry-signup.webp",
-    png:  "/assets/barry/barry-signup.png",
-    // Intrinsic size of the derivative — used to reserve space and avoid CLS.
-    width: 640, height: 1140,
-    alt: "Barry, the IDYNIFY bear mascot",
+    signup: {
+      avif: "/assets/barry/barry-signup.avif",
+      webp: "/assets/barry/barry-signup.webp",
+      png:  "/assets/barry/barry-signup.png",
+      width: 640, height: 1140,
+      alt: "Barry, the IDYNIFY bear mascot, giving a thumbs up",
+    },
+    login: {
+      avif: "/assets/barry/barry-login.avif",
+      webp: "/assets/barry/barry-login.webp",
+      png:  "/assets/barry/barry-login.png",
+      width: 555, height: 1140,
+      alt: "Barry, the IDYNIFY bear mascot, standing with arms crossed",
+    },
+    forgot: {
+      avif: "/assets/barry/barry-forgot.avif",
+      webp: "/assets/barry/barry-forgot.webp",
+      png:  "/assets/barry/barry-forgot.png",
+      width: 634, height: 1140,
+      alt: "Barry, the IDYNIFY bear mascot, waving",
+    },
   },
   // Raster today. When an official vector lands it swaps here and nowhere else.
   wordmark: "/assets/brand/idynify-wordmark.png",

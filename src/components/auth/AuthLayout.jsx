@@ -96,20 +96,21 @@ function useKeyboardInset() {
 }
 
 /**
- * Barry and his card. Frozen copy — the positioning brief specifies this
- * wording exactly and forbids the mockup's "AI SDR / sales engine" language.
+ * Barry and his contextual speech card.
+ *
+ * Each auth surface passes its own `barry` config so the pose and copy match
+ * the user's current moment. The layout renders whatever it receives.
  */
-function BarryPanel() {
-  const b = AUTH_ASSETS.barry;
+function BarryPanel({ barry }) {
+  const b = barry?.asset ?? AUTH_ASSETS.barry.signup;
   return (
     <div className="auth-hero">
       <div className="auth-speech">
-        <p className="auth-speech-hi">Hi! I&apos;m Barry <span aria-hidden="true">👋</span></p>
+        <p className="auth-speech-hi">{barry?.headline ?? <>Hi! I&apos;m Barry <span aria-hidden="true">👋</span></>}</p>
         <p className="auth-speech-body">
-          I&apos;m the intelligence inside IDYNIFY. I&apos;ll help you know who matters,
-          why they matter, and what to do next.
+          {barry?.body ?? <>I&apos;m the intelligence inside IDYNIFY. I&apos;ll help you know who matters, why they matter, and what to do next.</>}
         </p>
-        <p className="auth-speech-cta">Let&apos;s get started.</p>
+        <p className="auth-speech-cta">{barry?.cta ?? "Let’s get started."}</p>
       </div>
 
       <picture className="auth-barry">
@@ -121,8 +122,6 @@ function BarryPanel() {
           width={b.width}
           height={b.height}
           decoding="async"
-          /* Lowercase deliberately: React 18 does not recognise the camelCase
-             spelling and logs a warning instead of forwarding it. */
           fetchpriority="low"
         />
       </picture>
@@ -130,7 +129,7 @@ function BarryPanel() {
   );
 }
 
-export default function AuthLayout({ variant = 'quiet', children, below }) {
+export default function AuthLayout({ variant = 'quiet', children, below, barry }) {
   const full = variant === 'full';
   useKeyboardInset();
 
@@ -142,7 +141,7 @@ export default function AuthLayout({ variant = 'quiet', children, below }) {
         </main>
 
         <aside className="auth-panel-right" aria-hidden={!full}>
-          {full && <BarryPanel />}
+          {full && <BarryPanel barry={barry} />}
         </aside>
       </div>
 

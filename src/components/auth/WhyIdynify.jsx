@@ -5,6 +5,14 @@
  * banned vocabulary ("leads", "automate", "sales engine", "AI SDR", "always
  * on") is not paraphrased here — it is simply absent.
  *
+ * The heading is "Why teams love IDYNIFY", not "Why sales teams". The four
+ * value propositions below it are relationship-first and read the same for a
+ * fundraiser, a partnership manager or a founder as they do for a BD rep;
+ * naming one audience in the heading narrowed it a line before the copy
+ * deliberately widened it. This is a heading-scope change only — the product
+ * category ("AI Relationship Intelligence for Sales") is untouched and is
+ * tracked separately as POSITIONING-001.
+ *
  * Lazy-loaded by Signup: nothing here is needed to create an account, so it
  * must not compete with the form for the first paint.
  */
@@ -38,7 +46,7 @@ export default function WhyIdynify() {
   return (
     <section className="auth-why" aria-labelledby="auth-why-title">
       <h2 className="auth-why-title" id="auth-why-title">
-        Why sales teams love <em>IDYNIFY</em>
+        Why teams love <em>IDYNIFY</em>
       </h2>
       <div className="auth-why-grid">
         {CARDS.map((card) => {

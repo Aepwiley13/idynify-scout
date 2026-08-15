@@ -52,7 +52,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <AuthLayout variant="quiet">
+    <AuthLayout variant="full">
       <BrandMark />
 
       <div className="auth-head">

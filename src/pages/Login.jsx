@@ -68,7 +68,7 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout variant="quiet">
+    <AuthLayout variant="full">
       <BrandMark />
 
       <div className="auth-head">

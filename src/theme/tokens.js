@@ -47,7 +47,13 @@ export const MODULE_COLORS = {
 // ─── ASSET PATHS ─────────────────────────────────────────────────────────────
 export const ASSETS = {
   barryAvatar:  "/assets/barry_AI.jpg",          // Astronaut bear — circular crop
-  logoFull:     "/assets/Idynify_logo1.png",     // Full wordmark — nav expanded / onboarding
+  logoFull:     "/assets/Idynify_logo1.png",     // Full wordmark — canonical master (not served directly)
+  logoFullOptimized: {
+    avif: "/assets/sidebar/idynify-wordmark.avif",
+    webp: "/assets/sidebar/idynify-wordmark.webp",
+    png:  "/assets/sidebar/idynify-wordmark.png",
+    width: 204, height: 68,
+  },
   logoMark:     "/assets/Short_Logo_Idynify.png",// Pocket icon — collapsed rail / favicon
 };
 

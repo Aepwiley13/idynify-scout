@@ -97,7 +97,6 @@ function BrandMark({ compact }) {
     <span className="sidebar-wordmark-text" aria-hidden="true">IDYNIFY</span>
   ) : (
     <picture>
-      <source srcSet={opt.avif} type="image/avif" />
       <source srcSet={opt.webp} type="image/webp" />
       <img
         className="sidebar-wordmark-img"

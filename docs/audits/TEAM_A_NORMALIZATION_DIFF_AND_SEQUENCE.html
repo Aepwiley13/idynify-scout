@@ -1,0 +1,935 @@
+<title>Normalization Diff and Onboarding Sequence</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Positioning &amp; Terminology · Team A · Round 3</p>
+  <h1>Normalization Diff and Onboarding Sequence</h1>
+  <p class="standfirst">Items 1–3 are staged and verified but <strong>not committed</strong>, per your
+  instruction to return every string first. Items 4–6 are returned for review. Five capability-gap issues are
+  open. One new structural finding: the training framing you banned is a route, a page and a nav section, not
+  a string.</p>
+  <div class="meta">
+    <span><b>Build</b> passing</span>
+    <span><b>Tests</b> 1128 pass / 5 known</span>
+    <span><b>Committed</b> nothing this round</span>
+    <span><b>Issues</b> #561–565</span>
+  </div>
+</header>
+
+<!-- ══ 1 ══ -->
+<section id="daily">
+  <div class="sec-head"><span class="sec-letter">01</span><h2>Daily Discoveries — staged, awaiting your sign-off</h2></div>
+
+  <p class="prose">Fifteen strings, each read for what it describes rather than pattern-matched. Four of them
+  needed more than the surface name swapped — those are marked.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Location</th><th>Before</th><th>After</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">DailyLeads:2142</td>
+          <td>Daily Lead Insights</td>
+          <td><strong>Daily Discoveries</strong></td>
+          <td>Page heading. Canonical surface name; "Insights" was never part of it.</td>
+        </tr>
+        <tr>
+          <td class="mono">DailyLeads:2050</td>
+          <td>Loading lead insights...</td>
+          <td><strong>Loading your discoveries...</strong></td>
+          <td><span class="chip c-accent">Rewritten</span> What loads is the queue itself — both tabs — not an insights panel.</td>
+        </tr>
+        <tr>
+          <td class="mono">DailyLeads:2068</td>
+          <td>Scout needs to know who you're targeting before it can <strong>curate your daily leads</strong>.</td>
+          <td>Scout needs to know who you're targeting before it can <strong>find your matches</strong>.</td>
+          <td><span class="chip c-accent">Rewritten</span> The gate blocks <em>discovery</em>, not curation of a surface. Items are Matches.</td>
+        </tr>
+        <tr>
+          <td class="mono">DailyLeads:54</td>
+          <td>Help Barry send better <strong>leads</strong> your way.</td>
+          <td>Help Barry send better <strong>matches</strong> your way.</td>
+          <td>Rejection feedback on one surfaced item. Item noun.</td>
+        </tr>
+        <tr>
+          <td class="mono">MissionCardDeck:571</td>
+          <td>aria-label="Scout daily leads deck"</td>
+          <td>aria-label="Scout daily <strong>discoveries</strong> deck"</td>
+          <td>Screen-reader name for the deck. Surface name.</td>
+        </tr>
+        <tr>
+          <td class="mono">SavedCompanies:171</td>
+          <td>Match with companies in <strong>Daily Leads</strong> to start building your hunt list.</td>
+          <td>Match with companies in <strong>Daily Discoveries</strong> to start building your hunt list.</td>
+          <td>Sentence already said "Match with". Surface name only.</td>
+        </tr>
+        <tr>
+          <td class="mono">AllLeads:1748</td>
+          <td>All contacts are in active missions, or add new ones via <strong>Daily Leads</strong>.</td>
+          <td>…via <strong>Daily Discoveries</strong>.</td>
+          <td>Surface name only.</td>
+        </tr>
+        <tr>
+          <td class="mono">AllLeads:1751</td>
+          <td><strong>Accept</strong> companies in Daily Leads to start building your contact pipeline.</td>
+          <td><strong>Save</strong> companies in Daily Discoveries to start building your contact pipeline.</td>
+          <td><span class="chip c-accent">Rewritten</span> "Accept" is not a verb the UI uses. The swipe action is Save / Skip.</td>
+        </tr>
+        <tr>
+          <td class="mono">SharedCompaniesView:422</td>
+          <td><strong>Accept</strong> companies in Daily Leads to start building your hunt list.</td>
+          <td><strong>Save</strong> companies in Daily Discoveries to start building your hunt list.</td>
+          <td><span class="chip c-accent">Rewritten</span> Same verb correction.</td>
+        </tr>
+        <tr>
+          <td class="mono">SharedCompaniesView:425</td>
+          <td><strong>Accept</strong> companies in Daily Leads to start building your pipeline.</td>
+          <td><strong>Save</strong> companies in Daily Discoveries to start building your pipeline.</td>
+          <td><span class="chip c-accent">Rewritten</span> Same verb correction.</td>
+        </tr>
+        <tr>
+          <td class="mono">ICPSettings:552</td>
+          <td>{n} new companies added to <strong>Daily Leads</strong></td>
+          <td>{n} new companies added to <strong>Daily Discoveries</strong></td>
+          <td>Surface name only.</td>
+        </tr>
+        <tr>
+          <td class="mono">GameSessionStart:114</td>
+          <td>Start by <strong>approving</strong> your Daily Leads</td>
+          <td>Start by <strong>reviewing</strong> your Daily Discoveries</td>
+          <td><span class="chip c-accent">Rewritten</span> The gate clears when items are <em>processed</em> — saved or skipped. "Approving" describes only half.</td>
+        </tr>
+        <tr>
+          <td class="mono">GameSessionStart:118</td>
+          <td><strong>Process</strong> your Daily Leads first, then assign contacts to buckets…</td>
+          <td><strong>Review</strong> your Daily Discoveries first, then assign contacts to buckets…</td>
+          <td>Matches the heading above it.</td>
+        </tr>
+        <tr>
+          <td class="mono">GameSessionStart:124</td>
+          <td>Go to Daily Leads</td>
+          <td>Go to <strong>Daily Discoveries</strong></td>
+          <td>Surface name only.</td>
+        </tr>
+        <tr>
+          <td class="mono">BarryOnboarding:579</td>
+          <td>Taking you to <strong>Daily Leads</strong> in a moment</td>
+          <td>Taking you to <strong>Daily Discoveries</strong> in a moment</td>
+          <td>Surface name only.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h4>Untouched, deliberately</h4>
+    <p>Three remaining "Daily Leads" occurrences are <strong>code comments and docstrings</strong> —
+    <code>App.jsx:405</code>, <code>ContactPage.jsx:18</code>, <code>DailyLeads.jsx:2057</code>. None render.
+    All route values, tab values and identifiers unchanged: <code>daily-leads</code>, <code>all-leads</code>,
+    view id <code>daily</code>, <code>activeTab</code> state payloads, <code>DailyLeads.jsx</code> filename.</p>
+
+    <div class="flag warn">
+      <p><span class="lede">One string I did not change and want your call on.</span>
+      <code>DailyLeads.jsx:2144</code>, the page subtitle directly under the heading, reads
+      <strong>"AI-curated prospects matching {ICP name}"</strong>. It contains no form of "lead", so it was
+      outside the fifteen — but it conflicts with two things you just locked: items on this surface are
+      <em>Matches</em>, not prospects, and "AI-curated" is exactly the generic AI-does-X framing your Batch 0b
+      principles rule out. Proposed: <strong>"Matched to {ICP name}"</strong>. Not applied.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 2 ══ -->
+<section id="two-three">
+  <div class="sec-head"><span class="sec-letter">02</span><h2>Tagline and Match Score — staged</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Location</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">ScoutMain.jsx:205</td><td>tagline="Find and qualify prospects"</td><td><strong>tagline="Discover who matters"</strong></td></tr>
+        <tr><td class="mono">CompanyCard.jsx:276</td><td>Company Lead Score</td><td><strong>Company Match Score</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><code>fit_score</code>, <code>icp_score</code> and the local <code>leadScore</code> variable are
+    unchanged. Not ported into <code>ScoutDashboardPage.jsx</code> or any other dead surface, as instructed.</p>
+
+    <div class="flag stop">
+      <p><span class="lede">The tagline change required a test edit — flagging explicitly.</span>
+      <code>src/test/scoutSubNav.test.jsx:75</code> asserted the literal string
+      <code>'Find and qualify prospects'</code> and failed. I updated the assertion to
+      <code>'Discover who matters'</code>. That is the only test change, and it is the test tracking your
+      authorized copy decision rather than a workaround — the suite is back to exactly 1128 pass / 5 known
+      failures. Calling it out because a test file was not on your list of things I may touch.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 3 ══ -->
+<section id="remaining">
+  <div class="sec-head"><span class="sec-letter">03</span><h2>Groups 02 / 04 — remaining copy, for review</h2></div>
+
+  <p class="prose">Not implemented. Seventeen live strings. The two success-message clusters are the
+  interesting ones — both currently name a destination that no longer exists.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Location</th><th>Current</th><th>Proposed</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">CompanyDetail:1454<br>CompanyProfileView:687<br>CompanyDetailModal:632</td>
+          <td>Select contacts to add as leads</td>
+          <td><strong>Select contacts to save</strong></td>
+          <td>Section subtitle above the Save buttons. Names the action once; the button beneath names the destination where needed.</td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyDetailModal:702</td>
+          <td>Select contacts to add</td>
+          <td><strong>Select contacts to save</strong></td>
+          <td>Same button's empty-selection label. Contains no "lead" — but it now reads "…to add" → "Save 3 to People". Verb consistency only.</td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyDetail:1833<br>CompanyProfileView:879<br>CompanyDetailModal:723</td>
+          <td>Search your existing <strong>leads &amp; people</strong> by name and link them to this company</td>
+          <td>Search your <strong>people</strong> by name and link them to this company</td>
+          <td>One collection (<code>contacts</code>) described as two.</td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyDetail:1849<br>CompanyProfileView:891<br>CompanyDetailModal:739</td>
+          <td>Search all <strong>leads &amp; people</strong> by name...</td>
+          <td>Search all <strong>people</strong> by name...</td>
+          <td>Same.</td>
+        </tr>
+        <tr>
+          <td class="mono">ScoutPlus:246–247</td>
+          <td>Your contact has been saved to your <strong>leads</strong>.</td>
+          <td>Your contact has been saved to <strong>People</strong>.</td>
+          <td>Success message after CSV/manual add.</td>
+        </tr>
+        <tr>
+          <td class="mono">ScoutPlus:283</td>
+          <td>Go to Lead / <strong>View in Leads</strong></td>
+          <td>Go to Contact / <strong>View in People</strong></td>
+          <td><span class="chip c-stop">Names a destination that does not exist</span> <code>handleViewResults</code> navigates to <code>activeTab: 'all-leads'</code>, whose visible label is <strong>People</strong>.</td>
+        </tr>
+        <tr>
+          <td class="mono">FindContact:508</td>
+          <td>Confirm &amp; Save Lead</td>
+          <td>Confirm &amp; <strong>Save Contact</strong></td>
+          <td>Creates one contact record. Matches the verb now used on the company screens.</td>
+        </tr>
+        <tr>
+          <td class="mono">AllLeads:1899</td>
+          <td>Total Leads</td>
+          <td><strong>Total People</strong></td>
+          <td>Last stale label on the People surface. Also renders in <code>basecamp</code> and <code>fallback</code> modes, where "Leads" is wrong regardless.</td>
+        </tr>
+        <tr>
+          <td class="mono">ScoutMain:56</td>
+          <td>desc: 'My leads'</td>
+          <td>desc: <strong>'My people'</strong></td>
+          <td>Sibling <code>label</code> is already <code>People</code>.</td>
+        </tr>
+        <tr>
+          <td class="mono">GettingStarted:57</td>
+          <td>Select contacts and build <strong>leads</strong></td>
+          <td>Select contacts and build <strong>your pipeline</strong></td>
+          <td>Body already says "That's your pipeline." Low priority — routed but unlinked.</td>
+        </tr>
+        <tr>
+          <td class="mono">Questionnaire:23</td>
+          <td>…the better your <strong>leads</strong>.</td>
+          <td>…the better your <strong>matches</strong>.</td>
+          <td>Orphan route <code>/questionnaire</code>. Lowest priority; include only if the route survives the cleanup sprint.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ 4 ══ -->
+<section id="batch0b">
+  <div class="sec-head"><span class="sec-letter">04</span><h2>Batch 0b — the full onboarding sequence</h2></div>
+
+  <p class="prose">Returned as one experience, unpatched, as instructed. Two surfaces run in parallel: the
+  conversational flow at <code>/onboarding</code>, and the explainer page at <code>/getting-started</code>.
+  Strings that conflict with your principles are marked <span class="chip c-stop">flag</span>.</p>
+
+  <h3>Surface A — <span class="mono">OnboardingFlow.jsx</span>, six steps</h3>
+<pre class="diagram"><b>STEP 1 — Meet Barry</b>
+  <i>[Barry avatar, 120px]</i>
+  h1   Hi {firstName}, I'm Barry.
+  p    Give me about 3 minutes and I'll build your first <b>prospecting engine</b>.        ← flag
+       I just need a little context about your business.                          <i>(Batch 0)</i>
+  cta  Let's do it →
+
+<b>STEP 2 — Website</b>
+  barry  What's your website?
+  input  yourcompany.com
+  <i>progress list, six states:</i>
+         Analyzing website
+         Identifying products
+         Understanding your ICP
+         Finding target industries
+         <b>Researching competitors</b>                                                  ← flag
+         <b>Crafting your value props</b>                                                ← flag
+  barry  Perfect. I'm analyzing your company now...
+  <i>on failure:</i>
+  barry  I couldn't read your website <b>automatically</b>. No worries — let me ask       ← flag
+         you a few questions instead.
+
+<b>STEP 3 — Smart Questions</b>
+  barry  I think I understand your business pretty well. I just have a few
+         questions that only you can answer.
+
+<b>STEP 4 — Connect Gmail</b>
+  barry  Great! Now I have what I need. I can write personalized outreach and
+         send it from your inbox. To do that, I just need permission.
+  h3     Connect your Gmail
+  p      Secure. Private. We'll never send without your approval.
+
+<b>STEP 5 — Scout builds your list</b>
+  barry  Give me a second... Finding companies that match your ideal customer profile.
+  stat   I found  →  {n}
+
+<b>STEP 6 — Your first prospects</b>   <i>(JSX comment; not rendered)</i>
+  barry  Here are your top matches. I've ranked them based on how well they fit your ICP.
+  <i>empty:</i>
+  p      No companies matched yet. Head to Mission Control and Barry will help
+         you find <b>prospects</b>.                                                      ← flag
+  cta    Go to Mission Control →</pre>
+
+  <h3>Surface B — <span class="mono">GettingStarted.jsx</span>, explainer</h3>
+<pre class="diagram"><b>HEADER</b>
+  🐻  <i>(bear — deferred with Homepage)</i>
+  h1  Welcome to Idynify
+  p   Let's get you set up in under 5 minutes
+
+<b>WHAT IS SCOUT?</b>
+  p   Scout is where you spend your time. It's your daily prospecting workspace.
+      · Approve or reject in seconds — Swipe through companies in seconds.        <i>(Tier 1)</i>
+      · <b>Select contacts and build leads</b> — Pick the right decision makers…        ← group 04
+
+<b>WHAT IS RECON?</b>
+  p   Recon is where you <b>train Barry AI</b>. You don't live here — you visit         ← flag ×2
+      when things change.
+      · Define your ideal customer profile
+      · Give Barry the context that matters                                       <i>(Batch 0)</i>
+      · Update when things change — …Come back to Recon and Barry adapts.
+  note  Think of Recon as: Mission control. You set the strategy,
+        <b>Barry executes it in Scout</b>.                                              ← flag
+
+<b>HOW THEY WORK TOGETHER</b>
+  p   Recon <b>teaches Barry</b> what you need. Scout delivers it every day.            ← flag
+  1   Fill out Recon        — Define your ICP and ideal customer
+  2   Barry connects the dots — <b>AI analyzes your inputs and finds patterns</b>       ← flag  <i>(title from Batch 0)</i>
+  3   Scout delivers        — Companies appear in your daily queue
+  4   You take action       — Review, approve, and build your pipeline
+  note  The more you interact with Scout (approving/rejecting companies),
+        <b>the smarter Barry gets</b> at understanding your preferences.                ← flag</pre>
+
+  <div class="prose">
+    <h4>What the sequence does wrong, read as one experience</h4>
+    <p>The two surfaces tell <em>different stories</em>. Surface A is Barry in first person, doing work for
+    you, and it lands well until the word "engine". Surface B narrates Barry in the third person as a system
+    you configure and train — "train Barry AI", "Barry executes it", "the smarter Barry gets". A user who sees
+    both meets two different Barrys: a colleague and a machine.</p>
+    <p>Every flag above falls into one of three patterns:</p>
+    <ul>
+      <li><strong>Autonomous system</strong> — "prospecting engine", "Barry executes it in Scout"</li>
+      <li><strong>Training / surveillance</strong> — "train Barry AI", "Recon teaches Barry", "the smarter Barry gets"</li>
+      <li><strong>Generic AI-does-X</strong> — "AI analyzes your inputs and finds patterns", "Barry AI"</li>
+    </ul>
+    <p>Step 2's progress list is a borderline case I would leave alone: "Analyzing website" and "Crafting your
+    value props" describe literal work in progress and read as competence, not autonomy. Worth a decision
+    rather than an assumption.</p>
+  </div>
+
+  <div class="callout">
+    <span class="tag">New structural finding — training framing is not a string problem</span>
+    <p>"Train Barry" is not two lines in an explainer. It is the organizing metaphor of the entire RECON
+    module, and it is built into structure you have frozen:</p>
+    <p><code>/recon/barry-training</code> route · <code>pages/Recon/BarryTraining.jsx</code> ·
+    breadcrumb <code>'Barry Training'</code> (<code>ReconBreadcrumbs.jsx:20, 99</code>) ·
+    mobile nav section <code>'Barry Training'</code> (<code>mobileNavigation.js:156</code>) ·
+    a dedicated <code>BarryKnowledgeButton</code> whose label, tooltip and aria-label all say
+    <em>Train Barry</em> (<code>:36, 48, 51</code>) ·
+    <code>MissionCardDeck.jsx:382</code> <code>title="Train Barry"</code> ·
+    <code>'Your current training progress: {n}%'</code> (<code>ImpactPreviewPanel.jsx:184</code>) ·
+    <code>'This field trains Barry's understanding of your business.'</code>
+    (<code>Section1Foundation.jsx:347</code>) ·
+    RECON's own greeting: <em>"Complete the training modules below"</em>
+    (<code>ReconOnboardingWizard.jsx:55</code>).</p>
+    <p>The <em>visible</em> labels can all move without touching the route or the filename. But this is a
+    module-level renaming decision — what RECON <em>is</em>, if it is not training — and it is bigger than
+    Batch 0b. <strong>Recommend scoping it separately rather than folding it in.</strong> If Barry connects
+    context, RECON is plausibly where you <em>give</em> him context; but that is your call to make, not a
+    string swap.</p>
+  </div>
+
+  <p class="prose">Also live and off-model: <code>NavigationBar.jsx:52</code> "Barry AI • Mission Control"
+  (legacy surface) and <code>BarryICPPanel.jsx:28</code> <code>alt="Barry AI"</code> (live). No patches
+  applied to anything in this section.</p>
+</section>
+
+<!-- ══ 5 ══ -->
+<section id="reconplan">
+  <div class="sec-head"><span class="sec-letter">05</span><h2>RECON — surgical removal plan</h2></div>
+
+  <p class="prose">Not implemented. Removals and reductions only; no replacement marketing language, and the
+  queue-size behavior is not substituted anywhere, per your instruction.</p>
+
+  <h4>Group 1 · Buying-signal and high-intent prioritization — remove</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Location</th><th>Current</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">BarryTraining:85</td><td><code>impactWhenTrained:</code> 'Scout prioritizes leads showing active buying signals.'</td><td><span class="chip c-stop">Remove the Scout clause.</span> The dimension's own <code>description</code> ("Barry detects timing signals and behavioral triggers that indicate readiness") already states what RECON captures. Suggest the field carry a messaging-side impact instead, or be dropped.</td></tr>
+        <tr><td class="mono">BarryTraining:86</td><td><code>impactWhenMissing:</code> 'No signal-based prioritization. All prospects treated equally.'</td><td><span class="chip c-warn">Remove first sentence.</span> It implies completing the module adds prioritization. Second sentence is also untrue — ranking by <code>fit_score</code> is not equal treatment.</td></tr>
+        <tr><td class="mono">ReconModulePage:91</td><td>'…Scout will surface high-intent leads faster.'</td><td><span class="chip c-stop">Delete the sentence.</span> Preceding text about calibrating decision process and behavioral triggers stands on its own.</td></tr>
+        <tr><td class="mono">ReconModulePage:96</td><td>'Scout will prioritize high-intent leads, and Hunter timing will adapt to buyer readiness.'</td><td><span class="chip c-warn">Delete the first clause, keep the Hunter clause</span> — Hunter timing is fed by RECON via <code>barryGenerateSequenceStep.js</code>.</td></tr>
+        <tr><td class="mono">ReconModulePage:177</td><td><code>feedsInto[0]:</code> 'Scout prioritizes leads showing real purchase intent signals'</td><td><span class="chip c-stop">Remove the array entry.</span> Remaining two entries (Hunter timing, Barry urgency in context) are supported.</td></tr>
+        <tr><td class="mono">ReconOverview:90</td><td><code>{ source: 'Buying Signals', effect: 'Prioritizes leads showing real purchase intent' }</code></td><td><span class="chip c-stop">Remove the object</span> from Scout's <code>PLATFORM_IMPACTS</code>.</td></tr>
+        <tr><td class="mono">ReconOverview:77</td><td><code>impactAreas:</code> ['Scout lead prioritization', …]</td><td><span class="chip c-stop">Remove the first tag.</span> Keep 'Hunter timing optimization' and 'Barry urgency detection'.</td></tr>
+        <tr><td class="mono">ReconFeedbackToast:40</td><td><code>barryQuote:</code> "I'll prioritize leads showing active buying behavior."</td><td><span class="chip c-stop">Replace with a messaging-side quote or remove.</span> Barry is making a first-person promise he cannot keep.</td></tr>
+        <tr><td class="mono">reconHealthConstants:55, :114</td><td>'Lead prioritization doesn't account for buying readiness indicators.'</td><td><span class="chip c-warn">Keep the fact, drop the implication.</span> Accurate today, but framed as a deficit the module would fix. Suggest restating against messaging.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Group 2 · Competitor filtering, deprioritization and keyword detection — remove</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Location</th><th>Current</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">ReconModulePage:69</td><td>'…so he can position you effectively and filter out competitor-locked leads.'</td><td><span class="chip c-warn">Truncate</span> after "position you effectively."</td></tr>
+        <tr><td class="mono">ReconModulePage:79</td><td>'Scout will deprioritize competitor-locked leads, and Hunter messaging will differentiate effectively.'</td><td><span class="chip c-warn">Delete the Scout clause, keep Hunter.</span></td></tr>
+        <tr><td class="mono">ReconModulePage:71</td><td>'Barry will also flag prospects who mention competitor keywords in their profiles.'</td><td><span class="chip c-stop">Delete the sentence.</span> No keyword detection exists.</td></tr>
+        <tr><td class="mono">ReconModulePage:159</td><td>'…Barry uses this to sharpen messaging and filter out competitor-locked leads.'</td><td><span class="chip c-warn">Truncate</span> after "sharpen messaging."</td></tr>
+        <tr><td class="mono">ReconModulePage:164</td><td><code>feedsInto[2]:</code> 'Scout filters out prospects locked into competitor ecosystems'</td><td><span class="chip c-stop">Remove the array entry.</span> First two entries (Barry positioning, Hunter differentiation) are supported.</td></tr>
+        <tr><td class="mono">ReconOverview:91</td><td><code>{ source: 'Competitive Intel', effect: 'Filters out prospects already locked into competitors' }</code></td><td><span class="chip c-stop">Remove the object</span> from Scout's impacts.</td></tr>
+        <tr><td class="mono">ReconOverview:66</td><td><code>impactAreas:</code> [… 'Prospect qualification']</td><td><span class="chip c-warn">Review.</span> Vague enough to be unfalsifiable; recommend removing rather than defending.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Group 3 · RECON improves / unlocks / weights Scout scoring — remove or reduce</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Location</th><th>Current</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">BarryTraining:40</td><td><code>impactWhenTrained:</code> 'Scout lead scoring reflects your actual ideal customer characteristics.'</td><td><span class="chip c-stop">Remove.</span> No RECON → scoring path. The sibling <code>notTrainedDescription</code> ("Barry cannot assess whether a prospect matches your ICP") is about Barry's assessment in context, and is supported.</td></tr>
+        <tr><td class="mono">BarryTraining:41</td><td><code>impactWhenMissing:</code> 'All leads are treated equally — no qualification intelligence.'</td><td><span class="chip c-stop">Remove.</span> False independently of RECON: a user with an ICP and zero RECON gets fully differentiated scores.</td></tr>
+        <tr><td class="mono">BarryTraining:270</td><td>'Complete remaining RECON modules to unlock: <strong>ICP-based lead scoring</strong>, competitive positioning, personalized messaging'</td><td><span class="chip c-warn">Remove the first item only.</span> Nothing gates scoring on RECON. The other two are messaging-side and supported.</td></tr>
+        <tr><td class="mono">ReconModulePage:23</td><td>'Each section you complete makes Scout's lead scoring more accurate.'</td><td><span class="chip c-stop">Delete the sentence.</span> Preceding text ("You're building Barry's core understanding of your business") stands alone.</td></tr>
+        <tr><td class="mono">ReconModulePage:28</td><td>'He can <strong>match prospects against your ICP</strong> and generate business-aware context.'</td><td><span class="chip c-warn">PARTIAL — keep the second half only.</span> Business-aware context is verified via <code>barryContextStack.js:292</code>.</td></tr>
+        <tr><td class="mono">ReconOverview:44</td><td><code>impactAreas:</code> ['Scout lead scoring', 'Barry prospect matching', 'Hunter targeting']</td><td><span class="chip c-stop">Remove the first tag.</span> Second is Barry-context and supported; third needs its own check.</td></tr>
+        <tr><td class="mono">ReconOverview:89</td><td><code>{ source: 'ICP Intelligence', effect: 'Better lead scoring — Barry matches prospects against your actual ICP' }</code></td><td><span class="chip c-stop">Remove the object</span> from Scout's impacts. With Groups 1–3 applied, Scout's <code>PLATFORM_IMPACTS</code> array becomes empty — <strong>that is a design question for you</strong>, and the honest answer available is the queue-size behavior you have asked me not to write yet.</td></tr>
+        <tr><td class="mono">reconHealthConstants:74</td><td>'Scout ICP alignment cannot be validated. <strong>Lead scoring is unweighted.</strong>'</td><td><span class="chip c-warn">Correct the second sentence.</span> Wrong on its own terms: <code>DEFAULT_WEIGHTS</code> (50/25/15/10) always applies and <code>icpProfile.scoringWeights</code> overrides it. Scoring is never unweighted.</td></tr>
+        <tr><td class="mono">ReconFeedbackToast:25</td><td><code>barryQuote:</code> "I can now score leads based on how well they match your target market."</td><td><span class="chip c-warn">Remove or reduce.</span> Also circular as written — "score leads based on how well they match". If retained after the RECON→Scout decision, the object is a <em>company</em>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Preserved — the two verified claim families</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Claim</th><th>Location</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>'Barry references competitive advantages. Hunter messaging differentiates.'</td><td class="mono">BarryTraining:68</td><td rowspan="4"><code>barryBulkPersonalize.js:238</code> injects a <code>reconBlock</code> as sender business intelligence; <code>barryGenerateContext.js</code>, <code>barryGenerateMissionSequence.js</code> and <code>barryGenerateSequenceStep.js</code> all load RECON data. <code>barryContextStack.js:292</code> extracts the RECON ICP section into Barry's chat context.</td></tr>
+        <tr><td>'Hunter messages address real pain points. Barry anticipates objections.'</td><td class="mono">BarryTraining:52</td></tr>
+        <tr><td>'The differentiation points you define will appear in Hunter messaging.'</td><td class="mono">ReconModulePage:74</td></tr>
+        <tr><td>'Your Hunter follow-ups just got a lot smarter.'</td><td class="mono">ReconModulePage:62</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="flag warn">
+      <p><span class="lede">One consequence to decide before implementation.</span> Applying Groups 1–3 empties
+      Scout's entry in <code>ReconOverview</code>'s <code>PLATFORM_IMPACTS</code> and strips the Scout clause
+      from both <code>BarryTraining</code> impact dimensions. RECON's story becomes
+      <em>"RECON improves Barry and Hunter messaging"</em> — which is true, and narrower than what it
+      currently promises. Whether Scout is shown with zero impacts, removed from the array, or given the
+      queue-size behavior is a product decision I have deliberately not made.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 6 ══ -->
+<section id="issues">
+  <div class="sec-head"><span class="sec-letter">06</span><h2>Capability-gap issues — opened</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>#</th><th>Title</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">561</td><td>RECON → Scout: does RECON intelligence influence Match Scores and prioritization?</td><td><span class="chip c-decide">Capability gap</span></td></tr>
+        <tr><td class="mono">562</td><td>Behavioral / intent signal prioritization — define and implement before any UI claims it exists</td><td><span class="chip c-decide">Capability gap</span></td></tr>
+        <tr><td class="mono">563</td><td>Competitive Intelligence → Scout: filter, flag, explain, or deprioritize?</td><td><span class="chip c-decide">Capability gap</span></td></tr>
+        <tr><td class="mono">564</td><td>Adaptive signals: savedTitles is collected and sent but never applied to the Apollo query</td><td><span class="chip c-stop">Bug</span></td></tr>
+        <tr><td class="mono">565</td><td>Adaptive signals: only one of three search-companies call paths sends adaptive context</td><td><span class="chip c-stop">Bug</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">Each carries file-and-line evidence, the claims it invalidates, and the decision needed. No
+  implementation. Duplicate search returned nothing before creating.</p>
+</section>
+
+<!-- ══ 7 ══ -->
+<section id="status">
+  <div class="sec-head"><span class="sec-letter">07</span><h2>Status and what unblocks next</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Item</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Daily Discoveries normalization (15 strings)</td><td><span class="chip c-warn">Staged, uncommitted</span> — awaiting your sign-off on §01</td></tr>
+        <tr><td>2 · Scout tagline</td><td><span class="chip c-warn">Staged, uncommitted</span> — includes one test assertion update</td></tr>
+        <tr><td>3 · Company Match Score</td><td><span class="chip c-warn">Staged, uncommitted</span></td></tr>
+        <tr><td>4 · Groups 02/04 remaining copy</td><td><span class="chip c-decide">Returned for review</span> — §03</td></tr>
+        <tr><td>5 · Batch 0b onboarding sequence</td><td><span class="chip c-decide">Returned for review</span> — §04, unpatched</td></tr>
+        <tr><td>6 · RECON removal plan</td><td><span class="chip c-decide">Returned for review</span> — §05, unimplemented</td></tr>
+        <tr><td>7 · Capability-gap issues</td><td><span class="chip c-ok">Done</span> — #561–565</td></tr>
+        <tr><td>8 · Dead code · admin · long tail</td><td><span class="chip c-dead">Held</span> — no action taken</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Open decisions, smallest first</h4>
+  <ol class="questions">
+    <li>Sign off §01 so items 1–3 can be committed, or send back individual strings.</li>
+    <li><code>DailyLeads:2144</code> subtitle — "AI-curated prospects matching {ICP}" → "Matched to {ICP}"?</li>
+    <li>Groups 02/04 (§03) — approve as proposed, or amend?</li>
+    <li>Batch 0b — the two surfaces currently tell different Barry stories. Rewrite both together?</li>
+    <li>RECON removals (§05) — approve, and decide what Scout's impact list shows once emptied.</li>
+    <li><strong>Training framing.</strong> A route, a page, a breadcrumb, a mobile nav section, a button and
+    six strings. Scope it as its own item?</li>
+  </ol>
+</section>
+
+<footer class="end">
+  Nothing committed this round · build passing · 1128 pass / 5 known failures · no PR<br>
+  No collections, fields, routes, events, functions, variables, filenames, statuses or tab values changed
+</footer>
+
+</div>

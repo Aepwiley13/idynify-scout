@@ -11,7 +11,7 @@ export default function GettingStarted() {
       <div className="gs-header">
         <div className="gs-header-content">
           <div className="gs-bear">🐻</div>
-          <h1 className="gs-title">Welcome to Idynify</h1>
+          <h1 className="gs-title">Welcome to IDYNIFY</h1>
           <p className="gs-subtitle">Let's get you set up in under 5 minutes</p>
         </div>
       </div>
@@ -27,7 +27,7 @@ export default function GettingStarted() {
             </div>
             <h2 className="section-title">What Is Scout?</h2>
             <p className="section-description">
-              Scout is where you spend your time. It's your daily prospecting workspace.
+              Scout helps you discover who matters. It's where IDYNIFY surfaces the people and companies worth your attention.
             </p>
 
             <div className="feature-list">
@@ -36,7 +36,7 @@ export default function GettingStarted() {
                 <div className="feature-content">
                   <h3 className="feature-title">Find companies daily</h3>
                   <p className="feature-text">
-                    Barry AI discovers companies that match your ICP and adds them to your queue every weekday morning.
+                    Barry finds companies that match your ICP and adds them to your queue every weekday morning.
                   </p>
                 </div>
               </div>
@@ -54,7 +54,7 @@ export default function GettingStarted() {
               <div className="feature-item">
                 <CheckCircle className="feature-icon" />
                 <div className="feature-content">
-                  <h3 className="feature-title">Select contacts and build leads</h3>
+                  <h3 className="feature-title">Select contacts and build your pipeline</h3>
                   <p className="feature-text">
                     Pick the right decision makers from companies you like. That's your pipeline.
                   </p>
@@ -88,7 +88,7 @@ export default function GettingStarted() {
             </div>
             <h2 className="section-title">What Is Recon?</h2>
             <p className="section-description">
-              Recon is where you train Barry AI. You don't live here — you visit when things change.
+              Recon is where you give Barry context. You don't live here — you visit when things change.
             </p>
 
             <div className="feature-list">
@@ -107,7 +107,7 @@ export default function GettingStarted() {
                 <div className="feature-content">
                   <h3 className="feature-title">Give Barry the context that matters</h3>
                   <p className="feature-text">
-                    The more you fill out Recon, the smarter Scout becomes at finding your perfect-fit companies.
+                    The more context you give Barry, the more he has to work with when understanding relationships and helping you communicate.
                   </p>
                 </div>
               </div>
@@ -117,7 +117,7 @@ export default function GettingStarted() {
                 <div className="feature-content">
                   <h3 className="feature-title">Update when things change</h3>
                   <p className="feature-text">
-                    New product launch? Shifting ICP? Come back to Recon and Barry adapts.
+                    New product launch? Shifting ICP? Come back to Recon and update what Barry knows.
                   </p>
                 </div>
               </div>
@@ -125,7 +125,7 @@ export default function GettingStarted() {
 
             <div className="section-highlight">
               <p>
-                <strong>Think of Recon as:</strong> Mission control. You set the strategy, Barry executes it in Scout.
+                <strong>Think of Recon as:</strong> The context Barry works from. You set the direction, and it shapes everything he writes.
               </p>
             </div>
 
@@ -149,7 +149,7 @@ export default function GettingStarted() {
             </div>
             <h2 className="section-title">How They Work Together</h2>
             <p className="section-description">
-              Recon teaches Barry what you need. Scout delivers it every day.
+              Recon is where you tell Barry what matters. Scout is where IDYNIFY helps you find who does.
             </p>
 
             <div className="workflow-diagram">
@@ -167,7 +167,7 @@ export default function GettingStarted() {
                 <div className="step-number">2</div>
                 <div className="step-content">
                   <h3 className="step-title">Barry connects the dots</h3>
-                  <p className="step-text">AI analyzes your inputs and finds patterns</p>
+                  <p className="step-text">Barry connects what you've told him to what he sees</p>
                 </div>
               </div>
 
@@ -176,8 +176,8 @@ export default function GettingStarted() {
               <div className="workflow-step">
                 <div className="step-number">3</div>
                 <div className="step-content">
-                  <h3 className="step-title">Scout delivers</h3>
-                  <p className="step-text">Companies appear in your daily queue</p>
+                  <h3 className="step-title">Scout shows you who matters</h3>
+                  <p className="step-text">Matches appear in your daily queue</p>
                 </div>
               </div>
 
@@ -195,7 +195,7 @@ export default function GettingStarted() {
             <div className="improvement-note">
               <Users className="w-6 h-6" />
               <p>
-                The more you interact with Scout (approving/rejecting companies), the smarter Barry gets at understanding your preferences.
+                Your saves shape what Scout looks for next.
               </p>
             </div>
           </section>
@@ -204,7 +204,7 @@ export default function GettingStarted() {
           <section className="cta-section">
             <h2 className="cta-title">Ready to Start?</h2>
             <p className="cta-text">
-              Head to Scout to review your first companies, or visit Recon to train Barry AI on your ideal customer.
+              Head to Scout to review your first companies, or visit Recon to tell Barry about your ideal customer.
             </p>
 
             <div className="cta-buttons">
@@ -222,7 +222,7 @@ export default function GettingStarted() {
                 onClick={() => navigate('/recon')}
               >
                 <TrendingUp className="w-6 h-6" />
-                <span>Train Barry in Recon</span>
+                <span>Add context in Recon</span>
                 <ArrowRight className="w-6 h-6" />
               </button>
             </div>

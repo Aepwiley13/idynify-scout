@@ -23,7 +23,7 @@ export default function BarryKnowledgeButton({ variant = 'compact' }) {
       <button
         onClick={() => navigate('/recon')}
         className="inline-flex items-center gap-2.5 px-4 py-2.5 bg-purple-50 border-[1.5px] border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 transition-all group"
-        aria-label="Update Barry's training knowledge in RECON"
+        aria-label="Add business context in RECON"
       >
         <div className="w-7 h-7 rounded-md bg-purple-100 border border-purple-200 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
           <Brain size={14} className="text-purple-600" strokeWidth={2.5} />
@@ -33,7 +33,7 @@ export default function BarryKnowledgeButton({ variant = 'compact' }) {
             Update Barry Knowledge
           </span>
           <span className="text-[10px] text-purple-500 block leading-tight">
-            Train Barry in RECON
+            Add context in RECON
           </span>
         </div>
       </button>
@@ -44,11 +44,11 @@ export default function BarryKnowledgeButton({ variant = 'compact' }) {
     <button
       onClick={() => navigate('/recon')}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 transition-all text-xs font-semibold text-purple-700"
-      aria-label="Update Barry's training knowledge in RECON"
-      title="Train Barry with your business context"
+      aria-label="Add business context in RECON"
+      title="Give Barry more business context"
     >
       <Brain size={14} className="text-purple-600" strokeWidth={2.5} />
-      <span>Train Barry</span>
+      <span>Add context</span>
     </button>
   );
 }

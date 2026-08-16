@@ -134,7 +134,7 @@ export default function BarryTraining() {
     return (
       <div className="barry-training-loading">
         <div className="loading-spinner" />
-        <p className="loading-text">Loading Barry Training Status...</p>
+        <p className="loading-text">Loading what Barry knows...</p>
       </div>
     );
   }
@@ -153,7 +153,7 @@ export default function BarryTraining() {
 
       {/* Header — Finding 10: Scout's centered enterprise-header */}
       <div className="barry-training-header">
-        <h1 className="barry-training-title">Barry Training Status</h1>
+        <h1 className="barry-training-title">What Barry Knows</h1>
         <p className="barry-training-subtitle">What Barry knows and what he's missing</p>
       </div>
 
@@ -161,11 +161,11 @@ export default function BarryTraining() {
       <div className="barry-training-status">
         <div className="barry-training-stats-grid">
           <div className="barry-training-stat">
-            <p className="barry-training-stat-label">Training Progress</p>
+            <p className="barry-training-stat-label">Context Coverage</p>
             <p className="barry-training-stat-value purple">{overallProgress}%</p>
           </div>
           <div className="barry-training-stat bordered">
-            <p className="barry-training-stat-label">Dimensions Trained</p>
+            <p className="barry-training-stat-label">Areas Covered</p>
             <p className="barry-training-stat-value dark">{trainedDimensions}/{totalDimensions}</p>
           </div>
           <div className="barry-training-stat">
@@ -267,7 +267,7 @@ export default function BarryTraining() {
               <AlertCircle className="info" />
               <p>
                 Complete remaining RECON modules to unlock:{' '}
-                {overallProgress < 40 && 'ICP-based lead scoring, competitive positioning, personalized messaging'}
+                {overallProgress < 40 && 'competitive positioning, personalized messaging'}
                 {overallProgress >= 40 && overallProgress < 80 && 'buying signal detection, full competitive positioning, objection handling'}
                 {overallProgress >= 80 && 'full training across all dimensions'}
               </p>

@@ -25,7 +25,7 @@ const CONTEXTUAL_TIPS = {
     completed: {
       icon: Trophy,
       title: 'Module Complete!',
-      content: 'Barry now has a strong foundation. He can match prospects against your ICP and generate business-aware context. Consider completing Messaging next for maximum impact.'
+      content: 'Barry now has a strong foundation. He can generate business-aware context. Consider completing Messaging next for maximum impact.'
     }
   },
   'messaging': {
@@ -66,7 +66,7 @@ const CONTEXTUAL_TIPS = {
     notStarted: {
       icon: Lightbulb,
       title: 'Know Your Battlefield',
-      content: 'Prospects are always comparing you to alternatives. Teach Barry the competitive landscape so he can position you effectively and filter out competitor-locked leads.'
+      content: 'Prospects are always comparing you to alternatives. Give Barry the competitive landscape so he can position you effectively.'
     },
     inProgress: {
       icon: Sparkles,
@@ -76,7 +76,7 @@ const CONTEXTUAL_TIPS = {
     completed: {
       icon: Trophy,
       title: 'Competitive Intel Active!',
-      content: 'Barry now knows how to position you against alternatives. Scout will deprioritize competitor-locked leads, and Hunter messaging will differentiate effectively.'
+      content: 'Barry now knows how to position you against alternatives. Hunter messaging will differentiate effectively.'
     }
   },
   'buying-signals': {
@@ -156,7 +156,7 @@ const MODULE_CONFIG = {
     color: 'red',
     guidance: {
       why: 'If Barry doesn\'t know your competitors, he can\'t help you differentiate. Prospects are always evaluating alternatives — Barry needs to know the landscape to position you effectively.',
-      what: 'You\'ll identify your key competitors, how you differentiate, and what prospects typically compare you against. Barry uses this to sharpen messaging and filter out competitor-locked leads.'
+      what: 'You\'ll identify your key competitors, how you differentiate, and what prospects typically compare you against. Barry uses this to sharpen messaging.'
     },
     feedsInto: [
       'Barry positions your product against known alternatives',

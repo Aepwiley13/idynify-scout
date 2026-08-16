@@ -344,7 +344,7 @@ export default function Section1Foundation({ initialData = {}, onSave, onComplet
                 {question.required && <span className="recon-form-required">*</span>}
                 {question.barryContext && (
                   <ReconTooltip
-                    text={question.helpText ? null : 'This field trains Barry\'s understanding of your business.'}
+                    text={question.helpText ? null : 'This field shapes how Barry understands your business.'}
                     barryUses={question.barryContext}
                   />
                 )}

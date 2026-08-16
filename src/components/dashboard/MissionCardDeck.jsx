@@ -379,9 +379,9 @@ function ReconDeck({ userId, onClose }) {
   if (phase === 'brief') {
     return (
       <BriefingCard
-        title="Train Barry"
-        body="Your answers make Barry smarter. Complete training cards to improve Scout matches, Hunter outreach, and Barry's recommendations."
-        cta="Start Training →"
+        title="Give Barry context"
+        body="Your answers give Barry more to work with. Complete these to sharpen Hunter outreach and Barry's recommendations."
+        cta="Start →"
         accentColor="#a855f7"
         onStart={handleStart}
       />

@@ -318,7 +318,7 @@ export default function CadencesList() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '12px 0' }}>
                 <img
                   src={ASSETS.barryAvatar}
-                  alt="Barry AI"
+                  alt=""
                   style={{ width: 48, height: 48, borderRadius: '50%', marginBottom: 12, opacity: 0.7 }}
                   onError={e => { e.currentTarget.style.display = 'none'; }}
                 />

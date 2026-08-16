@@ -71,7 +71,7 @@ export const TRAINING_DIMENSIONS = [
     id: 'icp',
     label: 'Ideal Customer Profile',
     sections: [3, 4],
-    impactWhenMissing: 'Scout ICP alignment cannot be validated. Lead scoring is unweighted.',
+    impactWhenMissing: 'Scout ICP alignment cannot be validated.',
     fallbackAssumption: FALLBACK_ASSUMPTIONS.icp,
     priority: 2,
   },

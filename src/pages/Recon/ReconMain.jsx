@@ -131,7 +131,7 @@ const RECON_ITEMS = [
   { id: 'objections',        label: 'Objections',             Icon: Shield,          path: '/recon/objections',          desc: 'Pain points & behavior'  },
   { id: 'competitive-intel', label: 'Competitive Intel',      Icon: Swords,          path: '/recon/competitive-intel',   desc: 'Your landscape'          },
   { id: 'buying-signals',    label: 'Buying Signals',         Icon: Zap,             path: '/recon/buying-signals',      desc: 'Intent triggers'         },
-  { id: 'barry-training',    label: 'Barry Training',         Icon: Brain,           path: '/recon/barry-training',      desc: 'Direct AI training'      },
+  { id: 'barry-training',    label: 'What Barry Knows',       Icon: Brain,           path: '/recon/barry-training',      desc: "Barry's context coverage" },
 ];
 
 

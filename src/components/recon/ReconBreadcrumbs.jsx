@@ -17,7 +17,7 @@ const MODULE_LABELS = {
   'objections': 'Objections & Constraints',
   'competitive-intel': 'Competitive Intel',
   'buying-signals': 'Buying Signals',
-  'barry-training': 'Barry Training'
+  'barry-training': 'What Barry Knows'
 };
 
 const SECTION_TO_MODULE = {
@@ -96,7 +96,7 @@ export default function ReconBreadcrumbs({ sectionTitle }) {
   // If we're on /recon/barry-training
   if (pathname === '/recon/barry-training') {
     crumbs.push({
-      label: 'Barry Training',
+      label: 'What Barry Knows',
       path: pathname,
       current: true
     });

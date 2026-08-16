@@ -22,7 +22,7 @@ const SECTION_FEEDBACK = {
   3: {
     learned: 'Target Market',
     impact: 'Barry knows your ideal company firmographics.',
-    barryQuote: "I can now score leads based on how well they match your target market."
+    barryQuote: "I know the kind of company you're looking for."
   },
   4: {
     learned: 'Customer Psychographics',

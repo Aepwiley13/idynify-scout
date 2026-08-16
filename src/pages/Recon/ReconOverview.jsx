@@ -327,10 +327,10 @@ export default function ReconOverview() {
       {/* Page header */}
       <div className="recon-overview-header">
         <h1 className="recon-page-title">RECON</h1>
-        <p className="recon-page-subtitle">Barry's Training Intelligence</p>
+        <p className="recon-page-subtitle">The context Barry works from</p>
         <p className="recon-description">
-          RECON is how you train Barry. Every module you complete gives Barry deeper context about your business,
-          customers, and market — making Scout smarter, Hunter sharper, and every interaction more relevant.
+          RECON is how you give Barry context. Every module you complete tells him more about your business,
+          customers and market — making Hunter sharper and every interaction more relevant.
         </p>
       </div>
 

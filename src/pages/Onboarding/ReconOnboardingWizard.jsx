@@ -52,7 +52,7 @@ const WIZARD_MODULES = [
 ];
 
 const GREETING = {
-  incomplete: "Before I can work effectively for you, I need to understand your business. Complete the training modules below — starting with ICP Intelligence. The more context you give me, the better every lead, message, and conversation will be.",
+  incomplete: "Before I can work effectively for you, I need to understand your business. Complete the modules below — starting with ICP Intelligence. The more context you give me, the better every lead, message, and conversation will be.",
   messagingGate: "Your ICP and pain point context is solid. One more module before launch: Messaging & Voice. This tells me how to speak on your behalf — tone, value prop, proof points. It's what separates generic outreach from yours.",
   ready: "You're ready to launch. I've got enough context to start finding leads, qualifying prospects, and writing outreach that actually sounds like you. Head to Mission Control to activate your first campaigns.",
 };

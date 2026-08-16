@@ -835,7 +835,7 @@ export default function ContactProfile({
             </div>
             <div className="stale-intel-actions">
               <button className="stale-intel-train-btn" onClick={() => navigate('/recon')}>
-                <Brain className="w-4 h-4" /><span>Train Barry</span><ArrowRight className="w-3 h-3" />
+                <Brain className="w-4 h-4" /><span>Add context</span><ArrowRight className="w-3 h-3" />
               </button>
               <button className="stale-intel-dismiss-btn" onClick={() => setStaleDismissed(true)}>Dismiss</button>
             </div>

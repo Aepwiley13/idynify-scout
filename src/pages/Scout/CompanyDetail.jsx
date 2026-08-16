@@ -1434,7 +1434,7 @@ export default function CompanyDetail({
                   ) : (
                     <>
                       <UserPlus className="w-5 h-5" />
-                      <span>Add {selectedSuggestedIds.size} to Leads</span>
+                      <span>Save {selectedSuggestedIds.size} Contacts</span>
                     </>
                   )}
                 </button>
@@ -1535,7 +1535,7 @@ export default function CompanyDetail({
                   ) : (
                     <>
                       <UserPlus className="w-5 h-5" />
-                      <span>Add {selectedDecisionMakers.length} to Leads</span>
+                      <span>Save {selectedDecisionMakers.length} Contacts</span>
                     </>
                   )}
                 </button>
@@ -1663,7 +1663,7 @@ export default function CompanyDetail({
                     ) : (
                       <>
                         <UserPlus className="w-4 h-4" />
-                        <span>Add {selectedContactIds.size} to Leads</span>
+                        <span>Save {selectedContactIds.size} Contacts</span>
                       </>
                     )}
                   </button>
@@ -1810,7 +1810,7 @@ export default function CompanyDetail({
                         onClick={() => handleApproveContact(contact)}
                       >
                         <UserPlus className="w-4 h-4" />
-                        <span>Add to Leads</span>
+                        <span>Save Contact</span>
                       </button>
                     )}
                   </div>

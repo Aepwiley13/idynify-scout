@@ -105,7 +105,7 @@ export default function GettingStarted() {
               <div className="feature-item">
                 <CheckCircle className="feature-icon" />
                 <div className="feature-content">
-                  <h3 className="feature-title">Barry learns your market</h3>
+                  <h3 className="feature-title">Give Barry the context that matters</h3>
                   <p className="feature-text">
                     The more you fill out Recon, the smarter Scout becomes at finding your perfect-fit companies.
                   </p>
@@ -166,7 +166,7 @@ export default function GettingStarted() {
               <div className="workflow-step">
                 <div className="step-number">2</div>
                 <div className="step-content">
-                  <h3 className="step-title">Barry learns</h3>
+                  <h3 className="step-title">Barry connects the dots</h3>
                   <p className="step-text">AI analyzes your inputs and finds patterns</p>
                 </div>
               </div>

@@ -294,7 +294,7 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
             color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
-            <UserPlus size={16} /> Approve & Add to Leads
+            <UserPlus size={16} /> Approve & Save Company
           </button>
         )}
       </div>

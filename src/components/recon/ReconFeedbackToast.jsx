@@ -117,7 +117,7 @@ export default function ReconFeedbackToast({ sectionId, isVisible, onClose, vari
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-gray-900 mb-1">
-              Barry learned: {feedback.learned}
+              Barry now has your {feedback.learned}
             </p>
             <p className="text-xs text-gray-600 mb-2">
               {feedback.impact}

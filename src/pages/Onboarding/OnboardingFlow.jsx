@@ -549,7 +549,7 @@ export default function OnboardingFlow() {
             </h1>
             <p style={{ fontSize: 16, color: T.textMuted, lineHeight: 1.6, margin: 0 }}>
               Give me about 3 minutes and I'll build your first prospecting engine.
-              I just need to learn a little about your business.
+              I just need a little context about your business.
             </p>
           </div>
           <CtaButton onClick={handleStart} T={T}>

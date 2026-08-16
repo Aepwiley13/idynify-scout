@@ -1,0 +1,955 @@
+<title>Context, Not Training</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Positioning &amp; Terminology · Team A · Round 4</p>
+  <h1>Context, Not Training</h1>
+  <p class="standfirst">RECON does not train anything. Its content is retrieved and injected into prompts as
+  context — so "training" is not only off-positioning, it is technically wrong. That one fact resolves the
+  terminology question, and it changes what the module should be called.</p>
+  <div class="meta">
+    <span><b>Committed</b> fb7aa08 — subtitle</span>
+    <span><b>Build</b> passing</span>
+    <span><b>Tests</b> 1128 / 5 known</span>
+    <span><b>PR</b> none</span>
+  </div>
+</header>
+
+<!-- ══ 0 ══ -->
+<section id="done">
+  <div class="sec-head"><span class="sec-letter">00</span><h2>Implemented</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Item</th><th>Before</th><th>After</th><th>Rendered</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">DailyLeads:2144</td>
+          <td>AI-curated prospects matching {ICP}</td>
+          <td><strong>Matches based on {ICP}</strong></td>
+          <td>"Matches based on <em>Acme Manufacturing</em>" · "Matches based on <em>your ICP</em>"</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>The interpolation is untouched, so both branches of the existing ternary read cleanly and no runtime
+    reformatting was needed.</p>
+    <div class="flag">
+      <p><span class="lede">ICP gate — condition not met, so no change.</span> Your instruction was to use
+      "…before Scout can find your matches" <em>if the surrounding sentence doesn't already establish Scout as
+      subject</em>. It does: <code>DailyLeads:2068</code> currently reads <strong>"Scout needs to know who
+      you're targeting before it can find your matches."</strong> Scout is the subject of the sentence and
+      "it" is unambiguous. Naming Scout twice would read as a stutter, so I left it. Say the word if you want
+      it anyway.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 1 ══ -->
+<section id="d1">
+  <div class="sec-head"><span class="sec-letter">01</span><h2>Groups 02 / 04 — save and people copy</h2></div>
+
+  <p class="prose">Every underlying action traced. All writes land in <code>users/{uid}/contacts</code>; all
+  searches read the same collection via <code>PEOPLE_PATHS.allPeople()</code>, which resolves to
+  <code>users/{uid}/contacts</code>.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Current</th><th>File + line</th><th>Actual underlying action</th><th>Destination visible?</th><th>Proposed copy</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Select contacts to add as leads</td>
+          <td class="mono">CompanyDetail:1454</td>
+          <td>Section subtitle over buttons calling <code>handleAddDecisionMakersToLeads</code> → <code>prepareContactWrite</code> + <code>setDoc(users/{uid}/contacts)</code>, <code>record_status: suggested</code>. No <code>person_type</code> set.</td>
+          <td><span class="chip c-ok">Yes</span> — "Saved Contacts (n)" :1286, "View All People →" :1292</td>
+          <td><strong>Select contacts to save</strong></td>
+        </tr>
+        <tr>
+          <td>Select contacts to add as leads</td>
+          <td class="mono">CompanyProfileView:687</td>
+          <td>Same, via <code>saveDecisionMakers</code>.</td>
+          <td><span class="chip c-ok">Yes</span> — "Saved Contacts (n)" Section :658</td>
+          <td><strong>Select contacts to save</strong></td>
+        </tr>
+        <tr>
+          <td>Select contacts to add as leads</td>
+          <td class="mono">CompanyDetailModal:632</td>
+          <td>Same, via <code>handleAddSelectedToLeads</code> → <code>setDoc(users/{uid}/contacts)</code> :279.</td>
+          <td><span class="chip c-stop">No</span> — modal has no saved-contacts section and no People link</td>
+          <td><strong>Select contacts to save</strong></td>
+        </tr>
+        <tr>
+          <td>Select contacts to add</td>
+          <td class="mono">CompanyDetailModal:702</td>
+          <td>Empty-selection label on the <em>same button</em> that now reads "Save {n} to People" when a selection exists.</td>
+          <td>n/a</td>
+          <td><strong>Select contacts to save</strong> — <span class="chip c-warn">verb mismatch</span> currently reads "…to add" → "Save 3 to People"</td>
+        </tr>
+        <tr>
+          <td>Search your existing <strong>leads &amp; people</strong> by name and link them to this company</td>
+          <td class="mono">CompanyDetail:1833<br>CompanyProfileView:879<br>CompanyDetailModal:723</td>
+          <td><code>searchPeople(uid, query)</code> → reads <code>users/{uid}/contacts</code>, filtered to non-archived. Selection then links existing contacts to this company.</td>
+          <td><span class="chip c-ok">Yes</span> — the section is named "Add Your Contacts"</td>
+          <td><strong>Search your people by name and link them to this company</strong></td>
+        </tr>
+        <tr>
+          <td>Search all <strong>leads &amp; people</strong> by name...</td>
+          <td class="mono">CompanyDetail:1849<br>CompanyProfileView:891<br>CompanyDetailModal:739</td>
+          <td>Placeholder on the same input. One collection described as two.</td>
+          <td>n/a</td>
+          <td><strong>Search all people by name...</strong></td>
+        </tr>
+        <tr>
+          <td>Your contact has been saved to your <strong>leads</strong>.<br>Your contacts have been saved to your <strong>leads</strong>.</td>
+          <td class="mono">ScoutPlus:246–247</td>
+          <td>Success state after CSV or manual add. <code>CSVUpload</code> batch-writes to <code>users/{uid}/contacts</code>.</td>
+          <td><span class="chip c-warn">Partly</span> — the button beneath names it</td>
+          <td><strong>Your contact has been saved to People.</strong><br><strong>Your contacts have been saved to People.</strong></td>
+        </tr>
+        <tr>
+          <td>Go to Lead / <strong>View in Leads</strong></td>
+          <td class="mono">ScoutPlus:283</td>
+          <td><code>handleViewResults</code> → single: <code>openSavedContact(id)</code>; multiple: <code>navigate('/scout', { activeTab: 'all-leads' })</code>, whose visible label is <strong>People</strong>.</td>
+          <td><span class="chip c-stop">Names a destination that does not exist</span></td>
+          <td><strong>Go to Contact</strong> / <strong>View in People</strong></td>
+        </tr>
+        <tr>
+          <td>Confirm &amp; Save <strong>Lead</strong></td>
+          <td class="mono">FindContact:508</td>
+          <td>Creates one contact record from the Apollo result the user confirmed.</td>
+          <td><span class="chip c-warn">n/a</span> — single-object action</td>
+          <td><strong>Confirm &amp; Save Contact</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Total Leads</strong></td>
+          <td class="mono">AllLeads:1899</td>
+          <td>Stat badge rendering <code>contacts.length</code>; clicking sets <code>actionFilter: 'all'</code>. Renders in <code>scout</code>, and the component also runs in <code>basecamp</code> and <code>fallback</code> modes.</td>
+          <td><span class="chip c-ok">Yes</span> — sibling lenses say "All People"</td>
+          <td><strong>Total People</strong></td>
+        </tr>
+        <tr>
+          <td>desc: '<strong>My leads</strong>'</td>
+          <td class="mono">ScoutMain:56</td>
+          <td>Sub-nav description under <code>label: 'People'</code>. Navigation only.</td>
+          <td><span class="chip c-ok">Yes</span> — it sits directly under the label</td>
+          <td><strong>'My people'</strong></td>
+        </tr>
+        <tr>
+          <td>Select contacts and build <strong>leads</strong></td>
+          <td class="mono">GettingStarted:57</td>
+          <td>Explainer feature title. No action. Body already reads "That's your pipeline."</td>
+          <td>n/a</td>
+          <td><strong>Select contacts and build your pipeline</strong></td>
+        </tr>
+        <tr>
+          <td>…the better your <strong>leads</strong>.</td>
+          <td class="mono">Questionnaire:23</td>
+          <td>Tip text on the orphan <code>/questionnaire</code> route.</td>
+          <td>n/a</td>
+          <td><strong>…the better your matches.</strong> <span class="chip c-dead">Include only if the route survives cleanup</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ 2 ══ -->
+<section id="d2">
+  <div class="sec-head"><span class="sec-letter">02</span><h2>The onboarding sequence, in screen order</h2></div>
+
+  <p class="prose">Every user-visible string. <span class="chip c-accent">B</span> Barry first-person ·
+  <span class="chip c-decide">S</span> system explanation · <span class="chip c-ok">U</span> user instruction ·
+  <span class="chip c-warn">P</span> positioning · <span class="chip c-dead">T</span> status.
+  <span class="chip c-stop">✗</span> marks a conflict with the frozen principles.</p>
+
+  <h3>Surface A — <span class="mono">/onboarding</span></h3>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Screen</th><th>String</th><th>Class</th><th>Conflict</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td>Hi {firstName}, I'm Barry.</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">1</td><td>Give me about 3 minutes and I'll build your first <strong>prospecting engine</strong>. I just need a little context about your business.</td><td><span class="chip c-accent">B</span></td><td><span class="chip c-stop">✗</span> autonomous system</td></tr>
+        <tr><td class="mono">1</td><td>Let's do it →</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">2</td><td>What's your website?</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">2</td><td>yourcompany.com <em>(placeholder)</em></td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">2</td><td>Analyzing website · Identifying products · Understanding your ICP · Finding target industries · Researching competitors · Crafting your value props</td><td><span class="chip c-dead">T</span></td><td><span class="chip c-warn">borderline</span> — literal progress, reads as competence not autonomy</td></tr>
+        <tr><td class="mono">2</td><td>Perfect. I'm analyzing your company now...</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">2</td><td>I couldn't read your website <strong>automatically</strong>. No worries — let me ask you a few questions instead.</td><td><span class="chip c-accent">B</span></td><td><span class="chip c-warn">✗</span> mild — but describes real behavior</td></tr>
+        <tr><td class="mono">3</td><td>I think I understand your business pretty well. I just have a few questions that only you can answer.</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">4</td><td>Great! Now I have what I need. I can write personalized outreach and send it from your inbox. To do that, I just need permission.</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">4</td><td>Connect your Gmail</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">4</td><td>Secure. Private. We'll never send without your approval.</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">5</td><td>Give me a second... Finding companies that match your ideal customer profile.</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">5</td><td>I found → {n}</td><td><span class="chip c-dead">T</span></td><td>—</td></tr>
+        <tr><td class="mono">6</td><td>Here are your top matches. I've ranked them based on how well they fit your ICP.</td><td><span class="chip c-accent">B</span></td><td>—</td></tr>
+        <tr><td class="mono">6</td><td>No companies matched yet. Head to Mission Control and <strong>Barry will help you</strong> find prospects.</td><td><span class="chip c-decide">S</span></td><td><span class="chip c-stop">✗</span> third person mid-conversation — Barry stops being "I"</td></tr>
+        <tr><td class="mono">6</td><td>Go to Mission Control →</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">Fifteen of seventeen strings are Barry speaking. The voice is consistent and good — it
+  breaks in exactly two places, at the very start ("engine") and the very end (third person).</p>
+
+  <h3>Surface B — <span class="mono">/getting-started</span></h3>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Section</th><th>String</th><th>Class</th><th>Conflict</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">header</td><td>Welcome to Idynify</td><td><span class="chip c-warn">P</span></td><td>—</td></tr>
+        <tr><td class="mono">header</td><td>Let's get you set up in under 5 minutes</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">scout</td><td>What Is Scout?</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">scout</td><td>Scout is where you spend your time. It's your daily prospecting workspace.</td><td><span class="chip c-warn">P</span></td><td>—</td></tr>
+        <tr><td class="mono">scout</td><td>Find companies daily — <strong>Barry AI</strong> discovers companies that match your ICP and adds them to your queue every weekday morning.</td><td><span class="chip c-decide">S</span></td><td><span class="chip c-stop">✗</span> "Barry AI"</td></tr>
+        <tr><td class="mono">scout</td><td>Approve or reject in seconds — Swipe through companies in seconds. Fast decisions, no overwhelm.</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">scout</td><td>Select contacts and build <strong>leads</strong> — Pick the right decision makers from companies you like. That's your pipeline.</td><td><span class="chip c-ok">U</span></td><td><span class="chip c-warn">group 04</span></td></tr>
+        <tr><td class="mono">scout</td><td>Think of Scout as: Your daily prospecting habit. A few minutes each morning beats hours of manual research.</td><td><span class="chip c-warn">P</span></td><td>—</td></tr>
+        <tr><td class="mono">scout</td><td>Go to Scout →</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">recon</td><td>What Is Recon?</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">recon</td><td>Recon is where you <strong>train Barry AI</strong>. You don't live here — you visit when things change.</td><td><span class="chip c-warn">P</span></td><td><span class="chip c-stop">✗✗</span> training + "Barry AI"</td></tr>
+        <tr><td class="mono">recon</td><td>Define your ideal customer profile — Answer a few questions about who you sell to…</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">recon</td><td>Give Barry the context that matters — The more you fill out Recon, the <strong>smarter Scout becomes</strong> at finding your perfect-fit companies.</td><td><span class="chip c-ok">U</span></td><td><span class="chip c-stop">✗</span> "smarter" + unverified RECON→Scout claim</td></tr>
+        <tr><td class="mono">recon</td><td>Update when things change — New product launch? Shifting ICP? Come back to Recon and Barry adapts.</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">recon</td><td>Think of Recon as: Mission control. You set the strategy, <strong>Barry executes it</strong> in Scout.</td><td><span class="chip c-warn">P</span></td><td><span class="chip c-stop">✗</span> autonomous agent</td></tr>
+        <tr><td class="mono">recon</td><td>Go to Recon →</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">together</td><td>How They Work Together</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">together</td><td>Recon <strong>teaches Barry</strong> what you need. Scout delivers it every day.</td><td><span class="chip c-warn">P</span></td><td><span class="chip c-stop">✗</span> training</td></tr>
+        <tr><td class="mono">together</td><td>1 · Fill out Recon — Define your ICP and ideal customer</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">together</td><td>2 · Barry connects the dots — <strong>AI analyzes your inputs</strong> and finds patterns</td><td><span class="chip c-decide">S</span></td><td><span class="chip c-stop">✗</span> generic AI-does-X</td></tr>
+        <tr><td class="mono">together</td><td>3 · Scout delivers — Companies appear in your daily queue</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+        <tr><td class="mono">together</td><td>4 · You take action — Review, approve, and build your pipeline</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">together</td><td>The more you interact with Scout…, the <strong>smarter Barry gets</strong> at understanding your preferences.</td><td><span class="chip c-decide">S</span></td><td><span class="chip c-stop">✗</span> training / surveillance</td></tr>
+        <tr><td class="mono">cta</td><td>Ready to Start?</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">cta</td><td>Head to Scout to review your first companies, or visit Recon to <strong>train Barry AI</strong> on your ideal customer.</td><td><span class="chip c-ok">U</span></td><td><span class="chip c-stop">✗✗</span> training + "Barry AI"</td></tr>
+        <tr><td class="mono">cta</td><td>Start with Scout →</td><td><span class="chip c-ok">U</span></td><td>—</td></tr>
+        <tr><td class="mono">cta</td><td><strong>Train Barry</strong> in Recon →</td><td><span class="chip c-ok">U</span></td><td><span class="chip c-stop">✗</span> training</td></tr>
+        <tr><td class="mono">cta</td><td>Questions? Reply to the welcome email from Aaron.</td><td><span class="chip c-decide">S</span></td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="tag">The diagnosis</span>
+    <p>Surface A is <strong>15 of 17 strings in Barry's own voice</strong>. Surface B is
+    <strong>zero</strong> — Barry appears only in the third person, as a thing you configure, train, and that
+    then executes on your behalf. A user who completes onboarding and then opens the help page meets two
+    different characters: a colleague who asked about their business, and a system with a training progress
+    bar.</p>
+    <p>Both surfaces are internally coherent. Neither is wrong on its own. The problem is that nothing
+    connects them, so the flags cluster almost entirely on Surface B — 9 of 11 conflicts.</p>
+  </div>
+
+  <h3>One coherent Barry story</h3>
+  <div class="prose">
+    <p>Your governing principle already contains the spine. Four beats, in this order, on both surfaces:</p>
+  </div>
+<pre class="diagram"><b>1 · YOU GIVE BARRY CONTEXT</b>          <i>Recon. Not training — you brief him.</i>
+       "Tell Barry about your business, your customers, and how you win."
+
+<b>2 · BARRY CONNECTS THE DOTS</b>         <i>The intelligence, in first person where he speaks.</i>
+       "Barry connects your conversations, activity and relationships."
+
+<b>3 · IDYNIFY SHOWS WHO MATTERS</b>       <i>Scout. The product surfaces; Barry doesn't "deliver".</i>
+       "Matches based on your ICP, every weekday morning."
+
+<b>4 · YOU DECIDE WHAT TO DO NEXT</b>      <i>The user acts. Always.</i>
+       "Save the ones worth your time. Barry tells you why they matter."</pre>
+  <div class="prose">
+    <p><strong>Two voice rules that fix the split without rewriting Surface A:</strong></p>
+    <ol>
+      <li><strong>Where Barry speaks, he says "I".</strong> Surface A already does this — the one break is the
+      step-6 empty state ("Barry will help you"), which should be "I'll help you find companies."</li>
+      <li><strong>Where the product is described, IDYNIFY is the subject and Barry is named as the
+      intelligence inside it — never as an agent that executes or a system you train.</strong> Surface B
+      inverts this everywhere. "Recon teaches Barry" becomes "Recon is where you give Barry context."
+      "Barry executes it in Scout" becomes "Scout shows you who matters."</li>
+    </ol>
+    <p>Applying those two rules resolves 9 of the 11 flags without any new copy invention. The remaining
+    two — "prospecting engine" and the step-2 progress list — are judgment calls I'd want you on. My
+    recommendation: replace "prospecting engine" with <strong>"I'll show you who's worth your time"</strong>,
+    and leave the progress list alone.</p>
+    <p><strong>Not implemented.</strong> Returned for review as instructed.</p>
+  </div>
+</section>
+
+<!-- ══ 3 ══ -->
+<section id="d3">
+  <div class="sec-head"><span class="sec-letter">03</span><h2>Live training-framing inventory</h2></div>
+
+  <p class="prose">Live, user-visible only. Excludes comments, docstrings, routes, filenames, and the dead or
+  orphaned surfaces (<code>ICPScoring</code>, <code>ImprovedScoutQuestionnaire</code>,
+  <code>NavigationBar</code>, <code>UnifiedDashboard</code>, <code>Questionnaire</code>,
+  <code>ImpactPreviewPanel</code> — the last has no imports and was in my earlier note in error).
+  <strong>24 live strings.</strong></p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Current visible copy</th><th>File + line</th><th>Surface</th><th>Purpose</th><th>Concept</th><th>Proposed copy</th></tr></thead>
+      <tbody>
+        <tr><td>Barry Training</td><td class="mono">ReconMain:134</td><td>RECON sub-nav</td><td>Module section label</td><td>Context state</td><td><strong>What Barry Knows</strong></td></tr>
+        <tr><td>desc: 'Direct AI training'</td><td class="mono">ReconMain:134</td><td>RECON sub-nav</td><td>Section description</td><td>Context state</td><td><strong>'Barry's context coverage'</strong></td></tr>
+        <tr><td>Barry Training</td><td class="mono">ReconBreadcrumbs:20, :99</td><td>Breadcrumb</td><td>Location label</td><td>Context state</td><td><strong>What Barry Knows</strong></td></tr>
+        <tr><td>label 'Training' · section 'Barry Training'</td><td class="mono">mobileNavigation:156</td><td>Mobile nav</td><td>Destination label</td><td>Context state</td><td><strong>'Knows' · 'What Barry Knows'</strong></td></tr>
+        <tr><td>Barry Training Status</td><td class="mono">BarryTraining:156</td><td>Page h1</td><td>Page identity</td><td>Context state</td><td><strong>What Barry Knows</strong></td></tr>
+        <tr><td>What Barry knows and what he's missing</td><td class="mono">BarryTraining:157</td><td>Page subtitle</td><td>Page identity</td><td>Context state</td><td><span class="chip c-ok">Keep — already on-model</span></td></tr>
+        <tr><td>Loading Barry Training Status...</td><td class="mono">BarryTraining:137</td><td>Loading</td><td>Status</td><td>Context state</td><td><strong>Loading what Barry knows...</strong></td></tr>
+        <tr><td>Training Progress</td><td class="mono">BarryTraining:164</td><td>KPI label</td><td>Metric</td><td>Coverage</td><td><strong>Context Coverage</strong></td></tr>
+        <tr><td>Dimensions Trained</td><td class="mono">BarryTraining:168</td><td>KPI label</td><td>Metric</td><td>Coverage</td><td><strong>Areas Covered</strong></td></tr>
+        <tr><td>Barry's Training Intelligence</td><td class="mono">ReconOverview:333</td><td>RECON page subtitle</td><td>Module identity</td><td>Context</td><td><strong>The context Barry works from</strong></td></tr>
+        <tr><td>RECON is how you <strong>train Barry</strong>. Every module you complete gives Barry deeper context about your business, customers, and market — making Scout smarter, Hunter sharper…</td><td class="mono">ReconOverview:335–336</td><td>RECON description</td><td>Module explanation</td><td>Context</td><td><strong>RECON is how you give Barry context. Every module you complete tells him more about your business, customers and market — so his messaging and his read on a relationship reflect how you actually work.</strong> <span class="chip c-warn">"making Scout smarter" is also an unverified claim — see §05</span></td></tr>
+        <tr><td>Your answers <strong>train Barry directly</strong>. More specific = <strong>smarter</strong> context across Scout and Hunter.</td><td class="mono">ReconSectionEditor:528</td><td>Editor helper</td><td>User instruction</td><td>Context</td><td><strong>Your answers go straight into Barry's context. More specific = sharper context across Scout and Hunter.</strong></td></tr>
+        <tr><td>This field <strong>trains</strong> Barry's understanding of your business.</td><td class="mono">Section1Foundation:347</td><td>Field help</td><td>User instruction</td><td>Context</td><td><strong>This field shapes how Barry understands your business.</strong></td></tr>
+        <tr><td>Train Barry in RECON</td><td class="mono">BarryKnowledgeButton:36</td><td>Button (contact profile)</td><td>Action</td><td>Give context</td><td><strong>Add context in RECON</strong></td></tr>
+        <tr><td>title="Train Barry with your business context"</td><td class="mono">BarryKnowledgeButton:48</td><td>Tooltip</td><td>Action</td><td>Give context</td><td><strong>"Give Barry more business context"</strong></td></tr>
+        <tr><td>Train Barry</td><td class="mono">BarryKnowledgeButton:51</td><td>Button label</td><td>Action</td><td>Give context</td><td><strong>Add context</strong></td></tr>
+        <tr><td>aria-label="Update Barry's training knowledge in RECON"</td><td class="mono">BarryKnowledgeButton:26, :47</td><td>Accessibility</td><td>Action</td><td>Give context</td><td><strong>"Add business context in RECON"</strong></td></tr>
+        <tr><td>Train Barry</td><td class="mono">ContactProfile:838</td><td>Contact profile CTA</td><td>Action</td><td>Give context</td><td><strong>Add context</strong></td></tr>
+        <tr><td>title="Train Barry"</td><td class="mono">MissionCardDeck:382</td><td>Mission Control card</td><td>Card identity</td><td>Give context</td><td><strong>Give Barry context</strong></td></tr>
+        <tr><td>Your answers make Barry <strong>smarter</strong>. Complete <strong>training cards</strong> to improve Scout matches, Hunter outreach, and Barry's recommendations.</td><td class="mono">MissionCardDeck:383</td><td>Card body</td><td>Explanation</td><td>Give context</td><td><strong>Your answers give Barry more to work with. Complete these to sharpen Hunter outreach and Barry's recommendations.</strong> <span class="chip c-warn">"improve Scout matches" dropped — unverified</span></td></tr>
+        <tr><td>cta="Start Training →"</td><td class="mono">MissionCardDeck:384</td><td>Card CTA</td><td>Action</td><td>Give context</td><td><strong>"Start →"</strong></td></tr>
+        <tr><td>Complete the <strong>training modules</strong> below — starting with ICP Intelligence.</td><td class="mono">ReconOnboardingWizard:55</td><td>Barry greeting</td><td>Barry first-person</td><td>Give context</td><td><strong>Complete the modules below — starting with ICP Intelligence.</strong></td></tr>
+        <tr><td>Recon is where you <strong>train Barry AI</strong>.</td><td class="mono">GettingStarted:91</td><td>Explainer</td><td>Positioning</td><td>Give context</td><td><strong>Recon is where you give Barry context.</strong></td></tr>
+        <tr><td>Recon <strong>teaches Barry</strong> what you need.</td><td class="mono">GettingStarted:152</td><td>Explainer</td><td>Positioning</td><td>Give context</td><td><strong>Recon is where you tell Barry what matters.</strong></td></tr>
+        <tr><td>the <strong>smarter Barry gets</strong> at understanding your preferences</td><td class="mono">GettingStarted:198</td><td>Explainer</td><td>Explanation</td><td>Context</td><td><strong>the more Barry has to work with when he reads a relationship</strong></td></tr>
+        <tr><td>visit Recon to <strong>train Barry AI</strong> on your ideal customer</td><td class="mono">GettingStarted:207</td><td>Explainer CTA</td><td>User instruction</td><td>Give context</td><td><strong>visit Recon to tell Barry about your ideal customer</strong></td></tr>
+        <tr><td>Train Barry in Recon</td><td class="mono">GettingStarted:225</td><td>Explainer button</td><td>Action</td><td>Give context</td><td><strong>Add context in Recon</strong></td></tr>
+        <tr><td><strong>AI analyzes your inputs</strong> and finds patterns</td><td class="mono">GettingStarted:170</td><td>Explainer step 2</td><td>Explanation</td><td>Barry as intelligence</td><td><strong>Barry connects what you've told him to what he sees</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>"Barry AI" — adjacent, same family</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Current</th><th>File + line</th><th>Surface</th><th>Proposed</th></tr></thead>
+      <tbody>
+        <tr><td>Barry AI discovers companies that match your ICP…</td><td class="mono">GettingStarted:39</td><td>Explainer</td><td><strong>Barry finds companies that match your ICP…</strong></td></tr>
+        <tr><td>Barry AI Insights</td><td class="mono">CadencesList:310</td><td>Scout · Cadences</td><td><strong>Barry's Read</strong></td></tr>
+        <tr><td>alt="Barry AI"</td><td class="mono">CadencesList:321 · AllLeads:65 · BarryICPPanel:28</td><td>Avatar alt text</td><td><strong>alt="Barry"</strong></td></tr>
+        <tr><td>'Barry AI tone'</td><td class="mono">UserSettings:106</td><td>Settings</td><td><strong>'Barry's tone'</strong></td></tr>
+        <tr><td>…and Barry AI tone controls are on the roadmap.</td><td class="mono">UserSettings:1378</td><td>Settings</td><td><strong>…and Barry's tone controls are on the roadmap.</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose"><strong>Not implemented.</strong> All routes, filenames, component names and
+  <code>TRAINING_DIMENSIONS</code> / <code>getDimensionStatus</code> identifiers stay exactly as they are.</p>
+</section>
+
+<!-- ══ 4 ══ -->
+<section id="d4">
+  <div class="sec-head"><span class="sec-letter">04</span><h2>RECON terminology — the recommendation</h2></div>
+
+  <div class="callout">
+    <span class="tag">The technical fact that decides it</span>
+    <p>RECON content is <strong>retrieved and injected into prompts</strong>. Nothing is trained. There is no
+    model update, no weight change, no fine-tune. <code>barryContextStack.js:292</code> extracts RECON
+    sections into a context object for Barry's chat; <code>barryBulkPersonalize.js:238</code> injects a
+    <code>reconBlock</code> labelled — in the code itself — <em>"SENDER'S BUSINESS INTELLIGENCE"</em>;
+    <code>barryGenerateContext</code>, <code>barryGenerateMissionSequence</code> and
+    <code>barryGenerateSequenceStep</code> each load it the same way.</p>
+    <p>So "training" is not merely off-positioning. <strong>It describes a mechanism the product does not
+    have.</strong> Every other criterion follows from fixing that.</p>
+  </div>
+
+  <p class="prose">All three candidate vocabularies already exist somewhere in the codebase, which is a strong
+  signal the product has reached for them before: <code>ReconOverview</code> already renders a
+  <em>"Barry's Context Confidence score"</em> section, <code>/recon/alignment-brief</code> already ships an
+  <em>Alignment Brief</em>, and <code>BarryKnowledgeButton.jsx</code> is already named for knowledge.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>System</th><th>Vocabulary</th><th>User understands?</th><th>Avoids training framing?</th><th>Sales + relationships?</th><th>Describes what's stored?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>A · CONTEXT</strong><br><span class="chip c-ok">Recommended</span></td>
+          <td>Give Barry context · Barry's context · Context Coverage · What Barry Knows · Add context</td>
+          <td><span class="chip c-ok">Yes</span> "Give Barry context" is plain English and matches the mental model of briefing a colleague.</td>
+          <td><span class="chip c-ok">Yes</span> Context is something you provide, not something a system absorbs about you.</td>
+          <td><span class="chip c-ok">Yes</span> Fully neutral. Context about a donor base reads the same as context about a sales territory.</td>
+          <td><span class="chip c-ok">Exact</span> Prompt context is literally what it is. Already the word the codebase uses.</td>
+        </tr>
+        <tr>
+          <td><strong>B · BRIEFING</strong></td>
+          <td>Brief Barry · Barry's brief · Briefing complete · What's in the brief</td>
+          <td><span class="chip c-ok">Yes</span> Fits RECON's own military metaphor — you run recon, then you brief.</td>
+          <td><span class="chip c-ok">Yes</span> A briefing is unambiguously one-directional.</td>
+          <td><span class="chip c-warn">Mostly</span> Slightly operational; reads more naturally for a sales team than a fundraiser.</td>
+          <td><span class="chip c-warn">Close</span> But <strong>collides with the existing Alignment Brief</strong> at <code>/recon/alignment-brief</code>, which is a different artifact. Overloading it would make two things share one word.</td>
+        </tr>
+        <tr>
+          <td><strong>C · KNOWLEDGE</strong></td>
+          <td>Barry's knowledge · What Barry knows · Knowledge coverage</td>
+          <td><span class="chip c-ok">Yes</span> "What Barry knows" is the clearest phrase of the three — and is already the subtitle at <code>BarryTraining:157</code>.</td>
+          <td><span class="chip c-warn">Partly</span> "Barry's knowledge" edges toward the AI-brain framing — knowledge implies something retained and grown, which is the implication we are removing.</td>
+          <td><span class="chip c-ok">Yes</span> Neutral.</td>
+          <td><span class="chip c-warn">Partly</span> Nothing is retained between sessions beyond the stored document; "knowledge" oversells persistence.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h4>Recommendation: A, with C's best phrase kept</h4>
+    <p><strong>Context</strong> is the canonical system — it is the only one of the three that is literally
+    accurate about the mechanism, it is fully neutral across sales and relationship use cases, and it is
+    already the word <code>ReconOverview</code> uses for its confidence score.</p>
+    <p>But keep <strong>"What Barry Knows"</strong> as the name of the status page, because it is the clearest
+    user-facing phrase available and it already exists as that page's subtitle. The distinction that makes
+    both work: <em>context</em> is the thing you give; <em>what Barry knows</em> is the readout of how much of
+    it he has. One is the verb side, one is the noun side.</p>
+    <p>Reserve <strong>brief</strong> for the Alignment Brief. It already means something specific.</p>
+    <p>Proposed canonical set:</p>
+  </div>
+<pre class="diagram"><b>MODULE</b>        RECON                     <i>unchanged</i>
+<b>WHAT IT IS</b>    "The context Barry works from"
+<b>THE ACTION</b>    "Give Barry context" · "Add context"
+<b>THE STATUS</b>    "What Barry Knows"        <i>page — subtitle already says this</i>
+<b>THE METRIC</b>    "Context Coverage"        <i>replaces "Training Progress"</i>
+<b>THE UNIT</b>      "Areas Covered"           <i>replaces "Dimensions Trained"</i>
+<b>RESERVED</b>      "Alignment Brief"         <i>the existing artifact — do not overload</i></pre>
+</section>
+
+<!-- ══ 5 ══ -->
+<section id="d5">
+  <div class="sec-head"><span class="sec-letter">05</span><h2>RECON — 25 actions</h2></div>
+
+  <h4><span class="chip c-stop">REMOVE</span> — delete entirely, no replacement language</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>#</th><th>File + line</th><th>Current</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td class="mono">BarryTraining:40</td><td><code>impactWhenTrained:</code> 'Scout lead scoring reflects your actual ideal customer characteristics.'</td></tr>
+        <tr><td class="mono">2</td><td class="mono">BarryTraining:41</td><td><code>impactWhenMissing:</code> 'All leads are treated equally — no qualification intelligence.'</td></tr>
+        <tr><td class="mono">3</td><td class="mono">BarryTraining:85</td><td><code>impactWhenTrained:</code> 'Scout prioritizes leads showing active buying signals.'</td></tr>
+        <tr><td class="mono">4</td><td class="mono">ReconModulePage:23</td><td>'Each section you complete makes Scout's lead scoring more accurate.'</td></tr>
+        <tr><td class="mono">5</td><td class="mono">ReconModulePage:71</td><td>'Barry will also flag prospects who mention competitor keywords in their profiles.'</td></tr>
+        <tr><td class="mono">6</td><td class="mono">ReconModulePage:91</td><td>'Scout will surface high-intent leads faster.'</td></tr>
+        <tr><td class="mono">7</td><td class="mono">ReconModulePage:164</td><td><code>feedsInto[2]:</code> 'Scout filters out prospects locked into competitor ecosystems'</td></tr>
+        <tr><td class="mono">8</td><td class="mono">ReconModulePage:177</td><td><code>feedsInto[0]:</code> 'Scout prioritizes leads showing real purchase intent signals'</td></tr>
+        <tr><td class="mono">9</td><td class="mono">ReconOverview:44</td><td><code>impactAreas[0]:</code> 'Scout lead scoring'</td></tr>
+        <tr><td class="mono">10</td><td class="mono">ReconOverview:66</td><td><code>impactAreas[2]:</code> 'Prospect qualification' — unfalsifiable; remove rather than defend</td></tr>
+        <tr><td class="mono">11</td><td class="mono">ReconOverview:77</td><td><code>impactAreas[0]:</code> 'Scout lead prioritization'</td></tr>
+        <tr><td class="mono">12</td><td class="mono">ReconOverview:89</td><td>Scout impact: 'Better lead scoring — Barry matches prospects against your actual ICP'</td></tr>
+        <tr><td class="mono">13</td><td class="mono">ReconOverview:90</td><td>Scout impact: 'Prioritizes leads showing real purchase intent'</td></tr>
+        <tr><td class="mono">14</td><td class="mono">ReconOverview:91</td><td>Scout impact: 'Filters out prospects already locked into competitors'</td></tr>
+        <tr><td class="mono">15</td><td class="mono">ReconFeedbackToast:40</td><td><code>barryQuote:</code> "I'll prioritize leads showing active buying behavior." — a first-person promise Barry cannot keep</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4><span class="chip c-warn">REDUCE</span> — keep only the supported portion</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>#</th><th>File + line</th><th>Current</th><th>Reduction</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">16</td><td class="mono">BarryTraining:86</td><td>'No signal-based prioritization. All prospects treated equally.'</td><td>Drop both sentences' implication — the first implies the module would add prioritization; the second is untrue, since ranking by <code>fit_score</code> is not equal treatment.</td></tr>
+        <tr><td class="mono">17</td><td class="mono">BarryTraining:270</td><td>'…unlock: <strong>ICP-based lead scoring</strong>, competitive positioning, personalized messaging'</td><td>Drop the first item only. The other two are messaging-side and supported.</td></tr>
+        <tr><td class="mono">18</td><td class="mono">ReconModulePage:28</td><td>'He can <strong>match prospects against your ICP</strong> and generate business-aware context.'</td><td>Keep the second half. Business-aware context is verified.</td></tr>
+        <tr><td class="mono">19</td><td class="mono">ReconModulePage:69</td><td>'…position you effectively <strong>and filter out competitor-locked leads</strong>.'</td><td>Truncate after "position you effectively."</td></tr>
+        <tr><td class="mono">20</td><td class="mono">ReconModulePage:79</td><td>'<strong>Scout will deprioritize competitor-locked leads</strong>, and Hunter messaging will differentiate effectively.'</td><td>Drop the Scout clause; keep Hunter.</td></tr>
+        <tr><td class="mono">21</td><td class="mono">ReconModulePage:96</td><td>'<strong>Scout will prioritize high-intent leads</strong>, and Hunter timing will adapt to buyer readiness.'</td><td>Drop the Scout clause; keep Hunter — <code>barryGenerateSequenceStep.js</code> supports it.</td></tr>
+        <tr><td class="mono">22</td><td class="mono">ReconModulePage:159</td><td>'…sharpen messaging <strong>and filter out competitor-locked leads</strong>.'</td><td>Truncate after "sharpen messaging."</td></tr>
+        <tr><td class="mono">23</td><td class="mono">ReconFeedbackToast:25</td><td><code>barryQuote:</code> "I can now score leads based on how well they match your target market."</td><td>Also circular as written. Reduce or remove pending the §06 decision.</td></tr>
+        <tr><td class="mono">24</td><td class="mono">reconHealthConstants:74</td><td>'Scout ICP alignment cannot be validated. <strong>Lead scoring is unweighted.</strong>'</td><td>Correct the second sentence — <code>DEFAULT_WEIGHTS</code> (50/25/15/10) always applies and <code>icpProfile.scoringWeights</code> overrides. Scoring is never unweighted.</td></tr>
+        <tr><td class="mono">25</td><td class="mono">ReconOverview:335–336</td><td>'…<strong>making Scout smarter</strong>, Hunter sharper, and every interaction more relevant.'</td><td>Drop "making Scout smarter"; the Hunter and interaction clauses are supported.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4><span class="chip c-ok">KEEP</span> — verified, do not touch</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>File + line</th><th>Claim</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">BarryTraining:52</td><td>'Hunter messages address real pain points. Barry anticipates objections.'</td><td rowspan="5"><code>barryBulkPersonalize.js:238</code> · <code>barryGenerateContext.js</code> · <code>barryGenerateMissionSequence.js</code> · <code>barryGenerateSequenceStep.js</code> · <code>barryContextStack.js:292</code></td></tr>
+        <tr><td class="mono">BarryTraining:68</td><td>'Barry references competitive advantages. Hunter messaging differentiates.'</td></tr>
+        <tr><td class="mono">BarryTraining:74</td><td>'All generated content reflects your actual voice and positioning.'</td></tr>
+        <tr><td class="mono">ReconModulePage:62</td><td>'Your Hunter follow-ups just got a lot smarter.'</td></tr>
+        <tr><td class="mono">ReconModulePage:74</td><td>'The differentiation points you define will appear in Hunter messaging.'</td></tr>
+        <tr><td class="mono">BarryTraining:157</td><td>'What Barry knows and what he's missing'</td><td>Already on-model — reuse as the page name (§04)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4><span class="chip c-decide">HOLD FOR PRODUCT DECISION</span></h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Item</th><th>Question</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">reconHealthConstants:55, :114</td><td>'Lead prioritization doesn't account for buying readiness indicators.' — factually true today, but framed as a deficit the module would fix. Keep the fact, or drop the sentence?</td></tr>
+        <tr><td class="mono">BarryTraining · <code>signals</code> dimension</td><td>With actions 3 and 16 applied, this dimension has no verified impact left. Does Behavioral Signals still earn a place in the training-status readout, or does it become messaging-only?</td></tr>
+        <tr><td class="mono">ReconOverview · Scout <code>PLATFORM_IMPACTS</code></td><td>Empty after actions 12–14. See §06.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose"><strong>Not implemented.</strong> No replacement language written for any unverified claim.</p>
+</section>
+
+<!-- ══ 6 ══ -->
+<section id="d6">
+  <div class="sec-head"><span class="sec-letter">06</span><h2>PLATFORM_IMPACTS — Scout's three options</h2></div>
+
+  <p class="prose">After actions 12–14, Scout's entry in <code>ReconOverview</code>'s
+  <code>PLATFORM_IMPACTS</code> has zero effects. Hunter's and Barry's entries are untouched and still
+  populated.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Option</th><th>What the user sees</th><th>Honest assessment</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>A · Remove Scout</strong><br><span class="chip c-ok">Recommended</span></td>
+          <td>RECON's impact section lists Hunter and Barry. Scout is absent.</td>
+          <td><strong>The only option that is true today and needs no new product decision.</strong> Cost: Scout is where users spend their time, so removing it weakens RECON's pitch and may reduce completion. That is a real cost, and it is the accurate one — RECON genuinely does not affect what Scout surfaces. Also the lowest-maintenance: nothing to revisit if the integration never ships. Risk: a user may notice Scout disappearing and read it as a regression.</td>
+        </tr>
+        <tr>
+          <td><strong>B · One verified effect</strong></td>
+          <td>Scout · "RECON completeness increases the size of your discovery queue"</td>
+          <td>True — <code>QUEUE_TARGET = min(50 + floor(reconConfidence × 0.5), 100)</code>. But <strong>read it from the user's side: it says we cap your results at 50 until you do homework.</strong> That is a gate described as a benefit, and it may land worse than saying nothing. It also makes an internal throttle a public promise, which constrains you from changing the numbers later. Only viable if the behavior is first reframed as a feature you actually want to sell — which is the separate review you flagged.</td>
+        </tr>
+        <tr>
+          <td><strong>C · Retain, label planned</strong></td>
+          <td>Scout · three effects, each badged "Coming soon"</td>
+          <td><strong>Weakest of the three.</strong> It keeps advertising unbuilt capability — a milder form of the original problem, now with a disclaimer. Three "coming soon" badges on a single module reads as an admission the module does not do what it says. Roadmap labels also rot: nobody removes them, and in six months they read as abandoned rather than planned. It converts a copy defect into a permanent visible commitment.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="callout">
+      <span class="tag">Recommendation</span>
+      <p><strong>Option A now. Option B later, and only if the queue-size behavior is first reframed as a
+      benefit rather than a gate.</strong></p>
+      <p>A is the only choice that is honest today without requiring you to decide anything else first. If
+      Scout's absence from the list bothers you, the right fix is issue #561 — build the integration — not a
+      copy patch. And if you do want Scout represented in the interim, B is defensible, but the sentence has
+      to be written so it reads as "more RECON, more to review", never as "less RECON, fewer results."</p>
+    </div>
+  </div>
+</section>
+
+<footer class="end">
+  Implemented this round: DailyLeads:2144 subtitle (commit fb7aa08) · build passing · 1128 pass / 5 known · no PR<br>
+  Returned unimplemented: Groups 02/04 · onboarding sequence · training inventory · RECON terminology · 25 RECON actions · PLATFORM_IMPACTS options<br>
+  Frozen and untouched: /recon/barry-training · BarryTraining.jsx · all routes, analytics, schema, persisted fields · 50 dead entries · 18 Lead lifecycle usages · issues #561–565
+</footer>
+
+</div>

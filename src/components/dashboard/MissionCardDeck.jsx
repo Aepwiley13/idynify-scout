@@ -568,7 +568,7 @@ export default function MissionCardDeck({ module, userId, onClose }) {
   // Scout renders DailyLeads directly — it has its own title/tabs/close pattern
   if (module === 'scout') {
     return (
-      <section className="mb-12 mt-2" aria-label="Scout daily leads deck">
+      <section className="mb-12 mt-2" aria-label="Scout daily discoveries deck">
         <div
           className="max-w-2xl mx-auto rounded-2xl border-2 relative overflow-hidden"
           style={{

@@ -168,7 +168,7 @@ export default function SavedCompanies({ onSelectCompany }) {
         <Building2 size={48} color={T.textFaint} />
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: T.text }}>No Matched Companies Yet</h2>
         <p style={{ margin: 0, fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
-          Match with companies in Daily Leads to start building your hunt list.
+          Match with companies in Daily Discoveries to start building your hunt list.
         </p>
         <button
           onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}

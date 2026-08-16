@@ -1745,10 +1745,10 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       : mode === 'sniper'
       ? { title: 'No Pipeline Contacts', body: 'Add warm contacts to your pipeline from Scout or Hunter using "Add to SNIPER".', cta: null }
       : mode === 'scout'
-      ? { title: 'No Unengaged Contacts', body: 'All contacts are in active missions, or add new ones via Daily Leads.', cta: null }
+      ? { title: 'No Unengaged Contacts', body: 'All contacts are in active missions, or add new ones via Daily Discoveries.', cta: null }
       : mode === 'fallback'
       ? { title: 'No Archived People', body: 'People you archive or mark as lost will appear here.', cta: null }
-      : { title: 'No Contacts Yet', body: 'Accept companies in Daily Leads to start building your contact pipeline.', cta: 'View Saved Companies' };
+      : { title: 'No Contacts Yet', body: 'Save companies in Daily Discoveries to start building your contact pipeline.', cta: 'View Saved Companies' };
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16, color: T.textMuted }}>
         <Users size={48} color={T.textFaint} />

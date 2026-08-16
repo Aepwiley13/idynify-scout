@@ -576,7 +576,7 @@ export default function BarryOnboarding() {
                 <span>Finding companies matching your ICP...</span>
               </div>
 
-              <p className="save-redirect-note">Taking you to Daily Leads in a moment</p>
+              <p className="save-redirect-note">Taking you to Daily Discoveries in a moment</p>
             </div>
           </div>
         )}

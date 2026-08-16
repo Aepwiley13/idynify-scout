@@ -1,0 +1,1211 @@
+<title>Claims, Surfaces and the Live Plan</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Positioning &amp; Terminology · Team A · Round 2</p>
+  <h1>Claims, Surfaces and the Live Plan</h1>
+  <p class="standfirst">Batch 0 and the two false action labels are shipped. The RECON audit found something
+  larger than terminology: six advertised Scout capabilities have no implementation, and the one real
+  RECON→Scout capability isn't claimed anywhere.</p>
+  <div class="meta">
+    <span><b>Branch</b> claude/idynify-positioning-handoff-dcpnhl</span>
+    <span><b>Build</b> passing</span>
+    <span><b>Tests</b> 1128 pass / 5 known</span>
+    <span><b>PR</b> none</span>
+  </div>
+</header>
+
+<!-- ══ 1 ══ -->
+<section id="impl">
+  <div class="sec-head"><span class="sec-letter">01</span><h2>Implemented — Batch 0</h2></div>
+
+  <p class="prose">Five user-facing strings, each classified by purpose before rewriting. Nothing was
+  mechanically replaced.</p>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Location</th><th>Before</th><th>After</th><th>Purpose read</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">GettingStarted.jsx:108</td>
+          <td>Barry learns your market</td>
+          <td><strong>Give Barry the context that matters</strong></td>
+          <td>User supplies information — the card's body is "The more you fill out Recon…"</td>
+        </tr>
+        <tr>
+          <td class="mono">GettingStarted.jsx:169</td>
+          <td>Barry learns</td>
+          <td><strong>Barry connects the dots</strong></td>
+          <td>Processing state — step 2 of "You answer → ? → Scout delivers"</td>
+        </tr>
+        <tr>
+          <td class="mono">OnboardingFlow.jsx:552</td>
+          <td>I just need to learn a little about your business.</td>
+          <td><strong>I just need a little context about your business.</strong></td>
+          <td>User supplies information — Barry first-person, before the website prompt</td>
+        </tr>
+        <tr>
+          <td class="mono">ReconFeedbackToast.jsx:120</td>
+          <td>Barry learned: {feedback.learned}</td>
+          <td><strong>Barry now has your {feedback.learned}</strong></td>
+          <td>Confirmation after the user saved Recon data — states possession, not training</td>
+        </tr>
+        <tr>
+          <td class="mono">GoToWar.jsx:1456</td>
+          <td>…This helps Barry learn your patterns.</td>
+          <td><strong>…This helps Barry understand what's working.</strong></td>
+          <td>User supplies outcome data</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="flag warn">
+      <p><span class="lede">Correction to my own B3 table.</span> I cited
+      <code>OnboardingFlow.jsx:561</code>. That line is a JSX comment
+      (<code>{/* STEP 2: Barry Learns Your Business */}</code>) and does not render. The real user-facing
+      string was <code>:552</code>, which is what I changed. The comment is untouched, as are three docstrings
+      (<code>schema.js:861</code>, <code>ReconFeedbackToast.jsx:7</code>, <code>ReconSection0.jsx:5</code>) —
+      none of them render.</p>
+    </div>
+
+    <div class="flag stop">
+      <p><span class="lede">Found while editing, not changed — <code>OnboardingFlow.jsx:551</code>.</span>
+      One line above the string I fixed, Barry says: <em>"Give me about 3 minutes and I'll build your first
+      <strong>prospecting engine</strong>."</em> That is the same construction as the banned "sales engine",
+      on a live onboarding screen, and it implies an autonomous system. It contains no form of "learn", so it
+      was outside Batch 0's authorization and I left it. <strong>Recommend adding it to a Batch 0b.</strong></p>
+    </div>
+
+    <div class="flag">
+      <p><span class="lede">Adjacent, flagged not changed — <code>GettingStarted.jsx:170</code>.</span>
+      The body under the step I renamed still reads "AI analyzes your inputs and finds patterns", which
+      attributes the work to "AI" rather than Barry and sits oddly under "Barry connects the dots". Outside
+      Batch 0's five strings.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 2 ══ -->
+<section id="labels">
+  <div class="sec-head"><span class="sec-letter">02</span><h2>Implemented — the two false action labels</h2></div>
+
+  <p class="prose">Applied context-dependently as directed. <code>Save Contact</code> where the screen already
+  shows the destination; <code>Save to People</code> only where it does not.</p>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Location</th><th>Before</th><th>After</th><th>Why this form</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">MissionControlDashboardV2.jsx:297</td>
+          <td>Approve &amp; Add to Leads</td>
+          <td><strong>Approve &amp; Save Company</strong></td>
+          <td><code>handleApprove</code> writes <code>companies/{id}</code> <code>status:'accepted'</code>. The object is a company; no person is created.</td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyDetail.jsx:1437, 1538, 1666</td>
+          <td>Add {n} to Leads</td>
+          <td><strong>Save {n} Contacts</strong></td>
+          <td rowspan="2">Screen already carries <code>Saved Contacts ({n})</code> (:1286) and <code>View All People →</code> (:1292). The destination is visible; the object is what matters. Done-state is already <code>Saved</code>.</td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyDetail.jsx:1813</td>
+          <td>Add to Leads</td>
+          <td><strong>Save Contact</strong></td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyProfileView.jsx:732, 793</td>
+          <td>Add {n} to Leads</td>
+          <td><strong>Save {n} Contacts</strong></td>
+          <td rowspan="2">Same screen vocabulary — <code>Saved Contacts ({n})</code> section (:658) and "All found contacts are already saved!" (:844).</td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyProfileView.jsx:830, 867</td>
+          <td>Save to Leads</td>
+          <td><strong>Save Contact</strong></td>
+        </tr>
+        <tr>
+          <td class="mono">CompanyDetailModal.jsx:701</td>
+          <td>Add {n} to Leads</td>
+          <td><strong>Save {n} to People</strong></td>
+          <td>A modal over Saved Companies with no "Saved Contacts" section and no People link. Destination is genuinely useful here — the only place it is.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">Subtitles, search placeholders and success messages in these files were <em>not</em> touched —
+  they sit in group 04 of the revised plan below, pending your review.</p>
+
+  <div class="prose">
+    <div class="flag">
+      <p><span class="lede">Small residual inconsistency left in place.</span>
+      <code>CompanyDetailModal.jsx:702</code> shows <code>'Select contacts to add'</code> as the same button's
+      empty-selection label, so it now reads "Select contacts to add" → "Save 3 to People". Changing it was
+      outside the authorized scope; it belongs with group 04.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 3 ══ -->
+<section id="tier1">
+  <div class="sec-head"><span class="sec-letter">03</span><h2>Tier 1 gaps — resolution</h2></div>
+
+  <h3>B1 · ScoutDashboardPage tagline</h3>
+  <div class="prose">
+    <p><strong>A live equivalent exists.</strong> The dead file's tagline sits under a <code>SCOUT</code>
+    header; the live Scout module renders the same slot through <code>ModuleSubNav</code> at
+    <code>ScoutMain.jsx:203–205</code>:</p>
+    <p><code>title="SCOUT"</code> · <code>tagline="Find and qualify prospects"</code></p>
+    <p><strong>Tier 1 status: closed, no violation on the live surface.</strong> "Find and qualify prospects"
+    contains no banned vocabulary — no Tinder, AI SDR, sales engine, automated, always-on or learns. The dead
+    file's copy did not need porting.</p>
+    <p><strong>But it raises a terminology question, not a Tier 1 one.</strong> This tagline uses
+    <em>prospects</em> as a top-level noun, which contradicts the correction you accepted in E2 — prospect is
+    a brigade inside <code>person_type: lead</code>, not a category of thing Scout finds. It is also the
+    module's own one-line self-description, so it belongs in the Scout surface definition below rather than in
+    a string sweep. <strong>I have not changed it.</strong> Recommendation is in section 05.</p>
+  </div>
+
+  <h3>B2 · The bear emoji</h3>
+  <div class="prose">
+    <p><strong>Resolved — and the original Tier 2 scope was drawn correctly.</strong> The bear appears in about
+    forty live places. Nearly all are Barry's avatar or an <code>onError</code> fallback for
+    <code>ASSETS.barryAvatar</code> — <code>Sidebar.jsx:121</code>, <code>MoreSheet.jsx:54</code>,
+    <code>BarryChatPanel</code>, <code>BarryReconGuide</code> and so on. Those are <em>Barry's visual
+    identity</em>, which the handoff explicitly scoped out.</p>
+    <p>The distinction Tier 2 was actually drawing is <strong>brand-mark slot vs. avatar slot</strong>.
+    NavigationBar and UnifiedDashboard were brand slots. The live app shell's brand slot is
+    <code>Sidebar.jsx</code>, and <strong>it already renders the IDYNIFY wordmark</strong> — merged in PR #559
+    before this work began.</p>
+    <p>So: no live brand slot is missing the mark. The one remaining live brand-slot bear is
+    <code>Homepage.jsx:91</code>, which you deferred. Two smaller ones sit on unrouted or unlinked pages
+    (<code>GettingStarted.jsx:13</code>, <code>ImprovedScoutQuestionnaire.jsx:526</code>). <strong>Item closed
+    as resolved-via-dead-code plus already-correct-on-live-shell.</strong></p>
+  </div>
+</section>
+
+<!-- ══ 4 ══ -->
+<section id="dead">
+  <div class="sec-head"><span class="sec-letter">04</span><h2>Dead &amp; orphaned inventory</h2></div>
+
+  <p class="prose">Documented only — nothing deleted, nothing renamed. Two categories: files with no route at
+  all, and files behind routes that exist but are unreachable from any navigation surface.</p>
+
+  <h4>Category A · No route — cannot render</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>File</th><th>Matrix</th><th>Evidence it is unreachable</th><th>Deletion safe?</th><th>Superseded by</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">components/ICPScoring.jsx</td><td class="num">#1–9</td>
+          <td>Zero imports anywhere in <code>src/</code>. Renders <code>mockLeads</code>.</td>
+          <td><span class="chip c-ok">Likely safe</span></td>
+          <td><code>Scout/ICPSettings.jsx</code> + <code>utils/icpScoring.js</code></td>
+        </tr>
+        <tr>
+          <td class="mono">components/ImprovedScoutQuestionnaire.jsx</td><td class="num">#10–13</td>
+          <td>Imported at <code>App.jsx:66</code> but bound to no <code>&lt;Route&gt;</code>.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>Onboarding/BarryOnboarding.jsx</code></td>
+        </tr>
+        <tr>
+          <td class="mono">components/scout/AddContactModal.jsx</td><td class="num">#35–37</td>
+          <td>Zero imports. <code>Sniper/sections/PipelineSection.jsx:106</code> declares its own local component of the same name.</td>
+          <td><span class="chip c-ok">Likely safe</span></td>
+          <td>Sniper's local modal; <code>scout/FindContact.jsx</code></td>
+        </tr>
+        <tr>
+          <td class="mono">pages/Scout/ContactSearch.jsx</td><td class="num">#111–112</td>
+          <td>Zero imports.</td>
+          <td><span class="chip c-ok">Likely safe</span></td>
+          <td><code>components/scout/FindContact.jsx</code> (live via <code>ContactDetailModal</code>)</td>
+        </tr>
+        <tr>
+          <td class="mono">pages/ScoutDashboardPage.jsx</td><td class="num">—</td>
+          <td>Imported at <code>App.jsx:34</code>, bound to no route. <em>Carries a Tier 1 change.</em></td>
+          <td><span class="chip c-ok">Likely safe</span></td>
+          <td><code>Scout/ScoutMain.jsx</code> + <code>MissionControlDashboardV2</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Category B · Routed but unreachable from any nav surface</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>File</th><th>Route</th><th>Matrix</th><th>Evidence</th><th>Deletion safe?</th><th>Superseded by</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">pages/UnifiedDashboard.jsx</td><td class="mono">/old-dashboard</td><td class="num">#125–144</td>
+          <td>Route sits under the comment <em>"Old Flow (keep for backwards compatibility)"</em>. No link anywhere.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>MissionControlDashboardV2</code></td>
+        </tr>
+        <tr>
+          <td class="mono">components/LeadList.jsx</td><td class="mono">/lead-review</td><td class="num">#19–22</td>
+          <td>Only inbound links are <code>ContactSuggestions.jsx:181, 243</code> and <code>NavigationBar.jsx:28</code> — all inside category B themselves.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>Scout/AllLeads.jsx</code> (People)</td>
+        </tr>
+        <tr>
+          <td class="mono">components/LeadDetail.jsx</td><td class="mono">—</td><td class="num">#14–18</td>
+          <td>Imported only by <code>LeadList.jsx:8</code>.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>Scout/ContactProfile.jsx</code> · <code>contacts/</code> panels</td>
+        </tr>
+        <tr>
+          <td class="mono">components/NavigationBar.jsx</td><td class="mono">—</td><td class="num">#23</td>
+          <td>Rendered only by <code>CompanyList.jsx</code> and <code>ContactSuggestions.jsx</code>. <em>Carries a Tier 2 change.</em></td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>layout/MainLayout.jsx</code> + <code>layout/Sidebar.jsx</code></td>
+        </tr>
+        <tr>
+          <td class="mono">components/QuotaDisplay.jsx</td><td class="mono">—</td><td class="num">#24–25</td>
+          <td>Rendered only by <code>ContactSuggestions.jsx:12</code>.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td>No direct successor — quota UI appears not to exist on the live shell</td>
+        </tr>
+        <tr>
+          <td class="mono">components/CompanyList.jsx · ContactSuggestions.jsx</td><td class="mono">/companies · /contact-suggestions</td><td class="num">—</td>
+          <td>Routed, no inbound links. They are what keeps NavigationBar and QuotaDisplay alive.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>Scout/SavedCompanies.jsx</code> · <code>Scout/AllLeads.jsx</code></td>
+        </tr>
+        <tr>
+          <td class="mono">pages/Questionnaire.jsx</td><td class="mono">/questionnaire</td><td class="num">#74</td>
+          <td>Routed, no inbound links. Two sibling routes already redirect to <code>/mission-control-v2</code>.</td>
+          <td><span class="chip c-warn">Verify first</span></td>
+          <td><code>Onboarding/BarryOnboarding.jsx</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p><code>pages/GettingStarted.jsx</code> (<code>/getting-started</code>, matrix #67) is a borderline case:
+    routed and reachable by URL, no inbound link found. I have treated it as <strong>live but low
+    priority</strong> rather than orphaned — and it did receive two Batch 0 fixes on that basis.</p>
+    <div class="flag warn">
+      <p><span class="lede">"Verify first" means one specific check.</span> Every category B file is reachable
+      by typing its URL, so deletion is a product decision about whether any user, bookmark, support macro or
+      external link still points there — not something static analysis settles. Category A files cannot render
+      under any URL.</p>
+    </div>
+  </div>
+
+  <h4>Revised exclusion count</h4>
+  <div class="scope">
+    <div><span class="k">Matrix entries</span><span class="v">149</span><span class="n">As audited</span></div>
+    <div><span class="k">Category A</span><span class="v">18</span><span class="n">No route — cannot render</span></div>
+    <div><span class="k">Category B</span><span class="v">32</span><span class="n">Routed, unreachable from nav</span></div>
+    <div><span class="k">Live</span><span class="v hi">99</span><span class="n">Of which 18 are ratified keeps</span></div>
+  </div>
+  <p class="prose"><strong>This corrects my earlier figure of 41.</strong> The true exclusion count is
+  <strong>50</strong> — I had previously undercounted the Lead Review cluster and had not yet found that
+  <code>ImprovedScoutQuestionnaire.jsx</code> (4 entries) and <code>QuotaDisplay.jsx</code> (2 entries) were
+  also unreachable. Live strings actually needing change: <strong>81</strong>, of which 3 are held (Homepage
+  #68 out of scope; checkout #65–66 pending) — leaving <strong>78</strong> in the batches.</p>
+</section>
+
+<!-- ══ 5 ══ -->
+<section id="surface">
+  <div class="sec-head"><span class="sec-letter">05</span><h2>Scout surface definition</h2></div>
+
+  <p class="prose">Requested before any normalization. This is the current state of both surfaces across every
+  layer you listed. <strong>Nothing here has been changed.</strong></p>
+
+  <h3>Surface 1 — Daily Discoveries</h3>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Layer</th><th>Current value</th><th>Source</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Canonical route</td><td class="mono">/scout?tab=daily-leads</td><td class="mono">ScoutMain.jsx:80</td><td><span class="chip c-ok">Frozen — do not change</span></td></tr>
+        <tr><td>Internal view id</td><td class="mono">daily</td><td class="mono">ScoutMain.jsx:55</td><td><span class="chip c-ok">Frozen</span></td></tr>
+        <tr><td>Desktop nav label</td><td><strong>Daily Discoveries</strong></td><td class="mono">ScoutMain.jsx:55</td><td><span class="chip c-ok">Canonical</span></td></tr>
+        <tr><td>Desktop nav description</td><td>Review queue</td><td class="mono">ScoutMain.jsx:55</td><td><span class="chip c-ok">Consistent</span></td></tr>
+        <tr><td>Mobile nav label</td><td>Daily</td><td class="mono">mobileNavigation.js:73</td><td><span class="chip c-ok">Consistent</span></td></tr>
+        <tr><td>Mobile section name</td><td><strong>Daily Discoveries</strong></td><td class="mono">mobileNavigation.js:73</td><td><span class="chip c-ok">Canonical</span></td></tr>
+        <tr><td>Page heading</td><td>Daily Lead Insights</td><td class="mono">DailyLeads.jsx:2142</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>Page subtitle</td><td>AI-curated prospects matching {ICP}</td><td class="mono">DailyLeads.jsx:2144</td><td><span class="chip c-warn">Uses "prospects" as top-level noun</span></td></tr>
+        <tr><td>Inner tabs</td><td>Companies · People</td><td class="mono">DailyLeads.jsx:2225</td><td><span class="chip c-ok">Consistent</span></td></tr>
+        <tr><td>Loading state</td><td>Loading lead insights…</td><td class="mono">DailyLeads.jsx:2050</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>ICP gate state</td><td>…before it can curate your daily leads</td><td class="mono">DailyLeads.jsx:2068</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>Barry terminology</td><td>Help Barry send better leads your way.</td><td class="mono">DailyLeads.jsx:54</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>Accessibility label</td><td>Scout daily leads deck</td><td class="mono">MissionCardDeck.jsx:571</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>Inbound cross-links (8)</td><td>"Daily Leads"</td><td class="mono">SavedCompanies:171 · AllLeads:1748,1751 · SharedCompaniesView:422,425 · ICPSettings:552 · GameSessionStart:114,118,124 · BarryOnboarding:579</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>Outbound cross-link</td><td><strong>Daily Discoveries</strong></td><td class="mono">AllLeads.jsx:2469</td><td><span class="chip c-ok">Canonical</span></td></tr>
+        <tr><td>Test assertion</td><td><strong>Daily Discoveries</strong></td><td class="mono">scoutSubNav.test.jsx:90</td><td><span class="chip c-ok">Locks the canonical name</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose"><strong>Definition:</strong> Daily Discoveries is Scout's review queue. It holds two tabs —
+  Companies and People — both scored against the active ICP, both at <code>record_status: suggested</code>. The
+  user swipes to save or skip. <strong>Canonical name: Daily Discoveries. Individual items are Matches.</strong>
+  Roughly 14 visible references are stale.</p>
+
+  <h3>Surface 2 — People</h3>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Layer</th><th>Current value</th><th>Source</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>Canonical route</td><td class="mono">/scout?tab=all-leads</td><td class="mono">ScoutMain.jsx:82</td><td><span class="chip c-ok">Frozen — do not change</span></td></tr>
+        <tr><td>Internal view id</td><td class="mono">all</td><td class="mono">ScoutMain.jsx:56</td><td><span class="chip c-ok">Frozen</span></td></tr>
+        <tr><td>Desktop nav label</td><td><strong>People</strong></td><td class="mono">ScoutMain.jsx:56</td><td><span class="chip c-ok">Canonical</span></td></tr>
+        <tr><td>Desktop nav description</td><td>My leads</td><td class="mono">ScoutMain.jsx:56</td><td><span class="chip c-stop">Stale</span></td></tr>
+        <tr><td>Mobile nav label</td><td><strong>People</strong></td><td class="mono">mobileNavigation.js</td><td><span class="chip c-ok">Canonical</span></td></tr>
+        <tr><td>Lens filters</td><td>All People · Active · New (Unengaged)</td><td class="mono">AllLeads.jsx:1118–1122</td><td><span class="chip c-ok">Consistent</span></td></tr>
+        <tr><td>Stat badges (scout mode)</td><td>Unengaged · Added This Week · <strong>Total Leads</strong></td><td class="mono">AllLeads.jsx:1897–1899</td><td><span class="chip c-stop">Stale — third badge only</span></td></tr>
+        <tr><td>Empty states</td><td>No Unengaged Contacts · No Contacts Yet</td><td class="mono">AllLeads.jsx:1748, 1751</td><td><span class="chip c-ok">Consistent</span></td></tr>
+        <tr><td>Inbound cross-link</td><td><strong>View All People →</strong></td><td class="mono">CompanyDetail.jsx:1292</td><td><span class="chip c-ok">Canonical</span></td></tr>
+        <tr><td>Shared across modules</td><td><code>mode</code>: people · scout · hunter · sniper · basecamp · fallback</td><td class="mono">AllLeads.jsx:1184</td><td><span class="chip c-warn">Any label change hits six modules</span></td></tr>
+        <tr><td>Test assertion</td><td><strong>People</strong></td><td class="mono">scoutSubNav · mobileNavigation</td><td><span class="chip c-ok">Locks the canonical name</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose"><strong>Definition:</strong> People is the saved-contact roster, rendered by one shared
+  component across six modules with a per-module filter. In Scout mode it shows contacts not yet engaged.
+  <strong>Canonical name: People. The record is a Contact.</strong> Only two visible references are stale.</p>
+
+  <h3>The module tagline — needs your call</h3>
+  <div class="prose">
+    <p><code>ScoutMain.jsx:205</code> reads <code>tagline="Find and qualify prospects"</code>. It is the one
+    line describing what Scout is, and it disagrees with everything below it: Scout's own sections are
+    <em>Daily Discoveries</em>, <em>People</em> and <em>Saved Companies</em>, and its scored objects are
+    companies. It also promotes <em>prospects</em> to a top-level noun, which you've accepted it should not be.</p>
+    <p><strong>My recommendation:</strong> <code>tagline="Find companies and people who match"</code> — it names
+    both inner tabs, uses the canonical word for what Scout produces, and drops the lifecycle noun. Runner-up:
+    <code>"Discover and review your matches"</code>. I have not changed it.</p>
+  </div>
+</section>
+
+<!-- ══ 6 ══ -->
+<section id="score">
+  <div class="sec-head"><span class="sec-letter">06</span><h2>Match Score — what each score actually is</h2></div>
+
+  <p class="prose">Confirmed before recommending any label change. There are two scores, both pre-relationship
+  fit measures, and <strong>the internal field already calls one of them a fit score.</strong></p>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Field</th><th>Scope</th><th>What it computes</th><th>Current visible label</th><th>Recommended label</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">fit_score</td><td>Company</td>
+          <td><code>calculateICPScore()</code> — weighted average over exactly four dimensions: industry&nbsp;50%, location&nbsp;25%, employee size&nbsp;15%, revenue&nbsp;10%, normalized over the dimensions the ICP configures.</td>
+          <td>Company Lead Score<br><span class="mono" style="color:var(--muted)">CompanyCard.jsx:276</span></td>
+          <td><strong>Company Match Score</strong></td>
+        </tr>
+        <tr>
+          <td class="mono">icp_score</td><td>Person</td>
+          <td>Documented in <code>peopleSchema.js:230</code> as "0-100 ICP match score"; used for sort order at <code>AllLeads.jsx:1690</code>.</td>
+          <td>—<span class="mono" style="color:var(--muted)"> (not surfaced)</span></td>
+          <td><strong>Match Score</strong>, if ever surfaced</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="callout">
+      <span class="tag">The decisive evidence</span>
+      <p><code>CompanyCard.jsx:123</code> reads:</p>
+      <p><code>const leadScore = company.fit_score || 0;</code></p>
+      <p>A variable named <em>leadScore</em> renders a field named <em>fit_score</em>, under a label reading
+      <em>Company Lead Score</em>, on a card whose primary button says <em>This is a Match</em>. The data layer
+      and the schema docstring both already say <strong>fit</strong> and <strong>match</strong>. Only the
+      visible label says lead.</p>
+    </div>
+    <p><strong>Confirmed: <code>Match Score</code> is accurate for both.</strong> Neither score measures pursuit,
+    intent or likelihood to buy — only fit against user-set criteria, computed while the record is still
+    <code>suggested</code>. Per your guardrail, <code>fit_score</code>, <code>icp_score</code> and the local
+    <code>leadScore</code> variable are all <strong>unchanged</strong>; only the two visible strings move, and
+    only after you approve the revised plan.</p>
+  </div>
+</section>
+
+<!-- ══ 7 ══ -->
+<section id="recon">
+  <div class="sec-head"><span class="sec-letter">07</span><h2>RECON claim-to-capability audit</h2></div>
+
+  <p class="prose">Every substantive RECON→Scout capability claim, checked against implementation. No RECON
+  copy has been changed.</p>
+
+  <div class="callout">
+    <span class="tag">Headline</span>
+    <p><strong>The one RECON→Scout capability that is real is never claimed. Six that are claimed do not
+    exist.</strong></p>
+    <p>RECON's completeness score reaches Scout through exactly one path:
+    <code>DailyLeads.jsx:1491</code> sends <code>reconConfidence</code> to
+    <code>search-companies.js</code>, which uses it at lines 382 and 468 as
+    <code>QUEUE_TARGET = Math.min(50 + floor(reconConfidence × 0.5), 100)</code>. Completing RECON makes the
+    discovery queue <em>bigger</em> — from 50 up to 100 companies. It does not touch scoring, ordering or
+    filtering. No UI text anywhere says so.</p>
+  </div>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>User-facing claim</th><th>Location</th><th>Claimed capability</th><th>Implementation evidence</th><th>Status</th><th>Recommendation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>"Scout lead scoring reflects your actual ideal customer characteristics"</td>
+          <td class="mono">BarryTraining.jsx:40</td>
+          <td>Completing RECON §3–4 improves Scout's scoring</td>
+          <td><code>fit_score</code> is computed from <code>users/{uid}/icpProfiles</code>. That collection is written by the ICP wizard (<code>dashboardUtils.js:284</code>), Barry chat (<code>updateIcpFromChat.js</code>), <code>Section9MessagingFlow</code> and <code>ICPSettings</code> — <strong>not by RECON</strong>. A grep for <code>recon.</code> across <code>pages/Scout</code>, <code>components/scout</code> and <code>utils</code> returns nothing.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Reduce to what is true: the ICP profile drives scoring; RECON completeness scales queue size. Or open an issue if the wiring was intended.</td>
+        </tr>
+        <tr>
+          <td>"All leads are treated equally — no qualification intelligence"</td>
+          <td class="mono">BarryTraining.jsx:41</td>
+          <td>Without RECON there is no scoring differentiation</td>
+          <td>Scoring depends on the ICP profile, not RECON. A user with an ICP and zero RECON progress still gets fully differentiated <code>fit_score</code> values.</td>
+          <td><span class="chip c-stop">STALE</span></td>
+          <td>Remove, or restate against the ICP profile rather than RECON.</td>
+        </tr>
+        <tr>
+          <td>"Scout prioritizes leads showing active buying signals"</td>
+          <td class="mono">BarryTraining.jsx:85</td>
+          <td>Behavioral-signal prioritization in Scout</td>
+          <td>Zero matches across <code>src/</code> and <code>netlify/</code> for <code>buying_signal</code>, <code>intent_score</code>, <code>purchase_intent</code> or <code>high_intent</code>. <code>icpScoring.js</code> has four dimensions, none behavioral.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Remove the claim; open a product issue for signal-based prioritization if it is wanted.</td>
+        </tr>
+        <tr>
+          <td>"Scout will surface high-intent leads faster" · "Scout will prioritize high-intent leads"</td>
+          <td class="mono">ReconModulePage.jsx:91, :96</td>
+          <td>Intent-ranked discovery ordering</td>
+          <td>Same as above. Queue order comes from <code>fit_score</code> only.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Remove.</td>
+        </tr>
+        <tr>
+          <td>"Scout prioritizes leads showing real purchase intent signals"</td>
+          <td class="mono">ReconModulePage.jsx:177</td>
+          <td>Same, stated as a <code>feedsInto</code> guarantee</td>
+          <td>Same as above.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Remove.</td>
+        </tr>
+        <tr>
+          <td>"Scout will deprioritize competitor-locked leads"</td>
+          <td class="mono">ReconModulePage.jsx:79</td>
+          <td>Automatic competitor-lock deprioritization</td>
+          <td><code>deprioritizeCompany()</code> exists (<code>statusService.js:15</code>) but is a <strong>manual user action</strong> behind a confirm button (<code>MissionControl.jsx:296</code>). No competitor evaluation anywhere.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Remove, or restate accurately as a manual control the <em>user</em> has.</td>
+        </tr>
+        <tr>
+          <td>"Scout filters out prospects locked into competitor ecosystems"</td>
+          <td class="mono">ReconModulePage.jsx:164</td>
+          <td>Competitor-based filtering</td>
+          <td><code>passesAllFilters()</code> filters on exactly one thing: <code>foundedAgeRange</code>. No competitor dimension exists.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Remove.</td>
+        </tr>
+        <tr>
+          <td>"Barry will also flag prospects who mention competitor keywords in their profiles"</td>
+          <td class="mono">ReconModulePage.jsx:71</td>
+          <td>Competitor keyword detection on profiles</td>
+          <td>No competitor keyword matching found in <code>src/</code> or <code>netlify/</code>.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Remove or open an issue.</td>
+        </tr>
+        <tr>
+          <td>"ICP-based lead scoring" listed as a locked capability</td>
+          <td class="mono">BarryTraining.jsx:270</td>
+          <td>RECON progress unlocks ICP scoring</td>
+          <td>Scoring runs off <code>icpProfiles</code> regardless of RECON progress. Nothing gates it.</td>
+          <td><span class="chip c-warn">STALE</span></td>
+          <td>Restate: RECON completeness scales queue size (verified). It does not unlock scoring.</td>
+        </tr>
+        <tr>
+          <td>"Lead scoring is unweighted"</td>
+          <td class="mono">reconHealthConstants.js:74</td>
+          <td>Without RECON §3–4, scoring has no weights</td>
+          <td><code>DEFAULT_WEIGHTS</code> (50/25/15/10) always applies; <code>icpProfile.scoringWeights</code> overrides. Scoring is never unweighted.</td>
+          <td><span class="chip c-warn">STALE</span></td>
+          <td>Correct: without an ICP there is nothing to weigh <em>against</em>; with one, default weights apply.</td>
+        </tr>
+        <tr>
+          <td>"Lead prioritization doesn't account for buying readiness indicators"</td>
+          <td class="mono">reconHealthConstants.js:55, :114</td>
+          <td>Negative claim — no readiness weighting</td>
+          <td>Accidentally accurate: no readiness weighting exists. But the framing implies completing the module would add it, which is false.</td>
+          <td><span class="chip c-warn">PARTIAL</span></td>
+          <td>Keep the negative statement; remove the implied positive.</td>
+        </tr>
+        <tr>
+          <td>"Scout lead scoring" · "Scout lead prioritization" impact-area tags</td>
+          <td class="mono">ReconOverview.jsx:44, :77</td>
+          <td>Two named impact areas</td>
+          <td>Scoring link unverified; prioritization unimplemented.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Collapse to one accurate impact area, or replace with the queue-size effect that is real.</td>
+        </tr>
+        <tr>
+          <td>"Each section you complete makes Scout's lead scoring more accurate"</td>
+          <td class="mono">ReconModulePage.jsx:23</td>
+          <td>Incremental scoring accuracy per section</td>
+          <td>Same as the first row — no RECON→scoring path.</td>
+          <td><span class="chip c-stop">UNVERIFIED</span></td>
+          <td>Restate against queue size, or remove.</td>
+        </tr>
+        <tr>
+          <td>"He can match prospects against your ICP and generate business-aware context"</td>
+          <td class="mono">ReconModulePage.jsx:28</td>
+          <td>Two claims in one sentence</td>
+          <td>Second half <strong>verified</strong> — <code>barryContextStack.js:292</code> extracts RECON's ICP section into Barry's context for <code>BarryChatPanel</code>. First half unverified.</td>
+          <td><span class="chip c-warn">PARTIAL</span></td>
+          <td>Keep the context half; drop the matching half.</td>
+        </tr>
+        <tr>
+          <td>"The differentiation points you define will appear in Hunter messaging"</td>
+          <td class="mono">ReconModulePage.jsx:74</td>
+          <td>RECON data reaches outreach copy</td>
+          <td><strong>Verified.</strong> <code>barryBulkPersonalize.js:238</code> injects a <code>reconBlock</code> as "SENDER'S BUSINESS INTELLIGENCE"; <code>barryGenerateContext</code>, <code>barryGenerateMissionSequence</code> and <code>barryGenerateSequenceStep</code> all load RECON data.</td>
+          <td><span class="chip c-ok">VERIFIED</span></td>
+          <td>No change. This is the claim family RECON can safely make.</td>
+        </tr>
+        <tr>
+          <td>"Barry can now anticipate concerns… Your Hunter follow-ups just got a lot smarter."</td>
+          <td class="mono">ReconModulePage.jsx:62</td>
+          <td>RECON improves Hunter messaging</td>
+          <td>Same evidence as the row above.</td>
+          <td><span class="chip c-ok">VERIFIED</span></td>
+          <td>No change.</td>
+        </tr>
+        <tr>
+          <td><em>(no claim exists)</em></td>
+          <td class="mono">search-companies.js:382, 468</td>
+          <td>RECON completeness scales queue size 50→100</td>
+          <td><code>QUEUE_TARGET = Math.min(50 + floor(reconConfidence × 0.5), 100)</code>, fed by <code>calculateReconConfidence()</code> and mirrored server-side in <code>reconCapability.js</code>.</td>
+          <td><span class="chip c-ok">VERIFIED</span></td>
+          <td><strong>Unclaimed capability.</strong> This is the honest replacement for several of the removals above — but it is a product-copy decision, and per your instruction I have not written it.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Adjacent finding — a signal path that is half-wired</h4>
+  <div class="prose">
+    <p><code>adaptiveSignals</code> in <code>search-companies.js</code> blends the industries of companies the
+    user has already saved into the next Apollo query (<code>:691–697</code>). That is real behavioral
+    adaptation — though it comes from the user's own swipes, not from RECON's Behavioral Signals module.</p>
+    <p>Two caveats worth logging separately from the terminology work:</p>
+    <ul>
+      <li><code>adaptiveSignals.savedTitles</code> is received and <code>console.log</code>'d at
+      <code>:699–701</code> and <strong>never applied to the query</strong>. The people-side signal is
+      collected and discarded.</li>
+      <li><code>adaptiveSignals</code> is passed from only one of the three <code>search-companies</code> call
+      sites (<code>DailyLeads.jsx:1803</code>). The other two — <code>:1491</code> and <code>:1091</code> —
+      omit it, so the adaptation silently does not apply on those paths.</li>
+    </ul>
+    <p>Neither is a copy problem. Both are worth a product issue.</p>
+  </div>
+</section>
+
+<!-- ══ 8 ══ -->
+<section id="plan">
+  <div class="sec-head"><span class="sec-letter">08</span><h2>Revised live terminology plan</h2></div>
+
+  <p class="prose">Dead and orphaned surfaces removed. 99 live entries, grouped by semantic concept.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Group</th><th>Live</th><th>Approved terminology</th><th>Ambiguous occurrences</th><th>Risk</th><th>Batch</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>01 · Barry language</strong></td>
+          <td class="num">5 done<br>+6 open</td>
+          <td>"connects the dots" for processing; "context" where the user supplies information. Never "learns", never an engine.</td>
+          <td><code>OnboardingFlow:551</code> "prospecting engine" — banned construction, not a lead string. <code>ReconOnboardingWizard</code> greeting is positioning copy, not a label.</td>
+          <td><span class="chip c-ok">Low</span></td>
+          <td><strong>0 shipped</strong><br>0b for "prospecting engine"</td>
+        </tr>
+        <tr>
+          <td><strong>02 · Scout discovery &amp; matches</strong></td>
+          <td class="num">6</td>
+          <td><strong>Match</strong> = one scored, unsaved item. Never the surface.</td>
+          <td><code>MissionCardDeck:571</code> is an <code>aria-label</code> — invisible but read aloud; still worth fixing.</td>
+          <td><span class="chip c-ok">Low</span></td>
+          <td class="num">2</td>
+        </tr>
+        <tr>
+          <td><strong>03 · Daily Discoveries</strong></td>
+          <td class="num">14</td>
+          <td><strong>Daily Discoveries</strong> — already canonical in nav, mobile nav and one test.</td>
+          <td>Page subtitle "AI-curated prospects" uses a lifecycle noun. Module tagline needs its own decision (§05).</td>
+          <td><span class="chip c-ok">Low</span> — route values frozen, so no URL churn</td>
+          <td class="num">1</td>
+        </tr>
+        <tr>
+          <td><strong>04 · Saving contacts &amp; people</strong></td>
+          <td class="num">10 done<br>+14 open</td>
+          <td><strong>Save Contact</strong> where destination is visible; <strong>Save to People</strong> where it is not. Record = Contact; collection = People.</td>
+          <td>ScoutPlus "Go to Lead" / "View in Leads" navigates to a tab labelled People — currently names a destination that does not exist.</td>
+          <td><span class="chip c-warn">Med</span> — must not collide with the Lead person_type chip</td>
+          <td><strong>partly shipped</strong><br>rest in 2</td>
+        </tr>
+        <tr>
+          <td><strong>05 · Company actions</strong></td>
+          <td class="num">1 done</td>
+          <td>Company-scoped actions name the company: <strong>Approve &amp; Save Company</strong>.</td>
+          <td>None remaining.</td>
+          <td><span class="chip c-ok">Low</span></td>
+          <td><strong>shipped</strong></td>
+        </tr>
+        <tr>
+          <td><strong>06 · Match scoring (Scout)</strong></td>
+          <td class="num">2</td>
+          <td><strong>Match Score</strong> — confirmed against <code>fit_score</code> and <code>icp_score</code> in §06.</td>
+          <td>None. Both scores verified as fit measures.</td>
+          <td><span class="chip c-warn">Med</span> — must land before any RECON copy references it</td>
+          <td class="num">3</td>
+        </tr>
+        <tr>
+          <td><strong>07 · Legitimate lead lifecycle</strong></td>
+          <td class="num">18</td>
+          <td><strong>Keep as "Lead".</strong> <code>person_type: 'lead'</code>, its brigades, verb usages, job titles, and user-language placeholders.</td>
+          <td>None — this is the load-bearing set and it must survive intact.</td>
+          <td><span class="chip c-ok">None</span> — no change</td>
+          <td><strong>no action</strong></td>
+        </tr>
+        <tr>
+          <td><strong>08 · RECON claims</strong></td>
+          <td class="num">17</td>
+          <td><span class="chip c-stop">Blocked</span> — 9 UNVERIFIED, 3 STALE/PARTIAL, 2 VERIFIED per §07.</td>
+          <td>All of them. These need accuracy decisions before any noun swap; renaming an unimplemented claim makes it more prominent, not more true.</td>
+          <td><span class="chip c-stop">High</span> — copy currently promises unbuilt behavior</td>
+          <td><strong>hold</strong></td>
+        </tr>
+        <tr>
+          <td><strong>09 · Admin &amp; internal UI</strong></td>
+          <td class="num">3</td>
+          <td><strong>Contacts</strong> — matches the collection an admin would query.</td>
+          <td>Field stays <code>recon.leadsTotal</code>; label/field mismatch needs a code comment.</td>
+          <td><span class="chip c-ok">Low</span> — internal audience</td>
+          <td class="num">5</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose mono" style="font-size:12px;color:var(--muted)">Held out of all batches: Homepage #68
+  (out of scope) · checkout #65–66 (pending Stripe/marketing answer) · module tagline (pending §05 decision).</p>
+
+  <h4>Recommended batch order</h4>
+  <ol class="batches">
+    <li><span class="bnum">SHIPPED</span><div><p class="btitle">Batch 0 + false action labels</p><p class="bbody">Groups 01 (partial), 04 (partial), 05. Build passing, tests unchanged.</p></div></li>
+    <li><span class="bnum">NEXT</span><div><p class="btitle">Batch 1 — Daily Discoveries normalization</p><p class="bbody">Group 03. Fourteen stale references to a name already canonical in the nav and locked by a passing test. Zero new product decisions.</p><span class="bmeta">Unblocked once you ratify the §05 surface definition</span></div></li>
+    <li><span class="bnum">THEN</span><div><p class="btitle">Batch 2 — remaining save/search copy + Scout discovery</p><p class="bbody">Groups 02 and the rest of 04 — subtitles, search placeholders, ScoutPlus success copy, the People stat badge and nav description.</p></div></li>
+    <li><span class="bnum">THEN</span><div><p class="btitle">Batch 3 — Match Score, Scout side</p><p class="bbody">Group 06. Two strings. Gates Batch 4.</p></div></li>
+    <li><span class="bnum">HOLD</span><div><p class="btitle">Batch 4 — RECON</p><p class="bbody">Group 08. Blocked on accuracy decisions from §07, not on terminology.</p></div></li>
+    <li><span class="bnum">LAST</span><div><p class="btitle">Batch 5 — admin and long tail</p><p class="bbody">Group 09 plus low-traffic strings.</p></div></li>
+  </ol>
+</section>
+
+<!-- ══ 9 ══ -->
+<section id="questions">
+  <div class="sec-head"><span class="sec-letter">09</span><h2>The seven questions, with my recommendation</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th style="width:1%">#</th><th>Question</th><th>My recommendation</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td>
+          <td>Prioritization noun — "Scout prioritizes ___ showing buying intent"</td>
+          <td><strong>Neither — delete the sentence.</strong> The audit changed my answer. There is no intent prioritization to name. Picking a noun would polish a claim that should be removed. If signal prioritization gets built, revisit then and use <strong>matches</strong>, since it orders the discovery queue.</td>
+        </tr>
+        <tr><td class="mono">2</td>
+          <td>Competitor-locked noun — companies or prospects?</td>
+          <td><strong>Neither — delete.</strong> Same reasoning: <code>passesAllFilters()</code> filters only on founding age. Had the capability existed, <strong>companies</strong> would be right, since the Scout queue is company-scoped.</td>
+        </tr>
+        <tr><td class="mono">3</td>
+          <td>Dead / legacy cluster — delete or freeze?</td>
+          <td><strong>Freeze now, delete in a dedicated cleanup.</strong> Category A (18 entries, cannot render under any URL) is safe to delete whenever you want the diff. Category B (32 entries) is reachable by typed URL, so deletion is a product call about bookmarks and support links — not something I should make. Either way, exclude all 50 from terminology work.</td>
+        </tr>
+        <tr><td class="mono">4</td>
+          <td>Checkout copy — Stripe / marketing counterpart?</td>
+          <td><strong>I can't answer this from the repo</strong> — Stripe product descriptions live in the Stripe dashboard, not in the codebase. Recommend holding both strings until someone confirms. The in-app risk of leaving them is low; the risk of diverging from a paid product description is not.</td>
+        </tr>
+        <tr><td class="mono">5</td>
+          <td>Barry greeting rewrite — do you want to write it?</td>
+          <td><strong>Yes, you should write it.</strong> It's Barry's first-person introduction and the single most positioning-dense string in the app. My draft — "every relationship, message and conversation" — is a safe swap, not a voice decision. Worth noting it sits next to <code>OnboardingFlow:551</code>'s "prospecting engine", so the whole greeting sequence deserves one pass rather than two.</td>
+        </tr>
+        <tr><td class="mono">6</td>
+          <td>Automation language — keep behavioral descriptions?</td>
+          <td><strong>Keep them; ban the positioning claim, not the verb.</strong> "Barry will send it automatically at the scheduled time" describes a real scheduled send and telling the user otherwise would be worse. The distinction that holds: never say the <em>product</em> is automated; do say what a <em>specific feature</em> does. One exception — <code>OnboardingFlow:551</code>'s "prospecting engine" is a positioning claim and should go.</td>
+        </tr>
+        <tr><td class="mono">7</td>
+          <td>Does Scout implement intent-based and competitor-lock prioritization?</td>
+          <td><strong>No. Neither exists.</strong> Zero implementation for buying signals, intent scoring or competitor evaluation across <code>src/</code> and <code>netlify/</code>. <code>icpScoring.js</code> scores four firmographic dimensions; <code>passesAllFilters()</code> filters one. Full evidence in §07. Recommend two product issues — one for signal prioritization, one for competitor filtering — and removing the claims meanwhile.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ 10 ══ -->
+<section id="corrections">
+  <div class="sec-head"><span class="sec-letter">10</span><h2>Corrections to the handoff, and to my own review</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Document</th><th>Claim</th><th>Correction</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Handoff §8</td>
+          <td>Firestore collection <code>users/{uid}/leads</code> must not be renamed</td>
+          <td><strong>That collection is not in use.</strong> <code>leads</code> appears once as an unused constant at <code>src/firebase/schema.js:43</code>. Every write path targets <code>contacts</code>. Other <code>'leads'</code> occurrences are a CSV upload-type flag, a brigade id and a context prop. Documented as instructed — <strong>no schema change made or proposed.</strong></td>
+        </tr>
+        <tr>
+          <td>Handoff §13</td>
+          <td>Start Tier 3 with the highest-concentration files, beginning with <code>UnifiedDashboard.jsx</code> (20)</td>
+          <td>That file is routed only at <code>/old-dashboard</code>. Following this instruction would have spent the first third of the effort on an unreachable surface.</td>
+        </tr>
+        <tr>
+          <td>My review §B3</td>
+          <td>"Barry learns" at <code>OnboardingFlow.jsx:561</code></td>
+          <td>Line 561 is a non-rendering JSX comment. The real user-facing string was <code>:552</code>, which is what Batch 0 changed.</td>
+        </tr>
+        <tr>
+          <td>My review §C</td>
+          <td>41 matrix entries on dead or legacy code</td>
+          <td><strong>The correct figure is 50.</strong> I undercounted the Lead Review cluster and had not yet identified <code>ImprovedScoutQuestionnaire.jsx</code> (4) or <code>QuotaDisplay.jsx</code> (2) as unreachable. Live count is 99, not 108; changeable strings 81, not 82.</td>
+        </tr>
+        <tr>
+          <td>My review §C</td>
+          <td>RECON prioritization nouns need a decision from you</td>
+          <td>Superseded by the audit — the sentences should be removed, not renamed. Questions 1 and 2 are withdrawn as terminology questions and re-raised as accuracy issues.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="end">
+  Shipped: Batch 0 (5 strings) · false action labels (11 strings) · build passing · 1128 pass / 5 known failures<br>
+  Held for approval: Daily Discoveries normalization · remaining save copy · Match Score · RECON · admin<br>
+  No PR opened · no collections, fields, routes, events, functions, variables, filenames, statuses or tab values changed
+</footer>
+
+</div>

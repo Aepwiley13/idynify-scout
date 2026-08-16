@@ -118,7 +118,7 @@ export default function Homepage() {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-4">How It Works</h2>
           <p className="text-xl text-gray-300 text-center mb-12 italic">
-            It's kind of like Tinder, except for owners and executives
+            Know who matters, why they matter, and what to do next
           </p>
 
           <div className="grid md:grid-cols-3 gap-12">

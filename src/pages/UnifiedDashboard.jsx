@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { ASSETS } from "../theme/tokens";
 import { auth, db } from "../firebase/config";
 import { doc, getDoc } from "firebase/firestore";
 import { Users, Target, TrendingUp, Building2, Brain, MessageSquare, Zap, Loader, CheckCircle, XCircle, Sparkles, Filter } from "lucide-react";
@@ -164,7 +165,9 @@ export default function UnifiedDashboard() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-4xl">🐻</div>
+              <div style={{ width: 36, height: 36 }}>
+                <img src={ASSETS.logoMark} alt="IDYNIFY" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
               <div>
                 <h1 className="text-xl font-bold text-white">Mission Control</h1>
                 <p className="text-xs text-slate-400">Barry AI • Scout Tier</p>

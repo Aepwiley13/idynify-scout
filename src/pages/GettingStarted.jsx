@@ -46,7 +46,7 @@ export default function GettingStarted() {
                 <div className="feature-content">
                   <h3 className="feature-title">Approve or reject in seconds</h3>
                   <p className="feature-text">
-                    Swipe through companies like Tinder. Fast decisions, no overwhelm.
+                    Swipe through companies in seconds. Fast decisions, no overwhelm.
                   </p>
                 </div>
               </div>

@@ -36,8 +36,7 @@ const SECTION_FEEDBACK = {
   },
   6: {
     learned: 'Buying Triggers',
-    impact: 'Barry recognizes signals that indicate purchase readiness.',
-    barryQuote: "I'll prioritize leads showing active buying behavior."
+    impact: 'Barry recognizes signals that indicate purchase readiness.'
   },
   7: {
     learned: 'Decision Process',
@@ -56,8 +55,7 @@ const SECTION_FEEDBACK = {
   },
   10: {
     learned: 'Behavioral Signals',
-    impact: 'Barry detects timing indicators and buying signals.',
-    barryQuote: "I'll flag prospects showing urgency signals for immediate follow-up."
+    impact: 'Barry detects timing indicators and buying signals.'
   }
 };
 
@@ -122,14 +120,18 @@ export default function ReconFeedbackToast({ sectionId, isVisible, onClose, vari
             <p className="text-xs text-gray-600 mb-2">
               {feedback.impact}
             </p>
-            <div className="bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
-              <div className="flex items-start gap-1.5">
-                <Sparkles className="w-3 h-3 text-purple-500 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-purple-700 italic">
-                  "{feedback.barryQuote}"
-                </p>
+            {/* Quote block omitted entirely where Barry has nothing supported
+                to say, rather than rendering a pair of empty quote marks. */}
+            {feedback.barryQuote && (
+              <div className="bg-purple-50 rounded-lg px-3 py-2 border border-purple-100">
+                <div className="flex items-start gap-1.5">
+                  <Sparkles className="w-3 h-3 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-purple-700 italic">
+                    "{feedback.barryQuote}"
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

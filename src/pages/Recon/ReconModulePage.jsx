@@ -20,7 +20,7 @@ const CONTEXTUAL_TIPS = {
     inProgress: {
       icon: Sparkles,
       title: 'Keep Going!',
-      content: 'You\'re building Barry\'s core understanding of your business. Each section you complete makes Scout\'s lead scoring more accurate.'
+      content: 'You\'re building Barry\'s core understanding of your business.'
     },
     completed: {
       icon: Trophy,
@@ -71,7 +71,7 @@ const CONTEXTUAL_TIPS = {
     inProgress: {
       icon: Sparkles,
       title: 'Building Competitive Awareness',
-      content: 'The differentiation points you define will appear in Hunter messaging. Barry will also flag prospects who mention competitor keywords in their profiles.'
+      content: 'The differentiation points you define will appear in Hunter messaging.'
     },
     completed: {
       icon: Trophy,
@@ -88,7 +88,7 @@ const CONTEXTUAL_TIPS = {
     inProgress: {
       icon: Sparkles,
       title: 'Calibrating Barry\'s Radar',
-      content: 'The decision process and behavioral triggers you\'re mapping will help Barry detect urgency. Scout will surface high-intent leads faster.'
+      content: 'The decision process and behavioral triggers you\'re mapping will help Barry detect urgency.'
     },
   }
 };
@@ -155,8 +155,7 @@ const MODULE_CONFIG = {
     },
     feedsInto: [
       'Barry positions your product against known alternatives',
-      'Hunter differentiates messaging based on competitive context',
-      'Scout filters out prospects locked into competitor ecosystems'
+      'Hunter differentiates messaging based on competitive context'
     ]
   },
   'buying-signals': {
@@ -169,7 +168,6 @@ const MODULE_CONFIG = {
       what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this for timing optimization and urgency detection.'
     },
     feedsInto: [
-      'Scout prioritizes leads showing real purchase intent signals',
       'Hunter optimizes outreach timing based on buyer readiness',
       'Barry detects urgency signals and adapts context accordingly'
     ]

@@ -400,7 +400,6 @@ export default function AlignmentBrief() {
             </div>
             <div style={{ fontSize: 12, color: T.textFaint, marginBottom: 8 }}>
               Your ICP settings in Scout no longer match your RECON context.
-              Barry may score leads using outdated criteria.
             </div>
             <button
               onClick={() => navigate('/scout?tab=icp-settings')}

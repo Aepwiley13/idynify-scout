@@ -40,7 +40,7 @@ const RECON_MODULES = [
     color: 'purple',
     sections: [1, 2, 3, 4],
     sectionNames: ['Business Foundation', 'Product Deep Dive', 'Target Market', 'Customer Psychographics'],
-    impactAreas: ['Scout lead scoring', 'Barry prospect matching', 'Hunter targeting'],
+    impactAreas: ['Barry prospect matching', 'Hunter targeting'],
     path: '/recon/icp-intelligence'
   },
   {
@@ -62,7 +62,7 @@ const RECON_MODULES = [
     color: 'red',
     sections: [8],
     sectionNames: ['Competitive Landscape'],
-    impactAreas: ['Barry competitive positioning', 'Hunter differentiation', 'Prospect qualification'],
+    impactAreas: ['Barry competitive positioning', 'Hunter differentiation'],
     path: '/recon/competitive-intel'
   },
   {
@@ -73,7 +73,7 @@ const RECON_MODULES = [
     color: 'emerald',
     sections: [7, 10],
     sectionNames: ['Decision Process', 'Behavioral & Timing Signals'],
-    impactAreas: ['Scout lead prioritization', 'Hunter timing optimization', 'Barry urgency detection'],
+    impactAreas: ['Hunter timing optimization', 'Barry urgency detection'],
     path: '/recon/buying-signals'
   }
 ];

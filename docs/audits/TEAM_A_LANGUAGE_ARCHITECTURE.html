@@ -1,0 +1,845 @@
+<title>The Language Architecture</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Positioning &amp; Terminology · Team A · Final pass</p>
+  <h1>The Language Architecture</h1>
+  <p class="standfirst">Every remaining training string classified by what it means, not by the word it used.
+  Five categories, 48 strings, seven of them on Mission Control. The impact guard is in and pinned by a test
+  that fails without it. Ten residuals remain — all of them deliberate.</p>
+  <div class="meta">
+    <span><b>Committed</b> 4bfbda2</span>
+    <span><b>Build</b> passing</span>
+    <span><b>Tests</b> 1132 / 5 known</span>
+    <span><b>Lint</b> unchanged</span>
+    <span><b>PR</b> none</span>
+  </div>
+</header>
+
+<!-- ══ 0 ══ -->
+<section id="arch">
+  <div class="sec-head"><span class="sec-letter">00</span><h2>The five categories</h2></div>
+
+  <p class="prose">These are the distinctions that made the copy write itself. Each string was assigned one
+  category first; the wording followed.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Category</th><th>Question it answers</th><th>Vocabulary</th><th>The distinction that matters</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>ACTION</strong></td><td>What do I do here?</td>
+          <td>Add context · Update context · Give Barry context</td>
+          <td>Varies with state. Nothing yet → <em>Add</em>. Something already there → <em>Update</em>. Mission Control's CTA now switches on <code>reconCompletion</code> rather than saying one thing forever.</td>
+        </tr>
+        <tr>
+          <td><strong>KNOWLEDGE</strong></td><td>What does Barry have?</td>
+          <td>What Barry Knows</td>
+          <td>The destination and the readout. Never the act of providing it.</td>
+        </tr>
+        <tr>
+          <td><strong>COVERAGE</strong></td><td>How much has been provided?</td>
+          <td>Context complete · Context Coverage · Areas Covered · No context yet</td>
+          <td>A proportion. "Fully trained" was always coverage wearing a training word.</td>
+        </tr>
+        <tr>
+          <td><strong>FRESHNESS</strong></td><td>How current is it?</td>
+          <td>Context last updated {n} days ago · Outdated</td>
+          <td><strong>Not coverage.</strong> "Last trained 90 days ago" is about recency, so "last context 90 days ago" would be nonsense. This was the category most easily got wrong.</td>
+        </tr>
+        <tr>
+          <td><strong>SOURCE</strong></td><td>Where did this output come from?</td>
+          <td>Using your RECON context · Barry is using your context for this dimension</td>
+          <td>Attribution on generated output. Distinct from coverage — it says <em>this specific thing</em> drew on your context.</td>
+        </tr>
+        <tr>
+          <td><strong>STATUS</strong></td><td>What state is this in?</td>
+          <td>Covered · Thin data · Outdated · Conflict</td>
+          <td>Rewritten per state rather than as one word. "Trained" as a legend entry became <em>Covered</em>; as a tile title it became <em>— Covered</em>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">One rule fell out of the exercise and is worth keeping: <strong>the user provides context;
+  Barry uses it.</strong> Every string where the product was the subject of a learning verb became a string
+  where the user is the subject of a giving verb, or Barry is the subject of a using verb. Nothing in the
+  vocabulary now implies the system changes itself.</p>
+</section>
+
+<!-- ══ 1 ══ -->
+<section id="mc">
+  <div class="sec-head"><span class="sec-letter">01</span><h2>Mission Control</h2></div>
+
+  <p class="prose">Seven strings on the app's highest-traffic surface. Two of them now vary with state where
+  they previously did not.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>File + line</th><th>Before</th><th>After</th><th>Category</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">ModuleNavigationGrid:127</td><td>description: 'Train your AI assistant'</td><td><strong>'Give Barry context'</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">ModuleNavigationGrid:129</td><td>'Fully trained'</td><td><strong>'Context complete'</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ModuleNavigationGrid:131</td><td>`${n}% training complete`</td><td><strong>`${n}% context complete`</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ModuleNavigationGrid:132</td><td>'Training not started'</td><td><strong>'No context yet'</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ModuleNavigationGrid:145</td><td>btnLabel: 'Train AI →' <em>(static)</em></td><td><strong>reconCompletion &gt; 0 ? 'Update context →' : 'Add context →'</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">QuickLaunchStrip:61</td><td>'Fully trained'</td><td><strong>'Context complete'</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">QuickLaunchStrip:65</td><td>btnLabel: 'Train AI →' <em>(static)</em></td><td><strong>reconCompletion &gt; 0 ? 'Update context →' : 'Add context →'</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">The two CTAs use state that was already in scope in both components, so nothing new is
+  computed or fetched. "AI assistant" is gone from the app's front door — that phrase existed nowhere else.</p>
+</section>
+
+<!-- ══ 2 ══ -->
+<section id="rest">
+  <div class="sec-head"><span class="sec-letter">02</span><h2>The remaining 41 strings</h2></div>
+
+  <h4>RECON overview and knowledge map</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>File + line</th><th>Before</th><th>After</th><th>Category</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">ReconOverview:168</td><td>…since this dimension was trained.</td><td><strong>…since you last updated this dimension.</strong></td><td><span class="chip c-warn">FRESHNESS</span></td></tr>
+        <tr><td class="mono">ReconOverview:180</td><td>Last trained {n} days ago.</td><td><strong>Context last updated {n} days ago.</strong></td><td><span class="chip c-warn">FRESHNESS</span></td></tr>
+        <tr><td class="mono">ReconOverview:203</td><td>{label} — Trained</td><td><strong>{label} — Covered</strong></td><td><span class="chip c-dead">STATUS</span></td></tr>
+        <tr><td class="mono">ReconOverview:205</td><td>Barry is using your training data for this dimension.</td><td><strong>Barry is using your context for this dimension.</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">ReconOverview:216</td><td>Barry has no training here.</td><td><strong>Barry has no context here.</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ReconOverview:219</td><td>Tap to start training →</td><td><strong>Tap to add context →</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">ReconOverview:370</td><td>legend: Trained</td><td><strong>Covered</strong></td><td><span class="chip c-dead">STATUS</span></td></tr>
+        <tr><td class="mono">ReconOverview:408</td><td>Fully Trained</td><td><strong>All areas covered</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ReconOverview:427</td><td>Re-train outdated section</td><td><strong>Update outdated section</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">ReconOverview:428</td><td>Strengthen thin training</td><td><strong>Strengthen thin context</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">ReconOverview:459</td><td>Your Training Path</td><td><strong>Build Barry's Context</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">reconHealth:185</td><td>…have changed since this was trained.</td><td><strong>…have changed since you last updated this.</strong></td><td><span class="chip c-warn">FRESHNESS</span></td></tr>
+        <tr><td class="mono">reconHealth:233</td><td>Outdated — last trained {n} days ago.</td><td><strong>Outdated — context last updated {n} days ago.</strong></td><td><span class="chip c-warn">FRESHNESS</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Alignment Brief</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>File + line</th><th>Before</th><th>After</th><th>Category</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">AlignmentBrief:191</td><td>ICP settings conflict with your RECON training…</td><td><strong>…with your RECON context…</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:193</td><td>Training data is older than 90 days — consider refreshing.</td><td><strong>Context last updated more than 90 days ago — consider refreshing.</strong></td><td><span class="chip c-warn">FRESHNESS</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:320</td><td>Barry is well-trained.</td><td><strong>Barry has strong context.</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:322</td><td>…generic where training is thin.</td><td><strong>…generic where context is thin.</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:377</td><td>Barry is missing foundational training…</td><td><strong>Barry is missing foundational context…</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:402</td><td>…no longer match your RECON training.</td><td><strong>…no longer match your RECON context.</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:427</td><td>Training Dimensions</td><td><strong>Context Areas</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:501</td><td>Barry hasn't been trained yet</td><td><strong>Barry has no context yet</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">AlignmentBrief:539</td><td>Train next: {label}</td><td><strong>Add context: {label}</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Live Output Preview — almost entirely SOURCE</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Line</th><th>Before</th><th>After</th><th>Category</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">52</td><td>…competitive context if trained.</td><td><strong>…competitive context if provided.</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">148</td><td>"[…opener from your training data]"</td><td><strong>"[…opener from your RECON context]"</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">172</td><td>"[…from your Section 2 training]"</td><td><strong>"[…from your Section 2 context]"</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">177</td><td>Your RECON training is informing the specifics here.</td><td><strong>Your RECON context is informing the specifics here.</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">195</td><td>…evaluating vendors on your trained decision criteria</td><td><strong>…on the decision criteria you defined</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">207</td><td>…is your trained differentiation statement.</td><td><strong>…is the differentiation statement you defined.</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">210</td><td>…when your RECON training is complete.</td><td><strong>…when your RECON context is complete.</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">317</td><td>…about a contact right now, with no training.</td><td><strong>…with no context.</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">318</td><td>…what becomes available as you train.</td><td><strong>…as you add context.</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">Two of these went further than swapping a noun. "Your trained decision criteria" and "your
+  trained differentiation statement" both attributed the user's own input to a training process — rewritten
+  as <em>"the decision criteria you defined"</em> and <em>"the differentiation statement you defined"</em>,
+  which is both truer and clearer about whose work it is.</p>
+
+  <h4>Everything else</h4>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>File + line</th><th>Before</th><th>After</th><th>Category</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">BarryTraining:188</td><td>Training Dimensions</td><td><strong>Context Areas</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">BarryTraining:253</td><td>Reference your RECON training data ({n} sections) when generating context</td><td><strong>Draw on your RECON context ({n} sections) in everything he writes</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">BarryTraining:272</td><td>full training across all dimensions</td><td><strong>full context across all areas</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ReconMain:126</td><td>desc 'Training dashboard'</td><td><strong>'Context overview'</strong></td><td><span class="chip c-accent">KNOWLEDGE</span></td></tr>
+        <tr><td class="mono">ReconModulePage:44</td><td>title 'Messaging Trained!'</td><td><strong>'Messaging Context Added!'</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ReconModulePage:421</td><td>What This Module Trains</td><td><strong>What This Module Covers</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">BarryReconGuide:354</td><td>Your training guide</td><td><strong>Your context guide</strong></td><td><span class="chip c-accent">KNOWLEDGE</span></td></tr>
+        <tr><td class="mono">BarryReconGuide:436</td><td>Barry is reviewing your training data...</td><td><strong>Barry is reviewing your context...</strong></td><td><span class="chip c-decide">SOURCE</span></td></tr>
+        <tr><td class="mono">BarryHUD:48</td><td>Mark how each one landed. This trains me to do better on the next wave.</td><td><strong>Mark how each one landed. That tells me what's working.</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">InlineEngagementSection:1174</td><td>link text: RECON training</td><td><strong>RECON</strong></td><td><span class="chip c-accent">ACTION</span></td></tr>
+        <tr><td class="mono">ReconOnboardingWizard:176</td><td>{n}% trained</td><td><strong>{n}% context coverage</strong></td><td><span class="chip c-ok">COVERAGE</span></td></tr>
+        <tr><td class="mono">ReconFeedbackToast:82</td><td>fallback quote: "Thanks for training me!"</td><td><strong>"Thanks — I've got that."</strong></td><td><span class="chip c-accent">KNOWLEDGE</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══ 3 ══ -->
+<section id="collision">
+  <div class="sec-head"><span class="sec-letter">03</span><h2>Alignment Brief collision — resolved</h2></div>
+<pre class="diagram"><i>src/pages/Recon/ReconMain.jsx</i>
+
+  { id: 'overview',        label: 'Overview',         desc: <b>'Context overview'</b> }
+  { id: 'alignment-brief', label: 'Alignment Brief',  desc: <b>'Your current context, summarized'</b> }
+  …
+  { id: 'barry-training',  label: 'What Barry Knows', desc: <b>"Barry's context coverage"</b> }</pre>
+  <p class="prose">The two destinations now read as distinct things, which matches what they are:
+  <strong>What Barry Knows</strong> is the accumulated context and its coverage;
+  <strong>Alignment Brief</strong> is the synthesis of it. The Overview description also moved off
+  "Training dashboard" in the same pass.</p>
+</section>
+
+<!-- ══ 4 ══ -->
+<section id="guard">
+  <div class="sec-head"><span class="sec-letter">04</span><h2>Impact guard + REMOVE 1–3 + REDUCE 16</h2></div>
+
+<pre class="diagram"><i>src/pages/Recon/BarryTraining.jsx — render</i>
+
+    const isPartial = status === 'partial';
+<b>+   const impact = isTrained ? dimension.impactWhenTrained : dimension.impactWhenMissing;</b>
+    …
+<b>-   &lt;div className={`barry-dimension-impact …`}&gt;</b>
+<b>-     &lt;span&gt;Impact: &lt;/span&gt;</b>
+<b>-     {isTrained ? dimension.impactWhenTrained : dimension.impactWhenMissing}</b>
+<b>-   &lt;/div&gt;</b>
+<b>+   {impact && (</b>
+<b>+     &lt;div className={`barry-dimension-impact …`}&gt;</b>
+<b>+       &lt;span&gt;Impact: &lt;/span&gt;</b>
+<b>+       {impact}</b>
+<b>+     &lt;/div&gt;</b>
+<b>+   )}</b>
+
+<i>— data, once guarded</i>
+
+  <i>Ideal Customer Profile</i>
+<b>-   impactWhenTrained: 'Scout lead scoring reflects your actual ideal customer characteristics.'</b>
+<b>-   impactWhenMissing: 'All leads are treated equally — no qualification intelligence.'</b>
+
+  <i>Behavioral Signals</i>
+<b>-   impactWhenTrained: 'Scout prioritizes leads showing active buying signals.'</b>
+<b>-   impactWhenMissing: 'No signal-based prioritization. All prospects treated equally.'</b></pre>
+
+  <div class="prose">
+    <p>No replacement copy was manufactured. Both areas keep their <code>description</code> and
+    <code>notTrainedDescription</code>, which are about what Barry knows rather than what Scout does, and are
+    supported. The other five areas are untouched and still show their impact line.</p>
+    <p><strong>One important scoping note:</strong> <code>BarryTraining.jsx</code> declares its own local
+    <code>TRAINING_DIMENSIONS</code> at line 24 — it is <em>not</em> the export of the same name in
+    <code>reconHealthConstants.js</code> that <code>AlignmentBrief</code> and <code>ReconOverview</code>
+    consume. Only the local array was edited, so the tooltips and brief that read the shared constants are
+    unaffected.</p>
+  </div>
+
+  <h4>Test — <span class="mono">src/test/barryContextCoverage.test.jsx</span>, 4 tests, new</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Test</th><th>Asserts</th></tr></thead>
+      <tbody>
+        <tr><td>renders no impact block for Ideal Customer Profile</td><td>No <code>.barry-dimension-impact</code>, no "Impact:" text in that card</td></tr>
+        <tr><td>renders no impact block for Behavioral Signals</td><td>Same</td></tr>
+        <tr><td>still renders the impact block for areas that have one</td><td>Messaging Framework shows "Impact:" and its actual text</td></tr>
+        <tr><td>never renders a bare "Impact:" label anywhere</td><td>Every impact block on the page has content after the label</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose"><strong>Verified the test can fail.</strong> Replacing <code>{impact && (</code> with
+  <code>{true && (</code> fails 3 of the 4. Restored immediately after checking.</p>
+</section>
+
+<!-- ══ 5 ══ -->
+<section id="item21">
+  <div class="sec-head"><span class="sec-letter">05</span><h2>Item 21 and ReconOverview:98 — removed</h2></div>
+
+<pre class="diagram"><i>src/pages/Recon/ReconModulePage.jsx — 'buying-signals'</i>
+
+<b>-   completed: {</b>
+<b>-     icon: Trophy,</b>
+<b>-     title: 'Signal Detection Online!',</b>
+<b>-     content: 'Barry now recognizes when prospects are ready to buy. Scout will</b>
+<b>-              prioritize high-intent leads, and Hunter timing will adapt to buyer</b>
+<b>-              readiness. Full system upgrade complete.'</b>
+<b>-   }</b>
+
+<i>src/pages/Recon/ReconOverview.jsx — PLATFORM_IMPACTS → Hunter</i>
+
+<b>-   { source: 'Buying Signals', effect: 'Outreach timing matches buyer readiness signals' }</b></pre>
+
+  <div class="prose">
+    <p><strong>Rendering behaviour:</strong> no guard needed. <code>ReconModulePage:325</code> already reads
+    <code>const tip = moduleTips[tipState]; if (!tip) return null;</code> — so at 100% completion the Buying
+    Signals module simply renders no tip card. Verified by reading the resolver, not assumed.</p>
+    <p>The user's buying-signal input is untouched: RECON section 10 still collects it, and
+    <code>reconCompiler.js:129–136</code> still compiles it into Barry's prompt as a
+    <code>BEHAVIORAL SIGNALS:</code> block. What was removed is the claim that IDYNIFY <em>detects</em> those
+    signals on a contact — which it does not.</p>
+    <p>Hunter's PLATFORM_IMPACTS entry now carries two effects instead of three. Nothing was substituted to
+    keep it at three.</p>
+  </div>
+</section>
+
+<!-- ══ 6 ══ -->
+<section id="read">
+  <div class="sec-head"><span class="sec-letter">06</span><h2>Barry's Read</h2></div>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>File + line</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">CadencesList:310</td><td>Barry AI Insights</td><td><strong>Barry's Read</strong></td></tr>
+        <tr><td class="mono">CadencesList:303</td><td><code>{/* Barry AI Insights */}</code></td><td><code>{/* Barry's Read */}</code> — comment kept in sync</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">BETA badge, <code>InsightRow</code> components, counts, filter actions and the empty state
+  are all unchanged. Behaviour identical.</p>
+</section>
+
+<!-- ══ 7 ══ -->
+<section id="residual">
+  <div class="sec-head"><span class="sec-letter">07</span><h2>Residual sweep</h2></div>
+
+  <p class="prose">Swept <code>src/</code> for <code>train / training / trained</code>, <code>Barry AI</code>,
+  <code>AI assistant</code>, <code>smarter Barry</code>, <code>Barry learns</code>,
+  <code>AI analyzes</code>, <code>AI executes</code>, excluding dead surfaces and frozen identifiers.
+  <strong>Ten residuals, every one intentional. Zero user-facing Barry-training framing remains.</strong></p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>File + line</th><th>Residual</th><th>Why it stays</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">utils/reconCompiler.js:70</td><td>`RECON TRAINING DATA ({n}% complete):`</td><td rowspan="3"><span class="chip c-dead">Prompt-internal</span> Sent to the model, never rendered. You scoped these out of this pass.</td></tr>
+        <tr><td class="mono">utils/reconCompiler.js:71</td><td>'The user has trained this AI with the following business context…'</td></tr>
+        <tr><td class="mono">utils/reconCompiler.js:154</td><td>'INSTRUCTION: Use the above RECON training data…'</td></tr>
+        <tr><td class="mono">components/csm/SuccessWizard.jsx:49</td><td>'Customer has completed initial setup and training'</td><td><span class="chip c-ok">Legitimate</span> Describes the <em>customer's</em> onboarding, not Barry. Correct word.</td></tr>
+        <tr><td class="mono">components/recon/Section2ProductDeepDive.jsx:95</td><td>question: "Training/support level required"</td><td rowspan="2"><span class="chip c-ok">Legitimate</span> A product attribute the user reports about their own offering.</td></tr>
+        <tr><td class="mono">components/recon/Section2ProductDeepDive.jsx:103</td><td>"High (dedicated CSM, training)"</td></tr>
+        <tr><td class="mono">components/recon/Section5PainPointsMotivations.jsx:34</td><td>"…built internal tool, trained team on new process…"</td><td><span class="chip c-ok">Legitimate</span> Placeholder written in the user's own language. Sanitising it makes the example less recognisable.</td></tr>
+        <tr><td class="mono">constants/apolloIndustries.js:117</td><td>"Professional Training &amp; Coaching"</td><td><span class="chip c-ok">External data</span> An Apollo industry taxonomy name. Renaming it would break matching.</td></tr>
+        <tr><td class="mono">hooks/useOnboardingState.js:116</td><td><code>// Barry Learns Your Business</code></td><td><span class="chip c-dead">Comment</span> Does not render.</td></tr>
+        <tr><td class="mono">pages/Recon/BarryTraining.jsx:123</td><td><code>return 'trained';</code></td><td><span class="chip c-dead">Frozen identifier</span> Internal status value consumed by <code>getDimensionStatus</code>. Not rendered.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>A different residual class — unverified claims still live</h4>
+  <div class="prose">
+    <p>These contain no training vocabulary so they fall outside your sweep list, but they are the same
+    accuracy problem and I do not want them to disappear quietly. <strong>All eight are REMOVE items 4–15
+    from the accepted plan, which have never been individually authorised.</strong> Untouched.</p>
+  </div>
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>File + line</th><th>Claim</th><th>Plan item</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">ReconModulePage:91</td><td>'…Scout will surface high-intent leads faster.'</td><td>REMOVE 6</td></tr>
+        <tr><td class="mono">ReconOverview:43</td><td>impactAreas: 'Scout lead scoring'</td><td>REMOVE 9</td></tr>
+        <tr><td class="mono">ReconOverview:65</td><td>impactAreas: 'Prospect qualification'</td><td>REMOVE 10</td></tr>
+        <tr><td class="mono">ReconOverview:76</td><td>impactAreas: 'Scout lead prioritization'</td><td>REMOVE 11</td></tr>
+        <tr><td class="mono">ReconFeedbackToast:40</td><td>"I'll prioritize leads showing active buying behavior."</td><td>REMOVE 15</td></tr>
+        <tr><td class="mono">ReconFeedbackToast:60</td><td>"I'll flag prospects showing urgency signals for immediate follow-up."</td><td><span class="chip c-warn">not in the plan</span> — same family, found this round</td></tr>
+        <tr><td class="mono">AlignmentBrief:403</td><td>'Barry may score leads using outdated criteria.'</td><td><span class="chip c-warn">not in the plan</span> — found this round</td></tr>
+        <tr><td class="mono">reconHealthConstants:55</td><td>"Lead prioritization doesn't account for buying readiness indicators."</td><td>HOLD</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="prose">Two of these — <code>ReconFeedbackToast:60</code> and <code>AlignmentBrief:403</code> —
+  are new finds this round, not previously reported. Both are Barry making first-person promises the product
+  cannot keep.</p>
+</section>
+
+<!-- ══ 8 ══ -->
+<section id="state">
+  <div class="sec-head"><span class="sec-letter">08</span><h2>Build, test, lint and changed files</h2></div>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Build</td><td><span class="chip c-ok">Pass</span></td><td><code>vite build</code> exit 0</td></tr>
+        <tr><td>Tests</td><td><span class="chip c-ok">1132 pass / 5 fail</span></td><td>Up 4 from 1128 — the new guard tests. Failures unchanged: HunterContactCard ×1, ReconSectionEditor ×4 (#545)</td></tr>
+        <tr><td>Lint — changed files</td><td><span class="chip c-ok">Identical</span></td><td>21 problems (15 errors, 6 warnings) before and after, verified by stashing. Zero introduced.</td></tr>
+        <tr><td>Lint — new test file</td><td><span class="chip c-ok">Clean</span></td><td>0 problems</td></tr>
+        <tr><td>Working tree</td><td><span class="chip c-ok">Clean</span></td><td><code>4bfbda2</code></td></tr>
+        <tr><td>PR</td><td><span class="chip c-dead">Not opened</span></td><td>Awaiting your review</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Changed files this pass — 17</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>File</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">components/dashboard/ModuleNavigationGrid.jsx</td><td>5 Mission Control strings, CTA now state-dependent</td></tr>
+        <tr><td class="mono">components/dashboard/QuickLaunchStrip.jsx</td><td>2 Mission Control strings, CTA now state-dependent</td></tr>
+        <tr><td class="mono">pages/Recon/AlignmentBrief.jsx</td><td>9 strings</td></tr>
+        <tr><td class="mono">components/recon/LiveOutputPreview.jsx</td><td>9 strings</td></tr>
+        <tr><td class="mono">pages/Recon/ReconOverview.jsx</td><td>11 strings + Hunter impact removal</td></tr>
+        <tr><td class="mono">pages/Recon/BarryTraining.jsx</td><td>3 strings, impact guard, 4 unsupported impact fields removed</td></tr>
+        <tr><td class="mono">pages/Recon/ReconModulePage.jsx</td><td>2 strings + buying-signals completed tip removed</td></tr>
+        <tr><td class="mono">pages/Recon/ReconMain.jsx</td><td>2 descriptions — collision fix</td></tr>
+        <tr><td class="mono">shared/reconHealth.js</td><td>2 freshness strings</td></tr>
+        <tr><td class="mono">components/recon/BarryReconGuide.jsx</td><td>2 strings</td></tr>
+        <tr><td class="mono">components/recon/ReconFeedbackToast.jsx</td><td>Fallback quote</td></tr>
+        <tr><td class="mono">components/BarryHUD.jsx</td><td>Barry first-person line</td></tr>
+        <tr><td class="mono">components/contacts/InlineEngagementSection.jsx</td><td>Link text</td></tr>
+        <tr><td class="mono">pages/Onboarding/ReconOnboardingWizard.jsx</td><td>Progress label</td></tr>
+        <tr><td class="mono">pages/Scout/CadencesList.jsx</td><td>Barry's Read + comment</td></tr>
+        <tr><td class="mono">test/moduleMigration.test.jsx</td><td>Fixture tracks the two description changes</td></tr>
+        <tr><td class="mono">test/barryContextCoverage.test.jsx</td><td><span class="chip c-ok">New</span> 4 tests pinning the impact guard</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Branch — 10 commits, unmerged, no PR</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Commit</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">4bfbda2</td><td>Remaining training framing, impact guard, signal-claim removals, Barry's Read</td></tr>
+        <tr><td class="mono">7fe0214</td><td>Round 6 report + inventory correction</td></tr>
+        <tr><td class="mono">57d05d1</td><td>Context vocabulary, getting-started rewrite, RECON REDUCE</td></tr>
+        <tr><td class="mono">4a2a5e2</td><td>Round 5 report</td></tr>
+        <tr><td class="mono">e4ddc56</td><td>Scout removed from PLATFORM_IMPACTS</td></tr>
+        <tr><td class="mono">fcd4bc9</td><td>Round 4 report</td></tr>
+        <tr><td class="mono">fb7aa08</td><td>Daily Discoveries subtitle</td></tr>
+        <tr><td class="mono">2b4b252</td><td>Daily Discoveries normalization, Scout tagline, Match Score</td></tr>
+        <tr><td class="mono">119aec5 · 5e18bb7 · 594ae96 · 73b76e2</td><td>Round 3 report · RECON audit · Batch 0 + action labels · takeover review</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Open for your decision</h4>
+  <ol class="questions">
+    <li>The eight remaining unverified claims — REMOVE 4–15 plus two new finds. Authorise, or leave for a separate accuracy pass?</li>
+    <li><code>reconCompiler.js</code>'s prompt-internal "RECON TRAINING DATA" — out of scope by your instruction, but it is the last place the product calls this training. Worth a follow-up?</li>
+  </ol>
+</section>
+
+<footer class="end">
+  Commit 4bfbda2 · 17 files · build passing · 1132 pass / 5 known · lint unchanged · no PR<br>
+  Frozen and untouched: /recon/barry-training · BarryTraining.jsx · component names · functions · variables · schema · Firestore fields and collections · analytics · persisted identifiers · statuses · CSS classes · 50 dead entries · 18 Lead lifecycle usages · issues #561–565
+</footer>
+
+</div>

@@ -275,7 +275,7 @@ export default function ScoutDashboardPage() {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">
                   SCOUT
                 </h1>
-                <p className="text-xs text-gray-400 font-mono">Review and match with your ideal customers</p>
+                <p className="text-xs text-gray-400 font-mono">Review companies matched to you</p>
               </div>
             </div>
             <div className="flex items-center gap-4">

@@ -422,7 +422,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
 
         {/* Heading */}
         <h1 style={{ fontSize: 28, fontWeight: 800, color: T.text, margin: 0, lineHeight: 1.3 }}>
-          {isSearching && 'Barry is learning your relationships'}
+          {isSearching && 'Barry is connecting the dots'}
           {isReady && 'Barry found your first matches'}
           {isError && 'Barry ran into a problem'}
         </h1>
@@ -499,7 +499,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
               <Search size={24} color={T.accent} />
             </div>
             <p style={{ fontSize: 14, color: T.textMuted, textAlign: 'center', margin: 0 }}>
-              Barry is learning your relationships...
+              Barry is connecting the dots...
             </p>
           </div>
         )}

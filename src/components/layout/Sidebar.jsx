@@ -70,11 +70,11 @@ const MODULE_ICONS = {
 /**
  * Brand mark — full wordmark in wide mode, square mark in compact.
  *
- * Both fall back rather than rendering nothing. /assets/Idynify_logo1.png,
- * Short_Logo_Idynify.png and barry_AI.jpg are not in this repository, so
- * without fallbacks the top of the sidebar is blank in any environment where
- * the assets are not deployed. Flagged for Aaron — a CSS wordmark is a
- * safety net, not the shipping brand asset.
+ * Wide mode serves optimized derivatives (AVIF → WebP → PNG) via <picture>,
+ * sized at 204×68 (2× the 34px render height). Falls back to a CSS wordmark
+ * if the asset 404s. The auth surface has its own BrandMark that references
+ * AUTH_ASSETS with different fallback and accessibility patterns — the two
+ * are deliberately independent.
  */
 function BrandMark({ compact }) {
   const [failed, setFailed] = useState(false);
@@ -92,15 +92,21 @@ function BrandMark({ compact }) {
     );
   }
 
+  const opt = ASSETS.logoFullOptimized;
   return failed ? (
     <span className="sidebar-wordmark-text" aria-hidden="true">IDYNIFY</span>
   ) : (
-    <img
-      className="sidebar-wordmark-img"
-      src={ASSETS.logoFull}
-      alt=""
-      onError={() => setFailed(true)}
-    />
+    <picture>
+      <source srcSet={opt.webp} type="image/webp" />
+      <img
+        className="sidebar-wordmark-img"
+        src={opt.png}
+        alt=""
+        width={opt.width}
+        height={opt.height}
+        onError={() => setFailed(true)}
+      />
+    </picture>
   );
 }
 

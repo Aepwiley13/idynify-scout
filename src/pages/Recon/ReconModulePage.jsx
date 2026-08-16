@@ -53,7 +53,7 @@ const CONTEXTUAL_TIPS = {
     },
     inProgress: {
       icon: Sparkles,
-      title: 'Teaching Barry Empathy',
+      title: 'Barry Understands the Why',
       content: 'The buying behaviors and motivations you\'re defining help Barry understand the "why" behind prospect actions. This makes follow-up sequences dramatically more effective.'
     },
     completed: {
@@ -83,12 +83,12 @@ const CONTEXTUAL_TIPS = {
     notStarted: {
       icon: Lightbulb,
       title: 'Timing is Everything',
-      content: 'The signals you define here teach Barry when to prioritize. A prospect showing buying signals is worth 10x a cold lead — but only if Barry knows what to look for.'
+      content: 'Describe what actually signals timing in your market — who decides, and what triggers evaluation. Barry uses it as context when he writes.'
     },
     inProgress: {
       icon: Sparkles,
       title: 'Calibrating Barry\'s Radar',
-      content: 'The decision process and behavioral triggers you\'re mapping will help Barry detect urgency.'
+      content: 'The decision process and behavioral triggers you\'re mapping become part of the context Barry writes from.'
     },
   }
 };
@@ -164,7 +164,7 @@ const MODULE_CONFIG = {
     sections: [7, 10],
     color: 'emerald',
     guidance: {
-      why: 'Timing matters as much as targeting. Without signal awareness, Barry can\'t distinguish a cold prospect from one actively evaluating solutions. This module teaches Barry when to prioritize.',
+      why: 'Timing matters as much as targeting. This module captures how your buyers decide and what you watch for, so Barry can reference it in the context and outreach he writes.',
       what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this for timing optimization and urgency detection.'
     },
     feedsInto: [

@@ -52,7 +52,7 @@ export const FALLBACK_ASSUMPTIONS = {
   messaging:
     "I have no value proposition or tone guidance. Outreach uses category-level framing, not your actual positioning.",
   signals:
-    "I have no behavioral signal data. Lead prioritization doesn't account for buying readiness indicators.",
+    "I have no behavioral signal data. The context I generate doesn't reference the timing cues that matter in your market.",
 };
 
 // ─── Training dimensions ──────────────────────────────────────────────────────

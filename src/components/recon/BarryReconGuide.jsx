@@ -351,7 +351,7 @@ export default function BarryReconGuide({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>Barry</div>
           <div style={{ fontSize: 10, color: T.textFaint }}>
-            {introLoading ? 'Thinking...' : 'Your training guide'}
+            {introLoading ? 'Thinking...' : 'Your context guide'}
           </div>
         </div>
         <div style={{
@@ -433,7 +433,7 @@ export default function BarryReconGuide({
             fontSize: 11, color: BRAND.cyan,
             animation: 'brg-pulse 1.5s ease-in-out infinite',
           }}>
-            Barry is reviewing your training data...
+            Barry is reviewing your context...
           </div>
         )}
         {coachingData && (

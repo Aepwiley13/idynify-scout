@@ -124,12 +124,12 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
     {
       id: 'recon',
       label: 'RECON',
-      description: 'Train your AI assistant',
+      description: 'Give Barry context',
       stat: reconCompletion >= 100
-        ? 'Fully trained'
+        ? 'Context complete'
         : reconCompletion > 0
-          ? `${reconCompletion}% training complete`
-          : 'Training not started',
+          ? `${reconCompletion}% context complete`
+          : 'No context yet',
       badge: reconCompletion >= 100
         ? { label: 'COMPLETE', color: 'green' }
         : reconCompletion > 0
@@ -142,7 +142,7 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
       shadowClass: 'shadow-purple-500/40',
       bgGradient: 'from-purple-500/10 to-pink-600/5',
       icon: <ReconIcon />,
-      btnLabel: 'Train AI →',
+      btnLabel: reconCompletion > 0 ? 'Update context →' : 'Add context →',
       onClick: () => onNavigate('/recon'),
     },
   ];

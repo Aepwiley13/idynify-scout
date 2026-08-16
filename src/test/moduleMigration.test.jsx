@@ -163,7 +163,7 @@ const MIGRATED = [
       'Messaging & Voice', 'Objections', 'Competitive Intel',
       'Buying Signals', 'What Barry Knows',
     ],
-    descriptions: ['Training dashboard', 'What Barry knows'],
+    descriptions: ['Context overview', 'Your current context, summarized'],
     // Recon's sections are ROUTES, not tabs — the active item is derived from
     // the pathname, so this row exercises a different resolution path.
     activeTab: { query: '', path: '/recon/messaging', expect: 'Messaging & Voice' },
@@ -261,8 +261,7 @@ describe.each(MIGRATED)('$name — migrated into the shell', (mod) => {
     // Barry is the shell's now: one instance, one thread.
     //
     // Checked structurally, not by text: Recon legitimately has a section named
-    // "What Barry Knows" and a description reading "What Barry knows", and a
-    // /barry/i text query would
+    // "What Barry Knows", and a /barry/i text query would
     // fail on those while still missing an actual mounted Barry.
     const { container } = renderModule(mod);
     expect(container.querySelector('img[alt="Barry"]')).toBeNull();

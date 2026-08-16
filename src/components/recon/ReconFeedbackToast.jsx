@@ -79,7 +79,7 @@ export default function ReconFeedbackToast({ sectionId, isVisible, onClose, vari
   const feedback = SECTION_FEEDBACK[sectionId] || {
     learned: 'Section Data',
     impact: 'Barry has been updated with your information.',
-    barryQuote: "Thanks for training me!"
+    barryQuote: "Thanks — I've got that."
   };
 
   if (!isVisible) return null;

@@ -300,14 +300,14 @@ export default function CadencesList() {
             </button>
           </div>
 
-          {/* Barry AI Insights */}
+          {/* Barry's Read */}
           <div style={{
             background: T.cardBg, border: `1px solid ${T.border}`,
             borderRadius: 12, padding: '18px 20px',
             display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>Barry AI Insights</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>Barry's Read</span>
               <span style={{
                 fontSize: 10, fontWeight: 700, color: BRAND.purple,
                 padding: '2px 8px', borderRadius: 10,

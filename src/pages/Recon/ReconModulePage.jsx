@@ -41,7 +41,7 @@ const CONTEXTUAL_TIPS = {
     },
     completed: {
       icon: Trophy,
-      title: 'Messaging Trained!',
+      title: 'Messaging Context Added!',
       content: 'Barry now writes like you. Hunter messages will use your value prop, and conversation starters reflect your brand voice. Major upgrade unlocked.'
     }
   },
@@ -90,11 +90,6 @@ const CONTEXTUAL_TIPS = {
       title: 'Calibrating Barry\'s Radar',
       content: 'The decision process and behavioral triggers you\'re mapping will help Barry detect urgency. Scout will surface high-intent leads faster.'
     },
-    completed: {
-      icon: Trophy,
-      title: 'Signal Detection Online!',
-      content: 'Barry now recognizes when prospects are ready to buy. Scout will prioritize high-intent leads, and Hunter timing will adapt to buyer readiness. Full system upgrade complete.'
-    }
   }
 };
 
@@ -418,7 +413,7 @@ export default function ReconModulePage() {
       {/* How This Module Feeds the Platform */}
       <div className="recon-feeds-into">
         <h3>
-          What This Module Trains
+          What This Module Covers
         </h3>
         <div className="recon-feeds-into-list">
           {config.feedsInto.map((impact, idx) => (

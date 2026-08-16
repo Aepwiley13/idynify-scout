@@ -173,7 +173,7 @@ export default function ReconOnboardingWizard() {
             />
           </div>
           <p className="row-wizard-progress-label">
-            {reconConfidence}% trained
+            {reconConfidence}% context coverage
             {allDone && <span className="row-wizard-progress-complete"> — ready to launch</span>}
           </p>
         </div>

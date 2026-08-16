@@ -58,11 +58,11 @@ export default function QuickLaunchStrip({ stats = {}, onModuleSelect, activeMod
       badgeClass: reconCompletion >= 100
         ? 'bg-emerald-500 text-white'
         : 'bg-purple-500/30 text-purple-300 border border-purple-500/40',
-      status: reconCompletion >= 100 ? 'Fully trained' : `${reconCompletion}% complete`,
+      status: reconCompletion >= 100 ? 'Context complete' : `${reconCompletion}% complete`,
       glowClass: 'border-purple-500/60',
       glowStyle: { boxShadow: '0 0 18px rgba(168, 85, 247, 0.25)' },
       btnClass: 'from-purple-500 to-pink-600 hover:from-purple-400 hover:to-pink-500 shadow-purple-500/40',
-      btnLabel: 'Train AI →'
+      btnLabel: reconCompletion > 0 ? 'Update context →' : 'Add context →'
     },
     {
       id: 'sniper',

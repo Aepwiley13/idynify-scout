@@ -94,8 +94,7 @@ const PLATFORM_IMPACTS = [
     color: 'pink',
     impacts: [
       { source: 'Messaging & Voice', effect: 'Messages use your real value proposition, not generic templates' },
-      { source: 'Objections & Constraints', effect: 'Follow-ups address actual concerns before they surface' },
-      { source: 'Buying Signals', effect: 'Outreach timing matches buyer readiness signals' }
+      { source: 'Objections & Constraints', effect: 'Follow-ups address actual concerns before they surface' }
     ]
   },
   {
@@ -166,7 +165,7 @@ function TileTooltip({ dimension, state, stalenessFlags }) {
       <div className="recon-heatmap-tooltip-content">
         <p className="recon-heatmap-tooltip-title km-tooltip--conflict">ICP Conflict Detected</p>
         <p className="recon-heatmap-tooltip-body">
-          Your ICP settings have changed since this dimension was trained.
+          Your ICP settings have changed since you last updated this dimension.
           Barry's targeting and your Scout ICP settings no longer match.
         </p>
         <p className="recon-heatmap-tooltip-cta">Tap to reconcile →</p>
@@ -178,7 +177,7 @@ function TileTooltip({ dimension, state, stalenessFlags }) {
       <div className="recon-heatmap-tooltip-content">
         <p className="recon-heatmap-tooltip-title">{dimension.label} — Outdated</p>
         <p className="recon-heatmap-tooltip-body">
-          Last trained {staleFlag?.daysSinceUpdate || '90+'} days ago.
+          Context last updated {staleFlag?.daysSinceUpdate || '90+'} days ago.
           Barry may be using context that no longer matches your business.
         </p>
         <p className="recon-heatmap-tooltip-cta">Tap to update →</p>
@@ -200,9 +199,9 @@ function TileTooltip({ dimension, state, stalenessFlags }) {
   if (state === 'strong') {
     return (
       <div className="recon-heatmap-tooltip-content">
-        <p className="recon-heatmap-tooltip-title">{dimension.label} — Trained</p>
+        <p className="recon-heatmap-tooltip-title">{dimension.label} — Covered</p>
         <p className="recon-heatmap-tooltip-body">
-          Barry is using your training data for this dimension.
+          Barry is using your context for this dimension.
         </p>
         <p className="recon-heatmap-tooltip-cta">Tap to review →</p>
       </div>
@@ -213,10 +212,10 @@ function TileTooltip({ dimension, state, stalenessFlags }) {
     <div className="recon-heatmap-tooltip-content">
       <p className="recon-heatmap-tooltip-title">{dimension.label}</p>
       <p className="recon-heatmap-tooltip-body">
-        Barry has no training here.<br />
+        Barry has no context here.<br />
         Without this: {dimension.impactWhenMissing}
       </p>
-      <p className="recon-heatmap-tooltip-cta">Tap to start training →</p>
+      <p className="recon-heatmap-tooltip-cta">Tap to add context →</p>
     </div>
   );
 }
@@ -367,7 +366,7 @@ export default function ReconOverview() {
             </div>
           </div>
           <div className="recon-heatmap-legend">
-            <span className="recon-legend-item"><span className="recon-legend-dot km-state--strong" /> Trained</span>
+            <span className="recon-legend-item"><span className="recon-legend-dot km-state--strong" /> Covered</span>
             <span className="recon-legend-item"><span className="recon-legend-dot km-state--weak" /> Thin data</span>
             <span className="recon-legend-item"><span className="recon-legend-dot km-state--stale" /> Outdated</span>
             <span className="recon-legend-item"><span className="recon-legend-dot km-state--empty" /> Not started</span>
@@ -405,7 +404,7 @@ export default function ReconOverview() {
             <div className="recon-train-next-complete-inline">
               <CheckCircle2 size={16} className="complete-icon" />
               <div>
-                <p className="train-next-complete-title">Fully Trained</p>
+                <p className="train-next-complete-title">All areas covered</p>
                 <p className="train-next-complete-sub">Barry has complete knowledge of your business context.</p>
               </div>
             </div>
@@ -424,8 +423,8 @@ export default function ReconOverview() {
                 <div>
                   <p className="train-next-cta-label">
                     {trainNext.state === 'conflict' ? 'Reconcile ICP Conflict' :
-                     trainNext.state === 'stale'    ? 'Re-train outdated section' :
-                     trainNext.state === 'weak'     ? 'Strengthen thin training' :
+                     trainNext.state === 'stale'    ? 'Update outdated section' :
+                     trainNext.state === 'weak'     ? 'Strengthen thin context' :
                                                       'Start here'}
                   </p>
                   <p className="train-next-dimension-name">{trainNext.dimension.label}</p>
@@ -456,7 +455,7 @@ export default function ReconOverview() {
       {/* ── Your Training Path ────────────────────────────────────────────── */}
       <hr className="recon-section-divider" />
       <div className="recon-modules-section">
-        <h2 className="recon-section-title">Your Training Path</h2>
+        <h2 className="recon-section-title">Build Barry's Context</h2>
         <p className="recon-section-subtitle">Complete these modules to give Barry full context for your market.</p>
         <p className="recon-foundation-note">Your Intelligence Foundation — shared across all ICP profiles</p>
         <div className="recon-modules-grid">

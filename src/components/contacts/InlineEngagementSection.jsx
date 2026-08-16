@@ -1171,7 +1171,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                     <strong>Barry is missing context about you.</strong>{' '}
                     Messages may feel generic until you complete{' '}
                     <a href="/recon" style={{ color: '#b45309', fontWeight: 600, textDecoration: 'underline' }}>
-                      RECON training
+                      RECON
                     </a>
                     {' '}(Business Foundation, Communication Style, Messaging).
                   </span>

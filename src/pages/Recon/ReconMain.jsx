@@ -123,8 +123,8 @@ const SETTINGS_ORANGE = '#faaa20';
 
 // ─── Recon sub-nav items ──────────────────────────────────────────────────────
 const RECON_ITEMS = [
-  { id: 'overview',          label: 'Overview',               Icon: LayoutDashboard, path: '/recon',                     desc: 'Training dashboard'      },
-  { id: 'alignment-brief',   label: 'Alignment Brief',        Icon: FileText,        path: '/recon/alignment-brief',     desc: 'What Barry knows'        },
+  { id: 'overview',          label: 'Overview',               Icon: LayoutDashboard, path: '/recon',                     desc: 'Context overview'        },
+  { id: 'alignment-brief',   label: 'Alignment Brief',        Icon: FileText,        path: '/recon/alignment-brief',     desc: 'Your current context, summarized' },
   { id: 'user-profile',      label: 'User Profile',           Icon: Users,           path: '/recon/user-profile',        desc: 'Section 0 — who you are' },
   { id: 'icp-intelligence',  label: 'ICP Intelligence',       Icon: Target,          path: '/recon/icp-intelligence',    desc: 'Who you target'          },
   { id: 'messaging',         label: 'Messaging & Voice',      Icon: MessageSquare,   path: '/recon/messaging',           desc: 'Value proposition'       },

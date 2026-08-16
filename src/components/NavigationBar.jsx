@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ASSETS } from '../theme/tokens';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
 
@@ -38,11 +39,11 @@ export default function NavigationBar() {
           {/* Logo + Barry */}
           <div className="flex items-center gap-3">
             <div
-              className="text-4xl cursor-pointer"
-              style={{ animation: 'floatBear 6s ease-in-out infinite' }}
+              className="cursor-pointer"
+              style={{ animation: 'floatBear 6s ease-in-out infinite', width: 36, height: 36 }}
               onClick={() => navigate('/mission-control')}
             >
-              🐻
+              <img src={ASSETS.logoMark} alt="IDYNIFY" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div className="cursor-pointer" onClick={() => navigate('/mission-control')}>
               <h1 className="text-lg font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent font-mono">

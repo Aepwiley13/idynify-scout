@@ -415,14 +415,14 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
               color: STATUS.green,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS.green }} />
-              AI SDR &bull; Online
+              Barry &bull; Online
             </div>
           </div>
         </div>
 
         {/* Heading */}
         <h1 style={{ fontSize: 28, fontWeight: 800, color: T.text, margin: 0, lineHeight: 1.3 }}>
-          {isSearching && 'Barry is building your sales engine'}
+          {isSearching && 'Barry is learning your relationships'}
           {isReady && 'Barry found your first matches'}
           {isError && 'Barry ran into a problem'}
         </h1>
@@ -499,7 +499,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
               <Search size={24} color={T.accent} />
             </div>
             <p style={{ fontSize: 14, color: T.textMuted, textAlign: 'center', margin: 0 }}>
-              Barry is building your sales engine...
+              Barry is learning your relationships...
             </p>
           </div>
         )}

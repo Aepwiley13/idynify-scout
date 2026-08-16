@@ -51,7 +51,7 @@ export default function ModuleNavigationGrid({ stats = {}, onScoutClick, onNavig
     {
       id: 'hunter',
       label: 'HUNTER',
-      description: 'Automated outreach campaigns',
+      description: 'Outreach campaigns',
       stat: hunterMissions > 0
         ? `${hunterMissions} active mission${hunterMissions !== 1 ? 's' : ''}`
         : 'No missions running',

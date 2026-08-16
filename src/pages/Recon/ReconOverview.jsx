@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   Circle,
   AlertCircle,
-  Users,
   Mail,
   Sparkles,
   AlertTriangle,
@@ -79,18 +78,16 @@ const RECON_MODULES = [
   }
 ];
 
-// Platform impact mapping (unchanged)
+// Platform impact mapping.
+//
+// Scout is deliberately absent. Its three entries claimed RECON improved
+// Scout's scoring, prioritised by purchase intent and filtered competitor-
+// locked companies. None of that is implemented: fit_score is computed from
+// icpProfiles over four firmographic dimensions, passesAllFilters() filters
+// only on founding age, and no intent or competitor evaluation exists. RECON
+// reaches Barry and Hunter messaging, which is what the two entries below
+// describe. Scout returns here when the integration is real — see #561.
 const PLATFORM_IMPACTS = [
-  {
-    system: 'Scout',
-    icon: Users,
-    color: 'cyan',
-    impacts: [
-      { source: 'ICP Intelligence', effect: 'Better lead scoring — Barry matches prospects against your actual ICP' },
-      { source: 'Buying Signals', effect: 'Prioritizes leads showing real purchase intent' },
-      { source: 'Competitive Intel', effect: 'Filters out prospects already locked into competitors' }
-    ]
-  },
   {
     system: 'Hunter',
     icon: Mail,

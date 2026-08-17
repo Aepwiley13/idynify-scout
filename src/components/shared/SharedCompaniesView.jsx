@@ -419,10 +419,10 @@ export default function SharedCompaniesView({ mode = 'scout' }) {
   // ── Empty state ────────────────────────────────────────────────────────────
   if (isFallback ? archivedCompanies.length === 0 : (companies.length === 0 && archivedCompanies.length === 0)) {
     const emptyMsg = {
-      scout:    { title: 'No Saved Companies Yet', body: 'Accept companies in Daily Leads to start building your hunt list.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
+      scout:    { title: 'No Saved Companies Yet', body: 'Save companies in Daily Discoveries to start building your hunt list.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
       hunter:   { title: 'No Hunter Companies Yet', body: 'Engage contacts in Scout to start tracking company-level activity here.', cta: () => navigate('/scout'), ctaLabel: 'Go to Scout' },
       sniper:   { title: 'No Sniper Companies Yet', body: 'Add warm contacts to your Sniper pipeline to see their companies here.', cta: () => navigate('/sniper'), ctaLabel: 'Go to Pipeline' },
-      all:      { title: 'No Companies Yet', body: 'Accept companies in Daily Leads to start building your pipeline.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
+      all:      { title: 'No Companies Yet', body: 'Save companies in Daily Discoveries to start building your pipeline.', cta: () => navigate('/scout', { state: { activeTab: 'daily-leads' } }), ctaLabel: 'Start Matching' },
       fallback: { title: 'No Archived Companies', body: 'Companies you archive will appear here.', cta: null, ctaLabel: null },
     }[mode] || { title: 'No Companies Yet', body: '', cta: null, ctaLabel: null };
     return (

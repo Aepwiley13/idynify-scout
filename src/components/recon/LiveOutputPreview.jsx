@@ -49,7 +49,7 @@ const THRESHOLDS = [
     min: 85,
     max: 94,
     label: 'Capable',
-    description: 'Full product awareness, tone-matched, competitive context if trained.',
+    description: 'Full product awareness, tone-matched, competitive context if provided.',
   },
   {
     id: 't95',
@@ -145,7 +145,7 @@ function PreviewContent({ thresholdIndex, persona }) {
         </PreviewLine>
         <PreviewLine label="Conversation starters">
           <ul>
-            <li>"[Use-case-specific opener from your training data]"</li>
+            <li>"[Use-case-specific opener from your RECON context]"</li>
             <li>"How are you managing the workflow challenges your product addresses?"</li>
           </ul>
         </PreviewLine>
@@ -169,12 +169,12 @@ function PreviewContent({ thresholdIndex, persona }) {
         <PreviewLine label="Conversation starters (using your messaging voice)">
           <ul>
             <li>"[Specific opener using your differentiator — not generic]"</li>
-            <li>"[Second opener referencing a real use case from your Section 2 training]"</li>
+            <li>"[Second opener referencing a real use case from your Section 2 context]"</li>
           </ul>
         </PreviewLine>
         <PreviewLine label="ICP fit">Strong match on industry and size.</PreviewLine>
         <PreviewLine label="Barry's note">
-          I'm not generating this from a template. Your RECON training is informing the specifics here.
+          I'm not generating this from a template. Your RECON context is informing the specifics here.
         </PreviewLine>
         <PreviewAnnotation>
           Complete Section 8 to also unlock competitive context for this contact.
@@ -192,7 +192,7 @@ function PreviewContent({ thresholdIndex, persona }) {
       <PreviewLine label="What this role cares about">
         <ul>
           <li>Often accountable for the specific pain point your product addresses</li>
-          <li>Usually evaluating vendors on your trained decision criteria</li>
+          <li>Usually evaluating vendors on the decision criteria you defined</li>
           <li>Commonly frustrated by the friction point your platform solves</li>
         </ul>
       </PreviewLine>
@@ -204,10 +204,10 @@ function PreviewContent({ thresholdIndex, persona }) {
       </PreviewLine>
       <PreviewLine label="ICP fit">Strong match. Industry, size, and role all align.</PreviewLine>
       <PreviewLine label="Competitive context">
-        If {company} is evaluating alternatives, your positioning angle is your trained differentiation statement.
+        If {company} is evaluating alternatives, your positioning angle is the differentiation statement you defined.
       </PreviewLine>
       <p className="lop-footnote">
-        This is what Barry generates for every contact when your RECON training is complete.
+        This is what Barry generates for every contact when your RECON context is complete.
       </p>
     </>
   );
@@ -314,8 +314,8 @@ export default function LiveOutputPreview({ score = 0 }) {
 
       {score === 0 && (
         <p className="lop-zero-cta">
-          This is what Barry says about a contact right now, with no training.
-          The greyed sections show what becomes available as you train.
+          This is what Barry says about a contact right now, with no context.
+          The greyed sections show what becomes available as you add context.
         </p>
       )}
     </div>

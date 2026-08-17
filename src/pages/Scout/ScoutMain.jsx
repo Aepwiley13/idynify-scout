@@ -202,7 +202,7 @@ function ScoutShellInner() {
     <div className="module-shell">
       <ModuleSubNav
         title="SCOUT"
-        tagline="Find and qualify prospects"
+        tagline="Discover who matters"
         items={SCOUT_VIEWS}
         activeId={activeView}
         onSelect={switchView}

@@ -549,7 +549,7 @@ export default function ICPSettings() {
           {refreshResult && !refreshResult.error && (
             <span className="header-refresh-success">
               <CheckCircle className="w-4 h-4" />
-              {refreshResult.count > 0 ? `${refreshResult.count} new companies added to Daily Leads` : 'Queue is full — review current targets'}
+              {refreshResult.count > 0 ? `${refreshResult.count} new companies added to Daily Discoveries` : 'Queue is full — review current targets'}
             </span>
           )}
           {refreshResult?.error && (

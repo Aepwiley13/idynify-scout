@@ -72,7 +72,7 @@ describe('Scout sub-nav panel', () => {
     const panel = screen.getByRole('complementary', { name: /scout sections/i });
 
     expect(within(panel).getByText('SCOUT')).toBeInTheDocument();
-    expect(within(panel).getByText('Find and qualify prospects')).toBeInTheDocument();
+    expect(within(panel).getByText('Discover who matters')).toBeInTheDocument();
   });
 
   it('lists every Scout section in order', () => {

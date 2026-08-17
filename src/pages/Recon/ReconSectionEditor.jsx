@@ -525,7 +525,7 @@ export default function ReconSectionEditor() {
           }}>
             <Brain size={14} color={RECON_INDIGO} style={{ flexShrink: 0, marginTop: 1 }} />
             <p style={{ fontSize: 12, color: T.textMuted, margin: 0, lineHeight: 1.55 }}>
-              Your answers train Barry directly. More specific = smarter context across Scout and Hunter.
+              Your answers go straight into Barry's context. More specific = sharper context across Scout and Hunter.
               Ask Barry on the right if you're unsure what to write.
             </p>
           </div>

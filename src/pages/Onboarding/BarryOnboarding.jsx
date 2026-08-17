@@ -121,10 +121,10 @@ export default function BarryOnboarding() {
           const returnGreeting = buildReturnGreeting(data);
           setBarryMessage(returnGreeting);
         } else {
-          setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
+          setBarryMessage("I'm Barry. Your profile is started, but I don't have a target yet — tell me that once and Scout and Hunter will know who matters to you.\n\nWho are you hunting?");
         }
       } else {
-        setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
+        setBarryMessage("I'm Barry. I use the context you give IDYNIFY so Scout and Hunter know who matters to you — you only tell me once.\n\nWho are you hunting?");
       }
 
       // Check for existing in-progress conversation
@@ -164,7 +164,7 @@ export default function BarryOnboarding() {
       console.error('Error checking existing ICP:', error);
       setLoading(false);
       setStep('asking');
-      setBarryMessage("I'm Barry. I power Scout and Hunter by learning who you're after — once — so every search and outreach hits the mark.\n\nWho are you hunting?");
+      setBarryMessage("I'm Barry. I use the context you give IDYNIFY so Scout and Hunter know who matters to you. Let's start there.\n\nWho are you hunting?");
     }
   }
 
@@ -576,7 +576,7 @@ export default function BarryOnboarding() {
                 <span>Finding companies matching your ICP...</span>
               </div>
 
-              <p className="save-redirect-note">Taking you to Daily Leads in a moment</p>
+              <p className="save-redirect-note">Taking you to Daily Discoveries in a moment</p>
             </div>
           </div>
         )}

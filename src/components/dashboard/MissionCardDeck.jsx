@@ -379,9 +379,9 @@ function ReconDeck({ userId, onClose }) {
   if (phase === 'brief') {
     return (
       <BriefingCard
-        title="Train Barry"
-        body="Your answers make Barry smarter. Complete training cards to improve Scout matches, Hunter outreach, and Barry's recommendations."
-        cta="Start Training →"
+        title="Give Barry context"
+        body="Your answers give Barry more to work with. Complete these to sharpen Hunter outreach and Barry's recommendations."
+        cta="Start →"
         accentColor="#a855f7"
         onStart={handleStart}
       />
@@ -568,7 +568,7 @@ export default function MissionCardDeck({ module, userId, onClose }) {
   // Scout renders DailyLeads directly — it has its own title/tabs/close pattern
   if (module === 'scout') {
     return (
-      <section className="mb-12 mt-2" aria-label="Scout daily leads deck">
+      <section className="mb-12 mt-2" aria-label="Scout daily discoveries deck">
         <div
           className="max-w-2xl mx-auto rounded-2xl border-2 relative overflow-hidden"
           style={{

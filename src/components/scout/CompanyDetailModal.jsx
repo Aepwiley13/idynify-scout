@@ -698,7 +698,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                           <UserPlus className="w-5 h-5" />
                           <span>
                             {selectedDecisionMakers.length > 0
-                              ? `Add ${selectedDecisionMakers.length} to Leads`
+                              ? `Save ${selectedDecisionMakers.length} to People`
                               : 'Select contacts to add'}
                           </span>
                         </>

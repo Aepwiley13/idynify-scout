@@ -188,9 +188,9 @@ function DimensionCard({ dim, state, onTrain, T }) {
           {state === 'empty' || !state
             ? dim.impactWhenMissing
             : state === 'conflict'
-            ? 'ICP settings conflict with your RECON training — Barry may use outdated criteria.'
+            ? 'ICP settings conflict with your RECON context — Barry may use outdated criteria.'
             : state === 'stale'
-            ? 'Training data is older than 90 days — consider refreshing.'
+            ? 'Context last updated more than 90 days ago — consider refreshing.'
             : state === 'weak'
             ? 'Answers were thin. More detail will improve Barry\'s output quality.'
             : 'Barry is well-informed on this dimension.'}
@@ -317,9 +317,9 @@ export default function AlignmentBrief() {
           </div>
           <div style={{ fontSize: 12, color: T.textFaint, lineHeight: 1.6 }}>
             {score >= 80
-              ? 'Barry is well-trained. Output quality across Scout, Hunter, and Sniper should be high.'
+              ? 'Barry has strong context. Output quality across Scout, Hunter, and Sniper should be high.'
               : score >= 55
-              ? 'Barry has partial context. Some outputs may be generic where training is thin.'
+              ? 'Barry has partial context. Some outputs may be generic where context is thin.'
               : score >= 30
               ? 'Barry has limited context. Most outputs will fall back to generic assumptions.'
               : 'Barry has minimal context. Complete critical sections to unlock personalized output.'}
@@ -374,7 +374,7 @@ export default function AlignmentBrief() {
               Critical gaps detected
             </div>
             <div style={{ fontSize: 12, color: T.textFaint }}>
-              Barry is missing foundational training that affects every output.
+              Barry is missing foundational context that affects every output.
               Complete Business Identity (Sections 1–2) and Target Market (Section 3) to unlock meaningful personalization.
             </div>
           </div>
@@ -399,8 +399,7 @@ export default function AlignmentBrief() {
               Scout ICP drift detected
             </div>
             <div style={{ fontSize: 12, color: T.textFaint, marginBottom: 8 }}>
-              Your ICP settings in Scout no longer match your RECON training.
-              Barry may score leads using outdated criteria.
+              Your ICP settings in Scout no longer match your RECON context.
             </div>
             <button
               onClick={() => navigate('/scout?tab=icp-settings')}
@@ -424,7 +423,7 @@ export default function AlignmentBrief() {
           color: T.textFaint, marginBottom: 10,
           textTransform: 'uppercase',
         }}>
-          Training Dimensions
+          Context Areas
         </div>
         <div style={{
           display: 'grid',
@@ -498,7 +497,7 @@ export default function AlignmentBrief() {
         }}>
           <Brain size={32} color={RECON_INDIGO} style={{ opacity: 0.4, marginBottom: 12 }} />
           <div style={{ fontSize: 14, fontWeight: 600, color: T.textFaint, marginBottom: 6 }}>
-            Barry hasn't been trained yet
+            Barry has no context yet
           </div>
           <div style={{ fontSize: 13, color: T.textFaint, marginBottom: 16 }}>
             Complete RECON sections to build Barry's knowledge base.
@@ -536,7 +535,7 @@ export default function AlignmentBrief() {
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}
             >
-              Train next: {missingDims[0].label} <ArrowRight size={14} />
+              Add context: {missingDims[0].label} <ArrowRight size={14} />
             </button>
           )}
           <button

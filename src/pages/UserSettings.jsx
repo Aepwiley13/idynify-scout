@@ -103,7 +103,7 @@ const INTEGRATION_STUBS = [
 const HUNTER_STUBS = [
   { label: 'Sequence timing',  desc: 'Set default days between follow-up steps'           },
   { label: 'Follow-up limit',  desc: 'Maximum steps per contact before archiving'          },
-  { label: 'Barry AI tone',    desc: 'Formal, direct, or conversational messaging style'   },
+  { label: "Barry's tone",     desc: 'Formal, direct, or conversational messaging style'   },
   { label: 'Auto-archive',     desc: 'Automatically archive contacts after final step'     },
 ];
 
@@ -1375,7 +1375,7 @@ export default function UserSettings() {
             <section className="us-section">
               <h2 className="us-section-title">Sequence & Barry configuration</h2>
               <div className="us-section-note">
-                Per-user sequence settings and Barry AI tone controls are on the roadmap.
+                Per-user sequence settings and Barry's tone controls are on the roadmap.
                 These will let you tune follow-up cadence and messaging style without touching campaign defaults.
               </div>
               <div className="us-stub-list">

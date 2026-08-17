@@ -182,7 +182,7 @@ export function getTrainNextRecommendation(health, dimensions) {
   if (conflictDim) {
     return {
       dimension: conflictDim,
-      reason: 'ICP Conflict — your Scout ICP settings have changed since this was trained. Barry\'s targeting and your ICP no longer match.',
+      reason: 'ICP Conflict — your Scout ICP settings have changed since you last updated this. Barry\'s targeting and your ICP no longer match.',
       state: 'conflict',
     };
   }
@@ -230,7 +230,7 @@ export function getTrainNextRecommendation(health, dimensions) {
     const { dim, daysSince } = staleDims[0];
     return {
       dimension: dim,
-      reason: `Outdated — last trained ${daysSince} days ago. Barry may be using context that no longer matches your business.`,
+      reason: `Outdated — context last updated ${daysSince} days ago. Barry may be using context that no longer matches your business.`,
       state: 'stale',
     };
   }

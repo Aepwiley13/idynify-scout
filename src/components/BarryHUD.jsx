@@ -45,7 +45,7 @@ export const PHASE_COACHING = [
   // Phase 7 — Monitor
   "You're live. Track who's been sent, who's replied, and who needs a follow-up.",
   // Phase 8 — Debrief
-  "Mark how each one landed. This trains me to do better on the next wave.",
+  "Mark how each one landed. That tells me what's working.",
 ];
 
 const HUD_ACCENT = BRAND.cyan;

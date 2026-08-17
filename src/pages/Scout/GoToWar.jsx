@@ -1453,7 +1453,7 @@ export default function GoToWar() {
             Track responses
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
-            Mark how each contact responded. This helps Barry learn your patterns.
+            Mark how each contact responded. This helps Barry understand what's working.
           </p>
         </div>
 

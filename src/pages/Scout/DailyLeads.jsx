@@ -51,7 +51,7 @@ function RejectionFeedbackFace({ entityName, reasons, setReasons, note, setNote,
       <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, textAlign: 'center', lineHeight: 1.55 }}>
         Why isn't <strong>{entityName}</strong> a match?
         <br />
-        <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry send better leads your way.</span>
+        <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry send better matches your way.</span>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', width: '100%' }}>
         {REJECTION_REASONS.map(r => (
@@ -2047,7 +2047,7 @@ export default function DailyLeads({ onNavigate }) {
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: T.textMuted }}>
         <Loader size={28} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} />
-        <p style={{ fontSize: 13, margin: 0 }}>Loading lead insights...</p>
+        <p style={{ fontSize: 13, margin: 0 }}>Loading your discoveries...</p>
         <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
       </div>
     );
@@ -2065,7 +2065,7 @@ export default function DailyLeads({ onNavigate }) {
             Let's set up your ICP first
           </div>
           <p style={{ fontSize: 13, color: T.textFaint, lineHeight: 1.7, marginBottom: 28 }}>
-            Scout needs to know who you're targeting before it can curate your daily leads. Tell Barry who you're after and he'll take it from there.
+            Scout needs to know who you're targeting before it can find your matches. Tell Barry who you're after and he'll take it from there.
           </p>
           <button
             onClick={() => navigate('/onboarding/barry')}
@@ -2139,9 +2139,9 @@ export default function DailyLeads({ onNavigate }) {
       <div style={{ padding: isDesktop ? '20px 32px 0' : '16px 26px 0', background: T.appBg }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDesktop ? 16 : 14 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Lead Insights</h2>
+            <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Discoveries</h2>
             <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
-              AI-curated prospects matching {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
+              Matches based on {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

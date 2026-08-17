@@ -20,12 +20,12 @@ const CONTEXTUAL_TIPS = {
     inProgress: {
       icon: Sparkles,
       title: 'Keep Going!',
-      content: 'You\'re building Barry\'s core understanding of your business. Each section you complete makes Scout\'s lead scoring more accurate.'
+      content: 'You\'re building Barry\'s core understanding of your business.'
     },
     completed: {
       icon: Trophy,
       title: 'Module Complete!',
-      content: 'Barry now has a strong foundation. He can match prospects against your ICP and generate business-aware context. Consider completing Messaging next for maximum impact.'
+      content: 'Barry now has a strong foundation. He can generate business-aware context. Consider completing Messaging next for maximum impact.'
     }
   },
   'messaging': {
@@ -41,7 +41,7 @@ const CONTEXTUAL_TIPS = {
     },
     completed: {
       icon: Trophy,
-      title: 'Messaging Trained!',
+      title: 'Messaging Context Added!',
       content: 'Barry now writes like you. Hunter messages will use your value prop, and conversation starters reflect your brand voice. Major upgrade unlocked.'
     }
   },
@@ -53,7 +53,7 @@ const CONTEXTUAL_TIPS = {
     },
     inProgress: {
       icon: Sparkles,
-      title: 'Teaching Barry Empathy',
+      title: 'Barry Understands the Why',
       content: 'The buying behaviors and motivations you\'re defining help Barry understand the "why" behind prospect actions. This makes follow-up sequences dramatically more effective.'
     },
     completed: {
@@ -66,35 +66,30 @@ const CONTEXTUAL_TIPS = {
     notStarted: {
       icon: Lightbulb,
       title: 'Know Your Battlefield',
-      content: 'Prospects are always comparing you to alternatives. Teach Barry the competitive landscape so he can position you effectively and filter out competitor-locked leads.'
+      content: 'Prospects are always comparing you to alternatives. Give Barry the competitive landscape so he can position you effectively.'
     },
     inProgress: {
       icon: Sparkles,
       title: 'Building Competitive Awareness',
-      content: 'The differentiation points you define will appear in Hunter messaging. Barry will also flag prospects who mention competitor keywords in their profiles.'
+      content: 'The differentiation points you define will appear in Hunter messaging.'
     },
     completed: {
       icon: Trophy,
       title: 'Competitive Intel Active!',
-      content: 'Barry now knows how to position you against alternatives. Scout will deprioritize competitor-locked leads, and Hunter messaging will differentiate effectively.'
+      content: 'Barry now knows how to position you against alternatives. Hunter messaging will differentiate effectively.'
     }
   },
   'buying-signals': {
     notStarted: {
       icon: Lightbulb,
       title: 'Timing is Everything',
-      content: 'The signals you define here teach Barry when to prioritize. A prospect showing buying signals is worth 10x a cold lead — but only if Barry knows what to look for.'
+      content: 'Describe what actually signals timing in your market — who decides, and what triggers evaluation. Barry uses it as context when he writes.'
     },
     inProgress: {
       icon: Sparkles,
       title: 'Calibrating Barry\'s Radar',
-      content: 'The decision process and behavioral triggers you\'re mapping will help Barry detect urgency. Scout will surface high-intent leads faster.'
+      content: 'The decision process and behavioral triggers you\'re mapping become part of the context Barry writes from.'
     },
-    completed: {
-      icon: Trophy,
-      title: 'Signal Detection Online!',
-      content: 'Barry now recognizes when prospects are ready to buy. Scout will prioritize high-intent leads, and Hunter timing will adapt to buyer readiness. Full system upgrade complete.'
-    }
   }
 };
 
@@ -156,12 +151,11 @@ const MODULE_CONFIG = {
     color: 'red',
     guidance: {
       why: 'If Barry doesn\'t know your competitors, he can\'t help you differentiate. Prospects are always evaluating alternatives — Barry needs to know the landscape to position you effectively.',
-      what: 'You\'ll identify your key competitors, how you differentiate, and what prospects typically compare you against. Barry uses this to sharpen messaging and filter out competitor-locked leads.'
+      what: 'You\'ll identify your key competitors, how you differentiate, and what prospects typically compare you against. Barry uses this to sharpen messaging.'
     },
     feedsInto: [
       'Barry positions your product against known alternatives',
-      'Hunter differentiates messaging based on competitive context',
-      'Scout filters out prospects locked into competitor ecosystems'
+      'Hunter differentiates messaging based on competitive context'
     ]
   },
   'buying-signals': {
@@ -170,14 +164,15 @@ const MODULE_CONFIG = {
     sections: [7, 10],
     color: 'emerald',
     guidance: {
-      why: 'Timing matters as much as targeting. Without signal awareness, Barry can\'t distinguish a cold prospect from one actively evaluating solutions. This module teaches Barry when to prioritize.',
-      what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this for timing optimization and urgency detection.'
+      why: 'Timing matters as much as targeting. This module captures how your buyers decide and what you watch for, so Barry can reference it in the context and outreach he writes.',
+      what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this as context when he writes.'
     },
-    feedsInto: [
-      'Scout prioritizes leads showing real purchase intent signals',
-      'Hunter optimizes outreach timing based on buyer readiness',
-      'Barry detects urgency signals and adapts context accordingly'
-    ]
+    // Empty on purpose. The two entries here claimed Hunter times outreach by
+    // detected buyer readiness and that Barry detects urgency signals — neither
+    // exists. Hunter step spacing comes from the user-selected timeframe field
+    // validated in barryGenerateMissionSequence, and nothing evaluates an
+    // individual contact for urgency. See #562.
+    feedsInto: []
   }
 };
 
@@ -415,20 +410,24 @@ export default function ReconModulePage() {
         })}
       </div>
 
-      {/* How This Module Feeds the Platform */}
-      <div className="recon-feeds-into">
-        <h3>
-          What This Module Trains
-        </h3>
-        <div className="recon-feeds-into-list">
-          {config.feedsInto.map((impact, idx) => (
-            <div key={idx} className="recon-feeds-into-item">
-              <ChevronRight className={color} />
-              <p>{impact}</p>
-            </div>
-          ))}
+      {/* How This Module Feeds the Platform — omitted entirely for a module with
+          no verified downstream effect, rather than rendering a heading over an
+          empty list. */}
+      {config.feedsInto.length > 0 && (
+        <div className="recon-feeds-into">
+          <h3>
+            What This Module Covers
+          </h3>
+          <div className="recon-feeds-into-list">
+            {config.feedsInto.map((impact, idx) => (
+              <div key={idx} className="recon-feeds-into-item">
+                <ChevronRight className={color} />
+                <p>{impact}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Section Output Modal */}
       {viewingSection && (

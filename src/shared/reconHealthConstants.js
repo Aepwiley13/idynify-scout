@@ -52,7 +52,7 @@ export const FALLBACK_ASSUMPTIONS = {
   messaging:
     "I have no value proposition or tone guidance. Outreach uses category-level framing, not your actual positioning.",
   signals:
-    "I have no behavioral signal data. Lead prioritization doesn't account for buying readiness indicators.",
+    "I have no behavioral signal data. The context I generate doesn't reference the timing cues that matter in your market.",
 };
 
 // ─── Training dimensions ──────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ export const TRAINING_DIMENSIONS = [
     id: 'icp',
     label: 'Ideal Customer Profile',
     sections: [3, 4],
-    impactWhenMissing: 'Scout ICP alignment cannot be validated. Lead scoring is unweighted.',
+    impactWhenMissing: 'Scout ICP alignment cannot be validated.',
     fallbackAssumption: FALLBACK_ASSUMPTIONS.icp,
     priority: 2,
   },
@@ -111,7 +111,7 @@ export const TRAINING_DIMENSIONS = [
     id: 'signals',
     label: 'Behavioral Signals',
     sections: [10],
-    impactWhenMissing: 'Lead prioritization doesn\'t account for buying readiness indicators.',
+    impactWhenMissing: 'Generated context doesn\'t reference the timing cues you watch for.',
     fallbackAssumption: FALLBACK_ASSUMPTIONS.signals,
     priority: 7,
   },

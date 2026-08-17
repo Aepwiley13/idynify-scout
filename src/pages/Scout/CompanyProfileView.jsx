@@ -729,7 +729,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
               <button onClick={saveDecisionMakers} disabled={savingDMs}
                 style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 {savingDMs ? <><div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} />Saving…</>
-                  : <><UserPlus size={13} />Add {selectedDecisionMakers.length} to Leads</>}
+                  : <><UserPlus size={13} />Save {selectedDecisionMakers.length} Contacts</>}
               </button>
             )}
           </Section>
@@ -790,7 +790,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                       <span style={{ fontSize: 11, color: T.textMuted, alignSelf: 'center' }}>{selectedContactIds.size} selected</span>
                       <button onClick={bulkApprove} disabled={savingBulk}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                        {savingBulk ? 'Saving…' : <><UserPlus size={11} />Add {selectedContactIds.size} to Leads</>}
+                        {savingBulk ? 'Saving…' : <><UserPlus size={11} />Save {selectedContactIds.size} Contacts</>}
                       </button>
                       <button onClick={() => setSelectedContactIds(new Set())}
                         style={{ padding: '5px 10px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer' }}>
@@ -827,7 +827,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                         ) : (
                           <button onClick={e => { e.stopPropagation(); approveContact(c); }}
                             style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                            <UserPlus size={12} />Save to Leads
+                            <UserPlus size={12} />Save Contact
                           </button>
                         )
                       }
@@ -864,7 +864,7 @@ export default function CompanyProfileView({ companyId, onBack }) {
                   footer={
                     <button onClick={e => { e.stopPropagation(); approveContact({ id: c.apollo_person_id || c.id, ...c }); }}
                       style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                      <UserPlus size={12} />Save to Leads
+                      <UserPlus size={12} />Save Contact
                     </button>
                   }
                   getLeadershipBadge={getLeadershipBadge}

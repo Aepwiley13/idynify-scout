@@ -111,17 +111,17 @@ export default function GameSessionStart({ onSelectBucket }) {
       <div className="game-session-start">
         <div className="game-start-header">
           <h2>Scout Game</h2>
-          <p>Start by approving your Daily Leads</p>
+          <p>Start by reviewing your Daily Discoveries</p>
         </div>
         <div className="game-empty-state">
           <p className="game-empty-text">
-            Process your Daily Leads first, then assign contacts to buckets to start game sessions.
+            Review your Daily Discoveries first, then assign contacts to buckets to start game sessions.
           </p>
           <button
             className="game-empty-cta"
             onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}
           >
-            Go to Daily Leads
+            Go to Daily Discoveries
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

@@ -273,7 +273,7 @@ export default function CompanyCard({ company, onSwipe }) {
           <div className="status-score-section">
             <Award className="w-5 h-5" style={{ color: scoreBadge.color === 'green' ? '#10b981' : scoreBadge.color === 'blue' ? '#3b82f6' : '#6b7280' }} />
             <div>
-              <p className="status-label">Company Lead Score</p>
+              <p className="status-label">Company Match Score</p>
               <p className="status-score">
                 {leadScore} <span className="status-score-max">/ 100</span>
               </p>

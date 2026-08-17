@@ -37,8 +37,6 @@ const TRAINING_DIMENSIONS = [
     sections: [3, 4],
     description: 'Barry knows your target market, firmographics, and psychographics.',
     notTrainedDescription: 'Barry cannot assess whether a prospect matches your ICP.',
-    impactWhenTrained: 'Scout lead scoring reflects your actual ideal customer characteristics.',
-    impactWhenMissing: 'All leads are treated equally — no qualification intelligence.'
   },
   {
     id: 'pain-points',
@@ -80,10 +78,8 @@ const TRAINING_DIMENSIONS = [
     id: 'signals',
     label: 'Behavioral Signals',
     sections: [10],
-    description: 'Barry detects timing signals and behavioral triggers that indicate readiness.',
-    notTrainedDescription: 'Barry cannot detect buying signals or timing indicators.',
-    impactWhenTrained: 'Scout prioritizes leads showing active buying signals.',
-    impactWhenMissing: 'No signal-based prioritization. All prospects treated equally.'
+    description: 'Barry has your timing signals and behavioral triggers as context.',
+    notTrainedDescription: 'Barry has no timing signals or behavioral triggers to work from.',
   }
 ];
 
@@ -134,7 +130,7 @@ export default function BarryTraining() {
     return (
       <div className="barry-training-loading">
         <div className="loading-spinner" />
-        <p className="loading-text">Loading Barry Training Status...</p>
+        <p className="loading-text">Loading what Barry knows...</p>
       </div>
     );
   }
@@ -153,7 +149,7 @@ export default function BarryTraining() {
 
       {/* Header — Finding 10: Scout's centered enterprise-header */}
       <div className="barry-training-header">
-        <h1 className="barry-training-title">Barry Training Status</h1>
+        <h1 className="barry-training-title">What Barry Knows</h1>
         <p className="barry-training-subtitle">What Barry knows and what he's missing</p>
       </div>
 
@@ -161,11 +157,11 @@ export default function BarryTraining() {
       <div className="barry-training-status">
         <div className="barry-training-stats-grid">
           <div className="barry-training-stat">
-            <p className="barry-training-stat-label">Training Progress</p>
+            <p className="barry-training-stat-label">Context Coverage</p>
             <p className="barry-training-stat-value purple">{overallProgress}%</p>
           </div>
           <div className="barry-training-stat bordered">
-            <p className="barry-training-stat-label">Dimensions Trained</p>
+            <p className="barry-training-stat-label">Areas Covered</p>
             <p className="barry-training-stat-value dark">{trainedDimensions}/{totalDimensions}</p>
           </div>
           <div className="barry-training-stat">
@@ -185,12 +181,13 @@ export default function BarryTraining() {
 
       {/* Training Dimensions */}
       <div className="barry-training-dimensions">
-        <h2 className="barry-training-section-title">Training Dimensions</h2>
+        <h2 className="barry-training-section-title">Context Areas</h2>
         <div className="barry-training-dimensions-list">
           {TRAINING_DIMENSIONS.map((dimension) => {
             const status = getDimensionStatus(dimension);
             const isTrained = status === 'trained';
             const isPartial = status === 'partial';
+            const impact = isTrained ? dimension.impactWhenTrained : dimension.impactWhenMissing;
 
             return (
               <div
@@ -221,13 +218,17 @@ export default function BarryTraining() {
                       {isTrained ? dimension.description : dimension.notTrainedDescription}
                     </p>
 
-                    {/* Impact */}
-                    <div className={`barry-dimension-impact ${
-                      isTrained ? 'trained' : isPartial ? 'partial' : 'untrained'
-                    }`}>
-                      <span>Impact: </span>
-                      {isTrained ? dimension.impactWhenTrained : dimension.impactWhenMissing}
-                    </div>
+                    {/* Impact — omitted entirely for dimensions with no
+                        verified impact to state, rather than rendering a bare
+                        "Impact:" label with nothing after it. */}
+                    {impact && (
+                      <div className={`barry-dimension-impact ${
+                        isTrained ? 'trained' : isPartial ? 'partial' : 'untrained'
+                      }`}>
+                        <span>Impact: </span>
+                        {impact}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -250,7 +251,7 @@ export default function BarryTraining() {
             <div className="barry-capability-item">
               <CheckCircle2 className="success" />
               <p>
-                Reference your RECON training data ({completedSections} sections) when generating context
+                Draw on your RECON context ({completedSections} sections) in everything he writes
               </p>
             </div>
           )}
@@ -267,9 +268,9 @@ export default function BarryTraining() {
               <AlertCircle className="info" />
               <p>
                 Complete remaining RECON modules to unlock:{' '}
-                {overallProgress < 40 && 'ICP-based lead scoring, competitive positioning, personalized messaging'}
-                {overallProgress >= 40 && overallProgress < 80 && 'buying signal detection, full competitive positioning, objection handling'}
-                {overallProgress >= 80 && 'full training across all dimensions'}
+                {overallProgress < 40 && 'competitive positioning, personalized messaging'}
+                {overallProgress >= 40 && overallProgress < 80 && 'full competitive positioning, objection handling'}
+                {overallProgress >= 80 && 'full context across all areas'}
               </p>
             </div>
           )}

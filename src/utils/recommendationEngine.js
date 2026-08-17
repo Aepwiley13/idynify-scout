@@ -826,7 +826,7 @@ async function deriveStrategicGapAlerts(userId, dismissals) {
             campaignName,
             observed: `${noOutcomeCompleted.length} contact${noOutcomeCompleted.length > 1 ? 's' : ''} in campaign "${campaignName}" completed their sequences with no outcome recorded`,
             whyItMatters: `Without outcome data, Barry cannot evaluate campaign effectiveness or adapt future strategy`,
-            suggestion: `Record outcomes for completed sequences so Barry can learn from the results`,
+            suggestion: `Record outcomes for completed sequences so Barry has the results as context for what comes next`,
             rationale: `Outcome recording closes the feedback loop — it is the data Barry uses to improve future sequences`,
             actionType: RECOMMENDATION_ACTIONS.RECORD_OUTCOME,
             actionLabel: 'Record Outcomes'

@@ -153,7 +153,7 @@ export const MODULE_BOTTOM_NAV = {
       { id: 'overview',         label: 'Overview',  Icon: LayoutDashboard, to: '/recon' },
       { id: 'icp-intelligence', label: 'ICP',       Icon: Target,          to: '/recon/icp-intelligence', section: 'ICP Intelligence' },
       { id: 'messaging',        label: 'Messaging', Icon: MessageSquare,   to: '/recon/messaging',        section: 'Messaging & Voice' },
-      { id: 'barry-training',   label: 'Training',  Icon: Brain,           to: '/recon/barry-training',   section: 'Barry Training' },
+      { id: 'barry-training',   label: 'Context',   Icon: Brain,           to: '/recon/barry-training',   section: 'What Barry Knows' },
     ],
     overflow: [
       { id: 'alignment-brief',   label: 'Alignment Brief',  Icon: FileText, to: '/recon/alignment-brief' },

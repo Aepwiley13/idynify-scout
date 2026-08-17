@@ -121,8 +121,37 @@ repository alone.
 | Firestore database | `(default)` — `getFirestore()` is called with no database argument |
 | Environment authority | `BARRY_ENV` |
 | `environment` emitted in production, before the fix | `dev` (every row) |
-| `environment` emitted in production, after the fix | `production` |
+| `environment` emitted in production, after the fix | `production` — **verified in production, see below** |
 | `environment` when `BARRY_ENV` is absent | `unknown` — never guessed |
+
+#### Production verification — confirmed 2026-08-10
+
+The `after the fix` row above is measured, not projected. The first production
+row written after the `BARRY_ENV` deploy:
+
+| Field | Value |
+|---|---|
+| `environment` | `production` |
+| `provider` | `anthropic` |
+| `endpoint` | `ANTHROPIC_GENERATE-ENGAGEMENT-MESSAGE` |
+| `model` | `claude-sonnet-4-5-20250929` |
+| `status` | `success` |
+| `inputTokens` / `outputTokens` | 1657 / 977 |
+| `timestamp` | 2026-08-10T19:31:17Z |
+
+Attribution to the post-fix code is established two independent ways, so it
+does not rest on deploy timing alone:
+
+1. **Chronology.** The `BARRY_ENV` change (#521) merged at 2026-08-10T19:15:53Z
+   (`17368c1`); the row was written 15m24s later.
+2. **Structurally.** The superseded implementation was
+   `projectId.includes('dev') ? 'dev' : 'prod'`. Its range is exactly two
+   strings, `dev` and `prod`. The literal `production` is unreachable from it
+   under every input, so no pre-fix build could have produced this row
+   regardless of when it deployed.
+
+This row is Baseline Day 1. It also carries `provider: anthropic` and a
+resolved `model`, which is the same evidence that closes A2 stage 2.
 
 **Resolved.** The heuristic was replaced with `process.env.BARRY_ENV || 'unknown'`.
 That also retires the `VITE_` divergence noted above: the label no longer reads

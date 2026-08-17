@@ -871,9 +871,12 @@ export default function MissionControlDashboardV2() {
   };
 
   // ── First-Run Gate ─────────────────────────────────────────────────────────
+  // [B3 fix] Accept both legacy ('barry_onboarding') and live ('onboarding_flow')
+  // onboarding sources. Temporary compatibility behavior — the existing
+  // onboarding state schema is not the future intelligence model.
   const isFirstRun =
     obComplete === true &&
-    onboardingSource === 'barry_onboarding' &&
+    (onboardingSource === 'barry_onboarding' || onboardingSource === 'onboarding_flow') &&
     hasSeenMCWelcome === false;
 
   // ── Loading ────────────────────────────────────────────────────────────────

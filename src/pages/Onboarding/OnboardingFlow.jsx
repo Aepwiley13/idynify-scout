@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { initializeDashboard } from '../../utils/dashboardUtils';
 import { useT } from '../../theme/ThemeContext';
 import { useMissionControlTheme } from '../../theme/useMissionControlTheme';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
@@ -417,15 +418,49 @@ export default function OnboardingFlow() {
     if (!userId) return;
 
     // Save answers to RECON / dashboard
+    // [B1 fix] initializeDashboard ensures dashboards/{uid} exists before writing.
+    // Previous code used updateDoc on a non-existent doc — Firestore threw and
+    // .catch(() => {}) silently lost every user's Step 3 answers.
+    // Temporary compatibility behavior — future onboarding will use the
+    // Intelligence Contract storage model, not raw dashboard fields.
     try {
       const reconFields = {};
       QUESTIONS.forEach(q => {
         if (answers[q.key]) reconFields[q.reconField] = answers[q.key];
       });
       if (Object.keys(reconFields).length > 0) {
-        await updateDoc(doc(db, 'dashboards', userId), reconFields).catch(() => {});
+        await initializeDashboard(userId);
+        await updateDoc(doc(db, 'dashboards', userId), reconFields);
       }
-    } catch { /* best effort */ }
+    } catch (err) {
+      console.error('OnboardingFlow: failed to save ICP answers to dashboard', err);
+    }
+
+    // [B2 fix] Trigger company discovery — mirrors BarryOnboarding.jsx:370.
+    // Temporary compatibility behavior — future onboarding will not assume
+    // company discovery always follows Step 3.
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const authToken = await user.getIdToken();
+        const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
+        const companyProfile = profileDoc.exists() ? profileDoc.data() : {};
+
+        await setDoc(
+          doc(db, 'users', userId),
+          { barryState: 'SEARCHING', companiesFoundCount: 0 },
+          { merge: true }
+        );
+
+        fetch('/.netlify/functions/search-companies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, authToken, companyProfile }),
+        }).catch(err => console.error('OnboardingFlow: background search failed', err));
+      }
+    } catch (err) {
+      console.error('OnboardingFlow: failed to trigger company discovery', err);
+    }
 
     await onboarding.markStep('smartQuestionsAnswered');
     setStep(4);
@@ -494,6 +529,19 @@ export default function OnboardingFlow() {
         setTopCompanies(scored.slice(0, 5));
 
         await onboarding.markStep('completed');
+        // [B3 fix] Write the four fields Mission Control's FirstRunView gate expects.
+        // Temporary compatibility behavior — the existing onboarding state schema
+        // is not the future intelligence model.
+        await setDoc(
+          doc(db, 'users', userId),
+          {
+            onboardingComplete: true,
+            onboardingSource: 'onboarding_flow',
+            hasSeenMCWelcome: false,
+            companiesFoundCount: scored.length,
+          },
+          { merge: true }
+        );
         setBuildingList(false);
         clearTimeout(stillWorkingTimer);
 
@@ -505,6 +553,19 @@ export default function OnboardingFlow() {
         setBuildingList(false);
         clearTimeout(stillWorkingTimer);
         await onboarding.markStep('completed');
+        // [B3 fix] Same handoff fields on the error path
+        try {
+          await setDoc(
+            doc(db, 'users', userId),
+            {
+              onboardingComplete: true,
+              onboardingSource: 'onboarding_flow',
+              hasSeenMCWelcome: false,
+              companiesFoundCount: 0,
+            },
+            { merge: true }
+          );
+        } catch { /* best effort — primary markStep already succeeded */ }
         setTimeout(() => setStep(6), 1500);
       }
     };

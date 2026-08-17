@@ -139,7 +139,7 @@ const SECTION_2_QUESTIONS = [
     required: true,
     validation: { minLength: 100, maxLength: 300 },
     placeholder: "e.g., They typically use Salesforce for CRM, Marketo for marketing automation, Slack for team communication...",
-    barryContext: "Barry identifies prospects using compatible tech stacks to prioritize high-fit opportunities."
+    barryContext: "Barry references the tools your customers already use when writing to them."
   },
   {
     id: "integrations",

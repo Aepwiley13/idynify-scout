@@ -165,12 +165,14 @@ const MODULE_CONFIG = {
     color: 'emerald',
     guidance: {
       why: 'Timing matters as much as targeting. This module captures how your buyers decide and what you watch for, so Barry can reference it in the context and outreach he writes.',
-      what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this for timing optimization and urgency detection.'
+      what: 'You\'ll describe how your customers make decisions, who\'s involved, what triggers evaluation, and what behavioral signals indicate readiness. Barry uses this as context when he writes.'
     },
-    feedsInto: [
-      'Hunter optimizes outreach timing based on buyer readiness',
-      'Barry detects urgency signals and adapts context accordingly'
-    ]
+    // Empty on purpose. The two entries here claimed Hunter times outreach by
+    // detected buyer readiness and that Barry detects urgency signals — neither
+    // exists. Hunter step spacing comes from the user-selected timeframe field
+    // validated in barryGenerateMissionSequence, and nothing evaluates an
+    // individual contact for urgency. See #562.
+    feedsInto: []
   }
 };
 
@@ -408,20 +410,24 @@ export default function ReconModulePage() {
         })}
       </div>
 
-      {/* How This Module Feeds the Platform */}
-      <div className="recon-feeds-into">
-        <h3>
-          What This Module Covers
-        </h3>
-        <div className="recon-feeds-into-list">
-          {config.feedsInto.map((impact, idx) => (
-            <div key={idx} className="recon-feeds-into-item">
-              <ChevronRight className={color} />
-              <p>{impact}</p>
-            </div>
-          ))}
+      {/* How This Module Feeds the Platform — omitted entirely for a module with
+          no verified downstream effect, rather than rendering a heading over an
+          empty list. */}
+      {config.feedsInto.length > 0 && (
+        <div className="recon-feeds-into">
+          <h3>
+            What This Module Covers
+          </h3>
+          <div className="recon-feeds-into-list">
+            {config.feedsInto.map((impact, idx) => (
+              <div key={idx} className="recon-feeds-into-item">
+                <ChevronRight className={color} />
+                <p>{impact}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Section Output Modal */}
       {viewingSection && (

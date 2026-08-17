@@ -73,7 +73,7 @@ const RECON_MODULES = [
     color: 'emerald',
     sections: [7, 10],
     sectionNames: ['Decision Process', 'Behavioral & Timing Signals'],
-    impactAreas: ['Hunter timing optimization', 'Barry urgency detection'],
+    impactAreas: ['Hunter timing optimization'],
     path: '/recon/buying-signals'
   }
 ];

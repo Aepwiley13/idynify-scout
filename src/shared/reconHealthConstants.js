@@ -111,7 +111,7 @@ export const TRAINING_DIMENSIONS = [
     id: 'signals',
     label: 'Behavioral Signals',
     sections: [10],
-    impactWhenMissing: 'Lead prioritization doesn\'t account for buying readiness indicators.',
+    impactWhenMissing: 'Generated context doesn\'t reference the timing cues you watch for.',
     fallbackAssumption: FALLBACK_ASSUMPTIONS.signals,
     priority: 7,
   },

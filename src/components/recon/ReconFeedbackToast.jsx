@@ -36,7 +36,7 @@ const SECTION_FEEDBACK = {
   },
   6: {
     learned: 'Buying Triggers',
-    impact: 'Barry recognizes signals that indicate purchase readiness.'
+    impact: 'Barry has your buying triggers as context.'
   },
   7: {
     learned: 'Decision Process',
@@ -55,7 +55,7 @@ const SECTION_FEEDBACK = {
   },
   10: {
     learned: 'Behavioral Signals',
-    impact: 'Barry detects timing indicators and buying signals.'
+    impact: 'Barry has your timing signals as context.'
   }
 };
 

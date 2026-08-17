@@ -78,8 +78,8 @@ const TRAINING_DIMENSIONS = [
     id: 'signals',
     label: 'Behavioral Signals',
     sections: [10],
-    description: 'Barry detects timing signals and behavioral triggers that indicate readiness.',
-    notTrainedDescription: 'Barry cannot detect buying signals or timing indicators.',
+    description: 'Barry has your timing signals and behavioral triggers as context.',
+    notTrainedDescription: 'Barry has no timing signals or behavioral triggers to work from.',
   }
 ];
 
@@ -269,7 +269,7 @@ export default function BarryTraining() {
               <p>
                 Complete remaining RECON modules to unlock:{' '}
                 {overallProgress < 40 && 'competitive positioning, personalized messaging'}
-                {overallProgress >= 40 && overallProgress < 80 && 'buying signal detection, full competitive positioning, objection handling'}
+                {overallProgress >= 40 && overallProgress < 80 && 'full competitive positioning, objection handling'}
                 {overallProgress >= 80 && 'full context across all areas'}
               </p>
             </div>

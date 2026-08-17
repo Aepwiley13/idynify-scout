@@ -548,7 +548,7 @@ export default function OnboardingFlow() {
               Hi{firstName ? ` ${firstName}` : ''}, I'm Barry.
             </h1>
             <p style={{ fontSize: 16, color: T.textMuted, lineHeight: 1.6, margin: 0 }}>
-              Give me about 3 minutes and I'll build your first prospecting engine.
+              Give me about 3 minutes and I'll have your first matches ready.
               I just need a little context about your business.
             </p>
           </div>

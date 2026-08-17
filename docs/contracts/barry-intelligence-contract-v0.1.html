@@ -1,0 +1,724 @@
+<title>Barry Intelligence Contract v0.1</title>
+<style>
+:root {
+  --bg: #F7F8FA;
+  --bg-surface: #FFFFFF;
+  --bg-evidence: #F0F3F6;
+  --text: #1A2332;
+  --text-secondary: #566778;
+  --text-muted: #8899A6;
+  --accent: #4A7C9B;
+  --accent-light: #4A7C9B18;
+  --alert: #D4634B;
+  --alert-light: #D4634B14;
+  --verified: #5B9A6F;
+  --verified-light: #5B9A6F14;
+  --warning: #C49A3C;
+  --warning-light: #C49A3C14;
+  --border: #D8DEE4;
+  --border-light: #E8ECF0;
+  --code-bg: #EDF0F4;
+  --code-text: #3D5266;
+  --mono: "SFMono-Regular", "Cascadia Mono", "IBM Plex Mono", Consolas, monospace;
+  --body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1419;
+    --bg-surface: #1A2332;
+    --bg-evidence: #1E2A38;
+    --text: #E7ECF0;
+    --text-secondary: #9AABB8;
+    --text-muted: #6B7D8D;
+    --accent: #6BA3C4;
+    --accent-light: #6BA3C418;
+    --alert: #E8806A;
+    --alert-light: #E8806A18;
+    --verified: #7AB88D;
+    --verified-light: #7AB88D18;
+    --warning: #D9B35A;
+    --warning-light: #D9B35A18;
+    --border: #2A3A4A;
+    --border-light: #243040;
+    --code-bg: #1A2838;
+    --code-text: #9AABB8;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1419;
+  --bg-surface: #1A2332;
+  --bg-evidence: #1E2A38;
+  --text: #E7ECF0;
+  --text-secondary: #9AABB8;
+  --text-muted: #6B7D8D;
+  --accent: #6BA3C4;
+  --accent-light: #6BA3C418;
+  --alert: #E8806A;
+  --alert-light: #E8806A18;
+  --verified: #7AB88D;
+  --verified-light: #7AB88D18;
+  --warning: #D9B35A;
+  --warning-light: #D9B35A18;
+  --border: #2A3A4A;
+  --border-light: #243040;
+  --code-bg: #1A2838;
+  --code-text: #9AABB8;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0 0 6px;
+  color: var(--text);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 40px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 56px 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+  color: var(--text);
+  text-wrap: balance;
+}
+h2 .section-num {
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: 6px;
+}
+h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 32px 0 8px;
+  color: var(--text);
+}
+h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 20px 0 6px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+p { margin: 0 0 12px; }
+code {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--border);
+}
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+.table-wrap { overflow-x: auto; }
+ul { padding-left: 20px; margin: 8px 0; }
+li { margin-bottom: 4px; }
+.evidence {
+  background: var(--bg-evidence);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--code-text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.principle {
+  border-left: 3px solid var(--accent);
+  padding: 16px 20px;
+  margin: 20px 0;
+  background: var(--accent-light);
+  border-radius: 0 4px 4px 0;
+}
+.principle-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.principle p { margin: 0; }
+.callout {
+  border-left: 3px solid var(--border);
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: var(--bg-surface);
+  border-radius: 0 4px 4px 0;
+}
+.callout.arch { border-left-color: var(--warning); background: var(--warning-light); }
+.callout-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  color: var(--warning);
+}
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tag-ws { background: #6366f118; color: #6366f1; }
+.tag-user { background: #8b5cf618; color: #8b5cf6; }
+.tag-rel { background: #0ea5e918; color: #0ea5e9; }
+.tag-mission { background: #f59e0b18; color: #f59e0b; }
+.toc {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 24px 0 40px;
+}
+.toc-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.toc ol {
+  margin: 0; padding: 0 0 0 20px;
+  font-size: 14px;
+  line-height: 2;
+  color: var(--text-secondary);
+}
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+hr { border: none; border-top: 1px solid var(--border-light); margin: 40px 0; }
+strong { font-weight: 700; }
+</style>
+
+<div class="container">
+
+<h1>Barry Intelligence Contract v0.1</h1>
+<p class="subtitle">What it means for Barry to know something &mdash; August 2026</p>
+
+<div class="toc">
+<div class="toc-title">Contents</div>
+<ol>
+<li><a href="#s1">Definition of Barry Intelligence</a></li>
+<li><a href="#s2">Governing Rules</a></li>
+<li><a href="#s3">The Four Intelligence Scopes</a></li>
+<li><a href="#s4">The Twelve Dimensions</a></li>
+<li><a href="#s5">Concrete Examples: Twelve Dimensions Applied</a></li>
+<li><a href="#s6">Major Intelligence Categories</a></li>
+<li><a href="#s7">Architecture Principle</a></li>
+</ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s1"><span class="section-num">1.</span> Definition of Barry Intelligence</h2>
+
+<p>Barry <strong>knows</strong> something when all of the following are true:</p>
+
+<ol>
+<li>He has a <strong>defined piece of intelligence</strong> about a <strong>known subject</strong> &mdash; not a raw data field, but a fact with meaning he can act on.</li>
+<li>He understands <strong>where it came from</strong> and <strong>how trustworthy</strong> it is &mdash; a user assertion, an AI inference, a third-party enrichment, or an observed behavior, each carrying different weight.</li>
+<li>He knows <strong>how long it should remain valid</strong> &mdash; a durable business truth, an evolving relationship state, a temporary strategy, or a mission-scoped objective.</li>
+<li>He knows <strong>what evidence may change it</strong> &mdash; which observations, outcomes, or user actions should trigger re-evaluation.</li>
+<li>He can <strong>apply it to a relevant decision or objective</strong> &mdash; intelligence that cannot reach any surface or influence any action is stored data, not knowledge.</li>
+</ol>
+
+<p>Intelligence that fails any of these conditions is incomplete. It may still be useful &mdash; raw data can become intelligence when the missing conditions are added &mdash; but Barry should not treat it with the same authority as intelligence that satisfies all five.</p>
+
+<p><strong>The gap today:</strong> Most of IDYNIFY's stored data satisfies condition 1 (a defined fact) but fails conditions 2&ndash;5. RECON answers have no provenance (2), no temporal scope (3), no update triggers (4), and several sections never reach any Barry surface (5). The Intelligence Contract exists to close these gaps systematically.</p>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s2"><span class="section-num">2.</span> Governing Rules</h2>
+
+<p>Two permanent product principles govern all intelligence operations. These are not guidelines &mdash; they are constraints that every future system must satisfy.</p>
+
+<div class="principle">
+<div class="principle-label">Barry's Question Rule</div>
+<p><strong>Discover</strong> what you can. <strong>Infer</strong> what you reasonably can. <strong>Confirm</strong> what matters. <strong>Ask</strong> only what you cannot know and need now. <strong>Learn</strong> everything else over time.</p>
+</div>
+
+<p>This rule establishes a priority order for intelligence acquisition. Barry's first instinct is never to ask the user &mdash; it is to discover (from websites, email, public data), then infer (from behavior, patterns, outcomes), then confirm (verify inferences that carry high consequence), and only then ask (when a decision requires information that cannot be discovered, inferred, or deferred). Everything that isn't immediately needed enters the "learn over time" path &mdash; Barry accumulates it passively from ongoing interactions.</p>
+
+<p><strong>Why this matters:</strong> Every question Barry asks is a withdrawal from the user's patience. The onboarding that asks 105 questions before delivering value violates this rule. The onboarding that analyzes a website, infers the business, confirms one critical assumption, and starts working &mdash; that follows it.</p>
+
+<div class="principle">
+<div class="principle-label">Barry's Intelligence Rule</div>
+<p><strong>Never collect intelligence without knowing</strong> who it belongs to, where it came from, how trustworthy it is, how long it should remain true, and what decisions it should improve.</p>
+</div>
+
+<p>This rule prevents the accumulation of unstructured data that no system reads. Today, <code>engagement_timeline</code> subcollections are written but never consumed. <code>enrichment_provenance</code> is tracked but never surfaced. Scout swipes are recorded with full context but produce zero learning. Each of these violates the Intelligence Rule: they collect without knowing what decisions the data should improve.</p>
+
+<p><strong>Together, these two rules define Barry's character:</strong> he is not a chatbot that asks everything upfront, nor a database that stores everything silently. He is an intelligence agent who acquires the minimum information needed to act, tracks what he knows and doesn't know, and gets smarter with every interaction.</p>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s3"><span class="section-num">3.</span> The Four Intelligence Scopes</h2>
+
+<p>Every piece of intelligence belongs to exactly one scope. The scope determines who owns it, who can see it, how long it lives, and how it moves between surfaces.</p>
+
+<h3><span class="tag tag-ws">Workspace</span> &mdash; Shared business truth</h3>
+<p>Intelligence about the business itself. Should eventually be shared across all users of the same organization. Durable &mdash; changes slowly, usually by deliberate human decision.</p>
+<ul>
+<li><strong>Examples from the current codebase:</strong></li>
+<li>ICP / target market definition &mdash; currently stored at <code>users/{uid}/icpProfiles</code>, <code>companyProfile/current</code>, and RECON sections in <code>dashboards/{uid}</code> (three locations, no reconciliation)</li>
+<li>Value proposition &mdash; stored at <code>dashboards/{uid}.valueProposition</code>, collected during onboarding Step 3 and RECON Section 1</li>
+<li>Competitive landscape &mdash; RECON Section 8, stored in <code>dashboards/{uid}</code></li>
+<li>Product/service description &mdash; extracted by <code>analyze-website</code>, stored in RECON Section 2</li>
+<li>Target industries, company sizes, geographies &mdash; RECON Section 3</li>
+<li>Excluded industries &mdash; <code>dashboards/{uid}.excludedIndustries</code> (note: this is actually temporary strategy, not durable truth &mdash; a scope error in the current system)</li>
+</ul>
+<p><strong>Key characteristic:</strong> Workspace intelligence is about "what is our business" and "who are our customers." It is true regardless of which user is logged in, which contact they're engaging, or what objective they're pursuing right now.</p>
+
+<h3><span class="tag tag-user">User</span> &mdash; Individual context</h3>
+<p>Intelligence about the specific person using IDYNIFY. Personal to them, not shared with other users of the same business.</p>
+<ul>
+<li><strong>Examples from the current codebase:</strong></li>
+<li>Communication style preferences &mdash; RECON Section 9 (Messaging), stored in <code>dashboards/{uid}</code></li>
+<li>Aggregate strategy stats &mdash; <code>users/{uid}/barry_memory.strategy_stats</code>, written by <code>barryOutcomeAttribution.js</code></li>
+<li>Gmail connection state &mdash; <code>users/{uid}/integrations/gmail</code></li>
+<li>Subscription tier and credits &mdash; <code>users/{uid}.subscriptionTier</code>, <code>credits</code></li>
+<li>Onboarding progress &mdash; <code>users/{uid}.onboarding.*</code> flags</li>
+</ul>
+<p><strong>Key characteristic:</strong> User intelligence is about "how this person works" and "what this person prefers." Two salespeople at the same company have different communication styles, different relationship networks, and different strategy outcomes.</p>
+
+<h3><span class="tag tag-rel">Relationship</span> &mdash; Person/company specific</h3>
+<p>Intelligence about a specific contact, company, or the user's relationship with them. Evolves continuously through interactions.</p>
+<ul>
+<li><strong>Examples from the current codebase:</strong></li>
+<li>Per-contact Barry memory &mdash; <code>users/{uid}/contacts/{cid}.barry_memory</code> (what_worked, what_didnt_work, channels_tried, preferences, new_facts), written by <code>barryMemoryService.js</code></li>
+<li>Relationship warmth &mdash; <code>warmth_level</code> with <code>relationship_state_source</code> tracking (<code>user_set</code> vs <code>barry_inferred</code>), inferred by <code>inferRelationshipWarmth.js</code></li>
+<li>Contact identity &mdash; name, title, company, email, resolved by <code>contactIdentityService.js</code> with 6-step hierarchy and <code>CANONICAL_FIELDS</code> protection</li>
+<li>Engagement history &mdash; session outcomes, channels used, NBS derivation</li>
+<li>Brigade assignment and transition history &mdash; <code>users/{uid}/contacts/{cid}.brigade</code>, immutable transition log</li>
+<li>Company ICP fit score &mdash; calculated by <code>icpScoring.js</code> against the active ICP profile</li>
+</ul>
+<p><strong>Key characteristic:</strong> Relationship intelligence is about "what we know about this person/company" and "how our interactions with them have gone." It is cumulative &mdash; every session adds to it &mdash; and it is the primary input to message generation and strategy recommendation.</p>
+
+<h3><span class="tag tag-mission">Mission</span> &mdash; Temporary objective</h3>
+<p>Intelligence about what the user is trying to accomplish right now. Expected to change frequently. Scoped to a specific objective, campaign, or engagement goal.</p>
+<ul>
+<li><strong>Examples from the current codebase:</strong></li>
+<li>Mission objectives &mdash; <code>users/{uid}/missions/{mid}.outcome_goal</code>, per-contact engagement plans</li>
+<li>Engagement intent &mdash; selected per-contact in Hunter (e.g., "Schedule meeting", "Get referral"), ephemeral per-session</li>
+<li>Campaign goals &mdash; cadence targets, send counts, reply rate objectives</li>
+<li>"This quarter's focus" &mdash; currently stored identically to permanent business truth (e.g., <code>idealCustomerTypes</code> in <code>dashboards/{uid}</code>), a scope error</li>
+</ul>
+<p><strong>Key characteristic:</strong> Mission intelligence is about "what are we trying to do right now." It has an expected end &mdash; the mission completes, the campaign finishes, the quarter changes. Intelligence that outlives its mission should be promoted to a more durable scope (Relationship or Workspace) or archived.</p>
+
+<p><strong>Note on the current codebase:</strong> No explicit <code>workspace</code> or <code>mission</code> entity exists today. All business intelligence is stored under user-scoped paths. Mission intelligence is fragmented across per-contact fields and per-session state. The four scopes describe the target architecture's conceptual model, not today's storage.</p>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s4"><span class="section-num">4.</span> The Twelve Dimensions</h2>
+
+<p>Every intelligence object must express these twelve dimensions. An intelligence object missing any dimension is incomplete &mdash; it can still be stored and used, but the system should know what's missing and seek to fill it.</p>
+
+<div class="table-wrap">
+<table>
+<tr><th>#</th><th>Dimension</th><th>Question It Answers</th><th>Why It Matters</th></tr>
+<tr>
+  <td>1</td>
+  <td><strong>Subject / Scope</strong></td>
+  <td>Workspace / User / Relationship / Mission?</td>
+  <td>Determines ownership, visibility, and lifetime. A value proposition is Workspace truth; a contact's preferred greeting is Relationship intelligence. Misscoping creates the bugs the audit found &mdash; temporary strategy stored as permanent truth, business facts locked to individual users.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><strong>Meaning</strong></td>
+  <td>What exactly does this fact represent?</td>
+  <td>A field name like <code>idealCustomerTypes</code> is ambiguous. Is it "who we sell to" (descriptive) or "who we should target" (prescriptive)? Meaning makes the distinction explicit so Barry can use it correctly in prompts and decisions.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>Source</strong></td>
+  <td>Where did Barry learn this?</td>
+  <td>User assertion, website extraction, Gmail analysis, Apollo enrichment, Barry inference from behavior, outcome attribution, AI analysis. The source determines baseline trustworthiness and whether the value can be overwritten.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><strong>Evidence</strong></td>
+  <td>What observations support this?</td>
+  <td>"Sarah prefers email" is stronger when backed by "3 email replies, 0 phone pickups, user confirmed" than when backed by "default assumption." Evidence lets Barry explain his reasoning and lets the user correct it.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><strong>Authority</strong></td>
+  <td>Which source can override another?</td>
+  <td>Today, only <code>inferRelationshipWarmth.js</code> implements this: if <code>relationship_state_source === 'user_set'</code>, Barry creates a suggestion instead of overwriting. This pattern needs to generalize &mdash; user assertions should generally beat AI inferences, which should generally beat third-party enrichment, but domain-specific rules may vary.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><strong>Confidence</strong></td>
+  <td>Known / inferred / estimated &mdash; how certain?</td>
+  <td>A user-typed value is known. A warmth level derived from 10 interactions is high-confidence inferred. An ICP match score from a single data point is low-confidence estimated. Confidence determines how aggressively Barry should act on the intelligence and whether to seek confirmation.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><strong>Temporal scope</strong></td>
+  <td>Durable truth / evolving truth / temporary strategy / mission-only?</td>
+  <td>"We sell SaaS" is durable. "Sarah is warm" evolves. "This quarter we target Utah nonprofits" is temporary. "Get a meeting with the CFO" is mission-only. The temporal scope determines staleness rules, expiration behavior, and whether the intelligence should persist after its context ends.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><strong>Acquisition</strong></td>
+  <td>Discover / infer+confirm / ask / learn later?</td>
+  <td>Follows Barry's Question Rule. Each intelligence object has a preferred acquisition method. Company size is discoverable (don't ask). Communication style is inferable from editing patterns (confirm if high-stakes). Budget authority must be asked. Org chart details can be learned later.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><strong>Consumer</strong></td>
+  <td>Which surfaces and decisions use this?</td>
+  <td>Intelligence with no consumer is dead storage. Today, <code>engagement_timeline</code> subcollections have no reader. RECON Section 3 (Target Market, weight 15) is excluded from the client-side context pipeline. The Consumer dimension forces the question: if nothing reads it, why collect it?</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><strong>Update trigger</strong></td>
+  <td>What evidence can change this?</td>
+  <td>Relationship warmth should update when engagement outcomes change. ICP fit should update when the user refines their target market. Value proposition should update when the website changes. Without explicit triggers, intelligence becomes stale silently.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><strong>Contradiction behavior</strong></td>
+  <td>Overwrite / defer to user / surface disagreement / request confirmation?</td>
+  <td>When Apollo says "VP of Sales" and the user typed "Director of Sales", what happens? Today: <code>CANONICAL_FIELDS</code> silently protects the user's value. The warmth system does better: it creates a <code>barry_warmth_suggestion</code> so the disagreement is visible. The contract must define a default and allow per-category overrides.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><strong>Requiredness</strong></td>
+  <td>Required for current objective / useful later / optional?</td>
+  <td>Determines acquisition urgency. If Barry needs the user's value proposition to draft a first outreach message, it's required now. If he could use their competitive landscape but can work without it, it's useful later. If their favorite sports team might help with small talk someday, it's optional. Requiredness is always relative to an objective, not absolute.</td>
+</tr>
+</table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s5"><span class="section-num">5.</span> Concrete Examples: Twelve Dimensions Applied</h2>
+
+<p>Five intelligence objects from the current codebase, each traced through all twelve dimensions. These demonstrate how the contract applies in practice.</p>
+
+<h3>Example A: Relationship Warmth</h3>
+<p><em>The most complete intelligence implementation in the current system.</em></p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Dimension</th><th>Current Implementation</th></tr>
+<tr><td>1. Subject/Scope</td><td><span class="tag tag-rel">Relationship</span> &mdash; stored on <code>users/{uid}/contacts/{cid}.warmth_level</code></td></tr>
+<tr><td>2. Meaning</td><td>How receptive this contact is likely to be to outreach, on a scale from cold to hot</td></tr>
+<tr><td>3. Source</td><td>Tracked via <code>relationship_state_source</code>: <code>"user_set"</code> (explicit user choice) or <code>"barry_inferred"</code> (AI analysis in <code>inferRelationshipWarmth.js</code>)</td></tr>
+<tr><td>4. Evidence</td><td><code>warmth_reasons</code> array: e.g., <code>["imported from Gmail (existing relationship)", "3 recent email exchanges"]</code></td></tr>
+<tr><td>5. Authority</td><td>User overrides Barry. When <code>source === 'user_set'</code>, Barry creates a <code>barry_warmth_suggestion</code> instead of overwriting &mdash; the system defers while surfacing disagreement</td></tr>
+<tr><td>6. Confidence</td><td>Implicit in source type &mdash; no explicit confidence score, but user-set is treated as definitive, barry-inferred as revisable</td></tr>
+<tr><td>7. Temporal scope</td><td>Evolving truth &mdash; changes as the relationship develops. No explicit expiration or staleness rule</td></tr>
+<tr><td>8. Acquisition</td><td>Inferred from contact source, communication history, and engagement outcomes. Confirmed by user when they override</td></tr>
+<tr><td>9. Consumer</td><td><code>barryGuardrail.js</code> uses warmth for pre-generation checks. <code>generate-engagement-message</code> adjusts tone. Displayed in contact profile UI</td></tr>
+<tr><td>10. Update trigger</td><td>Re-evaluated when engagement outcomes change. <code>inferRelationshipWarmth.js</code> runs on contact state transitions</td></tr>
+<tr><td>11. Contradiction</td><td>Surface disagreement &mdash; the <code>barry_warmth_suggestion</code> pattern is the system's only contradiction resolution mechanism</td></tr>
+<tr><td>12. Requiredness</td><td>Required for message generation (guardrail checks warmth before allowing cold outreach)</td></tr>
+</table>
+</div>
+
+<div class="callout">
+<p><strong>Assessment:</strong> Warmth is the most complete intelligence implementation. It satisfies 10 of 12 dimensions. Missing: explicit confidence scoring (dimension 6 is implicit) and temporal staleness rules (dimension 7 has no expiration). This is the model to generalize.</p>
+</div>
+
+
+<h3>Example B: Value Proposition</h3>
+<p><em>A Workspace fact treated as a User field.</em></p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Dimension</th><th>Current Implementation</th></tr>
+<tr><td>1. Subject/Scope</td><td><span class="tag tag-ws">Workspace</span> (logically) but stored at <code>dashboards/{uid}.valueProposition</code> <span class="tag tag-user">User-scoped</span></td></tr>
+<tr><td>2. Meaning</td><td>What makes this business different from competitors &mdash; the core differentiator</td></tr>
+<tr><td>3. Source</td><td>Unknown. Could be: user-typed in onboarding Step 3 (field <code>differentiator</code>), AI-extracted by <code>analyze-website</code>, or manually edited in RECON Section 1. No provenance tracked</td></tr>
+<tr><td>4. Evidence</td><td>None stored. The value exists as a string with no supporting observations</td></tr>
+<tr><td>5. Authority</td><td>Last write wins. No source tracking means no authority hierarchy</td></tr>
+<tr><td>6. Confidence</td><td>Unknown. AI-extracted from a website has different reliability than user-typed</td></tr>
+<tr><td>7. Temporal scope</td><td>Semi-permanent business truth, but stored identically to temporary strategy fields. No distinction</td></tr>
+<tr><td>8. Acquisition</td><td>Currently: asked in onboarding or discovered from website. Per the Question Rule, this should be discoverable first, confirmed second</td></tr>
+<tr><td>9. Consumer</td><td>Client-side <code>barryContextStack.js</code> includes it via RECON Section 1 (300-char truncation). Not in server-side assembler. Mission Control Barry gets it; Hunter Barry does not</td></tr>
+<tr><td>10. Update trigger</td><td>None. Only changes when user manually edits RECON. Website changes, product pivots, new messaging &mdash; none trigger re-evaluation</td></tr>
+<tr><td>11. Contradiction</td><td>Silent overwrite. If <code>analyze-website</code> extracts one value and the user types another, the last write wins with no record of the disagreement</td></tr>
+<tr><td>12. Requiredness</td><td>Required for outreach messaging &mdash; but the server-side message generation surface (Hunter Barry) doesn't receive it</td></tr>
+</table>
+</div>
+
+<div class="callout">
+<p><strong>Assessment:</strong> Satisfies only dimensions 1&ndash;2. Fails 3&ndash;7 (no provenance, no evidence, no authority, no confidence, no temporal marking), partially satisfies 8&ndash;9 (acquired but not via the right priority; consumed by one surface but not the other), and fails 10&ndash;12 (no update triggers, no contradiction handling, requiredness not enforced on the surface that needs it).</p>
+</div>
+
+
+<h3>Example C: Per-Contact Barry Memory (<code>what_worked</code>)</h3>
+<p><em>Cumulative learning from engagement sessions.</em></p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Dimension</th><th>Current Implementation</th></tr>
+<tr><td>1. Subject/Scope</td><td><span class="tag tag-rel">Relationship</span> &mdash; stored on <code>users/{uid}/contacts/{cid}.barry_memory.what_worked</code></td></tr>
+<tr><td>2. Meaning</td><td>Engagement strategies, message styles, and approaches that produced positive outcomes with this specific contact</td></tr>
+<tr><td>3. Source</td><td><code>barryMemoryService.js</code> writes after Barry engagement sessions. Source is always the outcome of a Barry-generated interaction</td></tr>
+<tr><td>4. Evidence</td><td>Implicit in the session that generated it, but the evidence chain (which session, which message, which outcome) is not stored on the memory field itself</td></tr>
+<tr><td>5. Authority</td><td>Barry-only. User cannot directly edit <code>barry_memory</code>. No authority conflict because only one system writes</td></tr>
+<tr><td>6. Confidence</td><td>High for direct outcomes (user reported "meeting booked"). Lower for inferred success (no reply but contact status changed). Not distinguished</td></tr>
+<tr><td>7. Temporal scope</td><td>Cumulative &mdash; grows over time. No expiration. Old strategies that worked 6 months ago carry the same weight as last week's</td></tr>
+<tr><td>8. Acquisition</td><td>Learned from outcomes &mdash; never asked, never inferred, always observed. This correctly follows the Question Rule</td></tr>
+<tr><td>9. Consumer</td><td>Server-side <code>barryContextAssembler.js</code> only. Assembled at P1 priority (second only to identity). 1200-char total budget means it competes with other memory fields. <strong>Not available to Mission Control Barry</strong></td></tr>
+<tr><td>10. Update trigger</td><td>Every completed Barry engagement session triggers a memory write via <code>barryMemoryService.js</code></td></tr>
+<tr><td>11. Contradiction</td><td>Append-only. New observations don't contradict old ones &mdash; they add to the history. If a strategy that once worked stops working, both facts coexist</td></tr>
+<tr><td>12. Requiredness</td><td>Required for effective message generation &mdash; without it, Barry repeats failed strategies. The system correctly prioritizes it (P1 in assembler budget)</td></tr>
+</table>
+</div>
+
+<div class="callout">
+<p><strong>Assessment:</strong> Strong implementation. Satisfies dimensions 1&ndash;3, 5, 8, 10&ndash;12. Weak on 4 (evidence chain not preserved), 6 (confidence not distinguished), 7 (no temporal decay). Critical gap on 9: only reachable from the server-side assembler, invisible to Mission Control Barry where users actually chat.</p>
+</div>
+
+
+<h3>Example D: Engagement Objective</h3>
+<p><em>A Mission-scoped fact with no persistent representation.</em></p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Dimension</th><th>Current Implementation</th></tr>
+<tr><td>1. Subject/Scope</td><td><span class="tag tag-mission">Mission</span> &mdash; no single storage location. Fragmented across <code>missions/{mid}.outcome_goal</code>, per-session intent classification, and per-contact <code>engagement_intent</code></td></tr>
+<tr><td>2. Meaning</td><td>"What are we trying to accomplish with this contact right now?" &mdash; e.g., schedule a meeting, get a referral, close a deal</td></tr>
+<tr><td>3. Source</td><td>User-selected in Hunter UI, or inferred per-session by Claude (13 intent types: inquiry, follow_up, objection, etc.)</td></tr>
+<tr><td>4. Evidence</td><td>None stored. The objective exists as a field value with no reasoning</td></tr>
+<tr><td>5. Authority</td><td>User-selected wins over Claude-inferred, but no explicit mechanism &mdash; they write to different fields</td></tr>
+<tr><td>6. Confidence</td><td>High when user-selected, variable when Claude-inferred. Not distinguished</td></tr>
+<tr><td>7. Temporal scope</td><td>Mission-only &mdash; should expire when the mission completes or the objective changes. Currently persists indefinitely on the contact doc</td></tr>
+<tr><td>8. Acquisition</td><td>Asked (user selects in Hunter) or inferred (Claude classifies per-session). Should be: inferred from context first, confirmed when ambiguous</td></tr>
+<tr><td>9. Consumer</td><td>Mission detail views display it. <code>barryContextStack.js</code> includes mission summaries in client context. Not in server-side assembler</td></tr>
+<tr><td>10. Update trigger</td><td>Manual user change only. Mission completion doesn't auto-clear the objective from the contact doc</td></tr>
+<tr><td>11. Contradiction</td><td>No handling. If a mission says "get referral" and the user selects "schedule meeting" in Hunter, both coexist with no reconciliation</td></tr>
+<tr><td>12. Requiredness</td><td>Required for effective message generation &mdash; the "ask" shapes the entire outreach. Currently not enforced &mdash; Barry can generate messages without knowing the objective</td></tr>
+</table>
+</div>
+
+<div class="callout">
+<p><strong>Assessment:</strong> The weakest of the five examples. Only dimension 2 (meaning) is clearly satisfied. The objective is fragmented across three locations, has no consistent source tracking, no temporal boundary, and no contradiction handling. This is the strongest case for the Mission scope &mdash; a first-class concept that owns intent and expires when fulfilled.</p>
+</div>
+
+
+<h3>Example E: ICP Target Industries</h3>
+<p><em>Workspace intelligence that drives company discovery but is disconnected from the surface that needs it most.</em></p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Dimension</th><th>Current Implementation</th></tr>
+<tr><td>1. Subject/Scope</td><td><span class="tag tag-ws">Workspace</span> &mdash; stored in RECON Section 3 fields within <code>dashboards/{uid}</code>, and separately in <code>icpProfiles/{id}.industries</code></td></tr>
+<tr><td>2. Meaning</td><td>Which industries the business should target for prospecting &mdash; the firmographic definition of the ideal customer</td></tr>
+<tr><td>3. Source</td><td>Multiple unreconciled: user-typed in RECON Section 3 (<code>Section3TargetMarketFirmographics.jsx</code>), AI-extracted by <code>analyze-website</code>, user-typed in ICP Builder, or inferred from BarryOnboarding conversation</td></tr>
+<tr><td>4. Evidence</td><td>None. No record of why these industries were chosen or what data supports the selection</td></tr>
+<tr><td>5. Authority</td><td>Last write wins. Four input surfaces can overwrite each other with no hierarchy</td></tr>
+<tr><td>6. Confidence</td><td>Unknown. User-typed in a dedicated builder is higher confidence than AI-extracted from a website, but both are stored identically</td></tr>
+<tr><td>7. Temporal scope</td><td>Mix &mdash; "we sell to healthcare" is durable, "this quarter we're targeting fintech" is temporary. No distinction in storage</td></tr>
+<tr><td>8. Acquisition</td><td>Currently asked (RECON questionnaire) and discovered (website analysis). Should be: discovered first from website, confirmed in onboarding, refined from scout swipe patterns over time</td></tr>
+<tr><td>9. Consumer</td><td><code>search-companies.js</code> uses ICP profile industries for Apollo queries. <code>icpScoring.js</code> uses them for fit scoring. <strong>RECON Section 3 is excluded from <code>barryContextStack.js</code></strong> (the client-side pipeline maps sections 1, 2, 4, 5, 9 only). Mission Control Barry never receives target market firmographics</td></tr>
+<tr><td>10. Update trigger</td><td>Manual edit only. Scout swipe patterns (accept/reject companies by industry) are recorded but never analyzed to refine targeting</td></tr>
+<tr><td>11. Contradiction</td><td>Silent overwrite between RECON, ICP Builder, and onboarding. If the user says "healthcare" in RECON and "fintech" in the ICP Builder, last write wins</td></tr>
+<tr><td>12. Requiredness</td><td>Required for company discovery &mdash; without target industries, <code>search-companies</code> cannot produce relevant results. Currently not enforced as a gate</td></tr>
+</table>
+</div>
+
+<div class="callout">
+<p><strong>Assessment:</strong> Critical Workspace intelligence stored in four locations with no reconciliation. The most important section for company discovery (RECON Section 3, weight 15) is excluded from the primary Barry chat surface. Scout swipes &mdash; the highest-volume user signal about industry preferences &mdash; produce zero learning. The strongest case for the Intelligence Rule: collect with purpose, track provenance, connect to decisions.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s6"><span class="section-num">6.</span> Major Intelligence Categories</h2>
+
+<p>These are the semantic categories of intelligence Barry needs to operate. They are defined by meaning, not by storage &mdash; a single Firestore document might contain intelligence from multiple categories, and a single category might be stored across multiple documents.</p>
+
+<div class="table-wrap">
+<table>
+<tr><th>Category</th><th>What It Contains</th><th>Primary Scope</th><th>Typical Temporal Scope</th></tr>
+<tr>
+  <td><strong>Business Identity</strong></td>
+  <td>Company name, founding, location, size, structure. "Who are we?"</td>
+  <td><span class="tag tag-ws">Workspace</span></td>
+  <td>Durable truth</td>
+</tr>
+<tr>
+  <td><strong>Offering</strong></td>
+  <td>Products, services, pricing model, delivery method. "What do we sell?"</td>
+  <td><span class="tag tag-ws">Workspace</span></td>
+  <td>Semi-durable (evolves with product)</td>
+</tr>
+<tr>
+  <td><strong>Market</strong></td>
+  <td>Target industries, geographies, company sizes, market segments. "Who should we sell to?"</td>
+  <td><span class="tag tag-ws">Workspace</span></td>
+  <td>Mix: durable market + temporary focus</td>
+</tr>
+<tr>
+  <td><strong>ICP</strong></td>
+  <td>Ideal customer psychographics, pain points, buying triggers, decision process. "What does our ideal customer look like?"</td>
+  <td><span class="tag tag-ws">Workspace</span></td>
+  <td>Semi-durable (refines with experience)</td>
+</tr>
+<tr>
+  <td><strong>Positioning</strong></td>
+  <td>Value proposition, differentiators, messaging themes, competitive advantages. "Why choose us?"</td>
+  <td><span class="tag tag-ws">Workspace</span></td>
+  <td>Semi-durable</td>
+</tr>
+<tr>
+  <td><strong>Messaging</strong></td>
+  <td>Voice, tone, communication style, channel preferences, formality level. "How do we sound?"</td>
+  <td><span class="tag tag-user">User</span></td>
+  <td>Semi-durable (personal to each user)</td>
+</tr>
+<tr>
+  <td><strong>People</strong></td>
+  <td>Contact identity: name, title, company, email, social profiles, seniority. "Who is this person?"</td>
+  <td><span class="tag tag-rel">Relationship</span></td>
+  <td>Evolving truth (people change roles)</td>
+</tr>
+<tr>
+  <td><strong>Relationship History</strong></td>
+  <td>Interactions, outcomes, messages sent, replies received, meetings held. "What happened between us?"</td>
+  <td><span class="tag tag-rel">Relationship</span></td>
+  <td>Cumulative</td>
+</tr>
+<tr>
+  <td><strong>Relationship Strength</strong></td>
+  <td>Warmth, trust level, engagement depth, responsiveness. "How strong is our connection?"</td>
+  <td><span class="tag tag-rel">Relationship</span></td>
+  <td>Evolving truth</td>
+</tr>
+<tr>
+  <td><strong>Preferences</strong></td>
+  <td>Contact's communication preferences, meeting preferences, content interests, timing. "How does this person like to be engaged?"</td>
+  <td><span class="tag tag-rel">Relationship</span></td>
+  <td>Evolving, inferred from behavior</td>
+</tr>
+<tr>
+  <td><strong>Objectives</strong></td>
+  <td>Current goals: what we're trying to accomplish, which contacts, what outcomes. "What are we working toward?"</td>
+  <td><span class="tag tag-mission">Mission</span></td>
+  <td>Temporary (expires with mission)</td>
+</tr>
+<tr>
+  <td><strong>Constraints</strong></td>
+  <td>Exclusions, rate limits, channel restrictions, timing windows. "What should we avoid?"</td>
+  <td>Mixed: <span class="tag tag-ws">Workspace</span> (industry exclusions) / <span class="tag tag-rel">Relationship</span> (contact-specific "do not call")</td>
+  <td>Mix: durable rules + temporary strategy</td>
+</tr>
+<tr>
+  <td><strong>Permissions</strong></td>
+  <td>What Barry may do autonomously vs. what requires user approval. "What am I allowed to do?"</td>
+  <td><span class="tag tag-user">User</span></td>
+  <td>Durable (set once, adjusted rarely)</td>
+</tr>
+<tr>
+  <td><strong>Outcomes</strong></td>
+  <td>Results of actions: replies, meetings, deals, rejections. "What happened when we tried?"</td>
+  <td><span class="tag tag-rel">Relationship</span></td>
+  <td>Cumulative (each outcome is permanent history)</td>
+</tr>
+<tr>
+  <td><strong>Learned Behavior</strong></td>
+  <td>Patterns Barry has identified: what strategies work for which segments, editing patterns, timing preferences. "What has experience taught us?"</td>
+  <td>Mixed: <span class="tag tag-user">User</span> (strategy_stats) / <span class="tag tag-rel">Relationship</span> (per-contact memory)</td>
+  <td>Cumulative, confidence grows with observations</td>
+</tr>
+</table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<h2 id="s7"><span class="section-num">7.</span> Architecture Principle</h2>
+
+<div class="callout arch">
+<div class="callout-label">Architecture Principle</div>
+<p><strong>One intelligence contract does not mean one intelligence database.</strong></p>
+<p>Workspace, User, Relationship, and Mission intelligence may remain appropriately distributed across different Firestore collections, server-side caches, and client-side state. The contract defines <strong>how Barry requests and receives relevant intelligence</strong> &mdash; not where it lives.</p>
+<p>A unified Barry context layer is the delivery mechanism, not a unified intelligence store. When Mission Control Barry needs to draft a message for Sarah, the context layer assembles: Workspace positioning (from wherever it's stored) + User messaging style (from wherever it's stored) + Relationship memory with Sarah (from wherever it's stored) + Mission objective (from wherever it's stored). The contract guarantees that each piece arrives with its provenance, confidence, and temporal scope intact.</p>
+</div>
+
+<p>This principle has three implications:</p>
+
+<ol>
+<li><strong>Storage design follows the contract, not the other way around.</strong> We do not begin with "what Firestore collections do we need?" We begin with "what intelligence categories exist, what dimensions must each carry, and which surfaces consume them?" Storage is the answer to those questions, not a prior constraint.</li>
+
+<li><strong>The context assembly layer is the unification point.</strong> Today's split-brain architecture (client-side <code>barryContextStack.js</code> for business breadth, server-side <code>barryContextAssembler.js</code> for relationship depth) is not a problem of storage &mdash; both systems read from appropriate stores. It is a problem of assembly: no surface calls both. The fix is a unified assembly function that knows which intelligence to gather for each surface, not a unified database.</li>
+
+<li><strong>Migration is incremental.</strong> Existing stores do not need to be rewritten in one pass. Each intelligence category can be upgraded independently: add provenance tracking to RECON fields, add temporal scope to ICP profiles, add confidence to warmth inference. The contract defines the target; migration happens category by category as each area is touched.</li>
+</ol>
+
+<hr>
+
+<h3>What v0.1 Does Not Cover (Deferred to v0.2+)</h3>
+<ul>
+<li>Mapping the 105 RECON questions to intelligence categories and dimensions</li>
+<li>Storage schema design or Firestore collection proposals</li>
+<li>Context Requirements by Surface (which Barry surface needs which intelligence)</li>
+<li>Onboarding experience design against the contract</li>
+<li>Signal Bus / Action Executor integration</li>
+<li>Specific confidence scoring algorithms or staleness decay functions</li>
+</ul>
+
+<hr>
+<p style="color: var(--text-muted); font-size: 13px; margin-top: 40px;">
+Barry Intelligence Contract v0.1 &mdash; IDYNIFY Scout &mdash; August 2026.<br>
+This document defines semantics and rules of intelligence. It does not propose schema, storage, or implementation.
+Every codebase reference traces to the exact file path cited in the Barry Onboarding Intelligence Audit.
+</p>
+
+</div>

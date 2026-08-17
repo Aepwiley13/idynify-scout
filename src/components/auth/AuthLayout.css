@@ -76,12 +76,11 @@
   position: relative;
   z-index: 1;
   height: 100%;
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 40px 32px 0;
+  padding: 32px 32px 0;
 }
 
 .auth-speech {
@@ -139,6 +138,36 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* Barry's natural render is 713px tall, which alone made the split 936px — so
+   the hero, not the form, was what pushed "Why teams love IDYNIFY" a full
+   viewport down. Capping his HEIGHT (width follows, so he scales rather than
+   crops) is what lets the section sit inside a 900px viewport. The cap is only
+   applied on the desktop split; the stacked layout below 1024px keeps its own
+   max-width rules untouched. */
+@media (min-width: 1024px) {
+  /* Signup only. `min-height: 100vh` here floored the split at a full viewport
+     even once Barry was capped, which parked "Why teams love IDYNIFY" exactly
+     at the fold no matter how tight its own rhythm got. The split now takes its
+     height from the taller column, and the proof section follows immediately
+     after it. Sign in and forgot-password (variant="quiet") have nothing below
+     them, so they keep the full-viewport panel. */
+  .auth-root.full .auth-split { min-height: 0; }
+  .auth-root.full .auth-panel-left { padding: 36px 40px; }
+
+  .auth-barry {
+    max-width: none;
+    width: auto;
+    display: flex;
+    justify-content: center;
+  }
+
+  .auth-barry img {
+    width: auto;
+    max-width: 100%;
+    max-height: clamp(300px, 46vh, 430px);
+  }
 }
 
 /* ── Brand mark ───────────────────────────────────────────────────────────── */
@@ -465,7 +494,7 @@
 
 .auth-why {
   background: var(--auth-surface);
-  padding: 62px 32px 74px;
+  padding: 36px 32px 40px;
   border-top: 1px solid var(--auth-border);
 }
 
@@ -474,7 +503,7 @@
   font-size: 25px;
   font-weight: 800;
   letter-spacing: -0.4px;
-  margin: 0 0 38px;
+  margin: 0 0 24px;
   color: var(--auth-text);
 }
 .auth-why-title em { font-style: normal; color: var(--auth-indigo); }
@@ -482,16 +511,25 @@
 .auth-why-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  max-width: 1180px;
+  gap: 18px;
+  max-width: 1320px;
   margin: 0 auto;
 }
 
+/* Icon beside the text rather than above it. The vertical stack cost ~57px per
+   card in icon height plus its margin — the single largest block of dead
+   vertical space on the page — and reclaiming it is what fits all four cards in
+   a 900px viewport without touching type sizes. Body copy stays 14px. */
 .auth-why-card {
   background: var(--auth-panel);
   border: 1px solid var(--auth-border);
   border-radius: 15px;
-  padding: 26px 22px;
+  padding: 18px 18px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 14px;
+  align-items: start;
 }
 
 .auth-why-icon {
@@ -503,21 +541,26 @@
   border-radius: 11px;
   background: rgb(79 70 229 / 0.1);
   color: var(--auth-indigo);
-  margin-bottom: 15px;
+  grid-column: 1;
+  grid-row: 1 / span 2;
 }
 
 .auth-why-card h3 {
   font-size: 16px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 2px 0 6px;
   color: var(--auth-text);
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .auth-why-card p {
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--auth-muted);
   margin: 0;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */

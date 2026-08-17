@@ -1,0 +1,1056 @@
+<title>Barry Onboarding Audit</title>
+<style>
+:root {
+  --bg: #F7F8FA;
+  --bg-surface: #FFFFFF;
+  --bg-evidence: #F0F3F6;
+  --text: #1A2332;
+  --text-secondary: #566778;
+  --text-muted: #8899A6;
+  --accent: #4A7C9B;
+  --accent-light: #4A7C9B18;
+  --alert: #D4634B;
+  --alert-light: #D4634B14;
+  --verified: #5B9A6F;
+  --verified-light: #5B9A6F14;
+  --warning: #C49A3C;
+  --warning-light: #C49A3C14;
+  --border: #D8DEE4;
+  --border-light: #E8ECF0;
+  --code-bg: #EDF0F4;
+  --code-text: #3D5266;
+  --mono: "SFMono-Regular", "Cascadia Mono", "IBM Plex Mono", Consolas, monospace;
+  --body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1419;
+    --bg-surface: #1A2332;
+    --bg-evidence: #1E2A38;
+    --text: #E7ECF0;
+    --text-secondary: #9AABB8;
+    --text-muted: #6B7D8D;
+    --accent: #6BA3C4;
+    --accent-light: #6BA3C418;
+    --alert: #E8806A;
+    --alert-light: #E8806A18;
+    --verified: #7AB88D;
+    --verified-light: #7AB88D18;
+    --warning: #D9B35A;
+    --warning-light: #D9B35A18;
+    --border: #2A3A4A;
+    --border-light: #243040;
+    --code-bg: #1A2838;
+    --code-text: #9AABB8;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1419;
+  --bg-surface: #1A2332;
+  --bg-evidence: #1E2A38;
+  --text: #E7ECF0;
+  --text-secondary: #9AABB8;
+  --text-muted: #6B7D8D;
+  --accent: #6BA3C4;
+  --accent-light: #6BA3C418;
+  --alert: #E8806A;
+  --alert-light: #E8806A18;
+  --verified: #7AB88D;
+  --verified-light: #7AB88D18;
+  --warning: #D9B35A;
+  --warning-light: #D9B35A18;
+  --border: #2A3A4A;
+  --border-light: #243040;
+  --code-bg: #1A2838;
+  --code-text: #9AABB8;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0 0 6px;
+  color: var(--text);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 40px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 56px 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+  color: var(--text);
+  text-wrap: balance;
+}
+h2 .section-num {
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: 6px;
+}
+h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 32px 0 8px;
+  color: var(--text);
+}
+h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 20px 0 6px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+p { margin: 0 0 12px; }
+code {
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.finding {
+  border-left: 3px solid var(--border);
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: var(--bg-surface);
+  border-radius: 0 4px 4px 0;
+}
+.finding.critical { border-left-color: var(--alert); background: var(--alert-light); }
+.finding.warning { border-left-color: var(--warning); background: var(--warning-light); }
+.finding.verified { border-left-color: var(--verified); background: var(--verified-light); }
+.finding.info { border-left-color: var(--accent); background: var(--accent-light); }
+.finding-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.finding.critical .finding-label { color: var(--alert); }
+.finding.warning .finding-label { color: var(--warning); }
+.finding.verified .finding-label { color: var(--verified); }
+.finding.info .finding-label { color: var(--accent); }
+.evidence {
+  background: var(--bg-evidence);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--code-text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--border);
+}
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+.table-wrap { overflow-x: auto; }
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tag-alert { background: var(--alert-light); color: var(--alert); }
+.tag-warning { background: var(--warning-light); color: var(--warning); }
+.tag-verified { background: var(--verified-light); color: var(--verified); }
+.tag-info { background: var(--accent-light); color: var(--accent); }
+.toc {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 24px 0 40px;
+}
+.toc-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.toc ol {
+  margin: 0; padding: 0 0 0 20px;
+  font-size: 14px;
+  line-height: 2;
+  color: var(--text-secondary);
+}
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+ul { padding-left: 20px; margin: 8px 0; }
+li { margin-bottom: 4px; }
+.flow-chain {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  padding: 8px 0;
+  word-break: break-word;
+}
+strong { font-weight: 700; }
+.executive-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+@media (max-width: 600px) { .executive-grid { grid-template-columns: 1fr; } }
+.exec-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 5px;
+  padding: 14px 16px;
+}
+.exec-card .num { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 0.4px; }
+.exec-card p { margin: 4px 0 0; font-size: 13.5px; color: var(--text-secondary); }
+hr { border: none; border-top: 1px solid var(--border-light); margin: 40px 0; }
+</style>
+
+<div class="container">
+
+<h1>Barry Onboarding Intelligence Audit</h1>
+<p class="subtitle">IDYNIFY Scout &mdash; Team B Deliverable &mdash; August 2026</p>
+
+<div class="toc">
+<div class="toc-title">Contents</div>
+<ol>
+<li><a href="#s1">Executive Summary</a></li>
+<li><a href="#s2">Current Onboarding Journey</a></li>
+<li><a href="#s3">Current Intelligence: World / People / Intent / Rules</a></li>
+<li><a href="#s4">Intelligence Scope Map</a></li>
+<li><a href="#s5">Intelligence Storage Map</a></li>
+<li><a href="#s6">Barry Context Assembly Map</a></li>
+<li><a href="#s7">RECON Intelligence Map</a></li>
+<li><a href="#s8">Data &rarr; Knowledge &rarr; Decision Map</a></li>
+<li><a href="#s9">Continuous Learning Map</a></li>
+<li><a href="#s10">Duplication / Fragmentation / Contradiction</a></li>
+<li><a href="#s11">P0 Break Verification</a></li>
+<li><a href="#s12">First-Value Capability Matrix</a></li>
+<li><a href="#s13">KEEP / CONNECT / TRANSFORM / BUILD</a></li>
+<li><a href="#s14">Minimum Viable Understanding</a></li>
+<li><a href="#s15">Open Product Decisions</a></li>
+</ol>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s1"><span class="section-num">1.</span> Executive Summary</h2>
+
+<p>The current onboarding flow collects intelligence from new users, then silently loses most of it. Barry emerges from onboarding with near-total amnesia &mdash; unable to reference what the user told him, unable to find companies for them, and unable to provide a guided first experience.</p>
+
+<h3>What onboarding actually does today</h3>
+<p>A new user signs up (email + password), pays via Stripe, and is routed to one of two onboarding paths. <code>CheckoutSuccessPage.jsx:13</code> navigates to <code>/onboarding/barry</code> (legacy BarryOnboarding), while <code>SmartRedirect</code> in <code>App.jsx:321</code> routes to <code>/onboarding</code> (live OnboardingFlow). Both paths exist and are reachable. The live OnboardingFlow collects a website URL, runs AI analysis, asks 4 ICP questions, offers Gmail connect, then attempts to show matched companies. It finds zero for every new user because it never triggers company discovery. The legacy BarryOnboarding runs a conversational ICP interview, triggers <code>search-companies</code>, and sets the state fields Mission Control needs.</p>
+
+<h3>Top 10 Findings</h3>
+
+<div class="executive-grid">
+<div class="exec-card">
+  <div class="num">F1 &mdash; CRITICAL</div>
+  <p>OnboardingFlow writes ICP answers to <code>dashboards/{uid}</code> via <code>updateDoc</code>, but this document is never created. <code>.catch(() => {})</code> silently discards the Firestore error. Every user's Step 3 answers are lost.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F2 &mdash; CRITICAL</div>
+  <p>OnboardingFlow never triggers company discovery. Step 5 reads <code>users/{uid}/companies</code> which is empty for new users. The promise of "ten matched companies" is undelivered.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F3 &mdash; CRITICAL</div>
+  <p>FirstRunView gate requires <code>onboardingSource === 'barry_onboarding'</code> which only the legacy flow sets. New users from OnboardingFlow skip the welcome experience and land on an empty dashboard.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F4 &mdash; CRITICAL</div>
+  <p>Barry has two incompatible context systems. Client-side <code>barryContextStack.js</code> provides business/RECON breadth. Server-side <code>barryContextAssembler.js</code> provides per-contact memory depth. No surface receives both. Mission Control Barry knows the business but not relationships; Hunter Barry knows relationships but not the business.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F5 &mdash; HIGH</div>
+  <p><code>CheckoutSuccessPage.jsx:13</code> routes paying users to <code>/onboarding/barry</code> (legacy), not <code>/onboarding</code> (live). The two flows write different state, store data differently, and set different completion flags.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F6 &mdash; HIGH</div>
+  <p>RECON Section 3 (Target Market, weight 15, the most critical section for company discovery) is excluded from the client-side context pipeline. It only reaches Barry through a shared 2000-char server budget where it competes with 9 other sections.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F7 &mdash; HIGH</div>
+  <p><code>track-outcome.js</code> &mdash; the most common outcome recording path &mdash; never calls <code>barryOutcomeAttribution</code>. Outcomes recorded through Hunter bypass the entire learning loop. The attribution engine only fires through Barry's own engage sessions.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F8 &mdash; HIGH</div>
+  <p>RECON is a static questionnaire, not a living intelligence model. No system event, user behavior, engagement outcome, or external data source ever updates RECON answers. 105 questions across 10 sections, stored with no provenance, no confidence, no timestamps, no staleness repair.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F9 &mdash; MEDIUM</div>
+  <p>Three overlapping intelligence collection surfaces (RECON, CompanyQuestionnaire, ImprovedScoutQuestionnaire) save to different Firestore paths with no cross-referencing. Three overlapping contact state fields (<code>contact_status</code>, <code>hunter_status</code>, <code>relationship_state</code>) with no reconciliation.</p>
+</div>
+<div class="exec-card">
+  <div class="num">F10 &mdash; MEDIUM</div>
+  <p>No formal intelligence lifecycle. No staleness detection (inferred values never expire), no versioning (overwritten without history), no confidence scores, and contradiction resolution exists only for relationship warmth. All other fields silently win based on write order.</p>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s2"><span class="section-num">2.</span> Current Onboarding Journey</h2>
+
+<h3>The actual live path</h3>
+<div class="flow-chain">Signup (/signup) &rarr; Checkout (/checkout) &rarr; CheckoutSuccess &rarr; /onboarding/barry (legacy) &rarr; conversational ICP &rarr; search-companies triggered &rarr; /mission-control-v2 (FirstRunView)</div>
+
+<h3>The intended live path</h3>
+<div class="flow-chain">Signup &rarr; Checkout &rarr; SmartRedirect &rarr; /onboarding (OnboardingFlow) &rarr; 6 steps &rarr; /mission-control-v2 (empty dashboard, no FirstRunView)</div>
+
+<p>The discrepancy exists because <code>CheckoutSuccessPage.jsx:13</code> hardcodes <code>navigate('/onboarding/barry')</code>. Only users who bypass checkout (or return later via SmartRedirect) reach OnboardingFlow.</p>
+
+<h3>OnboardingFlow: 6 Steps</h3>
+
+<div class="table-wrap">
+<table>
+<tr><th>Step</th><th>User Experience</th><th>Data Collected</th><th>Storage</th><th>Scope</th><th>Failure Mode</th></tr>
+<tr>
+  <td>1. Meet Barry</td>
+  <td>Barry avatar + greeting. "Let's get started" button.</td>
+  <td>None (tries to show <code>firstName</code> but it's never collected at signup)</td>
+  <td><code>users/{uid}.onboarding.started = true</code></td>
+  <td>User</td>
+  <td>Always shows "Hi, I'm Barry" without name</td>
+</tr>
+<tr>
+  <td>2. Website Analysis</td>
+  <td>URL input. Calls <code>analyze-website</code> Netlify function. Shows animated progress.</td>
+  <td>Website URL (not persisted as user field), AI-extracted RECON data</td>
+  <td>Analysis writes to <code>dashboards/{uid}</code> RECON sections. URL is not stored on user doc.</td>
+  <td>Business</td>
+  <td>Failure sets <code>analysisFailed</code> locally but still advances. <code>websiteAnalyzed</code> flag set regardless.</td>
+</tr>
+<tr>
+  <td>3. Smart Questions</td>
+  <td>4 questions: fastest close, avoid industries, differentiator, perfect customer</td>
+  <td>4 text answers mapped to RECON fields</td>
+  <td><code>updateDoc(doc(db, 'dashboards', userId), reconFields)</code> &mdash; <span class="tag tag-alert">SILENTLY FAILS</span></td>
+  <td>Business</td>
+  <td><strong>Document doesn't exist. updateDoc throws. .catch(() =&gt; {}) swallows error. Answers lost.</strong></td>
+</tr>
+<tr>
+  <td>4. Gmail Connect</td>
+  <td>GmailConnectButton or Skip</td>
+  <td>Gmail OAuth token if connected</td>
+  <td><code>users/{uid}/integrations/gmail</code></td>
+  <td>User</td>
+  <td>Skip is non-persistent &mdash; only sets local state. On reload, user returns to Step 4.</td>
+</tr>
+<tr>
+  <td>5. Build List</td>
+  <td>"Finding companies..." animation, then shows count + top 5</td>
+  <td>None collected. Reads existing <code>users/{uid}/companies</code>.</td>
+  <td>No writes. Marks <code>onboarding.completed</code>.</td>
+  <td>N/A</td>
+  <td><strong>Collection is always empty for new users. Shows "0 companies." No discovery triggered.</strong></td>
+</tr>
+<tr>
+  <td>6. First Prospects</td>
+  <td>Shows top companies or empty-state message. "Go to Mission Control" button.</td>
+  <td>None</td>
+  <td>None</td>
+  <td>N/A</td>
+  <td>Shows: "No companies matched yet. Head to Mission Control."</td>
+</tr>
+</table>
+</div>
+
+<h3>Legacy BarryOnboarding: Key Differences</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Aspect</th><th>OnboardingFlow</th><th>BarryOnboarding</th></tr>
+<tr><td>ICP creation</td><td>Website analysis + 4 canned questions</td><td>Free-form Claude conversation via <code>barryICPConversation</code></td></tr>
+<tr><td>Company search</td><td>None triggered</td><td>Triggers <code>search-companies</code> (line 370)</td></tr>
+<tr><td>Completion fields</td><td><code>onboarding.completed</code> (nested)</td><td><code>onboardingComplete</code>, <code>onboardingSource</code>, <code>barryState</code>, <code>hasSeenMCWelcome</code>, <code>companiesFoundCount</code></td></tr>
+<tr><td>ICP storage</td><td>Writes to <code>dashboards/{uid}</code> (fails silently)</td><td>Writes to <code>companyProfile/current</code> with <code>source: 'barry_onboarding'</code></td></tr>
+<tr><td>FirstRunView triggers</td><td>Never (missing <code>onboardingSource</code>)</td><td>Yes &mdash; all three gate conditions met</td></tr>
+</table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s3"><span class="section-num">3.</span> Current Intelligence: World / People / Intent / Rules</h2>
+
+<h3>A. Business / World Intelligence</h3>
+<p>Barry receives RECON data through two pipelines:</p>
+<ul>
+<li><strong>Client pipeline</strong> (<code>barryContextStack.js</code>): Loads RECON sections 1, 2, 4, 5, 9 from <code>dashboards/{uid}</code>, trimmed to 300 chars each. Provides ICP profile from <code>icpProfiles</code> or <code>companyProfile/current</code> fallback. Used by Mission Control chat.</li>
+<li><strong>Server pipeline</strong> (<code>reconCompiler.js</code> referenced in Netlify functions): Compiles all 10 sections into a 2000-char budget. Used by message generation functions. <em>Note: <code>reconCompiler.js</code> in <code>src/utils/</code> appears to have no importers &mdash; the server-side functions may use inline compilation.</em></li>
+</ul>
+
+<div class="finding warning">
+<div class="finding-label">Gap</div>
+Section 3 (Target Market Firmographics, weight 15) is excluded from the client pipeline &mdash; <code>RECON_SECTION_MAP</code> maps sections 1, 2, 4, 5, 9 only. The most important section for company discovery never reaches Mission Control Barry. Website URL and LinkedIn URL are collected by the Scout questionnaire but never passed to Barry.
+</div>
+
+<h3>B. Relationship / People Intelligence</h3>
+<p>Per-contact context is assembled by <code>barryContextAssembler.js</code> (server-side) and <code>barryMemoryService.js</code> (client-side). Barry receives:</p>
+<ul>
+<li>Identity: name, title, company, email</li>
+<li>Relationship classification: <code>relationship_state</code>, <code>warmth_level</code>, <code>known_contact</code></li>
+<li>Memory: <code>barry_memory</code> on contact doc (what worked, what didn't, channel history, preferences, new facts)</li>
+<li>Engagement stats: sessions count, last outcome, channels tried</li>
+<li>Engage state: current status, brigade assignment</li>
+</ul>
+
+<div class="finding info">
+<div class="finding-label">Stored but not available to Barry</div>
+Gmail message content, Apollo enrichment data, referral graph relationships, <code>engagement_timeline</code> subcollection events, <code>brigade_history</code> transitions, <code>enrichment_provenance</code> per-field source tracking. All stored in Firestore; none assembled into any Barry prompt.
+</div>
+
+<h3>C. Intent / Objective Intelligence</h3>
+<p><strong>No single canonical "user objective" exists.</strong> Intent is distributed across:</p>
+<ul>
+<li><strong>Missions</strong> (<code>users/{uid}/missions</code>): Have <code>outcome_goal</code> field, but missions are per-contact engagement plans, not user-level objectives</li>
+<li><strong>Session modes</strong>: Runtime classification of 13 intent types by Claude (inquiry, follow_up, objection, etc.) &mdash; ephemeral, not persisted</li>
+<li><strong>Brigade contracts</strong>: Define behavior cadence per contact tier, not user goals</li>
+<li><strong>Engagement intent</strong>: Selected per-contact in Hunter (e.g., "Schedule meeting", "Get referral") &mdash; contact-scoped, not user-scoped</li>
+</ul>
+<p>There is no persistent cross-module representation of "what the user is trying to accomplish right now."</p>
+
+<h3>D. Permission / Action Intelligence</h3>
+<p><strong>No formal permission model.</strong> Barry's action surface is defined entirely by the JSON output schema in each system prompt. All actions requiring state changes go through client-side confirmation (user clicks "Send", "Approve", etc.). There is no stored user preference for what Barry may autonomously research, recommend, draft, send, modify, or automate.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s4"><span class="section-num">4.</span> Intelligence Scope Map</h2>
+
+<h3>Where intelligence logically belongs vs. where it's stored</h3>
+
+<div class="table-wrap">
+<table>
+<tr><th>Intelligence</th><th>Logical Scope</th><th>Actual Storage</th><th>Scope Mismatch?</th><th>Temporal</th></tr>
+<tr><td>ICP / target market</td><td>Business</td><td><code>users/{uid}/icpProfiles</code> or <code>companyProfile/current</code></td><td>Stored under user, but is business-level</td><td>Semi-permanent</td></tr>
+<tr><td>RECON answers</td><td>Business</td><td><code>dashboards/{uid}</code></td><td>Stored on dashboard doc keyed by user ID, not a business entity</td><td>Mix: some permanent, some temporary strategy</td></tr>
+<tr><td>Value proposition</td><td>Business</td><td><code>dashboards/{uid}.valueProposition</code></td><td>User-scoped but business truth</td><td>Semi-permanent</td></tr>
+<tr><td>Excluded industries</td><td>Business (temporary)</td><td><code>dashboards/{uid}.excludedIndustries</code></td><td>User-scoped but business truth</td><td>Temporary strategy</td></tr>
+<tr><td>Contact relationship state</td><td>Relationship</td><td><code>users/{uid}/contacts/{cid}.relationship_state</code></td><td>Correct</td><td>Evolving</td></tr>
+<tr><td>Barry memory (per contact)</td><td>Relationship</td><td><code>users/{uid}/contacts/{cid}.barry_memory</code></td><td>Correct</td><td>Cumulative</td></tr>
+<tr><td>Strategy stats</td><td>User</td><td><code>users/{uid}/barry_memory.strategy_stats</code></td><td>Correct</td><td>Cumulative</td></tr>
+<tr><td>Engagement intent</td><td>Mission/Objective</td><td>Per-contact field, per-session selection</td><td>Should be mission-scoped, stored on contact</td><td>Temporary</td></tr>
+<tr><td>Competitors</td><td>Business</td><td>RECON Section 8 in <code>dashboards/{uid}</code></td><td>User-scoped but business truth</td><td>Semi-permanent</td></tr>
+<tr><td>Communication style</td><td>User</td><td>RECON via <code>dashboards/{uid}</code></td><td>Correct scope, wrong container</td><td>Semi-permanent</td></tr>
+</table>
+</div>
+
+<div class="finding warning">
+<div class="finding-label">Scope confusion</div>
+No <code>business</code> or <code>workspace</code> entity exists. All business intelligence (ICP, RECON, value proposition, competitors, market) is stored under user-scoped paths. This means: (1) multi-user businesses would duplicate all business intelligence per user, (2) there is no concept of shared business truth, and (3) "permanent-ish" business truths and "this quarter's strategy" are stored identically with no temporal distinction.
+</div>
+
+<h3>Temporal Scope Findings</h3>
+<p>The platform makes <strong>no distinction</strong> between permanent truth and temporary context. Examples of intelligence treated identically:</p>
+<ul>
+<li><strong>Permanent:</strong> "We sell SaaS to mid-market healthcare" (RECON Section 1, stored as plain text in <code>dashboards/{uid}</code>)</li>
+<li><strong>Temporary:</strong> "This quarter we're focused on Utah nonprofits" (<code>excludedIndustries</code> / <code>idealCustomerTypes</code>, stored as plain text in <code>dashboards/{uid}</code>)</li>
+</ul>
+<p>No field carries a <code>temporalScope</code>, <code>validUntil</code>, or <code>strategyPeriod</code> marker. All intelligence is treated as if it will be true forever.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s5"><span class="section-num">5.</span> Intelligence Storage Map</h2>
+
+<h3>Major Barry-Related Stores</h3>
+
+<div class="table-wrap">
+<table>
+<tr><th>Source</th><th>Storage Path</th><th>Scope</th><th>Consumer</th><th>Barry Context?</th><th>Update Path</th></tr>
+<tr>
+  <td>Signup</td><td><code>users/{uid}</code></td><td>User</td><td>Auth, routing, SmartRedirect</td><td>No &mdash; email/tier not in any prompt</td><td>setDoc at signup only</td>
+</tr>
+<tr>
+  <td>RECON answers</td><td><code>dashboards/{uid}</code> (section fields)</td><td>Business</td><td>Client context stack, reconHealth</td><td>Sections 1,2,4,5,9 via client; all 10 via server (truncated)</td><td>Manual RECON editor only</td>
+</tr>
+<tr>
+  <td>ICP profile</td><td><code>users/{uid}/icpProfiles/{id}</code> or <code>companyProfile/current</code></td><td>Business</td><td>ICP scoring, client context stack</td><td>Yes &mdash; messaging fields in client stack</td><td>ICP builder, BarryOnboarding</td>
+</tr>
+<tr>
+  <td>Companies</td><td><code>users/{uid}/companies/{cid}</code></td><td>Relationship</td><td>Scout views, Mission Control table</td><td>No &mdash; company data not in Barry prompts</td><td>Discovery, swipes, manual edits</td>
+</tr>
+<tr>
+  <td>Contacts</td><td><code>users/{uid}/contacts/{cid}</code></td><td>Relationship</td><td>Hunter, Basecamp, all engagement views</td><td>Identity + state via server assembler; summary list via client stack</td><td>Import, enrichment, user edits, Barry sessions</td>
+</tr>
+<tr>
+  <td>Contact barry_memory</td><td><code>users/{uid}/contacts/{cid}.barry_memory</code></td><td>Relationship</td><td><code>generate-engagement-message</code> only</td><td>Yes &mdash; server assembler only (1200 char budget)</td><td>barryMemoryService after sessions</td>
+</tr>
+<tr>
+  <td>User barry_memory</td><td><code>users/{uid}/barry_memory</code></td><td>User</td><td>Server assembler</td><td>Yes &mdash; strategy_stats, preferences</td><td>barryOutcomeAttribution</td>
+</tr>
+<tr>
+  <td>Missions</td><td><code>users/{uid}/missions/{mid}</code></td><td>Mission</td><td>Hunter views, client context stack</td><td>Summary via client stack; not in server assembler</td><td>Mission creation, step completion</td>
+</tr>
+<tr>
+  <td>Gmail integration</td><td><code>users/{uid}/integrations/gmail</code></td><td>User</td><td>GmailConnectButton, reply polling</td><td>No &mdash; connection status not in prompts</td><td>OAuth flow</td>
+</tr>
+<tr>
+  <td>Engagement timeline</td><td><code>users/{uid}/contacts/{cid}/engagement_timeline</code></td><td>Relationship</td><td><span class="tag tag-alert">No consumer found</span></td><td>No</td><td>Session outcomes, timeline events</td>
+</tr>
+<tr>
+  <td>Brigade assignment</td><td><code>users/{uid}/contacts/{cid}.brigade</code></td><td>Relationship</td><td>NBS derivation, follow-up cadence</td><td>No &mdash; not in any Barry prompt</td><td>barryMemoryService transitions</td>
+</tr>
+<tr>
+  <td>LinkedIn connections</td><td><code>users/{uid}/linkedin_connections/{id}</code></td><td>Relationship</td><td>LinkedIn import view</td><td>No</td><td>CSV import only</td>
+</tr>
+</table>
+</div>
+
+<h3>Flagged Issues</h3>
+<div class="finding critical">
+<div class="finding-label">Duplicate truths</div>
+<ul>
+<li><strong>ICP data</strong> exists in <code>dashboards/{uid}</code> (RECON), <code>icpProfiles/{id}</code>, and <code>companyProfile/current</code>. Three sources of truth for the same business positioning, with no reconciliation.</li>
+<li><strong>Contact status</strong> is tracked in three overlapping fields: <code>contact_status</code> (lifecycle), <code>hunter_status</code> (engagement), <code>relationship_state</code> (warmth). No reconciliation mechanism.</li>
+<li><strong>Onboarding completion</strong> uses two different fields: <code>onboarding.completed</code> (nested, OnboardingFlow) vs <code>onboardingComplete</code> (top-level, BarryOnboarding).</li>
+</ul>
+</div>
+
+<div class="finding warning">
+<div class="finding-label">Writes nobody reads</div>
+<code>engagement_timeline</code> subcollection is written by session outcomes and timeline events. No component or service reads from it. <code>enrichment_provenance</code> is written by <code>contactIdentityService.js</code> but never read by any Barry function. <code>referral_data</code> is tracked by <code>referralIntelligenceService.js</code> but never assembled into Barry context.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s6"><span class="section-num">6.</span> Barry Context Assembly Map</h2>
+
+<p>This is the most architecturally significant finding. Barry's intelligence is split across two incompatible context assembly systems that never merge.</p>
+
+<h3>System A: Client-Side (<code>barryContextStack.js</code>)</h3>
+<p><strong>Used by:</strong> Mission Control BarryChatPanel (the primary user chat surface)</p>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>All contacts (up to 500): name, title, company, relationship_state, status, stage</li>
+<li>Active missions: status, steps, last outcome</li>
+<li>RECON sections 1, 2, 4, 5, 9 (300 chars each)</li>
+<li>RECON confidence score</li>
+<li>Active ICP profile messaging fields</li>
+</ul>
+<p><strong>Does NOT provide:</strong> Per-contact <code>barry_memory</code>, strategy stats, session history, engagement history, what worked/didn't work</p>
+
+<h3>System B: Server-Side (<code>barryContextAssembler.js</code>)</h3>
+<p><strong>Used by:</strong> <code>generate-engagement-message</code>, <code>barryHunterGenerateStep</code>, <code>barryHunterProcessEngage</code></p>
+<p><strong>Provides:</strong></p>
+<ul>
+<li>Per-contact <code>barry_memory</code>: what worked, what didn't, channels tried, preferences, new facts</li>
+<li>Per-user <code>barry_memory</code>: strategy_stats, aggregate outcomes</li>
+<li>Recent barry_sessions (last 5)</li>
+<li>Prompt-ready context string (1200 char / ~300 token budget)</li>
+</ul>
+<p><strong>Does NOT provide:</strong> RECON data, ICP profile, business positioning, value proposition, competitors, target market, other contacts, missions</p>
+
+<div class="finding critical">
+<div class="finding-label">Split-brain architecture</div>
+<p><strong>Mission Control Barry</strong> (where users chat) knows the business but not the relationships. It sees 500 contact summaries but has zero memory of past conversations with any of them. It cannot say "Last time we tried a direct approach with Sarah and it didn't work."</p>
+<p><strong>Hunter Barry</strong> (where messages are generated) knows the relationships but not the business. It has deep per-contact memory but zero RECON/ICP context. It cannot reference the user's value proposition, competitive differentiators, or target market when drafting outreach.</p>
+<p><strong>No surface receives both.</strong></p>
+</div>
+
+<h3>Context Assembly by Surface (13 traced)</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Surface</th><th>Context System</th><th>Business Intel</th><th>Contact Memory</th><th>Strategy</th></tr>
+<tr><td>Mission Control chat</td><td>Client (A)</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>generate-engagement-message</td><td>Server (B)</td><td class="tag tag-alert">No</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>barryHunterGenerateStep</td><td>Server (B)</td><td class="tag tag-alert">No</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>barryHunterProcessEngage</td><td>Server (B)</td><td class="tag tag-alert">No</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>barryICPConversation</td><td>Neither</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>barryInboxAnalyzer</td><td>Ad-hoc</td><td class="tag tag-alert">No</td><td class="tag tag-warning">Partial</td><td class="tag tag-alert">No</td></tr>
+<tr><td>barryGuardrail</td><td>Ad-hoc</td><td class="tag tag-alert">No</td><td class="tag tag-warning">Partial</td><td class="tag tag-alert">No</td></tr>
+<tr><td>inferRelationshipWarmth</td><td>Ad-hoc</td><td class="tag tag-alert">No</td><td class="tag tag-warning">Partial</td><td class="tag tag-alert">No</td></tr>
+<tr><td>barryMorningBrief</td><td>Client (A)</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>barryCSM</td><td>Ad-hoc</td><td class="tag tag-alert">No</td><td class="tag tag-warning">Partial</td><td class="tag tag-alert">No</td></tr>
+<tr><td>barryStrategyRecommender</td><td>Server (B)</td><td class="tag tag-alert">No</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>NBS derivation</td><td>Neither (rule-based)</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>Onboarding (BarryOnboarding)</td><td>Neither</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+</table>
+</div>
+
+<div class="finding info">
+<div class="finding-label">Token budget</div>
+The server-side assembler's 1200-character budget (~300 tokens) means P2 context (preferences, engagement stats) and P3 context (session summaries, known facts) are routinely truncated. For contacts with 3+ sessions, only P0 (identity) and P1 (what worked/didn't) reliably fit.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s7"><span class="section-num">7.</span> RECON Intelligence Map</h2>
+
+<h3>Structure: 105 questions, 10 sections</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Section</th><th>Name</th><th>Weight</th><th>Questions</th><th>Client Pipeline?</th><th>Barry Receives?</th></tr>
+<tr><td>1</td><td>Foundation</td><td>15</td><td>~10</td><td class="tag tag-verified">Yes</td><td>300 chars</td></tr>
+<tr><td>2</td><td>Product Deep Dive</td><td>15</td><td>~12</td><td class="tag tag-verified">Yes</td><td>300 chars</td></tr>
+<tr><td>3</td><td>Target Market</td><td>15</td><td>~10</td><td class="tag tag-alert">No</td><td>Via server only (truncated)</td></tr>
+<tr><td>4</td><td>Ideal Customer Psychographics</td><td>10</td><td>~10</td><td class="tag tag-verified">Yes</td><td>300 chars</td></tr>
+<tr><td>5</td><td>Pain Points &amp; Motivations</td><td>10</td><td>~10</td><td class="tag tag-verified">Yes</td><td>300 chars</td></tr>
+<tr><td>6</td><td>Buying Behavior &amp; Triggers</td><td>5</td><td>~10</td><td class="tag tag-alert">No</td><td>Via server only (truncated)</td></tr>
+<tr><td>7</td><td>Decision Process</td><td>5</td><td>~10</td><td class="tag tag-alert">No</td><td>Via server only (truncated)</td></tr>
+<tr><td>8</td><td>Competitive Landscape</td><td>10</td><td>~12</td><td class="tag tag-alert">No</td><td>Via server only (truncated)</td></tr>
+<tr><td>9</td><td>Messaging</td><td>10</td><td>~11</td><td class="tag tag-verified">Yes</td><td>300 chars (also overridden by ICP profile messaging)</td></tr>
+<tr><td>10</td><td>Behavioral Signals</td><td>5</td><td>~10</td><td class="tag tag-alert">No</td><td>Via server only (truncated)</td></tr>
+</table>
+</div>
+
+<h3>Storage</h3>
+<p>Answers are stored in <code>dashboards/{uid}</code> as flat fields grouped by section key. Questions are defined inline in individual React component files (<code>Section1Foundation.jsx</code> through <code>Section10BehavioralSignals.jsx</code>) with no shared schema or question registry.</p>
+
+<h3>Key Findings</h3>
+<ul>
+<li><strong>Triple-write storage:</strong> Raw answers in section fields, AI-generated output in <code>sectionOutput</code> fields, dashboard-level aggregates in onboarding fields. No reconciliation between the three.</li>
+<li><strong>No provenance:</strong> No field-level timestamps, authorship tracking, confidence scores, or edit history. Cannot distinguish user-typed from AI-populated from <code>analyze-website</code>-populated.</li>
+<li><strong>No progressive learning:</strong> No system event, user behavior, engagement outcome, or external data source ever updates RECON data. The <code>reconHealth.js</code> staleness system detects decay (calculates completion %) but cannot repair it.</li>
+<li><strong>Three overlapping questionnaires:</strong> RECON (<code>src/components/recon/</code>), CompanyQuestionnaire (<code>src/components/scout/CompanyQuestionnaire.jsx</code>), and ImprovedScoutQuestionnaire (<code>src/components/ImprovedScoutQuestionnaire.jsx</code>) all collect business intelligence and save to different Firestore paths.</li>
+<li><strong>RECON is a questionnaire, not an intelligence model.</strong> It collects and stores answers but has no concept of confidence, freshness, source priority, or automated update.</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s8"><span class="section-num">8.</span> Data &rarr; Knowledge &rarr; Decision Map</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Intelligence Flow</th><th>Data</th><th>Knowledge</th><th>Decision</th><th>Stops At</th></tr>
+<tr>
+  <td>Engagement outcomes</td>
+  <td>Raw outcome recorded</td>
+  <td>Outcome classified, attributed to strategy/channel/guardrail</td>
+  <td>Strategy recommendation scored 0-100, prompt guidance injected</td>
+  <td class="tag tag-verified">Full chain</td>
+</tr>
+<tr>
+  <td>Relationship warmth</td>
+  <td>Contact source, timeline events</td>
+  <td>Inferred state, warmth_level with reasons</td>
+  <td>Guardrail rules modify message generation; suggestions when user disagrees</td>
+  <td class="tag tag-verified">Full chain</td>
+</tr>
+<tr>
+  <td>Next Best Step</td>
+  <td>Session outcome, channel, no-reply count</td>
+  <td>NBS type derived with reasoning</td>
+  <td>NBS presented to user, lifecycle tracked, surfaced in morning briefing</td>
+  <td class="tag tag-verified">Full chain</td>
+</tr>
+<tr>
+  <td>Referral intelligence</td>
+  <td>Network contacts, referral events</td>
+  <td>Overlap scoring, quality tracking</td>
+  <td>Leaderboard, opportunity detection surfaced to Barry</td>
+  <td class="tag tag-verified">Full chain</td>
+</tr>
+<tr>
+  <td>Health score</td>
+  <td>Recency, reply counts, NBS, milestones</td>
+  <td>Weighted composite 0-100 with risk bucket</td>
+  <td>Display and filtering only; no automated action</td>
+  <td class="tag tag-warning">Data &rarr; Knowledge</td>
+</tr>
+<tr>
+  <td>Contact identity</td>
+  <td>Identifiers from multiple sources</td>
+  <td>6-step resolution hierarchy; weak matches flagged</td>
+  <td>No automated resolution or user prompt</td>
+  <td class="tag tag-warning">Data &rarr; Knowledge</td>
+</tr>
+<tr>
+  <td>Gmail inbox analysis</td>
+  <td>Raw email text</td>
+  <td>Claude NLP: intent, sentiment, commitments</td>
+  <td>recommendedAction is text suggestion only, not structured action</td>
+  <td class="tag tag-warning">Data &rarr; Knowledge (weak decision)</td>
+</tr>
+<tr>
+  <td>Scout swipes</td>
+  <td>Swipe direction, ICP context</td>
+  <td>None</td>
+  <td>None</td>
+  <td class="tag tag-alert">Data only</td>
+</tr>
+<tr>
+  <td>LinkedIn import</td>
+  <td>Parsed CSV rows</td>
+  <td>Static title-seniority scoring</td>
+  <td>None</td>
+  <td class="tag tag-warning">Data &rarr; partial Knowledge</td>
+</tr>
+<tr>
+  <td>Product analytics</td>
+  <td>OPEN_CONTACT/COMPANY events</td>
+  <td>None</td>
+  <td>None</td>
+  <td class="tag tag-alert">Data only</td>
+</tr>
+</table>
+</div>
+
+<p><strong>Where IDYNIFY currently stops:</strong> The engagement outcome chain (sessions &rarr; attribution &rarr; memory &rarr; strategy recommendation &rarr; prompt guidance) is genuinely intelligent. Relationship warmth inference with guardrail integration is also a complete loop. But outside these two paths, most intelligence flows stop at Data or early Knowledge. Scout swipes (the highest-volume user signal) produce zero learning.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s9"><span class="section-num">9.</span> Continuous Learning Map</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Signal</th><th>Recorded</th><th>Interpreted</th><th>Updates Intel</th><th>Changes Future</th></tr>
+<tr><td>Barry engagement sessions</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>Brigade transitions</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>User field edits</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>Referral outcomes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td></tr>
+<tr><td>Gmail reply detection</td><td class="tag tag-verified">Yes</td><td class="tag tag-warning">Partial</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>Gmail inbox analysis</td><td class="tag tag-verified">Yes</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No (ephemeral)</td><td class="tag tag-alert">No</td></tr>
+<tr><td>Campaign outcome tracking</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>Scout swipes</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>Message editing</td><td class="tag tag-warning">Partial</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>RECON completions</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>LinkedIn imports</td><td class="tag tag-verified">Yes</td><td class="tag tag-warning">Static</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+<tr><td>Snooze actions</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-warning">Filtering only</td></tr>
+<tr><td>Product analytics</td><td class="tag tag-verified">Yes</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td><td class="tag tag-alert">No</td></tr>
+</table>
+</div>
+
+<h3>Critical Learning Gaps (ranked by impact)</h3>
+<ol>
+<li><strong><code>track-outcome.js</code> bypasses attribution.</strong> The most common outcome recording path (Hunter tracker) never calls <code>barryOutcomeAttribution</code>. The learning loop only fires through Barry's own engage sessions. Evidence: <code>track-outcome.js</code> writes to <code>learnings</code> collection but does not import or call any function from <code>barryOutcomeAttribution.js</code>.</li>
+<li><strong>Auto-detected Gmail replies don't trigger attribution.</strong> <code>gmail-poll-replies.js</code> detects replies and updates <code>contact_status</code> to "In Conversation" but never connects the reply to the Barry session that generated the message. The reply-to-strategy correlation is lost.</li>
+<li><strong>Scout swipes are not learned from.</strong> Every accept/reject is recorded with full ICP context (<code>swipedForICPId</code>, <code>barryFeedback</code>) but no service analyzes patterns to refine company discovery.</li>
+<li><strong>Message editing is invisible.</strong> User edits to Barry's generated messages are never compared to the original. If a user consistently removes humor or shortens messages, Barry cannot learn that preference.</li>
+<li><strong>Inbox analysis is ephemeral.</strong> Claude's analysis of inbound emails (intent, sentiment, commitments, urgency) influences only the current session. Results are not persisted to contact intelligence.</li>
+</ol>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s10"><span class="section-num">10.</span> Duplication / Fragmentation / Contradiction</h2>
+
+<h3>Duplicate Truths</h3>
+<ul>
+<li><strong>ICP / business positioning:</strong> <code>dashboards/{uid}</code> (RECON), <code>icpProfiles/{id}</code>, <code>companyProfile/current</code> &mdash; three sources, no sync</li>
+<li><strong>Onboarding completion:</strong> <code>onboarding.completed</code> (nested) vs <code>onboardingComplete</code> (top-level) &mdash; different flows write different fields</li>
+<li><strong>Contact status:</strong> <code>contact_status</code>, <code>hunter_status</code>, <code>relationship_state</code> &mdash; three overlapping state machines on the same contact document</li>
+<li><strong>Messaging/voice:</strong> RECON Section 9 vs ICP profile <code>messaging</code> fields vs <code>companyProfile/current</code> messaging &mdash; three potential sources of messaging guidance</li>
+</ul>
+
+<h3>Fragmented Intelligence</h3>
+<ul>
+<li><strong>Business intelligence collection:</strong> RECON, CompanyQuestionnaire, ImprovedScoutQuestionnaire &mdash; three surfaces saving to different paths</li>
+<li><strong>Context assembly:</strong> Client-side stack and server-side assembler &mdash; two systems with zero overlap</li>
+<li><strong>Onboarding paths:</strong> OnboardingFlow and BarryOnboarding &mdash; two active paths writing different data</li>
+</ul>
+
+<h3>Contradiction Resolution</h3>
+<p><strong>One pattern exists:</strong> <code>inferRelationshipWarmth.js</code> checks <code>relationship_state_source</code>. If <code>"user_set"</code>, Barry creates a <code>barry_warmth_suggestion</code> instead of overwriting &mdash; the system defers to the user while surfacing the disagreement.</p>
+<p><strong>Everywhere else:</strong> First-write wins. <code>CANONICAL_FIELDS</code> protection in <code>contactIdentityService.js</code> prevents enrichment from overwriting user edits, but disagreements are never surfaced. If Apollo says "VP of Sales" and the user typed "Director of Sales", the user's value is protected but no notification says "Apollo disagrees."</p>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s11"><span class="section-num">11.</span> P0 Break Verification</h2>
+
+<h3>B1 &mdash; Dashboard Initialization <span class="tag tag-alert">VERIFIED</span></h3>
+<ul>
+<li><strong>File:</strong> <code>src/pages/Onboarding/OnboardingFlow.jsx</code>, <code>handleFinishQuestions</code>, line 426</li>
+<li><strong>Current behavior:</strong> <code>updateDoc(doc(db, 'dashboards', userId), reconFields)</code> is called but <code>dashboards/{userId}</code> does not exist for new users. <code>initializeDashboard()</code> is never called in the OnboardingFlow path. Firestore's <code>updateDoc</code> throws on a missing document.</li>
+<li><strong>Error handling:</strong> <code>.catch(() => {})</code> silently swallows the error. The outer <code>try/catch</code> block has <code>/* best effort */</code>.</li>
+<li><strong>Root cause:</strong> OnboardingFlow was built without calling <code>initializeDashboard</code> first. The dashboard document is created elsewhere (RECON page, or legacy flows) but never during this onboarding path.</li>
+<li><strong>Blast radius:</strong> Every new user's Step 3 answers (<code>idealCustomerTypes</code>, <code>excludedIndustries</code>, <code>valueProposition</code>, <code>perfectCustomer</code>) are silently lost. These are the only user-provided ICP signals in OnboardingFlow.</li>
+<li><strong>Proposed minimal fix:</strong> Call <code>initializeDashboard(userId)</code> before the <code>updateDoc</code>, or switch to <code>setDoc(..., { merge: true })</code>.</li>
+</ul>
+
+<h3>B2 &mdash; Step 5 Discovery <span class="tag tag-alert">VERIFIED</span></h3>
+<ul>
+<li><strong>File:</strong> <code>src/pages/Onboarding/OnboardingFlow.jsx</code>, <code>loadCompanies</code> useEffect, lines 444-513</li>
+<li><strong>Current behavior:</strong> Step 5 only reads <code>users/{userId}/companies</code> with <code>getDocs(companiesRef)</code> (line 462). No <code>where()</code> clause, no status filter. For new users, this collection is empty.</li>
+<li><strong>Root cause:</strong> OnboardingFlow never calls <code>search-companies</code> or any discovery function. The legacy <code>BarryOnboarding.jsx</code> (line 370) correctly triggers <code>fetch('/.netlify/functions/search-companies', ...)</code> but the new flow does not replicate this.</li>
+<li><strong>Blast radius:</strong> Every new user through OnboardingFlow sees "I found 0 companies" at Step 5, then an empty list at Step 6 with the message "No companies matched yet."</li>
+<li><strong>Proposed minimal fix:</strong> Trigger <code>search-companies</code> after Step 3 (when ICP data is available), before showing Step 5 results. Or mirror BarryOnboarding's pattern of setting <code>barryState: 'SEARCHING'</code> and delegating to Mission Control.</li>
+</ul>
+
+<h3>B3 &mdash; Mission Control First-Run <span class="tag tag-alert">VERIFIED</span></h3>
+<ul>
+<li><strong>File:</strong> <code>src/pages/Scout/MissionControlDashboardV2.jsx</code>, lines 874-877</li>
+<li><strong>Gate condition:</strong></li>
+</ul>
+<div class="evidence">const isFirstRun =
+    obComplete === true &&
+    onboardingSource === 'barry_onboarding' &&
+    hasSeenMCWelcome === false;</div>
+<ul>
+<li><strong>Current behavior:</strong> OnboardingFlow never writes <code>onboardingComplete</code> (top-level), <code>onboardingSource</code>, <code>hasSeenMCWelcome</code>, or <code>barryState</code>. It only writes <code>onboarding.completed</code> (nested), which is a different field. The gate evaluates to <code>false</code> for every OnboardingFlow user.</li>
+<li><strong>Root cause:</strong> The FirstRunView gate was designed for BarryOnboarding's completion signature. OnboardingFlow uses a different field structure (<code>onboarding.completed</code> vs <code>onboardingComplete</code>).</li>
+<li><strong>Blast radius:</strong> Every new user from OnboardingFlow bypasses FirstRunView and lands on the regular (empty) Mission Control dashboard. No welcome guidance, no search-in-progress indicator, no "Barry is finding companies" state.</li>
+<li><strong>Proposed minimal fix:</strong> When OnboardingFlow marks completion, also write the four fields Mission Control expects: <code>onboardingComplete: true</code>, <code>onboardingSource: 'onboarding_flow'</code>, <code>hasSeenMCWelcome: false</code>, <code>barryState</code>. Update the FirstRunView gate to accept the new source value.</li>
+</ul>
+
+<div class="finding critical">
+<div class="finding-label">Chain-linked breaks</div>
+The three P0 breaks are not independent. B1 loses the ICP answers that should drive company discovery. B2 means no companies are found even if the answers survived. B3 means the welcome experience that should show "Barry is finding companies" never triggers. A new user completing OnboardingFlow arrives at an empty dashboard with lost data, zero companies, and no guidance.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s12"><span class="section-num">12.</span> First-Value Capability Matrix</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Capability</th><th>Status</th><th>Evidence</th></tr>
+<tr>
+  <td>Discover relevant companies</td>
+  <td><span class="tag tag-warning">PARTIAL</span></td>
+  <td><code>search-companies.js</code> exists (Apollo integration). Works when called from BarryOnboarding and manual Scout actions. Never triggered from OnboardingFlow.</td>
+</tr>
+<tr>
+  <td>Identify relevant people</td>
+  <td><span class="tag tag-warning">PARTIAL</span></td>
+  <td>Contact search exists in Scout. <code>ContactSuggestions</code> component exists. No automatic people discovery during onboarding.</td>
+</tr>
+<tr>
+  <td>Import an existing network</td>
+  <td><span class="tag tag-warning">PARTIAL</span></td>
+  <td>Gmail connect at OnboardingFlow Step 4. LinkedIn CSV import exists. Neither triggers relationship analysis.</td>
+</tr>
+<tr>
+  <td>Identify useful existing relationships</td>
+  <td><span class="tag tag-alert">NOT AVAILABLE</span></td>
+  <td>No component maps imported contacts against targets or identifies existing useful relationships.</td>
+</tr>
+<tr>
+  <td>Reactivate dormant relationships</td>
+  <td><span class="tag tag-alert">NOT AVAILABLE</span></td>
+  <td>Recommendation engine has <code>HIGH_VALUE_DORMANT</code> (30-day threshold) but requires existing contacts in the system. No reactivation workflow.</td>
+</tr>
+<tr>
+  <td>Identify referral opportunities</td>
+  <td><span class="tag tag-alert">NOT AVAILABLE</span></td>
+  <td>No referral mapping or network-to-target analysis exists.</td>
+</tr>
+<tr>
+  <td>Draft an appropriate ask</td>
+  <td><span class="tag tag-warning">PARTIAL</span></td>
+  <td><code>generate-engagement-message</code> exists. Generates outreach per company. Not contextual to relationship type or ask type.</td>
+</tr>
+<tr>
+  <td>Create outreach</td>
+  <td><span class="tag tag-warning">PARTIAL</span></td>
+  <td>Hunter module with campaigns, cadences, Blitz Mode is functional. Not connected to onboarding flow.</td>
+</tr>
+<tr>
+  <td>Surface relationship opportunities</td>
+  <td><span class="tag tag-warning">PARTIAL</span></td>
+  <td><code>recommendationEngine.js</code> surfaces stalled engagements, high-value contacts. Requires existing data &mdash; empty for new users.</td>
+</tr>
+</table>
+</div>
+
+<p><strong>Assessment:</strong> "Ten matched companies" is one activation path, not the universal activation moment. The platform has partial capabilities for multiple first-value paths, but none are fully wired end-to-end from onboarding for a new user.</p>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s13"><span class="section-num">13.</span> KEEP / CONNECT / TRANSFORM / BUILD</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Capability</th><th>Classification</th><th>Rationale</th></tr>
+<tr><td>Engagement outcome attribution</td><td><span class="tag tag-verified">KEEP</span></td><td>Full Data&rarr;Knowledge&rarr;Decision chain. Strategy recommender with scored alternatives. Genuinely intelligent.</td></tr>
+<tr><td>Relationship warmth inference</td><td><span class="tag tag-verified">KEEP</span></td><td>Complete loop with guardrail integration and contradiction handling (warmth suggestions).</td></tr>
+<tr><td>Next Best Step derivation</td><td><span class="tag tag-verified">KEEP</span></td><td>Rule-based but actionable. Lifecycle tracked. Surfaced in morning briefing.</td></tr>
+<tr><td>Barry per-contact memory</td><td><span class="tag tag-verified">KEEP</span></td><td>Cumulative learning from sessions. Priority-based truncation. Real memory that changes behavior.</td></tr>
+<tr><td>Contact identity resolution</td><td><span class="tag tag-verified">KEEP</span></td><td>6-step hierarchy, weak-match flagging, canonical field protection. Sound engineering.</td></tr>
+<tr><td>Brigade system</td><td><span class="tag tag-verified">KEEP</span></td><td>Immutable transition history. Follow-up cadence per tier. Clean lifecycle model.</td></tr>
+<tr><td>Referral intelligence</td><td><span class="tag tag-verified">KEEP</span></td><td>Full chain from data to leaderboard ranking. Opportunity detection exists.</td></tr>
+<tr>
+  <td>RECON intelligence</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>105 questions of valuable business intelligence. Disconnected: Section 3 excluded from client pipeline; no provenance; no update path from behavior. The questions are right; the storage and delivery need connecting.</td>
+</tr>
+<tr>
+  <td>Barry context (client stack)</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>Business breadth exists. Needs per-contact memory from server assembler.</td>
+</tr>
+<tr>
+  <td>Barry context (server assembler)</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>Relationship depth exists. Needs RECON/ICP context from client stack.</td>
+</tr>
+<tr>
+  <td>Gmail reply detection</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>Detects replies, updates status. Disconnected from attribution engine &mdash; reply is never correlated to originating Barry session.</td>
+</tr>
+<tr>
+  <td>Inbox analysis</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>Claude NLP extracts intent/sentiment/commitments. Results are ephemeral &mdash; not persisted to contact intelligence.</td>
+</tr>
+<tr>
+  <td>Track-outcome (Hunter)</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>Records outcomes with full context. Missing one function call to <code>barryOutcomeAttribution</code> to close the learning loop.</td>
+</tr>
+<tr>
+  <td>Health score</td>
+  <td><span class="tag tag-info">CONNECT</span></td>
+  <td>Composite scoring works. Stops at Knowledge &mdash; does not trigger actions or change Barry behavior.</td>
+</tr>
+<tr>
+  <td>Onboarding flow</td>
+  <td><span class="tag tag-warning">TRANSFORM</span></td>
+  <td>Collects valuable intelligence but loses it (B1), fails to deliver value (B2), and breaks handoff (B3). Underlying intelligence collection is right; acquisition method and storage need transformation.</td>
+</tr>
+<tr>
+  <td>RECON as progressive model</td>
+  <td><span class="tag tag-warning">TRANSFORM</span></td>
+  <td>Static questionnaire needs to become a living intelligence model that updates from behavior, engagement results, and external data.</td>
+</tr>
+<tr>
+  <td>Scout swipe learning</td>
+  <td><span class="tag tag-warning">TRANSFORM</span></td>
+  <td>Records accept/reject with full context but performs zero analysis. Data exists; interpretation and feedback loop need building.</td>
+</tr>
+<tr>
+  <td>Unified Barry context</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>No surface receives both business intelligence and relationship memory. A unified context layer is the highest-value architectural addition.</td>
+</tr>
+<tr>
+  <td>Knowledge provenance</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>Only <code>relationship_state_source</code> and <code>warmth_level_source</code> track origin. No other field has provenance.</td>
+</tr>
+<tr>
+  <td>Confidence / certainty</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>No confidence scores on inferred values. No decay over time. No "how sure is Barry?" signal.</td>
+</tr>
+<tr>
+  <td>Knowledge-gap identification</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>Barry cannot currently identify what he doesn't know. No "I need X to make a better recommendation" capability.</td>
+</tr>
+<tr>
+  <td>Objective/mission context (user-level)</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>No persistent cross-module "what the user is trying to accomplish." Intent is contact-scoped and ephemeral.</td>
+</tr>
+<tr>
+  <td>Relationship pathfinding</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>"Who in my network can get me to X?" &mdash; no existing capability.</td>
+</tr>
+<tr>
+  <td>Contextual questioning</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>Barry asks because a field is empty, not because knowing the answer will improve a specific outcome.</td>
+</tr>
+<tr>
+  <td>Temporal intelligence</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>No distinction between permanent truth and temporary strategy. No <code>validUntil</code>, no strategy periods.</td>
+</tr>
+<tr>
+  <td>Contradiction resolution (beyond warmth)</td>
+  <td><span class="tag tag-alert">BUILD</span></td>
+  <td>Only warmth has a suggestion pattern. All other fields: first-write wins with no surfacing.</td>
+</tr>
+</table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s14"><span class="section-num">14.</span> Minimum Viable Understanding</h2>
+
+<h3>Technically Required Today</h3>
+<p>What Barry must know to function at all in the current codebase:</p>
+<ul>
+<li><strong>User authentication</strong> (email, uid) &mdash; required for Firestore access</li>
+<li><strong>Subscription tier</strong> &mdash; gates credit usage and feature access</li>
+<li><strong>At least one contact</strong> &mdash; required for any engagement flow</li>
+<li><strong>Contact identity</strong> (name, email) &mdash; required for message generation</li>
+</ul>
+
+<h3>Product Assumptions Treated as Required</h3>
+<p>What the current flow treats as required but may not be:</p>
+<ul>
+<li><strong>Website URL</strong> &mdash; used for <code>analyze-website</code> but not stored. Not technically needed if business intelligence comes from other sources.</li>
+<li><strong>4 ICP questions</strong> &mdash; collected but silently lost (B1). Even when stored, only reachable via RECON path, not via ICP scoring or company discovery directly.</li>
+<li><strong>Gmail connection</strong> &mdash; offered at Step 4 but skippable. Not used for anything during onboarding itself.</li>
+<li><strong>Complete RECON</strong> &mdash; 105 questions weighted as if all are needed before value delivery. But Barry's engagement attribution, warmth inference, NBS, and strategy recommendations all work with zero RECON data.</li>
+</ul>
+
+<h3>Discoverable / Inferable Today</h3>
+<p>What Barry could already know without asking the user:</p>
+<ul>
+<li><strong>Company name, industry, size, location</strong> &mdash; <code>analyze-website</code> already extracts these from the website. Currently stored in RECON but could populate ICP directly.</li>
+<li><strong>Product/service description</strong> &mdash; extracted by <code>analyze-website</code> AI analysis</li>
+<li><strong>Competitors</strong> &mdash; partially discoverable from website content</li>
+<li><strong>Value proposition</strong> &mdash; extractable from website copy</li>
+<li><strong>Target personas</strong> &mdash; inferable from website "for whom" sections</li>
+<li><strong>User's existing relationships</strong> &mdash; discoverable from Gmail if connected</li>
+<li><strong>Communication style preference</strong> &mdash; inferable from message editing patterns (not currently tracked)</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="s15"><span class="section-num">15.</span> Open Product Decisions</h2>
+
+<p>These cannot be resolved from the codebase alone.</p>
+
+<ol>
+<li><strong>Which onboarding path is canonical?</strong> OnboardingFlow and BarryOnboarding both exist and are both reachable. <code>CheckoutSuccessPage</code> sends to one; <code>SmartRedirect</code> sends to the other. They write different data, set different completion flags, and create different post-onboarding states. The platform needs one path.</li>
+
+<li><strong>Is "ten matched companies" the universal first-value moment?</strong> The audit reveals multiple partial first-value paths. A user with a strong existing network might get more value from "Barry identified three relationships that can help" than from ten cold companies. Does first value vary by user intent?</li>
+
+<li><strong>Should the business/workspace entity be explicit?</strong> All business intelligence is currently stored under user-scoped paths. If IDYNIFY will support teams or multi-user businesses, a <code>workspace</code> entity needs to be created. If single-user only, the current approach works but should be documented as intentional.</li>
+
+<li><strong>What should Barry be allowed to do autonomously?</strong> Currently all actions require user confirmation. The eventual vision mentions "what Barry is allowed to research, recommend, draft, change, send, automate, or execute." Where on this spectrum should Barry start for a new user?</li>
+
+<li><strong>How should temporary strategy vs permanent truth be distinguished?</strong> "We sell SaaS to mid-market healthcare" and "this quarter we're focused on Utah nonprofits" are stored identically. Should temporary context expire? Should Barry ask "is this still true?" periodically?</li>
+
+<li><strong>What is the minimum information Barry needs before providing value?</strong> The current flow collects website + 4 questions + optional Gmail before showing (empty) results. How much of this is truly required vs. delayable? Could Barry provide value with just a website URL?</li>
+
+<li><strong>Should RECON evolve from questionnaire to living model?</strong> The 105 RECON questions capture valuable intelligence, but the questionnaire form factor requires manual completion and never updates. Should answers update from engagement results, website changes, and behavioral signals? If yes, what is the provenance/confidence model?</li>
+
+<li><strong>How should the two context assembly systems merge?</strong> The split-brain architecture (F4) is the highest-value technical fix. Should the server assembler expand to include RECON/ICP, or should the client stack expand to include per-contact memory? Or should a unified service replace both?</li>
+</ol>
+
+<hr>
+<p style="color: var(--text-muted); font-size: 13px; margin-top: 40px;">
+This audit traces behavior from code. Every conclusion is backed by exact file paths, function names, and line numbers as cited.
+Where a conclusion states "Barry knows X" &mdash; the path from stored field to prompt assembly to model input was verified.
+Where a conclusion states "stored, consumer not found" &mdash; grep across the full codebase returned zero importers or readers.
+No behavior was inferred from naming conventions alone.
+</p>
+
+</div>

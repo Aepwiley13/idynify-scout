@@ -1,0 +1,1220 @@
+<title>Scout Evidence Packet</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Team A · Scout Evidence Packet · For v0.3 Reconciliation</p>
+  <h1>Producer, Store, Consumer, Decision</h1>
+  <p class="standfirst">Repository evidence only. Every ICP, firmographic, Match, Eligibility and swipe path in Scout, traced end to end and classified by whether it actually reaches a decision. No migrations, no implementation, no proposals.</p>
+  <div class="meta">
+    <span><b>Purpose</b> Evidence for Team B to test v0.3 against</span>
+    <span><b>Areas</b> 8</span>
+    <span><b>Paths traced</b> 48</span>
+    <span><b>ICP transitions</b> 15</span>
+    <span><b>Code changed</b> none</span>
+  </div>
+</header>
+
+<section id="corrections">
+  <div class="sec-head"><span class="sec-letter">§0</span><h2>Two corrections to the Phase 8 report</h2></div>
+  <div class="prose">
+    <p>Tracing every path end to end for this packet turned up two claims in the Phase 8 report that are wrong. Both are on the accepted-findings list, so they need correcting before Team B tests v0.3 against them.</p>
+
+    <div class="flag stop">
+      <p class="lede">Correction 1 — the Mission Control finding named the wrong surface.</p>
+      <p>Phase 8 reported that Mission Control gates on <code>ICP_SCORE_THRESHOLD = 70</code> against a persisted <code>fit_score</code> discovery never writes, and called it a live user-visible bug. <strong><code>src/pages/Scout/MissionControl.jsx</code> is imported by nothing.</strong> It is not routed in <code>App.jsx</code> and no component references it. The threshold, and every read in that file, is dead code.</p>
+      <p>The routed surface is <code>MissionControlDashboardV2</code>, and it recomputes Match in memory (<code>:775</code>) exactly the way Daily Discoveries does. Those two agree.</p>
+      <p><strong>The divergence is real but lives elsewhere.</strong> <code>SavedCompanies</code> sorts on the persisted <code>fit_score</code> (<code>:145</code>) and <code>CompanyDetail</code> displays it (<code>:965</code>), neither rescoring. For any company discovered since the user last saved their ICP, that value is absent — so a company shown as a strong match in Daily Discoveries sorts as zero in Saved Companies, and its detail page hides the fit line entirely (the <code>fitScore &gt; 0</code> guard at <code>:988</code>). The accepted finding "Mission Control currently consumes persisted Match state differently from Daily Discoveries" should read <strong>"Saved Companies and Company Detail consume persisted Match state; Daily Discoveries and Mission Control V2 recompute it."</strong></p>
+    </div>
+
+    <div class="flag stop">
+      <p class="lede">Correction 2 — swipe feedback is not unconsumed, and it reveals what <code>icp_score</code> actually is.</p>
+      <p>Phase 8 said skips feed nothing and that <code>barryRejectionFeedback</code> is read by no code. Both are wrong. <code>barryMissionChat.js:183–206</code> reads both fields, building an ICP-feedback block for Barry's chat context: the mean of <code>barryFeedback.score</code>, companies rated ≥ 8 with their reasons, companies rated ≤ 4, and free-text notes from <em>both</em> saves and skips.</p>
+      <p>The correct statement is narrower: <strong>a swipe's direction and status drive nothing durable; a swipe carrying structured feedback reaches Barry's chat context and nothing else.</strong></p>
+      <p>This also resolves the <code>icp_score</code> scale contradiction better than Phase 8 did. <code>barryFeedback</code> has the shape <code>{ score: 1–10, reasons: [], note: string }</code> and is <strong>supplied by the user</strong>, not computed. Document 2's <code>icp_score: 1-10 (from barryFeedback.score)</code> therefore describes a user rating. Document 4's <code>ScoreICPFitOutput.icp_score: 0-100</code> describes a computed fit. <strong>These are two different quantities the contract has collapsed into one field name</strong> — not a units disagreement to be settled by picking a scale. v0.3 needs two fields, or one field with an explicit source discriminator.</p>
+    </div>
+
+    <p class="mono" style="font-size:11.5px;color:var(--muted)">Everything else on the accepted-findings list held up under end-to-end tracing.</p>
+  </div>
+</section>
+
+<section id="method">
+  <div class="sec-head"><span class="sec-letter">§1</span><h2>Classification standard</h2></div>
+  <div class="prose">
+    <p>Every row is traced as <strong>Producer → Store or derived object → Consumer → Decision</strong> and classified by where the chain breaks. The five statuses are disjoint and the distinction between the last three is the one that matters:</p>
+  </div>
+  <div class="tscroll"><table>
+    <thead><tr><th>Status</th><th>Meaning</th><th>Where the chain breaks</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip c-ok">REACHABLE</span></td><td>Producer writes, consumer reads, a decision changes in the running application.</td><td>Nowhere.</td></tr>
+      <tr><td><span class="chip c-warn">PARTIAL</span></td><td>The chain runs, but only some of the intelligence arrives, or it arrives only under some conditions.</td><td>Mid-chain, conditionally.</td></tr>
+      <tr><td><span class="chip c-decide">DORMANT</span></td><td>Consumer code is live and would run, but a required input is never produced, so its branch never fires.</td><td>At the producer — the code is fine, the data never comes.</td></tr>
+      <tr><td><span class="chip c-dead">DEAD</span></td><td>The code cannot execute. No caller, no route, no import.</td><td>Before the chain starts.</td></tr>
+      <tr><td><span class="chip c-stop">UNREACHABLE</span></td><td>Data is produced and durably stored, and no consumer exists.</td><td>After the store — the write succeeds and nothing ever reads it.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose">
+    <p>Five rows in the tables below fall outside this vocabulary because there is no chain to classify: the evidence is <strong>not produced at all</strong> (field-level provenance, employee count, location), the concept <strong>does not exist</strong> (mission-scoped targeting), or the row records a <strong>direct contradiction</strong> rather than a path. They are labelled as such rather than forced into a status.</p>
+    <p class="mono" style="font-size:11.5px;color:var(--muted)">DORMANT and UNREACHABLE are opposite failures and are worth keeping apart in v0.3: a dormant consumer is a contract already written that nothing satisfies; an unreachable store is a user answering a question nothing asked.</p>
+  </div>
+</section>
+
+<section id="area1">
+  <div class="sec-head"><span class="sec-letter">§2.1</span><h2>ICP / targeting intelligence</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Which store holds durable ICP targeting intelligence?</td>
+        <td>Two stores hold the same schema. Only one has a defined writer contract.</td>
+        <td><code>ICPSettings.jsx:221</code></td>
+        <td><code>users/{uid}/icpProfiles/{icpId}</code></td>
+        <td><code>ICPSettings</code>, <code>getActiveIcpId</code>, <code>barryContextStack:65</code></td>
+        <td>Which ICP the user edits and which companies the queue shows</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>Not read by the Apollo path. Bypassed by three writers.</td>
+      </tr>
+      <tr>
+        <td>Which store does discovery actually search from?</td>
+        <td><code>search-companies</code> builds its query from the <code>companyProfile</code> in the request body; every caller passes the bridge document.</td>
+        <td><code>ICPSettings:229</code> (mirror), <code>setActiveIcpProfile:35</code>, <code>updateIcpFromChat:22</code></td>
+        <td><code>users/{uid}/companyProfile/current</code></td>
+        <td><code>buildApolloQuery</code>; <code>DailyLeads:1796</code>; <code>BarryICPPanel:204</code></td>
+        <td><strong>Which companies exist at all</strong></td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Described in code as a cache. Behaves as the authoritative discovery input.</td>
+      </tr>
+      <tr>
+        <td>Can the two diverge?</td>
+        <td>Three surfaces write the bridge without writing <code>icpProfiles</code>.</td>
+        <td><code>CompanyQuestionnaire:176</code>, <code>BarryOnboarding:335</code>, <code>BarryICPPanel:200</code></td>
+        <td><code>companyProfile/current</code> only</td>
+        <td>Apollo query</td>
+        <td>Discovery targeting changes; ICP Settings still shows the old criteria</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td><strong>Yes, silently and in one direction.</strong> No reconciliation on read.</td>
+      </tr>
+      <tr>
+        <td>Is ICP intelligence per-workspace or per-ICP?</td>
+        <td><code>icpProfiles</code> is a collection with <code>isActive</code>; the bridge is a single document.</td>
+        <td><code>setActiveIcpProfile</code></td>
+        <td>Both</td>
+        <td>Queue filter <code>!c.icpId || c.icpId === activeId</code> (<code>DailyLeads:1400</code>)</td>
+        <td>Which discovered companies a user can see</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>The bridge is single-valued, so a bridge-only write retargets discovery for <em>every</em> profile while each profile's own document is unchanged.</td>
+      </tr>
+      <tr>
+        <td>Where do scoring weights live?</td>
+        <td><code>scoringWeights</code> exists only on the ICP profile; <code>DEFAULT_WEIGHTS</code> (50/25/15/10) is the fallback.</td>
+        <td><code>ICPSettings:379</code></td>
+        <td><code>icpProfiles.scoringWeights</code></td>
+        <td><code>calculateICPScore</code></td>
+        <td>Match rank</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Weights govern ranking only. The Apollo query has no weight concept, so weighting cannot influence what is discovered.</td>
+      </tr>
+      <tr>
+        <td>Is there any mission-scoped or temporary targeting override?</td>
+        <td>Searched: no mission-scoped targeting store exists.</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-stop">Does not exist</span></td>
+        <td>All ICP intelligence today is durable. <code>isActive</code> profile switching is the only seam a future override could use.</td>
+      </tr>
+      <tr>
+        <td>Is ICP↔RECON drift detected?</td>
+        <td><code>reconHealth.js:73</code> reads <code>storedHealth.icpSnapshotAtLastReconSave</code> to raise <code>ICP_INDUSTRY_DRIFT</code>, <code>ICP_SIZE_DRIFT</code>, <code>ICP_LOCATION_DRIFT</code>.</td>
+        <td><strong>None.</strong> No code writes the snapshot.</td>
+        <td>—</td>
+        <td><code>computeReconHealth</code> → Knowledge Map tile state</td>
+        <td>Whether the user is warned their ICP and RECON disagree</td>
+        <td><span class="chip c-decide">DORMANT</span></td>
+        <td>The one mechanism built to detect the divergence documented in this section cannot fire.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area2">
+  <div class="sec-head"><span class="sec-letter">§2.2</span><h2>Company / entity firmographics</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>What firmographic evidence is durably held per company?</td>
+        <td>The written document carries <code>name</code>, <code>industry</code>, <code>revenue</code>, <code>founded_year</code>, <code>phone</code>, three URLs, <code>status</code>, <code>icpId</code>, <code>barry_intel</code>.</td>
+        <td><code>saveCompaniesToFirestore:922</code></td>
+        <td><code>users/{uid}/companies/{companyId}</code></td>
+        <td><code>calculateICPScore</code>; all Scout cards</td>
+        <td>Match; what the user sees</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td><strong>No location field and no employee-count field.</strong> Two of the four scored dimensions are absent from every record.</td>
+      </tr>
+      <tr>
+        <td>Why are they absent?</td>
+        <td>Apollo's <code>mixed_companies/search</code> returns neither. Stated in code at <code>search-companies.js:939</code> and <code>:956</code>.</td>
+        <td>Apollo</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-stop">Not produced</span></td>
+        <td>A vendor capability limit, not an implementation oversight. Any contract assuming four-dimension firmographics is assuming data IDYNIFY does not receive.</td>
+      </tr>
+      <tr>
+        <td>Is stored <code>industry</code> observed evidence or user input?</td>
+        <td><code>search-companies.js:960</code> — <code>company.industry || company.primary_industry || <strong>companyProfile.industries?.[0]</strong> || 'Unknown'</code></td>
+        <td><code>saveCompaniesToFirestore</code></td>
+        <td><code>companies.industry</code></td>
+        <td><code>evalIndustry</code> (weight 50); <code>generateMatchReasons</code></td>
+        <td>Match, and the sentence explaining it</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td><strong>Either, indistinguishably.</strong> When Apollo cannot classify a company it is stamped with the user's own first ICP industry and then scores a confirmed match. Accepted as a correctness defect; fix on hold.</td>
+      </tr>
+      <tr>
+        <td>Is provenance recorded for any field?</td>
+        <td>Doc 2 defines <code>enrichment_status</code> and <code>enrichment_provenance</code> on Company.</td>
+        <td><strong>None.</strong></td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-stop">Not produced</span></td>
+        <td>No field-level source, age, or authority exists anywhere. Any v0.3 evidence or authority-precedence rule has no substrate in Scout today.</td>
+      </tr>
+      <tr>
+        <td>Is <code>'Unknown'</code> distinguishable from absent?</td>
+        <td>Executed: <code>industry: "Unknown"</code> scores 25; industry absent scores 50.</td>
+        <td><code>saveCompaniesToFirestore:960</code></td>
+        <td><code>companies.industry</code></td>
+        <td><code>evalIndustry</code></td>
+        <td>Match</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>No. The literal fallback string is scored as a confirmed miss; genuine absence is scored as unknown. Same fact, 25-point swing.</td>
+      </tr>
+      <tr>
+        <td>Does Barry write to the platform-owned Company record?</td>
+        <td><code>barry_intel</code> is written onto the company document by the discovery function.</td>
+        <td><code>buildBarryIntel</code> via <code>saveCompaniesToFirestore</code></td>
+        <td><code>companies.barry_intel</code></td>
+        <td>Company card / detail</td>
+        <td>What Barry appears to know about a company</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Doc 2 names this a <strong>confirmed ownership violation</strong> requiring migration to a Barry-owned artifact. Still present. Content is a rule-based firmographic restatement, not derived intelligence.</td>
+      </tr>
+      <tr>
+        <td>Is entity identity stable?</td>
+        <td>Document id is <code>apollo_organization_id</code>, falling back to <code>company_{timestamp}_{random}</code> when Apollo returns no id.</td>
+        <td><code>saveCompaniesToFirestore</code></td>
+        <td>Document id</td>
+        <td>Dedup via <code>getExistingCompanyIds</code></td>
+        <td>Whether a company is re-shown</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>Identity is vendor-derived. A company without an Apollo id gets a non-deterministic id and can be re-created on a later search.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area3">
+  <div class="sec-head"><span class="sec-letter">§2.3</span><h2>RECON §3 — Target Market</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Does §3 content reach any targeting decision?</td>
+        <td>Ten questions, answers keyed by question id.</td>
+        <td><code>ReconSectionEditor:207</code> → <code>saveSectionData</code></td>
+        <td><code>dashboards/{uid}.modules[recon].sections[3].data</code></td>
+        <td><code>AlignmentBrief:107</code> only</td>
+        <td>One display line in the brief</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>No §3 content reaches the Apollo query, either scorer, or any filter.</td>
+      </tr>
+      <tr>
+        <td>Does §3 <em>completeness</em> reach a decision?</td>
+        <td>Section 3 carries weight 15 in <code>SECTION_WEIGHTS</code>.</td>
+        <td><code>calculateReconConfidence</code></td>
+        <td>Derived 0–100, not stored</td>
+        <td><code>search-companies:382</code>, <code>:468</code></td>
+        <td><code>QUEUE_TARGET = min(50 + floor(conf × 0.5), 100)</code> — how deep Apollo is paged</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Completeness buys volume. Content buys nothing. This is the only live RECON→Scout link.</td>
+      </tr>
+      <tr>
+        <td><code>targetIndustries</code></td>
+        <td>Up to 3 from a fixed 10-item list.</td>
+        <td>§3</td>
+        <td>Section data</td>
+        <td><code>AlignmentBrief:107</code></td>
+        <td>Display only</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>Vocabulary is incompatible with <code>icpProfiles.industries</code>, which must hold Apollo taxonomy values for <code>getIndustryIds</code>.</td>
+      </tr>
+      <tr>
+        <td><code>companySize</code>, <code>revenueRange</code>, <code>geography</code></td>
+        <td>Stored under those ids. <code>AlignmentBrief:108–109</code> reads <code>d.companySizes</code> and <code>d.locations</code>.</td>
+        <td>§3</td>
+        <td>Section data</td>
+        <td>None — the reads name fields §3 never writes</td>
+        <td>None</td>
+        <td><span class="chip c-decide">DORMANT</span></td>
+        <td>Consumer branches exist and can never fire. The brief's Target Market line renders industries only.</td>
+      </tr>
+      <tr>
+        <td><code>avoidIndustries</code></td>
+        <td>"Any industries that are bad fit?"</td>
+        <td>§3</td>
+        <td>Section data</td>
+        <td><strong>None.</strong></td>
+        <td>None</td>
+        <td><span class="chip c-stop">UNREACHABLE</span></td>
+        <td>Exclusion intelligence exists in the repository and influences nothing. Semantically it is Eligibility, and Eligibility has no exclusion mechanism.</td>
+      </tr>
+      <tr>
+        <td><code>companyType</code>, <code>growthStage</code>, <code>budgetRange</code>, <code>decisionSpeed</code>, <code>marketSize</code></td>
+        <td>All five are <code>required: true</code>.</td>
+        <td>§3</td>
+        <td>Section data</td>
+        <td><strong>None.</strong></td>
+        <td>None</td>
+        <td><span class="chip c-stop">UNREACHABLE</span></td>
+        <td>Five required answers with no consumer. <code>growthStage</code> is <em>related</em> to <code>foundedAgeRange</code> but not derivable from it.</td>
+      </tr>
+      <tr>
+        <td>Targeting titles</td>
+        <td><code>AlignmentBrief:111</code> reads <code>d.targetTitles</code> from §3.</td>
+        <td>§3 <strong>has no titles question</strong></td>
+        <td>—</td>
+        <td><code>AlignmentBrief</code></td>
+        <td>Would display "Target titles"</td>
+        <td><span class="chip c-decide">DORMANT</span></td>
+        <td>The brief implies RECON owns buyer titles. It does not — <code>targetTitles</code> lives on the ICP profile.</td>
+      </tr>
+      <tr>
+        <td>Is §3 stored once?</td>
+        <td><code>Section3TargetMarketFirmographics:211</code> also writes <code>users/{uid}.section3Answers</code>.</td>
+        <td>Section 3 component</td>
+        <td><code>users/{uid}.section3Answers</code></td>
+        <td><strong>None.</strong></td>
+        <td>None</td>
+        <td><span class="chip c-stop">UNREACHABLE</span></td>
+        <td>A second copy written on every autosave, read by nothing. Can drift from the dashboard copy.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area4">
+  <div class="sec-head"><span class="sec-letter">§2.4</span><h2>RECON §4 — Psychographics</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Where does §4 intelligence go?</td>
+        <td><code>RECON_SECTION_MAP.psychographics = 4</code> is the canonical routing contract.</td>
+        <td><code>ReconSectionEditor</code> → <code>saveSectionData</code></td>
+        <td><code>dashboards/{uid}.modules[recon].sections[4].data</code></td>
+        <td>Barry context assembly via <code>RECON_SECTION_MAP</code></td>
+        <td>Message tone, framing, conversation starters</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>None. This is the cleanest producer→consumer chain in Scout's neighbourhood.</td>
+      </tr>
+      <tr>
+        <td>Does §4 contain firmographic content?</td>
+        <td>Ten fields: <code>nightFears</code>, <code>goals</code>, <code>values</code>, <code>commonPhrases</code>, <code>emotionalState</code>, <code>decisionFears</code>, <code>changeAttitude</code>, <code>successMeasurement</code>, <code>personalMotivators</code>, <code>riskTolerance</code>.</td>
+        <td>§4</td>
+        <td>Section data</td>
+        <td>Messaging paths only</td>
+        <td>—</td>
+        <td><span class="chip c-ok">N/A</span></td>
+        <td>No. Nothing in §4 is a company attribute, so nothing in §4 can be evaluated against a company record. Its absence from Match is correct, not an omission.</td>
+      </tr>
+      <tr>
+        <td>Is §4 per-ICP or per-workspace?</td>
+        <td><code>ICP_LEVEL_SECTIONS = [9]</code>. Sections 1–8 are declared shared user-level intelligence.</td>
+        <td><code>reconSectionMap.js:23</code></td>
+        <td>Dashboard module</td>
+        <td>Barry context</td>
+        <td>—</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>§4 is workspace-scoped by explicit declaration. Only §9 (Messaging) is per-ICP — which is a live counter-example to any rule that RECON is uniformly workspace-level.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area5">
+  <div class="sec-head"><span class="sec-letter">§2.5</span><h2>Match</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Which code computes Match in production?</td>
+        <td><code>icpScoring.js:318</code>. Normalised over configured dimensions; per-dimension values in {0, 50, 100}; weights 50/25/15/10.</td>
+        <td><code>calculateICPScore</code></td>
+        <td>Derived, in memory</td>
+        <td><code>DailyLeads:1406</code>, <code>MissionControlDashboardV2:773</code>, <code>OnboardingFlow:483</code>, <code>ICPSettings</code></td>
+        <td>Queue order; card score</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Four independent recomputations of the same value. No single producer.</td>
+      </tr>
+      <tr>
+        <td>Is there a second Match implementation?</td>
+        <td><code>calculateFitScore:1302</code> reached only from <code>enrichCompanyData:1083</code>, which has no caller.</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-dead">DEAD</span></td>
+        <td>Close to 300 lines of server scoring, including a different weighting (30/25/20/25) that ranks a confirmed industry miss above an industry match.</td>
+      </tr>
+      <tr>
+        <td>Is Match durably stored?</td>
+        <td>Only <code>recalculateAllScores</code> writes <code>fit_score</code>, and only on ICP save.</td>
+        <td><code>ICPSettings:274</code></td>
+        <td><code>companies.fit_score</code>, <code>fit_reasons</code>, <code>fit_reason</code>, <code>lastScoreUpdate</code></td>
+        <td><code>SavedCompanies:145</code> (sort), <code>CompanyDetail:965</code> (display)</td>
+        <td>Saved-list order; whether the detail page shows a fit line</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>Discovery writes no <code>fit_score</code>. Any company discovered since the last ICP save is stored as unscored and reads as zero.</td>
+      </tr>
+      <tr>
+        <td>Does Match gate discovery?</td>
+        <td><code>validateCompanyData:1133</code> holds <code>if (company.fit_score &lt; 50)</code>. No caller.</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-dead">DEAD</span></td>
+        <td>The live write path's own comment reads "SIMPLIFIED: Accept ALL companies - no filtering or complex scoring."</td>
+      </tr>
+      <tr>
+        <td>Can Match distinguish evidence from absence?</td>
+        <td>Executed: 1-of-4 dimensions known displays 75; 4-of-4 known and all matching displays 80.</td>
+        <td><code>calculateICPScore</code></td>
+        <td>Derived</td>
+        <td>All surfaces</td>
+        <td>Queue order</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>No. <code>UNKNOWN = 50</code> is folded into the weighted mean and is not recoverable from the output. Coverage is computable from <code>evaluateDimensions</code> and is currently discarded.</td>
+      </tr>
+      <tr>
+        <td>Does a Match carry a reasoning trace?</td>
+        <td><code>generateMatchReasons</code> returns per-dimension sentences.</td>
+        <td><code>icpScoring.js</code></td>
+        <td>Derived array; persisted only by <code>ICPSettings</code></td>
+        <td>Cards, tooltips</td>
+        <td>What the user is told</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Reasons are computed from the same dimensions as the score, so a fabricated industry produces a confidently-worded false reason.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area6">
+  <div class="sec-head"><span class="sec-letter">§2.6</span><h2>Eligibility</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>What admission rules run before a company is written?</td>
+        <td><code>search-companies:388</code> — <code>organizations.filter(c =&gt; passesAgeFilter(c, foundedAgeRange))</code>.</td>
+        <td><code>icpProfiles.foundedAgeRange</code> via the bridge</td>
+        <td>Applied to the Apollo page, not stored</td>
+        <td>The paging loop</td>
+        <td>Whether a company is written at all</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>The only content-based Eligibility rule in the system, and it is a single numeric range.</td>
+      </tr>
+      <tr>
+        <td>Is re-showing prevented?</td>
+        <td><code>getExistingCompanyIds:838</code> excludes already-known Apollo ids.</td>
+        <td>Existing companies collection</td>
+        <td>In-memory id set</td>
+        <td>The paging loop</td>
+        <td>Whether a company is re-written</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Keyed on <code>apollo_organization_id</code>. A company without one cannot be deduplicated.</td>
+      </tr>
+      <tr>
+        <td>Is there a client-side Eligibility gate?</td>
+        <td><code>icpScoring.js:431</code> <code>passesAllFilters</code> is exported. The only other mention is a comment in <code>ReconOverview:86</code>.</td>
+        <td>—</td>
+        <td>—</td>
+        <td>No caller</td>
+        <td>—</td>
+        <td><span class="chip c-dead">DEAD</span></td>
+        <td>An exported gate function that nothing invokes.</td>
+      </tr>
+      <tr>
+        <td>Can a user exclude anything?</td>
+        <td><code>avoidIndustries</code> is collected in RECON §3.</td>
+        <td>§3</td>
+        <td>Section data</td>
+        <td><strong>None.</strong></td>
+        <td>None</td>
+        <td><span class="chip c-stop">UNREACHABLE</span></td>
+        <td>Exclusion is expressible in the product and unenforceable in the code. An avoided-industry company scores identically to any other industry miss.</td>
+      </tr>
+      <tr>
+        <td>Is Eligibility distinguishable from Match in the data?</td>
+        <td>Age filtering happens pre-write; excluded companies leave no record.</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Yes, structurally — but only because Eligibility runs before persistence. There is no stored eligibility decision, so an exclusion cannot be explained or audited afterwards.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area7">
+  <div class="sec-head"><span class="sec-letter">§2.7</span><h2>Save / Skip</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>What does a swipe persist?</td>
+        <td><code>DailyLeads:1558–1566</code> — <code>status</code>, <code>swipedAt</code>, <code>swipeDirection</code>, <code>swipedForICPId</code>, and optional feedback.</td>
+        <td><code>handleSwipe</code></td>
+        <td><code>companies/{id}</code>; <code>scoutProgress/swipes</code>; <code>scoutProgress/streak</code></td>
+        <td>Queue exclusion; Saved list; counters</td>
+        <td>Whether the company is shown again</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Neither the Match shown at swipe time nor its coverage is captured, so a swipe cannot later be compared against the judgment it responded to.</td>
+      </tr>
+      <tr>
+        <td>Does structured feedback reach anything?</td>
+        <td><code>barryMissionChat.js:183–206</code> reads <code>barryFeedback.score</code>, <code>.reasons</code>, <code>.note</code> and <code>barryRejectionFeedback.note</code>.</td>
+        <td><code>handleSwipe</code> when the user fills the form</td>
+        <td><code>companies.barryFeedback</code>, <code>.barryRejectionFeedback</code></td>
+        <td>Barry mission chat context block</td>
+        <td>What Barry says in chat</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td><strong>Corrects Phase 8.</strong> Feedback is consumed, but only as chat context — it updates no ICP, no score, and no durable intelligence.</td>
+      </tr>
+      <tr>
+        <td>Is <code>barryFeedback.score</code> a Match?</td>
+        <td>Shape is <code>{ score: 1–10, reasons: [], note }</code>, entered by the user. Doc 2 maps <code>barryFeedback → icp_score</code>.</td>
+        <td>User</td>
+        <td><code>companies.barryFeedback.score</code></td>
+        <td><code>barryMissionChat</code></td>
+        <td>Chat framing</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td><strong>No — it is a user rating.</strong> Doc 4's <code>icp_score: 0-100</code> is a computed fit. The contract holds two different quantities under one field name.</td>
+      </tr>
+      <tr>
+        <td>Do Saves influence future discovery?</td>
+        <td><code>savedIndustries</code> from the current batch → <code>adaptiveSignals</code> → prepended to the Apollo industry keywords.</td>
+        <td><code>triggerAdaptiveSearch</code> (<code>DailyLeads:1796</code>)</td>
+        <td>Not stored — request-scoped</td>
+        <td><code>buildApolloQuery</code></td>
+        <td>What the next search asks Apollo for</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Derived from one batch, never persisted, never aggregated. Nothing survives a reload.</td>
+      </tr>
+      <tr>
+        <td>Is any pattern surfaced to the user?</td>
+        <td>Barry nudge fires when 3 of the last 5 saves share an industry.</td>
+        <td><code>sessionSavedCompanies</code> (React state)</td>
+        <td>Not stored</td>
+        <td>Nudge UI</td>
+        <td>Whether the user is prompted</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Session-scoped. Doc 2 permits this as an observation and forbids it as durable intelligence — the current use is on the correct side of that line.</td>
+      </tr>
+      <tr>
+        <td>Does anything become Learned Intelligence?</td>
+        <td>Doc 2 defines <code>users/{uid}/barry_memory/learned</code> with an <code>icp_correlation</code> category and a 3+ data-point rule.</td>
+        <td><strong>None.</strong></td>
+        <td>Store not written</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-decide">DORMANT</span></td>
+        <td>The contract for converting swipes into durable intelligence exists. No producer satisfies it.</td>
+      </tr>
+      <tr>
+        <td>Is an undone swipe distinguishable?</td>
+        <td><code>handleUndo</code> resets <code>status</code> to <code>pending</code> and nulls <code>swipedAt</code>/<code>swipeDirection</code>.</td>
+        <td><code>handleUndo</code></td>
+        <td><code>companies/{id}</code></td>
+        <td>Queue reload</td>
+        <td>Company returns to the queue</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>No trace is kept. Any future aggregation would count a corrected mistake as a genuine signal unless this is changed first.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="area8">
+  <div class="sec-head"><span class="sec-letter">§2.8</span><h2>Mission Control Match consumption</h2></div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Contract question</th><th>Repository evidence</th><th>Producer</th><th>Store / derived object</th><th>Consumer</th><th>Decision</th><th>Status</th><th>Contradiction / gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Which Mission Control is routed?</td>
+        <td><code>App.jsx:395</code> and <code>:477</code> route <code>MissionControlDashboardV2</code>. <code>src/pages/Scout/MissionControl.jsx</code> is imported by nothing.</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="chip c-dead">DEAD</span> (<code>MissionControl.jsx</code>)</td>
+        <td><strong>Corrects Phase 8.</strong> <code>ICP_SCORE_THRESHOLD = 70</code> and its five reads of persisted <code>fit_score</code> are in the unrouted file.</td>
+      </tr>
+      <tr>
+        <td>How does the routed surface obtain Match?</td>
+        <td><code>MissionControlDashboardV2:773–781</code> recomputes with <code>calculateICPScore</code> against the active profile.</td>
+        <td><code>calculateICPScore</code></td>
+        <td>In memory</td>
+        <td>Sort, score filters, <code>FitBadge</code></td>
+        <td>Ordering and the 90+/70–89/&lt;70 filters</td>
+        <td><span class="chip c-ok">REACHABLE</span></td>
+        <td>Agrees with Daily Discoveries because both call the same function with the same profile.</td>
+      </tr>
+      <tr>
+        <td>Which surfaces read persisted Match instead?</td>
+        <td><code>SavedCompanies:145</code> sorts on <code>fit_score</code>; <code>CompanyDetail:965</code> renders it, guarded by <code>fitScore &gt; 0</code> at <code>:988</code>.</td>
+        <td><code>ICPSettings:274</code> only</td>
+        <td><code>companies.fit_score</code></td>
+        <td>Saved list; company detail</td>
+        <td>Saved-list order; whether a fit line appears</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td><strong>This is the real divergence.</strong> A company shown as a strong match in Daily Discoveries sorts as zero in Saved Companies and shows no fit line on its detail page until the user re-saves their ICP.</td>
+      </tr>
+      <tr>
+        <td>Does Mission Control fall back to stale Match?</td>
+        <td><code>:775</code> — <code>activeProfile ? calculateICPScore(...) : (c.fit_score || c.icpScore || 0)</code>.</td>
+        <td>Mixed</td>
+        <td>In memory or persisted</td>
+        <td>Same consumers</td>
+        <td>Ordering</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>With no active profile the surface silently switches to whatever <code>ICPSettings</code> last wrote — a different quantity presented identically.</td>
+      </tr>
+      <tr>
+        <td>Is <code>fit_score</code> a fact about a company?</td>
+        <td>One <code>fit_score</code> field per company document.</td>
+        <td><code>recalculateAllScores</code></td>
+        <td><code>companies.fit_score</code></td>
+        <td>Saved list; company detail</td>
+        <td>Ordering</td>
+        <td><span class="chip c-stop">Contradiction</span></td>
+        <td>Match is a relation between a company <em>and an ICP</em>, but the field is single-valued per company. See §3.</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="multiicp">
+  <div class="sec-head"><span class="sec-letter">§3</span><h2>Multi-ICP identity and isolation</h2></div>
+  <div class="prose">
+    <p>Traced under the invariant <em>one authoritative representation per ICP</em>, not one ICP per workspace. The transition chain, classified end to end:</p>
+  </div>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Transition</th><th>Repository evidence</th><th>ICP identity</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>ICP creation</strong></td>
+        <td><code>ICPSettings:120</code> — <code>newId = `icp_${Date.now()}`</code>, written as the document key. The stored object contains <strong>no <code>id</code> field</strong>; <code>id</code> is attached only in memory (<code>:142</code>).</td>
+        <td><span class="chip c-ok">PRESERVED</span></td>
+        <td>Identity exists solely as the Firestore document key. It is not a property of the data.</td>
+      </tr>
+      <tr>
+        <td><strong>ICP bootstrap (no profiles yet)</strong></td>
+        <td><code>dashboardUtils:284</code> creates <code>icpProfiles/default</code> from <code>companyProfile/current</code>, with <code>id: DEFAULT_ICP_ID</code>.</td>
+        <td><span class="chip c-warn">DEFAULTED</span></td>
+        <td>The first ICP is named by a constant, not by the user. Every pre-migration workspace shares the same key.</td>
+      </tr>
+      <tr>
+        <td><strong>Active ICP selection</strong></td>
+        <td><code>getActiveIcpId</code> queries <code>isActive == true && status == 'active'</code>, <code>limit(1)</code>. Returns <code>DEFAULT_ICP_ID</code> when empty <strong>and inside <code>catch</code></strong>.</td>
+        <td><span class="chip c-warn">DEFAULTED</span></td>
+        <td>A transient Firestore error silently reassigns the caller to <code>'default'</code>. Failure and "no active ICP" are indistinguishable.</td>
+      </tr>
+      <tr>
+        <td><strong>Active ICP → bridge</strong></td>
+        <td><code>setActiveIcpProfile:35</code> and <code>ICPSettings:229</code> copy the profile body into the single document <code>companyProfile/current</code>. No consumer reads any id from it, and none is reliably present.</td>
+        <td><span class="chip c-stop">LOST</span></td>
+        <td><strong>The collapse point.</strong> One document per user holds one ICP's criteria with no marker of which. Identity cannot be recovered downstream.</td>
+      </tr>
+      <tr>
+        <td><strong>Search request</strong></td>
+        <td>Seven live callers of <code>search-companies</code>. Two pass <code>icpId</code>: <code>DailyLeads:1488</code> (<code>activeICPId</code>) and <code>ICPSettings:298</code> (<code>selectedICPId</code>). Five do not: <code>DailyLeads:1088</code>, <code>DailyLeads:1796</code>, <code>BarryICPPanel:204</code>, <code>CompanyQuestionnaire:213</code>, <code>BarryOnboarding:370</code>, <code>MissionControlDashboardV2:363</code>.</td>
+        <td><span class="chip c-stop">LOST</span> at 5 of 7</td>
+        <td>PR #570 restores it at two of them (<code>:1088</code>, <code>:1796</code>), leaving four. The rest send only the bridge body, from which no ICP can be inferred.</td>
+      </tr>
+      <tr>
+        <td><strong>Server tagging</strong></td>
+        <td><code>saveCompaniesToFirestore</code> writes <code>icpId: icpId || DEFAULT_ICP_ID</code>.</td>
+        <td><span class="chip c-warn">DEFAULTED</span></td>
+        <td><strong><code>DEFAULT_ICP_ID</code> masks the missing identity.</strong> The stored value is well-formed and indistinguishable from a genuine assignment to the default ICP.</td>
+      </tr>
+      <tr>
+        <td><strong>Discovered company</strong></td>
+        <td>Every company carries exactly one <code>icpId</code>.</td>
+        <td><span class="chip c-ok">PRESERVED</span> (as written)</td>
+        <td>Faithfully preserves whatever arrived — including a default that stands in for an unknown.</td>
+      </tr>
+      <tr>
+        <td><strong>Queue filter</strong></td>
+        <td><code>DailyLeads:1400</code> and <code>MissionControlDashboardV2:768</code> — <code>!c.icpId || c.icpId === activeICPId</code>.</td>
+        <td><span class="chip c-warn">PARTIAL</span></td>
+        <td>Correct isolation for tagged companies. The <code>!c.icpId</code> clause deliberately leaks untagged legacy records into <em>every</em> ICP.</td>
+      </tr>
+      <tr>
+        <td><strong>Match calculation</strong></td>
+        <td><code>DailyLeads:1406</code> scores against <code>activeProfile</code>, chosen by the same <code>isActive</code> rule that produced <code>activeId</code>. <code>MissionControlDashboardV2:756</code> does the same.</td>
+        <td><span class="chip c-ok">PRESERVED</span></td>
+        <td>In-memory Match is computed against the same ICP the queue was filtered to. This transition is correct on both live surfaces.</td>
+      </tr>
+      <tr>
+        <td><strong>Match persistence</strong></td>
+        <td><code>recalculateAllScores</code> reads <code>getDocs(collection(..., 'companies'))</code> — <strong>every company, no <code>icpId</code> filter</strong> — and writes <code>fit_score</code> computed against the ICP just saved.</td>
+        <td><span class="chip c-stop">LOST</span></td>
+        <td><strong>Cross-ICP contamination.</strong> Saving ICP B overwrites the stored Match of companies discovered for ICP A with B's scores and B's reasons.</td>
+      </tr>
+      <tr>
+        <td><strong>Saved / detail consumption</strong></td>
+        <td><code>SavedCompanies:145</code>, <code>CompanyDetail:965</code> read the single <code>fit_score</code>.</td>
+        <td><span class="chip c-stop">LOST</span></td>
+        <td>Neither surface knows which ICP produced the number it is showing.</td>
+      </tr>
+      <tr>
+        <td><strong>Adaptive signals</strong></td>
+        <td><code>savedIndustries</code> derives from the active ICP's batch; sent with the bridge body and (on <code>main</code>) no <code>icpId</code>.</td>
+        <td><span class="chip c-stop">LOST</span></td>
+        <td>ICP-derived evidence produces companies tagged <code>'default'</code>. The repository has <strong>no concept</strong> of a signal's ICP scope.</td>
+      </tr>
+      <tr>
+        <td><strong>RECON confidence → queue depth</strong></td>
+        <td><code>calculateReconConfidence(dashboardData)</code> is computed from the workspace dashboard.</td>
+        <td><span class="chip c-dead">NOT APPLICABLE</span></td>
+        <td>Workspace-scoped by construction, and correctly so — completeness of the user's business knowledge is not per-ICP.</td>
+      </tr>
+      <tr>
+        <td><strong>Swipe</strong></td>
+        <td><code>DailyLeads:1563</code> — <code>...(activeICPId ? { swipedForICPId: activeICPId } : {})</code>.</td>
+        <td><span class="chip c-ok">PRESERVED</span></td>
+        <td>The best-behaved transition in the chain: identity is recorded explicitly, and omitted rather than defaulted when unknown. Nothing reads it yet.</td>
+      </tr>
+      <tr>
+        <td><strong>ICP switch</strong></td>
+        <td><code>handleICPSwitch:1523</code> re-filters from <code>allCompaniesRef</code> and rescores in memory.</td>
+        <td><span class="chip c-ok">PRESERVED</span></td>
+        <td>No writes occur, so switching cannot corrupt stored state. Companies for other ICPs disappear from the queue, which is correct isolation.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="prose">
+    <h3>1 · What currently gives an ICP its identity?</h3>
+    <p><strong>The Firestore document key of <code>users/{uid}/icpProfiles/{icpId}</code>, and nothing else.</strong> A user-created profile stores no <code>id</code> field; only the bootstrap-created default does. Identity is therefore a property of <em>where the data is</em>, not of <em>what the data is</em> — so any copy of an ICP body loses its identity by construction. That single fact explains almost every row above.</p>
+
+    <h3>2 · Where is identity preserved?</h3>
+    <ul>
+      <li><strong>ICP creation and switching</strong> — the key is assigned and used consistently.</li>
+      <li><strong>Company tagging</strong> — every discovered company carries an <code>icpId</code>.</li>
+      <li><strong>Queue filtering</strong> — both live surfaces filter on it.</li>
+      <li><strong>In-memory Match</strong> — computed against the same profile the queue was filtered to.</li>
+      <li><strong>Swipes</strong> — <code>swipedForICPId</code> is written when known and omitted when not, which is the correct pattern and the only place in the codebase that uses it.</li>
+    </ul>
+
+    <h3>3 · Where is it lost or defaulted?</h3>
+    <ol>
+      <li><strong>The bridge document</strong> — the primary loss. One document, one ICP's criteria, no marker.</li>
+      <li><strong>Five of seven search callers</strong> (four after PR #570) — no <code>icpId</code> in the request, and none inferable from the body.</li>
+      <li><strong>Server default</strong> — <code>icpId || DEFAULT_ICP_ID</code> converts "unknown" into a valid-looking assignment.</li>
+      <li><strong><code>getActiveIcpId</code>'s catch block</strong> — an error returns <code>'default'</code> rather than failing.</li>
+      <li><strong><code>recalculateAllScores</code></strong> — writes one ICP's Match onto every company regardless of origin.</li>
+      <li><strong>Adaptive signals</strong> — no scope concept exists at all.</li>
+    </ol>
+
+    <h3>4 · Can two ICPs coexist without contaminating each other?</h3>
+    <p><strong>No.</strong> Four distinct contamination paths, in severity order:</p>
+    <div class="tscroll"><table>
+      <thead><tr><th>Path</th><th>Mechanism</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Persisted Match</strong></td><td><code>recalculateAllScores</code> ignores <code>icpId</code></td><td>Saving ICP B rewrites ICP A's companies with B's scores and B's reasons. The Saved list and every detail page then show A's companies judged by B.</td></tr>
+        <tr><td><strong>Search results</strong></td><td>Four callers omit <code>icpId</code></td><td>Companies discovered while ICP B is active are tagged <code>'default'</code> and become visible only under the default ICP — invisible to B, and mixed into the default's queue.</td></tr>
+        <tr><td><strong>Discovery targeting</strong></td><td>Bridge-only writers (<code>CompanyQuestionnaire</code>, <code>BarryOnboarding</code>, <code>BarryICPPanel</code>)</td><td>Editing targeting through those surfaces changes what Apollo searches for on behalf of <em>every</em> ICP, while each profile document is unchanged.</td></tr>
+        <tr><td><strong>Adaptive signals</strong></td><td>No scope concept</td><td>Industries learned from ICP B's saves steer a search whose results land under <code>'default'</code>.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Mission Control state and the in-memory queue are <em>not</em> contaminated: both filter and rescore per ICP correctly. The contamination is entirely in what is <strong>written</strong>, not in what is displayed from memory.</p>
+
+    <h3>5 · What implicitly assumes one ICP?</h3>
+    <ul>
+      <li><code>users/{uid}/companyProfile/current</code> — singular by name, path, and cardinality. The strongest single-ICP assumption in the codebase, and the one every other surface inherits.</li>
+      <li><code>companies.fit_score</code> / <code>fit_reasons</code> / <code>fit_reason</code> — one value per company for a quantity defined per (company, ICP).</li>
+      <li><code>recalculateAllScores</code> — iterates the whole collection.</li>
+      <li>The four search callers that pass no <code>icpId</code> — each written as though there were only one thing to search for.</li>
+      <li><code>DEFAULT_ICP_ID</code> as a fallback rather than an error — encodes "there is always one ICP, and if we don't know which, it's that one."</li>
+      <li><code>calculateReconConfidence</code> and RECON §3 — workspace-scoped, feeding a per-ICP surface.</li>
+      <li><code>ICP_LEVEL_SECTIONS = [9]</code> — declares §1–8 workspace-level, which makes RECON §3's firmographic targeting <em>structurally unable</em> to describe more than one ICP.</li>
+    </ul>
+
+    <h3>6 · What must be true for "one authoritative representation per ICP" to hold?</h3>
+    <p>Stated as testable conditions, not as an implementation plan:</p>
+    <ol>
+      <li><strong>Identity travels with the data.</strong> An ICP body must carry its own <code>icpId</code>, so that no copy — bridge, request payload, or cache — can exist without it.</li>
+      <li><strong>Every write that targets discovery names an ICP.</strong> No caller may search without one, and the server must reject or quarantine an untagged search rather than default it.</li>
+      <li><strong>Absent identity is an error, not a value.</strong> <code>DEFAULT_ICP_ID</code> must mean "the ICP whose key is <code>default</code>" and never "we don't know."</li>
+      <li><strong>Match is keyed by the pair.</strong> A single-valued <code>fit_score</code> per company cannot represent Match under a multi-ICP invariant. Either Match is never persisted, or it is stored per (company, ICP).</li>
+      <li><strong>Signals declare their scope.</strong> Every derived signal must state whether it is workspace-global (RECON confidence), ICP-scoped (saved industries), or entity-scoped. The repository currently makes no such distinction anywhere.</li>
+      <li><strong>Legacy untagged records have a defined status.</strong> The <code>!c.icpId</code> leak is a deliberate migration accommodation; under the invariant it needs an explicit rule rather than an implicit one.</li>
+      <li><strong>RECON's scope declaration must match its content.</strong> §9 is already per-ICP while §3 is workspace-level. If §3 is to inform per-ICP targeting, that declaration is the thing that has to change first.</li>
+    </ol>
+    <div class="callout">
+      <span class="tag">Single most consequential finding</span>
+      <p><strong>ICP identity is a location, not an attribute.</strong> Every loss in the chain above is a consequence of copying an ICP body out of its keyed document. A contract that requires one authoritative representation per ICP cannot be satisfied while identity lives only in the path.</p>
+    </div>
+  </div>
+</section>
+
+<section id="summary">
+  <div class="sec-head"><span class="sec-letter">§4</span><h2>Status roll-up</h2></div>
+  <div class="scope">
+    <div><span class="k">Reachable</span><span class="v">21</span><p class="n">Producer, store, consumer and decision all connected.</p></div>
+    <div><span class="k">Partial</span><span class="v">10</span><p class="n">Chain runs; intelligence arrives incompletely or conditionally.</p></div>
+    <div><span class="k">Dormant</span><span class="v hi">4</span><p class="n">Live consumers whose inputs are never produced.</p></div>
+    <div><span class="k">Dead</span><span class="v">4</span><p class="n">Code with no caller, route, or import.</p></div>
+    <div><span class="k">Unreachable</span><span class="v hi">4</span><p class="n">Durably stored data with no consumer at all.</p></div>
+    <div><span class="k">No chain</span><span class="v">5</span><p class="n">Not produced, does not exist, or a direct contradiction.</p></div>
+  </div>
+  <div class="prose">
+    <p>The two categories worth Team B's attention are the extremes. The four unreachable rows cover <strong>eight distinct pieces of stored intelligence</strong> the product asks for and never uses: <code>avoidIndustries</code>, <code>companyType</code>, <code>growthStage</code>, <code>budgetRange</code>, <code>decisionSpeed</code> and <code>marketSize</code> — five of them marked <code>required: true</code> — plus the duplicate <code>section3Answers</code> document. <code>avoidIndustries</code> is the sharpest of these: exclusion intelligence with no enforcement mechanism anywhere in the system. <strong>The four dormant consumers</strong> are contracts already written in code that nothing satisfies: the ICP drift detector, the Alignment Brief branches keyed to fields Section 3 never writes, and the Learned Intelligence store.</p>
+    <p>Together they describe a system whose semantic ambition is already encoded and whose producers have not caught up. That gap is the material v0.3 has to resolve.</p>
+  </div>
+</section>
+
+<footer class="end">
+  TEAM A · SCOUT EVIDENCE PACKET · FOR v0.3 RECONCILIATION<br>
+  Repository evidence only. No migrations, no implementation, no proposals. All Phase 8 holds remain in force.<br>
+  Two Phase 8 findings corrected in §0: the Mission Control surface named was dead code, and swipe feedback is consumed by <code>barryMissionChat</code>.<br>
+  Line references are against <code>main</code> at the time of writing; PR #570 changes two of the seven search call sites and is not yet merged.
+</footer>
+
+</div>

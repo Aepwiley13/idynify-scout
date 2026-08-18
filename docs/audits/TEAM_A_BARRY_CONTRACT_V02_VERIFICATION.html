@@ -1,0 +1,1540 @@
+<title>Evidence Before Architecture</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<style>
+  /* ── Additions for this report ─────────────────────── */
+  .verdict {
+    border: 2px solid var(--ink);
+    background: var(--surface);
+    padding: 22px 24px;
+    margin: 0 0 26px;
+  }
+  .verdict .vk {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+    display: block; margin-bottom: 10px;
+  }
+  .verdict .vv {
+    font-family: var(--serif); font-size: clamp(26px, 4.4vw, 38px);
+    font-weight: 600; line-height: 1.05; color: var(--decide);
+    margin: 0 0 12px; letter-spacing: -0.015em;
+  }
+  .verdict p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 66ch; }
+  .verdict p + p { margin-top: 10px; }
+
+  pre.code {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
+    background: var(--surface); border: 1px solid var(--rule-2);
+    color: var(--ink-2); padding: 18px 20px; overflow-x: auto;
+    margin: 0 0 22px; white-space: pre;
+  }
+  pre.code .del { color: var(--stop); }
+  pre.code .add { color: var(--ok); }
+  pre.code .cm  { color: var(--muted); }
+
+  .paths table { min-width: 1180px; font-size: 12.5px; }
+  .paths td:nth-child(1) { min-width: 210px; }
+  .paths td:nth-child(2) { min-width: 150px; }
+
+  .yes { color: var(--ok); font-weight: 700; }
+  .no  { color: var(--muted); }
+  td.ctr { text-align: center; }
+
+  .findings { list-style: none; padding: 0; margin: 0 0 22px; }
+  .findings > li {
+    display: grid; grid-template-columns: 86px 1fr; gap: 18px;
+    padding: 15px 0; border-top: 1px solid var(--rule); margin: 0;
+  }
+  .findings > li:last-child { border-bottom: 1px solid var(--rule); }
+  .findings .ftitle { font-weight: 650; color: var(--ink); margin: 0 0 5px; }
+  .findings .fbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Team A · Independent verification · Phase 0 + Intelligence Contract v0.2</p>
+  <h1>Evidence Before Architecture</h1>
+  <p class="standfirst">An independent trace of Team B's Phase 0 fixes and an adversarial review of the
+  Barry Intelligence Contract v0.2. The semantic foundation is sound. The evidence underneath it is not:
+  the contract's flagship worked example describes a subsystem whose only producer is unreachable.</p>
+  <div class="meta">
+    <span><b>Reviewed</b> 01661fe</span>
+    <span><b>Base</b> claude/barry-onboarding-audit-b5yf9x</span>
+    <span><b>Method</b> repository trace, no code executed</span>
+    <span><b>App changes</b> none applied — one correction proposed</span>
+  </div>
+</header>
+
+<div class="verdict">
+  <span class="vk">Recommendation</span>
+  <p class="vv">Revise to v0.3</p>
+  <p>The foundation holds. The hierarchy classifies ten of eleven traced examples, the four scopes classify
+  every concept tested but one, and the separation of authority from confidence is the document's best and
+  most defensible idea. Nothing found here justifies reopening Phase 0 or stopping Phase 2.</p>
+  <p>It should not be frozen as written. Six specific corrections are needed first — listed in Part 6 —
+  the largest being that two of the thirteen dimensions belong to the decision consuming the intelligence,
+  not to the intelligence object, and that the eight-state lifecycle is three variables wearing one label.</p>
+</div>
+
+<div class="scope">
+  <div><span class="k">Phase 0 claims</span><span class="v">4<span style="color:var(--muted)">/5</span></span><p class="n">verified. Claim 5 rejected as written — the reasoning is right, the conclusion is false.</p></div>
+  <div><span class="k">Unhappy paths</span><span class="v hi">2</span><p class="n">defects, 3 gaps, 2 pass. Both defects pre-date Phase 0.</p></div>
+  <div><span class="k">Guard scenarios</span><span class="v">10<span style="color:var(--muted)">/11</span></span><p class="n">pass. One defect: the latch is taken before the run is known to be performable.</p></div>
+  <div><span class="k">Evidence errors</span><span class="v hi">9</span><p class="n">claims contradicted by the code, in a document that guarantees every reference traces.</p></div>
+  <div><span class="k">Assembly paths</span><span class="v">9<span style="color:var(--muted)">+2</span></span><p class="n">live assemblers, plus two complete dead ones. v0.2 describes two.</p></div>
+  <div><span class="k">Dead stores found</span><span class="v hi">8</span><p class="n">written by live code, read by nothing — or read by live code, written by nothing.</p></div>
+</div>
+
+<p class="prose">Two findings dominate everything else and are stated up front because they change what
+Phase 2 should be.</p>
+
+<div class="callout">
+  <span class="tag">Finding 1 · The contract's model example does not run</span>
+  <p>v0.2 calls relationship warmth <em>"the most complete intelligence implementation in the current
+  system"</em> and <em>"the model to generalise."</em> <code>netlify/functions/inferRelationshipWarmth.js</code>
+  is the only writer of <code>warmth_level</code>, <code>warmth_level_source</code>,
+  <code>warmth_level_inference_reason</code> and <code>barry_warmth_suggestion</code> anywhere in the
+  repository. It is not imported by any module, not present in the client's set of invoked
+  <code>.netlify/functions/*</code> endpoints, not scheduled in <code>netlify.toml</code>, and not called by
+  another function. There is no UI editor for warmth either. Six consumers read the field — the guardrail,
+  the server assembler, three prompt builders, and a sort comparator — and every one of them reads a value
+  that nothing produces.</p>
+</div>
+
+<div class="callout">
+  <span class="tag">Finding 2 · Phase 0's onboarding search runs with no ICP</span>
+  <p>Step 3's <code>search-companies</code> call posts <code>users/{uid}/companyProfile/current</code>.
+  Nothing in the OnboardingFlow path ever writes that document — <code>analyze-website</code> writes only to
+  <code>dashboards/{uid}.modules[recon]</code>, and it skips even that for a new user because
+  <code>dashboards/{uid}</code> does not exist until Step 3 calls <code>initializeDashboard</code>. The
+  answers just captured in Step 3 are not passed either. The search Phase 0 correctly wired up therefore
+  executes against <code>{}</code>.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 1A</span><h2>The barryState lifecycle</h2></div>
+
+  <h3>Team B's five claims</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Claim</th><th>Verdict</th><th>Trace</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1 · OnboardingFlow writes <code>SEARCHING</code> at Step 3</td>
+        <td><span class="chip c-ok">Verified</span></td>
+        <td><code>OnboardingFlow.jsx:459-463</code> — <code>setDoc(users/{uid}, {barryState:'SEARCHING', companiesFoundCount:0}, {merge:true})</code>, awaited before the fetch.</td>
+      </tr>
+      <tr>
+        <td>2 · <code>search-companies</code> transitions to <code>READY</code> or <code>ERROR</code></td>
+        <td><span class="chip c-warn">Verified with holes</span></td>
+        <td>READY on both success paths (<code>:479-495</code> queue-full early return, <code>:537-553</code> normal completion); ERROR in the catch (<code>:621-635</code>). Three holes: the 405 non-POST return precedes the try; the ERROR write re-parses <code>event.body</code> and needs <code>userId &amp;&amp; authToken &amp;&amp; projectId</code>; and a platform timeout kills the function before any catch runs.</td>
+      </tr>
+      <tr>
+        <td>3 · Mission Control consumes those states</td>
+        <td><span class="chip c-ok">Verified</span></td>
+        <td><code>useOnboardingState.js:147</code> is an <code>onSnapshot</code> on the user doc, so <code>barryState</code> is live. It flows to <code>MissionControlDashboardV2.jsx:686</code> → <code>FirstRunView</code> (<code>:326-328</code>), which treats <code>SEARCHING</code> and <code>null</code> identically.</td>
+      </tr>
+      <tr>
+        <td>4 · B3 should not independently rewrite <code>barryState</code></td>
+        <td><span class="chip c-ok">Agree</span></td>
+        <td>Correct call. Onboarding completion can land after the search resolves; writing <code>SEARCHING</code> at completion would clobber a <code>READY</code> already delivered and bounce the first-run screen backwards. Abstaining is right.</td>
+      </tr>
+      <tr>
+        <td>5 · No sequence can leave Mission Control incorrect, <em>because</em> B3 does not write it</td>
+        <td><span class="chip c-stop">Rejected as written</span></td>
+        <td>The premise is right — B3's abstention is not a cause of any bad state. The conclusion is false. Three sequences leave Mission Control wrong, none of them caused by B3. Two are defects below; one is a two-writer race Phase 0 itself introduced on <code>companiesFoundCount</code>.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h3>The seven unhappy paths</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Path</th><th>Verdict</th><th>What actually happens</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Search never completes</td>
+        <td><span class="chip c-stop">Defect</span></td>
+        <td><code>netlify.toml</code> declares a timeout override for fourteen functions and <strong>not for <code>search-companies</code></strong> — it runs under Netlify's 10&nbsp;second synchronous default while paging Apollo and writing companies. On a platform kill the catch never runs, so no <code>ERROR</code> is written. The client's <code>fetch</code> is fire-and-forget and never reads the response (<code>OnboardingFlow.jsx:465-469</code>). <code>barryState</code> stays <code>SEARCHING</code>; the forward CTA is gated on <code>companies.length &gt; 0</code> and the retry button only renders under <code>isError</code>. Terminal.</td>
+      </tr>
+      <tr>
+        <td>Search returns zero companies</td>
+        <td><span class="chip c-warn">Gap</span></td>
+        <td>The state machine is correct — <code>toAdd = []</code>, then <code>READY</code> with <code>companiesFoundCount: 0</code>. The UI is not: <code>isReady</code> with no companies renders "Barry found your first matches" above a counter animating to zero, with no CTA and no retry. Success-shaped dead end.</td>
+      </tr>
+      <tr>
+        <td>User finishes onboarding before search completes</td>
+        <td><span class="chip c-warn">Gap</span></td>
+        <td>Legitimate as far as <code>barryState</code> goes. But B3 writes <code>companiesFoundCount: scored.length</code> from a <code>getDocs</code> taken earlier in Step 5, and <code>search-companies</code> writes the same field. Two writers, one field, no ordering guarantee and no authority rule. <code>counterTarget = companiesFoundCount &gt; 0 ? … : companies.length</code> self-heals a stale zero but not a stale undercount.</td>
+      </tr>
+      <tr>
+        <td>Search errors</td>
+        <td><span class="chip c-ok">Pass</span><span class="chip c-warn" style="margin-left:6px">caveat</span></td>
+        <td>The catch writes <code>ERROR</code> and <code>FirstRunView</code> renders the error state with <em>Try Again</em> and <em>Review ICP with Barry</em>. Caveat: a malformed body or a missing <code>VITE_FIREBASE_PROJECT_ID</code> silently skips the write and drops the user into the "never completes" dead end instead.</td>
+      </tr>
+      <tr>
+        <td>User refreshes after Step 3</td>
+        <td><span class="chip c-ok">Pass</span></td>
+        <td><code>smartQuestionsAnswered</code> puts <code>deriveOnboardingState</code> at step 4 or 5, so the Step 3 handler is unreachable. If the flag write had not landed, the user returns to Step 3 and a re-trigger is safe: <code>search-companies</code> is top-off idempotent — it early-returns <code>READY</code> when <code>pendingCount &gt;= TARGET_QUEUE_SIZE</code> and filters against <code>existingCompanyIds</code>.</td>
+      </tr>
+      <tr>
+        <td>Reaching Mission Control while <code>SEARCHING</code></td>
+        <td><span class="chip c-ok">Pass</span></td>
+        <td>The live listener means the searching state is genuine rather than a stale snapshot, and the narration loop and progress list render correctly.</td>
+      </tr>
+      <tr>
+        <td>Search succeeds after Mission Control has rendered</td>
+        <td><span class="chip c-stop">Defect</span></td>
+        <td><code>barryState</code> is live; <code>companies</code> is not. <code>loadCompanies()</code> is a one-shot <code>getDocs</code> in an effect keyed on <code>[activeUserId]</code> (<code>MissionControlDashboardV2.jsx:704-710, 761-763</code>) and never re-runs on a state change. When <code>READY</code> arrives the heading and counter update, <code>topThree</code> stays empty, and the only forward CTA is gated on <code>companies.length &gt; 0</code>. The user gets "Barry found N companies" over an empty panel with no way out — and because <code>hasSeenMCWelcome</code> stays <code>false</code>, every later visit re-enters the same screen. Only a manual reload clears it.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="flag stop">
+    <p class="lede">Neither defect is caused by B3, and neither is fixed by B3 writing <code>barryState</code>.</p>
+    <p>Both live in <code>FirstRunView</code>, which gates its only forward action on a value it reads once.
+    Team B's decision was right; the guarantee they drew from it was not.</p>
+  </div>
+
+  <h3>Three further Phase 0 findings, outside the seven</h3>
+  <ul class="findings">
+    <li>
+      <span class="chip c-stop">B1 partial</span>
+      <div>
+        <p class="ftitle">The same missing-dashboard bug B1 fixed at Step 3 is still live at Step 2</p>
+        <p class="fbody"><code>analyze-website.js:379-382</code> returns early when <code>dashboards/{uid}</code>
+        does not exist — which is every OnboardingFlow user at Step 2, since <code>initializeDashboard</code>
+        is not called until Step 3. The whole extraction is discarded and the function still returns
+        <code>{ success: true }</code>. B1 fixed one instance of a two-instance bug.</p>
+      </div>
+    </li>
+    <li>
+      <span class="chip c-dead">B1 dead</span>
+      <div>
+        <p class="ftitle">B1 restored a write to a location nothing reads</p>
+        <p class="fbody">The four Step 3 answers land at the top level of <code>dashboards/{uid}</code> as
+        <code>idealCustomerTypes</code>, <code>excludedIndustries</code>, <code>valueProposition</code> and
+        <code>perfectCustomer</code>. A search across <code>src/</code> and <code>netlify/</code> returns
+        <strong>zero readers for all four</strong>. <code>barryContextStack</code> reads value proposition
+        from RECON section 2; <code>AlignmentBrief</code> reads it from section 9. Neither reads the top-level
+        field. Losing the answers was a bug; recovering them into a store nothing consumes is not yet a fix.</p>
+      </div>
+    </li>
+    <li>
+      <span class="chip c-warn">B2 input</span>
+      <div>
+        <p class="ftitle">The search runs on an empty profile and a pinned queue size</p>
+        <p class="fbody">B2 posts <code>companyProfile/current</code> — never written in this flow — so
+        <code>buildApolloQuery({})</code> runs unfiltered. <code>reconConfidence</code> is not passed either,
+        so <code>TARGET_QUEUE_SIZE</code> is pinned at 50 rather than scaling to 100. The legacy
+        <code>BarryOnboarding</code> path passes the ICP it just built; the new path has no equivalent.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 1B</span><h2>The idempotency guard</h2></div>
+
+  <h3>When the latch closes, relative to each awaited operation</h3>
+  <p class="prose"><code>searchTriggeredRef.current = true</code> executes on the second line of the handler,
+  synchronously, in the same microtask as the click — <strong>before every await and before the only
+  validation that can reject the run</strong>:</p>
+
+  <pre class="code">const handleFinishQuestions = async () =&gt; {
+  if (searchTriggeredRef.current) return;   <span class="cm">// guard read</span>
+  searchTriggeredRef.current = true;        <span class="cm">// ← LATCH CLOSES HERE</span>
+
+  const userId = getActiveUserId();         <span class="cm">// sync</span>
+  if (!userId) return;                      <span class="cm">// ← returns with the latch held</span>
+
+  await initializeDashboard(userId);        <span class="cm">// await 1</span>
+  await updateDoc(...);                     <span class="cm">// await 2</span>
+  await user.getIdToken();                  <span class="cm">// await 3</span>
+  await getDoc(companyProfile/current);     <span class="cm">// await 4</span>
+  await setDoc({ barryState: 'SEARCHING' });<span class="cm">// await 5</span>
+  fetch('/.netlify/functions/search-companies')  <span class="cm">// not awaited</span>
+  await onboarding.markStep(...);           <span class="cm">// await 6</span>
+  setStep(4);</pre>
+
+  <div class="tscroll"><table>
+    <thead><tr><th>Scenario</th><th>Verdict</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Mouse double-click</td><td><span class="chip c-ok">Pass</span></td><td>The second <code>onClick</code> sees <code>true</code> and returns. Check-and-set is atomic — there is no await between the read and the write, so two handlers cannot interleave.</td></tr>
+      <tr><td>Keyboard activation</td><td><span class="chip c-ok">Pass</span></td><td><code>&lt;button&gt;</code> Enter/Space routes through the same <code>onClick</code>; one activation, one call.</td></tr>
+      <tr><td>Rapid Enter/Space (auto-repeat)</td><td><span class="chip c-ok">Pass</span></td><td>Key repeat produces separate clicks; all after the first are blocked.</td></tr>
+      <tr><td>Rerender</td><td><span class="chip c-ok">Pass</span></td><td><code>useRef</code> identity survives re-render; the handler is recreated but the ref object is not.</td></tr>
+      <tr><td>React Strict Mode</td><td><span class="chip c-ok">Pass</span></td><td>Strict Mode double-invokes render and effects, not DOM event handlers. The handler has no effect-driven caller.</td></tr>
+      <tr><td>Refresh</td><td><span class="chip c-ok">Pass</span></td><td>New mount resets the ref, but <code>smartQuestionsAnswered</code> moves the derived step past 3, so the handler is unreachable. Had the flag not landed, the re-fire is absorbed by the server's top-off model.</td></tr>
+      <tr><td>Unmount / remount</td><td><span class="chip c-ok">Pass</span></td><td>Identical to refresh.</td></tr>
+      <tr><td>Network retry</td><td><span class="chip c-dead">N/A</span></td><td>There is no retry. <code>fetch(...).catch(console.error)</code> is fire-and-forget and unawaited — the guard is not involved. This is the same hole as the "never completes" path in Part 1A.</td></tr>
+      <tr><td>Step 3 restored from persisted state</td><td><span class="chip c-ok">Pass</span></td><td>Fresh mount ⇒ ref is <code>false</code>; the restore effect only calls <code>setStep</code>.</td></tr>
+      <tr><td>Failed initialization before the search fires</td><td><span class="chip c-stop">Defect</span></td><td>See below.</td></tr>
+      <tr><td>Failed search after the latch is set</td><td><span class="chip c-ok">Pass by design</span></td><td>A server-side failure is the server's to report via <code>barryState:'ERROR'</code>, and <code>FirstRunView.handleRetry</code> owns the retry. The guard correctly does not re-arm here.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The critical question: does the ref prevent a legitimate retry?</h3>
+  <div class="flag stop">
+    <p class="lede">Yes. The latch is taken before the run is known to be performable, so a pre-search failure is unrecoverable without a reload.</p>
+    <p><code>getActiveUserId()</code> returns
+    <code>_impersonationCache?.targetUserId ?? auth.currentUser?.uid ?? null</code>
+    (<code>ImpersonationContext.jsx:32-34</code>). It reads the Firebase SDK object directly, while
+    <code>ProtectedRoute</code> gates on App-level React state fed by <code>onAuthStateChanged</code>. Those
+    two diverge for as long as it takes React to commit — so <code>auth.currentUser</code> can be
+    <code>null</code> while <code>OnboardingFlow</code> is still mounted: a revoked session, a sign-out in
+    another tab under local persistence, a cleared session mid-flow. Step 3 holds four free-text questions,
+    so the component sits mounted for minutes.</p>
+    <p>When it happens the latch is closed and nothing has been done — no dashboard write, no
+    <code>barryState</code>, no search, no <code>markStep</code>, no <code>setStep(4)</code>. The Continue
+    button is inert for the rest of the mount. It has no <code>disabled</code> state and no spinner, so the
+    user sees a live-looking button that does nothing, with no error. Before the guard existed, the second
+    click would have worked.</p>
+    <p>This is wrong independent of how often that specific window is hit. A <code>return</code> that leaves a
+    one-shot latch closed is a design error on its own terms, and it makes any validation added above the
+    latch in future silently unrecoverable.</p>
+  </div>
+
+  <h3>The smallest correction</h3>
+  <p class="prose">Move the latch below the only validation that can reject the run. Idempotency is fully
+  preserved: <code>getActiveUserId()</code> is synchronous, so there is still no await between the guard read
+  and the latch write and two rapid clicks still cannot interleave. Nothing about onboarding is redesigned.</p>
+
+  <pre class="code"><span class="cm">--- a/src/pages/Onboarding/OnboardingFlow.jsx</span>
+<span class="cm">+++ b/src/pages/Onboarding/OnboardingFlow.jsx</span>
+ const handleFinishQuestions = async () =&gt; {
+   if (searchTriggeredRef.current) return;
+<span class="del">-  searchTriggeredRef.current = true;</span>
+<span class="del">-</span>
+   const userId = getActiveUserId();
+   if (!userId) return;
+<span class="add">+</span>
+<span class="add">+  // Latch only once the run is known to be performable. getActiveUserId() is</span>
+<span class="add">+  // synchronous, so check-and-set stays atomic within one click — a second</span>
+<span class="add">+  // click cannot interleave — while a click that resolved no user leaves the</span>
+<span class="add">+  // guard unarmed and the retry available.</span>
+<span class="add">+  searchTriggeredRef.current = true;</span></pre>
+
+  <div class="callout">
+    <span class="tag">Not applied</span>
+    <p>The Phase 0 commits live on <code>claude/barry-onboarding-audit-b5yf9x</code> and are not on
+    <code>main</code>, so this diff has no target on the verification branch. Merging Team B's branch in to
+    apply it was blocked by the sandbox. The diff applies cleanly to <code>01661fe</code> and is offered as a
+    proposal, per the brief's instruction to propose the smallest correction.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 2C</span><h2>The intelligence hierarchy under load</h2></div>
+
+  <p class="prose">Eleven examples traced from the repository through
+  <code>Data → Intelligence → Actionable Intelligence → Decision</code>. Ten fit. The pattern in the
+  misfits is consistent and points at one missing idea, not a broken model.</p>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Example</th><th>Data</th><th>Intelligence</th><th>Actionable</th><th>Decision</th><th>Reaches</th><th>Gap</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Scout Save / Skip</td>
+        <td><code>companies.status</code>, <code>swipedAt</code>, <code>swipeDirection</code>, <code>swipedForICPId</code></td>
+        <td>none persisted</td>
+        <td><code>savedIndustries</code> computed in memory per batch</td>
+        <td>next Apollo query keywords</td>
+        <td><span class="chip c-warn">Data → Actionable</span></td>
+        <td>Skips Intelligence entirely. The preference never becomes a durable object — it dies with the batch and is never written back to the ICP profile. Rejections contribute nothing.</td>
+      </tr>
+      <tr>
+        <td>ICP Match Score</td>
+        <td>Apollo firmographics</td>
+        <td>the ICP profile</td>
+        <td><code>calculateICPScore</code> + <code>generateMatchReasons</code></td>
+        <td>swipe / queue order</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td><strong>Does not fit.</strong> Recomputed at read time in at least three places and never stored with its inputs. It is a durable derived object, not "intelligence relevant to the current decision" — it exists before any decision does.</td>
+      </tr>
+      <tr>
+        <td>Relationship warmth</td>
+        <td>outcomes, <code>addedFrom</code>, <code>enrichment_provenance</code></td>
+        <td><code>warmth_level</code> + source + reason</td>
+        <td>guardrail cool-down</td>
+        <td>tone of the generated message</td>
+        <td><span class="chip c-stop">Data only</span></td>
+        <td>The level-2 transition is code that never runs. See Part 4A.</td>
+      </tr>
+      <tr>
+        <td>Gmail reply</td>
+        <td><code>communication_records</code>, <code>last_reply_at</code>, status transition</td>
+        <td><code>relationship_context</code>: conversationState, openQuestions, openCommitments, objections</td>
+        <td><code>barryInboxAnalyzer</code> prompt</td>
+        <td>draft reply / suggested action</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td><strong>The only chain that traverses all four levels cleanly.</strong> But <code>relationship_context</code> is invisible to every other Barry surface — the server assembler never reads it.</td>
+      </tr>
+      <tr>
+        <td>Email open without reply</td>
+        <td><code>openedCount</code>, <code>last_opened_at</code>, <code>timeline</code> event</td>
+        <td>none</td>
+        <td>none</td>
+        <td>none</td>
+        <td><span class="chip c-stop">Data only</span></td>
+        <td>The classic interest-without-response signal — which should raise Priority without touching Match — has no intelligence object at all. Used only for activity sorting in <code>AllLeads</code> and an open-rate tile.</td>
+      </tr>
+      <tr>
+        <td><code>what_has_worked</code></td>
+        <td>session outcome, attribution</td>
+        <td>the array on <code>barry_memory</code></td>
+        <td><code>recommendStrategy</code> promptGuidance</td>
+        <td>chosen angle and channel</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td>Append-only with recency truncation, no decay, evidence chain not stored, invisible to Mission Control Barry.</td>
+      </tr>
+      <tr>
+        <td>RECON value proposition</td>
+        <td>user typing, website text</td>
+        <td>RECON section 2</td>
+        <td><code>compileReconForPrompt</code>, client stack</td>
+        <td>message content</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td>Five competing storage locations, two of them with no readers. Fits the hierarchy; fails the dimensions.</td>
+      </tr>
+      <tr>
+        <td>Target industry</td>
+        <td>selection, Apollo taxonomy, website extraction</td>
+        <td><code>icpProfiles.industries</code>, RECON s3, bridge cache, websiteAnalysis</td>
+        <td><code>buildApolloQuery</code>, <code>scoreIndustry</code></td>
+        <td>which companies exist and how they rank</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td>Six locations, last-write-wins, one of them with zero readers.</td>
+      </tr>
+      <tr>
+        <td>Engagement objective</td>
+        <td>—</td>
+        <td><code>missions.outcome_goal</code>, <code>contact.engagement_intent</code></td>
+        <td>step purposes, <code>recommendStrategy</code> input</td>
+        <td>sequence shape</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td><strong>Strains the hierarchy.</strong> An objective is not an interpretation of data — it is declared intent. It enters at level 2 with no level-1 beneath it. The hierarchy assumes intelligence is always derived.</td>
+      </tr>
+      <tr>
+        <td>Referral / introduction / pathway</td>
+        <td><code>users/{uid}/referrals/{id}</code> — from, to, status, converted_at</td>
+        <td><code>detectReferralOpportunities</code>, <code>referral_data</code>, analytics</td>
+        <td><code>deriveReferralNbs</code>, <code>deriveIntroNbs</code></td>
+        <td>Next Best Step in Reinforcements</td>
+        <td><span class="chip c-warn">Decision, UI only</span></td>
+        <td><strong>No server-side Barry function reads the referrals collection</strong> — yet <code>barryMissionChat.js:496</code> instructs Barry to "surface warm intro paths, referral opportunities, and network connections." Barry is told to reason about a graph he is never given.</td>
+      </tr>
+      <tr>
+        <td>RECON confidence</td>
+        <td>section completion states</td>
+        <td><code>calculateReconConfidence</code> → 0–100</td>
+        <td>gates <code>recon.enhanced</code>, sizes the discovery queue, drives the capability block</td>
+        <td>what Barry claims he can do</td>
+        <td><span class="chip c-ok">Decision</span></td>
+        <td><strong>Fits none of the four levels.</strong> It is intelligence about the completeness of intelligence.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h4>What does not fit, and the one correction that covers it</h4>
+  <p class="prose">Three kinds of object resist the four levels, and two of them are the same kind:</p>
+  <ul class="prose">
+    <li><strong>Derived, durable objects</strong> — Match Score, <code>strategy_stats</code>, RECON
+    confidence. Computed from intelligence, reusable across decisions, existing before any decision. "Actionable
+    Intelligence" is defined by <em>relevance to the current decision</em>, which they do not have.</li>
+    <li><strong>Meta-intelligence</strong> — RECON confidence again, and the <code>'ok' | 'not_found' |
+    'error'</code> status both assemblers were deliberately hardened to return. That distinction is not
+    bookkeeping: both files carry comments explaining that conflating "no memory" with "read failed" made
+    Barry generate cold-prospect copy for a warm relationship. Knowing what he cannot see <em>is</em>
+    intelligence Barry acts on, and the hierarchy has no place for it.</li>
+    <li><strong>Declared intent</strong> — engagement objective, mission goal. Enters at level 2 with no
+    level-1 data.</li>
+  </ul>
+  <p class="prose">Keep the four levels. Name <strong>Derived Intelligence</strong> explicitly as a kind that
+  occupies level 2, and state that <em>actionable</em> is a relation between an intelligence object and a
+  decision rather than a level an object sits in. That covers the first two cases and costs a paragraph.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 2D</span><h2>Are four scopes enough?</h2></div>
+
+  <p class="prose">Ten concepts tested. Nine classify cleanly. One breaks the rule — and the fix is smaller
+  than a fifth scope.</p>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Concept</th><th>Classification</th><th>Verdict</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Company intelligence</td><td>Intelligence category inside Relationship scope</td><td><span class="chip c-warn">Correct, misnamed</span></td><td><code>users/{uid}/companies/{id}</code> carries firmographics, <code>fit_score</code>, <code>swipedAt</code>, <code>barryFeedback</code> — and no edge at all: no warmth, no history, no user↔company relation. Calling the scope "Relationship" forces an entity with no edge into a scope named for edges. The subject is an entity; name the scope for the subject.</td></tr>
+      <tr><td>Contact intelligence</td><td>Intelligence category (Entity Identity)</td><td><span class="chip c-ok">Correct</span></td><td>Resolved by <code>contactIdentityService.js</code>; fields intrinsic to the person. Same naming objection.</td></tr>
+      <tr><td>Relationship-edge intelligence</td><td>Intelligence scope (Relationship / edge)</td><td><span class="chip c-ok">Correct — strongest part of v0.2</span></td><td><code>warmth_level</code>, <code>engagement_summary</code>, <code>barry_memory</code>, <code>relationship_state</code> are all edge facts. Splitting Entity from Edge inside one scope is the right call and is well supported by the storage.</td></tr>
+      <tr><td>Workspace-wide learned patterns</td><td>Intelligence category, Workspace scope</td><td><span class="chip c-warn">Missing from the product, not the model</span></td><td>No workspace entity exists and there is no cross-user learning anywhere in the codebase. Workspace scope can hold it when it is built. No new scope.</td></tr>
+      <tr><td>User-specific learned patterns</td><td>Intelligence category (Learned Behavior), User scope</td><td><span class="chip c-ok">Correct and live</span></td><td><code>users/{uid}/barry_memory/strategy_stats</code> — <code>angle_outcomes</code>, <code>channel_outcomes</code>, <code>guardrail_outcomes</code>, gated at <code>total_attributions &gt;= 3</code> — read by <code>loadStrategyStats</code> → <code>recommendStrategy</code>. The model already covers it.</td></tr>
+      <tr><td>Segment / cohort intelligence</td><td>Intelligence category, composed</td><td><span class="chip c-ok">Category, not scope</span></td><td>"Fintech contacts reply better to a data-led angle" is Workspace market intelligence filtered by an entity attribute. <code>strategy_stats.angle_outcomes</code> already has the shape; it simply is not keyed by segment.</td></tr>
+      <tr><td>Network / path intelligence</td><td>—</td><td><span class="chip c-stop">Breaks the rule</span></td><td>See below.</td></tr>
+      <tr><td>Campaign intelligence</td><td>Intelligence category (Outcomes), Mission scope with promotion</td><td><span class="chip c-warn">Under-specified</span></td><td><code>cadences/{id}</code> holds <code>sentCount</code>, <code>openedCount</code>, <code>repliedCount</code> — durable outcome data that outlives the campaign. v0.2's promotion rule is right; nothing in the codebase performs it.</td></tr>
+      <tr><td>Temporary targeting strategy</td><td>Intelligence scope (Mission)</td><td><span class="chip c-ok">The model's clearest win</span></td><td>"This quarter, Utah nonprofits" today overwrites <code>icpProfiles/{id}.industries</code> — durable Workspace storage for a temporary fact. The scope model diagnoses this precisely and the product is actively suffering from it.</td></tr>
+      <tr><td>System / platform knowledge</td><td>System configuration</td><td><span class="chip c-ok">Correctly excluded</span></td><td><code>buildCapabilityBlock</code>, <code>models.js</code>, guardrail rules. One exception: <code>computeReconState</code> / <code>calculateReconConfidence</code> is Barry's model of his own coverage — not configuration, and not any of the four scopes. It is the meta-intelligence case from Part 2C.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Network and path intelligence — the specific stress test</h3>
+  <p class="prose">"Sarah knows James who can introduce me to Acme." Decomposed against the repository:</p>
+
+  <pre class="diagram">  me ──────────────▶ <b>Sarah</b>     Relationship edge, user is one endpoint.       <i>fits</i>
+  me ──────────────▶ <b>James</b>     Relationship edge, user is one endpoint.       <i>fits</i>
+  <b>Sarah</b> ───────────▶ <b>James</b>     users/{uid}/referrals/{id}                    <i>← no primary subject</i>
+                              from_contact_id: sarah
+                              to_contact_id:   james
+  <b>James</b> ───────────▶ <b>Acme</b>      entity affiliation on James's record          <i>fits</i></pre>
+
+  <p class="prose">v0.2's rule is that every intelligence object has one primary subject, with related
+  intelligence composed at decision time. Applied to the referral record the question is:
+  <strong>what is its one primary subject?</strong> Under the current model the only available answer is
+  "Relationship, scoped to one of the two contacts" — which is arbitrary. And the codebase has already
+  refused to make that choice: the record lives in a <strong>separate top-level <code>referrals</code>
+  collection keyed by neither contact</strong> (<code>referralIntelligenceService.js:107, 208</code>), with a
+  copy denormalised onto both as <code>contact.referral_data</code>.</p>
+
+  <div class="flag stop">
+    <p class="lede">"One primary scope, composed at decision time" is not adequate here — but the fix is not a fifth scope.</p>
+    <p>Composition at decision time cannot conjure an edge that was never stored with a defined subject, and
+    there is no non-arbitrary primary scope to pick. What is actually wrong is narrower: v0.2 already splits
+    Relationship into Entity and Edge, and then <em>silently assumes one endpoint of every edge is the
+    user</em>. Drop that assumption. An edge is subject-identified by an ordered pair, in which the user is a
+    common but not mandatory endpoint.</p>
+    <p>The scope stays Relationship. What changes is that "one primary subject" means "one subject — which
+    for an edge is a pair." Referrals, introductions and multi-hop paths become first-class in one sentence.</p>
+  </div>
+
+  <p class="prose">This is not speculative future-proofing. <code>detectReferralOpportunities</code> and
+  <code>detectLinkedInOpportunities</code> already perform read-time graph inference,
+  <code>deriveIntroNbs</code> already emits <code>intro_offer</code> next steps, and
+  <code>barryMissionChat</code> already tells Barry to surface intro paths. The capability is half-built and
+  the model does not describe it. This is the single most important conceptual correction in this review, and
+  it is also the smallest.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 2E</span><h2>The thirteen dimensions</h2></div>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Dimension</th><th>Independent?</th><th>Intrinsic or contextual</th><th>Static or derived</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>1 · Subject / Scope</td><td>Yes</td><td>Intrinsic</td><td>Static</td><td><span class="chip c-ok">Keep</span> — with the edge-pair correction from Part 2D.</td></tr>
+      <tr><td>2 · Meaning</td><td>Yes</td><td>Intrinsic</td><td>Static</td><td><span class="chip c-ok">Keep</span> — the best-justified dimension in the set. <code>idealCustomerTypes</code> is a live example of exactly the descriptive/prescriptive ambiguity it fixes.</td></tr>
+      <tr><td>3 · Source</td><td>Yes</td><td>Intrinsic</td><td>Static per assertion</td><td><span class="chip c-warn">Keep, extend</span> — an object accumulates sources over time (value proposition: typed → re-extracted → edited). Modelled as singular, provenance is lost exactly when contradiction handling needs it. Needs "source of the current value + prior sources."</td></tr>
+      <tr><td>4 · Evidence</td><td>Yes</td><td>Intrinsic</td><td>Derived, accumulating</td><td><span class="chip c-ok">Keep</span></td></tr>
+      <tr><td>5 · Authority</td><td>Yes, of the <em>source</em></td><td>—</td><td>—</td><td><span class="chip c-stop">Not a property of the object</span> — "user assertion beats AI inference" is a rule about sources, not a field on a fact. Stamping it per object is how you get <code>CANONICAL_FIELDS</code>-style silent protection with no explanation.</td></tr>
+      <tr><td>6 · Confidence</td><td>Yes — v0.2 argues this well</td><td>Intrinsic</td><td>Derived from 4</td><td><span class="chip c-ok">Keep</span></td></tr>
+      <tr><td>7 · Temporal scope</td><td>Partly</td><td>Intrinsic</td><td>Static</td><td><span class="chip c-warn">Keep, disambiguate</span> — v0.2 lists temporary targeting under Mission scope <em>and</em> under Market category as "durable market + temporary focus." Scope is partly determined by temporal scope, so they are not independent. Say plainly: a durable market definition and a quarter's focus are two objects, not one object with two temporal scopes.</td></tr>
+      <tr><td>8 · Acquisition</td><td>No</td><td><strong>Contextual</strong></td><td>Derived</td><td><span class="chip c-stop">Move</span> — "discover / infer+confirm / ask / learn later" is chosen given what Barry currently lacks and what the objective needs. Company size is "discover" when unknown and nothing at all when already enriched. Belongs to the acquisition planner, computed from 13 + 12.</td></tr>
+      <tr><td>9 · Consumer / Decision Class</td><td>No</td><td><strong>Contextual</strong></td><td>Derived</td><td><span class="chip c-stop">Invert</span> — see below.</td></tr>
+      <tr><td>10 · Update trigger</td><td>Yes</td><td>Intrinsic to the <em>category</em></td><td>Static</td><td><span class="chip c-warn">Keep, lift</span> — every <code>warmth_level</code> has the same triggers. This belongs on the category, not on each instance.</td></tr>
+      <tr><td>11 · Contradiction behavior</td><td>Yes, of the source pair</td><td>—</td><td>—</td><td><span class="chip c-stop">Fold into 5</span> — a policy keyed by category and source pair, not a per-object field. v0.2 half-says this; make it explicit that the dimension is <em>resolved by</em> policy, not <em>stored on</em> the object.</td></tr>
+      <tr><td>12 · Requiredness</td><td>No</td><td><strong>Contextual</strong></td><td>Computed at decision time</td><td><span class="chip c-stop">Move</span> — see below.</td></tr>
+      <tr><td>13 · Intelligence Status</td><td>Partly — not independent of 3</td><td>Mixed</td><td>Mixed</td><td><span class="chip c-stop">Split</span> — see Part 2F.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Requiredness: intrinsic to the object, or computed at decision time?</h3>
+  <div class="flag warn">
+    <p class="lede">v0.2 already concedes the answer and then contradicts it.</p>
+    <p>Dimension 12 says <em>"Requiredness is always relative to an objective, not absolute."</em> Section 5
+    says every intelligence object must express all thirteen dimensions. Those two statements cannot both
+    hold.</p>
+  </div>
+  <p class="prose">The repository settles it. <code>generate-engagement-message</code> builds its target-market
+  block only <code>if (section3?.status === 'completed' &amp;&amp; section3?.data)</code> and proceeds
+  perfectly well without it. <code>barryGuardrail</code> needs <code>warmth_level</code> only when the action
+  is cold outreach. <code>search-companies</code> requires <code>companyProfile.industries</code> and nothing
+  else. The same fact is required for one decision and irrelevant to the next, inside the same session.</p>
+  <p class="prose"><strong>Requiredness is not a dimension of intelligence. It is an input requirement of a
+  decision.</strong> It belongs on the decision side, expressed as: <em>this decision requires these
+  intelligence categories, at this minimum status and confidence.</em> Leaving it on the object guarantees it
+  is stamped once, from the perspective of whichever decision the author had in mind, and is then wrong for
+  every other consumer.</p>
+
+  <h3>Consumer / Decision Class: the same argument, stronger</h3>
+  <p class="prose">v0.2's justification for dimension 9 is <em>diagnostic</em> — "if nothing reads it now,
+  what class of decisions would it inform?" That is a genuinely valuable question, and it is exactly how this
+  review found eight dead stores. But the <em>answer</em> is a fact about the system's wiring, not about the
+  intelligence object. If the server assembler starts reading <code>relationship_context</code> tomorrow, no
+  intelligence object changed — the assembler changed.</p>
+  <div class="flag stop">
+    <p class="lede">Decisions should declare what they consume. Coverage is then computed, not maintained.</p>
+    <p>"Which categories have no consumer" becomes a query over a decision registry rather than a field
+    maintained on thousands of objects. Stamping it per object guarantees drift — and the proof is in the
+    contract itself, whose own claims about which fields have readers are wrong in four places. A field that
+    documents wiring will always lag the wiring.</p>
+  </div>
+
+  <h4>Three dimensions that are missing</h4>
+  <ul class="prose">
+    <li><strong>Sensitivity / shareability.</strong> v0.2 states that Workspace intelligence "should
+    eventually be shared across all users of the same organization," and then says nothing about which
+    intelligence may cross that boundary. A contact's personal disclosure inside a Gmail thread is
+    Relationship-scoped and must never become workspace-visible. With sharing named as a goal, this is not
+    deferrable.</li>
+    <li><strong>Subject stability.</strong> Every Relationship-scoped object depends on
+    <code>contactIdentityService</code> resolving a person. When two contact records merge, what happens to
+    their edges, memory and referral records? The contract has <em>Superseded</em> for values and nothing for
+    subjects.</li>
+    <li><strong>Cardinality.</strong> Is <code>industries</code> one object with a list value, or N objects?
+    It decides whether "the user removed healthcare" is an overwrite or a retirement — that is, whether
+    dimensions 11 and 13 can be applied at all. The worked examples silently assume both.</li>
+  </ul>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 2F</span><h2>Authority, confidence, status</h2></div>
+
+  <h3>Six real examples</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Situation</th><th>From the repository</th></tr></thead>
+    <tbody>
+      <tr><td>High authority, low confidence</td><td><code>contact.title</code> typed during a business-card scan. <code>CANONICAL_FIELDS</code> protects it from Apollo overwrite — high authority — but it originated in OCR-assisted manual entry with no verification. Barry never sees the difference.</td></tr>
+      <tr><td>High confidence, low authority</td><td><code>openedCount</code> from <code>track-open.js</code> — a server-verified pixel load incremented inside a transaction, about as evidentially solid as anything in the product. It has authority over nothing: no field it may override, no decision it is allowed to change.</td></tr>
+      <tr><td>Confirmed becomes stale</td><td><code>icpProfiles/{id}.industries</code> set deliberately in ICP Settings, then contradicted for months by swipe data. <code>loadSwipeFeedback</code> surfaces the disagreement to Barry as prose in a prompt; nothing marks the profile stale.</td></tr>
+      <tr><td>Observed contradicts user-confirmed</td><td><code>strategy_stats.angle_outcomes</code> shows an angle failing while <code>barry_memory.what_has_worked</code> still lists it — the array is append-only with no removal path. Both are handed to <code>recommendStrategy</code> in the same call.</td></tr>
+      <tr><td>Two authoritative human inputs disagree</td><td><code>missions/{mid}.outcome_goal</code> set in mission setup versus <code>contact.engagement_intent</code> set in the Hunter engage bar. Both user-selected, both authoritative, different fields, no reconciliation — and <code>barryHunterProcessEngage</code> branches on the first while <code>recommendStrategy</code>, in the same file, branches on the second.</td></tr>
+      <tr><td>Inference outweighs assertion</td><td><code>engagement_summary.replies_received</code>, counted from real Gmail threads by <code>gmail-poll-replies</code>, against a user-set <code>relationship_state</code> of <code>unaware</code>. The inference has hard evidence; the assertion has authority.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="flag">
+    <p class="lede">The three-concept separation is correct. Keep it.</p>
+    <p>Authority as precedence and confidence as evidential support are genuinely different, every example
+    above demonstrates it, and this is the most valuable idea in v0.2 — subject only to the correction that
+    authority belongs to the source rather than the object.</p>
+  </div>
+
+  <h3>The lifecycle contains a contradiction</h3>
+  <p class="prose">Unknown / Inferred / Confirmed / Observed / Contested / Stale / Superseded / Archived are
+  not eight values of one variable. They are <strong>three variables wearing one label</strong>:</p>
+
+  <pre class="diagram">  <b>How the current value was established</b>   Unknown · Inferred · Confirmed · Observed
+                                          <i>— this is dimension 3, Source</i>
+
+  <b>Whether it is still trustworthy</b>        Stale
+                                          <i>— derived from dimension 7 + elapsed time</i>
+
+  <b>Whether it is still the operative one</b>  Superseded · Archived · (Contested)
+                                          <i>— the only genuine lifecycle states</i></pre>
+
+  <p class="prose">v0.2 defines Source as "user assertion, website extraction, Gmail analysis, Apollo
+  enrichment, Barry inference from behavior, outcome attribution, AI analysis."
+  <em>Inferred</em> and <em>Observed</em> are two entries from that same list. <em>Confirmed</em> is a source
+  event. Dimension 13 duplicates dimension 3 inside itself.</p>
+
+  <h4>Does <code>Observed</code> belong in the same state machine as <code>Confirmed</code>, <code>Stale</code> and <code>Contested</code>?</h4>
+  <div class="flag stop">
+    <p class="lede">No. It describes source and evidence type, not lifecycle position — and the contract's own text proves it twice.</p>
+    <p><strong>One.</strong> The transition table contains <code>Observed → updated value</code>. That is not
+    a transition between states; it is "new evidence arrived and the value changed." Every other row moves
+    between two states. <em>Observed</em> has no outgoing transition to another status because it is not a
+    status.</p>
+    <p><strong>Two.</strong> The Status-vs-Confidence table reads
+    <code>Observed | High | Validated through real outcomes — strongest evidential basis</code>. That sentence
+    defines an evidence tier. The same objection applies to <em>Inferred</em>.</p>
+    <p><strong>And from the codebase.</strong> <code>warmth_level_source: 'barry_inferred' | 'user_set'</code>
+    is a source field. The contract's Example A maps <code>barry_inferred</code> to status <em>Inferred</em>
+    and <code>user_set</code> to status <em>Confirmed</em> — reading one stored value as both dimension 3 and
+    dimension 13. The collapse is visible inside the document's own worked example.</p>
+  </div>
+
+  <p class="prose">There is a second, independent problem: <strong><code>Contested</code> is not mutually
+  exclusive with the rest.</strong> A value can be Confirmed <em>and</em> Contested — that is precisely what
+  <code>barry_warmth_suggestion</code> represents — and can be Stale <em>and</em> Contested. As a
+  single-valued enum, moving to <em>Contested</em> erases how the value was established. That is a modelling
+  error, not a naming quibble.</p>
+
+  <p class="prose">Per the brief this is returned rather than redesigned. Stated minimally, the correction is:
+  Status carries operative status only — Active / Superseded / Archived — with Contested and Stale as
+  orthogonal, derivable flags, and Unknown / Inferred / Confirmed / Observed relocated into Source as an
+  evidence tier. Two dimensions change; nothing else moves.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 3</span><h2>Scout's five concepts, mapped</h2></div>
+
+  <p class="prose">Which intelligence may legitimately move which Scout concept. The distinctions the brief
+  asked to preserve are stated as rules underneath.</p>
+
+  <div class="tscroll paths"><table>
+    <thead><tr><th>Intelligence · category · scope</th><th class="ctr">Match</th><th class="ctr">Priority</th><th class="ctr">Confidence</th><th class="ctr">Relationship</th><th class="ctr">Next Action</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>ICP firmographics — Market · Workspace<br><code>icpProfiles.industries / locations / companySizes / revenueRanges</code></td>
+        <td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr no">—</td>
+        <td>The only inputs to <code>calculateICPScore</code> (industry 50, location 25, employee size 15, revenue 10). They also cap Confidence: an unset dimension scores <code>UNKNOWN</code>, so a sparse ICP yields a score that is not wrong so much as unfounded.</td>
+      </tr>
+      <tr>
+        <td>RECON section 3 target market — Market · Workspace</td>
+        <td class="ctr yes">✓ <span class="chip c-warn">should</span></td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr no">—</td>
+        <td>Semantically the same fact as the row above, stored elsewhere. Today it reaches <code>generate-engagement-message</code> as prose but never <code>calculateICPScore</code>. This is issue #561's real question, and by this mapping it is the <em>only</em> RECON section with a defensible claim on Match.</td>
+      </tr>
+      <tr>
+        <td>RECON section 5 pain points — ICP · Workspace</td>
+        <td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td>
+        <td>Does not change whether a company fits; changes what the first message argues.</td>
+      </tr>
+      <tr>
+        <td>RECON section 9 / brand voice — Brand Voice · Workspace</td>
+        <td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr yes">✓</td>
+        <td><strong>Communication only.</strong> Correctly absent from the scorer today. Any future change must preserve this — brand voice must never move a Match Score.</td>
+      </tr>
+      <tr>
+        <td><code>warmth_level</code> / <code>relationship_state</code> — Relationship Strength · Relationship edge</td>
+        <td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr yes">✓</td>
+        <td>Warm is not better fit. It changes urgency, what Barry may assume, and which pathway he recommends. It must not touch ICP fit.</td>
+      </tr>
+      <tr>
+        <td><code>strategic_value</code> — Relationship Strength · Relationship</td>
+        <td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr yes">✓</td>
+        <td>User-declared importance, and the dominant term in <code>recommendationEngine</code>'s priority weights. Orthogonal to fit by construction.</td>
+      </tr>
+      <tr>
+        <td>Swipe outcomes — Learned Behavior · User<br><code>companies.status</code>, <code>barryFeedback</code>, <code>barryRejectionFeedback</code></td>
+        <td class="ctr yes">✓ <span class="chip c-warn">should</span></td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr no">—</td>
+        <td>Evidence about the ICP, therefore about Match. Today it reaches Barry only as prose and biases the next Apollo query — it never revises the profile or the score.</td>
+      </tr>
+      <tr>
+        <td>Buying signal — Outcomes · Relationship<br><code>openedCount</code>, <code>last_opened_at</code>, <code>last_reply_at</code></td>
+        <td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr yes">✓</td>
+        <td><strong>The clearest Match/Priority separation in the product.</strong> An open changes nothing about fit and everything about when to act. Today it moves neither — <code>recommendationEngine</code> does not read opens at all.</td>
+      </tr>
+      <tr>
+        <td>Referral / intro path — Relationship edge (pair)</td>
+        <td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr yes">✓</td>
+        <td>Changes the recommended <em>pathway</em> — warm intro versus cold — not the fit. <code>deriveIntroNbs</code> already emits it as a Next Action; no Barry surface receives it.</td>
+      </tr>
+      <tr>
+        <td>Mission objective — Objectives · Mission</td>
+        <td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr yes">✓</td>
+        <td><strong>Temporary reweighting of what matters now.</strong> Must alter Priority and Next Action without rewriting <code>icpProfiles</code>. Today "this quarter, fintech" is typed straight into the ICP profile — which silently corrupts Match.</td>
+      </tr>
+      <tr>
+        <td>RECON confidence — meta-intelligence · Workspace</td>
+        <td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr no">—</td>
+        <td>Barry's model of his own coverage. Already gates <code>recon.enhanced</code> and sizes the discovery queue. The honest home for "how certain is IDYNIFY", and not a Match input.</td>
+      </tr>
+      <tr>
+        <td><code>barry_memory.what_has_worked</code> — Learned Behavior · Relationship edge</td>
+        <td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr yes">✓</td>
+        <td>Per-contact strategy history driving <code>recommendStrategy</code>. No bearing on fit or urgency.</td>
+      </tr>
+      <tr>
+        <td>Recency — Relationship History · Relationship<br><code>last_interaction_at</code>, <code>consecutive_no_replies</code></td>
+        <td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr no">—</td><td class="ctr yes">✓</td><td class="ctr yes">✓</td>
+        <td>Every threshold in <code>recommendationEngine</code> is recency-based. Pure Priority and Next Action.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h3>The six rules this implies</h3>
+  <ol class="questions">
+    <li>Only Workspace Market and ICP intelligence may move <strong>Match</strong>. Nothing relationship-scoped, nothing mission-scoped, nothing about voice.</li>
+    <li>Buying signals and relationship state move <strong>Priority</strong>, never Match.</li>
+    <li>Brand voice and personal style shape how <strong>Next Action</strong> is expressed, and touch neither Match nor Priority.</li>
+    <li>Relationship warmth and referral edges change the recommended <strong>pathway</strong> inside Next Action, not the fit.</li>
+    <li>Mission objectives reweight Priority and Next Action for a bounded period and must never write to durable Workspace intelligence. <span class="chip c-stop">violated today</span></li>
+    <li><strong>Confidence is about the intelligence, not the entity.</strong> Two companies with identical firmographics have the same Match; if one was enriched from a stale Apollo record they should not have the same Confidence. Nothing in the product expresses this.</li>
+  </ol>
+  <p class="prose">The mapping also answers the brief's warning directly: <strong>not every RECON field belongs
+  in Match Score.</strong> Sections 5, 8 and 9 belong to Next Action. Section 4 psychographics is ICP but not
+  firmographic, so it can only inform Match if the scorer gains a non-firmographic dimension — a scoring
+  change, not a wiring change, and out of scope here.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 4</span><h2>Retracing the five examples</h2></div>
+
+  <h3>A · Relationship warmth — the flagship does not run</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Contract claim</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>Source tracked via <code>relationship_state_source</code></td><td><span class="chip c-stop">Wrong field</span> Warmth's source field is <code>warmth_level_source</code> (<code>peopleSchema.js:85</code>). <code>relationship_state_source</code> (<code>:82</code>) belongs to a different fact.</td></tr>
+      <tr><td>Evidence: a <code>warmth_reasons</code> array, e.g. <code>["imported from Gmail…", "3 recent email exchanges"]</code></td><td><span class="chip c-stop">Field does not exist</span> <code>grep -rn warmth_reasons src/ netlify/</code> returns nothing. The real field is <code>warmth_level_inference_reason</code> — a single string, not an array. The quoted values are invented.</td></tr>
+      <tr><td>Update trigger: re-evaluated on contact state transitions via <code>inferRelationshipWarmth.js</code></td><td><span class="chip c-stop">Never fires</span> Not imported anywhere, not among the <code>.netlify/functions/*</code> endpoints the client calls, not scheduled in <code>netlify.toml</code>, not invoked by another function.</td></tr>
+      <tr><td>Authority: Barry creates a <code>barry_warmth_suggestion</code> rather than overwriting</td><td><span class="chip c-stop">Unreachable</span> Written only at <code>inferRelationshipWarmth.js:247</code>. Never produced.</td></tr>
+      <tr><td>Status: Unknown → Inferred → Confirmed → Contested</td><td><span class="chip c-stop">Only Unknown is reachable</span></td></tr>
+      <tr><td>Consumers: guardrail, message generation, contact UI</td><td><span class="chip c-ok">Confirmed</span> <code>barryGuardrail.js:33-64,123</code>; <code>barryContextAssembler.js:123</code>; <code>barryGenerateSequenceStep.js:264</code>; <code>AllLeads.jsx:1699</code> sorting.</td></tr>
+      <tr><td>— missed by Team B —</td><td><span class="chip c-stop">There is no producer at all</span> <code>inferRelationshipWarmth.js</code> is the only writer of <code>warmth_level</code> in the repository, and there is no UI editor — <code>StructuredFields.jsx</code> mentions warmth only in a header comment. Every consumer therefore reads null. <code>barryGuardrail</code>'s cold-contact branch is the permanent default.</td></tr>
+      <tr><td>— missed by Team B —</td><td><span class="chip c-warn">Adjacent fact is live, its provenance is not</span> <code>relationship_state</code> <em>is</em> written — by <code>HunterOutcomeOverlay.jsx:64</code> on user outcome taps and by <code>hunterBootstrap.js:105</code>. But <code>relationship_state_source</code> is written only by the dead function, so the provenance the contract cites is never populated for that field either.</td></tr>
+      <tr><td>Requiredness: "required for message generation"</td><td><span class="chip c-warn">Overstated</span> <code>barryGuardrail</code> degrades gracefully when warmth is absent. Nothing gates on it.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose">Scope classification — Relationship, edge — is correct. But the contract's flagship is the
+  one example that should <em>not</em> be generalised until it has a producer, and this is the most
+  consequential factual error in v0.2, because the entire document is anchored on "warmth satisfies 11 of 13
+  dimensions — this remains the model to generalize."</p>
+
+  <h3>B · Value proposition — five locations, two of them dead</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Contract claim</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>Stored at <code>dashboards/{uid}.valueProposition</code></td><td><span class="chip c-warn">One of five</span> — and the only one with no reader.</td></tr>
+      <tr><td><code>barryContextStack</code> includes it via RECON section 1</td><td><span class="chip c-stop">Wrong section</span> <code>RECON_SECTION_MAP.valueProposition = 2</code> (Product Deep Dive). Section 1 is Business Foundation.</td></tr>
+      <tr><td>Not in the server-side assembler</td><td><span class="chip c-warn">True of one, false of the other</span> True of <code>barryContextAssembler</code>. False of the server RECON path: <code>compileReconForPrompt</code> emits all ten sections uncapped and serves <code>barryMissionChat</code>, <code>barryFirstTouch</code>, <code>barryGenerateContext</code> and <code>barryGenerateMissionSequence</code>.</td></tr>
+      <tr><td>Hunter Barry doesn't receive it</td><td><span class="chip c-warn">Right answer, wrong reason</span> <code>generate-engagement-message</code> loads sections 3, 5, 8 and 9 — not 2. But <code>barryFirstTouch</code>, also a Hunter surface, does receive it via the server compiler.</td></tr>
+      <tr><td>Update trigger: none</td><td><span class="chip c-warn">Incomplete</span> <code>analyze-website</code> re-extracts it on every run and merges it into <code>modules[recon].websiteAnalysis</code>. That is an update trigger — it simply writes where nothing reads.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tscroll"><table>
+    <thead><tr><th>Location</th><th>Written by</th><th>Read by</th></tr></thead>
+    <tbody>
+      <tr><td><code>dashboards/{uid}.valueProposition</code></td><td>OnboardingFlow Step 3 (B1)</td><td><span class="chip c-dead">nothing</span></td></tr>
+      <tr><td><code>modules[recon].websiteAnalysis.valueProposition</code></td><td><code>analyze-website</code></td><td><span class="chip c-dead">nothing</span></td></tr>
+      <tr><td><code>modules[recon].sections[2].data</code></td><td>RECON editor</td><td><code>barryContextStack</code>, <code>compileReconForPrompt</code></td></tr>
+      <tr><td><code>modules[recon].sections[9].data.valueProp | .valueProposition</code></td><td>RECON section 9</td><td><code>AlignmentBrief.jsx:126</code></td></tr>
+      <tr><td><code>icpProfiles/{id}.messaging</code></td><td>multi-ICP migration, ICP settings</td><td><code>barryContextStack</code> as <code>outreach_context</code>; server compiler as the section 9 override</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose">The diagnosis — no provenance, no authority, no temporal boundary — is right. The evidence
+  is wrong in three particulars and understates the sprawl fivefold.</p>
+
+  <h3>C · <code>what_has_worked</code> — more producers, more consumers, one dead assembler</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Contract claim</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>Field is <code>barry_memory.what_worked</code></td><td><span class="chip c-stop">Field is <code>what_has_worked</code></span></td></tr>
+      <tr><td>Producer: <code>barryMemoryService.js</code> after engagement sessions</td><td><span class="chip c-warn">Three producers</span> <code>barryMemoryService.js:153</code> (session close), <code>:792</code> (<code>recordEngagementOutcome</code>), and <code>barryOutcomeAttribution.js:182</code> (server-side <code>arrayUnion</code>).</td></tr>
+      <tr><td>Consumer: <code>barryContextAssembler.js</code> only</td><td><span class="chip c-warn">Two more</span> <code>barryStrategyRecommender.js:46</code> reads it directly across four call sites; <code>barryMemoryService.js:976</code> reads its counterpart in the client assembler.</td></tr>
+      <tr><td>— missed by Team B —</td><td><span class="chip c-dead">A third assembler exists and is dead</span> <code>src/services/barryMemoryService.js:599 assembleBarryContext</code> is a complete client-side context assembler with no production caller.</td></tr>
+      <tr><td>Contradiction: append-only, both facts coexist</td><td><span class="chip c-stop">Worse than stated</span> <code>boundArray(…, MAX_WHAT_HAS_WORKED)</code> truncates by recency, so a genuinely effective old strategy is silently dropped while a stale recent one survives. That is an unexplained belief change — a direct violation of the contract's own Evidence Rule, inside the example it holds up as strong.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>D · Engagement objective — a fourth field, and it does reach the assembler</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Contract claim</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>Fragmented across mission goal, session intent, contact intent</td><td><span class="chip c-warn">Plus a fourth</span> <code>contact.engage_state.current_goal</code>, exposed at <code>barryContextAssembler.js:147</code>.</td></tr>
+      <tr><td>Not in the server-side assembler</td><td><span class="chip c-stop">False</span> The assembler exposes <code>relationship.engagement_intent</code> (<code>:125</code>) and <code>engage.current_goal</code> (<code>:147</code>), and <code>recommendStrategy</code> takes <code>engagementIntent</code> as a required argument.</td></tr>
+      <tr><td>No contradiction handling</td><td><span class="chip c-ok">Confirmed, demonstrably</span> <code>barryHunterProcessEngage.js:87</code> branches on <code>outcomeGoal</code> while <code>:325</code>, in the same file, branches on <code>engagementIntent</code>. Two objectives, one session, no reconciliation.</td></tr>
+      <tr><td>"Only dimension 2 is clearly satisfied"</td><td><span class="chip c-warn">Understated</span> Source, consumer and update trigger are all partly present. The real failure is 7 and 13 — no expiry, no completion — which the contract does correctly identify.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>E · ICP target industries — six locations, and the learning claim is wrong</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Contract claim</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>Four storage locations</td><td><span class="chip c-warn">At least six</span> <code>icpProfiles/{id}.industries</code>; <code>companyProfile/current.industries</code> (written by four separate modules); RECON section 3 <code>targetIndustries</code>; <code>modules[recon].websiteAnalysis.targetIndustry</code> (<span class="chip c-dead">no readers</span>); <code>dashboards/{uid}.excludedIndustries</code> (<span class="chip c-dead">no readers</span>); plus the transient <code>adaptiveSignals.savedIndustries</code>.</td></tr>
+      <tr><td>Section 3 excluded from the pipeline — Mission Control Barry never receives target market firmographics</td><td><span class="chip c-stop">False</span> <code>barryMissionChat</code>, the Mission Control surface, loads the dashboard server-side and calls <code>compileReconForPrompt</code>, which emits section 3 in full (<code>reconCompiler.js:59-66</code>). The <em>client</em> stack omits it; the server path supplies it. <code>generate-engagement-message:334-350</code> builds an explicit target-market block from it too.</td></tr>
+      <tr><td>Scout swipes never refine targeting; swipes produce zero learning</td><td><span class="chip c-stop">False on two counts</span> (1) <code>triggerAdaptiveSearch</code> (<code>DailyLeads.jsx:1779-1808</code>, called at <code>:1838</code>) sends the batch's <code>savedIndustries</code> into <code>search-companies</code>, which prepends them to Apollo's keyword tags (<code>:691-697</code>). (2) <code>loadSwipeFeedback</code> (<code>barryMissionChat.js:162-215</code>) feeds accepted and rejected scores, reasons and user notes into both the opening brief and the ICP reclarification prompt.</td></tr>
+      <tr><td>— the sharper finding —</td><td><span class="chip c-warn">Learning with no memory and no rejection channel</span> <code>savedIndustries</code> is computed in memory per batch and never persisted or written back to the profile. <code>savedTitles</code> is gathered, transmitted, and only <code>console.log</code>ged (<code>search-companies.js:699-701</code>). Structured <code>rejectionReasons</code> are stored but only free-text notes are read.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Cross-cutting evidence errors</h3>
+  <div class="flag stop">
+    <p class="lede">The contract closes by guaranteeing that "every codebase reference traces to the exact file path cited." Two of its recurring examples do not exist as described.</p>
+    <p><strong><code>engagement_timeline</code></strong> — cited three times as "written but never consumed."
+    There is no <code>engagement_timeline</code> anywhere in the repository. The collection is
+    <code>users/{uid}/contacts/{cid}/timeline</code>, and it <em>is</em> consumed: by
+    <code>EngagementTimeline.jsx:287</code> in the UI and by <code>barryInboxAnalyzer.js:71-79</code> in
+    Barry's prompt.</p>
+    <p><strong><code>enrichment_provenance</code></strong> — cited as "tracked but never surfaced." It is
+    surfaced twice: <code>EnrichmentPanel.jsx:78</code> renders it, and
+    <code>inferRelationshipWarmth.js:37</code> uses it as an inference signal.</p>
+  </div>
+
+  <h3>Dead and unreachable paths found</h3>
+  <div class="tscroll"><table>
+    <thead><tr><th>Path</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td><code>netlify/functions/inferRelationshipWarmth.js</code></td><td><span class="chip c-dead">Unreachable</span> Sole writer of every warmth field.</td></tr>
+      <tr><td><code>src/services/barryMemoryService.js:599 assembleBarryContext</code></td><td><span class="chip c-dead">No production caller</span></td></tr>
+      <tr><td><code>src/utils/reconCompiler.js</code> (243 lines)</td><td><span class="chip c-dead">No importer</span> Duplicate of the server compiler.</td></tr>
+      <tr><td><code>modules[recon].websiteAnalysis.*</code></td><td><span class="chip c-dead">Write-only</span> Four fields written by <code>analyze-website</code>; zero readers.</td></tr>
+      <tr><td><code>dashboards/{uid}.{idealCustomerTypes, excludedIndustries, perfectCustomer, valueProposition}</code></td><td><span class="chip c-dead">Write-only</span> Written by OnboardingFlow B1; zero readers.</td></tr>
+      <tr><td><code>adaptiveSignals.savedTitles</code></td><td><span class="chip c-dead">Logged and discarded</span></td></tr>
+      <tr><td><code>netlify/functions/barryFirstTouch.js</code></td><td><span class="chip c-warn">Reachability unconfirmed</span> Not in the client's invoked-endpoint set and no server caller found. Confirm before treating as live.</td></tr>
+      <tr><td><code>analyze-website</code> → <code>writeToRecon</code> for new users</td><td><span class="chip c-warn">Live code, dead in practice</span> Returns early when <code>dashboards/{uid}</code> is absent — which is every OnboardingFlow user at Step 2.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 5</span><h2>The actual context topology</h2></div>
+
+  <p class="prose">v0.2 describes two assemblers. There are nine live assembly paths, two complete dead ones,
+  and no two of them agree on what Barry should know.</p>
+
+  <div class="tscroll paths"><table>
+    <thead><tr><th>Path</th><th>Caller / surface</th><th>Inputs</th><th>Scopes</th><th>Major omissions</th><th>Location</th><th>Duplicates</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>barryContextStack.js</code><br><code>buildContextStack</code></td>
+        <td><code>BarryChatPanel.jsx:434</code> — Mission Control Barry chat</td>
+        <td>contacts (≤500), active missions (≤20), RECON sections 1·2·4·5·9 at 300 chars each, active ICP profile, service profiles (≤5), Google Calendar, <code>communicationStyle</code></td>
+        <td>Workspace, User, Relationship (entity, shallow), Mission</td>
+        <td>No <code>barry_memory</code>, no <code>engagement_summary</code>, no sessions, no attributions, no referrals, no RECON 3·6·7·8·10; everything truncated</td>
+        <td>Client, sessionStorage, 5 min TTL</td>
+        <td>Path 2, on RECON</td>
+      </tr>
+      <tr>
+        <td><code>utils/reconCompiler.js</code><br><code>compileReconForPrompt</code></td>
+        <td><code>barryMissionChat</code>, <code>barryFirstTouch</code>, <code>barryGenerateContext</code>, <code>barryGenerateMissionSequence</code></td>
+        <td>All ten RECON sections, untruncated, plus a per-ICP messaging override</td>
+        <td>Workspace</td>
+        <td>No relationship or mission intelligence whatsoever</td>
+        <td>Server</td>
+        <td><strong>Supersedes path 1's RECON while path 1 still runs on the same request</strong> — <code>barryMissionChat</code> receives both</td>
+      </tr>
+      <tr>
+        <td><code>utils/barryContextAssembler.js</code><br><code>assembleBarryContext</code></td>
+        <td><code>barryGenerateSequenceStep</code>, <code>barryHunterGenerateStep</code>, <code>barryHunterProcessEngage</code>, <code>generate-engagement-message</code></td>
+        <td>Contact doc, <code>barry_memory</code>, user memory, 5 sessions, <code>strategy_stats</code>, 5 attributions, <code>engagement_summary</code>, <code>engage_state</code></td>
+        <td>Relationship (entity + edge), User</td>
+        <td>No RECON, no ICP, no brand voice, no mission, no referrals, no <code>relationship_context</code></td>
+        <td>Server, 30 s in-process cache</td>
+        <td>None — the only relationship-depth path</td>
+      </tr>
+      <tr>
+        <td><code>generate-engagement-message.js</code><br>inline</td>
+        <td>Engagement message generation</td>
+        <td>Path 3 + <code>recommendStrategy</code> + RECON 3·5·8·9 read inline + service profile + <code>contact.barryContext</code></td>
+        <td>Workspace, User, Relationship, Mission</td>
+        <td>RECON 1, 2 (value proposition), 4, 6, 7, 10</td>
+        <td>Server</td>
+        <td><strong>Re-implements RECON extraction with a different section set. This path falsifies "no surface calls both."</strong></td>
+      </tr>
+      <tr>
+        <td><code>utils/barryInboxAnalyzer.js</code></td>
+        <td><code>process-barry-inbox-queue</code> (scheduled)</td>
+        <td><code>communication_records/{id}</code>, contact doc, <code>relationship_context</code>, last 5 <code>timeline</code> events</td>
+        <td>Relationship (edge)</td>
+        <td>No RECON, no ICP, no <code>barry_memory</code>, no strategy stats</td>
+        <td>Server</td>
+        <td><code>relationship_context</code> is a parallel relationship-edge store that path 3 never reads, and path 3's <code>barry_memory</code> is never read here — <strong>two relationship memories unaware of each other</strong></td>
+      </tr>
+      <tr>
+        <td><code>barryMissionChat.js</code><br>inline, plus path 2</td>
+        <td>Mission Control Barry, server side</td>
+        <td><code>loadServerSideRecommendations</code>, <code>loadStats</code>, <code>loadSwipeFeedback</code> (scores, reasons and user notes from accepted and rejected companies), <code>buildCapabilityBlock</code>, plus the client stack posted in the body</td>
+        <td>All four</td>
+        <td>No <code>barry_memory</code>, no referrals</td>
+        <td>Server</td>
+        <td>The broadest single surface, and the only one that sees Scout swipe intelligence</td>
+      </tr>
+      <tr>
+        <td><code>barryOrientationBrief.js</code><br>inline</td>
+        <td>Orientation brief</td>
+        <td>Dashboard doc, missions, companies, contacts; <code>computeReconState</code> but <em>not</em> the compiler</td>
+        <td>Workspace, Mission</td>
+        <td>All RECON section content; all relationship memory</td>
+        <td>Server</td>
+        <td>Own RECON state handling</td>
+      </tr>
+      <tr>
+        <td><code>generate-campaign-messages.js</code> · <code>generate-followup.js</code><br>inline</td>
+        <td>Campaign and follow-up copy</td>
+        <td>Contact doc + dashboard (campaign) · contact doc + campaign doc (follow-up)</td>
+        <td>Relationship (shallow), Workspace (campaign only)</td>
+        <td>Follow-up has no RECON and no memory at all</td>
+        <td>Server</td>
+        <td>Two more RECON handlings</td>
+      </tr>
+      <tr>
+        <td><code>referralIntelligenceService.js</code> + <code>nextBestStepService.js</code></td>
+        <td>Reinforcements UI, Referral Hub, contact drawers</td>
+        <td><code>users/{uid}/referrals</code>, contact graph scan (cap 100), <code>referral_data</code>, analytics</td>
+        <td>Relationship (edge, pairs)</td>
+        <td>—</td>
+        <td>Client</td>
+        <td><strong>A real graph-intelligence layer that no Barry or LLM surface reads</strong></td>
+      </tr>
+      <tr>
+        <td><code>recommendationEngine.js</code> · <code>loadServerSideRecommendations</code></td>
+        <td>Mission Control priorities, Barry opening brief</td>
+        <td>Contacts, missions, campaigns, NBS queue, recency thresholds, <code>strategic_value</code></td>
+        <td>Relationship, Mission</td>
+        <td>No ICP fit, no opens, no referrals</td>
+        <td>Client <em>and</em> server</td>
+        <td><strong>Priority is derived twice, in two languages</strong></td>
+      </tr>
+      <tr>
+        <td><code>barryMemoryService.js:599</code></td>
+        <td>—</td><td>—</td><td>—</td><td>—</td><td>Client</td>
+        <td><span class="chip c-dead">Dead</span> Complete assembler, no caller</td>
+      </tr>
+      <tr>
+        <td><code>src/utils/reconCompiler.js</code></td>
+        <td>—</td><td>—</td><td>—</td><td>—</td><td>Client</td>
+        <td><span class="chip c-dead">Dead</span> Complete compiler, no importer</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h3>Testing the architecture principle</h3>
+  <div class="flag">
+    <p class="lede">"One intelligence contract does not mean one intelligence database" — agreed, and the repository supports it.</p>
+    <p>Storage really is appropriately distributed. Nothing found here argues for consolidating Firestore.</p>
+  </div>
+  <div class="flag stop">
+    <p class="lede">"Client-side for business breadth, server-side for relationship depth — no surface calls both" — false, and the correction changes the size of Phase 2.</p>
+    <p>At least three surfaces already combine business and relationship context:
+    <code>generate-engagement-message</code>, <code>barryMissionChat</code> and <code>barryFirstTouch</code>.
+    The problem is not that no surface calls both. It is that <strong>every surface assembles its own set and
+    no two agree</strong>. RECON is extracted by four separate code paths with four different section sets and
+    two truncation rules. Relationship memory lives in two mutually unaware stores. Priority is derived twice.
+    Referral intelligence reaches no Barry surface at all while Barry is instructed to reason about it.</p>
+    <p>"The context assembly layer is the unification point" survives — it is still the right answer. What does
+    not survive is the sizing. This is not one integration between two systems; it is a consolidation of nine.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="sec-head"><span class="sec-letter">PART 6</span><h2>Recommendation</h2></div>
+
+  <div class="verdict">
+    <span class="vk">Verdict</span>
+    <p class="vv">Revise to v0.3</p>
+    <p><strong>Not reopen.</strong> The foundation is sound. The hierarchy classifies ten of eleven traced
+    examples. The four scopes classify every concept tested but one, and that one needs a clarification rather
+    than a fifth scope. The authority/confidence separation is correct and well argued. All three governing
+    rules are supported by repository evidence. Nothing here justifies stopping.</p>
+    <p><strong>Not freeze.</strong> The document is anchored on a worked example that does not run, its status
+    dimension is internally inconsistent, two of its thirteen dimensions belong to the consumer rather than the
+    object, and nine of its supporting evidence claims are contradicted by the code — in a document that closes
+    by guaranteeing every reference traces to a cited path. Freezing it fixes those into the foundation.</p>
+  </div>
+
+  <h3>The six corrections</h3>
+  <ul class="batches">
+    <li>
+      <span class="bnum">C1</span>
+      <div>
+        <p class="btitle">Correct the evidence, and re-anchor the model example</p>
+        <p class="bbody">Replace Example A's warmth trace with the finding that its only producer is
+        unreachable, and re-anchor "the model to generalise" on a subsystem that runs —
+        <code>barry_memory</code> + <code>barryContextAssembler</code> + <code>recommendStrategy</code> is the
+        honest candidate. Fix <code>warmth_reasons</code> → <code>warmth_level_inference_reason</code>,
+        <code>relationship_state_source</code> → <code>warmth_level_source</code>, <code>what_worked</code> →
+        <code>what_has_worked</code>, <code>engagement_timeline</code> → <code>timeline</code> (and drop the
+        "never consumed" claim), the <code>enrichment_provenance</code> claim, the section 1 / section 2
+        value-proposition mix-up, and "Scout swipes produce zero learning".</p>
+      </div>
+    </li>
+    <li>
+      <span class="bnum">C2</span>
+      <div>
+        <p class="btitle">Move Requiredness and Consumer / Decision Class off the object</p>
+        <p class="bbody">Requiredness becomes a decision's input requirement — <em>this decision needs these
+        categories at this minimum status and confidence</em>. Consumer becomes a decision registry, from which
+        coverage and dead storage are <em>computed</em>. Eleven dimensions on the object, two on the decision.
+        This is the correction with the largest downstream effect, because it determines the shape of whatever
+        assembler Phase 3 builds.</p>
+      </div>
+    </li>
+    <li>
+      <span class="bnum">C3</span>
+      <div>
+        <p class="btitle">Split dimension 13</p>
+        <p class="bbody">Move Unknown / Inferred / Confirmed / Observed into Source as an evidence tier. Leave
+        Status as operative status only — Active / Superseded / Archived — with Contested and Stale as
+        orthogonal, derivable flags rather than mutually exclusive enum members. As drafted, the enum
+        duplicates dimension 3 and forbids states the product already produces.</p>
+      </div>
+    </li>
+    <li>
+      <span class="bnum">C4</span>
+      <div>
+        <p class="btitle">Make Authority and Contradiction behavior source-level policy</p>
+        <p class="bbody">Both answer "which source wins," which is a property of the source pair and the
+        category. Keeping them per-object reproduces the <code>CANONICAL_FIELDS</code> failure — protection
+        with no explanation, which is exactly what the Evidence Rule forbids.</p>
+      </div>
+    </li>
+    <li>
+      <span class="bnum">C5</span>
+      <div>
+        <p class="btitle">Let a Relationship edge have two endpoints</p>
+        <p class="bbody">The user is a common endpoint, not a mandatory one. This makes referrals,
+        introductions and multi-hop paths first-class without a fifth scope, and it is already required by code
+        that exists: <code>users/{uid}/referrals</code>, <code>detectReferralOpportunities</code>,
+        <code>deriveIntroNbs</code>.</p>
+      </div>
+    </li>
+    <li>
+      <span class="bnum">C6</span>
+      <div>
+        <p class="btitle">Name Derived Intelligence, and make "actionable" a relation</p>
+        <p class="bbody">Match Score, <code>strategy_stats</code> and RECON confidence are computed from
+        intelligence, are durable, and precede any decision. Say that <em>actionable</em> describes a relation
+        between an intelligence object and a decision rather than a level an object occupies. Without this,
+        derived objects have no correct home.</p>
+      </div>
+    </li>
+  </ul>
+  <p class="prose">Optional but cheap: add <strong>Sensitivity / shareability</strong> as a fourteenth
+  dimension. v0.2 names cross-user workspace sharing as a goal; without it the first sharing feature will leak
+  relationship-scoped disclosures.</p>
+
+  <h3>What Phase 2 should be</h3>
+  <div class="callout">
+    <span class="tag">Recommended · not implemented here</span>
+    <p><strong>Phase 2 = Producer / Consumer Reconciliation.</strong> A read-only, evidence-first pass that
+    produces the one artifact the contract explicitly defers and that every later phase depends on: a verified
+    map of every intelligence producer, every store, every consumer, and every path between them.</p>
+    <p>Why this and not the unified assembler, and not #561: this review found, without looking for them, four
+    write-only stores, three dead assemblers, one unreachable producer sitting beneath six live consumers, and
+    nine mutually inconsistent assembly paths. An assembler built on that inventory would faithfully wire
+    together fields that are already wrong. The contract's Consumer dimension is the diagnostic that finds
+    them — and corrections C2 and C6 are what make it usable.</p>
+  </div>
+  <ol class="questions">
+    <li>A producer → store → consumer table for every category in the contract's Section 8, each row traced to a file and line and each <em>verified reachable</em>. The <code>inferRelationshipWarmth</code> class of error must not survive it.</li>
+    <li>The dead-storage list with one decision per entry — wire it or delete it. Eight candidates are already identified in Part 4.</li>
+    <li>The surface → required-categories table: dimensions 12 and 9 relocated per C2. This is the deferred "Context Requirements by Surface" item, and it is the specification the eventual assembler is written against.</li>
+    <li>Reconciliation decisions for the multi-writer fields this review surfaced: value proposition (5 locations), target industries (6), engagement objective (4), <code>companiesFoundCount</code> (2 writers, no rule).</li>
+  </ol>
+  <p class="prose"><strong>Phase 3</strong> is then the unified assembly layer, written against item 3.
+  <strong>Phase 4</strong> is #561 — answerable by then, because Part 3's matrix establishes that only RECON
+  section 3 has a claim on Match Score, and the reconciliation will have established which of the six
+  target-industry stores is authoritative.</p>
+
+  <h3>And before any of it — the Phase 0 items this review opened</h3>
+  <p class="prose">These are small, and two of them mean the onboarding Phase 0 fixed is still not delivering
+  intelligence.</p>
+  <ul class="gate">
+    <li>The <code>searchTriggeredRef</code> reorder (Part 1B) — three lines.</li>
+    <li>No <code>[functions."search-companies"]</code> timeout in <code>netlify.toml</code>. The primary onboarding search runs under Netlify's 10 s default and writes no <code>ERROR</code> when the platform kills it.</li>
+    <li><code>analyze-website</code> discards its whole extraction for new users because <code>dashboards/{uid}</code> does not yet exist. <code>initializeDashboard</code> needs to happen before Step 2, not at Step 3.</li>
+    <li>Step 3's search posts <code>companyProfile/current</code>, which nothing in the OnboardingFlow path ever writes — so the search executes against an empty ICP, and <code>reconConfidence</code> is never passed.</li>
+    <li><code>FirstRunView</code>'s only forward CTA is gated on <code>companies.length &gt; 0</code> while <code>companies</code> is a one-shot read. READY-with-nothing-loaded, and READY-with-zero-results, are both terminal.</li>
+  </ul>
+</section>
+
+<footer class="end">
+  Team A · Independent verification of Phase 0 and Barry Intelligence Contract v0.2 · August 2026<br>
+  Reviewed at <code>01661fe</code> on <code>claude/barry-onboarding-audit-b5yf9x</code>. Investigation and architecture review only —
+  no schema proposed, no collection created, no intelligence migrated, no assembler built, no application code changed.<br>
+  Every claim above traces to a file and line in this repository. Where it contradicts the contract, the code was read.
+</footer>
+
+</div>

@@ -1,4 +1,4 @@
-<title>Barry Intelligence Contract v0.3</title>
+<title>Barry Intelligence Contract v0.3.1</title>
 <style>
 :root {
   --bg: #F7F8FA;
@@ -395,7 +395,7 @@ strong { font-weight: 700; }
 
 <div class="container">
 
-<h1>Barry Intelligence Contract v0.3</h1>
+<h1>Barry Intelligence Contract v0.3.1</h1>
 <p class="subtitle">What it means for Barry to know something &mdash; August 2026</p>
 
 <div class="toc">
@@ -428,6 +428,11 @@ strong { font-weight: 700; }
 <strong>C9</strong> Cardinality Semantics dimension added.
 <strong>C10</strong> Entity scope separated from Relationship after stress-test.
 Permanent reachability standard adopted. Scout invariants stated. Context topology documented. "Still Open" section added.
+</div>
+
+<div class="delta">
+<div class="delta-label">v0.3.1 correction</div>
+Scout Invariant 1 corrected: "One ICP Truth" &rarr; "One Authoritative Representation per ICP." IDYNIFY supports multiple ICPs; <code>companyProfile/current</code> is documented as a legacy compatibility projection, not the authoritative ICP store. The authoritative store per ICP is explicitly deferred to Phase 1B reconciliation. Internal consistency with &sect;10 and &sect;11 restored.
 </div>
 
 
@@ -539,8 +544,9 @@ v0.2 stated that <code>enrichment_provenance</code> was "tracked but never surfa
 <p>These four product rules are not aspirational &mdash; they constrain all onboarding and search behavior today and in every future version.</p>
 
 <div class="principle">
-<div class="principle-label">Scout Invariant 1 &mdash; One ICP Truth</div>
-<p>There must be exactly one canonical ICP representation that every consumer reads. Any surface that writes ICP data must project it to that canonical location. Today this is <code>companyProfile/current</code>. Adding new ICP input surfaces does not mean adding new ICP storage locations.</p>
+<div class="principle-label">Scout Invariant 1 &mdash; One Authoritative Representation per ICP</div>
+<p>There must ultimately be one authoritative representation per ICP from which compatibility projections and consumer-specific views are derived. A workspace may maintain multiple distinct ICPs. Each ICP must have a stable identity, and every search, Match calculation, Mission, and compatibility projection must know which ICP it is operating against.</p>
+<p>The authoritative store per ICP is not decided by this contract. Today <code>companyProfile/current</code> is a legacy compatibility projection consumed by <code>search-companies</code> &mdash; it must not be interpreted as authoritative merely because a current consumer depends on it. Phase 1B must reconcile current ICP producers, stores, projections, and consumers before an authoritative source is designated.</p>
 </div>
 
 <div class="principle">
@@ -1344,7 +1350,7 @@ UI:       BarryInsightsCard.jsx:37 (direct Firestore read)</div>
 
 <hr>
 <p style="color: var(--text-muted); font-size: 13px; margin-top: 40px;">
-Barry Intelligence Contract v0.3 &mdash; IDYNIFY Scout &mdash; August 2026.<br>
+Barry Intelligence Contract v0.3.1 &mdash; IDYNIFY Scout &mdash; August 2026.<br>
 This document defines semantics and rules of intelligence. It does not propose schema, storage, or implementation.
 Every codebase reference has been verified against the source at the cited file path and line number.
 </p>

@@ -305,6 +305,7 @@ export default function OnboardingFlow() {
   const [stillWorking, setStillWorking] = useState(false);
 
   const hasCheckedOnboardingRef = useRef(false);
+  const searchTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (onboarding.loading || hasCheckedOnboardingRef.current) return;
@@ -414,6 +415,9 @@ export default function OnboardingFlow() {
   };
 
   const handleFinishQuestions = async () => {
+    if (searchTriggeredRef.current) return;
+    searchTriggeredRef.current = true;
+
     const userId = getActiveUserId();
     if (!userId) return;
 

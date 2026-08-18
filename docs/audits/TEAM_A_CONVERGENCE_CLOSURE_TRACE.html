@@ -1,0 +1,707 @@
+<title>Convergence Closure Trace</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Team A · Convergence Closure Trace · C1–C3</p>
+  <h1>Three Closures</h1>
+  <p class="standfirst">The bridge write-back lifecycle, database-level dependence on persisted Match, and the first-search targeting contract. Repository behaviour as it stands on <code>main</code> at <code>f3d78a5</code>, with PR #570 merged. No architecture, no recommendations, no code changed.</p>
+  <div class="meta">
+    <span><b>C1</b> ICP projection lifecycle</span>
+    <span><b>C2</b> Match persistence dependency</span>
+    <span><b>C3</b> First-search targeting</span>
+  </div>
+</header>
+
+<section id="c1">
+  <div class="sec-head"><span class="sec-letter">§1</span><h2>C1 — ICP projection lifecycle</h2></div>
+
+  <h3>Reachable flow, per bridge-only writer</h3>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Writer</th><th>Write</th><th>Immediately after</th><th>Writes <code>icpProfiles</code>?</th><th>Passes <code>icpId</code>?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CompanyQuestionnaire</strong></td><td><code>:176</code> <code>setDoc(companyProfile/current, {...formData})</code></td><td><code>:213</code> <code>search-companies</code></td><td><span class="chip c-stop">No</span></td><td><span class="chip c-stop">No</span> → server stamps <code>DEFAULT_ICP_ID</code></td></tr>
+      <tr><td><strong>BarryOnboarding</strong></td><td><code>:335</code> <code>setDoc(companyProfile/current, icpProfile)</code></td><td><code>:370</code> <code>search-companies</code></td><td><span class="chip c-stop">No</span></td><td><span class="chip c-stop">No</span> → <code>DEFAULT_ICP_ID</code></td></tr>
+      <tr><td><strong>BarryICPPanel</strong></td><td><code>:200</code> <code>setDoc(companyProfile/current, mergedProfile)</code></td><td><code>:204</code> <code>search-companies</code></td><td><span class="chip c-stop">No</span></td><td><span class="chip c-stop">No</span> → <code>DEFAULT_ICP_ID</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose"><p>All three follow the same shape: write the bridge, immediately search from it, never touch <code>icpProfiles</code>, never name an ICP. Their edits exist only in the bridge until some other path picks them up.</p></div>
+
+  <h3>Q1 — Do bridge-only edits ever update an <em>existing</em> <code>icpProfiles</code> document?</h3>
+  <div class="prose">
+    <p><strong>Yes — through one reachable path, and it is none of the three writers above.</strong></p>
+    <pre class="diagram">BarryChatPanel:568  updateIcpFromChat(userId, icp_params, action, <b>contextStack?.icpProfile</b>)
+      ↓
+updateIcpFromChat:47   setDoc(companyProfile/current, newProfile)
+      ↓
+updateIcpFromChat:52   query icpProfiles where isActive==true && status=='active' limit 1
+      ↓
+updateIcpFromChat:63   targetRef = <i>icpSnap.empty</i> ? icpProfiles/<b>default</b> : icpSnap.docs[0].ref
+      ↓
+updateIcpFromChat:78   setDoc(targetRef, { industries, companySizes, locations,
+                                           targetTitles, companyKeywords, … })</pre>
+    <p>Five criteria fields are written into an existing profile document. The merge base is <code>contextStack.icpProfile</code>, resolved by <code>barryContextStack.getActiveMessagingProfile:62</code>: the active profile when one exists, otherwise <strong>the bridge, returned stamped <code>id: DEFAULT_ICP_ID</code></strong> (<code>:75</code>).</p>
+    <p>So the three named writers do not themselves update a profile, but the bridge state they leave behind is the fallback merge base for this path.</p>
+  </div>
+
+  <h3>Q2 — Can bridge-only edits create a <em>new</em> ICP identity?</h3>
+  <div class="prose">
+    <p><strong>Yes — two reachable paths, both gated on the same condition: zero existing <code>icpProfiles</code> documents.</strong></p>
+    <ul>
+      <li><strong><code>ICPSettings:64</code></strong> — guard <code>if (icps.length === 0)</code>. Reads <code>companyProfile/current</code>, mints <code>icp_${Date.now()}</code>, seeds eleven fields from the bridge (<code>industries</code>, <code>companySizes</code>, <code>revenueRanges</code>, <code>skipRevenue</code>, <code>locations</code>, <code>isNationwide</code>, <code>targetTitles</code>, <code>scoringWeights</code>, <code>foundedAgeRange</code>, <code>managedByBarry</code>, <code>lookalikeSeed</code>), then <code>setDoc</code>.</li>
+      <li><strong><code>dashboardUtils:281</code></strong> — guard <code>if (icpSnap.empty)</code>. Reads the bridge, creates <code>icpProfiles/default</code> with <code>isActive: true, status: 'active'</code>.</li>
+    </ul>
+    <p><strong>Exact condition in both cases: the <code>icpProfiles</code> collection must be empty.</strong> Once any profile exists, neither path can run, and bridge edits can no longer mint an identity.</p>
+  </div>
+
+  <h3>Q3 — On activation, is the bridge overwritten with that profile's criteria?</h3>
+  <div class="prose">
+    <p><strong>Yes on two paths, and no on a third — the distinction matters.</strong></p>
+    <ul>
+      <li><strong><code>setActiveIcpProfile:35</code></strong> — <code>batch.set(companyProfile/current, {...targetData, isActive: true, status: 'active'})</code>. A full document overwrite, not a merge. Called by <code>ICPSettings.handleSetActive:156</code>.</li>
+      <li><strong><code>dashboardUtils:343</code></strong> — Step 4, <code>batch.set(companyProfile/current, {...activeProfileData})</code>. Also a full overwrite, inside the one-time <code>migratedMultiICP</code> branch.</li>
+      <li><strong><code>DailyLeads.handleICPSwitch:1523</code></strong> — <span class="chip c-stop">writes nothing</span>. It sets React state, re-filters <code>allCompaniesRef</code> and rescores in memory. No bridge write, no <code>isActive</code> write, no Firestore write of any kind.</li>
+    </ul>
+    <p>The in-session ICP switcher in Daily Discoveries therefore leaves both the bridge and the persisted <code>isActive</code> flag pointing at the previously activated profile, while the user works under a different one.</p>
+  </div>
+
+  <h3>Q4 — Is there a reachable path where one ICP's criteria are persisted under another ICP's identity?</h3>
+  <div class="prose">
+    <p><strong>Yes. Traced, every hop cited. The destination is always <code>icpProfiles/default</code>.</strong></p>
+    <pre class="diagram"><b>1</b>  ICP A is active.
+   setActiveIcpProfile:35 has mirrored A's criteria into companyProfile/current.
+
+<b>2</b>  User deletes ICP A in ICP Settings.
+   ICPSettings.handleDeleteICP:175  deleteDoc(icpProfiles/A)
+   <i>Guard is only `icpList.length &lt;= 1`. No promotion of another profile,
+    no isActive write, no bridge write.</i>
+   → <b>Zero profiles now carry isActive:true, while ≥1 profile still exists.</b>
+   → The bridge still holds <b>A's criteria</b>.
+
+<b>3</b>  User confirms an ICP change in the Barry dashboard chat.
+   barryContextStack:70   active-profile query returns empty
+   barryContextStack:75   falls back to the bridge, returns { id: <b>DEFAULT_ICP_ID</b>, ...A's criteria }
+   BarryChatPanel:568     passes that as `existingProfile`
+   updateIcpFromChat:63   icpSnap.empty → targetRef = icpProfiles/<b>default</b>
+   updateIcpFromChat:78   setDoc(icpProfiles/default, { …A's criteria merged with the delta })
+
+<b>Result</b>  Deleted ICP A's criteria are persisted under the default ICP's identity.</pre>
+    <p>The enabling defect is step 2: <code>handleDeleteICP</code> permits deletion of the active profile without reassigning activity, which is the only reachable way to reach a state where profiles exist and none is active. Every downstream fallback in the chain then resolves to <code>default</code>, and none of them can tell that the criteria came from somewhere else.</p>
+  </div>
+
+  <h3>Q5 — What happens to unsynchronized bridge-only edits after an ICP switch?</h3>
+  <div class="callout">
+    <span class="tag">Classification — CONDITION-DEPENDENT</span>
+    <p><strong>OVERWRITTEN</strong> when the switch goes through <code>ICPSettings.handleSetActive:156</code> → <code>setActiveIcpProfile:35</code>. That call is <code>batch.set</code>, not a merge, so every bridge-only edit is discarded with no read-before-write and no warning.</p>
+    <p><strong>PRESERVED — and orphaned</strong> when the switch goes through <code>DailyLeads.handleICPSwitch:1523</code>. Nothing is written, so the edits survive in the bridge while the user works under a different ICP in session. They remain the fallback merge base for <code>updateIcpFromChat</code> and the seed for the two bootstrap paths in Q2.</p>
+    <p><strong>PROMOTED</strong> only in the Q2 condition — <code>icpProfiles</code> empty — where the bridge becomes a new profile wholesale.</p>
+    <p>The condition is <em>which switching surface the user used</em>. The two surfaces are not equivalent, and nothing reconciles them.</p>
+  </div>
+
+  <h3>Appendix — active-ICP selection mechanisms</h3>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>#</th><th>Location</th><th>Active behaviour</th><th>Fallback</th><th>Ordering / tiebreak</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>getActiveIcpId.js:10</code></td><td>Query <code>isActive==true && status=='active'</code>, <code>limit(1)</code></td><td><code>DEFAULT_ICP_ID</code> on empty <strong>and inside <code>catch</code></strong></td><td>None — Firestore returns first match</td></tr>
+      <tr><td>2</td><td><code>barryContextStack.js:62</code></td><td>Same query</td><td>Reads <code>companyProfile/current</code> and returns it stamped <code>id: DEFAULT_ICP_ID</code>; <code>null</code> on error</td><td>None</td></tr>
+      <tr><td>3</td><td><code>updateIcpFromChat.js:52</code></td><td>Same query</td><td><code>icpProfiles/default</code> as write target</td><td>None</td></tr>
+      <tr><td>4</td><td><code>dashboardUtils.js:297</code></td><td><code>profiles.find(p =&gt; p.isActive === true)</code></td><td>Promotes a profile and writes <code>isActive</code></td><td><strong>Oldest by <code>createdAt</code></strong></td></tr>
+      <tr><td>5</td><td><code>ICPSettings.jsx:62</code></td><td>In-memory <code>find</code> over the loaded list</td><td>First element</td><td><strong>Sorted by <code>createdAt</code></strong></td></tr>
+      <tr><td>6</td><td><code>MissionControlDashboardV2.jsx:756</code></td><td><code>icps.find(i =&gt; i.isActive && i.status==='active') \|\| icps[0]</code></td><td><code>icps[0]</code></td><td><strong>Sorted by <code>createdAt</code></strong> (<code>:748</code>)</td></tr>
+      <tr><td>7</td><td><code>DailyLeads.jsx:1379</code> and <code>:1398</code></td><td>Same expression</td><td><code>icps[0]</code></td><td><span class="chip c-stop">Unsorted</span> — Firestore document-key order</td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose"><p>Seven mechanisms. Three distinct tiebreaks when no profile is marked active: <code>'default'</code> (1, 2, 3), oldest by <code>createdAt</code> (4, 5, 6), and document-key order (7). Mechanism 2 is the only one that manufactures an identity for data that has none.</p></div>
+</section>
+
+<section id="c2">
+  <div class="sec-head"><span class="sec-letter">§2</span><h2>C2 — Match persistence dependency</h2></div>
+  <div class="prose">
+    <h3>Database-level dependencies on persisted Match</h3>
+    <p>Searched every Firestore query constraint in <code>src/</code> and <code>netlify/</code> for <code>fit_score</code>, <code>icpScore</code>, <code>fit_reason</code> and <code>lastScoreUpdate</code> inside <code>where()</code> or <code>orderBy()</code>, and checked the index and rules files.</p>
+    <p><strong>Zero matches.</strong> Every <code>orderBy()</code> in the repository sorts on a timestamp, a name, or a status field — none on a score. No composite index or security rule references <code>fit_score</code>.</p>
+    <p>Every reachable query against <code>users/{uid}/companies</code> constrains on <code>status</code>, or on identity fields for deduplication:</p>
+  </div>
+  <div class="tscroll"><table>
+    <thead><tr><th>Query site</th><th>Constraint</th><th>Score involved?</th></tr></thead>
+    <tbody>
+      <tr><td><code>DailyLeads:1393</code></td><td><code>where('status','==','pending')</code></td><td>No</td></tr>
+      <tr><td><code>DailyLeads:1868</code></td><td><code>where('status','in',['pending','accepted'])</code></td><td>No</td></tr>
+      <tr><td><code>SavedCompanies:48–49</code></td><td><code>where('status','==','accepted' / 'archived')</code></td><td>No</td></tr>
+      <tr><td><code>MissionControlDashboardV2:719</code></td><td><code>where('status','==','accepted')</code></td><td>No</td></tr>
+      <tr><td><code>MissionControlDashboardV2:763</code></td><td>unconstrained <code>getDocs</code></td><td>No</td></tr>
+      <tr><td><code>GoToWar:399</code></td><td><code>where('status','==','accepted')</code></td><td>No</td></tr>
+      <tr><td><code>SharedCompaniesView:196, 204</code></td><td><code>where('status','==',…)</code></td><td>No</td></tr>
+      <tr><td><code>useQuickSearch:202</code></td><td><code>where('status','!=','archived')</code></td><td>No</td></tr>
+      <tr><td><code>companyIdentityService:90, 119</code></td><td><code>where('apollo_organization_id'/'name','==',…)</code>, <code>limit(1)</code></td><td>No</td></tr>
+      <tr><td><code>ICPSettings:259</code></td><td>unconstrained <code>getDocs</code> (rescore loop)</td><td>Writes, does not read</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <span class="tag">Primary question</span>
+    <p><strong>DOES ANY REACHABLE DATABASE-LEVEL QUERY REQUIRE PERSISTED MATCH TODAY? — NO.</strong></p>
+    <p>No query-time admission, filtering, ordering, or pagination anywhere in the repository depends on a persisted score. Every company set is loaded by <code>status</code> first; all Match filtering and sorting happens in memory afterwards.</p>
+  </div>
+
+  <div class="prose">
+    <h3>Reachable post-load consumers of persisted <code>fit_score</code></h3>
+    <p>Listed for the record only. No recommendation on persistence follows from this section.</p>
+  </div>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Consumer</th><th>Reads</th><th>Use</th><th>Rescores first?</th><th>Reachable?</th></tr></thead>
+    <tbody>
+      <tr><td><code>SavedCompanies:145</code></td><td><code>c.fit_score \|\| 0</code></td><td>Sorts the saved list</td><td><span class="chip c-stop">No</span> — no scorer imported</td><td><span class="chip c-ok">Yes</span> — Scout tab, <code>ScoutMain:169</code></td></tr>
+      <tr><td><code>SavedCompanies:493</code></td><td><code>current?.fit_score \|\| 0</code></td><td>Displays the score</td><td><span class="chip c-stop">No</span></td><td><span class="chip c-ok">Yes</span></td></tr>
+      <tr><td><code>CompanyDetail:965</code>, guard <code>:988</code></td><td><code>company.fit_score \|\| 0</code></td><td>Renders "N% fit"; hidden when 0</td><td><span class="chip c-stop">No</span></td><td><span class="chip c-ok">Yes</span> — <code>/company/:companyId</code></td></tr>
+      <tr><td><code>OnboardingFlow:478</code></td><td><code>c.fit_score \|\| c.icpScore \|\| 50</code></td><td>Step 5 list, <code>hasFreshData</code> branch (any company &lt; 24h old)</td><td><span class="chip c-stop">No</span> — the branch exists to skip rescoring</td><td><span class="chip c-ok">Yes</span></td></tr>
+      <tr><td><code>MissionControlDashboardV2:777</code></td><td><code>c.fit_score \|\| c.icpScore \|\| 0</code></td><td>Fallback only when <code>activeProfile</code> is null</td><td><span class="chip c-warn">Conditional</span></td><td><span class="chip c-ok">Yes</span></td></tr>
+      <tr><td><code>CompanyCard:123</code></td><td><code>company.fit_score \|\| 0</code></td><td>Card badge</td><td>Depends on caller</td><td><span class="chip c-ok">Yes</span> via <code>CompanyList</code> (<code>App:759</code>) and <code>AddCompanyForm</code> (<code>App:776</code>); <span class="chip c-dead">Dead</span> via <code>ScoutDashboardPage</code> — imported at <code>App:34</code>, never rendered</td></tr>
+      <tr><td><code>MobileCompanyCard:16</code></td><td><code>company.fit_score \|\| 0</code></td><td>Card badge</td><td>Receives the recomputed value from <code>MCDv2</code></td><td><span class="chip c-ok">Yes</span></td></tr>
+      <tr><td><code>MissionControl.jsx</code> (all reads)</td><td><code>fit_score</code> vs <code>ICP_SCORE_THRESHOLD = 70</code></td><td>SOM gating</td><td>—</td><td><span class="chip c-dead">Dead</span> — file imported by nothing</td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose">
+    <p>Four reachable surfaces read persisted Match without rescoring: Saved Companies (sort and display), Company Detail, and the Onboarding Step 5 fresh-data branch. Discovery writes no <code>fit_score</code>, and the only writer is <code>ICPSettings.recalculateAllScores:274</code>.</p>
+  </div>
+</section>
+
+<section id="c3">
+  <div class="sec-head"><span class="sec-letter">§3</span><h2>C3 — First-search targeting contract</h2></div>
+  <div class="prose">
+    <p><code>buildApolloQuery</code> (<code>search-companies.js:659</code>, called once at <code>:289</code>) emits at most four Apollo parameters. Everything else the profile carries is either applied after retrieval, logged, or ignored.</p>
+    <pre class="diagram">query = { page: 1, per_page: 50 }                          <i>always</i>
+  + q_organization_keyword_tags          ← industries ∪ companyKeywords ∪ adaptiveSignals
+  + organization_num_employees_ranges    ← companySizes, "51-100" → "51,100"
+  + organization_locations               ← locations via `${state}, United States`
+                                            <i>or</i> ["United States"] when isNationwide</pre>
+  </div>
+
+  <h3>Parameter classification</h3>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Input</th><th>Apollo parameter</th><th>Class</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td><code>industries</code></td><td><code>q_organization_keyword_tags</code> (lowercased, free text)</td><td><span class="chip c-ok">B — Material targeting</span></td><td><code>:672</code>. Sent as <strong>keyword tags, not Apollo industry IDs</strong>.</td></tr>
+      <tr><td><code>companySizes</code></td><td><code>organization_num_employees_ranges</code></td><td><span class="chip c-ok">B — Material targeting</span></td><td><code>:716</code>. A true structured Apollo filter.</td></tr>
+      <tr><td><code>locations</code></td><td><code>organization_locations</code></td><td><span class="chip c-ok">B — Material targeting</span></td><td><code>:748</code> via <code>formatStatesForApollo:219</code> — requires US state names.</td></tr>
+      <tr><td><code>isNationwide</code></td><td><code>organization_locations = ["United States"]</code></td><td><span class="chip c-warn">C — Optional refinement</span></td><td><code>:753</code>. Country-level only; comment states that without it Apollo returns global results.</td></tr>
+      <tr><td><code>companyKeywords</code></td><td><code>q_organization_keyword_tags</code></td><td><span class="chip c-warn">C — Optional refinement</span></td><td><code>:680</code>. Same tag list as industries; narrows only if populated.</td></tr>
+      <tr><td><code>adaptiveSignals.savedIndustries</code></td><td><code>q_organization_keyword_tags</code> (prepended)</td><td><span class="chip c-warn">C — Optional refinement</span></td><td><code>:697</code>. Request-scoped; not part of any profile.</td></tr>
+      <tr><td><code>revenueRanges</code>, <code>skipRevenue</code></td><td>— none —</td><td><span class="chip c-stop">E — Unused</span></td><td><code>:735–745</code> — the entire <code>revenue_range</code> block is <strong>commented out</strong>: "TEMPORARILY DISABLED TO DEBUG - Apollo keeps rejecting with Invalid parameters".</td></tr>
+      <tr><td><code>foundedAgeRange</code></td><td>— none —</td><td><span class="chip c-decide">D — Post-search only</span></td><td>Read at <code>:315</code>, applied at <code>:388</code> via <code>passesAgeFilter</code> after the page returns.</td></tr>
+      <tr><td><code>scoringWeights</code></td><td>— none —</td><td><span class="chip c-decide">D — Ranking only</span></td><td>Never reaches the server; consumed by <code>calculateICPScore</code> on the client.</td></tr>
+      <tr><td><code>targetTitles</code></td><td>— none —</td><td><span class="chip c-stop">E — Unused</span></td><td>Absent by design — organization search, not people search (comment at <code>:700–706</code>).</td></tr>
+      <tr><td><code>lookalikeSeed</code></td><td>— none —</td><td><span class="chip c-stop">E — Unused</span></td><td><code>:685</code> logs the seed and explicitly does not add it: "Don't add the actual company name".</td></tr>
+      <tr><td><code>searchStrategy</code></td><td>— none —</td><td><span class="chip c-stop">E — Unused</span></td><td><code>:688</code>, logged only.</td></tr>
+      <tr><td><code>avoidIndustries</code> / <code>excludedIndustries</code></td><td>— none —</td><td><span class="chip c-stop">E — Unused</span></td><td>No exclusion parameter is constructed anywhere in the function.</td></tr>
+      <tr><td><code>getIndustryIds:201</code></td><td>— none —</td><td><span class="chip c-dead">Dead</span></td><td>No caller. The Apollo industry-ID mapping exists and is never used.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="prose">
+    <p><strong>Class A is empty.</strong> No profile input is required for the search to execute. The only guard is <code>:236</code> — <code>if (!userId || !authToken || !companyProfile) throw</code> — and an empty object satisfies it.</p>
+  </div>
+
+  <h3>Six cases</h3>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Case</th><th>Input</th><th>Apollo parameters produced</th><th>Retrieval changes?</th><th>Classification</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>1</strong> Empty profile</td>
+        <td><code>{}</code></td>
+        <td><code>page</code>, <code>per_page</code> only</td>
+        <td><span class="chip c-stop">No</span></td>
+        <td><strong>Executable, untargeted.</strong> Passes the <code>:236</code> guard; three "⚠️ No … selected!" branches log at <code>:675</code>, <code>:731</code>, <code>:756</code>. Apollo returns unfiltered global organizations. <code>passesAgeFilter</code> returns <code>true</code> immediately (<code>:16</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>2</strong> Phase 0B projection</td>
+        <td><code>idealCustomerTypes</code>, <code>excludedIndustries</code>, <code>valueProposition</code>, <code>perfectCustomer</code></td>
+        <td><strong>None</strong></td>
+        <td><span class="chip c-stop">No</span></td>
+        <td><strong>Identical to Case 1.</strong> <code>OnboardingFlow:423–426</code> writes these four as top-level fields on <code>dashboards/{userId}</code>. They are never written to <code>companyProfile/current</code>, never sent to <code>search-companies</code>, and <code>buildApolloQuery</code> reads none of them. Repo-wide grep finds no consumer for <code>idealCustomerTypes</code>, <code>excludedIndustries</code> or <code>perfectCustomer</code> outside the question definitions themselves.</td>
+      </tr>
+      <tr>
+        <td><strong>3</strong> Industry only</td>
+        <td><code>industries: ["Financial Services"]</code></td>
+        <td><code>q_organization_keyword_tags: ["financial services"]</code></td>
+        <td><span class="chip c-ok">Yes</span></td>
+        <td><strong>Meaningfully targeted — minimally.</strong> A single free-text keyword tag. No location bound, so results are global.</td>
+      </tr>
+      <tr>
+        <td><strong>4</strong> Industry + geography</td>
+        <td><code>industries</code> + <code>locations: ["TX"]</code></td>
+        <td><code>q_organization_keyword_tags</code> + <code>organization_locations: ["TX, United States"]</code></td>
+        <td><span class="chip c-ok">Yes — two axes</span></td>
+        <td><strong>Meaningfully targeted.</strong> Adds a structured geographic bound to the keyword match.</td>
+      </tr>
+      <tr>
+        <td><strong>5</strong> Industry + company size</td>
+        <td><code>industries</code> + <code>companySizes: ["101-200"]</code></td>
+        <td><code>q_organization_keyword_tags</code> + <code>organization_num_employees_ranges: ["101,200"]</code></td>
+        <td><span class="chip c-ok">Yes — two axes</span></td>
+        <td><strong>Meaningfully targeted.</strong> Size is a structured Apollo filter, so this narrows more reliably than the keyword tag alone.</td>
+      </tr>
+      <tr>
+        <td><strong>6</strong> Smallest materially-targeted set</td>
+        <td><code>industries</code> + <strong>either</strong> <code>locations</code> <strong>or</strong> <code>companySizes</code></td>
+        <td>Keyword tags + one structured filter</td>
+        <td><span class="chip c-ok">Yes</span></td>
+        <td><strong>The observed floor.</strong> <code>industries</code> alone (Case 3) is the minimum that changes retrieval at all, but it produces only an unbounded free-text keyword match. Pairing it with one of the two <em>structured</em> filters is the smallest currently-supported combination that constrains retrieval on a bounded axis. <code>isNationwide</code> alone yields <code>["United States"]</code> — a country-level bound that narrows very little.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <span class="tag">Executable vs meaningfully ICP-targeted</span>
+    <p><strong>Executable requires nothing.</strong> Class A is empty: <code>{}</code> reaches Apollo and returns results. The Phase 0B fields make the profile non-empty in <code>dashboards/{userId}</code> but leave the query byte-identical to the empty case, because they are stored somewhere <code>search-companies</code> never reads.</p>
+    <p><strong>Meaningfully targeted requires <code>industries</code> at minimum, and one structured filter to bound it.</strong> Only three inputs reach Apollo as retrieval constraints — <code>industries</code>, <code>companySizes</code>, <code>locations</code> — and only two of those are structured. Revenue is commented out, exclusions have no parameter, titles and lookalike seed are unused, and the Apollo industry-ID mapper is dead.</p>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="sec-head"><span class="sec-letter">§4</span><h2>Evidence limitations</h2></div>
+  <div class="prose">
+    <ul>
+      <li><strong>Apollo's response to each query shape is not observed.</strong> "Retrieval changes" above means the request differs; how much Apollo actually narrows on a free-text <code>q_organization_keyword_tags</code> match cannot be established from the repository. Case 3 versus Cases 4–6 is a claim about the request, not about result counts.</li>
+      <li><strong>Case 2 is traced against <code>OnboardingFlow.jsx</code> on <code>main</code> at <code>f3d78a5</code>.</strong> If Phase 0B includes a projection into <code>companyProfile/current</code> that is not yet merged, this finding changes and should be re-run against that branch.</li>
+      <li><strong>C1 Q4's step 2 is traced but not executed.</strong> Deleting the active ICP leaves no profile marked active, and every downstream fallback resolves to <code>default</code>. Each hop is cited, but the sequence has not been reproduced against a live Firestore instance.</li>
+    </ul>
+    <p>Nothing here prevented a factual answer to C1, C2 or C3.</p>
+  </div>
+</section>
+
+<section id="hold">
+  <div class="sec-head"><span class="sec-letter">§5</span><h2>Hold confirmation</h2></div>
+  <ul class="gate">
+    <li>No application code changed. The only file added is this document.</li>
+    <li>No architecture proposed.</li>
+    <li>No migration proposed.</li>
+    <li>Phase 1B not started.</li>
+    <li>ICP storage, <code>companyProfile/current</code>, active-ICP behaviour, <code>DEFAULT_ICP_ID</code>, Match, <code>fit_score</code>, <code>recalculateAllScores</code>, scoring weights and onboarding are all untouched.</li>
+    <li>Coverage not implemented. <code>barryFeedback.score</code> not renamed or split. RECON not wired into Match.</li>
+    <li>D8 and D9 not investigated.</li>
+  </ul>
+</section>
+
+<footer class="end">
+  TEAM A · CONVERGENCE CLOSURE TRACE · C1–C3<br>
+  Traced against <code>main</code> at <code>f3d78a5</code>, PR #570 merged.<br>
+  Next step is the Convergence Decision Packet. Team A is holding.
+</footer>
+
+</div>

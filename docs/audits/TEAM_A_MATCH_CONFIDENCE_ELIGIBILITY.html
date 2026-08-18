@@ -1,0 +1,1138 @@
+<title>Match Without Evidence</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Team A · Scout Intelligence · Phase 8 · Investigation only</p>
+  <h1>Match Without Evidence</h1>
+  <p class="standfirst">Scout's Match Score is computed from a company record that contains no location, no employee count, and — when Apollo could not classify the company — an industry copied from the user's own ICP. The score is not wrong arithmetic. It is arithmetic over data that was never collected.</p>
+  <div class="meta">
+    <span><b>Scope</b> Items 1–9 of the post-#561 direction</span>
+    <span><b>Code changed</b> none</span>
+    <span><b>Method</b> executed, not reasoned</span>
+  </div>
+</header>
+
+<section id="scope">
+  <div class="scope">
+    <div><span class="k">Live Match formulas</span><span class="v hi">1</span><p class="n">Not two. The server scorer is unreachable.</p></div>
+    <div><span class="k">Fields the score needs</span><span class="v">4</span><p class="n">Two of them are absent from every discovered company.</p></div>
+    <div><span class="k">Perfect vs. industry-only</span><span class="v hi">10</span><p class="n">Points of separation after persistence. Raw Apollo separates them by 50.</p></div>
+    <div><span class="k">Dead intelligence paths</span><span class="v">3</span><p class="n">Fit gate, ICP drift detection, post-fetch filters.</p></div>
+  </div>
+</section>
+
+<section id="blocker">
+  <div class="sec-head"><span class="sec-letter">§0</span><h2>Blocker: the reference document does not exist</h2></div>
+  <div class="prose">
+    <div class="flag stop">
+      <p class="lede">"Barry Intelligence Contract v0.2" is not in this repository.</p>
+      <p>I searched every tracked file across all branches for the phrase "intelligence contract", searched the full git history for commits referencing it, and searched the issue tracker. Nothing matches. There is no document by that name, and no versioned document at v0.2.</p>
+    </div>
+    <p>Item 3 asked me to map the five Scout layers against that contract, and item 6 cited it as the authority separating evidence, source, authority, confidence and temporal scope. I will not paraphrase a document I have not read.</p>
+    <p>What the repository <em>does</em> contain is a five-document frozen architecture stack under <code>docs/barry-os/architecture/</code>, authored by Team B and frozen between 2026-08-07 and 2026-08-11:</p>
+    <ol>
+      <li><code>BARRY_OS_REFERENCE_ARCHITECTURE.md</code> — frozen 2026-08-07</li>
+      <li><code>BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md</code> — frozen 2026-08-08</li>
+      <li><code>BARRY_OS_SIGNAL_SPECIFICATION.md</code> — frozen 2026-08-08</li>
+      <li><code>BARRY_OS_CAPABILITY_CONTRACTS.md</code> — frozen 2026-08-11</li>
+      <li><code>BARRY_OS_IMPLEMENTATION_PLAN.md</code> — frozen 2026-08-11</li>
+    </ol>
+    <p>These are governing contracts: Document 4 states "The architecture freeze rule is in force. Documents 1–5 are frozen." They define an object called <code>Company</code> with an <code>icp_score</code>, a Skill called <code>ScoreICPFitSkill</code>, a signal called <code>company.icp_evaluated</code>, and a <code>confidence</code> field on <code>Recommendation</code>. They are the closest existing thing to what item 3 asked for, and Scout is already in scope of them.</p>
+    <p><strong>I have reconciled the Scout layers against those five documents instead</strong>, and flagged every place the answer would change if v0.2 says something different. If "Barry Intelligence Contract v0.2" exists outside the repo, send it and I will redo §3 and §6 against it.</p>
+  </div>
+</section>
+
+<section id="item1">
+  <div class="sec-head"><span class="sec-letter">§1</span><h2>Item 1 — the isolated PR is open</h2></div>
+  <div class="prose">
+    <p><strong>PR #570</strong> — <em>Scout: scope adaptive searches to the active ICP, drop a dead signal read.</em> Four files, +201/−11, branched from <code>main</code>, containing only the #564/#565 correctness fixes and their 11 regression tests. No scoring, ranking, schema, RECON, or copy changes.</p>
+    <p>The description states the #564 finding plainly: the issue premise was incorrect, <code>person_titles</code> belongs to people discovery and cannot legitimately influence an organization query, and the real defect was an unbounded contacts-collection read whose result was logged and discarded. Using observed titles during <em>people</em> discovery is left open as a product decision.</p>
+    <div class="callout">
+      <span class="tag">Deviation to flag</span>
+      <p>The standing convention is to develop on <code>claude/idynify-positioning-handoff-dcpnhl</code>. That branch already carried the #561 investigation report, which is unrelated to #564/#565. To honour "no unrelated changes" I cut a dedicated branch, <code>claude/scout-adaptive-search-fixes</code>, from <code>main</code> and cherry-picked only the fix commit. The designated branch has been restarted from <code>main</code> and now carries the investigation reports only.</p>
+    </div>
+  </div>
+</section>
+
+<section id="item2">
+  <div class="sec-head"><span class="sec-letter">§2</span><h2>Item 2 — #561–563 frozen, reframed as directed</h2></div>
+  <div class="tscroll"><table>
+    <thead><tr><th>Issue</th><th>Disposition</th><th>Recorded question</th></tr></thead>
+    <tbody>
+      <tr><td>#561</td><td><span class="chip c-decide">Reframe</span></td><td>Not "how should RECON influence Scout scoring?" but <strong>what is the authoritative source of ICP intelligence, and how should Scout consume it consistently?</strong> §7 answers this with evidence.</td></tr>
+      <tr><td>#562</td><td><span class="chip c-warn">Hold — data dependency</span></td><td>Buying and behavioural signals belong to <strong>Priority</strong>, not Match. RECON may define which signals matter; IDYNIFY has no per-company event source to observe them. Confirmed: the persisted company document carries no event history of any kind.</td></tr>
+      <tr><td>#563</td><td><span class="chip c-warn">Hold — data dependency</span></td><td>Competitive intelligence may inform messaging and explanation today. No competitor-based filtering or prioritisation until reliable per-company vendor evidence exists. None exists.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="item3">
+  <div class="sec-head"><span class="sec-letter">§3</span><h2>Item 3 — the five Scout layers, reconciled</h2></div>
+  <div class="prose">
+    <p>First, a naming collision worth settling before the model is frozen. Document 1 §2 already defines "The Five Layers" — and they are not these:</p>
+    <pre class="diagram"><b>Barry OS five layers</b>  (Document 1 §2 — a <i>provenance</i> taxonomy)
+  Signal → Awareness → Recommendation → Prepared Action → Executed Action
+  <i>"These are not stages in a pipeline. They are distinct object types
+   with distinct storage, distinct lifecycles, and distinct ownership."</i>
+
+<b>Scout intelligence layers</b>  (this model — a <i>judgment</i> stack)
+  Eligibility → Match → Confidence → Priority → Relationship Intel → Next Action</pre>
+    <p>These are orthogonal, not competing. Every Scout layer below <em>lives inside</em> one or two Barry OS layers. Eligibility, Match and Confidence are all Layer-2 facts about a company. Priority and Next Action are Layer-3 recommendations. Relationship Intelligence straddles both. <strong>Naming the Scout stack "the five layers" will collide with a frozen document</strong> — I recommend "the Scout judgment stack" or similar, and I have used that framing throughout.</p>
+    <p>With that resolved, the model is sound and I recommend ratifying it. The mapping:</p>
+  </div>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Scout layer</th><th>Intelligence involved</th><th>Primary scope</th><th>Producer</th><th>Evidence</th><th>Consumer</th><th>Update trigger</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Eligibility</strong><br><span class="chip c-ok">Exists</span></td>
+        <td>Hard admissibility. Binary. Never a score.</td>
+        <td>Query-scoped — a property of this search, not of the company.</td>
+        <td>Server. <code>passesAgeFilter</code> (<code>search-companies.js:388</code>) is the only live instance; dedup via <code>getExistingCompanyIds</code> is the second.</td>
+        <td>Apollo <code>founded_year</code>; existing company IDs.</td>
+        <td>The Apollo result loop, before any write.</td>
+        <td>Each search execution.</td>
+      </tr>
+      <tr>
+        <td><strong>Match</strong><br><span class="chip c-warn">Exists, unsound</span></td>
+        <td>Degree of fit against stated ICP criteria. Barry OS calls this <code>icp_score</code>.</td>
+        <td>Workspace-durable, ICP-scoped. Changes when the ICP changes, not when the company does.</td>
+        <td>Client. <code>calculateICPScore</code> (<code>icpScoring.js:318</code>). Contract target: <code>ScoreICPFitSkill</code>.</td>
+        <td>Four firmographic dimensions — <strong>two of which are never persisted</strong> (§4).</td>
+        <td>DailyLeads queue order; Mission Control SOM gate; SavedCompanies sort.</td>
+        <td>Today: page load (in memory) and ICP save (persisted). These disagree.</td>
+      </tr>
+      <tr>
+        <td><strong>Confidence</strong><br><span class="chip c-stop">Absent</span></td>
+        <td>How much relevant evidence existed when Match was computed.</td>
+        <td>Per-company, per-evaluation. Temporal — decays.</td>
+        <td>Would be the same producer as Match; must be emitted <em>with</em> it.</td>
+        <td>Which dimensions resolved to real data vs. <code>UNKNOWN</code>; provenance and age of each value.</td>
+        <td>Anything that would otherwise read a Match score as certainty.</td>
+        <td>Same trigger as Match — the two are one output, not two.</td>
+      </tr>
+      <tr>
+        <td><strong>Priority</strong><br><span class="chip c-stop">Absent</span></td>
+        <td>Why this company deserves attention <em>now</em>.</td>
+        <td>Time-scoped. Decays without new events.</td>
+        <td>Think Layer (Doc 1 §4.6). Nothing today.</td>
+        <td>Requires per-company events. <strong>IDYNIFY has none</strong> — this is the #562 data dependency.</td>
+        <td>Mission Control ordering; Morning Brief.</td>
+        <td>Signal arrival. There is no signal bus.</td>
+      </tr>
+      <tr>
+        <td><strong>Relationship Intelligence</strong><br><span class="chip c-warn">Partial</span></td>
+        <td>What IDYNIFY knows about this entity and the user's path to it.</td>
+        <td>Entity-durable. Accumulates.</td>
+        <td>Contacts pipeline; <code>barry_intel</code> on the company doc.</td>
+        <td>Contacts, engagement history. <code>barry_intel</code> is a rule-based summary of firmographics, not relationship data.</td>
+        <td>Company detail; Hunter.</td>
+        <td>Contact writes.</td>
+      </tr>
+      <tr>
+        <td><strong>Next Action</strong><br><span class="chip c-warn">Partial</span></td>
+        <td>What to do given everything above and the current objective.</td>
+        <td>Session-scoped. Expires.</td>
+        <td><code>GenerateNextStepSkill</code> per contract; <code>nextBestStepService</code> today.</td>
+        <td>All layers above plus the user's objective.</td>
+        <td>The card CTA.</td>
+        <td>User arrival at the surface.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="prose">
+    <h3>Two contradictions inside the frozen stack that this model must not inherit</h3>
+    <p>Documents 1–3 are frozen and Document 4 explicitly "may not redefine" them. It does anyway, in two places that bear directly on Match:</p>
+    <div class="tscroll"><table>
+      <thead><tr><th>Field</th><th>Doc 2 (Domain Model)</th><th>Doc 3 (Signals)</th><th>Doc 4 (Capabilities)</th></tr></thead>
+      <tbody>
+        <tr><td><code>icp_score</code> scale</td><td class="num">1–10</td><td class="num">1–10</td><td class="num"><strong>0–100</strong></td></tr>
+        <tr><td><code>icp_decision</code> third value</td><td><code>pending</code></td><td><code>pending</code></td><td><strong><code>needs_review</code></strong></td></tr>
+      </tbody>
+    </table></div>
+    <p>The running code uses 0–100 throughout. Doc 4's <code>ScoreICPFitOutput</code> agrees with the code; Docs 2 and 3 do not. Someone with authority over the frozen stack has to pick one before <code>ScoreICPFitSkill</code> is built, or the first implementation will silently pick for them. I recommend 0–100 — it matches every surface, every stored <code>fit_score</code>, and the only contract written after the code was read.</p>
+    <p>The <code>needs_review</code> / <code>pending</code> split is not cosmetic either. <code>pending</code> means "not yet evaluated". <code>needs_review</code> means "evaluated, and the result was inconclusive". Those are different states, and the second one is exactly what a low-Confidence Match should produce. That argues for keeping <em>both</em>, not choosing.</p>
+  </div>
+</section>
+
+<section id="item4">
+  <div class="sec-head"><span class="sec-letter">§4</span><h2>Item 4 — the twelve scenarios, executed</h2></div>
+  <div class="prose">
+    <p>I did not hand-compute these. I copied <code>calculateFitScore</code> and its four helpers verbatim out of <code>search-companies.js</code>, imported <code>calculateICPScore</code> from <code>icpScoring.js</code>, reproduced <code>saveCompaniesToFirestore</code>'s persistence step exactly, and ran all twelve fixtures through all three. The numbers below are program output.</p>
+    <p>Before the table, the finding that changes what the table means.</p>
+    <div class="flag stop">
+      <p class="lede">There are not two competing Match formulas. There is one, and it is the client's.</p>
+      <p><code>calculateFitScore</code> is called only by <code>enrichCompanyData</code>. <code>enrichCompanyData</code> is called by nothing. <code>validateCompanyData</code> — which contains the <code>&lt; 50</code> gate — is called by nothing. <code>generateFitReasons</code>, <code>extractLocation</code>, <code>extractMidpoint</code>, <code>isWithinSizeRange</code>, <code>formatEmployeeRange</code>, <code>formatRevenueRange</code> and the server's <code>extractStateFromLocation</code> are all reachable only from those two dead functions. I grepped the entire repository, not just the file.</p>
+      <p>The live write path is <code>saveCompaniesToFirestore</code>, and its own comment says what it does: <em>"SIMPLIFIED: Accept ALL companies - no filtering or complex scoring."</em> Close to 300 lines of server scoring machinery — including the gate this investigation was convened to challenge — has been unreachable for some time.</p>
+    </div>
+    <p>The server column below therefore answers a hypothetical: <em>what would happen if that code were revived</em>. That hypothetical is not idle — any proposal to make the server canonical is a proposal to revive exactly this code, so it needs to be scored.</p>
+    <p>The <strong>displayed</strong> column is the one that describes production. It runs the client formula over the document that discovery actually writes.</p>
+
+    <h4>ICP under test</h4>
+    <p class="mono" style="font-size:12.5px">industries: ["Financial Services"] · companySizes: ["101-200"] · revenueRanges: ["$10M-$20M"] · locations: ["TX"] · weights: industry 50, location 25, size 15, revenue 10</p>
+  </div>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>#</th><th>Scenario</th><th>Server</th><th>Admitted?</th><th>Client (raw)</th><th>Displayed (real)</th><th>Coverage</th><th>Desired semantic result</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>Perfect match</td><td class="num">100</td><td><span class="chip c-ok">kept</span></td><td class="num">100</td><td class="num"><strong>80</strong></td><td>4 of 4</td><td>Match 100, Confidence full. <strong>Displays 80.</strong></td></tr>
+      <tr><td class="num">2</td><td>Industry match only</td><td class="num">50</td><td><span class="chip c-ok">kept</span></td><td class="num">50</td><td class="num"><strong>70</strong></td><td>4 of 4</td><td>~50. Three of four criteria fail. Kept, ranked low.</td></tr>
+      <tr><td class="num">3</td><td>Location match only</td><td class="num">45</td><td><span class="chip c-stop">dropped</span></td><td class="num">25</td><td class="num">20</td><td>4 of 4</td><td>~25, high Confidence. Visible, bottom of queue.</td></tr>
+      <tr><td class="num">4</td><td>Size match only</td><td class="num">45</td><td><span class="chip c-stop">dropped</span></td><td class="num">15</td><td class="num">20</td><td>4 of 4</td><td>~15, high Confidence.</td></tr>
+      <tr><td class="num">5</td><td>Revenue match only</td><td class="num">20</td><td><span class="chip c-stop">dropped</span></td><td class="num">10</td><td class="num">30</td><td>4 of 4</td><td>~10, high Confidence. Weakest of the four.</td></tr>
+      <tr><td class="num">6</td><td>Three matches + <strong>missing</strong> revenue</td><td class="num">80</td><td><span class="chip c-ok">kept</span></td><td class="num">95</td><td class="num">75</td><td>3 of 4</td><td>High Match over known dimensions, <strong>Confidence reduced to 3/4</strong>. Absence must not be penalised — or rewarded.</td></tr>
+      <tr><td class="num">7</td><td>Three matches + <strong>wrong</strong> revenue</td><td class="num"><strong>100</strong></td><td><span class="chip c-ok">kept</span></td><td class="num">90</td><td class="num">70</td><td>4 of 4</td><td>~90, full Confidence. <strong>Must never outscore #6.</strong> The server scores it 20 points higher.</td></tr>
+      <tr><td class="num">8</td><td>Perfect match, revenue <strong>unconfigured</strong></td><td class="num">100</td><td><span class="chip c-ok">kept</span></td><td class="num">100</td><td class="num">78</td><td>3 of 3</td><td>Match 100, Confidence <em>full</em>. Unconfigured is not unknown.</td></tr>
+      <tr><td class="num">9</td><td>Mostly unknown Apollo data</td><td class="num">30</td><td><span class="chip c-stop">dropped</span></td><td class="num">75</td><td class="num"><strong>75</strong></td><td>1 of 4</td><td><strong>Indeterminate.</strong> Should read <code>needs_review</code>, not 75. The two formulas differ by 45 points and disagree on admission.</td></tr>
+      <tr><td class="num">10</td><td>Wrong industry, all else matches</td><td class="num"><strong>70</strong></td><td><span class="chip c-ok">kept</span></td><td class="num">50</td><td class="num">30</td><td>4 of 4</td><td>~30. A confirmed miss on the primary axis should cap Match. The server ranks it <em>above</em> #2, which matches the industry.</td></tr>
+      <tr><td class="num">11</td><td>Avoid-industry company</td><td class="num">70</td><td><span class="chip c-ok">kept</span></td><td class="num">50</td><td class="num">30</td><td>4 of 4</td><td><strong>Ineligible</strong> — not low-scoring. Neither formula knows avoid-lists exist.</td></tr>
+      <tr><td class="num">12</td><td>No ICP criteria configured</td><td class="num">0</td><td><span class="chip c-stop">dropped</span></td><td class="num">50</td><td class="num">50</td><td>0 of 0</td><td><strong>Unscored</strong>, not 50 and not 0. Server behaviour: empties the queue for every new user.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="prose">
+    <h3>What the matrix proves</h3>
+
+    <h4>1 · Persistence destroys 80% of the score's discriminating power</h4>
+    <p>Apollo's <code>mixed_companies/search</code> endpoint returns neither employee count nor headquarters location — the code says so in its own comments at <code>search-companies.js:939</code> and <code>:956</code>. So the document written to Firestore carries <code>name</code>, <code>industry</code>, <code>revenue</code>, <code>founded_year</code>, <code>phone</code>, and three URLs. <strong>Two of the four scored dimensions are structurally absent from every company Scout has ever discovered.</strong></p>
+    <p>Both resolve to <code>UNKNOWN = 50</code> for every company, contributing a constant 2,000 of the 10,000-point weighted numerator regardless of what the company is. The consequence is scenario 1 versus scenario 2: on raw Apollo data a perfect company and an industry-only company are 50 points apart. On the document that actually ships they are <strong>10 points apart — 80 versus 70</strong>. And scenario 2 is not an outlier: six of the twelve displayed scores land in the 70–80 band.</p>
+
+    <h4>2 · Industry is fabricated when Apollo cannot classify a company</h4>
+    <p><code>saveCompaniesToFirestore:960</code> resolves industry as:</p>
+    <pre class="diagram">const industry = company.industry
+              || company.primary_industry
+              || <b>companyProfile.industries?.[0]</b>   <i>// ← the user's own ICP</i>
+              || 'Unknown';</pre>
+    <p>When Apollo returns no industry, the company is stamped with the first industry from the user's ICP. It then scores a <em>confirmed</em> match on the 50-weight dimension, and <code>generateMatchReasons</code> renders the sentence <em>"Matches your target industry: Financial Services."</em> I ran it:</p>
+    <div class="tscroll"><table>
+      <thead><tr><th>Apollo returned</th><th>Stored as</th><th>Score</th><th>Reason shown to the user</th></tr></thead>
+      <tbody>
+        <tr><td>no industry</td><td><code>Financial Services</code></td><td class="num">75</td><td>"Matches your target industry: Financial Services"</td></tr>
+        <tr><td><code>Financial Services</code></td><td><code>Financial Services</code></td><td class="num">75</td><td>"Matches your target industry: Financial Services"</td></tr>
+      </tbody>
+    </table></div>
+    <p>Identical score. Identical explanation. In one of those rows IDYNIFY knows the company's industry; in the other it is reading back the user's own input and presenting it as a finding. <strong>This is the most serious defect in the report</strong> — not because the arithmetic is wrong, but because the explanation is false, and Law 11 of the Barry OS principles is "if Barry cannot explain why he recommended something, that recommendation should not ship."</p>
+
+    <h4>3 · The literal string "Unknown" is scored as a definite miss</h4>
+    <p>When the ICP has no industries either, the fallback lands on the literal <code>'Unknown'</code>. <code>evalIndustry</code> treats it as a real value that matches nothing — <code>match: 0</code>, not <code>UNKNOWN: 50</code>:</p>
+    <div class="tscroll"><table>
+      <thead><tr><th>Company document</th><th>Score</th><th>Meaning applied</th></tr></thead>
+      <tbody>
+        <tr><td><code>industry: "Unknown"</code></td><td class="num">25</td><td>Confirmed miss</td></tr>
+        <tr><td>industry field absent</td><td class="num">50</td><td>Unknown data</td></tr>
+      </tbody>
+    </table></div>
+    <p>A 25-point swing decided by which branch of a fallback chain fired, for two documents that encode the same fact: <em>we do not know this company's industry.</em></p>
+
+    <h4>4 · The server formula rewards having wrong data over having no data</h4>
+    <p>Scenario 7 versus scenario 6, and the line that causes it (<code>calculateFitScore:1328</code>):</p>
+    <pre class="diagram">if (company.revenue_range) {
+  score += 20;          <i>// points for the field <b>existing</b>, not for matching</i>
+}</pre>
+    <p>Scenario 7's revenue is <code>$1B+</code> against an ICP wanting <code>$10M-$20M</code>. It scores the full 20. Scenario 6, which simply has no revenue data, scores 0. A company that is <em>demonstrably wrong</em> on a dimension outranks one that is merely unmeasured, by 20 points. This is the single strongest argument against reviving the server scorer as written.</p>
+
+    <h4>5 · The server's weighting inverts the ICP's own priority</h4>
+    <p>Scenario 10 — wrong industry, everything else correct — scores <strong>70</strong> on the server and is admitted. Scenario 2 — correct industry, everything else wrong — scores <strong>50</strong> and barely survives. The server weights industry at 30 of 100 while location and size together carry 50. The client weights industry at 50 alone. The client is right: industry is the axis an ICP is actually built on, and every user-facing string in Scout says so.</p>
+
+    <h4>6 · Coverage is invisible in the number</h4>
+    <p>Scenario 9 knows <strong>one</strong> of four dimensions and displays <strong>75</strong>. Scenario 1 knows all four and every one matches, and displays <strong>80</strong>. Five points separate near-total ignorance from near-total confirmation. There is no way for a user, or for any downstream consumer, to tell those two apart from the score. This is item 6's entire justification, in one row pair.</p>
+
+    <h4>7 · Neither formula knows about avoid-industries</h4>
+    <p>Scenario 11 scores identically to scenario 10. RECON §3 collects <code>avoidIndustries</code> ("Any industries that are bad fit?"). Nothing reads it — not the scorers, not the Apollo query builder. A user who explicitly told IDYNIFY to avoid Hospitality gets Hospitality companies at the same rank as any other industry miss. That is an <em>Eligibility</em> failure, not a Match failure, and it is the clearest case in the report of collected intelligence going nowhere.</p>
+  </div>
+</section>
+
+<section id="item5">
+  <div class="sec-head"><span class="sec-letter">§5</span><h2>Item 5 — challenging the <code>&lt; 50</code> gate</h2></div>
+  <div class="prose">
+    <p>The gate was to be scrutinised for doing two jobs: deciding whether Scout <em>retains</em> a company, and telling the user <em>how well it fits</em>. The scrutiny has an unexpected answer.</p>
+    <div class="flag stop">
+      <p class="lede">The <code>&lt; 50</code> gate does not run. It has not been coupling anything.</p>
+      <p>It lives in <code>validateCompanyData</code> (<code>search-companies.js:1135</code>), which no code path calls. Discovery admits every company Apollo returns, subject only to <code>passesAgeFilter</code> and deduplication.</p>
+    </div>
+    <p>But the coupling the question was aimed at is real — it just sits somewhere else, and it is worse.</p>
+
+    <h3>The gate that is actually live</h3>
+    <p><code>MissionControl.jsx:15</code> defines <code>ICP_SCORE_THRESHOLD = 70</code> and applies it in five places to compute the serviceable market, the target list, and the map. It reads the <strong>persisted</strong> <code>fit_score</code> — and discovery never writes one. The only writer is <code>recalculateAllScores</code> in <code>ICPSettings.jsx:274</code>, which fires when a user saves their ICP.</p>
+    <pre class="diagram">Discovery writes company  ──▶  <b>no fit_score field</b>
+DailyLeads reads it       ──▶  scores in memory, <i>never persists</i>
+Mission Control reads it  ──▶  <b>fit_score == null → excluded from SOM</b>
+User re-saves their ICP   ──▶  fit_score finally written for every company</pre>
+    <p>So a company discovered today is invisible to Mission Control's market view until the user happens to open ICP Settings and press Save. Two surfaces show two different Match Scores for the same company, and the mechanism that reconciles them is a button in a settings page. That is a genuine coupling defect, it is live, and it is not the one the question named.</p>
+
+    <h3>Should a low Match Score make a company disappear?</h3>
+    <p><strong>No.</strong> Match should rank; Eligibility should admit. The implications, taken in the order asked:</p>
+  </div>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Dimension</th><th>If Match gates</th><th>If only Eligibility gates</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Apollo credits</strong></td><td>No saving whatsoever. The credit is spent at fetch time; the gate runs after the response is parsed. Discarding results post-fetch buys nothing and destroys data already paid for.</td><td>Identical cost, more retained value.</td></tr>
+      <tr><td><strong>Queue quality</strong></td><td>Improves only if the score is trustworthy. §4 shows it is not: the gate would drop scenario 9 (one known dimension) while keeping scenario 10 (confirmed industry miss). It removes the <em>unmeasured</em>, not the <em>unfit</em>.</td><td>Ranking puts weak fits at the bottom where they cost a scroll, not a lost company.</td></tr>
+      <tr><td><strong>Discovery volume</strong></td><td>Actively fights <code>QUEUE_TARGET</code> (<code>:382</code>), which pages Apollo <em>until</em> 50–100 companies are collected. A post-fetch gate makes that loop fetch more pages to replace what it discards — more credits, not fewer.</td><td>The target is met with the first pages fetched.</td></tr>
+      <tr><td><strong>User trust</strong></td><td>Silent deletion is unexplainable by construction. The user cannot audit a company they never saw, and "we found nothing" is indistinguishable from "we found things and hid them."</td><td>A visible low-ranked company with a stated reason is falsifiable. The user can disagree, and that disagreement is evidence.</td></tr>
+      <tr><td><strong>Skip / Save learning</strong></td><td>Fatal. A gate at the score level pre-filters exactly the population whose Skips would tell you the score is wrong. The system can only ever confirm itself.</td><td>Skips on low-Match companies are cheap confirmations; <strong>Saves on low-Match companies are the highest-value signal Scout can receive</strong> — they mark where the model and the user disagree.</td></tr>
+      <tr><td><strong>Explainability</strong></td><td>Impossible for the dropped set. Barry OS Law 11 requires explainable judgment; a discarded company has no record to explain.</td><td>Every company carries its reasons array.</td></tr>
+      <tr><td><strong>Sparse Apollo data</strong></td><td>Catastrophic, and this is the normal case, not the edge case. Two of four dimensions are absent for <em>every</em> company. A gate on this score is largely a gate on Apollo's coverage.</td><td>Sparse companies surface with low Confidence and can be enriched on demand.</td></tr>
+      <tr><td><strong>Narrow ICP</strong></td><td>Worst affected. Few companies clear a high bar; the gate can empty the queue entirely. Scenario 12 — no criteria configured — drops <em>everything</em> under the server formula.</td><td>Narrow ICPs get a short, well-ordered list instead of an empty one.</td></tr>
+      <tr><td><strong>Broad ICP</strong></td><td>Gate is inert — nearly everything clears it — so it provides no protection where volume is actually a problem.</td><td>Ranking is the only thing that helps a broad ICP, and it works.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="prose">
+    <div class="callout">
+      <span class="tag">Recommendation — no code change requested</span>
+      <p><strong>Do not revive the <code>&lt; 50</code> gate.</strong> The right disposition for the dead server scoring block is deletion, in its own PR, with the reasoning recorded — but that is a separate authorisation and I am not requesting it here.</p>
+      <p><strong>Keep Eligibility and Match separate and keep them where they belong.</strong> Eligibility is a server-side, pre-write, binary admission decision — today <code>passesAgeFilter</code> and dedup, and the natural home for <code>avoidIndustries</code>. Match is a ranking signal computed against an ICP and never a reason to discard.</p>
+      <p><strong>The live coupling worth fixing first is not a threshold at all</strong> — it is that Mission Control's <code>ICP_SCORE_THRESHOLD = 70</code> reads a field discovery never writes. That is a real user-visible bug today: newly discovered companies are missing from the market view. It needs no new architecture to fix. See §9-H.</p>
+    </div>
+  </div>
+</section>
+
+<section id="item6">
+  <div class="sec-head"><span class="sec-letter">§6</span><h2>Item 6 — what Scout Confidence should mean</h2></div>
+  <div class="prose">
+    <p>The two candidates, and why they are not the same thing:</p>
+    <div class="tscroll"><table>
+      <thead><tr><th></th><th>Coverage confidence</th><th>Evidence confidence</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Claim</strong></td><td>"We could evaluate 3 of the 4 dimensions your ICP configures."</td><td>"The values we used are accurate and current."</td></tr>
+        <tr><td><strong>Computed from</strong></td><td>Which dimensions resolved to real data rather than <code>UNKNOWN</code>. Pure arithmetic over what is in hand.</td><td>Source authority, field age, corroboration across providers, verification history.</td></tr>
+        <tr><td><strong>Requires</strong></td><td>Nothing new. Every input already exists inside <code>evaluateDimensions</code>.</td><td>Provenance per field. IDYNIFY stores none — <code>enrichment_provenance</code> is defined in Doc 2 and written nowhere.</td></tr>
+        <tr><td><strong>Can be wrong how?</strong></td><td>Says 100% while every value is three years stale.</td><td>Says "high" while three of four fields are missing entirely.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Both failure modes are real. Apollo can return all four dimensions — full coverage — while the employee count is from a two-year-old crawl. And a freshly verified single field is strong evidence about almost nothing.</p>
+
+    <h3>Recommendation: coverage only, and not as a new field</h3>
+    <p>Scout needs <strong>coverage confidence first, alone, and immediately.</strong> Three reasons, in order of weight:</p>
+    <ol>
+      <li><strong>Coverage is the failure Scout actually has.</strong> §4 scenario 9 versus scenario 1: one known dimension displays 75, four known and matching displays 80. The problem in production is not that IDYNIFY's data is stale — it is that two of four dimensions <em>do not exist</em> on any company record. Coverage names exactly that. Evidence confidence would report "high" on all four scenarios and tell the user nothing.</li>
+      <li><strong>Evidence confidence is not computable today and would have to be invented.</strong> There is no provenance, no field-level timestamp, no second source to corroborate against, no verification history. Building it means either a new vendor dependency — explicitly out of scope — or a fabricated number, which is the exact class of defect §4 catalogues. A confidence score with no evidence behind it would be the most ironic possible outcome of this investigation.</li>
+      <li><strong>Coverage is honest at zero cost.</strong> <code>evaluateDimensions</code> already returns <code>{ active, match, unknown }</code> for all four dimensions. The count of <code>active &amp;&amp; !unknown</code> is coverage. It requires no schema change, no new write path, and no storage — <strong>it is derivable at read time from data already in hand.</strong></li>
+    </ol>
+    <p>That third point matters for the "no schema changes" guardrail: coverage does not need a field at all. It is a function of the company document and the ICP, exactly like the score itself, and can be returned alongside it from <code>scoreCompany</code>. The right first move is a derived value, not a stored one.</p>
+
+    <h3>Two things coverage must get right that the current score gets wrong</h3>
+    <ul>
+      <li><strong>Unconfigured is not unknown.</strong> Scenario 8 — a perfect match on an ICP that does not configure revenue — has <em>full</em> coverage of 3 of 3, not 3 of 4. <code>calculateICPScore</code> already normalises over active dimensions correctly; coverage must use the same denominator.</li>
+      <li><strong>"Unknown" the string is unknown data.</strong> Today <code>industry: "Unknown"</code> scores as a confirmed miss (§4.3). Whatever consumes coverage must treat the literal fallback string as absence, or coverage will disagree with the score it accompanies.</li>
+    </ul>
+
+    <h3>Where evidence confidence goes</h3>
+    <p>Not discarded — deferred, and it already has a home in the frozen contract. Doc 2's <code>LearnedIntelligence</code> carries <code>confidence: 0.0–1.0</code> backed by <code>data_points</code> and <code>supporting_signals</code>, and Doc 2's <code>Recommendation</code> carries <code>confidence: 0.0–1.0</code> beside a <code>reasoning_trace</code>. Both are evidence confidence, both are Barry-owned, and both belong to Priority and Next Action rather than to Match. When IDYNIFY has provenance, evidence confidence attaches there.</p>
+    <div class="callout">
+      <span class="tag">Naming</span>
+      <p>If both eventually exist, they must not share the word. I suggest <strong>Coverage</strong> for what Scout ships now — a count, expressed as "3 of 4 criteria assessed" — and reserve <strong>Confidence</strong> for the 0.0–1.0 evidence-backed figure the frozen contract already defines. Two numbers both called "confidence" on the same card would recreate the exact ambiguity this investigation exists to remove.</p>
+    </div>
+    <div class="flag warn">
+      <p class="lede">Dependency on the missing document.</p>
+      <p>The direction stated that Barry Intelligence Contract v0.2 "separates evidence, source, authority, confidence and temporal scope for exactly this reason." I could not read it. If v0.2 defines a specific coverage-versus-confidence split, this recommendation should be checked against it before anything is built.</p>
+    </div>
+  </div>
+</section>
+
+<section id="item7">
+  <div class="sec-head"><span class="sec-letter">§7</span><h2>Item 7 — RECON §3–4 versus <code>icpProfiles</code>: the real #561</h2></div>
+  <div class="prose">
+    <p>The question was framed as two stores. There are <strong>four</strong>, and the relationships between them are not what the file names suggest.</p>
+    <pre class="diagram"><b>1</b>  dashboards/{uid}.modules[recon].sections[3].data
+     <i>RECON §3 answers, keyed by question id (companySize, geography, targetIndustries…)</i>
+     written by ReconSectionEditor → saveSectionData()
+
+<b>2</b>  users/{uid}/icpProfiles/{icpId}
+     <i>industries, companySizes, revenueRanges, locations, isNationwide,
+      targetTitles, scoringWeights, foundedAgeRange</i>
+     written by ICPSettings
+
+<b>3</b>  users/{uid}/companyProfile/current
+     <i>described in code as a "bridge cache" of the active icpProfiles doc —</i>
+     <b>but also written directly, without touching icpProfiles, by</b>
+     CompanyQuestionnaire:176 · BarryOnboarding:335 · BarryICPPanel:200
+
+<b>4</b>  users/{uid}.section3Answers
+     <i>a second, redundant copy of §3, written by the same component (Section3…:211)</i></pre>
+    <p>Store 3 is the one that matters most and is the least governed. <strong>It is the document sent to Apollo.</strong> <code>search-companies</code> builds its query from the <code>companyProfile</code> the caller passes, and every caller passes <code>companyProfile/current</code>. Three surfaces write it without writing <code>icpProfiles</code>, so a user who edits their ICP through the Scout questionnaire or through Barry's ICP panel changes what Apollo searches for while ICP Settings continues to display — and score against — the older <code>icpProfiles</code> document.</p>
+  </div>
+
+  <h3>Overlap matrix</h3>
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Concept</th><th>RECON location</th><th>ICP profile location</th><th>Other producer</th><th>Consumers</th><th>Can diverge?</th><th>Current authority</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Industries</strong><br><span class="chip c-stop">Duplicate</span></td>
+        <td>§3 <code>targetIndustries</code> — 10 fixed self-description options</td>
+        <td><code>industries</code> — Apollo taxonomy values</td>
+        <td><code>companyProfile/current.industries</code></td>
+        <td>Apollo query (<code>getIndustryIds</code>); <code>evalIndustry</code> at weight 50; AlignmentBrief (display)</td>
+        <td><span class="chip c-stop">Yes — freely</span></td>
+        <td><code>companyProfile/current</code> in practice</td>
+      </tr>
+      <tr>
+        <td><strong>Avoid industries</strong><br><span class="chip c-warn">RECON-only, unconsumed</span></td>
+        <td>§3 <code>avoidIndustries</code> — free text</td>
+        <td>— none —</td>
+        <td>—</td>
+        <td><strong>Nothing.</strong> Not the Apollo query, not either scorer, not the brief.</td>
+        <td>n/a</td>
+        <td>No authority — the answer is stored and never read</td>
+      </tr>
+      <tr>
+        <td><strong>Geography</strong><br><span class="chip c-decide">Not actually the same</span></td>
+        <td>§3 <code>geography</code> — reach tier: Local / Regional / Nationwide&nbsp;(US) / North America / Europe / APAC / Global</td>
+        <td><code>locations</code> (US state list) + <code>isNationwide</code> (bool)</td>
+        <td><code>companyProfile/current</code></td>
+        <td>Apollo <code>formatStatesForApollo</code>; <code>evalLocation</code> at weight 25</td>
+        <td><span class="chip c-stop">Yes</span></td>
+        <td><code>icpProfiles</code> / bridge. RECON's answer is unreachable.</td>
+      </tr>
+      <tr>
+        <td><strong>Company size</strong><br><span class="chip c-stop">Duplicate</span></td>
+        <td>§3 <code>companySize</code> — 6 buckets (1-10 … 1000+)</td>
+        <td><code>companySizes</code> — 11 buckets (1-10 … 10,001+)</td>
+        <td><code>companyProfile/current</code></td>
+        <td>Apollo query; <code>evalEmployeeSize</code> at weight 15</td>
+        <td><span class="chip c-stop">Yes</span></td>
+        <td><code>icpProfiles</code> / bridge</td>
+      </tr>
+      <tr>
+        <td><strong>Revenue</strong><br><span class="chip c-stop">Duplicate</span></td>
+        <td>§3 <code>revenueRange</code> — 6 buckets</td>
+        <td><code>revenueRanges</code> — 11 buckets + <code>skipRevenue</code></td>
+        <td><code>companyProfile/current</code></td>
+        <td>Apollo query; <code>evalRevenue</code> at weight 10</td>
+        <td><span class="chip c-stop">Yes</span></td>
+        <td><code>icpProfiles</code> / bridge</td>
+      </tr>
+      <tr>
+        <td><strong>Company type</strong><br><span class="chip c-warn">RECON-only, unconsumed</span></td>
+        <td>§3 <code>companyType</code> — B2B / B2C / B2B2C / Marketplace / Platform</td>
+        <td>— none —</td>
+        <td>—</td>
+        <td><strong>Nothing.</strong></td>
+        <td>n/a</td>
+        <td>No authority</td>
+      </tr>
+      <tr>
+        <td><strong>Growth stage</strong><br><span class="chip c-decide">Related</span></td>
+        <td>§3 <code>growthStage</code> — Seed / Series A-B / Series C+ / Bootstrapped / Mature</td>
+        <td><code>foundedAgeRange</code> — company age in years</td>
+        <td>—</td>
+        <td>RECON: nothing. <code>foundedAgeRange</code>: <code>passesAgeFilter</code> — the one live Eligibility gate.</td>
+        <td><span class="chip c-warn">Partly</span></td>
+        <td><code>icpProfiles.foundedAgeRange</code></td>
+      </tr>
+      <tr>
+        <td><strong>Buyer roles / titles</strong><br><span class="chip c-decide">Not actually the same</span></td>
+        <td><strong>§3 has no titles question.</strong> AlignmentBrief reads <code>d.targetTitles</code> from §3 anyway — always empty.</td>
+        <td><code>targetTitles</code></td>
+        <td><code>companyProfile/current.targetTitles</code></td>
+        <td>Auto people-discovery after a Save (<code>DailyLeads:1584</code>); <code>searchPeople</code></td>
+        <td><span class="chip c-warn">Bridge only</span></td>
+        <td><code>companyProfile/current</code></td>
+      </tr>
+      <tr>
+        <td><strong>Budget / decision speed / market size</strong><br><span class="chip c-warn">RECON-only, unconsumed</span></td>
+        <td>§3 <code>budgetRange</code>, <code>decisionSpeed</code>, <code>marketSize</code></td>
+        <td>— none —</td>
+        <td>—</td>
+        <td><strong>Nothing.</strong> <code>decisionSpeed</code> is plausibly cadence intelligence, not Match intelligence.</td>
+        <td>n/a</td>
+        <td>No authority</td>
+      </tr>
+      <tr>
+        <td><strong>Psychographics (all of §4)</strong><br><span class="chip c-decide">Not actually the same</span></td>
+        <td>§4 <code>nightFears</code>, <code>goals</code>, <code>values</code>, <code>emotionalState</code>, <code>riskTolerance</code>, …</td>
+        <td>— none, and correctly so —</td>
+        <td>—</td>
+        <td>Barry context assembly via <code>RECON_SECTION_MAP.psychographics</code>; messaging and tone</td>
+        <td>n/a — no overlap to diverge</td>
+        <td>RECON, unambiguously</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="prose">
+    <h3>Classification summary</h3>
+    <ul>
+      <li><strong>DUPLICATE — 3 concepts</strong> (industries, company size, revenue). Same intelligence, asked twice, stored in incompatible bucket schemes. RECON's <code>11-50</code> straddles the ICP's <code>11-20</code> and <code>21-50</code>; RECON's <code>$5M-$20M</code> straddles four ICP bands. <strong>These cannot be mechanically merged</strong> — a migration has to decide which vocabulary survives, and the answer is forced: the ICP's, because those values are fed to Apollo.</li>
+      <li><strong>RELATED — 1 concept</strong> (growth stage / founded age). Correlated but genuinely different: a bootstrapped 20-year-old company and a Series C 3-year-old both exist, and age does not imply stage.</li>
+      <li><strong>NOT ACTUALLY THE SAME — 3 concepts</strong> (geography, buyer titles, all of §4). Shared vocabulary, different semantics. Geography is the sharpest case: "Local (city/metro)" and a US state list are not the same kind of answer, and neither can be derived from the other.</li>
+      <li><strong>MISSION OVERRIDE — 0 concepts.</strong> No temporary, mission-scoped targeting store exists. The nearest thing is <code>icpProfiles</code> multi-profile switching via <code>isActive</code>, and that is durable workspace intelligence, not a mission preference. <strong>This is worth stating plainly because it protects against a wrong consolidation:</strong> nothing in the current data model is a temporary override, so nothing would be destroyed by unifying the durable stores — but the multi-ICP <code>isActive</code> mechanism must survive any unification, because it is the hook a future mission-scoped override would hang from.</li>
+      <li><strong>Unconsumed RECON intelligence — 6 fields</strong> (avoidIndustries, companyType, budgetRange, decisionSpeed, marketSize, growthStage). The user answered six required questions whose answers nothing reads.</li>
+    </ul>
+
+    <h3>Three dead or broken links found while tracing</h3>
+    <ol>
+      <li><strong>RECON↔ICP drift detection cannot fire.</strong> <code>reconHealth.js:73</code> reads <code>storedHealth.icpSnapshotAtLastReconSave</code> to raise <code>ICP_INDUSTRY_DRIFT</code>, <code>ICP_SIZE_DRIFT</code> and <code>ICP_LOCATION_DRIFT</code>. Nothing in the repository ever writes that snapshot. The one mechanism built to detect exactly the divergence this section documents is inert.</li>
+      <li><strong>The Alignment Brief reads field names Section 3 never writes.</strong> <code>AlignmentBrief.jsx:108–111</code> reads <code>d.companySizes</code>, <code>d.locations</code> and <code>d.targetTitles</code>; Section 3's question ids are <code>companySize</code>, <code>geography</code>, and titles are not asked at all. The Target Market line renders <code>targetIndustries</code> only, and the Target Titles line never renders.</li>
+      <li><strong>Section 3 is written twice.</strong> Once into the dashboard module via <code>saveSectionData</code>, and again to <code>users/{uid}.section3Answers</code> by the component itself. Only the first is read.</li>
+    </ol>
+
+    <div class="callout">
+      <span class="tag">The answer to the reframed #561</span>
+      <p><strong>There is no authoritative source of ICP intelligence today.</strong> There are four stores, three writers that bypass the one with a schema, and a drift detector that cannot run. This is not a case of two systems disagreeing about which should win — it is a case of no system having been designated.</p>
+      <p>The decision to make is narrow and it is not a consolidation: <strong>designate <code>icpProfiles</code> as authoritative, demote <code>companyProfile/current</code> to a true derived cache with a single writer, and treat RECON §3 as elicitation rather than storage</strong> — the interview that helps a user articulate an ICP, which then writes through to <code>icpProfiles</code> in the ICP's own vocabulary. RECON §4 stays exactly where it is and never touches Match.</p>
+    </div>
+  </div>
+</section>
+
+<section id="item8">
+  <div class="sec-head"><span class="sec-letter">§8</span><h2>Item 8 — what a Save or Skip actually tells us</h2></div>
+  <div class="prose">
+    <h4>What is persisted today</h4>
+    <p><code>handleSwipe</code> (<code>DailyLeads.jsx:1545</code>) writes to the company document:</p>
+    <pre class="diagram">status:              'accepted' | 'rejected'
+swipedAt:            ISO timestamp
+swipeDirection:      'right' | 'left'
+swipedForICPId:      the active ICP at swipe time   <i>(only when one is active)</i>
+barryFeedback:          <i>optional free text — right swipes only</i>
+barryRejectionFeedback: <i>optional free text — left swipes only</i></pre>
+    <p>Plus two counters at <code>scoutProgress/swipes</code> and <code>scoutProgress/streak</code>. Note what is <em>not</em> written: no Match Score at swipe time, no coverage, no ICP snapshot, no dwell time, no card position, no reason code.</p>
+
+    <h4>What currently consumes it</h4>
+    <ul>
+      <li><strong>Saves →</strong> <code>savedIndustries</code>, derived from the current batch only, passed to <code>search-companies</code> as <code>adaptiveSignals</code> to bias the next Apollo query's industry keywords. Batch-scoped, never persisted.</li>
+      <li><strong>Saves →</strong> the Barry nudge, which fires when 3 of the last 5 saves share an industry. Computed from <code>sessionSavedCompanies</code> — session state, discarded on reload.</li>
+      <li><strong>Saves →</strong> auto people-discovery using <code>targetTitles</code>. Unrelated to learning.</li>
+      <li><strong>Skips →</strong> <span class="chip c-dead">nothing</span>. A rejection sets a status and, if the user typed one, stores a sentence no code reads.</li>
+    </ul>
+    <p>So Scout accumulates swipe events and consumes almost none of them. That is the honest starting position.</p>
+
+    <h4>The frozen contract already rules on this</h4>
+    <p>Two constraints from Document 2 bound anything built here, and both cut against fast learning:</p>
+    <ul>
+      <li><strong>A swipe is an evaluation result, not a lifecycle state.</strong> The Company object's field mapping reads: <code>swipe_* → icp_decision (acceptance/rejection is an evaluation result, not a lifecycle state)</code>. A Save means "this company was judged a fit" — it does not mean the ICP changed.</li>
+      <li><strong>Learned Intelligence forbids single-session writes.</strong> "Who may write: Statistical aggregation pipeline only. Never single-session writes — Learned Intelligence requires patterns observed across 3+ sessions, relationships, or missions." <code>proposed → confirmed</code> without 3+ data points is listed as an illegal transition, and there is a category named <code>icp_correlation</code> waiting for exactly this.</li>
+    </ul>
+    <p>The current Barry nudge fires on 3 of the last 5 saves <em>within one session</em>. Under the frozen contract that is a legitimate <em>observation</em> to show the user, and an illegitimate basis for durable intelligence. It is currently used for the former, which is correct.</p>
+  </div>
+
+  <div class="tscroll matrix"><table>
+    <thead><tr><th>Event</th><th>Raw data captured</th><th>Possible inference</th><th>Confidence</th><th>Scope</th><th>Safe to learn automatically?</th><th>Confirmation needed?</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Save</strong>, isolated</td>
+        <td>status, timestamp, direction, ICP id</td>
+        <td>Fits ICP · interesting now · recognised the name · wants to research · existing relationship · card looked good</td>
+        <td><span class="chip c-stop">Very low</span> — six readings, no way to separate them</td>
+        <td>This company, this moment</td>
+        <td><span class="chip c-stop">No</span></td>
+        <td>n/a — nothing to confirm</td>
+      </tr>
+      <tr>
+        <td><strong>Save</strong>, with free-text <code>barryFeedback</code></td>
+        <td>+ the user's own sentence</td>
+        <td>The stated reason, in the user's words</td>
+        <td><span class="chip c-ok">High</span> — self-reported, unambiguous</td>
+        <td>This company; may generalise</td>
+        <td><span class="chip c-warn">As an observation, yes</span> — it is already an explicit statement</td>
+        <td>Only to generalise it into an ICP change</td>
+      </tr>
+      <tr>
+        <td><strong>Save</strong> where Match was <em>low</em></td>
+        <td>status + the score that was displayed</td>
+        <td><strong>The model and the user disagree.</strong> Either the ICP is under-specified or the score is wrong.</td>
+        <td><span class="chip c-warn">Medium</span> — the disagreement is real even if its cause is not known</td>
+        <td>Diagnostic about the <em>model</em>, not about the company</td>
+        <td><span class="chip c-stop">No</span> — but it is the highest-value event Scout can record</td>
+        <td>Yes — surface as a question, never as a silent adjustment</td>
+      </tr>
+      <tr>
+        <td><strong>Save</strong> ×3+ same industry, across sessions</td>
+        <td>Industry frequency over time</td>
+        <td>An industry affinity the ICP does not express</td>
+        <td><span class="chip c-warn">Medium</span> — meets the 3+ data point rule; confounded by queue composition</td>
+        <td>Workspace-durable candidate</td>
+        <td><span class="chip c-warn">As <code>proposed</code> Learned Intelligence only</span></td>
+        <td><strong>Yes, explicitly.</strong> "You've saved 4 credit unions — add to your ICP?"</td>
+      </tr>
+      <tr>
+        <td><strong>Skip</strong>, isolated</td>
+        <td>status, timestamp, direction, ICP id</td>
+        <td>Bad fit · already known · already a customer · bad timing · thin card · fatigue · misclick</td>
+        <td><span class="chip c-stop">Very low</span> — and the null hypothesis (fatigue) is strong late in a batch</td>
+        <td>This company, this moment</td>
+        <td><span class="chip c-stop">No</span></td>
+        <td>n/a</td>
+      </tr>
+      <tr>
+        <td><strong>Skip</strong>, with free-text rejection</td>
+        <td>+ <code>barryRejectionFeedback</code></td>
+        <td>The stated reason</td>
+        <td><span class="chip c-ok">High</span></td>
+        <td>This company; may generalise</td>
+        <td><span class="chip c-warn">As an observation</span> — currently read by nothing at all</td>
+        <td>To generalise, yes</td>
+      </tr>
+      <tr>
+        <td><strong>Skip</strong> where Match was <em>high</em></td>
+        <td>status + displayed score</td>
+        <td>The score is over-confident — plausibly the §4.2 fabricated-industry case</td>
+        <td><span class="chip c-warn">Medium</span></td>
+        <td>Diagnostic about the model</td>
+        <td><span class="chip c-stop">No</span></td>
+        <td>Yes — and this is the cheapest available detector for fabricated Match</td>
+      </tr>
+      <tr>
+        <td><strong>Skip</strong> ×3+ same industry, across sessions</td>
+        <td>Industry frequency over time</td>
+        <td>A candidate for <code>avoidIndustries</code> — which RECON already collects and nothing reads</td>
+        <td><span class="chip c-warn">Medium</span></td>
+        <td>Workspace-durable candidate</td>
+        <td><span class="chip c-stop">No</span> — negative inference is far more dangerous than positive</td>
+        <td><strong>Yes, always.</strong> Silently narrowing a user's market is the worst failure mode available here.</td>
+      </tr>
+      <tr>
+        <td><strong>Undo</strong></td>
+        <td>Reverts status; no record kept</td>
+        <td>The prior swipe was an error</td>
+        <td><span class="chip c-ok">High</span> about the error itself</td>
+        <td>That one event</td>
+        <td><span class="chip c-warn">It must invalidate</span> — an undone swipe must never count as evidence</td>
+        <td>No — but the current implementation leaves no trace, so any future aggregation would need this</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="prose">
+    <h3>What this means</h3>
+    <p><strong>No single swipe supports any automatic change to Workspace ICP intelligence.</strong> The direction's own list of six possible meanings for a Save is the proof: the raw event is compatible with all six and distinguishes none. Aggregation across sessions raises confidence enough to <em>propose</em>, never enough to <em>apply</em>.</p>
+    <p>The most valuable observation in the table is not the one that would make Scout learn faster. It is the third row: <strong>a Save on a low-Match company is a labelled disagreement between the user and the model</strong>, and it is free to record. Given §4, where the score is computed over two structurally-absent dimensions and a sometimes-fabricated third, disagreement events are the only honest external check Scout currently has on its own arithmetic.</p>
+    <p>They cannot be recorded today, because the score that was displayed at swipe time is not persisted with the swipe. That is a one-field gap — and it is the cheapest thing on this list to close, though not the first thing to build (§9-H).</p>
+  </div>
+</section>
+
+<section id="item9">
+  <div class="sec-head"><span class="sec-letter">§9</span><h2>Item 9 — the eight answers</h2></div>
+
+  <ol class="questions">
+    <li><div>
+      <h3 style="margin-top:0">A · What exactly is Match?</h3>
+      <p><strong>Match is the degree to which a company's observed firmographic attributes agree with the criteria the user has stated in their active ICP — and nothing else.</strong></p>
+      <p class="mono" style="font-size:11.5px;color:var(--muted)">It is not a prediction of whether the company will buy, not a measure of how interesting it is today, and not a statement about how much IDYNIFY knows. Those are Priority and Confidence.</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">B · What exactly is Confidence?</h3>
+      <p><strong>Confidence is how much of the ICP's own criteria IDYNIFY was actually able to evaluate when it computed Match — a count of assessed dimensions over configured dimensions, not a judgment about the data's quality.</strong></p>
+      <p class="mono" style="font-size:11.5px;color:var(--muted)">Ship this as <em>Coverage</em>. Reserve the word "Confidence" for the evidence-backed 0.0–1.0 figure the frozen contract already defines on Recommendation and Learned Intelligence (§6).</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">C · What exactly is Eligibility?</h3>
+      <p><strong>Eligibility is a binary, pre-write admission decision about whether a company may enter consideration at all — a rule, never a score, and never reversible by a good Match.</strong></p>
+      <p class="mono" style="font-size:11.5px;color:var(--muted)">Today it is <code>passesAgeFilter</code> and deduplication. <code>avoidIndustries</code> belongs here and is currently nowhere.</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">D · Should Match gate the queue?</h3>
+      <p><strong>NO.</strong></p>
+      <p>Three reasons, weighted by how much they survive being wrong about everything else:</p>
+      <ol>
+        <li><strong>The score is not currently trustworthy enough to delete on.</strong> Two of four dimensions are structurally absent, the third is sometimes copied from the user's own ICP, and coverage is invisible in the number. A gate on this score removes the <em>unmeasured</em>, not the <em>unfit</em> — §4 scenario 9 is dropped while scenario 10, a confirmed industry miss, is kept.</li>
+        <li><strong>Gating destroys the only evidence that could fix the score.</strong> A Save on a low-Match company is a labelled disagreement between the user and the model (§8). Gate at the score level and that population never reaches a user, so the system can only ever confirm itself.</li>
+        <li><strong>It saves nothing.</strong> The Apollo credit is spent before the gate runs, and <code>QUEUE_TARGET</code> pages until the queue is full — so discarding results makes the loop fetch <em>more</em>.</li>
+      </ol>
+      <p>The two jobs separate cleanly: <strong>Eligibility admits, Match ranks.</strong> A weak match should cost the user a scroll, not a company.</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">E · Which scorer should become canonical?</h3>
+      <p><strong>The client's, <code>calculateICPScore</code> — with the caveat that the choice is already made and the alternative is dead.</strong></p>
+      <p><code>calculateFitScore</code> is unreachable and has been for some time. Making it canonical means reviving code that awards full revenue points for having <em>wrong</em> revenue data, ranks a confirmed industry miss above an industry match, weights industry at 30 against location-plus-size at 50, and returns 0 — dropping every company — for a user with no ICP configured. None of that is worth resurrecting.</p>
+      <p><code>calculateICPScore</code> is the better formula on the merits, not merely by default: it normalises over configured dimensions, distinguishes exact from partial matches, treats unconfigured as inactive rather than as failure, and weights industry at 50 where an ICP's meaning actually lives. Its defects — the <code>'Unknown'</code> string scored as a miss, and coverage being invisible — are fixable inside the function. The server's are structural.</p>
+      <p><strong>"Neither-as-written" is the honest label if the question is whether either is ready to be the contract's <code>ScoreICPFitSkill</code>.</strong> Neither is, because both score a document that lacks half its inputs. But the consolidation target is unambiguous: one scorer, the client's, moved server-side when the Skill is built, and computed once at a defined trigger rather than recomputed differently by four surfaces.</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">F · What is the authoritative source of ICP intelligence?</h3>
+      <p><strong>There isn't one, and that is the decision to make rather than a fact to discover.</strong></p>
+      <p>Four stores hold overlapping ICP intelligence (§7). The one Apollo actually searches from — <code>companyProfile/current</code> — is described in code as a cache but is written directly by three surfaces that never touch <code>icpProfiles</code>. The mechanism built to detect the resulting divergence cannot run, because <code>icpSnapshotAtLastReconSave</code> has no writer.</p>
+      <p>My recommendation: <strong><code>users/{uid}/icpProfiles/{icpId}</code> is authoritative.</strong> It is the only store with a schema, the only one supporting multiple profiles, the only one carrying <code>scoringWeights</code>, and the one <code>icpId</code> on every company document already points at. <code>companyProfile/current</code> becomes a genuinely derived cache with exactly one writer. RECON §3 becomes elicitation that writes through, not a fourth store.</p>
+      <p>This is a decision that needs a person, not an investigation. I am recommending, not concluding.</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">G · What role should RECON play in Scout today?</h3>
+      <p><strong>Two roles, both of which it can fill with data that exists — and neither of which is influencing Match.</strong></p>
+      <ol>
+        <li><strong>Elicitation.</strong> RECON §3 is a well-designed interview for helping a user articulate an ICP. Its output should write through to <code>icpProfiles</code> in the ICP's vocabulary rather than sitting in a parallel store in an incompatible one. That is the whole of §3's legitimate Scout role.</li>
+        <li><strong>Volume, which it already does.</strong> <code>QUEUE_TARGET = min(50 + floor(reconConfidence × 0.5), 100)</code> is the one place RECON changes Scout's behaviour today: a more complete RECON fetches a deeper queue. That is defensible as written — completeness earning volume, not ranking — and it needs no change.</li>
+      </ol>
+      <p><strong>RECON §4 should not touch Scout at all.</strong> Psychographics are buyer-persona intelligence for messaging and tone, they are correctly routed there by <code>RECON_SECTION_MAP</code>, and they have no firmographic content to contribute to Match. This is the cleanest "no" in the report.</p>
+      <p>And the six unconsumed §3 fields are a product decision, not an engineering one: either they should feed something (<code>avoidIndustries</code> → Eligibility is the obvious one) or they should stop being asked. Six required questions whose answers nothing reads is a cost the user is paying for nothing.</p>
+    </div></li>
+
+    <li><div>
+      <h3 style="margin-top:0">H · What should we build first?</h3>
+      <p><strong>Stop fabricating the industry.</strong></p>
+      <p>One expression, in <code>saveCompaniesToFirestore</code> (<code>search-companies.js:960</code>):</p>
+      <pre class="diagram">- const industry = company.industry || company.primary_industry
+-                  || <b>companyProfile.industries?.[0]</b> || 'Unknown';
++ const industry = company.industry || company.primary_industry || null;</pre>
+      <p>Why this one:</p>
+      <ul>
+        <li><strong>It fixes a real user problem.</strong> Today a company Apollo could not classify is stamped with the user's own first ICP industry, scores a confirmed match on the heaviest dimension, and is explained to the user with the sentence "Matches your target industry: Financial Services." That is a false statement presented as a finding, and it is the only defect in this report where IDYNIFY actively misleads rather than merely under-informs.</li>
+        <li><strong>It creates no architecture debt, because it is a deletion.</strong> No schema change, no new field, no new write path, no decision about Confidence, no dependency on the authority question in F. It removes an inference the system was never entitled to make.</li>
+        <li><strong>It fixes the <code>'Unknown'</code> defect for free.</strong> Writing <code>null</code> instead of the literal string makes <code>resolveIndustry</code> return <code>null</code>, which <code>evalIndustry</code> already handles correctly as <code>UNKNOWN = 50</code>. The 25-point swing in §4.3 disappears without touching the scorer.</li>
+        <li><strong>It makes every later step measurable.</strong> Coverage, disagreement detection, and any consolidation all assume the inputs mean what they say. None of them can be evaluated while a dimension is sometimes echoing the user's own input back at them.</li>
+      </ul>
+      <h4>What it costs, stated honestly</h4>
+      <ul>
+        <li>Companies previously stamped with a fabricated industry keep it. A fix forward does not clean history, and a backfill cannot recover what Apollo never returned — those documents can only be marked, not corrected. That is a separate decision.</li>
+        <li>Surfaces rendering <code>company.industry</code> will receive <code>null</code>. This is the same situation the structural rendering guard pattern already handles in three places in this codebase, and it should be handled the same way rather than by reintroducing a placeholder string.</li>
+        <li>Scores will move for affected companies — from 75 down to 50 in the §4 fixture. That is the score becoming honest, not regressing, but it is user-visible and should be expected.</li>
+      </ul>
+      <h4>Second and third, not now</h4>
+      <p><strong>Second:</strong> return coverage from <code>scoreCompany</code> as a derived value — no schema change, no storage — so consumers can distinguish "we know it fits" from "we know almost nothing." Displaying it needs copy authorisation, which this phase does not carry.</p>
+      <p><strong>Third:</strong> resolve F. Every consolidation, every Skill, and every drift detector is blocked behind designating an authoritative ICP store, and that is a decision rather than an implementation.</p>
+      <p class="mono" style="font-size:11.5px;color:var(--muted)">Not proposed, deliberately: reviving or deleting the dead server scoring block, persisting <code>fit_score</code> at discovery, wiring <code>avoidIndustries</code>, and recording displayed-Match with each swipe. All are worth doing. None is the smallest thing that fixes a real user problem, and each carries a decision this phase has not made.</p>
+    </div></li>
+  </ol>
+</section>
+
+<section id="guardrails">
+  <div class="sec-head"><span class="sec-letter">§10</span><h2>Guardrail compliance</h2></div>
+  <ul class="gate">
+    <li>Scoring — unchanged. <code>icpScoring.js</code> and <code>search-companies.js</code> untouched by this report.</li>
+    <li>The <code>&lt; 50</code> gate — unchanged. Neither raised, lowered, nor removed.</li>
+    <li>Confidence fields — none added. §6 recommends a derived value precisely to avoid one.</li>
+    <li>Firestore schema — unmodified.</li>
+    <li>RECON and ICP — not consolidated. §7 recommends a decision, and does not take it.</li>
+    <li>Signal detection, competitor detection, adaptive learning — not implemented.</li>
+    <li>Visible Match Score copy — unchanged.</li>
+    <li>Apollo and vendor dependencies — none introduced. §6 rejects evidence confidence partly on that ground.</li>
+    <li>#561–563 — not implemented; recorded as REFRAME / HOLD / HOLD.</li>
+  </ul>
+  <div class="prose">
+    <p class="mono" style="font-size:11.5px;color:var(--muted)">The only repository change in this phase is PR #570, authorised under item 1, plus this document and the earlier #561 report. The twelve-scenario harness was executed from a scratch file and deleted; it can be reproduced from the fixtures and formulas quoted in §4.</p>
+  </div>
+</section>
+
+<footer class="end">
+  TEAM A · SCOUT INTELLIGENCE ARCHITECTURE · PHASE 8<br>
+  Investigation only. No scoring, schema, RECON, ranking, route or Firestore change.<br>
+  Open blocker: "Barry Intelligence Contract v0.2" is not in this repository — §3 and §6 are reconciled against the frozen Barry OS Documents 1–5 instead and must be re-checked if v0.2 exists elsewhere.<br>
+  Decisions requested: F (authoritative ICP store) · H (authorise the industry fabrication fix).
+</footer>
+
+</div>

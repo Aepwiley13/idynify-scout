@@ -1,6 +1,7 @@
 # Team A — Phase 1B, Tier 1 Pre-Implementation Trace
 
-**Status:** Returned for review. **No implementation changes have been made.**
+**Status:** **ACCEPTED — IMPLEMENTATION ON HOLD.** No implementation changes have been made.
+Rulings recorded in §9. Tier 1 implementation is gated on Team B's final Barry Intelligence Contract.
 **Branch:** `claude/team-a-nz6kaz`
 **Baseline commit:** `f3d78a5` (identical to `origin/main` at time of writing)
 **Date:** 2026-08-18
@@ -329,3 +330,48 @@ the Tier 1 report.
    bootstrap guard → writer classification finalised with evidence.
 3. Build green, failure set unchanged from the 5 pre-existing failures, Tier 1 report returned with
    before/after and full Producer → Store → Consumer → Decision reachability evidence per change.
+
+---
+
+## 9. Review outcome — rulings recorded 2026-08-18
+
+Trace **ACCEPTED** as repository evidence. **Implementation: HOLD.** Nothing in §2–§5 is
+implemented until Team B's final contract is supplied and a single narrow contract-vs-trace check
+is performed. This section is the record of what was authorized; §2–§5 remain provisional
+proposals, not an authorized work order, except where stated below.
+
+### Question outcomes
+
+| Q | Subject | Outcome |
+|---|---|---|
+| Q1 | Writers with no ICP to name (W5/W7/W8) | **SEMANTICALLY GATED ON FINAL CONTRACT.** Write-through is the intended end state, but the new authorized bootstrap is **not** to be implemented from W5/W7/W8. W5/W7/W8 stand as confirmed reconciliation debt. Whether onboarding is an authorized ICP-creation event, or another explicit creation boundary owns it, is a contract decision. Also ruled out: `icpId: null` as a permanent solution; continuing to invent `default`; stopping onboarding. |
+| Q2 | `updateIcpFromChat` when unresolved | **RESOLVED — fail explicitly.** No manufacturing of `icpProfiles/default` on failed resolution. On authorization, UNRESOLVED returns a recoverable state to the calling surface. Final user-facing treatment is not a Tier 1 design deliverable. The three states — **no profiles**, **profiles exist but none active**, **identity/read failure** — must stay distinct and must not collapse into `default`. |
+| Q3 | `search-companies` fallback and omitted `icpId` | **RESOLVED — Tier 1 owns both sides.** On authorization: (1) reachable callers propagate explicit resolved ICP identity; (2) `search-companies` loses the ability to convert a missing `icpId` into `DEFAULT_ICP_ID`. Missing identity at the company-write boundary produces an explicit unresolved/error outcome, never a fabricated `default`. The scheduled `daily-leads-refresh` is covered by the same rule — a background process has no greater authority to infer ICP identity than an interactive caller. Explicitly **not** authorized: Company × ICP Match persistence, backfilling existing companies, deciding historical ownership. Existing mis-attributed records stay Category 2 debt. |
+| Q4 | Barry Intelligence Contract | **WAITING ON TEAM B.** Do not proceed against reconstructed semantics. No further git-history searching for the document. |
+
+### Additional rulings
+
+- **Canonical resolver** — direction accepted; the invariant (RESOLVED or explicitly UNRESOLVED, never a manufactured identity) is accepted. Implementation waits for the contract.
+- **`candidates[0]` fallback** — accepted **only** as a continuity mechanism. It must never be promoted, persisted, searched against, or represented as the active ICP merely because it was first in a list.
+- **Bridge content while unresolved** — criteria may temporarily remain usable as unattributed compatibility context to prevent regressions. The bridge must never be relabelled `default`, and never used as proof of ICP identity.
+- **B1 (`ICPSettings` load-time bootstrap)** — confirmed reconciliation debt. The proposed replacement user action is **not** authorized; it touches product behaviour and ICP-creation semantics. Held until the contract resolves Q1.
+- **B2 (`dashboardUtils` migration bootstrap)** — preserved as a documented transition path. Its authority is **not** to be extended to new onboarding flows without explicit authorization.
+- **B3 (`updateIcpFromChat` silent creation)** — confirmed defect. Silent creation stops once implementation is authorized.
+- **`adminUpdateUserICP` active-vs-oldest gate** — accepted as a Tier 1 correctness issue (an inactive ICP can overwrite the active projection). Included in the implementation plan when the gate opens.
+
+### Scope boundary reaffirmed
+
+The trace surfaced more than Tier 1 needs to solve; that does not expand the phase. Tier 1 remains
+**identity correctness and projection correctness** — not an ICP architecture redesign.
+
+Not authorized in Tier 1: backfilling bridge documents; re-attributing existing companies;
+Company × ICP persistence; Firestore schema migration; onboarding redesign; new ICP management UX;
+Coverage persistence; Match architecture change; RECON targeting work; Barry context composition
+work; any start on Tiers 2, 3 or 4.
+
+The §6 Category 2 inventory is accepted **as debt, not as an implementation backlog for this tier.**
+
+### State at hold
+
+Branch `claude/team-a-nz6kaz` preserved at the accepted baseline: no source file modified,
+build EXIT 0, test failure set unchanged at the 5 pre-existing failures recorded in §0.

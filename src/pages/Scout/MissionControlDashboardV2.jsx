@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMissionControlTheme } from '../../theme/useMissionControlTheme';
 import { useT } from '../../theme/ThemeContext';
@@ -523,7 +523,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
         )}
 
         {/* READY */}
-        {isReady && (
+        {isReady && counterTarget > 0 && (
           <>
             <div style={{
               textAlign: 'center', marginBottom: 20,
@@ -540,6 +540,41 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
               <FirstRunCompanyCard key={company.id || i} company={company} T={T} />
             ))}
           </>
+        )}
+
+        {/* [Gap 5 fix] READY with zero results — not a dead end */}
+        {isReady && counterTarget === 0 && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 16, padding: '32px 0',
+          }}>
+            <Search size={32} color={T.textMuted} />
+            <p style={{ fontSize: 14, color: T.text, textAlign: 'center', margin: 0 }}>
+              Barry finished searching but didn't find matches yet. Try refining your ICP or retry.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={handleRetry}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.accent, color: '#fff', border: 'none',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate('/onboarding/barry')}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  color: T.text, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Review ICP with Barry
+              </button>
+            </div>
+          </div>
         )}
 
         {/* ERROR */}
@@ -577,8 +612,8 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
           </div>
         )}
 
-        {/* CTA */}
-        {companies.length > 0 && !isError && (
+        {/* CTA — visible when READY (with or without results) */}
+        {isReady && !isError && (
           <div style={{ marginTop: 20 }}>
             <button
               onClick={handleSeenMC}
@@ -708,6 +743,19 @@ export default function MissionControlDashboardV2() {
       loadHunterReadinessData();
     }
   }, [activeUserId]);
+
+  // [Gap 5 fix] Reload companies when barryState transitions to READY.
+  // The initial load fires on activeUserId, but search-companies writes
+  // results asynchronously — without this, FirstRunView shows READY with
+  // zero companies and no CTA.
+  const prevBarryStateRef = useRef(barryState);
+  useEffect(() => {
+    const prev = prevBarryStateRef.current;
+    prevBarryStateRef.current = barryState;
+    if (barryState === 'READY' && prev !== 'READY' && activeUserId) {
+      loadCompanies();
+    }
+  }, [barryState, activeUserId]);
 
   const loadHunterReadinessData = async () => {
     try {

@@ -362,6 +362,12 @@ export default function OnboardingFlow() {
     try {
       const user = auth.currentUser;
       if (!user) return;
+
+      // [Gap 3 fix] Ensure dashboards/{uid} exists before analyze-website runs.
+      // analyze-website writes extracted data to the RECON module inside this
+      // doc — without it the write is silently skipped and the extraction lost.
+      await initializeDashboard(user.uid);
+
       const authToken = await user.getIdToken();
 
       const response = await fetch('/.netlify/functions/analyze-website', {
@@ -415,11 +421,10 @@ export default function OnboardingFlow() {
   };
 
   const handleFinishQuestions = async () => {
-    if (searchTriggeredRef.current) return;
-    searchTriggeredRef.current = true;
-
     const userId = getActiveUserId();
     if (!userId) return;
+    if (searchTriggeredRef.current) return;
+    searchTriggeredRef.current = true;
 
     // Save answers to RECON / dashboard
     // [B1 fix] initializeDashboard ensures dashboards/{uid} exists before writing.
@@ -441,14 +446,32 @@ export default function OnboardingFlow() {
     }
 
     // [B2 fix] Trigger company discovery — mirrors BarryOnboarding.jsx:370.
-    // Temporary compatibility behavior — future onboarding will not assume
-    // company discovery always follows Step 3.
+    // [Gap 4 fix] Build a real ICP profile from Step 2 (analyze-website) +
+    // Step 3 (smart questions) answers and write it to companyProfile/current
+    // so search-companies receives targeting data instead of {}.
+    // Legacy compatibility projection — companyProfile/current already has
+    // six writers (BarryOnboarding, ICPSettings, updateIcpFromChat,
+    // setActiveIcpProfile, dashboardUtils, adminUpdateUserICP).
     try {
       const user = auth.currentUser;
       if (user) {
         const authToken = await user.getIdToken();
-        const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-        const companyProfile = profileDoc.exists() ? profileDoc.data() : {};
+
+        const companyProfile = {
+          source: 'onboarding_flow',
+          updatedAt: new Date().toISOString(),
+          scoringWeights: DEFAULT_WEIGHTS,
+        };
+        if (answers.fastestClose) companyProfile.idealCustomerTypes = answers.fastestClose;
+        if (answers.avoidIndustries) companyProfile.excludedIndustries = answers.avoidIndustries;
+        if (answers.differentiator) companyProfile.valueProposition = answers.differentiator;
+        if (answers.perfectCustomer) companyProfile.perfectCustomer = answers.perfectCustomer;
+
+        await setDoc(
+          doc(db, 'users', userId, 'companyProfile', 'current'),
+          companyProfile,
+          { merge: true }
+        );
 
         await setDoc(
           doc(db, 'users', userId),

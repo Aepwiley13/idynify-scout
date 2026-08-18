@@ -53,6 +53,11 @@
 [functions."barryBulkPersonalize"]
   timeout = 26
 
+# search-companies paginates the Apollo API and writes results to Firestore
+# in batches — the default 10s timeout is too short for multi-page queries.
+[functions."search-companies"]
+  timeout = 60
+
 # analyze-website fetches an external site (10s cap) then calls Barry to extract
 # a business profile — give it headroom beyond the default function timeout.
 [functions."analyze-website"]

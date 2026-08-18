@@ -1010,7 +1010,7 @@ function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
 
 // ─── DailyLeads ──────────────────────────────────────────────────────────────
 // ─── ICP Reclarification Modal ────────────────────────────────────────────────
-function IcpReclarificationModal({ userId, onClose, onSearchComplete, reconConfidence }) {
+function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, reconConfidence }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -1088,7 +1088,7 @@ function IcpReclarificationModal({ userId, onClose, onSearchComplete, reconConfi
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile, reconConfidence }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile, icpId, reconConfidence }),
       });
     } catch (err) {
       console.error('ICP search error:', err);
@@ -1789,10 +1789,11 @@ export default function DailyLeads({ onNavigate }) {
       // Extract industry signals from companies saved in this batch
       const savedIndustries = [...new Set(savedCompanies.map(c => c.industry).filter(Boolean))];
 
-      // Pull titles from ALL accepted companies' contacts as ICP signal
-      const contactsSnap = await getDocs(collection(db, 'users', user.uid, 'contacts'));
-      const savedTitles = [...new Set(contactsSnap.docs.map(d => d.data().title).filter(Boolean))];
-
+      // icpId is not optional here. search-companies tags every company it
+      // writes with `icpId || DEFAULT_ICP_ID`, and the queue filters on
+      // `!c.icpId || c.icpId === activeId`. Omitting it meant this search spent
+      // Apollo credits and wrote companies that a user on any non-default ICP
+      // could never see.
       fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1800,7 +1801,8 @@ export default function DailyLeads({ onNavigate }) {
           userId: user.uid,
           authToken,
           companyProfile: profileDoc.data(),
-          adaptiveSignals: { savedIndustries, savedTitles },
+          icpId: activeICPId,
+          adaptiveSignals: { savedIndustries },
           reconConfidence,
         }),
       }).catch(err => console.error('Adaptive search error:', err));
@@ -2657,6 +2659,7 @@ export default function DailyLeads({ onNavigate }) {
       {showICPChat && (
         <IcpReclarificationModal
           userId={auth.currentUser?.uid}
+          icpId={activeICPId}
           reconConfidence={reconConfidence}
           onClose={() => setShowICPChat(false)}
           onSearchComplete={() => {

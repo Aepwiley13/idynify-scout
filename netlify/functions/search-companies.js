@@ -655,7 +655,8 @@ export const handler = async (event) => {
   }
 };
 
-function buildApolloQuery(companyProfile, adaptiveSignals) {
+/** Exported for testing — see src/test/searchCompaniesAdaptiveSignals.test.js */
+export function buildApolloQuery(companyProfile, adaptiveSignals) {
   console.log('📋 Building Apollo query from profile:', JSON.stringify(companyProfile, null, 2));
 
   const query = {
@@ -696,9 +697,13 @@ function buildApolloQuery(companyProfile, adaptiveSignals) {
     keywordTags.unshift(...adaptiveInds);
     console.log(`🎯 Adaptive industry signals blended: ${adaptiveInds.join(', ')}`);
   }
-  if (adaptiveSignals?.savedTitles?.length > 0) {
-    console.log(`👥 People signal context (${adaptiveSignals.savedTitles.length} titles from saved companies): ${adaptiveSignals.savedTitles.slice(0, 5).join(', ')}`);
-  }
+  // savedTitles is deliberately absent. This endpoint is Apollo's ORGANISATION
+  // search (mixed_companies/search); person titles belong to mixed_people, and
+  // no organisation-search call in this repo passes a title parameter. Folding
+  // titles into q_organization_keyword_tags would match companies whose
+  // keywords read like job titles, not companies that employ those people — a
+  // worse result than sending nothing. The client no longer collects them; see
+  // #564 for the people-side proposal.
 
   // Apply keyword tags if we have any
   if (keywordTags.length > 0) {

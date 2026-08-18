@@ -1,0 +1,785 @@
+<title>Two Scores, One Name</title>
+<style>
+  :root {
+    --paper:      #faf8fb;
+    --surface:    #ffffff;
+    --surface-2:  #f3eff5;
+    --ink:        #17121c;
+    --ink-2:      #453d50;
+    --muted:      #6d6478;
+    --rule:       #e2dbe6;
+    --rule-2:     #cfc5d5;
+    --accent:     #d1156f;
+    --accent-bg:  #fdeff5;
+    --ok:         #0e7c56;
+    --ok-bg:      #e6f5ee;
+    --warn:       #9a5a06;
+    --warn-bg:    #fbf0df;
+    --stop:       #ae2a2a;
+    --stop-bg:    #fbeaea;
+    --decide:     #6437c9;
+    --decide-bg:  #efeafc;
+    --dead:       #6d6478;
+    --dead-bg:    #eeeaf0;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #131019;
+      --surface:    #1c1724;
+      --surface-2:  #241d2e;
+      --ink:        #efeaf3;
+      --ink-2:      #c4bacd;
+      --muted:      #9a90a5;
+      --rule:       #2f2739;
+      --rule-2:     #453b52;
+      --accent:     #ff5c9d;
+      --accent-bg:  #331324;
+      --ok:         #4bcf9a;
+      --ok-bg:      #10291f;
+      --warn:       #e0a752;
+      --warn-bg:    #2e2311;
+      --stop:       #f27b7b;
+      --stop-bg:    #301717;
+      --decide:     #a98cf5;
+      --decide-bg:  #221a38;
+      --dead:       #9a90a5;
+      --dead-bg:    #252030;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #131019;
+    --surface:    #1c1724;
+    --surface-2:  #241d2e;
+    --ink:        #efeaf3;
+    --ink-2:      #c4bacd;
+    --muted:      #9a90a5;
+    --rule:       #2f2739;
+    --rule-2:     #453b52;
+    --accent:     #ff5c9d;
+    --accent-bg:  #331324;
+    --ok:         #4bcf9a;
+    --ok-bg:      #10291f;
+    --warn:       #e0a752;
+    --warn-bg:    #2e2311;
+    --stop:       #f27b7b;
+    --stop-bg:    #301717;
+    --decide:     #a98cf5;
+    --decide-bg:  #221a38;
+    --dead:       #9a90a5;
+    --dead-bg:    #252030;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 clamp(16px, 5vw, 48px) 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ── Masthead ─────────────────────────────────────── */
+  header.masthead {
+    padding: clamp(48px, 9vw, 88px) 0 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(34px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(17px, 2.1vw, 20px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+    margin: 0 0 30px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 28px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── Sections ─────────────────────────────────────── */
+  section { padding-top: 56px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--rule-2);
+    padding-bottom: 10px;
+    margin-bottom: 26px;
+  }
+  .sec-letter {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(23px, 3.2vw, 31px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin: 38px 0 12px;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 15px; }
+  .prose p, .prose li { color: var(--ink-2); }
+  strong { color: var(--ink); font-weight: 650; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 22px; margin: 0 0 15px; }
+  li { margin-bottom: 7px; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.855em; }
+  :not(pre) > code {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.08em 0.34em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ── Tables ───────────────────────────────────────── */
+  .tscroll {
+    overflow-x: auto;
+    border: 1px solid var(--rule-2);
+    background: var(--surface);
+    margin: 0 0 22px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--ink);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* matrix table gets wider min-width + tighter type */
+  .matrix table { min-width: 1000px; font-size: 13px; }
+  .matrix td:nth-child(1) { min-width: 190px; }
+  .matrix td:nth-child(2) { min-width: 120px; color: var(--muted); }
+  .matrix td:nth-child(3) { min-width: 175px; }
+  .matrix td:nth-child(4) { min-width: 290px; }
+
+  /* ── Chips ────────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .c-ok     { background: var(--ok-bg);     color: var(--ok);     }
+  .c-warn   { background: var(--warn-bg);   color: var(--warn);   }
+  .c-stop   { background: var(--stop-bg);   color: var(--stop);   }
+  .c-decide { background: var(--decide-bg); color: var(--decide); }
+  .c-dead   { background: var(--dead-bg);   color: var(--dead);   }
+  .c-accent { background: var(--accent-bg); color: var(--accent); }
+
+  /* ── Callouts with severity rail ──────────────────── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .callout .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+  .callout p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .callout p + p { margin-top: 10px; }
+
+  .flag {
+    border-left: 3px solid var(--rule-2);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+  }
+  .flag.warn { border-left-color: var(--warn); }
+  .flag.stop { border-left-color: var(--stop); }
+  .flag .lede { font-weight: 650; color: var(--ink); }
+
+  /* ── Diagram ──────────────────────────────────────── */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule-2);
+    color: var(--ink-2);
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    white-space: pre;
+  }
+  pre.diagram b { color: var(--accent); font-weight: 700; }
+  pre.diagram i { color: var(--muted); font-style: normal; }
+
+  /* ── Scope bar ────────────────────────────────────── */
+  .scope {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule-2);
+    border: 1px solid var(--rule-2);
+    margin: 0 0 22px;
+  }
+  .scope > div { background: var(--surface); padding: 15px 17px; }
+  .scope .k {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .scope .v {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scope .v.hi { color: var(--accent); }
+  .scope .n { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Batch list ───────────────────────────────────── */
+  .batches { list-style: none; padding: 0; margin: 0 0 22px; counter-reset: b -1; }
+  .batches > li {
+    display: grid;
+    grid-template-columns: 62px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+  .batches > li:last-child { border-bottom: 1px solid var(--rule); }
+  .batches .bnum {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+  .batches .btitle { font-weight: 650; color: var(--ink); margin: 0 0 6px; }
+  .batches .bbody { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+  .batches .bmeta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .gate { list-style: none; padding: 0; margin: 0 0 22px; }
+  .gate li {
+    padding-left: 26px;
+    position: relative;
+    font-size: 14.5px;
+    color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .gate li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px;
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--rule-2);
+    border-radius: 2px;
+  }
+
+  /* ── Questions ────────────────────────────────────── */
+  ol.questions { counter-reset: q; list-style: none; padding: 0; margin: 0; }
+  ol.questions > li {
+    counter-increment: q;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  ol.questions > li::before {
+    content: counter(q);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 3px;
+  }
+
+  footer.end {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Scout Intelligence Architecture · #561–563 · Investigation only</p>
+  <h1>Two Scores, One Name</h1>
+  <p class="standfirst">Before RECON can be connected to Scout, there is a prior problem: IDYNIFY already
+  computes <strong>two different fit scores with two different formulas</strong>. One decides what enters the
+  queue. The other is what the user sees. They do not agree.</p>
+  <div class="meta">
+    <span><b>Scope</b> Evidence + product model</span>
+    <span><b>Implemented</b> nothing</span>
+    <span><b>Also shipped</b> #564 · #565 fixes</span>
+  </div>
+</header>
+
+<!-- ══ A ══ -->
+<section id="a">
+  <div class="sec-head"><span class="sec-letter">A</span><h2>Current Match Score</h2></div>
+
+  <div class="callout">
+    <span class="tag">The finding that reframes #561</span>
+    <p>There is no single Match Score. There are two, computed by different code, with different weights,
+    different arithmetic, and different treatment of missing data.</p>
+    <p><strong>The server score gates the queue.</strong> <strong>The client score is what the user reads.</strong>
+    A company can be admitted at 62 and displayed at 44.</p>
+  </div>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th></th><th>Server — <code>calculateFitScore</code></th><th>Client — <code>calculateICPScore</code></th></tr></thead>
+      <tbody>
+        <tr><td><strong>Location</strong></td><td class="mono">netlify/functions/search-companies.js:1307</td><td class="mono">src/utils/icpScoring.js:318</td></tr>
+        <tr><td><strong>Runs when</strong></td><td>Once, at discovery, before the write</td><td>Every queue load, every ICP switch</td></tr>
+        <tr><td><strong>Weights</strong></td><td>Industry 30 · Size 25 · Location 25 · Revenue 20 — hardcoded</td><td>Industry 50 · Location 25 · Size 15 · Revenue 10 — overridable via <code>icpProfile.scoringWeights</code></td></tr>
+        <tr><td><strong>Per dimension</strong></td><td>All-or-nothing: full points or zero</td><td>Three states: 100 match · 50 unknown · 0 miss</td></tr>
+        <tr><td><strong>Missing data</strong></td><td>Scores 0 — indistinguishable from a mismatch</td><td>Scores 50 — uncertainty, not failure</td></tr>
+        <tr><td><strong>Unconfigured criteria</strong></td><td>Still counted in the denominator</td><td>Normalised out; nothing configured returns 50</td></tr>
+        <tr><td><strong>Consequence</strong></td><td><span class="chip c-stop">Hard filter</span> <code>fit_score &lt; 50</code> → company discarded at <code>:1140</code></td><td><span class="chip c-warn">Display + sort</span> overwrites the stored value in memory</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="flag stop">
+      <p><span class="lede">A scoring defect inside the server formula.</span> Revenue awards its 20 points
+      for <em>having revenue data at all</em>, not for matching the user's range:</p>
+      <p><code>if (company.revenue_range) { score += 20; }</code> &nbsp;— <code>:1333</code></p>
+      <p>And when the user skips revenue, the code adds 20 to both numerator and denominator
+      (<code>:1336–1339</code>), which is arithmetically the same as omitting the dimension but reads as a
+      free pass. A company in the wrong revenue band scores identically to one in the right band.</p>
+    </div>
+  </div>
+
+  <h4>Data flow, current state</h4>
+<pre class="diagram">Apollo <b>mixed_companies/search</b>
+   │  firmographics only
+   ▼
+<b>calculateFitScore</b>  <i>(server, 30/25/25/20, binary)</i>
+   │
+   ├── <b>&lt; 50 → discarded</b>          <i>the user never learns this company existed</i>
+   ▼
+Firestore <code>users/{uid}/companies/{id}</code>
+   <i>persists</i> fit_score, fit_reasons, status:'pending', icpId
+   │
+   ▼
+DailyLeads load → <b>calculateICPScore</b>  <i>(client, 50/25/15/10, three-state)</i>
+   │  overwrites fit_score in memory, re-sorts
+   ▼
+CompanyCard  "Company Match Score  {n} / 100"</pre>
+
+  <div class="prose">
+    <p><strong>What the number means today:</strong> pure <strong>ICP fit</strong> against four firmographic
+    dimensions — industry, location, employee size, revenue. It is not conversion likelihood, not priority,
+    not relationship strength, and not confidence. Nothing in either formula reads a signal, a behaviour, an
+    interaction, or anything from RECON.</p>
+    <p><strong>The person-level twin:</strong> <code>icp_score</code> exists on the contact schema
+    (<code>peopleSchema.js:230</code>, documented as "0-100 ICP match score") and is used only to sort
+    <code>AllLeads.jsx:1690</code>. No code writes it. It is a declared field with no producer.</p>
+  </div>
+</section>
+
+<!-- ══ B ══ -->
+<section id="b">
+  <div class="sec-head"><span class="sec-letter">B</span><h2>RECON dimensions, classified</h2></div>
+
+  <p class="prose">The constraint that decides most of this: <strong>a discovered company record holds
+  firmographics and nothing else</strong> — <code>industry, employee_count, revenue_range,
+  headquarters_location, founded_year, domain, linkedin_url, phone</code>
+  (<code>search-companies.js:1115–1132</code>). No tech stack, no news, no hiring data, no engagement
+  history. Most RECON dimensions describe <em>people and behaviour</em>, and there is nothing on the company
+  record to compare them against.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>RECON dimension</th><th>Sections · representative fields</th><th>Belongs in</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Business Identity</strong></td>
+          <td>1–2 · <code>whatYouDo</code>, <code>mainProduct</code>, <code>problemSolved</code>, <code>differentiation</code>, <code>techStack</code></td>
+          <td><span class="chip c-decide">Messaging</span> <span class="chip c-decide">Relationship intel</span></td>
+          <td>Describes the <em>seller</em>, not the target. Nothing here can score a company. It is what makes generated copy sound like the user — already wired through <code>reconCompiler</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>Ideal Customer Profile</strong></td>
+          <td>3–4 · <code>targetIndustries</code>, <code>avoidIndustries</code>, <code>companySize</code>, <code>revenueRange</code>, <code>geography</code>, <code>growthStage</code>, <code>companyType</code></td>
+          <td><span class="chip c-ok">Discovery</span> <span class="chip c-ok">Eligibility</span> <span class="chip c-ok">Match</span></td>
+          <td><strong>The only dimension the company record can actually be scored against.</strong> Section 3 is firmographic and directly comparable. <code>avoidIndustries</code> is eligibility, not fit — a negative filter, not a low score.</td>
+        </tr>
+        <tr>
+          <td><strong>Pain &amp; Motivations</strong></td>
+          <td>5–6 · <code>primaryPain</code>, <code>urgentTrigger</code>, <code>startTriggers</code>, <code>linkedinSignals</code>, <code>bestBuyingTimes</code></td>
+          <td><span class="chip c-warn">Priority*</span> <span class="chip c-decide">Messaging</span></td>
+          <td>Mostly messaging today. <code>startTriggers</code> and <code>linkedinSignals</code> are the only fields that <em>could</em> become priority inputs — but only if IDYNIFY acquires an event source. It has none. *Aspirational, not available.</td>
+        </tr>
+        <tr>
+          <td><strong>Decision Process</strong></td>
+          <td>7 · <code>economicBuyer</code>, <code>champion</code>, <code>committeeDecision</code>, <code>approvalLevels</code>, <code>decisionCriteria</code></td>
+          <td><span class="chip c-accent">Next action</span> <span class="chip c-decide">Messaging</span> <span class="chip c-warn">Discovery (people)</span></td>
+          <td>Describes <em>who to reach and in what order</em>. <code>economicBuyer</code> and <code>champion</code> are titles — the one place RECON could legitimately feed <em>people</em> discovery, which is where <code>person_titles</code> already lives.</td>
+        </tr>
+        <tr>
+          <td><strong>Competitive Intel</strong></td>
+          <td>8 · <code>directCompetitors</code>, <code>whyYouWin</code>, <code>whyYouLose</code>, <code>uniqueDifferentiators</code></td>
+          <td><span class="chip c-decide">Messaging</span> <span class="chip c-decide">Relationship intel</span> <span class="chip c-warn">Eligibility*</span></td>
+          <td>Verified in messaging today. Competitor-based <em>filtering</em> (#563) would need to know which vendors a company uses — Apollo's org record does not carry this. *Blocked on a data source, not on logic.</td>
+        </tr>
+        <tr>
+          <td><strong>Messaging Framework</strong></td>
+          <td>9 · <code>emailTone</code>, <code>keyMessages</code>, <code>callsToAction</code>, <code>urgencyTactics</code></td>
+          <td><span class="chip c-decide">Messaging</span></td>
+          <td>Purely generative. Correctly has no scoring role and should never acquire one.</td>
+        </tr>
+        <tr>
+          <td><strong>Behavioral Signals</strong></td>
+          <td>10 · <code>buyingTriggers</code>, <code>timingIndicators</code>, <code>buyingWindow</code>, <code>engagementPatterns</code>, <code>seasonalPatterns</code></td>
+          <td><span class="chip c-stop">None of the above — today</span></td>
+          <td>This is the dimension #562 is about. It defines <em>what a signal looks like</em>. IDYNIFY has no source that <em>detects</em> one on a company. Until it does, this is context for Barry's writing and nothing more.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="flag warn">
+      <p><span class="lede">The asymmetry worth sitting with.</span> Seven RECON dimensions, ten sections,
+      roughly ninety fields — and <strong>one dimension is comparable to what Scout stores</strong>. That is
+      not a wiring gap. It is a data gap: RECON collects rich qualitative context about buyers, and Scout
+      holds a firmographic row from Apollo. Connecting them meaningfully requires new <em>data</em>, not new
+      <em>arithmetic</em>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ C ══ -->
+<section id="c">
+  <div class="sec-head"><span class="sec-letter">C</span><h2>Five concepts, kept separate</h2></div>
+
+  <p class="prose">They should be distinct. Each answers a different question, changes on a different clock,
+  and fails in a different way. Collapsing them produces a number nobody can act on.</p>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Concept</th><th>Answers</th><th>Changes when</th><th>Exists today?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Match</strong></td><td>Does this fit what I said I want?</td>
+          <td>The user edits their ICP</td>
+          <td><span class="chip c-warn">Twice, inconsistently</span> — §A</td>
+        </tr>
+        <tr>
+          <td><strong>Priority</strong></td><td>Why this one, now?</td>
+          <td>Something happens in the world or in the relationship</td>
+          <td><span class="chip c-stop">No</span> — requires an event source IDYNIFY lacks</td>
+        </tr>
+        <tr>
+          <td><strong>Confidence</strong></td><td>How much do we actually know?</td>
+          <td>Data is enriched or goes stale</td>
+          <td><span class="chip c-stop">No</span> — and this is the most damaging absence</td>
+        </tr>
+        <tr>
+          <td><strong>Relationship intelligence</strong></td><td>What do we know that explains why this matters?</td>
+          <td>Conversations and activity accumulate</td>
+          <td><span class="chip c-ok">Partly</span> — <code>barryContextStack</code>, timeline, brigades</td>
+        </tr>
+        <tr>
+          <td><strong>Next action</strong></td><td>What do I do?</td>
+          <td>The relationship state changes</td>
+          <td><span class="chip c-ok">Partly</span> — <code>recommendationEngine</code>, brigade contracts</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <span class="tag">Confidence is the missing piece that makes everything else honest</span>
+    <p>The client formula already scores an unknown dimension <strong>50</strong> — the same value as a
+    genuine half-match. A company with no revenue data and a company whose revenue is a partial match are
+    indistinguishable on the card. The server formula is worse: unknown scores <strong>0</strong>, so
+    <em>missing data looks exactly like a bad fit</em>, and the &lt;50 filter silently discards companies for
+    being under-enriched rather than for being wrong.</p>
+    <p>Separating <strong>Match</strong> ("72% fit on the three dimensions we could check") from
+    <strong>Confidence</strong> ("we could only check three of four") costs one extra field and immediately
+    makes the score explainable. This is the smallest change with the largest honesty gain, and it needs no
+    RECON integration at all.</p>
+  </div>
+
+  <div class="prose">
+    <p><strong>Against a blended score.</strong> The frozen promise is <em>know who matters, why they matter,
+    and what to do next</em>. A single number answers "who" and destroys "why". If Match, Priority and
+    Confidence are folded together, a 78 cannot be explained — the user cannot tell whether the company fits
+    well, is showing urgency, or is simply well-enriched. Every one of those implies a different next action.</p>
+  </div>
+</section>
+
+<!-- ══ D ══ -->
+<section id="d">
+  <div class="sec-head"><span class="sec-letter">D</span><h2>What each issue actually is</h2></div>
+
+  <div class="tscroll matrix">
+    <table>
+      <thead><tr><th>Issue</th><th>As written</th><th>Evidence</th><th>What it actually is</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">#561</td>
+          <td>Should RECON influence Match Scores and prioritization?</td>
+          <td>Only RECON §3–4 is comparable to a company record. The rest describes buyers, not firms.</td>
+          <td><span class="chip c-warn">Partly the wrong question.</span> RECON §3–4 and the ICP profile are <em>the same information collected twice</em> — the real issue is that they are two stores, not that one should feed a score. <strong>Reframe as ICP consolidation.</strong></td>
+        </tr>
+        <tr>
+          <td class="mono">#562</td>
+          <td>Behavioral / intent signal prioritization</td>
+          <td>RECON §10 defines signals; nothing detects them. No event source exists.</td>
+          <td><span class="chip c-ok">Correct, and correctly separate.</span> This is a <strong>Priority</strong> capability, not a Match input. It is blocked on data acquisition, not on scoring design.</td>
+        </tr>
+        <tr>
+          <td class="mono">#563</td>
+          <td>Competitive intel → filter, flag, explain, or deprioritize?</td>
+          <td>Messaging use is verified. Filtering needs vendor data Apollo does not return.</td>
+          <td><span class="chip c-ok">Answer: explain, not filter.</span> Competitive intel belongs to <strong>Relationship intelligence</strong> and <strong>Messaging</strong>, both already working. Filtering is blocked on the same missing data as #562.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <div class="flag stop">
+      <p><span class="lede">A caution about the removed claims.</span> These issues exist because copy was
+      removed for promising unbuilt behaviour. That is not evidence the behaviour should be built. #562 and
+      #563 both require a data source IDYNIFY does not have and has no plan to acquire in the codebase —
+      building either means committing to signal ingestion, not to a scoring change.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ E ══ -->
+<section id="e">
+  <div class="sec-head"><span class="sec-letter">E</span><h2>Proposed model</h2></div>
+
+<pre class="diagram"><b>ELIGIBILITY</b>   <i>binary — is this even allowed in the queue?</i>
+     avoidIndustries · founded-age range · already-rejected
+     <i>fails loudly: "excluded because you avoid Staffing"</i>
+        │
+        ▼
+<b>MATCH</b>         <i>0-100 — how well does this fit what you asked for?</i>
+     industry · location · size · revenue        <i>one formula, one place</i>
+        │
+        ├── <b>CONFIDENCE</b>   <i>how many dimensions could we actually check?</i>
+        │      3 of 4 known → "72% on what we could verify"
+        │
+        ▼
+<b>PRIORITY</b>      <i>ranking — why this one now?  ← does not exist yet (#562)</i>
+     needs an event source. absent it, priority = match.
+        │
+        ▼
+<b>RELATIONSHIP INTELLIGENCE</b>   <i>why they matter — already partly built</i>
+     barryContextStack · timeline · brigade · competitive intel
+        │
+        ▼
+<b>NEXT ACTION</b>   <i>what to do — already partly built</i>
+     recommendationEngine · brigade contracts</pre>
+
+  <div class="prose">
+    <p>Each layer is independently explainable. A user can be told: <em>"Eligible. 72% match on industry,
+    location and size — we could not check revenue. No timing signal. You have no relationship here yet.
+    Suggested next step: intro email."</em> Five sentences, five layers, no opaque number.</p>
+  </div>
+
+  <h4>Risks</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Risk</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Reconciling the two formulas changes the queue</strong></td><td>Adopting the client formula server-side alters which companies clear the &lt;50 gate. Some currently-admitted companies would be excluded and vice versa. Needs a dry run against real data before switching.</td></tr>
+        <tr><td><strong>Stored scores become stale</strong></td><td><code>fit_score</code> is written once at discovery but the client recomputes on every load. Any consumer trusting the stored value — CRM export, admin metrics, <code>engagementSchema</code> — is reading a number the UI disagrees with.</td></tr>
+        <tr><td><strong>Confidence can look like a downgrade</strong></td><td>Surfacing "3 of 4 checked" on companies that previously showed a confident 75 may read as the product getting worse. It is getting more honest; the framing matters.</td></tr>
+        <tr><td><strong>RECON §3 vs ICP profile divergence</strong></td><td>Two stores hold target industries and size today. Users can set them differently and there is no reconciliation. This already produces the "ICP conflict" state RECON warns about.</td></tr>
+        <tr><td><strong>#562 scope creep</strong></td><td>Signal detection sounds like scoring work. It is data acquisition — a vendor, a budget and a refresh cadence.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Migration implications</h4>
+  <div class="prose">
+    <p>Nothing proposed here requires a schema migration. <code>fit_score</code> keeps its name and range. A
+    confidence value is additive and absent-tolerant. <code>icp_score</code> on contacts is currently unwritten,
+    so giving it a producer breaks nothing. The one genuinely breaking change would be consolidating RECON §3
+    with <code>icpProfiles</code>, which is the largest item and the one I would not start with.</p>
+  </div>
+</section>
+
+<!-- ══ F ══ -->
+<section id="f">
+  <div class="sec-head"><span class="sec-letter">F</span><h2>Smallest valuable implementation</h2></div>
+
+  <p class="prose">Ordered by value per unit of risk. <strong>None of it is #561 as written.</strong></p>
+
+  <ol class="batches">
+    <li><span class="bnum">STEP 1</span><div>
+      <p class="btitle">One formula, one place</p>
+      <p class="bbody">Import <code>icpScoring.js</code> into <code>search-companies</code> and delete
+      <code>calculateFitScore</code>. Fixes the revenue defect, ends the admitted-at-62 / displayed-at-44
+      divergence, and makes the &lt;50 gate mean what the card means. Pure consolidation — no new concept.</p>
+      <span class="bmeta">Highest value · needs a dry run on real data first · no RECON involvement</span>
+    </div></li>
+    <li><span class="bnum">STEP 2</span><div>
+      <p class="btitle">Separate Confidence from Match</p>
+      <p class="bbody">Return <code>{ score, confidence, checked, total }</code> from the scorer. Stop scoring
+      unknown dimensions as 50 inside the match number; report them as unchecked instead. Display
+      "72% · 3 of 4 checked".</p>
+      <span class="bmeta">Additive · makes the existing score explainable · unblocks the "why" half of the promise</span>
+    </div></li>
+    <li><span class="bnum">STEP 3</span><div>
+      <p class="btitle">Make eligibility explicit and visible</p>
+      <p class="bbody">Move <code>avoidIndustries</code> and the founding-age filter out of the score and into
+      a named eligibility pass that records <em>why</em> a company was excluded. Today a company can be
+      silently dropped and the user cannot find out why.</p>
+      <span class="bmeta">Small · directly serves explainability · currently invisible to users</span>
+    </div></li>
+    <li><span class="bnum">STEP 4</span><div>
+      <p class="btitle">Decide the ICP store question — #561, reframed</p>
+      <p class="bbody">RECON §3–4 and <code>icpProfiles</code> hold the same firmographic targeting twice.
+      Consolidate, or declare one authoritative and make the other read-only. This is the real #561 and it is
+      a product decision, not an integration.</p>
+      <span class="bmeta">Largest · breaking · do not start here</span>
+    </div></li>
+    <li><span class="bnum">HOLD</span><div>
+      <p class="btitle">#562 and #563 stay closed until there is a data source</p>
+      <p class="bbody">Both need per-company signal or vendor data that no current integration returns.
+      Reopen them as data-acquisition decisions, not scoring work.</p>
+      <span class="bmeta">Blocked on data, not on design</span>
+    </div></li>
+  </ol>
+
+  <div class="prose">
+    <div class="flag">
+      <p><span class="lede">If only one thing is done.</span> Step 1. Two formulas disagreeing about what
+      "fit" means is a correctness problem that exists right now, affects every user, and is entirely
+      internal — no new data, no new concept, no user-facing promise.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="end">
+  Investigation only — no schema, scoring, RECON, ranking, route or Firestore change made<br>
+  Shipped separately this round: #564 and #565 fixes (commit 0155c76) · 11 regression tests · suite 1143 passed / 5 known
+</footer>
+
+</div>

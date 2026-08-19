@@ -45,7 +45,7 @@ describe('D7 — which confirmed definitions may start a search', () => {
     ['location present', { ...BASE, locations: ['Texas'] }],
     ['company size present', { ...BASE, companySizes: ['11-20'] }],
     ['company keywords present', { ...BASE, companyKeywords: ['orthodontics'] }],
-    ['lookalike seed present', { ...BASE, lookalikeSeed: { name: 'Acme' } }],
+    ['nationwide present', { ...BASE, isNationwide: true }],
     ['founded age range present', { ...BASE, foundedAgeRange: { minAge: 0, maxAge: 5 } }],
   ])('%s → search runs', (_label, profile) => {
     expect(hasRetrievalConstraint(profile)).toBe(true);
@@ -54,6 +54,14 @@ describe('D7 — which confirmed definitions may start a search', () => {
   it('only unsupported/non-retrieval fields → no unfiltered Apollo search', () => {
     // Titles do not constrain a company search; revenue is not sent to Apollo.
     expect(hasRetrievalConstraint(BASE)).toBe(false);
+  });
+
+  it('a lookalike seed alone does not count — buildApolloQuery only logs it', () => {
+    // Tier 3 correction. The seed reaches buildApolloQuery and is logged, but
+    // its name is deliberately never added to the keyword tags, so an ICP whose
+    // only targeting is a seed would have produced a fully unfiltered search
+    // while claiming to be ICP-targeted.
+    expect(hasRetrievalConstraint({ ...BASE, lookalikeSeed: { name: 'Acme' } })).toBe(false);
   });
 
   it('empty confirmed definition → no search', () => {
@@ -71,9 +79,16 @@ describe('D7 — the gate matches what buildApolloQuery actually constrains on',
     ['companyKeywords', /companyProfile\.companyKeywords[\s\S]{0,200}keywordTags\.push/],
     ['companySizes', /organization_num_employees_ranges = companyProfile\.companySizes/],
     ['locations', /query\.organization_locations = formatStatesForApollo/],
-    ['lookalikeSeed', /companyProfile\.lookalikeSeed\?\.name/],
   ])('%s reaches the Apollo query', (_field, pattern) => {
     expect(searchFn).toMatch(pattern);
+  });
+
+  it('lookalikeSeed reaches buildApolloQuery but sets no parameter', () => {
+    const at = searchFn.indexOf('export function buildApolloQuery');
+    const body = searchFn.slice(at, at + 3000);
+
+    expect(body).toMatch(/lookalikeSeed\?\.name/);
+    expect(body).not.toMatch(/query\.\w+\s*=\s*[^;]*lookalikeSeed/);
   });
 
   it('revenue ranges are still commented out, so they cannot narrow a query', () => {

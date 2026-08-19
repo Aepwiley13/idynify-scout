@@ -403,12 +403,19 @@ export default function BarryOnboarding() {
       // not currently sent to Apollo — so a confirmed definition carrying only
       // those would produce an unfiltered global query wearing an ICP label.
       // We report that state rather than inventing criteria to fill it.
+      // lookalikeSeed is deliberately absent. buildApolloQuery receives it and
+      // logs it, but never turns it into a query parameter — the seed company's
+      // name is explicitly not added to the keyword tags. Counting it here let a
+      // confirmed ICP whose only targeting was a seed pass this gate and then run
+      // a completely unfiltered search, which is the exact thing D7 forbids: a
+      // search called ICP-targeted when no ICP constraint reached the query.
+      // Every field below does produce a demonstrable Apollo constraint.
       const hasRetrievalConstraint =
         (icpProfile.industries?.length > 0) ||
         (icpProfile.companyKeywords?.length > 0) ||
         (icpProfile.companySizes?.length > 0) ||
         (icpProfile.locations?.length > 0) ||
-        Boolean(icpProfile.lookalikeSeed?.name) ||
+        Boolean(icpProfile.isNationwide) ||
         Boolean(icpProfile.foundedAgeRange);
 
       // Mark onboarding complete on the user doc and set Barry's initial

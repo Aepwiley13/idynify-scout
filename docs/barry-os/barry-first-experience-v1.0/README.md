@@ -4,7 +4,7 @@
 **Date: 2026-08-19**
 **Repository: aepwiley13/idynify-scout**
 **Governing Contract: Barry Intelligence Contract v0.4-amend**
-**Status: Returned for convergence — v1.1-c**
+**Status: Implementation-ready — v1.1-d**
 
 ## Revision History
 
@@ -13,7 +13,8 @@
 | v1.0 | 2026-08-19 | Initial semantic design: WHO/INTENT/FIRST VALUE/PROGRESSIVE INTELLIGENCE models, five journey tests, accelerator model, anti-patterns, 12 undecided questions |
 | v1.1 | 2026-08-19 | Convergence pass: three owner clarifications (WHO name rule, intent taxonomy, multi-company tenancy), intent durability evaluation, accelerator status clause, five-journey convergence matrix against repository evidence, consolidated decision registry |
 | v1.1-b | 2026-08-19 | Bounded contract rulings: P-9 confirmation-before-search invariant (proto-targeting → confirm → ICP → search), P-5 intent durability formalized (transient routing context, not intelligence), Journey 1/2/4 corrected to require confirmation before discovery, Journey 2 factual corrections (website extraction scope, targetCompanySize semantic, free-text vs. structured) |
-| v1.1-c | 2026-08-19 | Final consistency cleanup: Discover section aligned with corrected website extraction scope, Journey 3 unsupported capability claims removed (no news producer, no referral graph), quality floor owner ruling applied (D-6 resolved), intent durability ruling applied (D-10 resolved), decision registry reconciled (4 blocking decisions remain: D-1, D-3, D-4, D-5), P-5 and P-9 locked |
+| v1.1-c | 2026-08-19 | Final consistency cleanup: Discover section aligned with corrected website extraction scope, Journey 3 unsupported capability claims removed (no news producer, no referral graph), quality floor owner ruling applied (D-6 resolved), intent durability ruling applied (D-10 resolved), decision registry reconciled, P-5 and P-9 locked |
+| v1.1-d | 2026-08-19 | Decision registry synchronization: D-1 resolved (P-1 canonical First Experience), D-3 resolved to implementation (T-1 normalization), D-4 resolved by Phase 1B (canonical availability states), D-5 resolved to implementation (P-1 + P-5), D-7/D-9/D-12 resolved, D-11 deferred, D-19 reframed (reconciliation debt, D-4 dependency cleared), legacy completion-field clarification, Apollo enrichment semantic clarification. No semantic decisions block Phase 2 implementation. |
 
 ---
 
@@ -982,31 +983,34 @@ Four onboarding paths exist in the current codebase, creating genuine overlap:
 
 All U-questions (from v1.0) and P-questions (derived from repository evidence cross-read) are consolidated, duplicates merged, and each classified.
 
-### MUST DECIDE BEFORE IMPLEMENTATION
+### RESOLVED — NO LONGER BLOCKING
 
-These decisions block Phase 2 implementation. Without them, the implementation has no clear target.
+All formerly blocking decisions have been resolved by owner rulings, Phase 1B completed work, or reclassification to implementation work.
 
-| ID | Question | Source | Why Blocking |
+| ID | Question | Resolution | Resolved By |
 |---|---|---|---|
-| **D-1** | **Onboarding authority resolution.** Which onboarding path(s) survive? Four competing flows exist with two different completion flags. The First Experience semantic model prohibits setup wizards (AP-1) and completion states (FE-4). Must the current flows be retired, adapted, or replaced? | U-1, P-3 | Cannot build the First Experience while four competing flows contest the same entry point. |
-| **D-2** | **~~Proto-targeting intelligence persistence.~~** **RESOLVED by v1.1-b.** Proto-targeting intelligence does not require independent persistence. It is conversational context used by Barry to propose a targeting definition. Confirmation creates a formal ICP; no intermediate storage object is needed. The conversation-to-search path is: proto-targeting (conversational) → user confirmation → ICP creation → ICP-targeted search. | U-2, P-1 | ~~Resolved~~ — no longer blocking. |
-| **D-3** | **Website analysis → search wiring.** Website analysis extracts `targetIndustry` and `targetCompanySize` but stores them in `websiteAnalysis` sub-object, disconnected from `buildApolloQuery`. Must the wiring be built as Cat 1 reconciliation, or does it require schema changes (Cat 2)? | P-2 | Journey 2 (Website Provider) cannot deliver first value without this wiring. |
-| **D-4** | **DEFAULT_ICP_ID disposition.** The `'default'` fallback in `getActiveIcpId` violates v0.4 ICP Availability States. What replaces it? Must every consumer handle `no-profiles` / `none-active` / `read-failed` explicitly? | P-4 | Zero-ICP behavior throughout the platform depends on how the silent default is retired. |
-| **D-5** | **Non-prospecting intent routing.** Current platform routing (`SmartRedirect` → `OnboardingFlow`) assumes all users are prospectors. How do Engagement, Communication, Preparation, and other non-prospecting intents reach their first value without passing through a prospecting-oriented onboarding? | P-5 | Journeys 1 (Exploration), 3 (Networker), and any non-prospecting intent cannot reach first value through the current routing. |
-| **D-6** | **~~First value quality floor.~~** **RESOLVED by owner ruling (v1.1-c).** A single real, currently-supported retrieval constraint is sufficient to attempt First Value. Barry does not need an arbitrary minimum number of targeting dimensions. If targeting is broad, Barry presents the result honestly as broad and uses feedback to improve. If no supported retrieval constraint exists, Barry must not search and should request the minimum additional targeting information required. This is not a multi-field completeness threshold. | U-5, P-7 | ~~Resolved~~ — no longer blocking. |
+| **D-1** | **~~Onboarding authority resolution.~~** | **RESOLVED by P-1.** One canonical Barry First Experience. `/onboarding` is the implementation authority. Neither legacy flow survives unchanged. Existing capabilities from `BarryOnboarding`, `OnboardingFlow`, and related surfaces may be composed behind the canonical route. | P-1 (v1.1-d) |
+| **D-2** | **~~Proto-targeting intelligence persistence.~~** | **RESOLVED.** Proto-targeting is conversational context only. No provisional object needed. Confirmation creates a formal ICP. | v1.1-b |
+| **D-3** | **~~Website analysis → search wiring.~~** | **RESOLVED TO IMPLEMENTATION WORK.** Team A has identified bounded T-1 normalization: website-derived free text → defensible supported enumeration → proposed targeting → explicit user confirmation → authoritative ICP. Ambiguous values are omitted rather than invented. No proto-targeting persistence is introduced. This is implementation work, not a semantic blocker. | P-1 + Team A (v1.1-d) |
+| **D-4** | **~~DEFAULT_ICP_ID disposition.~~** | **RESOLVED BY PHASE 1B. DO NOT REOPEN.** Phase 1B eliminated silent default attribution from live ICP resolution/search paths and established the canonical availability states: `no-profiles`, `none-active`, `read-failed`. | Phase 1B (v1.1-d) |
+| **D-5** | **~~Non-prospecting intent routing.~~** | **RESOLVED TO IMPLEMENTATION.** P-1 + P-5 establish the semantic answer: the canonical Barry First Experience routes by transient current intent, and non-Prospecting paths may operate at zero ICP. Building those routes is implementation work, not a semantic decision. | P-1 + P-5 (v1.1-d) |
+| **D-6** | **~~First value quality floor.~~** | **RESOLVED.** A single supported retrieval constraint is sufficient. Not a multi-field completeness threshold. If no constraint exists, Barry must not search and should request minimum additional targeting info. | Owner ruling (v1.1-c) |
 
-### OWNER BUSINESS DECISIONS
+### OWNER BUSINESS DECISIONS — RESOLVED
 
-These are product and business decisions that the semantic model surfaces but cannot make.
+| ID | Question | Resolution | Resolved By |
+|---|---|---|---|
+| **D-7** | **~~Engagement first value for zero-contact users.~~** | **RESOLVED FOR PHASE 2.** One named person is sufficient to begin an Engagement/Referral-oriented path. Enrichment is an optional implementation mechanism, not a semantic prerequisite. Automatic second-degree relationship detection remains future capability. | Owner ruling (v1.1-d) |
+| **D-9** | **~~Returning user experience.~~** | **RESOLVED FOR FIRST EXPERIENCE.** Returning users re-enter the same state-aware First Experience. Existing conversation/state may resume. This does not establish a universal long-term memory policy beyond existing intelligence contracts. | Owner ruling (v1.1-d) |
+| **D-10** | **~~Intent durability → Mission promotion.~~** | **RESOLVED.** Intent is transient conversational routing context, not durable User identity and not a seventh intelligence type. No persistent intent store is required. P-5 is locked. | P-5 (v1.1-c) |
+| **D-12** | **~~ICP confirmation proactivity.~~** | **LOCKED.** For Prospecting, Barry proactively proposes a targeting definition when available intelligence can produce at least one defensible supported retrieval constraint. If it cannot, Barry asks the minimum additional useful question. Explicit user confirmation remains the ICP creation/update boundary. | Owner ruling (v1.1-d) |
+
+### OWNER BUSINESS DECISIONS — REMAINING
 
 | ID | Question | Source | Nature |
 |---|---|---|---|
-| **D-7** | **Engagement first value for zero-contact users.** A new user with Engagement intent has zero contacts. Is "name a contact and I'll research them" sufficient first value? Or must Barry have pre-existing contact data? | P-6 | Product scope — defines the minimum viable Engagement experience. |
-| **D-8** | **Cross-session intelligence continuity.** When a user returns after days or weeks, what does Barry remember? All progressive intelligence? Only confirmed facts? Does Barry re-confirm stale inferences? | U-8 | Product policy — defines the returning user contract. |
-| **D-9** | **Returning user experience.** Does Barry resume from where they left off, re-greet, or adapt based on time away? | U-9 | Product UX — closely related to D-8. |
-| **D-10** | **~~Intent durability → Mission promotion.~~** **RESOLVED by owner ruling P-5 (v1.1-c).** Intent is transient conversational routing context, not durable User identity and not a seventh intelligence type. No persistent intent store is required. An objective may become Mission intelligence only via explicit promotion when it becomes a persistent objective Barry is tracking across interactions. P-5 is locked. | v1.1 | ~~Resolved~~ — P-5 locks the interpretation. |
-| **D-11** | **Whether Barry provides meaningful value before payment.** | Owner instruction | Business model decision. This semantic model does not decide it. |
-| **D-12** | **ICP confirmation proactivity.** When proto-targeting intelligence is coherent, should Barry proactively propose an ICP, or wait for the user? How often? What threshold? | U-7 | Product behavior — defines Barry's assertiveness. |
+| **D-8** | **Cross-session intelligence continuity.** When a user returns after days or weeks, what does Barry remember? All progressive intelligence? Only confirmed facts? Does Barry re-confirm stale inferences? | U-8 | Product policy — defines the returning user contract. D-9 (returning user experience) is resolved for the First Experience, but D-8 (what specifically persists and with what freshness policy) remains an owner product decision. |
+| **D-11** | **~~Whether Barry provides meaningful value before payment.~~** **DEFERRED OUT OF PHASE 2.** Pre-payment Barry is a separate owner/growth decision. Phase 2 implementation targets authenticated/post-signup use. | Owner instruction | ~~Deferred~~ — not a Phase 2 concern. |
 
 ### MAY DEFER
 
@@ -1027,7 +1031,31 @@ These require architectural work that is beyond Phase 2 scope.
 |---|---|---|---|
 | **D-17** | **Multi-company workspace switching.** Visual workspace indicator, UI switching, context persistence. | U-4 | Requires tenant/organization model that does not exist. |
 | **D-18** | **Team / group first experience.** How does the second user on a team inherit Workspace intelligence? | U-12 | Requires multi-user workspace architecture. |
-| **D-19** | **RECON capability bypass interaction.** `reconCapability.js` instructs Barry "Do NOT tell the user their ICP is 'not configured'" when RECON score >= 60%. How does this interact with zero-ICP semantics? | P-8 | Cat 1 reconciliation work — must align with D-4 (DEFAULT_ICP_ID disposition). |
+| **D-19** | **RECON capability bypass interaction.** `reconCapability.js` instructs Barry "Do NOT tell the user their ICP is 'not configured'" when RECON score >= 60%. **Remaining conflict:** With D-4 resolved (silent default eliminated, canonical availability states established), the RECON bypass instruction may still conflict with zero-ICP semantics — if a user has no ICP but RECON >= 60%, Barry is instructed to suppress ICP-absence messaging, which could mask a genuine zero-ICP state. This is future reconciliation debt, not a Phase 2 implementation blocker. | P-8 | Reconciliation debt. D-4 dependency resolved; remaining conflict is `reconCapability.js` suppressing ICP-absence messaging at high RECON scores. |
+
+---
+
+## Legacy Completion-Field Clarification (v1.1-d)
+
+Existing flags such as `onboardingComplete`, `onboarding.completed`, `onboardingSource`, `hasSeenMCWelcome`, and `barryState` may remain temporarily as compatibility/routing state. Their technical existence does not contradict FE-4 (No Setup Completion State).
+
+Semantically:
+- Barry has no "knowledge complete" state
+- There is no profile completeness requirement
+- The First Experience is not considered complete because a boolean flips
+- First Value and progressive intelligence remain the governing product concepts
+
+These flags are implementation routing artifacts. Their eventual retirement is implementation cleanup, not a semantic decision. Phase 2 implementation may use them for backward-compatible routing while building the canonical First Experience behind `/onboarding`.
+
+---
+
+## Apollo Enrichment Semantic Clarification (v1.1-d)
+
+A named contact is sufficient to begin an Engagement path. Enrichment (e.g., Apollo person/company lookup) is not required semantically.
+
+Barry should use already-available relationship/contact intelligence first and may enrich only when implementation determines it materially improves the requested First Value. Cost policy for enrichment is an implementation/owner concern, not a new semantic intelligence type or contract decision.
+
+Enrichment does not create a new intelligence type. Enriched data is attributed per the Intelligence Rule (Principle 2) with provenance "enriched from [source]" and appropriate confidence. It follows the same progressive intelligence model as all other intelligence acquisition.
 
 ---
 
@@ -1037,7 +1065,7 @@ These require architectural work that is beyond Phase 2 scope.
 
 v0.4 defines six intelligence types in Part I (ICP, Match, Coverage, User Judgment, Eligibility, RECON). Intent as defined in this document is not a seventh type — it is routing intelligence that determines what Barry does, not a stored intelligence artifact with the five properties required by Principle 2 (ownership, provenance, confidence, freshness, purpose).
 
-**Assessment:** No v0.4 conflict. Intent operates at a different layer than the intelligence types. If intent ever requires persistence and attribution (e.g., for the returning user experience), it would need to satisfy the Intelligence Rule — but that is a future decision (D-8, D-9), not a current requirement.
+**Assessment:** No v0.4 conflict. Intent operates at a different layer than the intelligence types. P-5 locks this interpretation: intent is transient routing context and does not require the Intelligence Rule's five properties. If cross-session intelligence continuity (D-8) ever requires persisted intent, it would need to satisfy the Intelligence Rule at that point — but that is not a Phase 2 requirement.
 
 ### Interpretation 2: Intent → Mission Promotion Boundary
 
@@ -1045,7 +1073,7 @@ Current intent is ephemeral routing intelligence. An objective that persists acr
 
 **Assessment:** Compatible with v0.4. The contract defines Mission scope but does not define when or how an objective becomes a Mission. This interpretation adds a semantic boundary that v0.4 implies but does not state: routing intent is not Mission; a durable, tracked objective is. v0.4 Part VI item 9 (Mission as first-class object) remains explicitly undecided — this interpretation does not decide storage, only the semantic threshold.
 
-**Recommendation:** Adopt as a v0.4 interpretation if owner approves (D-10).
+**Status:** Adopted. Owner ruling P-5 (v1.1-c) locks intent as transient routing context. D-10 resolved.
 
 ### Interpretation 3: Proto-Targeting Intelligence and v0.4 ICP Creation Semantics
 
@@ -1074,18 +1102,29 @@ Proto-targeting alone cannot produce persisted company discovery. No unattribute
 
 ---
 
-## Decisions That Must Be Locked Before Phase 2 Implementation
+## Implementation Readiness Summary
 
-The following four decisions (D-1, D-3, D-4, D-5) are implementation-blocking. D-2 (proto-targeting persistence) was resolved by v1.1-b: proto-targeting is conversational context only. D-6 (quality floor) was resolved by owner ruling (v1.1-c): a single supported retrieval constraint is sufficient. Without the remaining four decisions, the First Experience cannot be built because the implementation has no clear target for:
+**No semantic decisions block Phase 2 implementation.**
 
-1. **Entry point** (D-1, D-5) — what the user sees when they arrive
-2. **Intelligence storage** (D-3) — where website-inferred intelligence lives
-3. **ICP fallback behavior** (D-4) — what happens platform-wide when no ICP exists
+All formerly blocking decisions (D-1 through D-6) are resolved:
 
-Owner business decisions (D-7 through D-12) inform product behavior but do not block the core architecture. Deferrable decisions (D-13 through D-16) can be resolved during implementation. Future architecture decisions (D-17 through D-19) are explicitly out of Phase 2 scope.
+| ID | Resolution |
+|---|---|
+| D-1 | P-1: one canonical First Experience at `/onboarding` |
+| D-2 | v1.1-b: proto-targeting is conversational context only |
+| D-3 | Resolved to implementation work (T-1 normalization) |
+| D-4 | Phase 1B: canonical availability states established |
+| D-5 | P-1 + P-5: intent-routed First Experience, zero-ICP non-Prospecting paths |
+| D-6 | Owner ruling: single supported retrieval constraint sufficient |
+
+**One remaining owner decision (D-8):** Cross-session intelligence continuity — what Barry remembers across sessions and with what freshness policy. This informs product behavior but does not block Phase 2 core architecture.
+
+**D-11** (pre-payment value) is deferred out of Phase 2 scope.
+
+Deferrable decisions (D-13 through D-16) can be resolved during implementation. Future architecture decisions (D-17 through D-19) are explicitly out of Phase 2 scope. D-19 is reconciliation debt, not a blocker.
 
 ---
 
 *This document was produced by Team B. No code was written or changed during its production. This is a semantic design document only.*
 
-*Status: Returned for convergence — v1.1-c. No implementation is authorized by this document. Decisions D-1, D-3, D-4, D-5 must be locked before Phase 2 implementation (D-2 resolved by v1.1-b, D-6 resolved by owner quality floor ruling, D-10 resolved by P-5 ruling). Owner business decisions D-7 through D-9, D-11, D-12 are requested. P-5 and P-9 semantic rulings are LOCKED.*
+*Status: Implementation-ready — v1.1-d. No semantic decisions block Phase 2 implementation. All formerly blocking decisions (D-1 through D-6) are resolved. Owner business decisions D-7, D-9, D-12 are resolved. D-8 (cross-session intelligence continuity) remains an owner product decision but does not block Phase 2 core architecture. D-11 deferred out of Phase 2. P-5 and P-9 semantic rulings are LOCKED. This document is the semantic authority for Phase 2 implementation.*

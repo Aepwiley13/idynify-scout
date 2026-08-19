@@ -10,7 +10,7 @@ export default function CheckoutSuccessPage() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigate('/onboarding/barry');
+          navigate('/onboarding');
           return 0;
         }
         return prev - 1;
@@ -95,7 +95,7 @@ export default function CheckoutSuccessPage() {
 
           {/* Manual Button */}
           <button
-            onClick={() => navigate('/onboarding/barry')}
+            onClick={() => navigate('/onboarding')}
             className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-purple-500/50 text-lg font-mono"
           >
             🧠 MEET BARRY NOW

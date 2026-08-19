@@ -588,7 +588,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
                 Try Again
               </button>
               <button
-                onClick={() => navigate('/onboarding/barry')}
+                onClick={() => navigate('/onboarding')}
                 style={{
                   padding: '10px 20px', borderRadius: 10,
                   background: T.surface, border: `1px solid ${T.border}`,
@@ -631,7 +631,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
                 Add Targeting Detail
               </button>
               <button
-                onClick={() => navigate('/onboarding/barry')}
+                onClick={() => navigate('/onboarding')}
                 style={{
                   padding: '10px 20px', borderRadius: 10,
                   background: T.surface, border: `1px solid ${T.border}`,

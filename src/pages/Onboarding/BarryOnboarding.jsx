@@ -67,7 +67,7 @@ function buildReturnGreeting(icpData) {
   return `${strategyLine}${sizeContext}${locationContext}.${strategyExplanation}${contextSummary}${refreshNote}${actionPrompt}`;
 }
 
-export default function BarryOnboarding() {
+export default function BarryOnboarding({ knownName = null } = {}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState('welcome'); // welcome, asking, clarifying, confirming, saving
@@ -126,7 +126,7 @@ export default function BarryOnboarding() {
           setBarryMessage("I'm Barry. Your profile is started, but I don't have a target yet — tell me that once and Scout and Hunter will know who matters to you.\n\nWho are you hunting?");
         }
       } else {
-        setBarryMessage("I'm Barry. I use the context you give IDYNIFY so Scout and Hunter know who matters to you — you only tell me once.\n\nWho are you hunting?");
+        setBarryMessage(`${knownName ? `Good to meet you, ${knownName}. ` : ''}I'm Barry. I use the context you give IDYNIFY so Scout and Hunter know who matters to you — you only tell me once.\n\nWho are you hunting?`);
       }
 
       // Check for existing in-progress conversation

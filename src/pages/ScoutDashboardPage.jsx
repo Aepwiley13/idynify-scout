@@ -35,7 +35,7 @@ export default function ScoutDashboardPage() {
 
       if (!profileDoc.exists()) {
         // No profile - redirect to questionnaire
-        navigate('/onboarding/company-profile');
+        navigate('/onboarding');
         return;
       }
 
@@ -216,7 +216,7 @@ export default function ScoutDashboardPage() {
                 ⬅️ BACK TO MISSION CONTROL
               </button>
               <button
-                onClick={() => navigate('/onboarding/company-profile')}
+                onClick={() => navigate('/onboarding')}
                 className="w-full px-8 py-4 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 font-bold rounded-xl transition-all font-mono"
               >
                 🔄 UPDATE SEARCH CRITERIA
@@ -280,7 +280,7 @@ export default function ScoutDashboardPage() {
             </div>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/onboarding/company-profile')}
+                onClick={() => navigate('/onboarding')}
                 className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg font-mono font-bold text-sm transition-all"
               >
                 🔄 UPDATE SEARCH

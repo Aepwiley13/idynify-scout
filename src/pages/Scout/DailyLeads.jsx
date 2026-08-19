@@ -2126,7 +2126,7 @@ export default function DailyLeads({ onNavigate }) {
             Scout needs to know who you're targeting before it can find your matches. Tell Barry who you're after and he'll take it from there.
           </p>
           <button
-            onClick={() => navigate('/onboarding/barry')}
+            onClick={() => navigate('/onboarding')}
             style={{
               width: '100%', padding: '13px',
               borderRadius: 12,

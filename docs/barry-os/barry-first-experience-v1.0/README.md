@@ -4,7 +4,14 @@
 **Date: 2026-08-19**
 **Repository: aepwiley13/idynify-scout**
 **Governing Contract: Barry Intelligence Contract v0.4-amend**
-**Status: Returned for convergence**
+**Status: Returned for convergence — v1.1**
+
+## Revision History
+
+| Version | Date | Scope |
+|---|---|---|
+| v1.0 | 2026-08-19 | Initial semantic design: WHO/INTENT/FIRST VALUE/PROGRESSIVE INTELLIGENCE models, five journey tests, accelerator model, anti-patterns, 12 undecided questions |
+| v1.1 | 2026-08-19 | Convergence pass: three owner clarifications (WHO name rule, intent taxonomy, multi-company tenancy), intent durability evaluation, accelerator status clause, five-journey convergence matrix against repository evidence, consolidated decision registry |
 
 ---
 
@@ -72,7 +79,7 @@ WHO is the lightest possible baseline. It establishes who Barry is talking to �
 
 | Information | Classification | Rationale |
 |---|---|---|
-| **Name** | Required now | Barry must address the user. Cannot be inferred. Minimum social contract. |
+| **Name** | Normally useful, conversationally acquired | Barry should address the user by name. Name may be stated, inferred from authenticated context (e.g., email display name), or confirmed. It must not create a mandatory profile-form gate before first value. |
 | **Primary company or organization** | Useful now | Provides workspace grounding. Enables website inference. Not required — a user may be between companies, independent, or not ready to share. |
 | **Company website** | Optional accelerator | High-value inference source. Barry can discover industry, positioning, company size, location, and competitive landscape from a website. Not required — many users do not have one, and its absence is not blocking. |
 | **Email address** | Required now (platform) | Authentication artifact. Not intelligence Barry asks for — the platform provides it. Barry may infer domain → company from it. |
@@ -91,6 +98,8 @@ WHO is the lightest possible baseline. It establishes who Barry is talking to �
 
 **WHO is not a profile.** Barry does not build a "user profile" from WHO. WHO establishes the minimum conversational ground truth: I know who I am talking to. Everything else is progressive intelligence, acquired through the Question Rule.
 
+**WHO requires only enough identity to begin.** The First Experience requires only enough personal identity to begin a useful conversation. Barry's goal is to establish a baseline understanding of the person — not to make the person complete a profile. A name is normally the minimum social contract, but it may be acquired conversationally, inferred from reliable authenticated context, or confirmed — it must never be a form field that gates first value.
+
 ---
 
 # INTENT Semantic Model
@@ -102,6 +111,10 @@ Intent is expressed in human terms. The user never needs to know what Barry's mo
 ## Intent Is Not a Menu Selection
 
 The user does not choose from a list of capabilities. They describe what they want. Barry's job is to understand. If the user says "I need more clients," Barry understands that as a discovery intent — the user does not need to know the word "discovery" or "Scout."
+
+## Intent Taxonomy Is Not UI Taxonomy
+
+The nine semantic intent types below are useful as an internal classification for how Barry reasons about what the user wants. They are not a UI element. The user does not need to understand, see, or select from Barry's complete internal intent taxonomy. Barry may infer intent from natural language, conversation, or a smaller set of broad choices and map it internally to one or more intent types. Implementation must not prescribe nine buttons, a nine-option selector, or any UI that mirrors the internal taxonomy.
 
 ## Human Intent Types
 
@@ -126,6 +139,19 @@ The user does not choose from a list of capabilities. They describe what they wa
 **Intent determines ICP relevance.** Per v0.4-amend, ICP is capability-required, not platform-required. The user's intent determines whether ICP intelligence becomes relevant. A user whose intent is Engagement never needs an ICP. A user whose intent is Prospecting will need an ICP — but not at the moment of declaring intent. ICP becomes relevant at the moment Barry needs a targeting definition to execute a discovery operation.
 
 **Compound intent is normal.** Most users want more than one thing. Barry serves the most actionable intent first and remembers the others. "I want to find new clients and also keep in touch with my existing network" — Barry starts with whichever is more immediately actionable (typically Engagement, because it requires less setup) and returns to Prospecting when the user is ready.
+
+### Intent Durability (v1.1)
+
+Current intent is routing intelligence. It answers what the user wants Barry to help with now. It is not automatically a durable characteristic of the user.
+
+If an objective persists across sessions or becomes something Barry is actively helping achieve over time, it may later become Mission intelligence (v0.4 Part III, Mission scope).
+
+**v0.4 compatibility evaluation:** This distinction is fully compatible with v0.4-amend.
+- v0.4 defines Mission scope as "the current objective, when one is active: mission goal, step progress, strategy, and outcome history" (Part III). This is durable, tracked intelligence — semantically distinct from ephemeral routing intent.
+- v0.4 Part VI item 9 leaves "Mission as a first-class Firestore object" explicitly undecided. The intent→Mission semantic boundary does not decide storage — it establishes when routing intelligence has matured into a durable objective.
+- The boundary: intent tells Barry what to do in this conversation; Mission is an objective Barry tracks and advances across conversations.
+
+**Recommendation:** This interpretation is compatible with v0.4-amend and clarifies a boundary the contract implies but does not state. Recommended for owner ruling as a v0.4 interpretation, not an amendment.
 
 ---
 
@@ -156,6 +182,8 @@ First value is the earliest moment when Barry delivers something the user finds 
 
 **FV-4: First value acknowledges its own limitations.** When Barry delivers a result from limited intelligence, Barry says so: "Based on what I can see, here are three companies that might fit. As I learn more about what you're looking for, these will get sharper." This is honesty, not an apology.
 
+**FV-5: First value is intent-appropriate. (v1.1)** Each intent type has its own first value. Not every journey leads toward Scout or ICP creation. A user whose intent is Engagement receives engagement value; a user whose intent is Preparation receives meeting preparation. The first value table above defines what "useful" means for each intent. Implementation must not funnel all intents through a single Prospecting-shaped path.
+
 ---
 
 # Progressive Intelligence Model
@@ -173,7 +201,7 @@ Intelligence available without asking:
 
 ### Phase 1: First Conversation (WHO + INTENT)
 Intelligence from the opening exchange:
-- Name (asked — the one required question)
+- Name (conversationally acquired — from authentication context, stated, or confirmed)
 - Company/organization (offered or inferred)
 - Website (offered as accelerator)
 - Intent (asked — "What brings you to Barry?")
@@ -344,13 +372,15 @@ Each test user must reach a useful outcome. If any is forced through intelligenc
 **Barry's path:**
 1. Barry greets Alex by name. Asks what brings them here.
 2. Alex says: "I work with three different companies — an investment firm, a cleantech startup, and my own advisory. I need Barry for all of them."
-3. Barry recognizes the multi-company pattern. Barry does not force Alex to pick one. Barry says: "I can work with you across all three. Which one should we start with?"
+3. Barry recognizes the multi-company pattern. Barry does not force Alex to pick one. Barry says: "Let's start with one — which is most pressing right now?"
 4. Alex says: "Let's start with my advisory — I need to find new clients."
 5. Intent for first context: **Prospecting** (for Alex Park Advisory).
-6. Barry proceeds with the Prospecting flow for the advisory, treating it as the active Workspace context.
-7. Barry remembers the other two companies. When Alex is ready, Barry can switch context: "Ready to work on Northwind Capital or TerraGrid?"
+6. Barry proceeds with the Prospecting flow for the advisory.
+7. Barry remembers the other two companies. The mechanism for returning to them depends on architectural support that does not yet exist (see §Multi-Company Behavior).
 
-**Test result:** Alex was not forced to abandon two companies to use Barry. Alex was not asked to "set up" three separate accounts. Barry acknowledged the multi-company reality as normal, asked which to start with, and delivered first value for the first context while preserving the others.
+**Test result:** Alex was not forced to abandon two companies to use Barry. Alex was not asked to "set up" three separate accounts. Barry acknowledged the multi-company reality as normal, asked which to start with, and delivered first value for the first context.
+
+**Current platform limitation (v1.1):** The platform currently has no tenant or organization model. All data is scoped to `users/{uid}/...`. Multi-company context isolation cannot be safely implemented today. The semantic model describes the desired behavior; the convergence matrix (see §Five-Journey Convergence Matrix) documents the gap.
 
 **Multi-company semantic model:** See §Multi-Company Behavior below.
 
@@ -363,9 +393,12 @@ Every piece of information Barry might want during the first experience is class
 ## Classification Definitions
 
 ### Required Now
-Information without which the first conversation cannot proceed. There are exactly two:
-- **Name** — Barry must address the user
+Information without which the first conversation cannot proceed:
 - **Intent** — Barry must know what to do
+
+### Conversationally Acquired
+Information Barry needs for natural conversation but which does not require a form:
+- **Name** — Barry should address the user by name; acquirable from authenticated context, conversational exchange, or confirmation
 
 ### Useful Now
 Information that materially improves first value quality. Barry benefits from having it but can proceed without it:
@@ -522,6 +555,8 @@ This is not a politeness rule. It is a Question Rule application: the résumé i
 
 **ACC-5: Accelerators compose.** A user who provides both a LinkedIn URL and a website gives Barry richer intelligence than either alone. Barry synthesizes rather than processing each in isolation.
 
+**ACC-6: Accelerator status is semantic classification, not capability claim. (v1.1)** The accelerator types listed above (website, LinkedIn, Facebook/social, résumé/document, free-form biography) are semantic classifications within the intelligence acquisition model. Their inclusion here does not claim that the processing capability for each accelerator currently exists in the codebase. Missing accelerator processing is an implementation gap, not a First Experience prerequisite. The architecture should permit future accelerators to plug into the WHO/intelligence acquisition pipeline without redesigning the First Experience model. No APIs, OAuth mechanisms, parsers, schemas, or vendors are specified by this classification.
+
 ---
 
 # Rules for When Barry May Ask vs. Infer and Confirm
@@ -641,35 +676,35 @@ Working across multiple companies or organizations is normal, not an edge case. 
 
 ## Semantic Model
 
-Per v0.4, User and Workspace are distinct scopes. A single User may be associated with multiple Workspaces. This is the foundational distinction.
+Per v0.4, User and Workspace are distinct scopes. A person's identity should conceptually persist across organizational contexts. This is a semantic design principle, not a claim about current platform capability.
 
-**User identity persists across Workspaces.** Alex Park is the same person whether working on Northwind Capital, TerraGrid, or Alex Park Advisory. User-scoped intelligence (name, communication style, role history, personal preferences) travels with the user.
+**Current platform limitation (v1.1):** The current platform cannot safely represent isolated multi-company contexts. All data is scoped to `users/{uid}/...` and no tenant or organization model exists. Phase 2 must not imply that independent Workspaces currently exist and does not authorize tenant architecture. The First Experience should avoid unnecessary decisions that prevent future multi-company support.
 
-**Workspace intelligence is Workspace-specific.** Each company has its own business context, value proposition, competitive landscape, client base, and (potentially) targeting definitions. Workspace-scoped intelligence does not leak between companies.
+**User identity persists across organizational contexts.** Alex Park is the same person whether working on Northwind Capital, TerraGrid, or Alex Park Advisory. User-scoped intelligence (name, communication style, role history, personal preferences) is conceptually tied to the person, not to any single company context.
+
+**Company-specific intelligence should not leak between contexts.** Each company context has its own business identity, value proposition, competitive landscape, client base, and (potentially) targeting definitions. When multi-company support becomes architecturally feasible, company-specific intelligence must not cross context boundaries.
 
 ## First Experience for Multi-Company Users
 
 1. Barry recognizes the multi-company pattern when the user mentions multiple companies or organizations.
 2. Barry asks which to start with — this is the one required decision. Barry does not ask the user to configure all companies upfront.
-3. Barry establishes the first Workspace context and delivers first value within it.
-4. Barry remembers the other companies and makes switching natural: "Ready to work on TerraGrid?" — not "Please configure your next workspace."
+3. Barry establishes the first company context and delivers first value within it.
+4. Barry remembers the other companies. The mechanism for context switching depends on architectural support that does not yet exist — the First Experience should not make promises about switching that the platform cannot fulfill.
 
-## Context Switching
+## Design Principles for Future Multi-Company Support
 
-Workspace context switching is a natural part of multi-company operation:
-- Barry maintains awareness of which Workspace is active
-- Switching is conversational: "Let's focus on Northwind" or "What about TerraGrid?"
-- User-scoped intelligence persists across switches
-- Workspace-scoped intelligence is scoped to the active Workspace
-- ICP, Match, and Eligibility are Workspace-and-ICP-scoped — they do not transfer between Workspaces
+The First Experience should avoid decisions that foreclose multi-company architecture:
+- Do not hard-wire the assumption that one user = one company
+- Do not store company-specific intelligence in user-global paths if a company-scoped alternative is feasible
+- Do not conflate User-scoped intelligence (personal style, name) with Workspace-scoped intelligence (business identity, ICP)
+- When multi-company architecture arrives, the second company should not require a separate onboarding
 
 ## Multi-Company Anti-Patterns
 
-- Requiring the user to "set up" each company before using it
-- Treating the second company as a separate onboarding
-- Leaking client intelligence from one company into another company's context
+- Leaking client intelligence from one company context into another
 - Forcing the user to choose a "primary" company
 - Treating multi-company as a premium or advanced feature
+- Implying that isolated multi-company contexts currently exist when they do not
 
 ---
 
@@ -801,6 +836,197 @@ This document assumes a single user. When multiple users share a Workspace (a te
 
 ---
 
+# Convergence Addendum (v1.1)
+
+This addendum reconciles the five journey tests against repository evidence, consolidates all decision questions, identifies v0.4 interpretations required, and specifies what must be locked before Phase 2 implementation begins.
+
+---
+
+## Five-Journey Convergence Matrix
+
+Each journey is tested against current repository capability. Evidence is from codebase research, not from Team A's report (which has not been committed to the repository as of this writing).
+
+### Journey 1: The Minimalist (Jordan — name only, "tech companies")
+
+| Requirement | Repository Support | Gap | Semantic Model Change? |
+|---|---|---|---|
+| Conversational intent capture | No current path maps conversational intent to a Barry routing decision. `SmartRedirect` (App.jsx:321) routes all new users to `OnboardingFlow`, which is a 6-step wizard. | **Critical gap.** Current platform assumes all users enter through a structured onboarding flow, not a conversation. | No — the model correctly describes what should happen. |
+| "Tech companies" → search | `buildApolloQuery` (search-companies.js:659) can run with just `industries: ["technology"]` as keyword tags. Technically functional. | **Wiring gap.** No current path converts conversational targeting input into the `companyProfile` object that `search-companies.js:237` requires. | No — model describes intent-to-search correctly. |
+| Zero-ICP search execution | `search-companies.js` warns but does not abort on empty filters. Apollo returns broad results. | **Quality gap.** Broad results may not constitute meaningful first value (see U-5). | No, but U-5 (quality floor) becomes relevant. |
+| No completion-flag gate | `useOnboardingState` (useOnboardingState.js:75-81) has a 7-day safety valve: accounts older than 7 days are treated as "complete." New users ARE gated by onboarding flow. | **Anti-pattern conflict.** Current `OnboardingFlow` is AP-1 (Setup Wizard) and AP-12 (Onboarding Trap). | No — model correctly prohibits this. Implementation must resolve. |
+
+**Owner ruling required?** No for the semantic model. Implementation must build the conversational-to-search bridge.
+
+### Journey 2: The Website Provider (Priya — name + website, Prospecting)
+
+| Requirement | Repository Support | Gap | Semantic Model Change? |
+|---|---|---|---|
+| Website analysis | **EXISTS.** `analyze-website.js` (658 lines) fetches URL, strips HTML, sends to Claude, extracts `companyName`, `description`, `whatTheySell`, `whoTheyServeTo`, `targetIndustry`, `targetCompanySize`, `valueProposition`, `icpSummary`. | None — capability exists. | No. |
+| Extracted targeting → search | Website analysis stores `targetIndustry` and `targetCompanySize` under `modules[recon].websiteAnalysis` sub-object. `buildApolloQuery` reads from `companyProfile` object. **These are different paths.** | **Wiring gap.** Website-extracted targeting intelligence does not reach the search function. `targetIndustry` from website analysis is stored but never promoted to the `companyProfile.industries` field that `buildApolloQuery` reads. | No — model correctly describes website as accelerator. Gap is implementation wiring. |
+| Confirm rather than ask | No current path supports confirmation-then-search from website inferences. `OnboardingFlow` Step 3 ("smart questions") asks additional questions after website analysis, even when the website already answered them. | **Partial conflict with FE-7.** Current flow asks questions the website may have already answered rather than confirming inferences. | No — model correctly prohibits re-asking. |
+
+**Owner ruling required?** No for the semantic model. Implementation must wire website analysis output to search parameters.
+
+### Journey 3: The Networker (Marcus — engagement + referrals, no ICP needed)
+
+| Requirement | Repository Support | Gap | Semantic Model Change? |
+|---|---|---|---|
+| Non-prospecting intent path | No current routing supports non-prospecting intent. `SmartRedirect` sends all new users to `OnboardingFlow`, which is prospecting-oriented (Step 5: "build list", Step 6: "show first prospects"). | **Critical gap.** The current platform has no first experience for users who do not want to prospect. | No — model correctly defines non-prospecting paths. |
+| Contact-based first value | Contact data at `users/{uid}/contacts`. New user has zero contacts. First value requires user to name contacts or import them. CSV upload, business card capture, and LinkedIn import exist. | **Realistic constraint.** First value for Engagement intent genuinely requires at least one contact to exist. The model is honest about this ("access to the user's contacts or at least one named contact"). | No. |
+| Zero-ICP non-blocking | `getActiveIcpId` falls back to `DEFAULT_ICP_ID = 'default'`. Several surfaces read this fallback without checking whether a real ICP exists. | **Defect, not a gap.** The silent default violates v0.4 ICP Availability States. Non-prospecting surfaces should not encounter ICP resolution at all. | No — v0.4 already governs this. |
+
+**Owner ruling required?** P-6 below: how does Barry deliver Engagement first value when the user has zero contacts? This is a product scope question — is "name a contact and I'll research them" sufficient first value, or must Barry have pre-existing contact data?
+
+### Journey 4: The Aspiring Prospector (Dana — no website, no ICP, targeting uncertainty)
+
+| Requirement | Repository Support | Gap | Semantic Model Change? |
+|---|---|---|---|
+| Conversational targeting from past clients | No current path extracts targeting intelligence from conversational description of past clients. `BarryOnboarding` uses a Claude-powered conversational ICP builder, which is the closest analog — but it saves to `companyProfile/current` and is labeled "legacy." | **Partial support.** `BarryOnboarding.handleConfirm()` is the only existing path that creates a formal ICP from conversation. But it follows its own multi-step flow, not the progressive confirmation model this design describes. | No — model describes the semantic process correctly. `BarryOnboarding` is evidence that conversational ICP creation has been attempted, but the current implementation doesn't match the progressive model. |
+| Search with minimal targeting | `buildApolloQuery` can execute with minimal filters. `adaptiveSignals.savedIndustries` (search-companies.js:693-699) can bias results toward historically accepted industries. | **Partial support.** Adaptive signals exist but only apply after the user has accepted companies in prior batches — not available for first search. | No. |
+| Proto-targeting → progressive refinement | No current mechanism stores proto-targeting intelligence as a distinct concept. Intelligence is either a formal ICP in `companyProfile/current` or nothing. | **Architecture gap.** The progressive refinement model requires a place for proto-targeting intelligence that is neither "no ICP" nor "completed ICP." | No for the semantic model. U-2 (Proto-Targeting Persistence) must be decided before implementation. |
+
+**Owner ruling required?** U-2 is critical. U-5 (quality floor) applies here — is a single-industry search sufficient first value?
+
+### Journey 5: The Multi-Company Operator (Alex — three companies)
+
+| Requirement | Repository Support | Gap | Semantic Model Change? |
+|---|---|---|---|
+| Multi-company awareness | No tenant or organization model exists. `ShellContext.jsx:327-332` explicitly documents: "Idynify has no tenant/organization model today; all data is scoped `users/{uid}/...`" | **Fundamental architecture gap.** Multi-company is aspirational, not current capability. | **Yes — v1.1 amendment applied.** Multi-company section now explicitly states the platform limitation and does not imply current tenancy. |
+| Context switching | Not possible today. All data is user-scoped. No mechanism to isolate one company's data from another within a single user account. | **Not achievable without architecture.** | No further change — v1.1 amendment addresses this. |
+| User identity persistence across contexts | User identity (`users/{uid}`) already persists since there is only one context per user. The distinction between User and Workspace is conceptual in v0.4 but not architecturally enforced. | **Conceptually aligned, architecturally unimplemented.** | No. |
+
+**Owner ruling required?** Multi-company architecture is a FUTURE ARCHITECTURE question. The semantic model now correctly avoids implying current capability. Implementation may offer a graceful acknowledgment ("I can help with one company context at a time right now") rather than a multi-company switching flow.
+
+---
+
+## Repository Evidence: Competing Onboarding Authorities
+
+Four onboarding paths exist in the current codebase, creating genuine overlap:
+
+| Component | Route | What It Does | Completion Flag | Creates ICP? |
+|---|---|---|---|---|
+| `OnboardingFlow` | `/onboarding` | 6-step wizard (Meet Barry → Website analysis → Smart questions → Gmail → Build list → First prospects) | `onboarding.completed` (nested) | No — populates RECON fields, not `companyProfile` |
+| `BarryOnboarding` | `/onboarding/barry` (labeled "legacy") | Conversational ICP builder via Claude | `onboardingComplete` (root) | Yes — saves to `companyProfile/current` |
+| `ReconOnboardingWizard` | `/onboarding/recon` | 5-module RECON depth wizard | `onboardingComplete` (root) | No |
+| `GettingStarted` | `/getting-started` | Static informational page | None | No |
+
+**Competing completion flags:** `SmartRedirect` (App.jsx:321) checks BOTH `userData?.onboardingComplete || userData?.onboarding?.completed`. Two different flag schemas compete for the same semantic: "has this user been onboarded?"
+
+**Semantic model implications:** All four paths conflict with FE-4 (No Setup Completion State), FE-8 (First Experience Is Not a Separate Mode), and AP-1 (The Setup Wizard). The semantic model correctly prohibits these patterns. The existence of four competing flows is implementation debt, not a semantic model deficiency. Which flow (if any) survives is an implementation decision that must align with this semantic model.
+
+---
+
+## Repository Evidence: RECON Question Consumption
+
+| Section | Name | Weight | Client-side `RECON_SECTION_MAP` | Server-side `compileReconForPrompt` |
+|---|---|---|---|---|
+| §1 | Business Foundation | 25% | Yes (`icp`) | Yes |
+| §2 | Product Deep Dive | 20% | Yes (`valueProposition`) | Yes |
+| §3 | Target Market | 15% | No | Yes |
+| §4 | Psychographics | 5% | Yes (`psychographics`) | Yes |
+| §5 | Pain Points | 15% | Yes (`painPoints`) | Yes |
+| §6 | Buying Behavior | 3% | No | Yes |
+| §7 | Decision Process | 3% | No | Yes |
+| §8 | Competitive Landscape | 3% | No | Yes |
+| §9 | Messaging | 10% | Yes (`outreachContext`) | Yes |
+| §10 | Behavioral Signals | 1% | No | Yes |
+
+**Implication for First Experience:** The semantic model classifies RECON as an acquisition method (per v0.4 §6), not a First Experience prerequisite (AP-6). The current `OnboardingFlow` treats RECON-like questions as a setup step — "smart questions" in Step 3 populate RECON Section 1 fields. The semantic model says these questions should appear when and if their answers are needed for the current operation, not as a setup gate.
+
+---
+
+## Consolidated Decision Registry
+
+All U-questions (from v1.0) and P-questions (derived from repository evidence cross-read) are consolidated, duplicates merged, and each classified.
+
+### MUST DECIDE BEFORE IMPLEMENTATION
+
+These decisions block Phase 2 implementation. Without them, the implementation has no clear target.
+
+| ID | Question | Source | Why Blocking |
+|---|---|---|---|
+| **D-1** | **Onboarding authority resolution.** Which onboarding path(s) survive? Four competing flows exist with two different completion flags. The First Experience semantic model prohibits setup wizards (AP-1) and completion states (FE-4). Must the current flows be retired, adapted, or replaced? | U-1, P-3 | Cannot build the First Experience while four competing flows contest the same entry point. |
+| **D-2** | **Proto-targeting intelligence persistence.** How and where is proto-targeting intelligence stored before it becomes a confirmed ICP? No current mechanism stores targeting intelligence between "nothing" and "formal ICP in `companyProfile/current`." | U-2, P-1, P-2 | The progressive targeting model requires a storage concept that does not exist. Without it, the conversation-to-search path has no persistence layer. |
+| **D-3** | **Website analysis → search wiring.** Website analysis extracts `targetIndustry` and `targetCompanySize` but stores them in `websiteAnalysis` sub-object, disconnected from `buildApolloQuery`. Must the wiring be built as Cat 1 reconciliation, or does it require schema changes (Cat 2)? | P-2 | Journey 2 (Website Provider) cannot deliver first value without this wiring. |
+| **D-4** | **DEFAULT_ICP_ID disposition.** The `'default'` fallback in `getActiveIcpId` violates v0.4 ICP Availability States. What replaces it? Must every consumer handle `no-profiles` / `none-active` / `read-failed` explicitly? | P-4 | Zero-ICP behavior throughout the platform depends on how the silent default is retired. |
+| **D-5** | **Non-prospecting intent routing.** Current platform routing (`SmartRedirect` → `OnboardingFlow`) assumes all users are prospectors. How do Engagement, Communication, Preparation, and other non-prospecting intents reach their first value without passing through a prospecting-oriented onboarding? | P-5 | Journeys 1 (Exploration), 3 (Networker), and any non-prospecting intent cannot reach first value through the current routing. |
+| **D-6** | **First value quality floor.** Is there a minimum targeting intelligence threshold below which Barry should not execute a search? Apollo returns broad results with zero filters. Is a single-industry search ("tech companies") sufficient first value, or must Barry acquire at least N targeting constraints? | U-5, P-7 | Journeys 1 and 4 depend on whether broad search results constitute meaningful first value. |
+
+### OWNER BUSINESS DECISIONS
+
+These are product and business decisions that the semantic model surfaces but cannot make.
+
+| ID | Question | Source | Nature |
+|---|---|---|---|
+| **D-7** | **Engagement first value for zero-contact users.** A new user with Engagement intent has zero contacts. Is "name a contact and I'll research them" sufficient first value? Or must Barry have pre-existing contact data? | P-6 | Product scope — defines the minimum viable Engagement experience. |
+| **D-8** | **Cross-session intelligence continuity.** When a user returns after days or weeks, what does Barry remember? All progressive intelligence? Only confirmed facts? Does Barry re-confirm stale inferences? | U-8 | Product policy — defines the returning user contract. |
+| **D-9** | **Returning user experience.** Does Barry resume from where they left off, re-greet, or adapt based on time away? | U-9 | Product UX — closely related to D-8. |
+| **D-10** | **Intent durability → Mission promotion.** Should the intent→Mission semantic boundary described in this document's Intent Durability section be adopted as a v0.4 interpretation? | v1.1 | Semantic governance — recommended for owner ruling. See v0.4 interpretation below. |
+| **D-11** | **Whether Barry provides meaningful value before payment.** | Owner instruction | Business model decision. This semantic model does not decide it. |
+| **D-12** | **ICP confirmation proactivity.** When proto-targeting intelligence is coherent, should Barry proactively propose an ICP, or wait for the user? How often? What threshold? | U-7 | Product behavior — defines Barry's assertiveness. |
+
+### MAY DEFER
+
+These may be deferred past initial implementation without blocking the First Experience.
+
+| ID | Question | Source | Why Deferrable |
+|---|---|---|---|
+| **D-13** | **Accelerator processing timing.** Synchronous vs. asynchronous processing of LinkedIn URLs, résumés, etc. | U-3 | Implementation detail. Can start with synchronous and optimize later. |
+| **D-14** | **Accelerator privacy boundaries.** What information may Barry extract from a résumé? Are there boundaries beyond references/contact information? | U-6 | Can start with reasonable defaults (exclude references, salary, sensitive personal data). |
+| **D-15** | **Intent conflict resolution.** How does Barry handle compound intents with conflicting requirements? | U-10 | Edge case. "Serve the most actionable first" is a sufficient starting heuristic. Observable before deciding. |
+| **D-16** | **Accelerator intelligence expiration.** How long does inferred intelligence from accelerators remain valid? | U-11 | Can start without expiration. Freshness policy can be added when staleness is observable. |
+
+### FUTURE ARCHITECTURE
+
+These require architectural work that is beyond Phase 2 scope.
+
+| ID | Question | Source | Dependency |
+|---|---|---|---|
+| **D-17** | **Multi-company workspace switching.** Visual workspace indicator, UI switching, context persistence. | U-4 | Requires tenant/organization model that does not exist. |
+| **D-18** | **Team / group first experience.** How does the second user on a team inherit Workspace intelligence? | U-12 | Requires multi-user workspace architecture. |
+| **D-19** | **RECON capability bypass interaction.** `reconCapability.js` instructs Barry "Do NOT tell the user their ICP is 'not configured'" when RECON score >= 60%. How does this interact with zero-ICP semantics? | P-8 | Cat 1 reconciliation work — must align with D-4 (DEFAULT_ICP_ID disposition). |
+
+---
+
+## v0.4 Interpretations Required
+
+### Interpretation 1: Intent Is Not an Intelligence Type
+
+v0.4 defines six intelligence types in Part I (ICP, Match, Coverage, User Judgment, Eligibility, RECON). Intent as defined in this document is not a seventh type — it is routing intelligence that determines what Barry does, not a stored intelligence artifact with the five properties required by Principle 2 (ownership, provenance, confidence, freshness, purpose).
+
+**Assessment:** No v0.4 conflict. Intent operates at a different layer than the intelligence types. If intent ever requires persistence and attribution (e.g., for the returning user experience), it would need to satisfy the Intelligence Rule — but that is a future decision (D-8, D-9), not a current requirement.
+
+### Interpretation 2: Intent → Mission Promotion Boundary
+
+Current intent is ephemeral routing intelligence. An objective that persists across sessions and becomes something Barry tracks may be promoted to Mission intelligence (v0.4 Part III, Mission scope).
+
+**Assessment:** Compatible with v0.4. The contract defines Mission scope but does not define when or how an objective becomes a Mission. This interpretation adds a semantic boundary that v0.4 implies but does not state: routing intent is not Mission; a durable, tracked objective is. v0.4 Part VI item 9 (Mission as first-class object) remains explicitly undecided — this interpretation does not decide storage, only the semantic threshold.
+
+**Recommendation:** Adopt as a v0.4 interpretation if owner approves (D-10).
+
+### Interpretation 3: Proto-Targeting Intelligence and v0.4 ICP Creation Semantics
+
+v0.4 §1 states: "An ICP must originate from an explicit creation or confirmation event." This document introduces proto-targeting intelligence — targeting knowledge accumulated through conversation and behavior that has not yet been confirmed as a formal ICP.
+
+**Assessment:** Compatible with v0.4, with one boundary condition. Proto-targeting intelligence is not an ICP. It does not carry an `icpId`. It is not stored in `icpProfiles`. It is working intelligence that Barry uses to serve the user, attributed as inferred (not canonical). It becomes an ICP only when the user explicitly confirms a targeting definition — satisfying v0.4's creation semantics.
+
+**Boundary condition:** Proto-targeting intelligence must never be silently promoted to a formal ICP. The boundary between "Barry's working hypothesis about your targeting" and "your confirmed targeting profile" must be explicit and user-visible. Silent promotion would violate both v0.4 ICP Creation Semantics and AP-9 (The Silent Default).
+
+---
+
+## Decisions That Must Be Locked Before Phase 2 Implementation
+
+The following six decisions (D-1 through D-6) are implementation-blocking. Without them, the First Experience cannot be built because the implementation has no clear target for:
+
+1. **Entry point** (D-1, D-5) — what the user sees when they arrive
+2. **Intelligence storage** (D-2, D-3) — where progressive and website-inferred intelligence lives
+3. **ICP fallback behavior** (D-4) — what happens platform-wide when no ICP exists
+4. **Quality threshold** (D-6) — what constitutes sufficient first value for Prospecting
+
+Owner business decisions (D-7 through D-12) inform product behavior but do not block the core architecture. Deferrable decisions (D-13 through D-16) can be resolved during implementation. Future architecture decisions (D-17 through D-19) are explicitly out of Phase 2 scope.
+
+---
+
 *This document was produced by Team B. No code was written or changed during its production. This is a semantic design document only.*
 
-*Status: Returned for convergence. No implementation is authorized by this document. Owner rulings on U-1 through U-12 are requested before implementation design begins.*
+*Status: Returned for convergence — v1.1. No implementation is authorized by this document. Decisions D-1 through D-6 must be locked before Phase 2 implementation. Owner business decisions D-7 through D-12 are requested. v0.4 interpretation on intent durability (D-10) recommended for owner ruling.*

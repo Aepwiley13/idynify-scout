@@ -263,4 +263,39 @@ I make no rulings.
 
 No code. No screens. No schema. No tenancy. No LinkedIn or social work. No résumé parser. No ICP builder. No Phase 1B ruling reopened, and no genuine contract contradiction found — the five items in §2 Q12 are open interfaces, returned for Team B and owner resolution.
 
-**Returned for convergence. Holding.**
+**Returned for convergence.** Outcome recorded in §6.
+
+---
+
+## 6. Convergence outcome — owner rulings recorded
+
+Matrix accepted. The headline finding is now authoritative for convergence:
+
+> **Phase 1B intentionally prevents unattributed company discovery.** A proto-targeting conversation cannot directly produce persisted company results without an explicit ICP identity. This is not a defect in Phase 1B — it is the boundary Phase 2 designs around.
+
+All four journey corrections in §1 are accepted as stated.
+
+### Approved
+
+| Decision | Ruling |
+|---|---|
+| **P-1** | One canonical First Experience. `BarryOnboarding`'s conversational loop, clarification/confirmation pattern and explicit targeting-confirmation boundary are reusable **spine components**; `analyze-website` becomes an optional accelerator; `OnboardingFlow`'s six-step orchestration does not survive. **Explicitly not authorization to rename `BarryOnboarding` and ship it unchanged.** |
+| **P-3** | Lightweight name acquisition. A single **optional** field at signup is acceptable; Barry may ask conversationally if absent. No profile wizard, and **no name-based gate before First Value**. |
+| **P-4** | Multi-company architecture deferred. Phase 2 may recognise several organisations, ask which to start with, and acknowledge the rest as user-stated information. **Product truth: one company context at a time.** No tenant or schema work. |
+| **P-6** | Résumé/document, user-LinkedIn and Facebook/social ingestion are **outside Phase 2 build scope**. They remain valid future accelerators, and the First Experience must not need redesign to admit them. |
+| **P-7** | Team B's First Value definitions are the long-term semantic target; the repository-backed Q4 outcomes are the **Phase 2 acceptance floor**. Capabilities that do not exist are **not to be simulated** to satisfy an aspirational journey. |
+| **P-8** | The four consumer-less smart questions are removed from the canonical First Experience. Historical stored data is left untouched. |
+
+### Pending — Phase 2 scope is not authorized until these return
+
+| # | Item | State |
+|---|---|---|
+| **P-2** | Barry before payment | **Owner/business decision. No team ruling.** |
+| **P-5** | Intent durability | Team B to return a contract interpretation, not product authority. **Owner leaning:** intent begins as lightweight routing context and becomes Mission intelligence only if it persists into an ongoing objective. **Do not implement persistent intent storage** until that interpretation is confirmed and locked. |
+| **P-9** | Proto-targeting attribution | **Owner direction: confirmation-before-search is preferred.** Proto-targeting may exist conversationally before an ICP exists, but an ICP-targeted search must not run until the user explicitly confirms the targeting definition and an attributable ICP identity exists. Team B is validating semantic compatibility with v0.4 / v1.1. **Do not design provisional targeting IDs, anonymous discovery, or unattributed company persistence.** |
+
+Also awaiting Team B: the **Journey 2 corrections** (§1).
+
+### State
+
+**HOLD.** No implementation. Phase 2 scope will be authorized after Team B returns P-5, P-9 and the Journey 2 corrections.

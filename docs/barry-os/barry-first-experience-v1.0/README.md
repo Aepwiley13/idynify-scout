@@ -4,7 +4,7 @@
 **Date: 2026-08-19**
 **Repository: aepwiley13/idynify-scout**
 **Governing Contract: Barry Intelligence Contract v0.4-amend**
-**Status: Returned for convergence — v1.1**
+**Status: Returned for convergence — v1.1-c**
 
 ## Revision History
 
@@ -13,6 +13,7 @@
 | v1.0 | 2026-08-19 | Initial semantic design: WHO/INTENT/FIRST VALUE/PROGRESSIVE INTELLIGENCE models, five journey tests, accelerator model, anti-patterns, 12 undecided questions |
 | v1.1 | 2026-08-19 | Convergence pass: three owner clarifications (WHO name rule, intent taxonomy, multi-company tenancy), intent durability evaluation, accelerator status clause, five-journey convergence matrix against repository evidence, consolidated decision registry |
 | v1.1-b | 2026-08-19 | Bounded contract rulings: P-9 confirmation-before-search invariant (proto-targeting → confirm → ICP → search), P-5 intent durability formalized (transient routing context, not intelligence), Journey 1/2/4 corrected to require confirmation before discovery, Journey 2 factual corrections (website extraction scope, targetCompanySize semantic, free-text vs. structured) |
+| v1.1-c | 2026-08-19 | Final consistency cleanup: Discover section aligned with corrected website extraction scope, Journey 3 unsupported capability claims removed (no news producer, no referral graph), quality floor owner ruling applied (D-6 resolved), intent durability ruling applied (D-10 resolved), decision registry reconciled (4 blocking decisions remain: D-1, D-3, D-4, D-5), P-5 and P-9 locked |
 
 ---
 
@@ -201,6 +202,8 @@ First value is the earliest moment when Barry delivers something the user finds 
 
 **FV-5: First value is intent-appropriate. (v1.1)** Each intent type has its own first value. Not every journey leads toward Scout or ICP creation. A user whose intent is Engagement receives engagement value; a user whose intent is Preparation receives meeting preparation. The first value table above defines what "useful" means for each intent. Implementation must not funnel all intents through a single Prospecting-shaped path.
 
+**FV-6: A single supported retrieval constraint is sufficient to attempt Prospecting first value. (v1.1-c, owner ruling)** Barry does not need an arbitrary minimum number of targeting dimensions before searching. A single real, currently-supported retrieval constraint (e.g., one confirmed industry) is sufficient to create an ICP and execute a search. If targeting is broad, Barry presents the result honestly as broad and uses subsequent feedback to improve. If no supported retrieval constraint exists, Barry must not search and should request the minimum additional targeting information required. This is not a multi-field completeness threshold.
+
 ---
 
 # Progressive Intelligence Model
@@ -350,9 +353,9 @@ Each test user must reach a useful outcome. If any is forced through intelligenc
 4. Both intents are non-ICP-dependent. Barry does not ask about targeting, ideal customer profiles, or discovery criteria. Those are irrelevant to this user's intent.
 5. Barry asks the minimum to deliver first value: "Do you have a few key clients or contacts in mind? Even one name gives me a starting point."
 6. Marcus names three clients.
-7. First value: Barry delivers a relationship snapshot for one of the three — recent news about their company, potential conversation starters, a follow-up suggestion based on how long it has been since contact. For the referral intent, Barry identifies a second-degree connection pattern: "Your client X is in the same space as Y — that might be a referral conversation."
+7. First value: Barry delivers a relationship snapshot for one of the three — a summary of what Barry knows about the contact from available intelligence, a useful follow-up suggestion, and a conversation starter based on available context. For the referral intent, Barry helps draft a referral ask: "You mentioned working with X and Y — would you like help drafting a referral request to X about introducing you to someone in their network?"
 
-**Test result:** Marcus reached first value without any ICP configuration, RECON questionnaire, or targeting intelligence collection. Barry correctly identified that the user's intent does not require ICP and did not collect it. The Engagement and Referral capabilities activated with relationship data alone.
+**Test result:** Marcus reached first value without any ICP configuration, RECON questionnaire, or targeting intelligence collection. Barry correctly identified that the user's intent does not require ICP and did not collect it. The Engagement and Referral capabilities activated with available relationship and contact data. First value is grounded in reachable capability: contact snapshots from existing data, follow-up suggestions, conversation starters from available intelligence, and help drafting referral asks to named relationships. Barry does not claim automatic second-degree relationship detection or real-time company news aggregation — these are not currently reachable capabilities.
 
 **ICP state:** `no-profiles` (valid, not blocking). Marcus may never create an ICP, and that is a correct, permanent product state.
 
@@ -603,7 +606,7 @@ These rules operationalize v0.4 Principle 1 (Barry's Question Rule) for the Firs
 ### 1. Discover
 Barry examines available intelligence sources without involving the user:
 - Email domain → probable company
-- Website → industry, size, positioning, location, value proposition
+- Website → company identity, description, what they sell, value proposition, and free-text target-customer context (target industries, target company sizes, who they serve). Does not extract user's company location, employee count, or competitive landscape.
 - Accelerator inputs → see Intelligence Accelerator Model
 - Platform-provided data → locale, timezone, referral source
 
@@ -611,9 +614,9 @@ Barry examines available intelligence sources without involving the user:
 
 ### 2. Infer
 Barry derives intelligence from discovered facts:
-- Company name + industry → probable company size range
-- Industry + location → probable competitive landscape
-- Role + company size → probable sales motion type
+- Company name + industry → probable market segment
+- Website target-customer descriptions + industry → proto-targeting hypothesis
+- Role + company context → probable sales motion type
 - Accept/reject patterns → targeting preference refinement
 
 **First Experience application:** Inferences are Barry's working hypotheses. They are good enough to act on, and acting on them produces confirmation or correction signals.
@@ -990,7 +993,7 @@ These decisions block Phase 2 implementation. Without them, the implementation h
 | **D-3** | **Website analysis → search wiring.** Website analysis extracts `targetIndustry` and `targetCompanySize` but stores them in `websiteAnalysis` sub-object, disconnected from `buildApolloQuery`. Must the wiring be built as Cat 1 reconciliation, or does it require schema changes (Cat 2)? | P-2 | Journey 2 (Website Provider) cannot deliver first value without this wiring. |
 | **D-4** | **DEFAULT_ICP_ID disposition.** The `'default'` fallback in `getActiveIcpId` violates v0.4 ICP Availability States. What replaces it? Must every consumer handle `no-profiles` / `none-active` / `read-failed` explicitly? | P-4 | Zero-ICP behavior throughout the platform depends on how the silent default is retired. |
 | **D-5** | **Non-prospecting intent routing.** Current platform routing (`SmartRedirect` → `OnboardingFlow`) assumes all users are prospectors. How do Engagement, Communication, Preparation, and other non-prospecting intents reach their first value without passing through a prospecting-oriented onboarding? | P-5 | Journeys 1 (Exploration), 3 (Networker), and any non-prospecting intent cannot reach first value through the current routing. |
-| **D-6** | **First value quality floor.** Is there a minimum targeting intelligence threshold below which Barry should not execute a search? Apollo returns broad results with zero filters. Is a single-industry search ("tech companies") sufficient first value, or must Barry acquire at least N targeting constraints? | U-5, P-7 | Journeys 1 and 4 depend on whether broad search results constitute meaningful first value. |
+| **D-6** | **~~First value quality floor.~~** **RESOLVED by owner ruling (v1.1-c).** A single real, currently-supported retrieval constraint is sufficient to attempt First Value. Barry does not need an arbitrary minimum number of targeting dimensions. If targeting is broad, Barry presents the result honestly as broad and uses feedback to improve. If no supported retrieval constraint exists, Barry must not search and should request the minimum additional targeting information required. This is not a multi-field completeness threshold. | U-5, P-7 | ~~Resolved~~ — no longer blocking. |
 
 ### OWNER BUSINESS DECISIONS
 
@@ -1001,7 +1004,7 @@ These are product and business decisions that the semantic model surfaces but ca
 | **D-7** | **Engagement first value for zero-contact users.** A new user with Engagement intent has zero contacts. Is "name a contact and I'll research them" sufficient first value? Or must Barry have pre-existing contact data? | P-6 | Product scope — defines the minimum viable Engagement experience. |
 | **D-8** | **Cross-session intelligence continuity.** When a user returns after days or weeks, what does Barry remember? All progressive intelligence? Only confirmed facts? Does Barry re-confirm stale inferences? | U-8 | Product policy — defines the returning user contract. |
 | **D-9** | **Returning user experience.** Does Barry resume from where they left off, re-greet, or adapt based on time away? | U-9 | Product UX — closely related to D-8. |
-| **D-10** | **Intent durability → Mission promotion.** Should the intent→Mission semantic boundary described in this document's Intent Durability section be adopted as a v0.4 interpretation? | v1.1 | Semantic governance — recommended for owner ruling. See v0.4 interpretation below. |
+| **D-10** | **~~Intent durability → Mission promotion.~~** **RESOLVED by owner ruling P-5 (v1.1-c).** Intent is transient conversational routing context, not durable User identity and not a seventh intelligence type. No persistent intent store is required. An objective may become Mission intelligence only via explicit promotion when it becomes a persistent objective Barry is tracking across interactions. P-5 is locked. | v1.1 | ~~Resolved~~ — P-5 locks the interpretation. |
 | **D-11** | **Whether Barry provides meaningful value before payment.** | Owner instruction | Business model decision. This semantic model does not decide it. |
 | **D-12** | **ICP confirmation proactivity.** When proto-targeting intelligence is coherent, should Barry proactively propose an ICP, or wait for the user? How often? What threshold? | U-7 | Product behavior — defines Barry's assertiveness. |
 
@@ -1073,12 +1076,11 @@ Proto-targeting alone cannot produce persisted company discovery. No unattribute
 
 ## Decisions That Must Be Locked Before Phase 2 Implementation
 
-The following five decisions (D-1, D-3 through D-6) are implementation-blocking. D-2 (proto-targeting persistence) was resolved by v1.1-b: proto-targeting is conversational context only, requiring no persistence or provisional object. Without the remaining five decisions, the First Experience cannot be built because the implementation has no clear target for:
+The following four decisions (D-1, D-3, D-4, D-5) are implementation-blocking. D-2 (proto-targeting persistence) was resolved by v1.1-b: proto-targeting is conversational context only. D-6 (quality floor) was resolved by owner ruling (v1.1-c): a single supported retrieval constraint is sufficient. Without the remaining four decisions, the First Experience cannot be built because the implementation has no clear target for:
 
 1. **Entry point** (D-1, D-5) — what the user sees when they arrive
 2. **Intelligence storage** (D-3) — where website-inferred intelligence lives
 3. **ICP fallback behavior** (D-4) — what happens platform-wide when no ICP exists
-4. **Quality threshold** (D-6) — what constitutes sufficient first value for Prospecting
 
 Owner business decisions (D-7 through D-12) inform product behavior but do not block the core architecture. Deferrable decisions (D-13 through D-16) can be resolved during implementation. Future architecture decisions (D-17 through D-19) are explicitly out of Phase 2 scope.
 
@@ -1086,4 +1088,4 @@ Owner business decisions (D-7 through D-12) inform product behavior but do not b
 
 *This document was produced by Team B. No code was written or changed during its production. This is a semantic design document only.*
 
-*Status: Returned for convergence — v1.1-b. No implementation is authorized by this document. Decisions D-1, D-3 through D-6 must be locked before Phase 2 implementation (D-2 resolved by v1.1-b). Owner business decisions D-7 through D-12 are requested. v0.4 interpretation on intent durability (D-10) recommended for owner ruling.*
+*Status: Returned for convergence — v1.1-c. No implementation is authorized by this document. Decisions D-1, D-3, D-4, D-5 must be locked before Phase 2 implementation (D-2 resolved by v1.1-b, D-6 resolved by owner quality floor ruling, D-10 resolved by P-5 ruling). Owner business decisions D-7 through D-9, D-11, D-12 are requested. P-5 and P-9 semantic rulings are LOCKED.*

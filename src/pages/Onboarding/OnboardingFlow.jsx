@@ -11,6 +11,7 @@ import useOnboardingState from '../../hooks/useOnboardingState';
 import GmailConnectButton from '../../components/hunter/GmailConnectButton';
 import { ArrowRight, Check, Globe, Loader, SkipForward, MessageCircle } from 'lucide-react';
 import AnimatedCounter from '../../components/AnimatedCounter';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 
 // ─── Progress Bar ────────────────────────────────────────────────────────────
 function ProgressDots({ step, total = 6, T }) {
@@ -227,16 +228,19 @@ function QuestionCard({ question, answer, onAnswer, index, T }) {
 
 // ─── Fit Score Badge ─────────────────────────────────────────────────────────
 function FitBadge({ score, T }) {
-  const color = score >= 90 ? STATUS.green : score >= 70 ? STATUS.amber : T.textFaint;
+  // A null score is an explicit unattributed state — no ICP resolved, so no
+  // Match exists to show. It is not a low score.
+  const unattributed = score === null || score === undefined;
+  const color = unattributed ? T.textFaint : score >= 90 ? STATUS.green : score >= 70 ? STATUS.amber : T.textFaint;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       padding: '3px 10px', borderRadius: 20,
       background: `${color}18`, border: `1px solid ${color}40`,
-      fontSize: 13, fontWeight: 700, color,
+      fontSize: unattributed ? 11 : 13, fontWeight: 700, color,
       fontVariantNumeric: 'tabular-nums',
     }}>
-      {score}
+      {unattributed ? 'no ICP' : score}
     </span>
   );
 }
@@ -246,7 +250,9 @@ function ProspectCard({ company, T }) {
   const name = company.name || company.company_name || 'Unknown Company';
   const industry = company.industry || '';
   const size = company.employee_count || company.employeeCount || '';
-  const score = company.fit_score || 0;
+  // null means no ICP resolved, so this company has no current Match. Showing 0
+  // would read as "terrible fit" for something that was never scored.
+  const score = company.fit_score ?? null;
   // Specific reasons from the shared scorer; never a generic industry template.
   const reasonList = company.fit_reasons || company.matchReasons || company.match_reasons || [];
   const reason = reasonList.length > 0
@@ -447,48 +453,35 @@ export default function OnboardingFlow() {
     setStillWorking(false);
 
     const stillWorkingTimer = setTimeout(() => setStillWorking(true), 10000);
-    const DAY_MS = 24 * 60 * 60 * 1000;
 
     const loadCompanies = async () => {
       const userId = getActiveUserId();
       if (!userId) return;
       try {
-        // Load ICP profile
-        const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-        const icpProfile = profileDoc.exists() ? profileDoc.data() : null;
+        // The ICP Match is computed against, from the canonical contract rather
+        // than the bridge projection — the bridge carries no reliable identity.
+        const icpResolution = await resolveActiveIcp(userId);
+        const matchIcp = isResolved(icpResolution) ? icpResolution.profile : null;
 
         // Load all companies (pending + accepted)
         const companiesRef = collection(db, 'users', userId, 'companies');
         const snapshot = await getDocs(companiesRef);
         const allCompanies = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Check freshness — if any company was discovered/created <24h ago, use existing scores
-        const now = Date.now();
-        const hasFreshData = allCompanies.length > 0 && allCompanies.some(c => {
-          const ts = c.discoveredAt || c.createdAt || c.addedAt;
-          if (!ts) return false;
-          const ms = ts.toDate ? ts.toDate().getTime() : new Date(ts).getTime();
-          return (now - ms) < DAY_MS;
-        });
-
-        let scored;
-        if (hasFreshData) {
-          scored = allCompanies.map(c => ({
-            ...c,
-            fit_score: c.fit_score || c.icpScore || 50,
-          }));
-        } else {
-          scored = allCompanies.map(c => ({
-            ...c,
-            fit_score: icpProfile
-              ? calculateICPScore(c, icpProfile, icpProfile.scoringWeights || DEFAULT_WEIGHTS)
-              : (c.fit_score || c.icpScore || 50),
-            fit_reasons: icpProfile
-              ? generateMatchReasons(c, icpProfile)
-              : (c.fit_reasons || []),
-          }));
-        }
-        scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
+        // Match is Company × ICP, so freshness of the RECORD says nothing about
+        // whether its stored score was computed against the ICP in use now. The
+        // fresh-data branch used to trust `c.fit_score` for exactly that reason
+        // and could show one ICP's Match under another's name. Match is always
+        // derived here against the resolved ICP; with none, no Match is claimed.
+        const scored = allCompanies.map(c => ({
+          ...c,
+          fit_score: matchIcp
+            ? calculateICPScore(c, matchIcp, matchIcp.scoringWeights || DEFAULT_WEIGHTS)
+            : null,
+          fit_reasons: matchIcp ? generateMatchReasons(c, matchIcp) : [],
+          match_attributed: Boolean(matchIcp),
+        }));
+        scored.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
         setMatchCount(scored.length);
         setTopCompanies(scored.slice(0, 5));

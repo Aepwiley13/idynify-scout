@@ -16,6 +16,8 @@ import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
+import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
 export default function SavedCompanies({ onSelectCompany }) {
@@ -86,8 +88,27 @@ export default function SavedCompanies({ onSelectCompany }) {
         return String(dB).localeCompare(String(dA));
       });
 
-      const companiesList = enrichWithContacts(acceptedSnap);
-      const archivedList = enrichWithContacts(archivedSnap);
+      // Match is Company × ICP. The stored fit_score carries no reliable ICP
+      // attribution — it may have been computed against a different ICP entirely
+      // — so it is never displayed or sorted on as if it were current. When an
+      // ICP resolves, Match is derived on demand against that ICP with the same
+      // scorer every other surface uses; when none resolves, the score is left
+      // explicitly unattributed rather than presented as accurate.
+      const resolution = await resolveActiveIcp(user.uid);
+      const icp = isResolved(resolution) ? resolution.profile : null;
+
+      const withMatch = list => list.map(c => (
+        icp
+          ? {
+              ...c,
+              fit_score: calculateICPScore(c, icp, icp.scoringWeights || DEFAULT_WEIGHTS),
+              match_attributed: true,
+            }
+          : { ...c, fit_score: null, match_attributed: false }
+      ));
+
+      const companiesList = withMatch(enrichWithContacts(acceptedSnap));
+      const archivedList = withMatch(enrichWithContacts(archivedSnap));
       setCompanies(sortNewest(companiesList));
       setArchivedCompanies(sortNewest(archivedList));
       setLoading(false);
@@ -139,10 +160,13 @@ export default function SavedCompanies({ onSelectCompany }) {
   const totalContacts = companies.reduce((sum, c) => sum + (c.contact_count || 0), 0);
   const companiesWithContacts = companies.filter(c => c.contact_count > 0).length;
   const completionRate = companies.length > 0 ? Math.round((companiesWithContacts / companies.length) * 100) : 0;
-  // Sort by fit score descending so highest-priority companies appear first in swipe
+  // Sort by Match descending so highest-priority companies appear first in swipe.
+  // With no ICP resolved there is no Match to rank by, and ordering by a stored
+  // number of unknown provenance would be a ranking claim we cannot support —
+  // so the saved order stands instead.
   const noContactCompanies = companies
     .filter(c => c.contact_count === 0)
-    .sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
+    .sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
   // Filtered list (cards/list modes)
   const sourceList = activeTab === 'active' ? companies : archivedCompanies;
@@ -490,9 +514,14 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 
   // ── Card-level derived values (DailyLeads parity) ────────────────────────────
   const overlayOpacity = Math.min(Math.abs(dragOffset.x) / 100 * 1.5, 0.85);
-  const score = current?.fit_score || 0;
-  const sc = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
-  const scoreLabel = score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
+  // A null score means no ICP resolved, so this company has no current Match —
+  // an explicit unattributed state, not a zero.
+  const score = current?.fit_score ?? null;
+  const matchUnattributed = score === null;
+  const sc = matchUnattributed ? STATUS.amber : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
+  const scoreLabel = matchUnattributed
+    ? 'No active ICP'
+    : score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
   const barryText = current?.barry_intel || current?.barry_context || current?.barryIntel
     || current?.description
     || `${current?.name} is on your hunt list — find the right contact to start engaging.`;
@@ -655,8 +684,19 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
                 ))}
               </div>
 
+              {/* No ICP resolved — say so, rather than showing a stale number or
+                  silently hiding the row as though the company had no Match. */}
+              {matchUnattributed && (
+                <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>MATCH</div>
+                  <div style={{ fontSize: 12, color: T.textMuted }}>
+                    No active ICP — Match can&apos;t be scored right now.
+                  </div>
+                </div>
+              )}
+
               {/* Fit score row (when available) */}
-              {score > 0 && (
+              {!matchUnattributed && score > 0 && (
                 <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>FIT SCORE</div>

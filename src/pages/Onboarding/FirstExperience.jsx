@@ -24,6 +24,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { resolveWho, rememberName, WHO_PROMPT } from '../../utils/resolveWho';
+import { resolveActiveIcp } from '../../utils/resolveActiveIcp';
+import { resolveFirstExperienceMode, shouldIntroduce } from '../../utils/firstExperienceMode';
 import BarryOnboarding from './BarryOnboarding';
 
 /**
@@ -61,13 +63,29 @@ export default function FirstExperience() {
         console.warn('[FirstExperience] user document read failed:', err.message);
       }
 
+      // What this visit is: beginning, resuming an unfinished conversation, or
+      // refining an ICP that already exists. Derived from state that already
+      // exists — never stored, so it cannot become another completion flag.
+      let conversation = null;
+      try {
+        const convSnap = await getDoc(doc(db, 'users', user.uid, 'barryConversations', 'icp'));
+        conversation = convSnap.exists() ? convSnap.data() : null;
+      } catch (err) {
+        console.warn('[FirstExperience] conversation read failed:', err.message);
+      }
+      const icpResolution = await resolveActiveIcp(user.uid);
+
       if (cancelled) return;
 
       const resolved = resolveWho(user, userData);
       setWho(resolved);
 
+      // Someone resuming or refining has met Barry already. Asking their name
+      // mid-conversation is the tell of a flow that does not know you have been
+      // here, so the question belongs to a genuine first conversation.
+      const { mode } = resolveFirstExperienceMode(conversation, icpResolution);
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
-      setAskingName(resolved.shouldAsk && !alreadyAsked);
+      setAskingName(resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode));
       setLoading(false);
     })();
 
@@ -140,5 +158,9 @@ export default function FirstExperience() {
 
   // Gate A: one branch. Gate B puts intent routing in front of this, and Gate C
   // decomposes what sits behind it.
+  // The mode is the shell's own reading of this visit — it decides whether
+  // Barry introduces itself and whether the WHO question belongs here. The
+  // delegated conversation restores its own state and builds its own returning
+  // greeting, so nothing is passed down that it would only ignore.
   return <BarryOnboarding knownName={who?.name || null} />;
 }

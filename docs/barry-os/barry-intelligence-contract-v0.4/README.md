@@ -20,6 +20,7 @@ This contract does not authorize implementation. It does not propose storage sch
 |---|---|---|
 | v0.3.1 | 2026-08-14 | Baseline intelligence contract derived from Barry OS Documents 1–4 |
 | v0.4 | 2026-08-19 | Incorporates semantic implications of Convergence Decisions D1–D10 |
+| v0.4-amend | 2026-08-19 | Owner amendment: ICP is capability-required, not platform-required; ICP availability states; ICP creation semantics; item 16 resolved |
 
 ## What v0.4 Changes from v0.3.1
 
@@ -37,6 +38,15 @@ v0.4 is not a rewrite. It is one deliberate revision incorporating the semantic 
 - Migration boundary as contract governance (D10)
 - Five governing principles stated as permanent product principles
 - "Explicitly Not Decided by This Contract" section
+
+**Amended (v0.4-amend):**
+- ICP cardinality: capability-required, not platform-required (owner decision)
+- ICP availability states: `no-profiles`, `none-active`, `read-failed` formally distinguished
+- ICP creation semantics: explicit creation/confirmation event required
+- Composition Invariant: scope requirements are operation-determined, not platform-global
+- ICP Context Hard Rule: applicability clarified for zero-ICP Workspaces
+- Part VI item 16 resolved; item 19 added
+- Appendix B Orientation brief ICP requirement corrected
 
 ---
 
@@ -73,6 +83,22 @@ An ICP is the user's explicit definition of what kind of company they want to do
 
 An ICP object is Workspace-owned. The targeting intelligence contained within that ICP is ICP-specific and must remain attributable to that ICP's stable identity. This distinction is critical: Workspace ownership means the ICP belongs to the workspace's collection of profiles; ICP-specific means the targeting criteria, scoring weights, and industry/location/size definitions within that profile are particular to that ICP and must not be treated as globally applicable to the Workspace. A workspace with multiple ICPs has multiple distinct targeting definitions — not one shared definition with multiple labels.
 
+### ICP Cardinality
+
+ICP is capability-required, not platform-required. A Workspace may validly contain zero or more ICPs. ICP becomes required when the requested operation semantically depends upon an explicit targeting definition.
+
+Operations that require an ICP include, at minimum: ICP-targeted Scout discovery, Company × ICP Match, ICP coaching, and other targeting decisions whose meaning depends upon a specific ICP.
+
+Operations that do not require an ICP include: existing-network engagement, customer engagement, referral workflows, inbox intelligence, meeting preparation, relationship management, and other operations whose result does not depend upon ICP targeting.
+
+A Workspace with zero ICPs is a valid product state. Barry can operate without an ICP. Relationship-oriented Barry capabilities — engagement, follow-up, inbox analysis, meeting preparation — function normally in a zero-ICP Workspace. ICP absence becomes blocking only when the requested operation requires an explicit targeting definition.
+
+### ICP Creation Semantics
+
+An ICP must originate from an explicit creation or confirmation event. An ICP must not be created merely because dashboard initialization occurred, a migration executed, a bridge/projection existed, onboarding collected information, an operation expected an ICP, or resolution failed.
+
+Barry may propose a targeting definition from attributable intelligence. When the user explicitly confirms that proposed targeting definition, that confirmation qualifies as an authorized ICP creation event. The confirmed definition becomes the authoritative `icpProfiles/{icpId}` representation. This is a semantic authorization — the design and implementation of any such flow are not decided by this contract.
+
 ### Identity Semantics
 
 ICP identity is intrinsic and stable. It does not change when the ICP is:
@@ -86,7 +112,9 @@ Every ICP carries a stable identifier (`icpId`) that is assigned at creation and
 
 ### Active ICP
 
-Active ICP is a separate relationship — which ICP is selected for a given context — not a property of ICP identity itself. A workspace may have multiple ICPs. Exactly one may be active at any time. The active ICP determines:
+Active ICP is a separate relationship — which ICP is selected for a given context — not a property of ICP identity itself. A Workspace with one or more ICPs may have at most one active ICP at a time. A Workspace with zero ICPs has no active ICP; this is a valid `no-profiles` state (see ICP Availability States below), not an error.
+
+When an active ICP exists, it determines:
 - Which targeting definition is used for discovery searches
 - Which ICP profile new Match scores are computed against
 - Which ICP context reaches Barry decision surfaces
@@ -100,13 +128,23 @@ The authoritative ICP representation lives in the canonical ICP store (`icpProfi
 - A projection that has diverged from its authoritative source is stale and must be treated as such
 - The bridge cache at `companyProfile/current` is a projection, not an authoritative representation
 
-### Missing ICP Identity
+### ICP Availability States
 
-Missing ICP identity must never be silently interpreted as intentional use of a default ICP. When ICP identity cannot be determined:
+ICP resolution produces one of three semantically distinct non-ICP outcomes. These must remain distinct at every hop. No resolution path may translate any of them into `DEFAULT_ICP_ID`.
 
-- The system must attempt explicit resolution through the canonical resolution contract
-- If resolution fails, the result is an explicitly unresolved state — not a silent fallback to `DEFAULT_ICP_ID`
-- Consumers encountering an unresolved ICP state must handle it explicitly — surface an error, request user selection, or document the gap — never silently proceed as if a default ICP was intentionally chosen
+| State | Meaning | Valid? | Blocking? |
+|---|---|---|---|
+| `no-profiles` | Zero ICP documents exist in the Workspace. The user has not created an ICP. | Valid Workspace state | Only for ICP-dependent operations (Discovery, Match, ICP coaching) |
+| `none-active` | One or more ICPs exist, but none is currently active. | Valid but requires resolution — the user must select an ICP before ICP-dependent operations proceed. | For ICP-dependent operations; non-ICP operations proceed. |
+| `read-failed` | Resolution mechanism encountered an error. ICP state is unknown. | Error state | Consumer must handle explicitly — not a valid basis for any decision. |
+
+**`no-profiles` is not a platform error.** A Workspace with zero ICPs is a valid configuration representing a user who has not yet defined a targeting profile. Barry relationship-oriented capabilities continue to function. `no-profiles` becomes blocking only when the requested operation semantically requires an explicit targeting definition.
+
+**`none-active` is distinct from `no-profiles`.** ICPs exist but the user has not selected one. For ICP-dependent operations, this is a selection-required outcome — the system must not silently choose a candidate.
+
+**`read-failed` is an error.** Resolution attempted but could not determine ICP state. Consumers must handle explicitly — surface an error, retry, or document the gap. Never silently proceed as if a default ICP was intentionally chosen.
+
+Missing ICP identity must never be silently interpreted as intentional use of a default ICP regardless of which state produced the absence.
 
 ### Repository Evidence
 
@@ -364,7 +402,7 @@ Code that exists is not the same as capability that works. A function that compu
 
 > Every Barry decision surface must receive intelligence from all scopes relevant to its operation. Truncation within a scope for token budget reasons is acceptable when explicit and documented. Omission of an entire required scope is not acceptable.
 
-See Part III for the full composition invariant specification.
+Scope requirements are determined by the operation, not by the platform. An intelligence scope that is required for one operation type is not automatically required for all operation types. See Part III for the full composition invariant specification.
 
 ## Principle 5: The Attribution Invariant
 
@@ -446,6 +484,8 @@ A surface that assembles Workspace context without including the active ICP prof
 
 **Rationale:** Match is defined as Company × ICP (Part I, §2). A discovery recommendation or Match assessment that does not know which ICP it is operating against cannot produce correctly attributed intelligence. Omitting ICP context from a discovery or Match surface is not a token budget decision — it is a missing input that changes the semantic correctness of the output.
 
+**Applicability:** This hard rule applies when an ICP exists and the operation is ICP-dependent. A zero-ICP Workspace operating on non-ICP-dependent surfaces (relationship engagement, inbox analysis, meeting preparation, follow-up) is not in violation of this rule — the rule's precondition (an ICP-dependent operation) is not met. Absence of ICP in a zero-ICP Workspace does not make relationship-oriented surfaces PARTIAL or NON-COMPLIANT when ICP context is not semantically required by those surfaces.
+
 ---
 
 ## Token Budget Principle
@@ -453,9 +493,9 @@ A surface that assembles Workspace context without including the active ICP prof
 Truncation within a scope for token budget reasons is acceptable when the truncation is explicit and documented. Examples:
 - Including the 100 highest-priority contacts instead of all 500 — acceptable, because Relationship scope is present at reduced fidelity
 - Summarizing RECON §2 to 200 tokens instead of the full 800 — acceptable, because Workspace scope is present at reduced fidelity
-- Omitting the active ICP profile entirely because the token budget is tight — not acceptable, because an entire required scope is missing
+- Omitting the active ICP profile entirely because the token budget is tight, when an ICP exists and the operation requires ICP context — not acceptable, because an entire required scope is missing
 
-The distinction: a scope that is present but summarized is truncation. A scope that is entirely absent is omission. Truncation is a budget decision. Omission is a correctness defect.
+The distinction: a scope that is present but summarized is truncation. A scope that is entirely absent is omission. Truncation is a budget decision. Omission is a correctness defect. Note: when no ICP exists (`no-profiles`) and the operation does not require ICP context, ICP absence is a valid state, not an omission.
 
 ---
 
@@ -557,9 +597,10 @@ The following decisions are explicitly deferred. This contract establishes that 
 13. **Workspace migration of user-scoped RECON data** — moving RECON sections from user-scoped storage to their true semantic scope
 14. **Onboarding screen design and question sequence** — the UX for first-time user intelligence collection
 15. **Whether RECON revenue ranges require Apollo API capability currently commented out and whether re-enabling is appropriate** — revenue targeting is configured in RECON §3 but the corresponding Apollo query parameter may be commented out
-16. **Whether the ICP Settings bootstrap path from `companyProfile/current` to `icpProfiles` is an authorized ICP creation mechanism** — the promotion path must be explicitly classified
+16. ~~Whether the ICP Settings bootstrap path from `companyProfile/current` to `icpProfiles` is an authorized ICP creation mechanism~~ — **RESOLVED.** Owner ruling: dashboard/migration-driven creation of an empty `icpProfiles/default` before the user has supplied targeting intelligence is reconciliation debt, not an authorized permanent ICP creation mechanism. An ICP must originate from an explicit creation or confirmation event per Part I §1 ICP Creation Semantics. Additionally: an existing Barry onboarding interaction in which Barry proposes a targeting definition and the user explicitly confirms that definition (e.g., `BarryOnboarding.handleConfirm()`) may serve as an authorized ICP creation/confirmation event. This is a semantic authorization — the design and implementation of that flow are not decided by this contract.
 17. **Whether `getIndustryIds` restoration changes Apollo retrieval behavior in ways that require user-facing explanation or recalibration of existing Match scores** — structured vs. free-text industry targeting may produce materially different result sets
 18. **Resolution of the conflict between the D5 separation of User Judgment and Match and the Barry OS Domain Lifecycle Model's existing `icp_score` / `barryFeedback.score` definition** — Repository evidence confirms the frozen document (Document 2, `BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md`, line 321: `icp_score: number | null // 1-10 (from barryFeedback.score)`) collapses concepts now defined separately by this contract: `icp_score` is sourced from `barryFeedback.score` (User Judgment, 1–10) but named as ICP scoring (Match). Resolving the frozen architecture document is documentation/governance debt and is not authorized as Phase 1B implementation by v0.4.
+19. **Barry-assisted ICP discovery design** — Barry may eventually propose targeting definitions from attributable Workspace, customer, relationship, RECON, website, engagement, and outcome intelligence for user confirmation. This is consistent with Barry's Question Rule (Principle 1). The data sources Barry may consider, confidence rules for proposed targeting criteria, the confirmation UX, and the lifecycle of a proposed-but-unconfirmed targeting definition are all undecided. This is a product direction, not authorized implementation.
 
 ---
 
@@ -585,11 +626,11 @@ The following decisions are explicitly deferred. This contract establishes that 
 | Message generation | Required | Required | Required | If active | Required for discovery-related |
 | Reply analysis | Required | Required | Required | If active | — |
 | Recommendation | Required | — | Required (entity context) | If active | Required for discovery/Match recs |
-| Orientation brief | Required | Required | Optional (no entity) | If active | Required |
+| Orientation brief | Required | Required | Optional (no entity) | If active | If ICP exists |
 | ICP coaching | Required | — | — | — | Required |
 | Meeting preparation | Required | Required | Required | If active | — |
 
-"Required" means the scope must be present for COMPLIANT classification. "—" means the scope is not required for this surface type but may be included. "If active" means required only when a mission exists for the entity in context. "Optional" means the scope enhances the surface but its absence does not make it PARTIAL.
+"Required" means the scope must be present for COMPLIANT classification. "—" means the scope is not required for this surface type but may be included. "If active" means required only when a mission exists for the entity in context. "If ICP exists" means required when the Workspace has an active ICP; absence in a zero-ICP Workspace (`no-profiles`) does not make the surface PARTIAL. "Optional" means the scope enhances the surface but its absence does not make it PARTIAL.
 
 ---
 

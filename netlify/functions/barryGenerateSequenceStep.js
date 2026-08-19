@@ -7,6 +7,23 @@ import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 /**
+ * User scope — the one line of it these surfaces need.
+ *
+ * `communicationStyle` lives on dashboards/{userId}, the document every one of
+ * these functions already loads for RECON, so this is a read of data already in
+ * hand rather than a new fetch. Message generation requires User scope
+ * (Appendix B); these surfaces were assembling Workspace, Relationship and
+ * Mission and then writing in Barry's default voice regardless of the style the
+ * user chose in RECON Section 0.
+ */
+function userStyleBlock(dashboardData) {
+  const style = dashboardData?.communicationStyle || null;
+  if (!style) return '';
+  return `\nUSER COMMUNICATION STYLE: ${String(style).replace(/_/g, ' ')}. Write in this voice.\n`;
+}
+
+
+/**
  * BARRY SEQUENCE STEP CONTENT GENERATOR (Step 5)
  *
  * Just-in-time content generation for individual sequence steps.
@@ -127,6 +144,7 @@ export const handler = async (event) => {
 
     // ─── Fetch RECON training data + active ICP messaging ───
     let reconContext = '';
+    let userStyle = '';
     try {
       const [dashboardDoc, icpDoc] = await Promise.all([
         db.collection('dashboards').doc(userId).get(),
@@ -138,6 +156,7 @@ export const handler = async (event) => {
       const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
         reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging);
+        userStyle = userStyleBlock(dashboardDoc.data());
         if (reconContext) {
           console.log('🧠 RECON training data loaded');
         }
@@ -229,7 +248,7 @@ ${adaptiveMap[previousOutcome] || 'No specific adaptation needed.'}
     const prompt = `You are Barry, a strategic engagement advisor. You are generating the actual content for Step ${stepIndex + 1} of a multi-step engagement sequence.
 
 CRITICAL: You are generating a REAL message that the user will review, potentially edit, and then send. Make it natural, personal, and purposeful.
-${reconContext}${barryMemoryContext}${strategyGuidance}
+${reconContext}${userStyle}${barryMemoryContext}${strategyGuidance}
 CONTACT:
 - Name: ${contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()}
 - Title: ${contact.title || 'Unknown'}

@@ -28,6 +28,23 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
+/**
+ * User scope — the one line of it these surfaces need.
+ *
+ * `communicationStyle` lives on dashboards/{userId}, the document every one of
+ * these functions already loads for RECON, so this is a read of data already in
+ * hand rather than a new fetch. Message generation requires User scope
+ * (Appendix B); these surfaces were assembling Workspace, Relationship and
+ * Mission and then writing in Barry's default voice regardless of the style the
+ * user chose in RECON Section 0.
+ */
+function userStyleBlock(dashboardData) {
+  const style = dashboardData?.communicationStyle || null;
+  if (!style) return '';
+  return `\nUSER COMMUNICATION STYLE: ${String(style).replace(/_/g, ' ')}. Write in this voice.\n`;
+}
+
+
 // Barry's step adaptation map (spec-exact)
 const STEP_ADAPTATION = {
   positive_reply: {
@@ -132,6 +149,7 @@ export const handler = async (event) => {
 
     // Load RECON + Barry intelligence layers in parallel (non-fatal)
     let reconContext = '';
+    let userStyle = '';
     let barryMemoryContext = '';
     let strategyGuidance = '';
     try {
@@ -143,7 +161,10 @@ export const handler = async (event) => {
       // See barryGenerateSequenceStep: a missing icpId must not cost the caller
       // its RECON context.
       const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
-      if (dashboardDoc.exists) reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging) || '';
+      if (dashboardDoc.exists) {
+        reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging) || '';
+        userStyle = userStyleBlock(dashboardDoc.data());
+      }
       barryMemoryContext = barryCtx.promptContext || '';
 
       // Get strategy recommendation using full contact + attribution data
@@ -176,7 +197,7 @@ Context:
 - Relationship state: ${contact.relationship_state || 'unaware'}
 - Outcome goal: ${mission.outcome_goal}
 - This step: ${stepPlan?.action || 'Follow up'}
-- Previous step outcome: ${previousOutcome}${reconContext ? `\n${reconContext}` : ''}${barryMemoryContext}${strategyGuidance}
+- Previous step outcome: ${previousOutcome}${reconContext ? `\n${reconContext}` : ''}${userStyle}${barryMemoryContext}${strategyGuidance}
 
 Engagement history:
 ${completedSteps.length > 0 ? completedSteps.join('\n') : 'No prior steps completed.'}

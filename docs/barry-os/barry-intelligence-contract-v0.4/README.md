@@ -65,11 +65,13 @@ Every intelligence concept in the Idynify platform belongs to exactly one of the
 ## 1. ICP (Ideal Customer Profile)
 
 **Type:** Named Intelligence Object
-**Scope:** Workspace
+**Scope:** Workspace-owned
 **Authority:** Canonical — user-authored, platform-stored
 **Identity:** Intrinsic and stable
 
 An ICP is the user's explicit definition of what kind of company they want to do business with. It is the targeting definition against which companies are evaluated.
+
+An ICP object is Workspace-owned. The targeting intelligence contained within that ICP is ICP-specific and must remain attributable to that ICP's stable identity. This distinction is critical: Workspace ownership means the ICP belongs to the workspace's collection of profiles; ICP-specific means the targeting criteria, scoring weights, and industry/location/size definitions within that profile are particular to that ICP and must not be treated as globally applicable to the Workspace. A workspace with multiple ICPs has multiple distinct targeting definitions — not one shared definition with multiple labels.
 
 ### Identity Semantics
 
@@ -186,7 +188,16 @@ Coverage is expressed as a structured result:
 
 ### Relationship to Match
 
-Coverage does not modify Match. Match is the score; Coverage is the confidence metadata. A Match of 85 with 4/4 dimensions observed means something fundamentally different from a Match of 85 with 1/4 dimensions observed. The second score is dominated by UNKNOWN defaults, not by evidence.
+Coverage does not modify Match. Match is the fit estimate; Coverage is the evidentiary-completeness context for that estimate. A Match of 85 with 4/4 dimensions observed means something fundamentally different from a Match of 85 with 1/4 dimensions observed. The second score is dominated by UNKNOWN defaults, not by evidence.
+
+### Semantic Distinctions
+
+- **Match:** Estimated Company × ICP fit from available evidence.
+- **Coverage:** Completeness of the relevant evidence available to support that Match judgment.
+- **Confidence:** Strength or reliability of the evidence supporting a judgment. (Not synonymous with Coverage — high coverage with weak data sources is high coverage but low confidence.)
+- **User Judgment:** Explicit human evaluation. Formally distinct from all of the above.
+
+Match and Coverage must not be combined into a single metric. Coverage is a structured result about evidentiary completeness, not a scalar modifier of Match.
 
 ### Current Implementation State
 
@@ -275,7 +286,8 @@ An Eligibility rule is a binary gate with three properties:
 
 | Rule | Status | Evidence |
 |---|---|---|
-| `passesAgeFilter` (founded year range) | CONFIRMED live | `icpScoring.js:431–445` via `passesAllFilters` |
+| `passesAgeFilter` (founded year range) | CONFIRMED live — server-side | `search-companies.js:15` (definition), `search-companies.js:388` (enforcement — post-fetch filter in Apollo search loop). Producer → Store → Consumer → Decision path: ICP `foundedAgeRange` → `passesAgeFilter` filter → excluded companies never reach client. |
+| `passesAllFilters` (client-side) | Exported but unreachable | `icpScoring.js:431` — exported, contains the same founded-age logic, but has zero importers in `src/`. Dead code by the Reachability Standard. |
 | `avoidIndustries` | Declared but unenforced | RECON §3 collects this data; no enforcement point wires it to search or post-fetch filtering |
 
 ---
@@ -394,6 +406,12 @@ The current objective, when one is active: mission goal, step progress, strategy
 
 ---
 
+## Unit of Composition Analysis
+
+The Composition Invariant applies to decision surfaces: reachable operations that ultimately produce a recommendation, action, generated output, or Barry decision. Helper functions used within a decision surface are components of that surface and are not independently classified unless they themselves constitute a user- or Barry-facing decision boundary.
+
+A decision surface is reachable when it traces a path from user action or system trigger through to a visible output (a displayed recommendation, a generated message, a Barry response). A helper function that receives pre-assembled data and returns a result to its caller is a component of the caller's decision surface.
+
 ## Classification Levels
 
 Every live Barry decision surface must be classified as exactly one of:
@@ -410,13 +428,15 @@ The surface receives some required scopes but is missing at least one. The missi
 
 **Worked example — Mission Control surface (not barryMissionChat):** Displays recommendations, KPIs, and pipeline state. Receives Workspace scope and User scope. Missing: Relationship scope — when a specific contact's recommendation is displayed, the surface does not fetch that contact's relationship memory, engagement history, or conversation state. The recommendation is displayed without the context that produced it. Classification: PARTIAL — missing Relationship scope for entity-specific recommendations.
 
-**Worked example — Hunter Barry surfaces (`barryHunterProcessEngage`, `barryHunterGenerateStep`):** Assembles contact data, engagement history, and mission context. Receives Relationship scope and Mission scope. However, RECON business context is loaded but ICP context is assembled only for prompt enrichment, not for the strategy recommendation that precedes message generation. The strategy scoring function (`recommendStrategy`) receives no Workspace scope at all — no RECON data, no ICP profile. Classification: PARTIAL — `recommendStrategy` component is missing Workspace and ICP scope.
+**Worked example — Hunter Barry surfaces (`barryHunterProcessEngage`, `barryHunterGenerateStep`):** These decision surfaces assemble contact data, engagement history, and mission context. They receive Relationship scope and Mission scope. However, RECON business context is loaded but ICP context is assembled only for prompt enrichment, not for the strategy recommendation that precedes message generation. The `recommendStrategy` helper function (a component of these surfaces, not an independently classified surface — see Unit of Composition Analysis above) receives no Workspace scope — no RECON data, no ICP profile. Because the decision surface's strategy selection path lacks required scope, the surface as a whole is PARTIAL. Classification: PARTIAL — Workspace and ICP scope missing from strategy selection component.
 
 ### NON-COMPLIANT
 
 The surface is missing one or more required scopes with no documented reason.
 
 **Identification criterion:** A surface is NON-COMPLIANT when the missing scope is relevant to its decision type and no documented rationale exists for the omission. NON-COMPLIANT is not a judgment about code quality — it is a factual assessment that a required intelligence input is absent.
+
+**Worked example — `barryInboxAnalyzer`:** Analyzes incoming emails and produces reply assessments. Missing required scopes: no RECON business context (Workspace), no active ICP context, no user communication preferences (User), and no Mission context where applicable. Has the narrowest context window of any major Barry surface. Classification: NON-COMPLIANT — missing Workspace, User, and Mission scopes for a surface that produces reply analysis and recommendations.
 
 ---
 
@@ -457,7 +477,7 @@ The composition invariant language above was tested against three concrete surfa
 |---|---|---|---|
 | `barryMissionChat` | COMPLIANT | COMPLIANT | All four scopes present — RECON (10 sections), ICP profile, user style, 500 contacts with engagement data, 20 missions with goals |
 | Mission Control display surface | PARTIAL — missing Relationship scope | PARTIAL | Displays contact-level recommendations without fetching per-contact relationship memory or engagement history for the displayed entities |
-| Hunter Barry (`barryHunterProcessEngage` + `recommendStrategy`) | PARTIAL — missing Workspace and ICP scope in strategy scoring | PARTIAL | Strategy recommendation via `recommendStrategy` receives contact relationship data and user-level strategy stats but zero Workspace scope (no RECON) and zero ICP context; ICP data reaches the Claude prompt through the caller but not the strategy scoring decision |
+| Hunter Barry decision surfaces (`barryHunterProcessEngage`, `barryHunterGenerateStep`) | PARTIAL — missing Workspace and ICP scope in strategy selection | PARTIAL | Strategy selection component (`recommendStrategy`, evaluated as part of the decision surface per Unit of Composition Analysis) receives contact relationship data and user-level strategy stats but zero Workspace scope (no RECON) and zero ICP context; ICP data reaches the Claude prompt but not the strategy selection path |
 
 All three classifications are unambiguous under the language above.
 
@@ -539,6 +559,7 @@ The following decisions are explicitly deferred. This contract establishes that 
 15. **Whether RECON revenue ranges require Apollo API capability currently commented out and whether re-enabling is appropriate** — revenue targeting is configured in RECON §3 but the corresponding Apollo query parameter may be commented out
 16. **Whether the ICP Settings bootstrap path from `companyProfile/current` to `icpProfiles` is an authorized ICP creation mechanism** — the promotion path must be explicitly classified
 17. **Whether `getIndustryIds` restoration changes Apollo retrieval behavior in ways that require user-facing explanation or recalibration of existing Match scores** — structured vs. free-text industry targeting may produce materially different result sets
+18. **Resolution of the conflict between the D5 separation of User Judgment and Match and the Barry OS Domain Lifecycle Model's existing `icp_score` / `barryFeedback.score` definition** — Repository evidence confirms the frozen document (Document 2, `BARRY_OS_DOMAIN_LIFECYCLE_MODEL.md`, line 321: `icp_score: number | null // 1-10 (from barryFeedback.score)`) collapses concepts now defined separately by this contract: `icp_score` is sourced from `barryFeedback.score` (User Judgment, 1–10) but named as ICP scoring (Match). Resolving the frozen architecture document is documentation/governance debt and is not authorized as Phase 1B implementation by v0.4.
 
 ---
 
@@ -550,7 +571,7 @@ The following decisions are explicitly deferred. This contract establishes that 
 | Match | 0–100 | Company × ICP | Derived | Company × ICP | `fit_score` |
 | Coverage | Structured (dims relevant / observable / unknown) | Property of a Match judgment | Derived | Company × ICP | Computable from `evaluateDimensions` |
 | User Judgment | 1–10 | User's opinion | Canonical | User or Relationship | `barryFeedback.score` |
-| Eligibility | Binary (pass/fail) | Company × Rules | Derived | Company × Rules | `passesAllFilters` |
+| Eligibility | Binary (pass/fail) | Company × Rules | Derived | Company × Rules | `passesAgeFilter` (live, server-side: `search-companies.js:15,388`) |
 | RECON | N/A | Collected intelligence | Canonical | Variable by section | `dashboards/{uid}.modules[recon]` |
 
 ---
@@ -574,4 +595,4 @@ The following decisions are explicitly deferred. This contract establishes that 
 
 *This contract was produced by Team B. No code was written or changed during its production. This is a semantic governance document only.*
 
-*Contract status: Returned for approval. Pending approval before Team A begins Tier 4.*
+*Contract status: Returned for approval. Approval of v0.4 satisfies the semantic-contract prerequisite for Team A. It does not itself authorize Tier 4 or later implementation. Team A retains a Tier 1 pre-implementation gate whose four questions must be reconciled against final v0.4 before implementation authorization is issued.*

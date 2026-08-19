@@ -12,21 +12,43 @@
  * than restarting — the same progressive model that governs Barry's ongoing
  * operation, running for the first time.
  *
- * Gate A scope: canonical entry, WHO acquisition, and resumption. Intent
- * routing (Gate B) and the decomposed Prospecting branch (Gate C) land on top
- * of this shell; until then the existing Barry conversation is the single
- * branch, so behaviour is preserved or better for every user at every step.
+ * The shape of a first conversation:
+ *
+ *   WHO ─► INTENT ─► FIRST VALUE
+ *
+ * WHO is one skippable question and never a gate. INTENT is one open question,
+ * classified invisibly. FIRST VALUE is either this conversation continuing
+ * (defining who to reach), a handoff to the surface that actually delivers the
+ * outcome, or an honest account of why it cannot happen yet.
+ *
+ * Nothing on this path is simulated. Where a capability is missing, Barry says
+ * so and offers something real instead.
  */
 
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, limit } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { resolveWho, rememberName, WHO_PROMPT } from '../../utils/resolveWho';
 import { resolveActiveIcp } from '../../utils/resolveActiveIcp';
-import { resolveFirstExperienceMode, shouldIntroduce } from '../../utils/firstExperienceMode';
+import { resolveFirstExperienceMode, shouldIntroduce, MODE_BEGIN } from '../../utils/firstExperienceMode';
+import {
+  OPENING_QUESTION,
+  normalizeClassification,
+  unclearClassification,
+  orderCompound,
+  INTENT_PROSPECTING,
+} from '../../utils/firstExperienceIntent';
+import {
+  routeIntent,
+  intentLabel,
+  ROUTE_IN_PLACE,
+  ROUTE_NAVIGATE,
+  ROUTE_CONFIRM,
+  ROUTE_CLARIFY,
+} from '../../utils/firstValueRouting';
 import BarryOnboarding from './BarryOnboarding';
 
 /**
@@ -40,8 +62,27 @@ import BarryOnboarding from './BarryOnboarding';
  */
 const ASKED_KEY = 'idynify_who_asked';
 
+/**
+ * The handful of facts routing needs, read once.
+ *
+ * A failed read reports the pessimistic answer. Barry then says what is missing
+ * and offers a real alternative, which is a recoverable turn — whereas routing
+ * someone to an empty replies view on an optimistic guess is a dead end.
+ */
+async function readReadiness(userId) {
+  const [contacts, gmail] = await Promise.all([
+    getDocs(query(collection(db, 'users', userId, 'contacts'), limit(1))).catch(() => null),
+    getDoc(doc(db, 'users', userId, 'integrations', 'gmail')).catch(() => null),
+  ]);
+  return {
+    hasContacts: Boolean(contacts) && !contacts.empty,
+    gmailConnected: Boolean(gmail?.exists()) && gmail.data()?.status === 'connected',
+  };
+}
+
 export default function FirstExperience() {
   const T = useT();
+  const navigate = useNavigate();
   // Why the user arrived on this navigation. Transient by construction — it
   // lives in the history entry and is gone on reload — so an explicit
   // "Review ICP with Barry" click can outrank generic resume state without
@@ -52,6 +93,16 @@ export default function FirstExperience() {
   const [who, setWho] = useState(null);
   const [askingName, setAskingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+
+  // Everything below is session state and dies with the tab. Intent is
+  // transient routing context: no field, no collection, no history.
+  const [askingIntent, setAskingIntent] = useState(false);
+  const [readiness, setReadiness] = useState({ hasContacts: false, gmailConnected: false });
+  const [turn, setTurn] = useState('');
+  const [classifying, setClassifying] = useState(false);
+  const [pending, setPending] = useState(null);   // classification awaiting confirmation
+  const [decision, setDecision] = useState(null);
+  const [held, setHeld] = useState(null);         // the second half of a compound intent
 
   useEffect(() => {
     let cancelled = false;
@@ -81,18 +132,31 @@ export default function FirstExperience() {
         console.warn('[FirstExperience] conversation read failed:', err.message);
       }
       const icpResolution = await resolveActiveIcp(user.uid);
+      const facts = await readReadiness(user.uid);
 
       if (cancelled) return;
 
       const resolved = resolveWho(user, userData);
       setWho(resolved);
+      setReadiness(facts);
 
       // Someone resuming or refining has met Barry already. Asking their name
       // mid-conversation is the tell of a flow that does not know you have been
       // here, so the question belongs to a genuine first conversation.
       const { mode } = resolveFirstExperienceMode(conversation, icpResolution, arrival);
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
-      setAskingName(resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode));
+      const wantsName = resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode);
+      setAskingName(wantsName);
+
+      // The intent question belongs to a genuine first conversation only.
+      // Someone resuming an unfinished targeting conversation, or arriving to
+      // refine an ICP that exists, has already told Barry what they came for —
+      // asking again would throw away the thing this route was built to keep.
+      const beginning = mode === MODE_BEGIN;
+      setAskingIntent(beginning && !wantsName);
+      if (!beginning) {
+        setDecision(routeIntent({ intent: INTENT_PROSPECTING, confidence: 1 }, facts));
+      }
       setLoading(false);
     })();
 
@@ -105,6 +169,7 @@ export default function FirstExperience() {
 
     sessionStorage.setItem(ASKED_KEY, '1');
     setAskingName(false);
+    setAskingIntent(true);
 
     if (!answered || !user) return;
 
@@ -116,6 +181,76 @@ export default function FirstExperience() {
   function skipName() {
     sessionStorage.setItem(ASKED_KEY, '1');
     setAskingName(false);
+    setAskingIntent(true);
+  }
+
+  /** Classify one turn and act on it. One round trip, nothing written. */
+  async function submitIntent() {
+    const said = turn.trim();
+    if (!said || classifying) return;
+
+    setClassifying(true);
+    setTurn('');
+
+    let classification;
+    try {
+      const user = getEffectiveUser() || auth.currentUser;
+      const authToken = await user.getIdToken();
+      const res = await fetch('/.netlify/functions/barryMissionChat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          firstExperience: true,
+          message: said,
+          knownName: who?.name || null,
+        }),
+      });
+      const data = res.ok ? await res.json() : null;
+      classification = data?.classification
+        ? normalizeClassification(data.classification)
+        : unclearClassification('unclassified');
+    } catch (err) {
+      // A classifier that cannot be reached asks a question. It never becomes a
+      // silent routing decision, and least of all a Prospecting one.
+      console.warn('[FirstExperience] classification failed:', err.message);
+      classification = unclearClassification('request-failed');
+    }
+
+    applyClassification(classification);
+    setClassifying(false);
+  }
+
+  function applyClassification(classification) {
+    // Compound intent is served one at a time, most actionable first. The
+    // second is held in this component for the session and nowhere else.
+    const [first, second] = orderCompound(classification.intent, classification.secondaryIntent);
+    setHeld(second);
+    setPending({ ...classification, intent: first });
+    setDecision(routeIntent({ ...classification, intent: first }, readiness));
+  }
+
+  /** The user said yes to Barry's restatement. */
+  function confirmIntent() {
+    const settled = { ...pending, needsConfirmation: false };
+    setPending(settled);
+    setDecision(routeIntent(settled, readiness));
+  }
+
+  /** The user said no. Back to the question, without re-asking it colder. */
+  function rejectIntent() {
+    setPending(null);
+    setDecision(null);
+    setHeld(null);
+    setAskingIntent(true);
+  }
+
+  /** An offered alternative — always a real capability, never a placeholder. */
+  function chooseIntent(intent) {
+    setHeld(prev => (prev === intent ? null : prev));
+    setPending({ intent, confidence: 1 });
+    setDecision(routeIntent({ intent, confidence: 1 }, readiness));
   }
 
   if (loading) {
@@ -132,42 +267,184 @@ export default function FirstExperience() {
   // on the answer.
   if (askingName) {
     return (
-      <div className="barry-onboarding" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 20, padding: 24 }}>
-        <p style={{ fontSize: 20, fontWeight: 600, color: T.text, margin: 0, textAlign: 'center' }}>
-          {WHO_PROMPT}
-        </p>
-        <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 420 }}>
-          <input
-            autoFocus
-            value={nameInput}
-            onChange={e => setNameInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitName(); }}
-            placeholder="Your name"
-            aria-label="Your name"
-            style={{ flex: 1, padding: '12px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface, color: T.text, fontSize: 15 }}
-          />
-          <button
-            onClick={submitName}
-            style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: T.accent, color: '#fff', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Continue
+      <Ask
+        T={T}
+        prompt={WHO_PROMPT}
+        value={nameInput}
+        onChange={setNameInput}
+        onSubmit={submitName}
+        placeholder="Your name"
+        label="Your name"
+        cta="Continue"
+        onSkip={skipName}
+      />
+    );
+  }
+
+  // The one INTENT question. Open text — the categories behind it are internal
+  // and are never rendered as choices.
+  if (askingIntent && !decision) {
+    return (
+      <Ask
+        T={T}
+        prompt={who?.name ? `${who.name} — ${lower(OPENING_QUESTION)}` : OPENING_QUESTION}
+        value={turn}
+        onChange={setTurn}
+        onSubmit={submitIntent}
+        placeholder="e.g. I need to follow up with a few people this week"
+        label="What you want to get done"
+        cta={classifying ? 'One moment…' : 'Continue'}
+        busy={classifying}
+      />
+    );
+  }
+
+  // Prospecting is served by this conversation. Everything that made the old
+  // ICP flow work is intact behind it — extraction, the clarify loop, the
+  // confirmation card, and the confirmation event that creates the ICP.
+  if (decision?.kind === ROUTE_IN_PLACE) {
+    return <BarryOnboarding knownName={who?.name || null} />;
+  }
+
+  // Barry read the intent back and is waiting to be told it is right.
+  if (decision?.kind === ROUTE_CONFIRM) {
+    return (
+      <Panel T={T} headline={decision.headline} detail={decision.detail}>
+        <button style={primaryBtn(T)} onClick={confirmIntent}>Yes, that's it</button>
+        <button style={quietBtn(T)} onClick={rejectIntent}>Not quite</button>
+      </Panel>
+    );
+  }
+
+  // Barry could not tell, and asks once rather than guessing.
+  if (decision?.kind === ROUTE_CLARIFY) {
+    return (
+      <Ask
+        T={T}
+        prompt={decision.headline}
+        value={turn}
+        onChange={setTurn}
+        onSubmit={submitIntent}
+        placeholder="In your own words"
+        label="What you want to get done"
+        cta={classifying ? 'One moment…' : 'Continue'}
+        busy={classifying}
+        options={decision.options}
+        onChoose={chooseIntent}
+      />
+    );
+  }
+
+  // A handoff, a missing precondition, or a branch that is not built yet. All
+  // three render the same way, because all three are Barry telling the user
+  // exactly what is about to happen or exactly why it is not.
+  if (decision) {
+    const offers = held
+      ? [...decision.options, { id: 'held', label: `Then ${intentLabel(held)}`, intent: held }]
+      : decision.options;
+
+    return (
+      <Panel T={T} headline={decision.headline} detail={decision.detail}>
+        {decision.destination && (
+          <button style={primaryBtn(T)} onClick={() => navigate(decision.destination.path)}>
+            {decision.kind === ROUTE_NAVIGATE ? 'Take me there' : 'Set that up'}
           </button>
+        )}
+        {offers.map(o => (
+          <button key={o.id} style={quietBtn(T)} onClick={() => chooseIntent(o.intent)}>
+            {o.label}
+          </button>
+        ))}
+      </Panel>
+    );
+  }
+
+  return <BarryOnboarding knownName={who?.name || null} />;
+}
+
+/** Lowercase a sentence's first letter so it can follow a name. */
+function lower(sentence) {
+  return sentence.charAt(0).toLowerCase() + sentence.slice(1);
+}
+
+const shell = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '60vh',
+  gap: 20,
+  padding: 24,
+};
+
+function primaryBtn(T) {
+  return {
+    padding: '12px 20px', borderRadius: 10, border: 'none',
+    background: T.accent, color: '#fff', fontWeight: 700, cursor: 'pointer',
+  };
+}
+
+function quietBtn(T) {
+  return {
+    padding: '10px 18px', borderRadius: 10, border: `1px solid ${T.border}`,
+    background: 'transparent', color: T.text, fontSize: 14, cursor: 'pointer',
+  };
+}
+
+/** One question, free text, with optional real alternatives beneath it. */
+function Ask({ T, prompt, value, onChange, onSubmit, placeholder, label, cta, onSkip, busy = false, options = [], onChoose }) {
+  return (
+    <div className="barry-onboarding" style={shell}>
+      <p style={{ fontSize: 20, fontWeight: 600, color: T.text, margin: 0, textAlign: 'center', maxWidth: 560 }}>
+        {prompt}
+      </p>
+      <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 520 }}>
+        <input
+          autoFocus
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') onSubmit(); }}
+          placeholder={placeholder}
+          aria-label={label}
+          disabled={busy}
+          style={{ flex: 1, padding: '12px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface, color: T.text, fontSize: 15 }}
+        />
+        <button onClick={onSubmit} disabled={busy} style={primaryBtn(T)}>{cta}</button>
+      </div>
+      {options.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {options.map(o => (
+            <button key={o.id} style={quietBtn(T)} onClick={() => onChoose?.(o.intent)}>{o.label}</button>
+          ))}
         </div>
+      )}
+      {onSkip && (
         <button
-          onClick={skipName}
+          onClick={onSkip}
           style={{ background: 'none', border: 'none', color: T.textMuted, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
         >
           Skip
         </button>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}
 
-  // Gate A: one branch. Gate B puts intent routing in front of this, and Gate C
-  // decomposes what sits behind it.
-  // The mode is the shell's own reading of this visit — it decides whether
-  // Barry introduces itself and whether the WHO question belongs here. The
-  // delegated conversation restores its own state and builds its own returning
-  // greeting, so nothing is passed down that it would only ignore.
-  return <BarryOnboarding knownName={who?.name || null} />;
+/** Barry says one thing and offers what is actually available. */
+function Panel({ T, headline, detail, children }) {
+  return (
+    <div className="barry-onboarding" style={shell}>
+      <p style={{ fontSize: 20, fontWeight: 600, color: T.text, margin: 0, textAlign: 'center', maxWidth: 560 }}>
+        {headline}
+      </p>
+      {detail && (
+        <p style={{ fontSize: 15, color: T.textMuted, margin: 0, textAlign: 'center', maxWidth: 520, lineHeight: 1.5 }}>
+          {detail}
+        </p>
+      )}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {children}
+      </div>
+    </div>
+  );
 }

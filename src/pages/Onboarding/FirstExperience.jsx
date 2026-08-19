@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -41,6 +42,12 @@ const ASKED_KEY = 'idynify_who_asked';
 
 export default function FirstExperience() {
   const T = useT();
+  // Why the user arrived on this navigation. Transient by construction — it
+  // lives in the history entry and is gone on reload — so an explicit
+  // "Review ICP with Barry" click can outrank generic resume state without
+  // becoming durable mode state.
+  const location = useLocation();
+  const arrival = location.state?.arrival || null;
   const [loading, setLoading] = useState(true);
   const [who, setWho] = useState(null);
   const [askingName, setAskingName] = useState(false);
@@ -83,14 +90,14 @@ export default function FirstExperience() {
       // Someone resuming or refining has met Barry already. Asking their name
       // mid-conversation is the tell of a flow that does not know you have been
       // here, so the question belongs to a genuine first conversation.
-      const { mode } = resolveFirstExperienceMode(conversation, icpResolution);
+      const { mode } = resolveFirstExperienceMode(conversation, icpResolution, arrival);
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
       setAskingName(resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode));
       setLoading(false);
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [arrival]);
 
   async function submitName() {
     const user = getEffectiveUser() || auth.currentUser;

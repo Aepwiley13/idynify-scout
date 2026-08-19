@@ -113,6 +113,37 @@ describe('asking is a cue, never a gate', () => {
   });
 });
 
+describe('the name survives the session; only the ask-state does not', () => {
+  it('round-trips: a name given in one session is known in the next', async () => {
+    // Session 1 — nothing known, Barry asks, the user answers.
+    const first = resolveWho({ displayName: null }, null);
+    expect(first.shouldAsk).toBe(true);
+
+    await rememberName('u1', 'Jordan');
+    const [, payload] = setDocMock.mock.calls[0];
+
+    // Session 2 — fresh browser, empty sessionStorage. The user document is
+    // what Barry reads, and it is enough.
+    const second = resolveWho({ displayName: null }, payload);
+    expect(second.name).toBe('Jordan');
+    expect(second.shouldAsk).toBe(false);
+  });
+
+  it('the stored field is one the app already read before this phase', () => {
+    // OnboardingFlow read `data.firstName || data.displayName || data.name`
+    // against a producer that never existed. This writes the first of those.
+    expect(resolveWho(null, { firstName: 'Jordan' }).name).toBe('Jordan');
+  });
+
+  it('if the write fails, the question may return — which is honest', async () => {
+    setDocMock.mockRejectedValue(new Error('offline'));
+    expect(await rememberName('u1', 'Jordan')).toBe(false);
+
+    // Nothing was stored, so a later session genuinely does not know the name.
+    expect(resolveWho({ displayName: null }, null).shouldAsk).toBe(true);
+  });
+});
+
 describe('remembering a name', () => {
   it('stores it as User-scoped intelligence on the user document', async () => {
     const stored = await rememberName('u1', 'Jordan');

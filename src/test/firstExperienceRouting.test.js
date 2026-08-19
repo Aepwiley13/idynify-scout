@@ -75,9 +75,13 @@ describe('every entry point lands on the canonical route', () => {
     expect(read('../pages/CheckoutSuccessPage.jsx')).toMatch(/navigate\('\/onboarding'\)/);
   });
 
-  it('the existing-user affordances point there too', () => {
-    expect(read('../pages/Scout/MissionControlDashboardV2.jsx')).toMatch(/navigate\('\/onboarding'\)/);
-    expect(read('../pages/Scout/DailyLeads.jsx')).toMatch(/navigate\('\/onboarding'\)/);
+  it('the existing-user affordances point there too, declaring why they came', () => {
+    // They navigate to the same canonical route, carrying transient arrival
+    // intent so an explicit review outranks generic resume state. Precedence
+    // itself is covered in firstExperienceResume.test.
+    for (const rel of ['../pages/Scout/MissionControlDashboardV2.jsx', '../pages/Scout/DailyLeads.jsx']) {
+      expect(read(rel)).toMatch(/navigate\('\/onboarding', \{ state: \{ arrival: ARRIVAL_REVIEW_ICP \} \}\)/);
+    }
   });
 
   it('SmartRedirect already targeted the canonical route and is unchanged', () => {

@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
+import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { getFitTier } from '../../utils/companyDisplay';
 import useOnboardingState from '../../hooks/useOnboardingState';
@@ -588,7 +589,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
                 Try Again
               </button>
               <button
-                onClick={() => navigate('/onboarding')}
+                onClick={() => navigate('/onboarding', { state: { arrival: ARRIVAL_REVIEW_ICP } })}
                 style={{
                   padding: '10px 20px', borderRadius: 10,
                   background: T.surface, border: `1px solid ${T.border}`,
@@ -631,7 +632,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
                 Add Targeting Detail
               </button>
               <button
-                onClick={() => navigate('/onboarding')}
+                onClick={() => navigate('/onboarding', { state: { arrival: ARRIVAL_REVIEW_ICP } })}
                 style={{
                   padding: '10px 20px', borderRadius: 10,
                   background: T.surface, border: `1px solid ${T.border}`,

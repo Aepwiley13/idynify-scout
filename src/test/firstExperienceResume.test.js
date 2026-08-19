@@ -20,6 +20,7 @@ import {
   MODE_BEGIN,
   MODE_RESUME,
   MODE_REFINE,
+  ARRIVAL_REVIEW_ICP,
 } from '../utils/firstExperienceMode';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -83,6 +84,70 @@ describe('zero-ICP and unresolved states are not failures here', () => {
   });
 });
 
+describe('explicit arrival intent outranks generic resume', () => {
+  const UNFINISHED = { messages: [{ role: 'user', content: 'about my inbox' }], status: 'in_progress' };
+
+  it('the case in question: unfinished conversation + explicit review click → refine', () => {
+    // Someone who clicked "Review ICP with Barry" has said what they came for.
+    // Dropping them into an unrelated half-finished conversation ignores it.
+    const withArrival = resolveFirstExperienceMode(UNFINISHED, RESOLVED, ARRIVAL_REVIEW_ICP);
+
+    expect(withArrival.mode).toBe(MODE_REFINE);
+  });
+
+  it('without the explicit click, the same state resumes', () => {
+    expect(resolveFirstExperienceMode(UNFINISHED, RESOLVED).mode).toBe(MODE_RESUME);
+  });
+
+  it('review intent with no ICP falls through — you cannot review what does not exist', () => {
+    // The user still gets the conversation that would produce one.
+    expect(resolveFirstExperienceMode(UNFINISHED, NO_PROFILES, ARRIVAL_REVIEW_ICP).mode)
+      .toBe(MODE_RESUME);
+    expect(resolveFirstExperienceMode(null, NO_PROFILES, ARRIVAL_REVIEW_ICP).mode)
+      .toBe(MODE_BEGIN);
+  });
+
+  it('none-active is not an ICP to review either', () => {
+    expect(resolveFirstExperienceMode(null, NONE_ACTIVE, ARRIVAL_REVIEW_ICP).mode).toBe(MODE_BEGIN);
+  });
+
+  it('an unrecognised arrival value changes nothing', () => {
+    expect(resolveFirstExperienceMode(UNFINISHED, RESOLVED, 'something-else').mode)
+      .toBe(MODE_RESUME);
+  });
+
+  it('arrival intent is transient — it is a navigation argument, not stored state', () => {
+    const code = shell.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+    expect(code).toMatch(/useLocation\(\)/);
+    expect(code).toMatch(/location\.state\?\.arrival/);
+    // Never written anywhere.
+    expect(code).not.toMatch(/setDoc[\s\S]{0,120}arrival/);
+    expect(code).not.toMatch(/sessionStorage[\s\S]{0,60}arrival/);
+    expect(code).not.toMatch(/localStorage/);
+  });
+});
+
+describe('the explicit affordances declare their intent', () => {
+  it.each([
+    ['../pages/Scout/MissionControlDashboardV2.jsx', 'Mission Control'],
+    ['../pages/Scout/DailyLeads.jsx', 'Daily Leads'],
+  ])('%s passes arrival intent when sending the user to review their ICP', (rel) => {
+    const src = readFileSync(resolve(here, rel), 'utf8');
+
+    expect(src).toMatch(/navigate\('\/onboarding', \{ state: \{ arrival: ARRIVAL_REVIEW_ICP \} \}\)/);
+    expect(src).toMatch(/import \{ ARRIVAL_REVIEW_ICP \}/);
+  });
+
+  it('there is still exactly one onboarding route — intent is an argument, not a second door', () => {
+    const app = readFileSync(resolve(here, '../App.jsx'), 'utf8');
+    const routed = [...app.matchAll(/<Route path="(\/onboarding[^"]*)" element=\{([^}]*)\}/g)]
+      .filter(m => !m[2].includes('Navigate'));
+
+    expect(routed).toHaveLength(1);
+  });
+});
+
 describe('Barry introduces itself only on a genuine first conversation', () => {
   it('introduces when beginning', () => {
     expect(shouldIntroduce(MODE_BEGIN)).toBe(true);
@@ -100,7 +165,7 @@ describe('the shell uses it, and stores nothing', () => {
   });
 
   it('derives the mode rather than persisting it', () => {
-    expect(shell).toMatch(/resolveFirstExperienceMode\(conversation, icpResolution\)/);
+    expect(shell).toMatch(/resolveFirstExperienceMode\(conversation, icpResolution, arrival\)/);
     expect(shell).not.toMatch(/setDoc[\s\S]{0,120}mode/);
   });
 

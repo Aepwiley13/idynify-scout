@@ -21,6 +21,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
+import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
@@ -2126,7 +2127,7 @@ export default function DailyLeads({ onNavigate }) {
             Scout needs to know who you're targeting before it can find your matches. Tell Barry who you're after and he'll take it from there.
           </p>
           <button
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate('/onboarding', { state: { arrival: ARRIVAL_REVIEW_ICP } })}
             style={{
               width: '100%', padding: '13px',
               borderRadius: 12,

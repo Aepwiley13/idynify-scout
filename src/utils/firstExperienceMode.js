@@ -16,19 +16,39 @@ export const MODE_RESUME = 'resume';     // a conversation was left in progress
 export const MODE_REFINE = 'refine';     // an ICP already exists; this is refinement
 
 /**
+ * Arrival intent — why the user came to the route on THIS navigation.
+ *
+ * Carried in React Router location state, which lives in the history entry and
+ * is gone on reload. Deliberately transient: it says why someone arrived, not
+ * what they are, so it must not outlive the navigation that produced it.
+ */
+export const ARRIVAL_REVIEW_ICP = 'review-icp';
+
+/**
  * @param {Object|null} conversation - users/{uid}/barryConversations/icp, or null
  * @param {Object} icpResolution - the canonical resolution (Tier 1 contract)
+ * @param {string|null} [arrival] - transient arrival intent, if the navigation carried one
  * @returns {{ mode: string, hasIcp: boolean, messageCount: number }}
  */
-export function resolveFirstExperienceMode(conversation, icpResolution) {
+export function resolveFirstExperienceMode(conversation, icpResolution, arrival = null) {
   const messages = Array.isArray(conversation?.messages) ? conversation.messages : [];
   const messageCount = messages.length;
   const hasIcp = icpResolution?.status === 'resolved';
 
-  // An unfinished conversation is the strongest signal: pick it up where it
-  // stopped, whatever else is true. Finishing what was started beats starting
-  // something new, and beats jumping to refinement of an ICP the user may have
-  // been in the middle of changing.
+  // Explicit arrival intent outranks everything below it. Someone who clicked
+  // "Review ICP with Barry" has said what they came for; dropping them into an
+  // unrelated half-finished conversation ignores the thing they just did.
+  //
+  // It only forces refinement when there is actually an ICP to refine — you
+  // cannot review what does not exist, so with no ICP the normal precedence
+  // applies and the user gets the conversation that will produce one.
+  if (arrival === ARRIVAL_REVIEW_ICP && hasIcp) {
+    return { mode: MODE_REFINE, hasIcp, messageCount };
+  }
+
+  // An unfinished conversation is the next strongest signal: pick it up where
+  // it stopped. Finishing what was started beats starting something new, and
+  // beats jumping to refinement of an ICP the user may have been mid-change on.
   if (messageCount > 0 && conversation?.status !== 'completed') {
     return { mode: MODE_RESUME, hasIcp, messageCount };
   }

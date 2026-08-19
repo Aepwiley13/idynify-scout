@@ -186,8 +186,8 @@ Match's subject is Company × ICP — not Company alone. A company does not have
 
 | Component | Path | Scale | Notes |
 |---|---|---|---|
-| Client-side scoring | `icpScoring.js:calculateICPScore` | 0–100 | Weighted average over 4 dimensions (industry 50%, location 25%, employee size 15%, revenue 10%), normalized over active dimensions |
-| Server-side scoring | `search-companies.js:calculateFitScore` | 0–100 | Different weights and logic — known divergence |
+| Client-side scoring | `icpScoring.js:calculateICPScore` | 0–100 | Weighted average over 4 dimensions (industry 50%, location 25%, employee size 15%, revenue 10%), normalized over active dimensions. This is the only live Match scorer. |
+| Server-side scoring | `search-companies.js:calculateFitScore` | 0–100 | Unreachable dead code. Called only from `enrichCompanyData` (line 1088), which is marked `DEPRECATED - OLD COMPLEX ENRICHMENT (NOT USED ANYMORE)` and has zero callers. Does not produce `fit_score` in production. |
 | Persisted field | `users/{uid}/companies/{cid}.fit_score` | 0–100 | Written at discovery and by `recalculateAllScores` |
 | Display label | "Match Score" | — | Normalized in positioning handoff |
 
@@ -195,7 +195,7 @@ Match's subject is Company × ICP — not Company alone. A company does not have
 
 **Cross-ICP contamination:** `recalculateAllScores` (in `ICPSettings.jsx:254`) iterates all companies in the user's collection and overwrites persisted `fit_score` using the currently-selected ICP without verifying that the resulting score is attributable to the intended Company × ICP evaluation. A company discovered under ICP A has its `fit_score` rewritten to reflect ICP B when ICP B's settings are saved. The `icpId` field on the company document is not updated by this operation.
 
-**Scoring divergence:** Client-side `calculateICPScore` and server-side `calculateFitScore` use different weights and logic, producing different scores for the same Company × ICP pair.
+**Dead server-side scorer:** `search-companies.js:calculateFitScore` uses different weights and logic from the live client-side `calculateICPScore`, but is unreachable dead code (inside deprecated `enrichCompanyData`, zero callers). By the Reachability Standard (Principle 3), there is no live client/server scoring divergence — only one scorer (`calculateICPScore`) is reachable. The dead server scorer is not a current defect but is noted as a maintenance concern: if the deprecated path is ever re-enabled without reconciliation, divergence would become live.
 
 ---
 

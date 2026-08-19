@@ -120,11 +120,16 @@ describe('2 — onboarding creates an ICP only on explicit confirmation', () => 
 });
 
 describe('3 — every search-companies caller carries identity or declines', () => {
+  // CompanyQuestionnaire was here in Tier 1, when it resolved an identity and
+  // passed it. Tier 3 found that identity could only ever be some *other* ICP's
+  // — the criteria come from this form, which no ICP holds — so the search was
+  // removed entirely rather than mis-attributed. It is asserted separately
+  // below: no call at all satisfies "carries identity or declines" strictly
+  // more than declining at the guard did.
   const callers = [
     ['../pages/Scout/DailyLeads.jsx', 'DailyLeads'],
     ['../pages/Scout/MissionControlDashboardV2.jsx', 'MissionControlDashboardV2'],
     ['../components/scout/BarryICPPanel.jsx', 'BarryICPPanel'],
-    ['../components/scout/CompanyQuestionnaire.jsx', 'CompanyQuestionnaire'],
     ['../pages/Onboarding/BarryOnboarding.jsx', 'BarryOnboarding'],
   ];
 
@@ -140,6 +145,13 @@ describe('3 — every search-companies caller carries identity or declines', () 
     // (CompanyQuestionnaire) or inlined in the body (everywhere else).
     const around = src.slice(Math.max(0, at - 900), at + 600);
     expect(around, `${name} searches without icpId`).toMatch(/\bicpId\b/);
+  });
+
+  it('CompanyQuestionnaire declines by not searching at all', () => {
+    const src = code(read('../components/scout/CompanyQuestionnaire.jsx'));
+
+    expect(src).toMatch(/resolveActiveIcp/);
+    expect(src).not.toMatch(/'\/\.netlify\/functions\/search-companies'/);
   });
 
   it('search-companies refuses a request with no ICP identity', () => {

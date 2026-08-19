@@ -12,6 +12,7 @@
 |---|---|---|
 | v1.0 | 2026-08-19 | Initial semantic design: WHO/INTENT/FIRST VALUE/PROGRESSIVE INTELLIGENCE models, five journey tests, accelerator model, anti-patterns, 12 undecided questions |
 | v1.1 | 2026-08-19 | Convergence pass: three owner clarifications (WHO name rule, intent taxonomy, multi-company tenancy), intent durability evaluation, accelerator status clause, five-journey convergence matrix against repository evidence, consolidated decision registry |
+| v1.1-b | 2026-08-19 | Bounded contract rulings: P-9 confirmation-before-search invariant (proto-targeting → confirm → ICP → search), P-5 intent durability formalized (transient routing context, not intelligence), Journey 1/2/4 corrected to require confirmation before discovery, Journey 2 factual corrections (website extraction scope, targetCompanySize semantic, free-text vs. structured) |
 
 ---
 
@@ -81,12 +82,12 @@ WHO is the lightest possible baseline. It establishes who Barry is talking to �
 |---|---|---|
 | **Name** | Normally useful, conversationally acquired | Barry should address the user by name. Name may be stated, inferred from authenticated context (e.g., email display name), or confirmed. It must not create a mandatory profile-form gate before first value. |
 | **Primary company or organization** | Useful now | Provides workspace grounding. Enables website inference. Not required — a user may be between companies, independent, or not ready to share. |
-| **Company website** | Optional accelerator | High-value inference source. Barry can discover industry, positioning, company size, location, and competitive landscape from a website. Not required — many users do not have one, and its absence is not blocking. |
+| **Company website** | Optional accelerator | High-value inference source. Barry can discover the user's company name, industry, positioning, value proposition, and what they sell from a website. May also extract targeting intelligence about the user's ideal customers (target industries, target company sizes). Not required — many users do not have one, and its absence is not blocking. |
 | **Email address** | Required now (platform) | Authentication artifact. Not intelligence Barry asks for — the platform provides it. Barry may infer domain → company from it. |
 | **Role or title** | Inferable / confirmable | Inferable from LinkedIn, résumé, or website team page. Barry confirms rather than asks. |
 | **Industry** | Inferable | Inferable from company name, website, or domain. Barry confirms if uncertain. |
-| **Location** | Inferable | Inferable from website, IP, LinkedIn, or company data. Progressively learnable. |
-| **Company size** | Inferable | Inferable from website, LinkedIn, or public data. Not asked. |
+| **Location** | Progressively learnable | May be available from LinkedIn, public data, or user statement. Not reliably inferable from a website alone. |
+| **Company size** | Progressively learnable | May be available from LinkedIn or public data. Not reliably inferable from a website alone. Not asked. |
 | **Years in business** | Not relevant now | Never asked. Progressively learnable if relevant to a future operation. |
 | **Photo/avatar** | Not relevant now | Never asked. Platform-supplied or progressively available. |
 
@@ -138,20 +139,36 @@ The nine semantic intent types below are useful as an internal classification fo
 
 **Intent determines ICP relevance.** Per v0.4-amend, ICP is capability-required, not platform-required. The user's intent determines whether ICP intelligence becomes relevant. A user whose intent is Engagement never needs an ICP. A user whose intent is Prospecting will need an ICP — but not at the moment of declaring intent. ICP becomes relevant at the moment Barry needs a targeting definition to execute a discovery operation.
 
-**Compound intent is normal.** Most users want more than one thing. Barry serves the most actionable intent first and remembers the others. "I want to find new clients and also keep in touch with my existing network" — Barry starts with whichever is more immediately actionable (typically Engagement, because it requires less setup) and returns to Prospecting when the user is ready.
+**Compound intent is normal.** Most users want more than one thing. Barry serves the most actionable intent first. "I want to find new clients and also keep in touch with my existing network" — Barry starts with whichever is more immediately actionable (typically Engagement, because it requires less setup). The user may raise the second intent when ready; Barry does not need to durably store or track multiple intents across sessions.
 
-### Intent Durability (v1.1)
+### Intent Durability (v1.1, refined v1.1-b)
 
-Current intent is routing intelligence. It answers what the user wants Barry to help with now. It is not automatically a durable characteristic of the user.
+Current intent is lightweight routing context, not durable User identity and not a seventh permanent intelligence type.
 
-If an objective persists across sessions or becomes something Barry is actively helping achieve over time, it may later become Mission intelligence (v0.4 Part III, Mission scope).
+Example: "I want referrals today" routes Barry now. It should not permanently define the person.
 
-**v0.4 compatibility evaluation:** This distinction is fully compatible with v0.4-amend.
-- v0.4 defines Mission scope as "the current objective, when one is active: mission goal, step progress, strategy, and outcome history" (Part III). This is durable, tracked intelligence — semantically distinct from ephemeral routing intent.
-- v0.4 Part VI item 9 leaves "Mission as a first-class Firestore object" explicitly undecided. The intent→Mission semantic boundary does not decide storage — it establishes when routing intelligence has matured into a durable objective.
-- The boundary: intent tells Barry what to do in this conversation; Mission is an objective Barry tracks and advances across conversations.
+Phase 2 may treat intent as transient routing context without creating a new intelligence store. Intent does not require persistence, attribution per the Intelligence Rule (Principle 2), or any of the five properties (ownership, provenance, confidence, freshness, purpose) that v0.4 requires of intelligence. It is conversational context that determines what Barry does in this interaction.
 
-**Recommendation:** This interpretation is compatible with v0.4-amend and clarifies a boundary the contract implies but does not state. Recommended for owner ruling as a v0.4 interpretation, not an amendment.
+Compound-intent memory within a single conversation is conversational context — Barry can track "the user also mentioned referrals" within a session without a durable store. Across sessions, the user re-states or Barry infers intent fresh. No cross-session intent persistence is required.
+
+**Semantic boundary — Intent vs. Mission:**
+
+| Property | Intent | Mission |
+|---|---|---|
+| Duration | This conversation | Across conversations |
+| Persistence | None required — conversational context | Required — tracked, stored, progressed |
+| Identity | No identifier | Mission identity (v0.4 Part III) |
+| Intelligence Rule | Does not apply — not an intelligence artifact | Applies — must have ownership, provenance, confidence, freshness, purpose |
+| Example | "I want referrals today" | "Get introduced to 5 VPs at SaaS companies this quarter" |
+| Promotion | User or Barry recognizes a persistent objective → becomes Mission | N/A — already Mission |
+
+The boundary: intent is what Barry acts on now; Mission is what Barry helps achieve over time. An objective crosses the boundary when it persists across sessions and Barry is actively tracking progress toward it. This promotion is an explicit event, not an automatic inference from repeated intent.
+
+**v0.4 compatibility:** Fully compatible.
+1. v0.4 defines six intelligence types in Part I. Intent is not a seventh — it is routing context, not intelligence.
+2. v0.4 defines Mission scope in Part III as "the current objective, when one is active." The intent→Mission boundary adds semantic clarity to "when one is active" without changing the definition.
+3. v0.4 Part VI item 9 leaves Mission-as-object explicitly undecided. This interpretation does not decide storage — only the semantic threshold for when routing context matures into a tracked objective.
+4. No new intelligence store, schema, or persistence mechanism is implied or required.
 
 ---
 
@@ -163,7 +180,7 @@ First value is the earliest moment when Barry delivers something the user finds 
 
 | Intent | First Value | What Barry Needs | What Barry Does NOT Need |
 |---|---|---|---|
-| **Prospecting** | A small set of relevant companies based on whatever targeting intelligence Barry has — even if only industry and location inferred from a website | At minimum, one inferable or stated targeting constraint | A fully specified ICP. A completed RECON. Any structured profile. |
+| **Prospecting** | A small set of relevant companies discovered after the user confirms a targeting definition that Barry proposed from inferred or stated intelligence | User confirmation of a proposed targeting definition (creating an ICP identity), which may be as lightweight as confirming a single inferred industry | A fully specified multi-dimensional ICP. A completed RECON. Any structured profile beyond the confirmed targeting definition. |
 | **Engagement** | An insight about one of the user's existing contacts — a recent event, a follow-up suggestion, a conversation starter | Access to the user's contacts or at least one named contact | A contact database import. A completed relationship map. |
 | **Communication** | An analyzed email with a suggested response or talking points | One email to analyze (forwarded, pasted, or connected) | Email integration setup. OAuth flow. |
 | **Preparation** | A briefing on an upcoming meeting — who the person is, what they care about, what to discuss | One meeting or one person to prepare for (named or from calendar) | Calendar integration. Full relationship history. |
@@ -176,7 +193,7 @@ First value is the earliest moment when Barry delivers something the user finds 
 
 **FV-1: First value must be reachable within the first conversation.** If the user provides WHO and INTENT, Barry must deliver first value without requiring the user to leave, complete a form, or return later.
 
-**FV-2: First value quality scales with intelligence depth.** A user who provides a website gets a better first Prospecting result than one who provides only a name. But both get a result. The user who provided less sees a useful outcome and understands that providing more produces better outcomes — without Barry lecturing about it.
+**FV-2: First value quality scales with intelligence depth.** A user who provides a website gets a richer targeting proposal and a more specific ICP-targeted search than one who provides only a name. But both reach confirmation and first value. The user who provided less sees a useful outcome and understands that providing more produces better outcomes — without Barry lecturing about it.
 
 **FV-3: First value is real, not simulated.** Barry does not show fake data, sample results, or demo content. First value uses whatever real intelligence is available, even if that intelligence is minimal.
 
@@ -262,16 +279,18 @@ Each test user must reach a useful outcome. If any is forced through intelligenc
 1. Barry greets Jordan by name. Asks what brings them to Barry — in conversational terms, not as a menu.
 2. Jordan says: "I'm not sure — show me what you can do."
 3. Intent classification: **Exploration**.
-4. First value: Barry delivers an orientation brief. "Here's what I can help with: finding new business, managing relationships, preparing for meetings, writing outreach. What sounds closest to what you need?" This is not a feature list — it is Barry demonstrating that it is ready to work, not waiting for configuration.
+4. First value (Exploration): Barry delivers an orientation brief. "Here's what I can help with: finding new business, managing relationships, preparing for meetings, writing outreach. What sounds closest to what you need?" This is not a feature list — it is Barry demonstrating that it is ready to work, not waiting for configuration.
 5. Jordan says: "I guess finding new business."
 6. Intent reclassified: **Prospecting**.
 7. Barry needs a targeting constraint but has none. Barry asks the minimum: "What kind of companies are you looking to reach? Even a general direction helps — like 'tech startups' or 'local restaurants.'"
 8. Jordan says: "Tech companies."
-9. Barry can now deliver a Prospecting first value: a set of companies in the tech industry. Results are broad because targeting intelligence is minimal. Barry acknowledges this: "Here are some tech companies I found. As I learn more about the kind of tech company you're looking for — size, location, specific niche — I can narrow this down."
+9. Barry proposes a confirmation: "Got it — should I search for tech companies and see what comes up?"
+10. Jordan confirms.
+11. Confirmation creates a lightweight ICP with industry targeting. Barry executes an ICP-targeted search. Results are broad because the targeting definition is minimal. Barry acknowledges this: "Here are some tech companies I found. As I learn more about the kind of tech company you're looking for — size, location, specific niche — I can narrow this down."
 
-**Test result:** Jordan reached first value (a set of real companies) with only a name and two conversational exchanges. No form. No profile completion. No ICP configuration screen. Barry asked for one thing it could not infer (industry targeting direction) because the intent required it.
+**Test result:** Jordan reached first value (a set of real, ICP-attributed companies) with a name, two conversational exchanges, and one lightweight confirmation. No form. No profile completion. No ICP configuration screen. Barry asked for one thing it could not infer (industry targeting direction) because the intent required it, then confirmed before searching.
 
-**ICP state:** `no-profiles` (valid). If Jordan continues to refine and eventually confirms a targeting definition, that constitutes an authorized ICP creation event per v0.4 §1 ICP Creation Semantics.
+**ICP state:** ICP created at step 10 via conversational confirmation — the lightest possible ICP creation event (single industry). Per v0.4 §1 ICP Creation Semantics, the user's explicit confirmation constitutes an authorized ICP creation event. The ICP can be progressively refined through reactions to results.
 
 ---
 
@@ -283,24 +302,32 @@ Each test user must reach a useful outcome. If any is forced through intelligenc
 **WHO intelligence after first exchange:**
 - Name: "Priya" (stated)
 - Company website: "www.securelane.io" (stated)
-- Company: "SecureLane" (inferred from website)
-- Industry: "Cybersecurity" (inferred from website content)
-- Company size: ~50 employees (inferred from website team page / public data)
-- Location: Austin, TX (inferred from website footer / contact page)
-- Value proposition: "Cloud security platform for mid-market enterprises" (inferred from website)
+- Company: "SecureLane" (inferred from website — `companyName` extraction)
+- Industry: "Cybersecurity" (inferred from website content — `description`, `whatTheySell`)
+- Value proposition: "Cloud security platform for mid-market enterprises" (inferred from website — `valueProposition`)
+
+**Targeting intelligence extracted from website (distinct from WHO):**
+- Target customer description: "mid-market enterprises" (from `whoTheyServeTo` / `icpSummary` — free-text, describes the user's ideal customers, not the user's own company)
+- Target industry context: enterprises needing cloud security (from `targetIndustry` — free-text, requires translation to structured search parameters)
+
+**What the website does NOT reliably provide:**
+- The user's own company location (not extracted by `analyze-website`)
+- The user's own company employee count (not extracted; `targetCompanySize` refers to target customer size, not the user's company)
+- Competitive landscape (not extracted by `analyze-website`)
 
 **Barry's path:**
 1. Barry greets Priya by name. Asks what brings them here.
 2. Priya says: "I want to find new customers."
 3. Intent classification: **Prospecting**.
-4. Barry has inferred substantial Workspace intelligence from the website. Barry confirms rather than asks: "I can see SecureLane is a cloud security platform based in Austin, focused on mid-market enterprises. Is that right?"
+4. Barry has inferred Workspace intelligence and proto-targeting intelligence from the website. Barry confirms rather than asks: "I can see SecureLane is a cloud security platform focused on mid-market enterprises. Is that right?"
 5. Priya confirms (or corrects — any correction becomes canonical).
-6. First value: Barry delivers a targeted set of mid-market companies that might need cloud security — using the inferred industry, company size range, and positioning from the website. This is a materially better result than Journey 1 because of the website accelerator.
-7. Barry notes what it does not yet know: "I'm using what I found on your website to target this search. Once you tell me more about your ideal customer — or just react to these results — I can get much sharper."
+6. Barry proposes a targeting definition from the website-extracted intelligence: "It looks like your ideal customers are mid-market enterprises that need cloud security. Should I search for companies like that?"
+7. Priya confirms. Confirmation creates an ICP with targeting criteria derived from the website extraction. Free-text values (e.g., "mid-market enterprises") are translated to structured search parameters at this point — this translation is an implementation concern, not a semantic one.
+8. Barry executes an ICP-targeted search. Results are more focused than Journey 1 because the website accelerator provided richer targeting intelligence. Barry notes what it does not yet know: "I'm using what I found on your website to target this search. Once you tell me more about your ideal customer — or just react to these results — I can get much sharper."
 
-**Test result:** Priya reached first value with a name, a website, and one conversational confirmation. The website accelerator eliminated multiple questions. Barry demonstrated the Question Rule: discover (website), infer (industry, size, positioning), confirm ("Is that right?"), ask nothing.
+**Test result:** Priya reached first value with a name, a website, and one conversational confirmation that doubled as ICP creation. The website accelerator eliminated multiple questions and provided proto-targeting intelligence. Barry demonstrated the Question Rule: discover (website), infer (industry, target customer), confirm ("Is that right?"), propose targeting definition, confirm before search.
 
-**ICP state:** `no-profiles`, but Barry has accumulated proto-targeting intelligence. If Priya confirms a targeting definition through continued refinement, that constitutes an authorized ICP creation event.
+**ICP state:** ICP created at step 7 via conversational confirmation. The website accelerator provided richer proto-targeting intelligence than Journey 1, producing a more specific ICP at creation. The ICP can be progressively refined through reactions to results.
 
 ---
 
@@ -349,13 +376,15 @@ Each test user must reach a useful outcome. If any is forced through intelligenc
 4. Barry does not launch a targeting questionnaire. Barry engages the Question Rule.
 5. Barry's first question is about existing experience, not ideal customers: "Who have been your best clients so far? Even one or two examples help me understand what works for you."
 6. Dana says: "I've done work for a few local restaurants and a tech startup."
-7. Barry can now infer proto-targeting intelligence: local businesses, service businesses, small-to-medium, probably in the user's metro area. Barry confirms: "It sounds like local businesses — restaurants, maybe other service businesses — have been a good fit. Should I look for more companies like those?"
+7. Barry infers proto-targeting intelligence: local businesses, service businesses, small-to-medium. Barry proposes a targeting definition: "It sounds like local businesses — restaurants, maybe other service businesses — have been a good fit. Should I search for more companies like those?"
 8. Dana says: "Yeah, and maybe some event venues too."
-9. First value: Barry delivers a set of local restaurants, service businesses, and event venues near Dana's inferred location. These are real results, not perfect results. Barry says: "Here's a first batch. As you tell me which ones look interesting and which don't, I'll learn your taste."
+9. Barry incorporates the refinement and confirms: "Restaurants, service businesses, and event venues — I'll search for those. Let's see what comes up."
+10. Dana's confirmation at steps 8–9 creates a lightweight ICP with the confirmed targeting definition.
+11. First value: Barry executes an ICP-targeted search and delivers a set of local restaurants, service businesses, and event venues. Barry says: "Here's a first batch. As you tell me which ones look interesting and which don't, I'll learn your taste."
 
-**Test result:** Dana reached first value without ever encountering the word "ICP," completing a form, or explicitly defining targeting criteria. Barry extracted targeting intelligence from Dana's existing experience using the Question Rule. Future accept/reject decisions on these results become User Judgment (v0.4 §4) and progressive targeting intelligence.
+**Test result:** Dana reached first value without ever encountering the word "ICP," completing a form, or explicitly defining targeting criteria. Barry extracted targeting intelligence from Dana's existing experience using the Question Rule. The conversational confirmation ("Yeah, and maybe some event venues too" in response to Barry's proposal) served as the ICP creation event. Future accept/reject decisions on these results become User Judgment (v0.4 §4) and progressive ICP refinement.
 
-**ICP state:** `no-profiles`. Barry has accumulated proto-targeting intelligence from conversation. When (if) this intelligence is confirmed as a targeting definition by the user, it becomes an authorized ICP creation event.
+**ICP state:** ICP created at step 10 via conversational confirmation. Dana never saw a configuration screen — the ICP was created through natural dialogue. The confirmation threshold was low (industries only), and the ICP can be refined over time.
 
 ---
 
@@ -408,11 +437,9 @@ Information that materially improves first value quality. Barry benefits from ha
 ### Inferable
 Information Barry can derive from available data without asking:
 - Industry (from company name, website, email domain)
-- Location (from website, IP locale, company data)
-- Company size (from website, public data)
 - Role/title (from LinkedIn, résumé, website team page)
 - Value proposition (from website)
-- Competitive landscape (from website + industry inference)
+- Target customer characteristics (from website — e.g., "who they serve," target industries, target company sizes; these describe the user's ideal customers, not the user's own company)
 
 ### Confirmable
 Information Barry has inferred and should verify rather than assume:
@@ -532,14 +559,22 @@ This is not a politeness rule. It is a Question Rule application: the résumé i
 
 ### Company Website
 **What Barry extracts:**
-- Company name, industry, positioning → Workspace scope
-- Products/services → Workspace scope
-- Company size indicators → Workspace scope
-- Location → Workspace scope
-- Value proposition → Workspace scope
-- Competitive positioning → Workspace scope
-- Client types or case studies → proto-targeting intelligence
-- Team information → Workspace scope
+- Company name → Workspace scope (`companyName`)
+- What the company does → Workspace scope (`description`)
+- What they sell → Workspace scope (`whatTheySell`)
+- Value proposition → Workspace scope (`valueProposition`)
+- Who they serve → proto-targeting intelligence (`whoTheyServeTo` — describes the user's ideal customers, not the user's own company)
+- Target industry → proto-targeting intelligence (`targetIndustry` — free-text, describes the types of companies the user targets)
+- Target company size → proto-targeting intelligence (`targetCompanySize` — free-text, describes the size of companies the user targets, not the user's own company size)
+- ICP summary → proto-targeting intelligence (`icpSummary` — synthesized description of the user's ideal customer)
+
+**What the website does NOT reliably provide:**
+- The user's own company location (not extracted by `analyze-website`)
+- The user's own company employee count (not extracted; `targetCompanySize` refers to target customers)
+- Competitive landscape (not extracted)
+- Team information (not extracted)
+
+**Free-text vs. structured:** Website-extracted targeting values (`targetIndustry`, `targetCompanySize`, `whoTheyServeTo`) are free-text descriptions, not structured parameters. They require translation to search-ready formats (e.g., Apollo industry codes, employee count ranges) before they can drive ICP-targeted discovery. This translation is an implementation concern.
 
 **Confidence level:** Medium-high. Websites are public and authored, but may be outdated.
 
@@ -641,32 +676,38 @@ The user who wants to manage their relationships has a complete, fully functiona
 
 ## When ICP Becomes Relevant
 
-For Prospecting intent, ICP becomes relevant when Barry needs a targeting definition to execute a discovery search. But ICP does not appear as a configuration step. The progression is:
+For Prospecting intent, ICP becomes relevant when Barry needs a targeting definition to execute a discovery search. But ICP does not appear as a configuration form. The progression is:
 
 1. User expresses Prospecting intent
 2. Barry needs targeting constraints to search
-3. Barry applies the Question Rule: discover (from website, accelerators), infer (from industry, past clients), confirm ("companies like these?")
-4. When Barry has enough targeting intelligence to produce useful results, Barry searches
-5. The user's reactions to results (accept/reject, refinements, corrections) progressively sharpen targeting
-6. At no point does Barry say "let's set up your ICP" or present an ICP configuration form
+3. Barry applies the Question Rule: discover (from website, accelerators), infer (from industry, past clients), clarify if needed
+4. Barry proposes a targeting definition from accumulated intelligence
+5. User confirms the proposed targeting definition — this confirmation is an ICP creation event per v0.4 §1 ICP Creation Semantics, creating an explicit ICP identity
+6. Barry executes ICP-targeted discovery search with the confirmed targeting definition
+7. The user's reactions to results (accept/reject, refinements, corrections) progressively sharpen the targeting definition through ICP updates
+8. At no point does Barry say "let's set up your ICP" or present an ICP configuration form — but confirmation always precedes ICP-targeted search
+
+**Confirmation-before-search invariant (v1.1-b):** ICP-targeted company discovery requires a confirmed ICP identity. Every discovered company is persisted with ICP attribution. Proto-targeting intelligence may inform Barry's conversation and proposal, but it does not produce persisted company discovery on its own. This preserves the Phase 1B attribution invariant: no company-write path exists without ICP identity.
 
 ## Proto-Targeting Intelligence
 
 Intelligence that would eventually constitute an ICP but has not yet been explicitly confirmed as a targeting definition is proto-targeting intelligence. It is:
 - Accumulated through conversation, accelerators, and behavior
 - Attributed per the Intelligence Rule
-- Used for searches with appropriate confidence acknowledgment
-- Not yet an ICP object — it becomes one when the user confirms a targeting definition
+- Used by Barry conversationally — to propose, clarify, and refine a targeting definition before confirmation
+- Not persisted as an independent intelligence object — it exists as conversational context until confirmation creates a formal ICP
 
-## ICP Creation Through Progressive Confirmation
+Proto-targeting intelligence does not require an independent semantic identity or lifecycle. It is working context within the Question Rule progression (discover → infer → clarify → propose → confirm). It has no `icpId`, no storage path, and no consumers beyond Barry's conversational reasoning. When the user confirms a targeting definition, the confirmed definition becomes the authoritative ICP representation; the proto-targeting context that led to it is superseded, not preserved as a parallel object.
 
-When proto-targeting intelligence reaches a coherent state — Barry has enough accumulated intelligence to propose a targeting definition — Barry may offer a confirmation event:
+## ICP Creation Through Conversational Confirmation
 
-"Based on what I've learned, it seems like you're looking for mid-market SaaS companies in North America with 50–500 employees. Want me to use that as your targeting profile going forward?"
+Barry proposes a targeting definition when accumulated intelligence is sufficient. The confirmation may be as lightweight as a single exchange:
 
-User confirmation of this proposal constitutes an authorized ICP creation event per v0.4 §1 ICP Creation Semantics.
+"It sounds like you're looking for mid-market SaaS companies. Should I search for companies like that?"
 
-This is not a required step. A user may use proto-targeting intelligence indefinitely without ever confirming a formal ICP. Confirmation is a convenience that improves consistency, not a gate that blocks functionality.
+User confirmation of this proposal constitutes an authorized ICP creation event per v0.4 §1 ICP Creation Semantics. The confirmed definition becomes an `icpProfiles/{icpId}` representation with explicit ICP identity. Subsequent searches are ICP-targeted and produce attributed company discovery.
+
+The confirmation threshold can be low — even a single confirmed industry is sufficient to create an ICP and execute an attributed search. The ICP can be refined through subsequent updates as the user reacts to results. The goal is to minimize the distance between Prospecting intent and first value while preserving attribution.
 
 ---
 
@@ -851,8 +892,7 @@ Each journey is tested against current repository capability. Evidence is from c
 | Requirement | Repository Support | Gap | Semantic Model Change? |
 |---|---|---|---|
 | Conversational intent capture | No current path maps conversational intent to a Barry routing decision. `SmartRedirect` (App.jsx:321) routes all new users to `OnboardingFlow`, which is a 6-step wizard. | **Critical gap.** Current platform assumes all users enter through a structured onboarding flow, not a conversation. | No — the model correctly describes what should happen. |
-| "Tech companies" → search | `buildApolloQuery` (search-companies.js:659) can run with just `industries: ["technology"]` as keyword tags. Technically functional. | **Wiring gap.** No current path converts conversational targeting input into the `companyProfile` object that `search-companies.js:237` requires. | No — model describes intent-to-search correctly. |
-| Zero-ICP search execution | `search-companies.js` warns but does not abort on empty filters. Apollo returns broad results. | **Quality gap.** Broad results may not constitute meaningful first value (see U-5). | No, but U-5 (quality floor) becomes relevant. |
+| "Tech companies" → confirm → ICP → search | `buildApolloQuery` (search-companies.js:659) can run with just `industries: ["technology"]` as keyword tags. Technically functional. Confirmation-before-search (v1.1-b) means conversational targeting → user confirmation → ICP creation → search. | **Wiring gap.** No current path converts conversational confirmation into the `companyProfile`/`icpProfiles` object and then to `search-companies.js:237`. | No — model describes confirmation-to-search correctly. |
 | No completion-flag gate | `useOnboardingState` (useOnboardingState.js:75-81) has a 7-day safety valve: accounts older than 7 days are treated as "complete." New users ARE gated by onboarding flow. | **Anti-pattern conflict.** Current `OnboardingFlow` is AP-1 (Setup Wizard) and AP-12 (Onboarding Trap). | No — model correctly prohibits this. Implementation must resolve. |
 
 **Owner ruling required?** No for the semantic model. Implementation must build the conversational-to-search bridge.
@@ -883,9 +923,9 @@ Each journey is tested against current repository capability. Evidence is from c
 |---|---|---|---|
 | Conversational targeting from past clients | No current path extracts targeting intelligence from conversational description of past clients. `BarryOnboarding` uses a Claude-powered conversational ICP builder, which is the closest analog — but it saves to `companyProfile/current` and is labeled "legacy." | **Partial support.** `BarryOnboarding.handleConfirm()` is the only existing path that creates a formal ICP from conversation. But it follows its own multi-step flow, not the progressive confirmation model this design describes. | No — model describes the semantic process correctly. `BarryOnboarding` is evidence that conversational ICP creation has been attempted, but the current implementation doesn't match the progressive model. |
 | Search with minimal targeting | `buildApolloQuery` can execute with minimal filters. `adaptiveSignals.savedIndustries` (search-companies.js:693-699) can bias results toward historically accepted industries. | **Partial support.** Adaptive signals exist but only apply after the user has accepted companies in prior batches — not available for first search. | No. |
-| Proto-targeting → progressive refinement | No current mechanism stores proto-targeting intelligence as a distinct concept. Intelligence is either a formal ICP in `companyProfile/current` or nothing. | **Architecture gap.** The progressive refinement model requires a place for proto-targeting intelligence that is neither "no ICP" nor "completed ICP." | No for the semantic model. U-2 (Proto-Targeting Persistence) must be decided before implementation. |
+| Proto-targeting → progressive refinement | No current mechanism stores proto-targeting intelligence as a distinct concept. Intelligence is either a formal ICP in `companyProfile/current` or nothing. | **Resolved by v1.1-b.** Proto-targeting is conversational context, not a stored object. Confirmation creates a formal ICP — no intermediate persistence needed. Progressive refinement updates the existing ICP. | No. |
 
-**Owner ruling required?** U-2 is critical. U-5 (quality floor) applies here — is a single-industry search sufficient first value?
+**Owner ruling required?** U-5 (quality floor) applies — is a single-industry search sufficient first value?
 
 ### Journey 5: The Multi-Company Operator (Alex — three companies)
 
@@ -946,7 +986,7 @@ These decisions block Phase 2 implementation. Without them, the implementation h
 | ID | Question | Source | Why Blocking |
 |---|---|---|---|
 | **D-1** | **Onboarding authority resolution.** Which onboarding path(s) survive? Four competing flows exist with two different completion flags. The First Experience semantic model prohibits setup wizards (AP-1) and completion states (FE-4). Must the current flows be retired, adapted, or replaced? | U-1, P-3 | Cannot build the First Experience while four competing flows contest the same entry point. |
-| **D-2** | **Proto-targeting intelligence persistence.** How and where is proto-targeting intelligence stored before it becomes a confirmed ICP? No current mechanism stores targeting intelligence between "nothing" and "formal ICP in `companyProfile/current`." | U-2, P-1, P-2 | The progressive targeting model requires a storage concept that does not exist. Without it, the conversation-to-search path has no persistence layer. |
+| **D-2** | **~~Proto-targeting intelligence persistence.~~** **RESOLVED by v1.1-b.** Proto-targeting intelligence does not require independent persistence. It is conversational context used by Barry to propose a targeting definition. Confirmation creates a formal ICP; no intermediate storage object is needed. The conversation-to-search path is: proto-targeting (conversational) → user confirmation → ICP creation → ICP-targeted search. | U-2, P-1 | ~~Resolved~~ — no longer blocking. |
 | **D-3** | **Website analysis → search wiring.** Website analysis extracts `targetIndustry` and `targetCompanySize` but stores them in `websiteAnalysis` sub-object, disconnected from `buildApolloQuery`. Must the wiring be built as Cat 1 reconciliation, or does it require schema changes (Cat 2)? | P-2 | Journey 2 (Website Provider) cannot deliver first value without this wiring. |
 | **D-4** | **DEFAULT_ICP_ID disposition.** The `'default'` fallback in `getActiveIcpId` violates v0.4 ICP Availability States. What replaces it? Must every consumer handle `no-profiles` / `none-active` / `read-failed` explicitly? | P-4 | Zero-ICP behavior throughout the platform depends on how the silent default is retired. |
 | **D-5** | **Non-prospecting intent routing.** Current platform routing (`SmartRedirect` → `OnboardingFlow`) assumes all users are prospectors. How do Engagement, Communication, Preparation, and other non-prospecting intents reach their first value without passing through a prospecting-oriented onboarding? | P-5 | Journeys 1 (Exploration), 3 (Networker), and any non-prospecting intent cannot reach first value through the current routing. |
@@ -1006,20 +1046,37 @@ Current intent is ephemeral routing intelligence. An objective that persists acr
 
 ### Interpretation 3: Proto-Targeting Intelligence and v0.4 ICP Creation Semantics
 
-v0.4 §1 states: "An ICP must originate from an explicit creation or confirmation event." This document introduces proto-targeting intelligence — targeting knowledge accumulated through conversation and behavior that has not yet been confirmed as a formal ICP.
+v0.4 §1 states: "An ICP must originate from an explicit creation or confirmation event." This document introduces proto-targeting intelligence — conversational context Barry uses to propose a targeting definition before confirmation.
 
-**Assessment:** Compatible with v0.4, with one boundary condition. Proto-targeting intelligence is not an ICP. It does not carry an `icpId`. It is not stored in `icpProfiles`. It is working intelligence that Barry uses to serve the user, attributed as inferred (not canonical). It becomes an ICP only when the user explicitly confirms a targeting definition — satisfying v0.4's creation semantics.
+**Assessment:** Compatible with v0.4. Proto-targeting intelligence is not an ICP, not a stored intelligence object, and not a provisional targeting artifact. It has no independent identity, no `icpId`, no storage path, and no consumers beyond Barry's conversational reasoning. It is conversational context — the working hypothesis Barry builds through dialogue to propose a targeting definition. It becomes an ICP only when the user explicitly confirms a targeting definition — satisfying v0.4's creation semantics.
 
 **Boundary condition:** Proto-targeting intelligence must never be silently promoted to a formal ICP. The boundary between "Barry's working hypothesis about your targeting" and "your confirmed targeting profile" must be explicit and user-visible. Silent promotion would violate both v0.4 ICP Creation Semantics and AP-9 (The Silent Default).
+
+**v1.1-b clarification:** No provisional targeting object is required. Proto-targeting does not need persistence, a schema, or independent identity. D-2 (proto-targeting persistence question) is resolved: proto-targeting is conversational context only.
+
+### Interpretation 4: Confirmation-Before-Search Invariant (P-9)
+
+v0.4 §1 ICP Creation Semantics require an explicit creation or confirmation event. The live codebase enforces this: `search-companies.js` returns `400 ICP_REQUIRED` when no `icpId` is present, and every discovered company is persisted with ICP attribution via `buildApolloQuery`.
+
+**Assessment:** The confirmation-before-search sequence is not merely a semantic preference — it is an invariant required by both the contract and the live codebase. The sequence is:
+
+1. Proto-targeting (conversational context) — Barry builds a working hypothesis
+2. User confirmation — explicit event satisfying v0.4 ICP Creation Semantics
+3. ICP creation — `BarryOnboarding.handleConfirm()` or equivalent authorized boundary
+4. ICP-targeted search — `search-companies` with valid `icpId`
+
+Proto-targeting alone cannot produce persisted company discovery. No unattributed company-write path exists in the current codebase.
+
+**v0.4 compatibility:** This invariant strengthens v0.4's Attribution Invariant (Principle 5) by ensuring no company intelligence enters the system without ICP attribution. It does not conflict with any v0.4 provision.
 
 ---
 
 ## Decisions That Must Be Locked Before Phase 2 Implementation
 
-The following six decisions (D-1 through D-6) are implementation-blocking. Without them, the First Experience cannot be built because the implementation has no clear target for:
+The following five decisions (D-1, D-3 through D-6) are implementation-blocking. D-2 (proto-targeting persistence) was resolved by v1.1-b: proto-targeting is conversational context only, requiring no persistence or provisional object. Without the remaining five decisions, the First Experience cannot be built because the implementation has no clear target for:
 
 1. **Entry point** (D-1, D-5) — what the user sees when they arrive
-2. **Intelligence storage** (D-2, D-3) — where progressive and website-inferred intelligence lives
+2. **Intelligence storage** (D-3) — where website-inferred intelligence lives
 3. **ICP fallback behavior** (D-4) — what happens platform-wide when no ICP exists
 4. **Quality threshold** (D-6) — what constitutes sufficient first value for Prospecting
 
@@ -1029,4 +1086,4 @@ Owner business decisions (D-7 through D-12) inform product behavior but do not b
 
 *This document was produced by Team B. No code was written or changed during its production. This is a semantic design document only.*
 
-*Status: Returned for convergence — v1.1. No implementation is authorized by this document. Decisions D-1 through D-6 must be locked before Phase 2 implementation. Owner business decisions D-7 through D-12 are requested. v0.4 interpretation on intent durability (D-10) recommended for owner ruling.*
+*Status: Returned for convergence — v1.1-b. No implementation is authorized by this document. Decisions D-1, D-3 through D-6 must be locked before Phase 2 implementation (D-2 resolved by v1.1-b). Owner business decisions D-7 through D-12 are requested. v0.4 interpretation on intent durability (D-10) recommended for owner ruling.*

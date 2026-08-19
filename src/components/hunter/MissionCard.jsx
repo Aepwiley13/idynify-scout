@@ -231,7 +231,7 @@ export default function MissionCard({ contact, reconConfidencePct, onMissionComp
           missionId,
           stepIndex: nextIdx,
           previousOutcome: outcomeId,
-          icpId: activeIcpId,
+          ...(activeIcpId ? { icpId: activeIcpId } : { icpAttribution: 'unresolved' }),
         })
       });
 

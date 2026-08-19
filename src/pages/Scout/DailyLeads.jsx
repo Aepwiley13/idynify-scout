@@ -21,6 +21,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
+import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -1070,12 +1071,23 @@ function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, rec
     try {
       const user = getEffectiveUser();
       if (!user) { onSearchComplete(); return; }
+      // This refines an ICP the user already has. It never creates one, and it
+      // never searches without an identity to attribute the results to.
+      const resolution = await resolveActiveIcp(user.uid);
+      if (!isResolved(resolution)) {
+        console.warn(`[IcpReclarificationModal] refinement skipped — ICP unresolved (${resolution.reason})`);
+        onSearchComplete();
+        return;
+      }
+      // The modal was opened against the ICP the queue was showing. If the
+      // active ICP changed underneath it, write to the resolved one — never to
+      // a stale id the user is no longer looking at.
+      if (icpId && icpId !== resolution.icpId) {
+        console.warn(`[IcpReclarificationModal] active ICP changed ${icpId} → ${resolution.icpId}`);
+      }
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      const baseProfile = profileDoc.exists() ? profileDoc.data() : {};
       const mergedProfile = {
-        ...baseProfile,
+        ...resolution.profile,
         ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
         ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
         ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
@@ -1083,12 +1095,19 @@ function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, rec
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };
-      // Persist the refined ICP so it shows in ICP Settings and survives page refreshes
-      await setDoc(profileRef, mergedProfile);
+      // Authoritative first, then the projection carrying its identity. The
+      // refinement used to be written to the bridge only, so the next
+      // activation of any ICP silently reverted it.
+      await setDoc(doc(db, 'users', user.uid, 'icpProfiles', resolution.icpId), mergedProfile, { merge: true });
+      await setDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'), {
+        ...mergedProfile,
+        icpId: resolution.icpId,
+        icpIdSource: 'icp-chat-refinement',
+      });
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile, icpId, reconConfidence }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile, icpId: resolution.icpId, reconConfidence }),
       });
     } catch (err) {
       console.error('ICP search error:', err);
@@ -1253,6 +1272,7 @@ export default function DailyLeads({ onNavigate }) {
   // ── Multi-ICP support ────────────────────────────────────────────────────────
   const [icpList, setIcpList] = useState([]);
   const [activeICPId, setActiveICPId] = useState(null);
+  const [icpUnresolvedReason, setIcpUnresolvedReason] = useState(null);
   // Store the full company list (unfiltered by ICP) for re-scoring
   const allCompaniesRef = useRef([]);
 
@@ -1361,30 +1381,33 @@ export default function DailyLeads({ onNavigate }) {
       const dashSnap = await getDoc(doc(db, 'dashboards', user.uid));
       if (dashSnap.exists()) setReconConfidence(calculateReconConfidence(dashSnap.data()));
 
-      // Load all ICP profiles for tab switching
-      const icpProfilesSnap = await getDocs(collection(db, 'users', user.uid, 'icpProfiles'));
-      let icps = icpProfilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      // Resolve the active ICP through the canonical contract. The queue is an
+      // ICP-dependent surface, so it explains the absence rather than inventing
+      // an identity — but zero ICPs is a valid state, not a broken account.
+      const resolution = await resolveActiveIcp(user.uid);
+      const icps = resolution.candidates;
+      setIcpList(icps);
+      setIcpUnresolvedReason(isResolved(resolution) ? null : resolution.reason);
 
-      // Load ICP profile (for score breakdown + Barry panel)
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      if (!profileDoc.exists() && icps.length === 0) { setLoading(false); return; }
-
-      let activeProfile = profileDoc.exists() ? profileDoc.data() : null;
-
-      // Use the explicitly active ICP profile, falling back to the first one
-      if (icps.length > 0) {
-        setIcpList(icps);
-        const firstICP = icps.find(i => i.isActive && i.status === 'active') || icps[0];
-        setActiveICPId(firstICP.id);
-        activeProfile = firstICP;
+      let activeProfile = null;
+      if (isResolved(resolution)) {
+        setActiveICPId(resolution.icpId);
+        activeProfile = resolution.profile;
+      } else if (resolution.reason === 'none-active' && icps.length > 0) {
+        // Continuity only: shown so the queue keeps rendering. Not promoted,
+        // not persisted, and never used as the identity of a search.
+        setActiveICPId(null);
+        activeProfile = icps[0];
+      } else {
+        setActiveICPId(null);
       }
 
       if (activeProfile) {
         setIcpProfile(activeProfile);
         if (activeProfile.scoringWeights) setIcpWeights(activeProfile.scoringWeights);
       } else {
+        setIcpProfile(null);
+        setCompanies([]);
         setLoading(false);
         return;
       }
@@ -1395,7 +1418,7 @@ export default function DailyLeads({ onNavigate }) {
       const allPendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
       // Filter to companies for the active ICP. Companies with no icpId are legacy (show for all ICPs).
-      const activeId = icps.length > 0 ? (icps.find(i => i.isActive && i.status === 'active') || icps[0]).id : null;
+      const activeId = isResolved(resolution) ? resolution.icpId : null;
       const companiesData = activeId
         ? allPendingData.filter(c => !c.icpId || c.icpId === activeId)
         : allPendingData;
@@ -1466,17 +1489,16 @@ export default function DailyLeads({ onNavigate }) {
     try {
       const authToken = await user.getIdToken();
 
-      // Use the active ICP profile from state (multi-ICP aware), fall back to legacy profile
-      if (!icpProfile) {
-        const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-        const profileDoc = await getDoc(profileRef);
-        if (!profileDoc.exists()) {
-          setRefreshMessage('Set up your ICP first to find targets.');
-          setIsRefreshing(false);
-          return;
-        }
+      // An ICP-targeted refresh requires a resolved ICP identity. Without one it
+      // does not run — no candidate is silently searched against, and no
+      // 'default' is manufactured.
+      const resolution = await resolveActiveIcp(user.uid);
+      if (!isResolved(resolution)) {
+        setRefreshMessage(explainUnresolved(resolution));
+        setIsRefreshing(false);
+        return;
       }
-      const searchProfile = icpProfile;
+      const searchProfile = resolution.profile;
 
       // Timeout after 25s — Netlify functions have a 26s limit
       const controller = new AbortController();
@@ -1488,7 +1510,7 @@ export default function DailyLeads({ onNavigate }) {
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: activeICPId, reconConfidence }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: resolution.icpId, reconConfidence }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1781,27 +1803,29 @@ export default function DailyLeads({ onNavigate }) {
     const user = getEffectiveUser();
     if (!user) return;
     try {
+      // icpId is not optional here, and it comes from the canonical resolver
+      // rather than the bridge projection. search-companies now refuses a search
+      // with no identity, and the queue filters on `!c.icpId || c.icpId === activeId`,
+      // so an unattributed adaptive search would spend Apollo credits writing
+      // companies its own user could never see.
+      const resolution = await resolveActiveIcp(user.uid);
+      if (!isResolved(resolution)) {
+        console.warn(`[DailyLeads] adaptive search skipped — ICP unresolved (${resolution.reason})`);
+        return;
+      }
       const authToken = await user.getIdToken();
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      if (!profileDoc.exists()) return;
 
       // Extract industry signals from companies saved in this batch
       const savedIndustries = [...new Set(savedCompanies.map(c => c.industry).filter(Boolean))];
 
-      // icpId is not optional here. search-companies tags every company it
-      // writes with `icpId || DEFAULT_ICP_ID`, and the queue filters on
-      // `!c.icpId || c.icpId === activeId`. Omitting it meant this search spent
-      // Apollo credits and wrote companies that a user on any non-default ICP
-      // could never see.
       fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid,
           authToken,
-          companyProfile: profileDoc.data(),
-          icpId: activeICPId,
+          companyProfile: resolution.profile,
+          icpId: resolution.icpId,
           adaptiveSignals: { savedIndustries },
           reconConfidence,
         }),
@@ -2267,6 +2291,23 @@ export default function DailyLeads({ onNavigate }) {
                     onRefresh={handleManualRefresh}
                     isRefreshing={isRefreshing}
                   />
+                ) : icpUnresolvedReason ? (
+                  /* Discovery is ICP-dependent, so this surface — and only a
+                     surface like it — explains that it needs a target profile.
+                     The account is not broken and nothing else is withheld. */
+                  <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                    <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>
+                      {icpUnresolvedReason === 'none-active' ? 'CHOOSE A TARGET PROFILE' : 'NO TARGET PROFILE YET'}
+                    </div>
+                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16, maxWidth: 320, margin: '0 auto 16px' }}>
+                      {explainUnresolved({ reason: icpUnresolvedReason })}
+                    </p>
+                    <button onClick={() => onNavigate ? onNavigate('icpsettings') : navigate('/scout', { state: { activeTab: 'icp-settings' } })} style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
+                      <Settings size={14} />
+                      {icpUnresolvedReason === 'none-active' ? 'Choose Profile' : 'Set Up Targeting'}
+                    </button>
+                  </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
                     <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>

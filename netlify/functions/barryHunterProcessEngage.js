@@ -22,7 +22,6 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
@@ -241,7 +240,8 @@ export const handler = async (event) => {
     userId = body.userId;
     const authToken = body.authToken;
     const guardrailAction = body.guardrailAction || null;
-    const icpId = body.icpId || DEFAULT_ICP_ID;
+    // See barryGenerateSequenceStep: absent identity stays absent.
+    const icpId = body.icpId || null;
 
     if (!contactId || !userId || !authToken) {
       throw new Error('Missing required parameters: contactId, userId, authToken');
@@ -280,9 +280,11 @@ export const handler = async (event) => {
     try {
       const [dashboardDoc, icpDoc] = await Promise.all([
         db.collection('dashboards').doc(userId).get(),
-        db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get(),
+        icpId ? db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get() : null,
       ]);
-      const icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
+      // See barryGenerateSequenceStep: a missing icpId must not cost the caller
+      // its RECON context.
+      const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
         reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging) || '';
       }

@@ -5,6 +5,8 @@ import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/fires
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import ICPConfirmationCard from '../../components/onboarding/ICPConfirmationCard';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
+import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import './BarryOnboarding.css';
 
 const DEFAULT_WEIGHTS = {
@@ -331,10 +333,57 @@ export default function BarryOnboarding() {
       // Show confirmation screen before redirect
       setSavedICP(icpProfile);
 
-      // Save to companyProfile/current
+      // ── The authorized ICP creation/confirmation event ────────────────────
+      //
+      // Onboarding does not create an ICP because onboarding ran. It creates
+      // one because the user has just explicitly confirmed the targeting
+      // definition Barry proposed — this function IS that confirmation. Only
+      // the targeting fields above become ICP criteria; nothing else collected
+      // during onboarding is reinterpreted as ICP intelligence.
+      //
+      // The authoritative icpProfiles document is written first. The bridge is
+      // written afterward as a projection carrying that identity.
+      const resolution = await resolveActiveIcp(user.uid);
+
+      if (resolution.status === 'unresolved' && resolution.reason === 'read-failed') {
+        // A transient read failure must not cause a duplicate ICP. It is not
+        // evidence that the user has none.
+        throw new Error('Could not confirm your existing target profile. Please try again.');
+      }
+
+      let icpId;
+      if (isResolved(resolution)) {
+        // An ICP already exists and is active — write through to it rather
+        // than creating a second one.
+        icpId = resolution.icpId;
+        await setDoc(
+          doc(db, 'users', user.uid, 'icpProfiles', icpId),
+          { ...resolution.profile, ...icpProfile, isActive: true, status: 'active' },
+          { merge: true }
+        );
+      } else {
+        // 'no-profiles', or ICPs exist but none is active. Either way the user
+        // has explicitly confirmed this definition, so it becomes a new ICP and
+        // that confirmation activates it. No existing candidate is silently
+        // promoted on their behalf.
+        icpId = `icp_${Date.now()}`;
+        await setDoc(doc(db, 'users', user.uid, 'icpProfiles', icpId), {
+          ...icpProfile,
+          name: 'My ICP',
+          isActive: true,
+          status: 'active',
+          messaging: null,
+          messagingProgress: 0,
+          source: 'barry_onboarding_confirmed',
+          createdAt: new Date().toISOString(),
+        });
+        await setActiveIcpProfile(user.uid, icpId);
+      }
+
+      // Projection of the ICP just confirmed, carrying its identity.
       await setDoc(
         doc(db, 'users', user.uid, 'companyProfile', 'current'),
-        icpProfile
+        { ...icpProfile, icpId, icpIdSource: 'barry_onboarding_confirmed' }
       );
 
       // Update conversation as completed
@@ -348,6 +397,20 @@ export default function BarryOnboarding() {
         { merge: true }
       );
 
+      // A search may only be called ICP-targeted when at least one retrieval
+      // constraint derived from the ICP actually narrows the result set.
+      // targetTitles do not constrain a company search, and revenue ranges are
+      // not currently sent to Apollo — so a confirmed definition carrying only
+      // those would produce an unfiltered global query wearing an ICP label.
+      // We report that state rather than inventing criteria to fill it.
+      const hasRetrievalConstraint =
+        (icpProfile.industries?.length > 0) ||
+        (icpProfile.companyKeywords?.length > 0) ||
+        (icpProfile.companySizes?.length > 0) ||
+        (icpProfile.locations?.length > 0) ||
+        Boolean(icpProfile.lookalikeSeed?.name) ||
+        Boolean(icpProfile.foundedAgeRange);
+
       // Mark onboarding complete on the user doc and set Barry's initial
       // execution state so Mission Control can read where Barry is. The
       // search-companies function flips barryState to READY (or ERROR) once
@@ -358,24 +421,30 @@ export default function BarryOnboarding() {
           onboardingComplete: true,
           onboardingCompletedAt: serverTimestamp(),
           onboardingSource: 'barry_onboarding',
-          barryState: 'SEARCHING',
+          barryState: hasRetrievalConstraint ? 'SEARCHING' : 'NEEDS_TARGETING',
           companiesFoundCount: 0,
           hasSeenMCWelcome: false
         },
         { merge: true }
       );
 
-      // Trigger immediate lead search in the background
-      const authToken = await user.getIdToken();
-      fetch('/.netlify/functions/search-companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          companyProfile: icpProfile
-        })
-      }).catch(err => console.error('Background search failed:', err));
+      // Trigger immediate lead search in the background, carrying the identity
+      // of the ICP the user just confirmed.
+      if (hasRetrievalConstraint) {
+        const authToken = await user.getIdToken();
+        fetch('/.netlify/functions/search-companies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.uid,
+            authToken,
+            companyProfile: icpProfile,
+            icpId
+          })
+        }).catch(err => console.error('Background search failed:', err));
+      } else {
+        console.warn('[BarryOnboarding] confirmed ICP carries no retrieval constraint — search not started');
+      }
 
       // Build Barry's "work in progress" message
       const strategyContext = extractedICP.lookalikeSeed?.name

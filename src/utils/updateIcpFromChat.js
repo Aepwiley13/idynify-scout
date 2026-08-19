@@ -2,37 +2,59 @@
  * updateIcpFromChat.js — Write ICP changes from Barry dashboard chat to Firestore.
  *
  * Called by BarryChatPanel after the user confirms an ICP change (add or replace).
- * Merges or overwrites companyProfile/current based on the action.
+ *
+ * This function updates an ICP the user already has. It never creates one.
+ * It previously wrote companyProfile/current before it knew which ICP it was
+ * projecting, and fell back to setDoc on icpProfiles/default when no active
+ * profile resolved — an undeclared create that manufactured an ICP identity
+ * out of a failed lookup. Both are gone: the authoritative icpProfiles document
+ * is written first, the bridge is written after as a projection carrying its
+ * icpId, and an unresolved identity refuses the write instead of inventing one.
  */
 
-import { doc, setDoc, getDocs, collection, query, where, limit, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { DEFAULT_ICP_ID } from './reconSectionMap';
+import { resolveActiveIcp, isResolved } from './resolveActiveIcp';
 
 /**
- * Apply a confirmed ICP delta from Barry chat to companyProfile/current.
+ * Apply a confirmed ICP delta from Barry chat.
  *
  * @param {string} userId
  * @param {Object} icpDelta - New ICP fields extracted by Barry (icp_params shape)
  * @param {'add'|'replace'} action
- * @param {Object|null} existingProfile - Current companyProfile/current doc (for merge)
- * @returns {Promise<Object>} The new profile written to Firestore
+ * @param {Object|null} existingProfile - Current profile shown in the chat (for merge)
+ * @returns {Promise<Object>} On success the written profile, with `status:'resolved'`.
+ *   On failure `{ status:'unresolved', reason }` — the caller surfaces it. The
+ *   three reasons stay distinct: 'no-profiles' means the user has never created
+ *   an ICP (a valid state — this operation simply needs one), 'none-active'
+ *   means they must choose which ICP this change applies to, and 'read-failed'
+ *   means the lookup itself failed and is worth retrying.
  */
 export async function updateIcpFromChat(userId, icpDelta, action, existingProfile) {
-  const profileRef = doc(db, 'users', userId, 'companyProfile', 'current');
+  const resolution = await resolveActiveIcp(userId);
 
-  let newProfile;
+  if (!isResolved(resolution)) {
+    console.warn(`[updateIcpFromChat] refusing write — ICP unresolved (${resolution.reason})`);
+    return { status: 'unresolved', reason: resolution.reason };
+  }
 
+  const { icpId } = resolution;
+  const authoritative = resolution.profile || {};
+
+  let updatedIcpProfile;
   if (action === 'replace') {
-    newProfile = {
+    updatedIcpProfile = {
+      ...authoritative,
       ...icpDelta,
       managedByBarry: true,
-      lastModified: Timestamp.now()
+      updatedAt: new Date().toISOString(),
     };
   } else {
-    // Merge: combine arrays and deduplicate, preserve existing weights and strategy
-    const current = existingProfile || {};
-    newProfile = {
+    // Merge: combine arrays and deduplicate, preserve existing weights and strategy.
+    // The authoritative document is the merge base — the chat's view of the
+    // profile is a projection and may be stale.
+    const current = { ...(existingProfile || {}), ...authoritative };
+    updatedIcpProfile = {
       ...current,
       industries: dedupe([...(current.industries || []), ...(icpDelta.industries || [])]),
       companySizes: dedupe([...(current.companySizes || []), ...(icpDelta.companySizes || [])]),
@@ -40,49 +62,20 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
       targetTitles: dedupe([...(current.targetTitles || []), ...(icpDelta.targetTitles || [])]),
       companyKeywords: dedupe([...(current.companyKeywords || []), ...(icpDelta.companyKeywords || [])]),
       managedByBarry: true,
-      lastModified: Timestamp.now()
-    };
-  }
-
-  await setDoc(profileRef, newProfile);
-
-  // Sync Barry's write-back to the ACTIVE icpProfiles document and keep the
-  // bridge cache (companyProfile/current) in sync so all reads stay consistent.
-  try {
-    const icpSnap = await getDocs(
-      query(
-        collection(db, 'users', userId, 'icpProfiles'),
-        where('isActive', '==', true),
-        where('status', '==', 'active'),
-        limit(1)
-      )
-    );
-
-    // If no active profile found, fall back to the default profile doc
-    const targetRef = icpSnap.empty
-      ? doc(db, 'users', userId, 'icpProfiles', DEFAULT_ICP_ID)
-      : icpSnap.docs[0].ref;
-    const existing = icpSnap.empty ? {} : (icpSnap.docs[0].data() || {});
-
-    const updatedIcpProfile = {
-      ...existing,
-      industries: newProfile.industries ?? existing.industries,
-      companySizes: newProfile.companySizes ?? existing.companySizes,
-      locations: newProfile.locations ?? existing.locations,
-      targetTitles: newProfile.targetTitles ?? existing.targetTitles,
-      companyKeywords: newProfile.companyKeywords ?? existing.companyKeywords,
-      managedByBarry: true,
       updatedAt: new Date().toISOString(),
     };
-
-    await setDoc(targetRef, updatedIcpProfile);
-    await setDoc(profileRef, { ...updatedIcpProfile, lastModified: Timestamp.now() });
-    return { ...updatedIcpProfile, lastModified: Timestamp.now() };
-  } catch (syncErr) {
-    console.warn('[updateIcpFromChat] icpProfiles sync failed (non-fatal):', syncErr.message);
   }
 
-  return newProfile;
+  // Authoritative first, projection second. A projection must carry the
+  // identity of the ICP it represents.
+  await setDoc(doc(db, 'users', userId, 'icpProfiles', icpId), updatedIcpProfile);
+  await setDoc(doc(db, 'users', userId, 'companyProfile', 'current'), {
+    ...updatedIcpProfile,
+    icpId,
+    lastModified: Timestamp.now(),
+  });
+
+  return { ...updatedIcpProfile, icpId, status: 'resolved' };
 }
 
 function dedupe(arr) {

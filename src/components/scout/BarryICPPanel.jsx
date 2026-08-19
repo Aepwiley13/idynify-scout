@@ -9,6 +9,7 @@ import { ArrowRight, Loader } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 
 // ─── BarryAvatar ──────────────────────────────────────────────────────────────
 export function BarryAvatar({ size = 20, style = {} }) {
@@ -59,6 +60,7 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
   const [conversationHistory, setConversationHistory] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [unresolvedNotice, setUnresolvedNotice] = useState(null);
   const messagesEndRef = useRef(null);
 
   // On mount: load prior conversation from Firestore, then show instant greeting.
@@ -187,9 +189,21 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
     try {
       const user = getEffectiveUser();
       if (!user) { onSearchComplete(); return; }
+      // This panel refines an ICP the user already has. It never creates one.
+      // It previously merged Barry's extracted params into the bridge alone —
+      // icpProfiles never learned about the change, so the next activation
+      // silently reverted the user's refinement — and then searched with no
+      // icpId, which the server turned into a fabricated 'default'.
+      const resolution = await resolveActiveIcp(user.uid);
+      if (!isResolved(resolution)) {
+        console.warn(`[BarryICPPanel] refinement skipped — ICP unresolved (${resolution.reason})`);
+        setUnresolvedNotice(explainUnresolved(resolution));
+        setIsSearching(false);
+        return;
+      }
       const authToken = await user.getIdToken();
       const mergedProfile = {
-        ...icpProfile,
+        ...resolution.profile,
         ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
         ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
         ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
@@ -197,14 +211,25 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };
+      // Authoritative first, projection second.
+      await setDoc(
+        doc(db, 'users', user.uid, 'icpProfiles', resolution.icpId),
+        mergedProfile,
+        { merge: true }
+      );
       await setDoc(
         doc(db, 'users', user.uid, 'companyProfile', 'current'),
-        mergedProfile
+        { ...mergedProfile, icpId: resolution.icpId, icpIdSource: 'barry-icp-panel' }
       );
       await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: mergedProfile }),
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: mergedProfile,
+          icpId: resolution.icpId,
+        }),
       });
     } catch (err) {
       console.error('ICP search error:', err);
@@ -292,6 +317,16 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* An ICP-dependent action that could not resolve an ICP explains why —
+            it does not silently do nothing, and it does not invent an ICP. */}
+        {unresolvedNotice && (
+          <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: `${BRAND.pink}12`, border: `1px solid ${BRAND.pink}55`, color: T.text, fontSize: 13 }}>
+              {unresolvedNotice}
+            </div>
+          </div>
+        )}
 
         {/* Find Companies CTA */}
         {hasEnoughContext && (

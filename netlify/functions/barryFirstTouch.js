@@ -15,6 +15,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { db } from './firebase-admin.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { resolveActiveIcp, isResolved } from './utils/resolveActiveIcp.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 async function verifyAuthToken(authToken, userId) {
@@ -87,20 +88,28 @@ export const handler = async (event) => {
     const reads = [
       userRef.collection('contacts').doc(contactId).get(),
       db.collection('dashboards').doc(userId).get(),
-      userRef.collection('icpProfiles').where('isActive', '==', true).where('status', '==', 'active').limit(1).get(),
+      resolveActiveIcp(db, userId),
     ];
     if (serviceProfileId !== 'default') {
       reads.push(userRef.collection('serviceProfiles').doc(serviceProfileId).get());
     }
 
     const results = await Promise.all(reads);
-    const [contactDoc, dashboardDoc, icpSnap, serviceProfileDoc] = results;
+    const [contactDoc, dashboardDoc, icpResolution, serviceProfileDoc] = results;
 
     if (!contactDoc.exists) throw new Error('Contact not found');
 
     const contact = contactDoc.data();
     const dashboardData = dashboardDoc.exists ? dashboardDoc.data() : null;
-    const icpMessaging = icpSnap.empty ? null : (icpSnap.docs[0].data()?.messaging || null);
+    // First Touch is relationship-oriented: it does not require an ICP. When no
+    // ICP identity resolves it proceeds without ICP messaging, and says which of
+    // the three unresolved states it was rather than treating them alike.
+    const icpMessaging = isResolved(icpResolution)
+      ? (icpResolution.profile?.messaging || null)
+      : null;
+    if (!isResolved(icpResolution)) {
+      console.log(`[barryFirstTouch] no ICP messaging (${icpResolution.reason}) — continuing`);
+    }
     const serviceProfile = serviceProfileDoc?.exists ? serviceProfileDoc.data() : null;
 
     // Extract key RECON sections (1=Business Foundation, 2=Product, 5=Pain Points)

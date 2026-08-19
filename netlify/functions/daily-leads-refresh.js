@@ -43,6 +43,8 @@ const handler = async (event) => {
       refreshed: 0,
       emailed: 0,
       failed: 0,
+      skipped: 0,
+      skippedReasons: {},
       errors: []
     };
 
@@ -54,11 +56,25 @@ const handler = async (event) => {
         // Get user's auth token (use service account for scheduled jobs)
         const authToken = await getServiceAccountToken();
 
-        // Get user's ICP profile
-        const profile = user.profile;
+        // A background job has no greater authority to infer ICP identity than
+        // an interactive caller. If this user's ICP cannot be resolved, skip
+        // their ICP-targeted refresh, record exactly which of the three states
+        // it was, and keep processing everyone else. A user without an ICP is
+        // not a broken account, and a failed read is not the same as no ICP.
+        const resolution = await resolveActiveIcpViaRest(projectId, user.userId);
+        if (resolution.status !== 'resolved') {
+          results.skipped++;
+          results.skippedReasons[resolution.reason] =
+            (results.skippedReasons[resolution.reason] || 0) + 1;
+          console.log(`⏭️  User ${user.userId}: skipped ICP-targeted refresh (${resolution.reason})`);
+          continue;
+        }
+
+        // Use the authoritative ICP profile, not the bridge projection.
+        const profile = resolution.profile;
 
         // Call search-companies to top off their queue
-        const refreshResult = await refreshUserQueue(user.userId, authToken, profile);
+        const refreshResult = await refreshUserQueue(user.userId, authToken, profile, resolution.icpId);
 
         console.log(`✅ User ${user.userId}: ${refreshResult.companiesAdded} companies added (queue: ${refreshResult.currentQueueSize})`);
 
@@ -90,7 +106,7 @@ const handler = async (event) => {
 
     const duration = (Date.now() - startTime) / 1000;
 
-    console.log(`✅ Daily refresh complete: ${results.refreshed}/${results.processed} users refreshed, ${results.emailed} emails sent in ${duration}s`);
+    console.log(`✅ Daily refresh complete: ${results.refreshed}/${results.processed} users refreshed, ${results.skipped} skipped (${JSON.stringify(results.skippedReasons)}), ${results.emailed} emails sent in ${duration}s`);
 
     return {
       statusCode: 200,
@@ -112,6 +128,72 @@ const handler = async (event) => {
     };
   }
 };
+
+/**
+ * REST mirror of the canonical active-ICP resolution contract.
+ *
+ * This job reads Firestore over the REST API rather than the Admin SDK, so it
+ * cannot import the shared resolver directly — but it implements the identical
+ * contract, including the three distinct unresolved reasons. It never returns
+ * DEFAULT_ICP_ID and never reads companyProfile/current for identity.
+ */
+async function resolveActiveIcpViaRest(projectId, userId) {
+  const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+  let response;
+  try {
+    response = await fetch(`${firestoreUrl}/users/${userId}/icpProfiles`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (err) {
+    console.warn(`[resolveActiveIcpViaRest] read failed for ${userId}:`, err.message);
+    return { status: 'unresolved', reason: 'read-failed', icpId: null, profile: null };
+  }
+
+  if (!response.ok) {
+    // 404 means the subcollection has no documents — that is "no ICP created",
+    // a valid state. Any other status is a genuine read failure and must not be
+    // reported as though the user simply has no ICP.
+    if (response.status === 404) {
+      return { status: 'unresolved', reason: 'no-profiles', icpId: null, profile: null };
+    }
+    return { status: 'unresolved', reason: 'read-failed', icpId: null, profile: null };
+  }
+
+  const data = await response.json();
+  const documents = data.documents || [];
+  if (documents.length === 0) {
+    return { status: 'unresolved', reason: 'no-profiles', icpId: null, profile: null };
+  }
+
+  const active = documents.find(d =>
+    d.fields?.isActive?.booleanValue === true &&
+    d.fields?.status?.stringValue === 'active'
+  );
+
+  if (!active) {
+    return { status: 'unresolved', reason: 'none-active', icpId: null, profile: null };
+  }
+
+  const f = active.fields || {};
+  const strings = key => f[key]?.arrayValue?.values?.map(v => v.stringValue).filter(Boolean) || [];
+
+  return {
+    status: 'resolved',
+    icpId: active.name.split('/').pop(),
+    profile: {
+      industries: strings('industries'),
+      companySizes: strings('companySizes'),
+      revenueRanges: strings('revenueRanges'),
+      locations: strings('locations'),
+      targetTitles: strings('targetTitles'),
+      companyKeywords: strings('companyKeywords'),
+      isNationwide: f.isNationwide?.booleanValue || false,
+      skipRevenue: f.skipRevenue?.booleanValue || false
+    }
+  };
+}
 
 /**
  * Get all active users with ICP profiles
@@ -202,9 +284,11 @@ async function getServiceAccountToken() {
 /**
  * Refresh a user's company queue using the search-companies logic
  */
-async function refreshUserQueue(userId, authToken, companyProfile) {
+async function refreshUserQueue(userId, authToken, companyProfile, icpId) {
   try {
-    // Call the search-companies function
+    // Call the search-companies function, carrying the resolved ICP identity.
+    // search-companies now refuses a search without one rather than stamping
+    // discovered companies with a fabricated 'default'.
     const searchResponse = await fetch(`${process.env.URL}/.netlify/functions/search-companies`, {
       method: 'POST',
       headers: {
@@ -213,7 +297,8 @@ async function refreshUserQueue(userId, authToken, companyProfile) {
       body: JSON.stringify({
         userId,
         authToken,
-        companyProfile
+        companyProfile,
+        icpId
       })
     });
 

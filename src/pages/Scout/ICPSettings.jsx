@@ -13,6 +13,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 import BarryICPPanel from '../../components/scout/BarryICPPanel';
 import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export default function ICPSettings() {
   // Multi-ICP state
   const [icpList, setIcpList] = useState([]);
   const [selectedICPId, setSelectedICPId] = useState(null);
+  const [icpUnresolvedReason, setIcpUnresolvedReason] = useState(null);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [showMessagingFlow, setShowMessagingFlow] = useState(false);
@@ -61,37 +63,33 @@ export default function ICPSettings() {
       let icps = profilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 
+      // Opening this page must not create an ICP. It used to: an empty
+      // collection silently produced `icp_${Date.now()}` from whatever the
+      // bridge held — with no isActive and no status, so the canonical resolver
+      // could never see the profile it had just made. An ICP now originates
+      // only from an explicit creation or confirmation event. With zero ICPs
+      // this page renders its empty state, where the existing "+" create
+      // action is reachable.
+      setIcpList(icps);
+
       if (icps.length === 0) {
-        // Migrate from legacy companyProfile/current if it exists
-        const legacyDoc = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
-        const legacyData = legacyDoc.exists() ? legacyDoc.data() : null;
-        const newId = `icp_${Date.now()}`;
-        const newICP = {
-          name: 'My ICP',
-          industries: legacyData?.industries || [],
-          companySizes: legacyData?.companySizes || [],
-          revenueRanges: legacyData?.revenueRanges || [],
-          skipRevenue: legacyData?.skipRevenue || false,
-          locations: legacyData?.locations || [],
-          isNationwide: legacyData?.isNationwide || false,
-          targetTitles: legacyData?.targetTitles || [],
-          scoringWeights: legacyData?.scoringWeights || DEFAULT_WEIGHTS,
-          foundedAgeRange: legacyData?.foundedAgeRange || null,
-          managedByBarry: legacyData?.managedByBarry || false,
-          lookalikeSeed: legacyData?.lookalikeSeed || null,
-          notes: '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await setDoc(doc(db, 'users', user.uid, 'icpProfiles', newId), newICP);
-        icps = [{ id: newId, ...newICP }];
+        setSelectedICPId(null);
+        setProfile(null);
+        setLoading(false);
+        return;
       }
 
-      setIcpList(icps);
-      const active = icps.find(i => i.isActive && i.status === 'active') || icps[0];
-      setSelectedICPId(active.id);
-      setNameInput(active.name || 'My ICP');
-      applyICPToState(active);
+      // Resolve through the canonical contract. When ICPs exist but none is
+      // active, the first is shown for continuity only — it is not treated as
+      // active, not persisted, and not searched against.
+      const resolution = await resolveActiveIcp(user.uid);
+      const selected = isResolved(resolution)
+        ? icps.find(i => i.id === resolution.icpId) || icps[0]
+        : icps[0];
+      setIcpUnresolvedReason(isResolved(resolution) ? null : resolution.reason);
+      setSelectedICPId(selected.id);
+      setNameInput(selected.name || 'My ICP');
+      applyICPToState(selected);
       setLoading(false);
     } catch (error) {
       console.error('Failed to load ICP profiles:', error);
@@ -228,7 +226,7 @@ export default function ICPSettings() {
       if (isActiveProfile) {
         await setDoc(
           doc(db, 'users', user.uid, 'companyProfile', 'current'),
-          updatedProfile
+          { ...updatedProfile, icpId: selectedICPId, icpIdSource: 'icp-settings-save' }
         );
       }
 
@@ -432,12 +430,19 @@ export default function ICPSettings() {
     );
   }
 
+  // Zero ICPs is a valid state, not a broken account — most of IDYNIFY works
+  // without one. This is the surface whose purpose IS the ICP, so it is the
+  // surface that offers to create one. handleCreateICP already existed; it was
+  // simply unreachable, because the "+" control renders below this early return.
   if (!profile) {
     return (
       <div className="icp-empty">
         <Filter className="w-16 h-16 text-gray-400 mb-4" />
-        <h2>No ICP Profile Found</h2>
-        <p>Please complete the questionnaire first to set up your Ideal Customer Profile.</p>
+        <h2>No target profile yet</h2>
+        <p>A target profile tells Scout which companies to look for. You only need one when you want to discover new companies — the rest of IDYNIFY works without it.</p>
+        <button className="icp-empty-create-btn" onClick={handleCreateICP}>
+          Create a target profile
+        </button>
       </div>
     );
   }
@@ -452,6 +457,16 @@ export default function ICPSettings() {
 
   return (
     <div className="icp-settings">
+      {icpUnresolvedReason === 'none-active' && (
+        <div className="icp-selection-required">
+          None of your target profiles is active. Scout uses the active profile — pick one below to start discovering against it.
+        </div>
+      )}
+      {icpUnresolvedReason === 'read-failed' && (
+        <div className="icp-selection-required">
+          Couldn&apos;t confirm which target profile is active. Reload to try again.
+        </div>
+      )}
       {/* Multi-ICP Selector */}
       <div className="icp-profile-selector">
         <div className="icp-tabs-row">

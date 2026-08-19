@@ -1,7 +1,6 @@
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
-import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 
 // ---------------------------------------------------------------------------
 // Post-fetch age filter helpers
@@ -235,6 +234,23 @@ export const handler = async (event) => {
 
     if (!userId || !authToken || !companyProfile) {
       throw new Error('Missing required parameters');
+    }
+
+    // An ICP-targeted search must carry the identity of the ICP it is targeting.
+    // This used to accept a missing icpId and stamp every company it wrote with
+    // DEFAULT_ICP_ID — persisting a fabricated attribution that the queue filter
+    // then hid from any user whose real ICP was not 'default'. Missing identity
+    // is now an explicit outcome, never an invented one.
+    if (!icpId) {
+      console.warn('[search-companies] refusing search — no ICP identity supplied');
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          success: false,
+          error: 'ICP_REQUIRED',
+          message: 'An ICP-targeted search requires an explicit ICP identity.',
+        }),
+      };
     }
 
     console.log('🔍 Starting Apollo company search for user:', userId);
@@ -989,8 +1005,9 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         // User Actions
         status: 'pending', // pending | accepted | rejected
 
-        // ICP association — which ICP profile discovered this company
-        icpId: icpId || DEFAULT_ICP_ID,
+        // ICP association — which ICP profile discovered this company.
+        // Guaranteed present: the handler refuses a search with no identity.
+        icpId,
 
         // Barry intel — rule-based summary from available data
         barry_intel: buildBarryIntel({ ...company, industry }, companyProfile),
@@ -1021,7 +1038,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           found_at: { timestampValue: company.found_at },
           source: { stringValue: 'apollo_api' },
           barry_intel: { stringValue: String(company.barry_intel || '') },
-          icpId: { stringValue: String(company.icpId || DEFAULT_ICP_ID) }
+          icpId: { stringValue: String(company.icpId) }
         }
       };
 

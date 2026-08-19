@@ -4,6 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 
 export default function CompanyQuestionnaire() {
   const navigate = useNavigate();
@@ -171,7 +172,15 @@ export default function CompanyQuestionnaire() {
       console.log('👥 Company sizes selected:', formData.companySizes);
       console.log('📍 Locations selected:', formData.locations);
 
-      // Save company profile
+      // Save company profile.
+      //
+      // RECONCILIATION DEBT — deliberately unchanged in Tier 1. This writes the
+      // bridge as if it were durable ICP state, without reading or writing
+      // icpProfiles. It cannot be made to carry an icpId without deciding
+      // whether this questionnaire is an authorized ICP-creation event, and
+      // where un-attributed collected targeting intelligence lives. Both are
+      // deferred semantic decisions. What Tier 1 does fix is below: the search
+      // this triggers no longer claims an ICP identity it does not have.
       const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
       await setDoc(profileRef, {
         ...formData,
@@ -200,12 +209,23 @@ export default function CompanyQuestionnaire() {
       console.log('🔍 Triggering Apollo company search...');
       console.log('📤 Sending to backend:', JSON.stringify(formData, null, 2));
 
+      // An ICP-targeted search requires an explicit ICP identity. This path has
+      // no authorized way to create one, so when none resolves it does not
+      // search — it never lets the server manufacture a 'default' attribution
+      // and persist it onto every company it writes.
+      const resolution = await resolveActiveIcp(userId);
+      if (!isResolved(resolution)) {
+        console.warn(`[CompanyQuestionnaire] search skipped — ICP unresolved (${resolution.reason})`);
+        return;
+      }
+
       const authToken = await auth.currentUser.getIdToken();
 
       const payload = {
         userId,
         authToken,
-        companyProfile: formData
+        companyProfile: formData,
+        icpId: resolution.icpId
       };
 
       console.log('📦 Full payload to backend:', JSON.stringify(payload, null, 2));

@@ -4,7 +4,6 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
 
 /**
@@ -54,7 +53,11 @@ export const handler = async (event) => {
       previousOutcome,
       icpId: rawIcpId,
     } = JSON.parse(event.body);
-    const icpId = rawIcpId || DEFAULT_ICP_ID;
+    // No icpId means the caller could not resolve one. It stays absent: this
+    // used to become DEFAULT_ICP_ID, which sent the read below to
+    // icpProfiles/default — a document most users do not have — so Barry
+    // generated outreach with no ICP messaging and reported nothing.
+    const icpId = rawIcpId || null;
 
     if (!userId || !authToken || !contact || !missionFields || !stepPlan) {
       throw new Error('Missing required parameters');
@@ -127,9 +130,12 @@ export const handler = async (event) => {
     try {
       const [dashboardDoc, icpDoc] = await Promise.all([
         db.collection('dashboards').doc(userId).get(),
-        db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get(),
+        icpId ? db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get() : null,
       ]);
-      const icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
+      // No icpId means the caller could not resolve one. Message generation is
+      // relationship-oriented and proceeds without ICP messaging — RECON context
+      // must still load, so never let a missing identity throw this block away.
+      const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
         reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging);
         if (reconContext) {

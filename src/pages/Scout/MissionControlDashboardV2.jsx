@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
+import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { getFitTier } from '../../utils/companyDisplay';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
@@ -326,6 +327,9 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
   const isSearching = barryState === 'SEARCHING' || barryState === null;
   const isReady = barryState === 'READY';
   const isError = barryState === 'ERROR';
+  // The user confirmed a target profile, but it carries nothing that narrows an
+  // Apollo query — so no search was started. That is not a failed search.
+  const needsTargeting = barryState === 'NEEDS_TARGETING';
 
   useEffect(() => {
     if (!isSearching) return;
@@ -357,13 +361,25 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
         barryState: 'SEARCHING',
         companiesFoundCount: 0,
       }, { merge: true });
+      // An ICP-targeted retry needs an explicit ICP identity. Without one it
+      // does not run — it never falls back to a manufactured 'default'.
+      const resolution = await resolveActiveIcp(user.uid);
+      if (!isResolved(resolution)) {
+        console.warn(`[MissionControlV2] retry skipped — ICP unresolved (${resolution.reason})`);
+        setCtaDisabled(false);
+        setCtaError(explainUnresolved(resolution));
+        return;
+      }
       const authToken = await user.getIdToken();
-      const profileDoc = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
-      const companyProfile = profileDoc.exists() ? profileDoc.data() : {};
       fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile }),
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: resolution.profile,
+          icpId: resolution.icpId,
+        }),
       }).catch(() => {});
     } catch { /* best effort */ }
   };
@@ -377,6 +393,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
     {
       label: isSearching ? 'Finding and ranking companies...'
         : isReady ? 'Prospect list ready'
+        : needsTargeting ? 'Add an industry, location or company size to start finding companies'
         : 'Search failed',
       done: isReady,
       active: isSearching,
@@ -742,20 +759,20 @@ export default function MissionControlDashboardV2() {
       const userId = activeUserId || auth.currentUser?.uid;
       if (!userId) return;
 
-      // Load ICP profiles from icpProfiles subcollection (matches DailyLeads pattern)
-      const icpProfilesSnap = await getDocs(collection(db, 'users', userId, 'icpProfiles'));
-      let icps = icpProfilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-
-      // Fallback to legacy companyProfile/current
-      const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-      let activeProfile = profileDoc.exists() ? profileDoc.data() : null;
+      // Resolve the active ICP through the canonical contract. Zero ICPs is a
+      // valid state: the company list still renders, it is simply not scored
+      // against a targeting definition that does not exist.
+      const resolution = await resolveActiveIcp(userId);
+      let activeProfile = null;
       let activeICPId = null;
 
-      if (icps.length > 0) {
-        const firstICP = icps.find(i => i.isActive && i.status === 'active') || icps[0];
-        activeICPId = firstICP.id;
-        activeProfile = firstICP;
+      if (isResolved(resolution)) {
+        activeICPId = resolution.icpId;
+        activeProfile = resolution.profile;
+      } else if (resolution.reason === 'none-active' && resolution.candidates.length > 0) {
+        // Continuity only — shown so the surface keeps working, never treated
+        // as the active ICP, never persisted, never searched against.
+        activeProfile = resolution.candidates[0];
       }
 
       // Load companies (accepted + pending)

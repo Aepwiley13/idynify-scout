@@ -1005,6 +1005,39 @@
   color: var(--text-secondary);
   font-size: 1rem;
   margin: 0;
+  max-width: 46ch;
+}
+
+.icp-empty-create-btn {
+  margin-top: 1.5rem;
+  padding: 10px 22px;
+  border-radius: 20px;
+  border: none;
+  background: #e91e8c;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.icp-empty-create-btn:hover {
+  opacity: 0.88;
+}
+
+/* Shown when ICPs exist but none is active — the user must choose. No
+   candidate is silently promoted on their behalf. */
+.icp-selection-required {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 10px 14px;
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(233, 30, 140, 0.35);
+  background: rgba(233, 30, 140, 0.06);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 /* ========================================

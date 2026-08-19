@@ -1481,6 +1481,38 @@ export default function DailyLeads({ onNavigate }) {
     }
   };
 
+  /**
+   * Which ICP a search launched from this screen belongs to.
+   *
+   * The tab strip lets a user with several ICPs look at any one of them. A
+   * search fired while ICP B is on screen belongs to B — writing it against
+   * whichever ICP happens to be globally active would tag the results for A,
+   * and the queue filter (`!c.icpId || c.icpId === activeId`) would then hide
+   * them from the tab that asked for them.
+   *
+   * Order, with no implicit step:
+   *   1. the ICP the user explicitly selected, when it is a real profile in the
+   *      loaded list — an explicit selection, not a fallback;
+   *   2. otherwise the canonical active-ICP resolver;
+   *   3. otherwise nothing. Never candidates[0], never icps[0], never a default.
+   *
+   * Selecting a tab does not change which ICP is active — that is a separate,
+   * deliberate action in ICP Settings. This only decides where a search lands.
+   */
+  const resolveSearchIcp = useCallback(async (user) => {
+    const selected = activeICPId ? icpList.find(i => i.id === activeICPId) : null;
+    if (selected) {
+      return { icpId: selected.id, profile: selected, source: 'explicit-tab' };
+    }
+
+    const resolution = await resolveActiveIcp(user.uid);
+    if (isResolved(resolution)) {
+      return { icpId: resolution.icpId, profile: resolution.profile, source: 'active-flag' };
+    }
+
+    return { icpId: null, profile: null, reason: resolution.reason };
+  }, [activeICPId, icpList]);
+
   const handleManualRefresh = async () => {
     const user = getEffectiveUser();
     if (!user || isRefreshing) return;
@@ -1489,16 +1521,16 @@ export default function DailyLeads({ onNavigate }) {
     try {
       const authToken = await user.getIdToken();
 
-      // An ICP-targeted refresh requires a resolved ICP identity. Without one it
+      // An ICP-targeted refresh requires an explicit ICP identity. Without one it
       // does not run — no candidate is silently searched against, and no
       // 'default' is manufactured.
-      const resolution = await resolveActiveIcp(user.uid);
-      if (!isResolved(resolution)) {
-        setRefreshMessage(explainUnresolved(resolution));
+      const searchIcp = await resolveSearchIcp(user);
+      if (!searchIcp.icpId) {
+        setRefreshMessage(explainUnresolved({ reason: searchIcp.reason }));
         setIsRefreshing(false);
         return;
       }
-      const searchProfile = resolution.profile;
+      const searchProfile = searchIcp.profile;
 
       // Timeout after 25s — Netlify functions have a 26s limit
       const controller = new AbortController();
@@ -1510,7 +1542,7 @@ export default function DailyLeads({ onNavigate }) {
       const response = await fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: resolution.icpId, reconConfidence }),
+        body: JSON.stringify({ userId: user.uid, authToken, companyProfile: searchProfile, icpId: searchIcp.icpId, reconConfidence }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -1808,9 +1840,9 @@ export default function DailyLeads({ onNavigate }) {
       // with no identity, and the queue filters on `!c.icpId || c.icpId === activeId`,
       // so an unattributed adaptive search would spend Apollo credits writing
       // companies its own user could never see.
-      const resolution = await resolveActiveIcp(user.uid);
-      if (!isResolved(resolution)) {
-        console.warn(`[DailyLeads] adaptive search skipped — ICP unresolved (${resolution.reason})`);
+      const searchIcp = await resolveSearchIcp(user);
+      if (!searchIcp.icpId) {
+        console.warn(`[DailyLeads] adaptive search skipped — ICP unresolved (${searchIcp.reason})`);
         return;
       }
       const authToken = await user.getIdToken();
@@ -1824,8 +1856,8 @@ export default function DailyLeads({ onNavigate }) {
         body: JSON.stringify({
           userId: user.uid,
           authToken,
-          companyProfile: resolution.profile,
-          icpId: resolution.icpId,
+          companyProfile: searchIcp.profile,
+          icpId: searchIcp.icpId,
           adaptiveSignals: { savedIndustries },
           reconConfidence,
         }),

@@ -442,6 +442,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
           {isSearching && 'Barry is connecting the dots'}
           {isReady && 'Barry found your first matches'}
           {isError && 'Barry ran into a problem'}
+          {needsTargeting && 'Barry has your ICP — it needs one more detail to search'}
         </h1>
 
         {/* Progress List */}
@@ -579,6 +580,49 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
                 }}
               >
                 Try Again
+              </button>
+              <button
+                onClick={() => navigate('/onboarding/barry')}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  color: T.text, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Review ICP with Barry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* NEEDS_TARGETING — an ICP exists and nothing failed. Scout simply has no
+            constraint it can send to Apollo yet, so no search was started. This
+            is deliberately not the ERROR panel: no red, no "try again", and the
+            next step is the existing targeting path, not a retry. */}
+        {needsTargeting && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 14, padding: '28px 0',
+          }}>
+            <Target size={32} color={T.accent} />
+            <p style={{ fontSize: 14, color: T.text, textAlign: 'center', margin: 0, maxWidth: 420, lineHeight: 1.5 }}>
+              Your ICP is saved. Scout needs at least one thing it can search on —
+              an industry, a location, or a company size — before it can go and find companies.
+            </p>
+            <p style={{ fontSize: 12.5, color: T.textMuted, textAlign: 'center', margin: 0, maxWidth: 420 }}>
+              Job titles help Barry pick the right people once companies are found, but they
+              can&apos;t narrow the search itself.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.accent, color: '#fff', border: 'none',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Add Targeting Detail
               </button>
               <button
                 onClick={() => navigate('/onboarding/barry')}

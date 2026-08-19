@@ -529,7 +529,11 @@ ${buildNavigationContextBlock(navigationContext)}
 ${icpBlock}
 Reference this when discussing prospecting or targeting. Use the formal filter fields when saved; use RECON intelligence as the targeting baseline when formal fields are absent but RECON is complete.
 
-━━━ SCOUT SWIPE INTELLIGENCE (user-rated company signals) ━━━
+━━━ SCOUT SWIPE INTELLIGENCE — USER JUDGMENT, NOT COMPUTED MATCH ━━━
+These 1-10 ratings are the USER's own judgment of companies they reviewed. They are
+a different intelligence type from Match, the 0-100 score IDYNIFY computes for a
+company against a specific ICP. Never compare the two scales, never average them
+together, and never describe a 1-10 user rating as a fit or match score.
 ${swipeFeedback
   ? `${swipeFeedback.avg != null ? `Based on ${swipeFeedback.total} rated companies — avg score: ${swipeFeedback.avg}/10.` : ''}
 Top-rated (8+): ${swipeFeedback.top.length > 0 ? swipeFeedback.top.join('; ') : 'none yet'}

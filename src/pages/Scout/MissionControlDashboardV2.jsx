@@ -67,16 +67,21 @@ function FitBadge({ score }) {
   // Threshold/color logic lives in the shared getFitTier util so the desktop
   // table and the mobile card can never diverge. Output is byte-identical to
   // the previous inline logic (green ≥75, amber ≥50, grey below).
-  const { color } = getFitTier(score);
+  // null = no ICP resolved, so there is no Company × ICP judgment to show. It
+  // is not a low score, and getFitTier would round it to a grey "Low Fit".
+  const unattributed = score === null || score === undefined;
+  const { color } = unattributed ? { color: '#888' } : getFitTier(score);
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      padding: '4px 12px', borderRadius: 20, minWidth: 42,
-      background: `${color}18`, border: `1px solid ${color}40`,
-      fontSize: 13, fontWeight: 700, color,
-      fontVariantNumeric: 'tabular-nums',
-    }}>
-      {Math.round(score)}
+    <span
+      title={unattributed ? 'No active ICP — Match not scored' : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        padding: '4px 12px', borderRadius: 20, minWidth: 42,
+        background: `${color}18`, border: `1px solid ${color}40`,
+        fontSize: unattributed ? 11 : 13, fontWeight: 700, color,
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+      {unattributed ? '—' : Math.round(score)}
     </span>
   );
 }
@@ -92,7 +97,8 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
   const size = company.employee_count || company.employeeCount || '';
   const location = company.location || company.city || '';
   const website = company.website || company.url || '';
-  const score = company.fit_score || 0;
+  // null = no ICP resolved, so no current Match. Never rendered as a zero.
+  const score = company.fit_score ?? null;
   const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
   const matchReason = company.matchReason || company.match_reason || '';
   const contact = company.recommendedContact || company.recommended_contact || null;
@@ -684,10 +690,10 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
 function FirstRunCompanyCard({ company, T }) {
   const name = company.name || company.company_name || 'Unknown';
   const industry = company.industry || '';
-  const score = Math.round(company.fit_score || 0);
+  const score = company.fit_score == null ? null : Math.round(company.fit_score);
   const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
-  const topReason = reasons[0] || 'Matches your ICP profile';
-  const color = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
+  const topReason = reasons[0] || (score === null ? 'No active ICP to match against' : 'Matches your ICP profile');
+  const color = score === null ? '#888' : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
 
   return (
     <div style={{
@@ -713,9 +719,9 @@ function FirstRunCompanyCard({ company, T }) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         padding: '4px 10px', borderRadius: 16, minWidth: 36,
         background: `${color}18`, border: `1px solid ${color}40`,
-        fontSize: 12, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums',
+        fontSize: score === null ? 10 : 12, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums',
       }}>
-        {score}
+        {score === null ? '—' : score}
       </span>
     </div>
   );
@@ -831,16 +837,19 @@ export default function MissionControlDashboardV2() {
 
       // Score and sort. Reasons come from the SAME shared scorer that produces
       // the score, so the "why it's a match" text is specific per company.
+      // With an ICP in hand, Match is derived against it. Without one there is
+      // no Company × ICP judgment to make: the stored fit_score carries no
+      // reliable ICP attribution, so falling back to it would present some other
+      // ICP's Match as this one's. null is the explicit unattributed state.
       const scored = filtered.map(c => ({
         ...c,
         fit_score: activeProfile
           ? calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS)
-          : (c.fit_score || c.icpScore || 0),
-        fit_reasons: activeProfile
-          ? generateMatchReasons(c, activeProfile)
-          : (c.fit_reasons || c.matchReasons || c.match_reasons || []),
+          : null,
+        fit_reasons: activeProfile ? generateMatchReasons(c, activeProfile) : [],
+        match_attributed: Boolean(activeProfile),
       }));
-      scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
+      scored.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
       // Try loading recommended contacts from contacts subcollection
       for (const company of scored.slice(0, 20)) {
@@ -876,9 +885,12 @@ export default function MissionControlDashboardV2() {
 
   const filtered = companies.filter(c => {
     if (industryFilter && c.industry !== industryFilter) return false;
-    if (scoreFilter === '90+' && (c.fit_score || 0) < 90) return false;
-    if (scoreFilter === '70-89' && ((c.fit_score || 0) < 70 || (c.fit_score || 0) >= 90)) return false;
-    if (scoreFilter === '<70' && (c.fit_score || 0) >= 70) return false;
+    // A company with no attributed Match belongs in no Match band — it is not a
+    // zero, and putting it in "<70" would be a judgment we cannot support.
+    if (scoreFilter !== 'all' && c.fit_score == null) return false;
+    if (scoreFilter === '90+' && c.fit_score < 90) return false;
+    if (scoreFilter === '70-89' && (c.fit_score < 70 || c.fit_score >= 90)) return false;
+    if (scoreFilter === '<70' && c.fit_score >= 70) return false;
     return true;
   });
 
@@ -887,7 +899,7 @@ export default function MissionControlDashboardV2() {
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
   const totalMatches = companies.length;
-  const highFit = companies.filter(c => (c.fit_score || 0) >= 75).length;
+  const highFit = companies.filter(c => c.fit_score != null && c.fit_score >= 75).length;
   const repliedThisWeek = cadenceReplies;
 
   // Report KPI readiness up to the shell so the globally-mounted Barry panel can
@@ -1105,7 +1117,7 @@ export default function MissionControlDashboardV2() {
 
                     {/* Fit Score */}
                     <div style={{ textAlign: 'center' }}>
-                      <FitBadge score={Math.round(company.fit_score || 0)} />
+                      <FitBadge score={company.fit_score == null ? null : Math.round(company.fit_score)} />
                     </div>
 
                     {/* Recommended Contact */}

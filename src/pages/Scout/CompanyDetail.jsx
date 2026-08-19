@@ -11,6 +11,8 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { openContact, ENTRY_POINTS } from '../../utils/navigation';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
+import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 
 /**
  * @param {object}   props
@@ -35,6 +37,9 @@ export default function CompanyDetail({
   const navigate = useNavigate();
 
   const [company, setCompany] = useState(null);
+  // The ICP this page scores Match against. Null until resolved, and null for
+  // good when no ICP is active — Match is then explicitly unattributed.
+  const [matchIcp, setMatchIcp] = useState(null);
   const [selectedTitles, setSelectedTitles] = useState([]);
   const [customTitleInput, setCustomTitleInput] = useState('');
   const [contacts, setContacts] = useState([]);
@@ -96,6 +101,12 @@ export default function CompanyDetail({
       }
 
       const userId = user.uid;
+
+      // Resolve the ICP this page will score Match against. Unresolved leaves
+      // matchIcp null, which renders an explicit unattributed state rather than
+      // the stored fit_score of unknown provenance.
+      const icpResolution = await resolveActiveIcp(userId);
+      setMatchIcp(isResolved(icpResolution) ? icpResolution.profile : null);
 
       // Load company document
       const companyDoc = await getDoc(doc(db, 'users', userId, 'companies', companyId));
@@ -962,7 +973,13 @@ export default function CompanyDetail({
   // Match intelligence carried by discovery records. Read here rather than in
   // the preview banner's own component because the field names differ by
   // source — the inline Mission Control panel resolves the same four aliases.
-  const fitScore = Math.round(company.fit_score || 0);
+  // Match is Company × ICP, so it is derived here against the ICP actually in
+  // use rather than read from the stored fit_score, which carries no reliable
+  // ICP attribution. `null` is an explicit unattributed state — no ICP resolved,
+  // therefore no current Match — and is never rendered as a zero.
+  const fitScore = matchIcp
+    ? Math.round(calculateICPScore(company, matchIcp, matchIcp.scoringWeights || DEFAULT_WEIGHTS))
+    : null;
   const matchReasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
   const matchReason = company.matchReason || company.match_reason || '';
 
@@ -985,7 +1002,8 @@ export default function CompanyDetail({
               {matchReason
                 || (matchReasons.length > 0 ? matchReasons.slice(0, 2).join(' · ') : null)
                 || 'Looking at this company does not add it. Approve to save it and its contacts.'}
-              {fitScore > 0 && <> {' · '}<strong>{fitScore}% fit</strong></>}
+              {fitScore !== null && fitScore > 0 && <> {' · '}<strong>{fitScore}% fit</strong></>}
+              {fitScore === null && <> {' · '}<em>no active ICP to score fit against</em></>}
             </span>
           </div>
           <button

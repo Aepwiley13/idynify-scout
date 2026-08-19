@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { calculateICPScore, generateMatchReason, generateMatchReasons } from '../../utils/icpScoring';
+
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate } from 'react-router-dom';
@@ -234,10 +234,10 @@ export default function ICPSettings() {
       setIcpList(prev => prev.map(i => i.id === selectedICPId ? { ...i, ...updatedProfile } : i));
       setProfile(updatedProfile);
 
-      // Recalculate all company scores with new weights
-      if (profile.scoringWeights) {
-        await recalculateAllScores(user.uid, updatedProfile, updatedProfile.scoringWeights);
-      }
+      // Match is no longer recomputed and persisted here. See the note where
+      // recalculateAllScores used to live: every live surface derives Match on
+      // demand against the ICP it is actually showing, so saving one ICP can no
+      // longer overwrite another ICP's stored scores.
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -249,41 +249,28 @@ export default function ICPSettings() {
     }
   }
 
-  async function recalculateAllScores(userId, icpProfile, weights) {
-    try {
-      console.log('🔄 Recalculating scores for all companies...');
-
-      // Get all companies
-      const companiesSnapshot = await getDocs(
-        collection(db, 'users', userId, 'companies')
-      );
-
-      const updates = [];
-
-      for (const companyDoc of companiesSnapshot.docs) {
-        const company = companyDoc.data();
-        const newScore = calculateICPScore(company, icpProfile, weights);
-        const fitReasons = generateMatchReasons(company, icpProfile);
-
-        // Update company with new fit_score + specific per-company match reasons
-        // (array for the Mission Control table, sentence for legacy string reads)
-        updates.push(
-          updateDoc(doc(db, 'users', userId, 'companies', companyDoc.id), {
-            fit_score: newScore,
-            fit_reasons: fitReasons,
-            fit_reason: generateMatchReason(company, icpProfile),
-            lastScoreUpdate: new Date().toISOString()
-          })
-        );
-      }
-
-      await Promise.all(updates);
-      console.log(`✅ Updated ${updates.length} company scores`);
-    } catch (error) {
-      console.error('❌ Failed to recalculate scores:', error);
-      // Don't throw - just log the error
-    }
-  }
+  /*
+   * recalculateAllScores was removed here.
+   *
+   * It iterated EVERY company in the user's collection and overwrote
+   * `fit_score`, `fit_reasons` and `fit_reason` using whichever ICP had just
+   * been saved — without checking which ICP each company was discovered for.
+   * Saving ICP B rewrote the stored Match of every company found under ICP A,
+   * and left `icpId` untouched, so the row then claimed A's identity while
+   * carrying B's score. That is cross-ICP contamination at the source.
+   *
+   * Match's subject is Company × ICP; it is not a property a company carries on
+   * its own. Persisting one number per company cannot express that, and building
+   * something that could is a Company × ICP persistence schema — Category 2, not
+   * authorized here. So the unsafe persistence is retired rather than patched:
+   * every live surface now derives Match on demand against the ICP it is
+   * displaying, which is both correct and free of stored contamination.
+   *
+   * Category 2 debt this leaves behind is recorded in the Tier 2 report:
+   * existing `fit_score` values written by this function remain in Firestore
+   * with no reliable ICP attribution. Nothing reads them as authoritative any
+   * more, and no migration is performed here.
+   */
 
   async function handleRefreshResults() {
     try {

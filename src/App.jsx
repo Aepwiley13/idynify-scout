@@ -63,7 +63,6 @@ import CrispChat from './components/CrispChat';
 import UpdateBanner from './components/UpdateBanner';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import ProtectedSuperAdminRoute from './components/ProtectedSuperAdminRoute';
-import ImprovedScoutQuestionnaire from './components/ImprovedScoutQuestionnaire';
 import ICPBuilder from './components/ICPBuilder';
 import ICPBriefView from './components/ICPBriefView';
 import CompanyList from './components/CompanyList';

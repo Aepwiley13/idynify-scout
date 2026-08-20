@@ -29,13 +29,23 @@ export const INDUSTRIES = [
   'Other'
 ];
 
-export const COMPANY_SIZES = [
-  '1-10',
-  '11-50',
-  '51-200',
-  '201-1000',
-  '1000+'
-];
+/**
+ * DATA-1 — one targeting-size vocabulary for new writes.
+ *
+ * This used to be its own coarse set — '11-50', '51-200', '201-1000', '1000+' —
+ * none of which Apollo accepts as an employee range. The conversational path
+ * validated against the canonical eleven buckets and would have rejected every
+ * one of them, so the same user could produce a targeting value in the editor
+ * that Barry would have refused in conversation.
+ *
+ * It now re-exports the canonical vocabulary. Newly created or edited targeting
+ * definitions therefore speak the same language as D7, T-1 and the Apollo query.
+ *
+ * Values already stored under the coarse set are NOT migrated and NOT
+ * reinterpreted on read — see DATA-1 in the debt register. Nothing in this
+ * repository converts them, and this change does not begin to.
+ */
+export { COMPANY_SIZE_OPTIONS as COMPANY_SIZES } from './targetingCanon.js';
 
 export const TARGET_TITLES = [
   'CEO',

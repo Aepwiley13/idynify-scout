@@ -68,7 +68,6 @@ describe('Match — cross-ICP persistence is gone', () => {
       '../pages/Scout/DailyLeads.jsx',
       '../pages/Scout/MissionControlDashboardV2.jsx',
       '../pages/Scout/SavedCompanies.jsx',
-      '../pages/Onboarding/OnboardingFlow.jsx',
     ]) {
       const src = code(read(rel));
       // In-memory derivation (`fit_score:` inside a .map) is fine; a Firestore
@@ -91,7 +90,6 @@ describe('Match — every consumer derives against a known ICP or shows nothing'
   it.each([
     ['../pages/Scout/SavedCompanies.jsx', 'Saved Companies'],
     ['../pages/Scout/CompanyDetail.jsx', 'Company Detail'],
-    ['../pages/Onboarding/OnboardingFlow.jsx', 'Onboarding'],
     ['../pages/Scout/MissionControlDashboardV2.jsx', 'Mission Control V2'],
   ])('%s resolves an ICP before showing Match', (rel, name) => {
     const src = code(read(rel));
@@ -105,8 +103,6 @@ describe('Match — every consumer derives against a known ICP or shows nothing'
     // Each surface expresses the same thing: an ICP produces a score, its
     // absence produces null. The shape differs (ternary vs branch) by file.
     expect(code(read('../pages/Scout/SavedCompanies.jsx'))).toMatch(/fit_score: null/);
-    expect(code(read('../pages/Onboarding/OnboardingFlow.jsx')))
-      .toMatch(/fit_score: matchIcp[\s\S]{0,140}: null/);
     expect(code(read('../pages/Scout/MissionControlDashboardV2.jsx')))
       .toMatch(/fit_score: activeProfile[\s\S]{0,160}: null/);
     expect(code(read('../pages/Scout/CompanyDetail.jsx')))
@@ -117,7 +113,6 @@ describe('Match — every consumer derives against a known ICP or shows nothing'
     for (const rel of [
       '../pages/Scout/SavedCompanies.jsx',
       '../pages/Scout/MissionControlDashboardV2.jsx',
-      '../pages/Onboarding/OnboardingFlow.jsx',
     ]) {
       expect(code(read(rel)), `${rel} sorts nulls as zero`).toMatch(/fit_score \?\? -1/);
     }
@@ -131,7 +126,6 @@ describe('Match — every consumer derives against a known ICP or shows nothing'
   it('badges render an explicit marker, not a rounded zero', () => {
     expect(read('../pages/Scout/MissionControlDashboardV2.jsx')).toMatch(/unattributed \? '—'/);
     expect(read('../components/mission-control/MobileCompanyCard.jsx')).toMatch(/No active ICP/);
-    expect(read('../pages/Onboarding/OnboardingFlow.jsx')).toMatch(/unattributed \? 'no ICP'/);
     expect(read('../pages/Scout/SavedCompanies.jsx')).toMatch(/No active ICP/);
   });
 });
